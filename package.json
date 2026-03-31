@@ -1,0 +1,79 @@
+{
+  "name": "mirror-code",
+  "displayName": "Mirror Code",
+  "description": "Premium Agentic Coding Assistant",
+  "version": "0.0.1",
+  "publisher": "mirror-code",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Education"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mirror-code-sidebar",
+          "title": "Mirror Code",
+          "icon": "resources/mirror.svg"
+        }
+      ]
+    },
+    "views": {
+      "mirror-code-sidebar": [
+        {
+          "type": "webview",
+          "id": "mirror-code.sidebar",
+          "name": "Chat",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "mirror-code.openChat",
+        "title": "Open Mirror Code Chat"
+      }
+    ],
+    "configuration": {
+      "title": "Mirror Code",
+      "properties": {
+        "mirror-code.ollamaUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "The URL of the Ollama server."
+        },
+        "mirror-code.ollamaModel": {
+          "type": "string",
+          "default": "codellama",
+          "description": "The model to use with Ollama."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "build:webview": "cd webview-ui && npm run build",
+    "build": "npm run build:extension && npm run build:webview",
+    "dev:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
+    "dev:webview": "cd webview-ui && npm run dev",
+    "install:all": "npm install && cd webview-ui && npm install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.21.3",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "axios": "^1.14.1"
+  }
+}

@@ -1,0 +1,77 @@
+Here are the developer execution notes to build this offline-first, context-optimized extension. This breaks down the architecture, library choices, and implementation steps required to get the core engine running.
+
+Architecture Overview
+The system is split into two distinct processes to prevent the VS Code extension host from hanging during heavy AST parsing or local inference:
+
+The Client (VS Code Extension): Written in TypeScript. Handles the UI, captures editor state, and queries the VS Code LSP.
+
+The Local Server (The "Brain"): A local Python or Node.js server that manages the vector database, parses the AST, and orchestrates the LLM tool-calling loop.
+
+Phase 1: Setting Up the Retrieval Engine (Client & Server)
+1. AST Parsing Strategy
+
+Tool: Use Tree-sitter. It is universally supported, lightning-fast, and handles broken code well.
+
+Implementation: In your local server, create a watcher that triggers on file saves. Pass the file through Tree-sitter to extract class names, function signatures, and docstrings.
+
+Data Structure: Map the AST to a JSON structure: { type: "function", name: "auth_user", dependencies: ["verify_token", "db_connect"], filepath: "/src/auth.ts" }.
+
+2. Local Vector Store
+
+Tool: Use LanceDB or ChromaDB. LanceDB is highly recommended here as it runs entirely in-process without needing a separate Docker container, keeping the installation frictionless.
+
+Implementation: Embed the extracted AST nodes (not the full implementation blocks, just the signatures and docstrings) and store them.
+
+3. VS Code LSP Integration
+
+Implementation: In the extension (extension.ts), expose a local API endpoint that the Local Server can hit. When the LLM decides it needs to see what verify_token does, the server asks the extension to execute the vscode.commands.executeCommand('vscode.executeDefinitionProvider', ...) command and return the raw text of just that specific definition block.
+
+Phase 2: Building the System 2 Tool-Calling Loop
+This is the core of the extension. Draw on the principles of System 2 self-correction—the orchestrator must be capable of pausing, evaluating the available data, and autonomously fetching missing context before generating code.
+
+1. The Tool Schema
+Define strict JSON schemas for your tools. The router model must be constrained to outputting valid function calls.
+
+read_skeleton(path)
+
+get_definition(symbol_name)
+
+search_vector_db(query)
+
+2. The Execution Loop
+
+Step A: User asks: "Update the JWT validation logic."
+
+Step B: The Router model is prompted with the user query and the available tools.
+
+Step C: The Router outputs a call to search_vector_db("JWT validation").
+
+Step D: The server executes the search, returning the file paths and function signatures.
+
+Step E: The Router evaluates the results. It outputs a call to get_definition("verify_token").
+
+Step F: Once the Router determines it has enough context to solve the problem without hallucinating, it passes the compiled, hyper-specific context payload to the Generator model.
+
+Phase 3: Hardware-Aware Memory Routing
+The inference engine needs dynamic resource allocation to remain stable across entirely different hardware profiles. You cannot hardcode VRAM assumptions.
+
+1. The Inference Engine
+
+Tool: Use llama.cpp (via python bindings or Ollama API). It is the most robust engine for dynamic hardware execution.
+
+2. Target Profiles
+
+Constrained GPU Profile (e.g., 4GB VRAM): When deploying on limited discrete VRAM, the orchestrator must heavily quantize the router model (e.g., Q4_K_M formats). Configure llama.cpp to offload only the maximum sustainable number of layers to the GPU, keeping the rest in system RAM to prevent out-of-memory crashes during context spikes.
+
+Unified Memory Profile (e.g., 16GB Unified): When the backend detects an Apple Silicon environment (Metal), it can load a highly capable 8B class model (like Qwen 2.5 Coder 7B or Llama 3 8B) entirely into unified memory. This allows the system to use a single, fast model for both the System 2 routing phase and the final code generation phase without swapping weights.
+
+Phase 4: State Management & UI
+1. Context Eviction Strategy
+
+Implement a sliding window for the chat history. Use a tiny, fast model to summarize older turns (e.g., "User successfully implemented the login function. Now working on logout.") and evict the raw code blocks from the prompt.
+
+2. The Extension UI
+
+Use VS Code's WebviewViewProvider to create a chat interface in the sidebar.
+
+Crucial UX detail: Make the tool-calling loop visible to the user. Show a loading state that says "Searching codebase for JWT...", "Reading verify_token definition...". This builds trust and lets the developer know exactly what context the model is using.
