@@ -41,10 +41,13 @@ async function indexSymbols(symbols, filepath) {
 
 async function searchSymbols(query) {
     const table = await initDB();
-    // Simple filter-based search for MVP
+    // Broaden search by replacing spaces with % for multi-word matching
+    const sqlQuery = query.trim().replace(/\s+/g, '%');
+    
+    // Simple filter-based search for MVP (Case-insensitive using ILIKE)
     const results = await table
         .query()
-        .where(`name LIKE '%${query}%' OR content LIKE '%${query}%'`)
+        .where(`name ILIKE '%${sqlQuery}%' OR content ILIKE '%${sqlQuery}%'`)
         .limit(5)
         .toArray();
     return results;

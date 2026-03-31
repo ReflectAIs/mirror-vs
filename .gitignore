@@ -37,6 +37,11 @@ Thumbs.db
 
 # Runtime data
 *.local
+server/vector_db
+vector_db/
+**/vector_db/
+*.db
+*.sqlite
 
 # Editor specific
 .idea/

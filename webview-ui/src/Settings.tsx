@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
 
+declare global {
+  interface Window {
+    vscode: any;
+  }
+}
+
 interface SettingsProps {
   onBack: () => void;
 }
@@ -7,12 +13,14 @@ interface SettingsProps {
 interface SettingsData {
   ollamaUrl: string;
   ollamaModel: string;
+  maxTurns: number;
 }
 
 export default function Settings({ onBack }: SettingsProps) {
   const [settings, setSettings] = useState<SettingsData>({
     ollamaUrl: 'http://localhost:11434',
-    ollamaModel: 'codellama'
+    ollamaModel: 'codellama',
+    maxTurns: 5
   });
   const [models, setModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -105,10 +113,32 @@ export default function Settings({ onBack }: SettingsProps) {
             {models.length > 0 ? `${models.length} models found` : 'No models found. Ensure Ollama is running.'}
           </p>
         </div>
+        
+        <div className="setting-item">
+          <label>Max Retries</label>
+          <input 
+            type="number" 
+            min="1" 
+            max="30"
+            value={settings.maxTurns} 
+            onChange={(e) => setSettings({ ...settings, maxTurns: parseInt(e.target.value) || 5 })}
+          />
+          <p className="setting-hint">Maximum reasoning turns before the agent stops.</p>
+        </div>
 
         <button className="save-button" onClick={handleSave}>
           Save Settings
         </button>
+
+        <div className="settings-divider"></div>
+
+        <div className="setting-item">
+          <label>Diagnostics & Logs</label>
+          <button className="secondary-button" onClick={() => window.vscode.postMessage({ type: 'openLogs' })}>
+            Open Output Logs
+          </button>
+          <p className="setting-hint">Check detailed tool calls and errors here.</p>
+        </div>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 const Parser = require('tree-sitter');
 const TypeScript = require('tree-sitter-typescript').typescript;
 const fs = require('fs');
+const path = require('path');
 
 const parser = new Parser();
 parser.setLanguage(TypeScript);

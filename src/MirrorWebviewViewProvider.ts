@@ -8,12 +8,15 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
 
     public static readonly viewType = 'mirror-code.sidebar';
     private _view?: vscode.WebviewView;
-    private _agent?: MirrorAgent;
+    private _agents: Map<string, MirrorAgent> = new Map();
+    private _outputChannel: vscode.OutputChannel;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _context: vscode.ExtensionContext
-    ) { }
+    ) {
+        this._outputChannel = vscode.window.createOutputChannel('Mirror Code');
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -29,17 +32,60 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // Initialize the agent
-        this._agent = new MirrorAgent(this);
+
+        // No longer creating a single agent here. Agents are created per session.
 
         webviewView.webview.onDidReceiveMessage(async (data) => {
             const config = vscode.workspace.getConfiguration('mirror-code');
             const historyKey = 'mirror-code.history';
 
             switch (data.type) {
+                case 'ready': {
+                    this._outputChannel.appendLine(`[Handshake] Webview is ready. Sending logo...`);
+                    // Send logo URI and Base64 once webview is ready
+                    try {
+                        const logoPath = path.join(this._extensionUri.fsPath, 'webview-ui', 'dist', 'assets', 'logo.png');
+                        const logoBase64 = Buffer.from(require('fs').readFileSync(logoPath)).toString('base64');
+                        const logoDataUri = `data:image/png;base64,${logoBase64}`;
+                        
+                        this._outputChannel.appendLine(`[Logo DEBUG] Read success. Length: ${logoBase64.length}`);
+                        
+                        webviewView.webview.postMessage({ 
+                            type: 'onInitialize', 
+                            value: { logoUri: logoDataUri } 
+                        });
+                    } catch (e: any) {
+                        this._outputChannel.appendLine(`[Logo DEBUG] READ FAILED: ${e.message}`);
+                        // Fallback to URI if FS read fails
+                        const logoUri = webviewView.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'webview-ui', 'dist', 'assets', 'logo.png'));
+                        webviewView.webview.postMessage({ type: 'onInitialize', value: { logoUri: logoUri.toString() } });
+                    }
+
+                    // Send active generations status
+                    webviewView.webview.postMessage({ 
+                        type: 'onActiveGenerations', 
+                        value: Array.from(this._agents.keys()) 
+                    });
+                    break;
+                }
                 case 'onUserMessage': {
-                    if (!data.value) return;
-                    this._agent?.handleUserMessage(data.value);
+                    if (!data.value || !data.sessionId) return;
+                    
+                    // Cancel existing agent if any for this session
+                    if (this._agents.has(data.sessionId)) {
+                        this._agents.get(data.sessionId)?.handleStop();
+                    }
+
+                    const agent = new MirrorAgent(data.sessionId, this, this._outputChannel);
+                    this._agents.set(data.sessionId, agent);
+                    
+                    agent.handleUserMessage(data.value, data.mode).then(() => {
+                        this._agents.delete(data.sessionId);
+                    });
+                    break;
+                }
+                case 'openLogs': {
+                    this._outputChannel.show();
                     break;
                 }
                 case 'getSettings': {
@@ -47,7 +93,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         type: 'onSettings',
                         value: {
                             ollamaUrl: config.get('ollamaUrl'),
-                            ollamaModel: config.get('ollamaModel')
+                            ollamaModel: config.get('ollamaModel'),
+                            maxTurns: config.get('maxTurns')
                         }
                     });
                     break;
@@ -55,6 +102,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 case 'updateSettings': {
                     config.update('ollamaUrl', data.value.ollamaUrl, vscode.ConfigurationTarget.Global);
                     config.update('ollamaModel', data.value.ollamaModel, vscode.ConfigurationTarget.Global);
+                    config.update('maxTurns', Number(data.value.maxTurns), vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Settings updated!');
                     break;
                 }
@@ -105,8 +153,14 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     }
                     break;
                 }
-                case 'onStopGeneration': {
-                    this._agent?.handleStop();
+                case 'stopGeneration': {
+                    if (data.sessionId) {
+                        const agent = this._agents.get(data.sessionId);
+                        if (agent) {
+                            agent.handleStop();
+                            this._agents.delete(data.sessionId);
+                        }
+                    }
                     break;
                 }
                 case 'commitPatch': {
@@ -149,7 +203,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-eval' 'unsafe-inline'; connect-src *;">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-eval' 'unsafe-inline'; connect-src *;">
                 <title>Mirror Code</title>
                 <link rel="stylesheet" href="${styleUri}">
                 <style>

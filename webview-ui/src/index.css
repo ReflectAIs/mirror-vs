@@ -1,24 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg-primary: #0d1117;
-  --bg-secondary: #010409;
-  --text-primary: #c9d1d9;
-  --text-secondary: #8b949e;
+  /* Minimalist High-Contrast Palette */
+  --bg-pure: #000000;
+  --bg-elevated: #121212;
+  --bg-bubble-user: #2d2d2d;
+  --bg-bubble-ai: #1a1a1a;
+  
+  --text-pure: #ffffff;
+  --text-muted: #a0a0a0;
+  --text-dark: #666666;
+  
   --accent: #58a6ff;
-  --accent-soft: rgba(88, 166, 255, 0.1);
-  --glass: rgba(255, 255, 255, 0.02);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --border-subtle: #222222;
+  --border-bold: #444444;
+  
   --danger: #f85149;
-  --font-size: 13px;
+  --success: #3fb950;
+  
+  --font-main: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   padding: 0;
   height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  font-family: var(--font-main);
+  background-color: var(--bg-pure);
+  color: var(--text-pure);
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
@@ -31,277 +42,19 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-pure);
 }
 
-/* Pro Header */
-.premium-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--glass-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
 }
 
-.header-left, .header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+::-webkit-scrollbar-thumb {
+  background: var(--border-bold);
+  border-radius: 10px;
 }
 
-.logo {
-  font-size: 14px;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: -0.2px;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
-
-.logo span {
-  color: var(--accent);
-}
-
-.mode-select {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-  font-size: 11px;
-  padding: 3px 6px;
-  border-radius: 4px;
-  outline: none;
-  cursor: pointer;
-}
-
-/* History View */
-.history-view {
-  flex: 1;
-  padding: 12px;
-  overflow-y: auto;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.history-header h3 {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-}
-
-.new-chat-btn {
-  background: var(--accent);
-  color: white;
-  border: none;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.history-item {
-  padding: 8px 12px;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.history-title {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.delete-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  opacity: 0;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-}
-
-.history-item:hover .delete-btn {
-  opacity: 0.6;
-}
-
-.delete-btn:hover {
-  opacity: 1 !important;
-  color: var(--danger);
-  background: rgba(248, 81, 73, 0.1);
-}
-
-.history-item:hover, .history-item.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-/* Chat container */
-.chat-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.message {
-  padding: 8px 12px;
-  border-radius: 8px;
-  max-width: 85%;
-  line-height: 1.45;
-  font-size: var(--font-size);
-  word-wrap: break-word;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.message-user {
-  align-self: flex-end;
-  background: #005cc5;
-  color: #ffffff;
-}
-
-.message-assistant {
-  align-self: flex-start;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-}
-
-/* Diff Review UI 2.0 */
-.diff-preview {
-  background: rgba(88, 166, 255, 0.05);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  padding: 10px;
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.diff-file {
-  font-family: 'SF Mono', 'Cascadia Code', monospace;
-  font-size: 11px;
-  color: var(--accent);
-  margin: 0;
-  font-weight: 600;
-}
-
-.diff-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.diff-actions button {
-  background: var(--accent);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.typing-indicator {
-  font-size: 11px;
-  color: var(--text-secondary);
-  padding: 0 12px;
-  font-style: italic;
-  animation: pulse 1.5s infinite;
-}
-
-/* Input area */
-.input-container {
-  padding: 12px;
-  padding-top: 4px;
-}
-
-.input-wrapper {
-  display: flex;
-  align-items: center;
-  background: var(--bg-secondary);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  padding: 2px 8px;
-}
-
-.input-wrapper input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 8px 4px;
-  color: var(--text-primary);
-  outline: none;
-}
-
-.send-button, .stop-button {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  color: var(--text-secondary);
-}
-
-.stop-button { color: var(--danger); }
-
-.icon-button {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-button:hover {
-  background: var(--glass-border);
-  color: var(--text-primary);
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-@keyframes spin { 100% { transform: rotate(360deg); } }
-.spinning { animation: spin 1s linear infinite; }
-
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }

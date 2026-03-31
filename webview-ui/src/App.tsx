@@ -1,39 +1,54 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { VscSend, VscHistory, VscSettingsGear, VscTrash, VscArrowLeft, VscLoading, VscTerminal, VscSearch, VscFile, VscFolder, VscStopCircle } from 'react-icons/vsc'
 import './App.css'
 import Settings from './Settings'
+import defaultLogo from './assets/logo.png'
+
+import ReactMarkdown from 'react-markdown'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+
+declare global {
+  interface Window {
+    vscode: any;
+  }
+}
+
+interface ToolTrace {
+  label: string;
+  category: 'analyzing' | 'planning' | 'executing';
+  result?: string;
+}
 
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'assistant';
-  type?: 'status' | 'chunk' | 'diff';
+  type?: 'chunk' | 'step' | 'trace' | 'diff' | 'status';
+  stepData?: any;
+  traceData?: ToolTrace;
   diffData?: any;
 }
 
-interface ChatSession {
+interface Session {
   id: string;
   title: string;
   messages: Message[];
   mode: 'planning' | 'coding';
 }
 
-declare global {
-  interface Window {
-    vscode: {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
+declare const vscode: any;
 
 function App() {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>(Date.now().toString());
   const [input, setInput] = useState('');
-  const [view, setView] = useState<'chat' | 'settings' | 'history'>('chat');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [mode, setMode] = useState<'planning' | 'coding'>('coding');
+  const [sessions, setSessions] = useState<Session[]>([]);
+   const [currentSessionId, setCurrentSessionId] = useState<string>(Date.now().toString());
+   const [generatingSessions, setGeneratingSessions] = useState<Record<string, boolean>>({});
+   const isGenerating = generatingSessions[currentSessionId] || false;
+  const [view, setView] = useState<'chat' | 'history' | 'settings'>('chat');
+  const [mode, setMode] = useState<'planning' | 'coding'>('planning');
+  const [logoUri, setLogoUri] = useState<string>(defaultLogo);
+  
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const currentSession = sessions.find(s => s.id === currentSessionId) || {
@@ -41,50 +56,81 @@ function App() {
   };
 
   useEffect(() => {
+    window.vscode.postMessage({ type: 'ready' });
     window.vscode.postMessage({ type: 'getHistory' });
 
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
       switch (message.type) {
-        case 'onHistory':
-          setSessions(message.value);
-          if (message.value.length > 0 && !currentSession.messages.length) {
-            setCurrentSessionId(message.value[0].id);
-          }
+        case 'onInitialize':
+          if (message.value.logoUri) setLogoUri(message.value.logoUri);
           break;
-        case 'onAssistantChunk':
-          updateCurrentSession((msg) => {
-            const last = msg[msg.length - 1];
-            if (last && last.sender === 'assistant' && last.type === 'chunk') {
-                const newMsg = [...msg];
-                newMsg[newMsg.length - 1] = { ...last, text: last.text + message.value };
-                return newMsg;
-            } else {
-                return [...msg, { id: Date.now().toString(), text: message.value, sender: 'assistant', type: 'chunk' }];
-            }
-          });
-          break;
-        case 'onAssistantMessage':
-          updateCurrentSession((msg) => [
-            ...msg.filter(m => m.type !== 'status' && m.type !== 'chunk'), 
-            { id: Date.now().toString(), text: message.value, sender: 'assistant' }
-          ]);
-          setIsGenerating(false);
-          break;
-        case 'requestDiffReview':
-          updateCurrentSession((msg) => [
-            ...msg, 
-            { id: Date.now().toString(), text: `Proposed changes for ${message.value.filepath}`, sender: 'assistant', type: 'diff', diffData: message.value }
-          ]);
-          setIsGenerating(false);
-          break;
-        case 'onPatchApplied':
-            updateCurrentSession((msg) => [
-                ...msg,
-                { id: Date.now().toString(), text: `Patch applied. Diagnosing...`, sender: 'assistant' }
-            ]);
-            break;
-      }
+         case 'onHistory':
+           if (message.value) setSessions(message.value);
+           break;
+         case 'onActiveGenerations':
+           if (message.value) {
+             const activeMap: Record<string, boolean> = {};
+             message.value.forEach((id: string) => activeMap[id] = true);
+             setGeneratingSessions(activeMap);
+           }
+           break;
+         case 'onAssistantChunk':
+           updateSession(message.sessionId || currentSessionId, (msg) => {
+             const last = msg[msg.length - 1];
+             if (last && last.sender === 'assistant' && last.type === 'chunk') {
+                 const newMsg = [...msg];
+                 newMsg[newMsg.length - 1] = { ...last, text: last.text + message.value };
+                 return newMsg;
+             } else {
+                 return [...msg, { id: Date.now().toString(), text: message.value, sender: 'assistant', type: 'chunk' }];
+             }
+           }, false);
+           break;
+         case 'onAssistantMessage':
+           updateSession(message.sessionId || currentSessionId, (msg) => [
+             ...msg.filter(m => m.type !== 'status' && m.type !== 'chunk'), 
+             { id: Date.now().toString(), text: message.value, sender: 'assistant' }
+           ], false);
+           if (message.sessionId) {
+             setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
+           }
+           break;
+         case 'onToolTrace':
+           updateSession(message.sessionId || currentSessionId, (msg) => {
+             const last = msg[msg.length - 1];
+             if (last && last.type === 'trace' && last.traceData?.label === message.value.label) {
+                 const newMsg = [...msg];
+                 newMsg[newMsg.length - 1] = { ...last, traceData: message.value };
+                 return newMsg;
+             }
+             return [
+               ...msg,
+               { id: Date.now().toString(), text: '', sender: 'assistant', type: 'trace', traceData: message.value }
+             ];
+           }, false);
+           break;
+         case 'onAssistantComplete':
+           if (message.sessionId) {
+             setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
+           }
+           break;
+         case 'requestDiffReview':
+           updateSession(message.sessionId || currentSessionId, (msg) => [
+             ...msg, 
+             { id: Date.now().toString(), text: `Proposed changes for ${message.value.filepath}`, sender: 'assistant', type: 'diff', diffData: message.value }
+           ], false);
+           if (message.sessionId) {
+             setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
+           }
+           break;
+         case 'onPatchApplied':
+             updateSession(message.sessionId || currentSessionId, (msg) => [
+                 ...msg,
+                 { id: Date.now().toString(), text: `Patch applied. Diagnosing...`, sender: 'assistant' }
+             ], false);
+             break;
+       }
     };
 
     window.addEventListener('message', handleMessage);
@@ -92,51 +138,62 @@ function App() {
   }, [currentSessionId]);
 
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    const scroller = chatContainerRef.current;
+    if (scroller) {
+      requestAnimationFrame(() => {
+        scroller.scrollTo({
+          top: scroller.scrollHeight,
+          behavior: isGenerating ? 'auto' : 'smooth'
+        });
+      });
     }
   }, [currentSession.messages, isGenerating]);
 
-  const updateCurrentSession = (fn: (msgs: Message[]) => Message[]) => {
+  const updateSession = (sid: string, fn: (msgs: Message[]) => Message[], bubbleToTop = true) => {
     setSessions(prev => {
-        const index = prev.findIndex(s => s.id === currentSessionId);
+        const index = prev.findIndex(s => s.id === sid);
         let newSessions = [...prev];
-        const currentMsgs = index >= 0 ? prev[index].messages : [];
-        const newMessages = fn(currentMsgs);
-        
-        let title = index >= 0 ? prev[index].title : 'New Chat';
-        if (title === 'New Chat' && newMessages.length > 0) {
-            const firstUserMsg = newMessages.find(m => m.sender === 'user');
-            if (firstUserMsg) {
-                title = firstUserMsg.text.substring(0, 30) + (firstUserMsg.text.length > 30 ? '...' : '');
-            }
-        }
+        const newMessages = fn(index >= 0 ? prev[index].messages : []);
+        const title = newMessages.find(m => m.sender === 'user')?.text.substring(0, 30) || 'New Chat';
 
         if (index >= 0) {
             newSessions[index] = { ...prev[index], messages: newMessages, title, mode };
-            // Move to top
-            const item = newSessions.splice(index, 1)[0];
-            newSessions.unshift(item);
+            if (bubbleToTop) {
+                const item = newSessions.splice(index, 1)[0];
+                newSessions.unshift(item);
+            }
         } else {
-            newSessions.unshift({ id: currentSessionId, title, messages: newMessages, mode });
+            newSessions.unshift({ id: sid, title, messages: newMessages, mode });
         }
-        
-        const updated = newSessions.find(s => s.id === currentSessionId);
-        if (updated) { window.vscode.postMessage({ type: 'saveChat', value: updated }); }
+        window.vscode.postMessage({ type: 'saveChat', value: newSessions.find(s => s.id === sid) });
         return newSessions;
     });
   };
 
+  const updateCurrentSession = (fn: (msgs: Message[]) => Message[], bubbleToTop = true) => {
+      updateSession(currentSessionId, fn, bubbleToTop);
+  };
+
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isGenerating) return;
     const userMsg: Message = { id: Date.now().toString(), text: input, sender: 'user' };
-    updateCurrentSession((msg) => [...msg, userMsg]);
-    setIsGenerating(true);
-    window.vscode.postMessage({ type: 'onUserMessage', value: input, mode });
+    updateCurrentSession((msg) => [...msg, userMsg], true);
+    setGeneratingSessions(prev => ({ ...prev, [currentSessionId]: true }));
+    window.vscode.postMessage({ type: 'onUserMessage', value: input, mode, sessionId: currentSessionId });
     setInput('');
   };
 
-  const handleNewChat = () => {
+  const handleStop = () => {
+    window.vscode.postMessage({ type: 'stopGeneration', sessionId: currentSessionId });
+    setGeneratingSessions(prev => ({ ...prev, [currentSessionId]: false }));
+  };
+
+  const switchSession = (id: string) => {
+    setCurrentSessionId(id);
+    setView('chat');
+  };
+
+  const startNewChat = () => {
     const newId = Date.now().toString();
     setCurrentSessionId(newId);
     setView('chat');
@@ -144,78 +201,142 @@ function App() {
 
   const deleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSessions(prev => {
-        const filtered = prev.filter(s => s.id !== id);
-        window.vscode.postMessage({ type: 'deleteChat', value: id });
-        if (id === currentSessionId) {
-            setCurrentSessionId(filtered.length > 0 ? filtered[0].id : Date.now().toString());
-        }
-        return filtered;
-    });
+    const newSessions = sessions.filter(s => s.id !== id);
+    setSessions(newSessions);
+    window.vscode.postMessage({ type: 'deleteChat', value: id });
+    if (currentSessionId === id && newSessions.length > 0) {
+      setCurrentSessionId(newSessions[0].id);
+    } else if (newSessions.length === 0) {
+      startNewChat();
+    }
   };
 
   const commitPatch = (diff: any) => {
     window.vscode.postMessage({ type: 'commitPatch', value: diff });
-    updateCurrentSession((msg) => msg.filter(m => m.id !== diff.messageId));
+    updateCurrentSession((msg) => msg.filter(m => m.id !== diff.messageId), false);
+  };
+
+  const getToolIcon = (label: string) => {
+    if (label.includes('Listing')) return <VscFolder />;
+    if (label.includes('Reading') || label.includes('Skeleton')) return <VscFile />;
+    if (label.includes('Searching')) return <VscSearch />;
+    if (label.includes('Terminal')) return <VscTerminal />;
+    return <VscSettingsGear />;
   };
 
   return (
     <div className="app-container">
-      <header className="premium-header">
-        <div className="header-left">
-          <button className="icon-button" onClick={() => setView('history')} title="History"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
-          <h1 className="logo">Mirror<span>Code</span></h1>
-        </div>
-        <div className="header-actions">
+      <header className="minimal-header">
+        <div className="brand">
+          <img src={logoUri} className="logo-img" alt="logo" />
+          <div className="brand-name">MIRROR <span>CODE</span></div>
           <select className="mode-select" value={mode} onChange={(e) => setMode(e.target.value as any)}>
-            <option value="coding">Coding</option>
             <option value="planning">Planning</option>
+            <option value="coding">Coding</option>
           </select>
-          <button className="icon-button" onClick={() => setView('settings')} title="Settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-1-1 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+        </div>
+        <div className="header-right">
+          <button className="nav-btn" onClick={() => setView('history')}><VscHistory /></button>
+          <button className="nav-btn" onClick={() => setView('settings')}><VscSettingsGear /></button>
         </div>
       </header>
 
-      {view === 'history' ? (
+      {view === 'chat' && (
+        <main className="chat-interface">
+          <div className="scroller" ref={chatContainerRef}>
+            {currentSession.messages.map((msg, i) => {
+                const isStacked = i > 0 && currentSession.messages[i-1].sender === msg.sender && currentSession.messages[i-1].type !== 'trace';
+                return (
+                  <div key={msg.id} className={`message sender-${msg.sender} ${isStacked ? 'stacked' : ''} type-${msg.type || 'text'}`}>
+                    {!isStacked && <div className="label">{msg.sender === 'user' ? 'YOU' : 'MIRROR'}</div>}
+                    <div className="bubble">
+                      {msg.type === 'trace' ? (
+                        <div className="tool-trace-card">
+                          <div className={`trace-header category-${msg.traceData?.category}`}>
+                            {getToolIcon(msg.traceData?.label || '')}
+                            <span className="trace-label">{msg.traceData?.label}</span>
+                          </div>
+                          {msg.traceData?.result && (
+                            <div className="trace-result">{msg.traceData.result}</div>
+                          )}
+                        </div>
+                      ) : msg.type === 'diff' ? (
+                        <div className="diff-card">
+                          <div className="diff-header">{msg.text}</div>
+                          <button className="apply-btn" onClick={() => commitPatch(msg.diffData)}>Apply Change</button>
+                        </div>
+                      ) : (
+                        <div className="text markdown-body">
+                          <ReactMarkdown
+                            components={{
+                              code({node, inline, className, children, ...props}: any) {
+                                const match = /language-(\w+)/.exec(className || '')
+                                return !inline && match ? (
+                                  <SyntaxHighlighter
+                                    {...props}
+                                    children={String(children).replace(/\n$/, '')}
+                                    style={vscDarkPlus}
+                                    language={match[1]}
+                                    PreTag="div"
+                                  />
+                                ) : (
+                                  <code {...props} className={className}>
+                                    {children}
+                                  </code>
+                                )
+                              }
+                            }}
+                          >
+                            {msg.text}
+                          </ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+            })}
+            {isGenerating && <div className="message sender-assistant"><div className="bubble thinking"><VscLoading className="spinning" /> Thinking...</div></div>}
+          </div>
+
+          <footer className="composer">
+            <div className="input-group">
+              <textarea 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder="Talk to Mirror..."
+                rows={1}
+              />
+              <button className={`send-btn ${isGenerating ? 'stop' : ''}`} onClick={isGenerating ? handleStop : handleSend}>
+                {isGenerating ? <VscStopCircle /> : <VscSend />}
+              </button>
+            </div>
+          </footer>
+        </main>
+      )}
+
+      {view === 'history' && (
         <div className="history-view">
-          <div className="history-header"><h3>Recent Chats</h3><button className="new-chat-btn" onClick={handleNewChat}>+ New Chat</button></div>
+          <div className="history-header">
+            <button className="back-button" onClick={() => setView('chat')}><VscArrowLeft /></button>
+            <h3>Recent Activity</h3>
+            <button className="new-chat-btn" onClick={startNewChat}>+ New</button>
+          </div>
           <div className="history-list">
             {sessions.map(s => (
-              <div key={s.id} className={`history-item ${s.id === currentSessionId ? 'active' : ''}`} onClick={() => {setCurrentSessionId(s.id); setView('chat');}}>
-                <span className="history-title">{s.title}</span>
-                <button className="delete-btn" onClick={(e) => deleteSession(s.id, e)} title="Delete Chat">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                </button>
+              <div key={s.id} className={`history-item ${s.id === currentSessionId ? 'active' : ''}`} onClick={() => switchSession(s.id)}>
+                <div className="history-info">
+                  <div className="history-title">{s.title || 'Empty chat'}</div>
+                  <div className="history-type">{s.mode} mode</div>
+                </div>
+                <button className="delete-btn" onClick={(e) => deleteSession(s.id, e)}><VscTrash /></button>
               </div>
             ))}
           </div>
         </div>
-      ) : view === 'chat' ? (
-        <>
-          <div className="chat-container" ref={chatContainerRef}>
-            {currentSession.messages.map(msg => (
-              <div key={msg.id} className={`message message-${msg.sender}`}>
-                {msg.type === 'diff' ? (
-                  <div className="diff-preview">
-                    <p className="diff-file">{msg.diffData.filepath.split(/[\\/]/).pop()}</p>
-                    <div className="diff-actions"><button onClick={() => commitPatch(msg.diffData)}>Apply Change</button></div>
-                  </div>
-                ) : msg.text}
-              </div>
-            ))}
-            {isGenerating && <div className="typing-indicator">Mirror is working...</div>}
-          </div>
-          <div className="input-container">
-            <div className="input-wrapper">
-              <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Ask anything..." />
-              <button className={isGenerating ? "stop-button" : "send-button"} onClick={() => isGenerating ? window.vscode.postMessage({type:'onStopGeneration'}) : handleSend()}>
-                {isGenerating ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>}
-              </button>
-            </div>
-          </div>
-        </>
-      ) : (
-        <Settings onBack={() => setView('chat')} />
       )}
+
+      {view === 'settings' && <Settings onBack={() => setView('chat')} />}
     </div>
   )
 }
