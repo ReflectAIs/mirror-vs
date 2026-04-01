@@ -13,6 +13,35 @@ export class MirrorAgent {
         private readonly output: vscode.OutputChannel
     ) { }
 
+    private async loadMemory(): Promise<string> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) return "";
+
+        const memoryPath = path.join(workspaceFolder.uri.fsPath, '.mirror', 'MEMORY.md');
+        try {
+            const data = await vscode.workspace.fs.readFile(vscode.Uri.file(memoryPath));
+            return Buffer.from(data).toString('utf8');
+        } catch {
+            return "No previous project memory found. This is a new session or a new project.";
+        }
+    }
+
+    private async saveMemory(content: string) {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) return;
+
+        const mirrorDir = path.join(workspaceFolder.uri.fsPath, '.mirror');
+        const memoryPath = path.join(mirrorDir, 'MEMORY.md');
+        
+        try {
+            await vscode.workspace.fs.createDirectory(vscode.Uri.file(mirrorDir));
+            await vscode.workspace.fs.writeFile(vscode.Uri.file(memoryPath), Buffer.from(content, 'utf8'));
+            this.log(`Memory updated in ${memoryPath}`);
+        } catch (e) {
+            this.log(`Failed to save memory: ${e}`);
+        }
+    }
+
     private log(msg: string) {
         const time = new Date().toLocaleTimeString();
         this.output.appendLine(`[${time}] ${msg}`);
@@ -84,7 +113,7 @@ export class MirrorAgent {
 
     public async handleUserMessage(text: string, mode: 'planning' | 'coding' = 'coding') {
         const config = vscode.workspace.getConfiguration('mirror-code');
-        const maxTurns = config.get<number>('maxTurns') || 5;
+        const maxTurns = config.get<number>('maxTurns') || 20;
         this.log(`--- New Session (${mode}, maxTurns: ${maxTurns}) ---`);
         this.log(`User Input: "${text}"`);
 
@@ -92,7 +121,11 @@ export class MirrorAgent {
         let history = `User: ${text}\n`;
         this.abortController = new AbortController();
 
-        const completeToolPattern = /<(search_vector_db|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal)\s+[^>]*\/>|<patch_file\s+[^>]*>[\s\S]*?<\/patch_file>/;
+        const memory = await this.loadMemory();
+        const isNewProject = memory.includes("No previous project memory found");
+        this.log(`Memory Loaded (New: ${isNewProject}). Enforcing Coordinator Protocols.`);
+
+        const completeToolPattern = /<(search_vector_db|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal|update_memory)\s+[^>]*\/>|<patch_file\s+[^>]*>[\s\S]*?<\/patch_file>/;
 
         while (turn < maxTurns) {
             if (this.abortController.signal.aborted) {
@@ -120,10 +153,9 @@ Tools:
 2. <read_skeleton filepath="path" />
 3. <read_file filepath="path" />
 4. <list_dir dirpath="path" />` :
-                `You are Mirror Code in CODING mode (Autopilot 2.0). Always confirm functionality by reading diagnostics after changes.
-IMPORTANT: You are OPERATING ONLY WITHIN the "${rootName}" workspace. Use ONLY relative paths.
-If you need to call a tool, output the XML tag and STOP immediately. Do NOT hallucinate results.
-Tools: 
+                `You are Mirror Code (Coordinator). Your goal is to solve the user's request by coordinating planning and execution.
+
+## TOOLS
 1. <search_vector_db query="term" />
 2. <read_skeleton filepath="path" />
 3. <read_file filepath="path" />
@@ -134,7 +166,21 @@ Tools:
 5. <get_symbols filepath="path" />
 6. <get_diagnostics filepath="path" />
 7. <list_dir dirpath="path" />
-8. <run_terminal command="cmd" />`;
+8. <run_terminal command="cmd" />
+9. <update_memory content="MARKDOWN_CONTENT" />
+
+## PROJECT MEMORY
+${memory}
+
+## COORDINATOR PROTOCOLS (MANDATORY)
+1. **Initialize First**: If PROJECT MEMORY is empty/new, your FIRST ACTION after listing files MUST be <update_memory>.
+2. **Forbidden**: Do NOT read individual files until you have created a MEMORY.md with a tech stack overview and a TASK_LIST.
+3. **Planning**: Use <update_memory> to record your plan. Keep it updated.
+4. **Environment**: Use relative paths in "${rootName}".
+
+${turn === 0 && isNewProject ? "[IMPORTANT] Project memory is MISSING. Use list_dir now to see the root structure." : ""}
+${turn === 1 && isNewProject && !history.includes('update_memory') ? "[CRITICAL] You have listing results. You MUST now use <update_memory> to save the project context and plan BEFORE reading any files." : ""}
+`;
 
             try {
                 const statusMsg = `Turn ${turn + 1}: Contacting ${ollamaModel}...`;
@@ -266,7 +312,7 @@ Tools:
                             const res = await axios.post('http://localhost:3000/tools/patch_file', { filepath: fp, blocks, previewOnly: true }, { signal: this.abortController.signal });
                             this.provider.postMessageToWebview({ 
                                 type: 'requestDiffReview', 
-                                value: { filepath: fp, blocks, original: res.data.original, modified: res.data.content },
+                                value: { filepath: fp, blocks, original: res.data.original, modified: res.data.content, sessionId: this.sessionId },
                                 sessionId: this.sessionId
                             });
                             return;
@@ -309,6 +355,11 @@ Tools:
                             });
                             const res = await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath }, { signal: this.abortController.signal });
                             toolResult = res.data.stdout + res.data.stderr;
+                        } else if (toolCall.includes('<update_memory')) {
+                            const content = /content=["']([\s\S]*?)["']/.exec(toolCall)?.[1] || "";
+                            await this.saveMemory(content);
+                            toolResult = "Memory updated successfully.";
+                            traceLabel = "Updating Memory";
                         }
                     } catch (err: any) {
                         this.log(`Tool Exception: ${err.name} - ${err.message}`);
@@ -336,6 +387,14 @@ Tools:
                     this.turnSummaries.push(`Turn ${turn + 1}: ${toolResult.substring(0, 200)}...`);
                     turn++;
                 } else {
+                    // --- COORDINATOR ENFORCER ---
+                    if (isNewProject && !history.includes('update_memory') && turn < maxTurns - 1) {
+                        this.log('Enforcer: Mandatory memory update missing. Forcing another turn.');
+                        history += `\n[SYSTEM ERROR]: You attempted to complete the session without initializing PROJECT MEMORY. You MUST call <update_memory> now with a tech stack overview and your plan before you can provide a final answer to the user.`;
+                        turn++;
+                        continue; // Force the loop to run again
+                    }
+
                     this.log('Turn complete (No more tools called).');
                     this.provider.postMessageToWebview({ 
                         type: 'onAssistantMessage', 
@@ -363,5 +422,16 @@ Tools:
         }
         this.log('Session Completed.\n');
         this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+    }
+
+    public async handlePatchResult(filepath: string, diags: any[]) {
+        this.log(`Handling patch result for ${filepath}...`);
+        const diagCount = diags.length;
+        const msg = diagCount === 0 
+            ? `The patch was applied successfully and there are no lint errors in ${path.basename(filepath)}.`
+            : `The patch was applied but there are ${diagCount} diagnostic errors remaining in ${path.basename(filepath)}: ${JSON.stringify(diags)}. Please fix them.`;
+        
+        // This triggers a new agent loop with the diagnostic feedback
+        return this.handleUserMessage(msg, 'coding');
     }
 }

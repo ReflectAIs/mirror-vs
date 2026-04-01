@@ -164,7 +164,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     break;
                 }
                 case 'commitPatch': {
-                    const { filepath, blocks } = data.value;
+                    const { filepath, blocks, sessionId } = data.value;
                     try {
                         await axios.post('http://localhost:3000/tools/patch_file', { 
                             filepath, 
@@ -173,8 +173,15 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         });
                         vscode.window.showInformationMessage(`Applied patch to ${path.basename(filepath)}`);
                         // Trigger diagnostic check automatically
-                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(filepath).toString());
-                        webviewView.webview.postMessage({ type: 'onPatchApplied', value: { filepath, diags } });
+                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(filepath).toString()) as any[];
+                        
+                        webviewView.webview.postMessage({ type: 'onPatchApplied', value: { filepath, diags, sessionId } });
+                        
+                        // Self-healing: notify the agent
+                        const agent = this._agents.get(sessionId);
+                        if (agent) {
+                            agent.handlePatchResult(filepath, diags);
+                        }
                     } catch (e: any) {
                         vscode.window.showErrorMessage(`Failed to apply patch: ${e.message}`);
                     }

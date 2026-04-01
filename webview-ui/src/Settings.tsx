@@ -20,7 +20,7 @@ export default function Settings({ onBack }: SettingsProps) {
   const [settings, setSettings] = useState<SettingsData>({
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'codellama',
-    maxTurns: 5
+    maxTurns: 20
   });
   const [models, setModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -115,13 +115,13 @@ export default function Settings({ onBack }: SettingsProps) {
         </div>
         
         <div className="setting-item">
-          <label>Max Retries</label>
+          <label>Max Turns</label>
           <input 
             type="number" 
             min="1" 
-            max="30"
+            max="50"
             value={settings.maxTurns} 
-            onChange={(e) => setSettings({ ...settings, maxTurns: parseInt(e.target.value) || 5 })}
+            onChange={(e) => setSettings({ ...settings, maxTurns: parseInt(e.target.value) || 20 })}
           />
           <p className="setting-hint">Maximum reasoning turns before the agent stops.</p>
         </div>
