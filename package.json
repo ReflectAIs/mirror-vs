@@ -63,14 +63,14 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "tsc -p ./ && npm run build:extension",
+    "watch": "npm run dev:extension",
     "build:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "build:webview": "cd webview-ui && npm run build",
     "build": "npm run build:extension && npm run build:webview",
     "dev:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
     "dev:webview": "cd webview-ui && npm run dev",
-    "install:all": "npm install && cd webview-ui && npm install"
+    "install:all": "npm install && cd server && npm install && cd ../webview-ui && npm install"
   },
   "devDependencies": {
     "@types/node": "^20.x",

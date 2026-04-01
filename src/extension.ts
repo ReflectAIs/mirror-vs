@@ -10,14 +10,24 @@ export function activate(context: vscode.ExtensionContext) {
     const provider = new MirrorWebviewViewProvider(context.extensionUri, context);
 
     // 1. Launch the Brain Server
+    const brainOutput = vscode.window.createOutputChannel('Mirror Code Brain');
+    brainOutput.show(true);
+
     const serverPath = path.join(context.extensionPath, 'server', 'index.js');
     brainProcess = spawn('node', [serverPath], {
         cwd: path.join(context.extensionPath, 'server'),
-        stdio: 'inherit'
+        env: { ...process.env, DEBUG: '*' }
+    });
+
+    brainProcess.stdout?.on('data', (data) => brainOutput.append(data.toString()));
+    brainProcess.stderr?.on('data', (data) => brainOutput.append(data.toString()));
+
+    brainProcess.on('exit', (code) => {
+        brainOutput.appendLine(`Brain server exited with code ${code}`);
     });
 
     brainProcess.on('error', (err) => {
-        console.error('Failed to start Brain server:', err);
+        brainOutput.appendLine(`Failed to start Brain server: ${err.message}`);
     });
 
     context.subscriptions.push(

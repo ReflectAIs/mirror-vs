@@ -25,15 +25,61 @@ export class MirrorAgent {
         }
     }
 
-    private resolvePath(relPath: string): string {
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!root) return relPath;
-        
-        // Prison Mode: Strip all leading slashes and drive letters to force relative paths
-        const sanitized = relPath.replace(/^([a-zA-Z]:)?[\\\/]+/, '').replace(/\.\.\//g, '');
-        const resolved = path.join(root, sanitized);
+    private resolvePath(p: string): string {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) return p;
 
-        return resolved;
+        const root = workspaceFolder.uri.fsPath;
+        const rootName = workspaceFolder.name;
+
+        // 1. Normalize the path (resolve any .. or //)
+        let normalized = path.normalize(p).replace(/[\\\/]+$/, '');
+
+        // 2. Prison Mode (Base behavior): Strip drive letters and leading slashes 
+        // This ensures "C:\Windows\..." becomes "Windows\..." relative to the root.
+        let stripped = normalized.replace(/^([a-zA-Z]:)?[\\\/]+/, '').replace(/\.\.\//g, '');
+        
+        // 3. Handle Hallucinated Root Prefix recursively
+        // Some models include the workspace folder name multiple times:
+        // "OllamaModels/OllamaModels/test.txt" -> "test.txt"
+        let count = 0;
+        while (rootName && count < 10) {
+            const lowerStripped = stripped.toLowerCase();
+            const lowerRootName = rootName.toLowerCase();
+            
+            if (lowerStripped.startsWith(lowerRootName + path.sep)) {
+                stripped = stripped.substring(rootName.length).replace(/^[\\\/]+/, '');
+            } else if (lowerStripped === lowerRootName) {
+                stripped = '.';
+                break;
+            } else {
+                break;
+            }
+            count++;
+        }
+
+        // 4. Force interpretation relative to the actual workspace root
+        return path.join(root, stripped);
+    }
+
+    private async summarizeHistory(history: string, ollamaUrl: string, ollamaModel: string): Promise<string> {
+        this.log("Summarizing history to save context...");
+        this.provider.postMessageToWebview({ 
+            type: 'onToolTrace', 
+            value: { label: 'Compressing Context...', category: 'analyzing' },
+            sessionId: this.sessionId
+        });
+        try {
+            const res = await axios.post(`${ollamaUrl}/api/generate`, {
+                model: ollamaModel,
+                prompt: `Summarize the following conversation history into a concise state description (max 2 sentences) that captures the user's goal and what has been accomplished so far. Focus on facts.\n\n${history}\n\nSummary:`,
+                stream: false
+            }, { signal: this.abortController?.signal });
+            return res.data.response;
+        } catch (e) {
+            this.log(`Summarization failed: ${e}`);
+            return "History compression failed. Continuing with raw history.";
+        }
     }
 
     public async handleUserMessage(text: string, mode: 'planning' | 'coding' = 'coding') {
@@ -54,8 +100,11 @@ export class MirrorAgent {
                 break;
             }
 
-            if (turn > 7) {
-                history = `User: ${text}\n... (compressed) ...\n${this.turnSummaries.slice(-3).join('\n')}\n`;
+            if (turn > 0 && turn % 5 === 0) {
+                const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
+                const ollamaModel = config.get<string>('ollamaModel') || 'codellama';
+                const summary = await this.summarizeHistory(history, ollamaUrl, ollamaModel);
+                history = `[CONTEXT COMPRESSED] Previous activities: ${summary}\n`;
             }
 
             const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
@@ -262,7 +311,14 @@ Tools:
                             toolResult = res.data.stdout + res.data.stderr;
                         }
                     } catch (err: any) {
-                        const errorMsg = err.response ? `API Error [${err.response.status}]: ${err.response.data?.error || err.message}` : err.message;
+                        this.log(`Tool Exception: ${err.name} - ${err.message}`);
+                        let errorMsg = err.message || 'Unknown error';
+                        if (err.response && err.response.data && err.response.data.error) {
+                            errorMsg = `API Error [${err.response.status}]: ${err.response.data.error}`;
+                        } else if (err.response) {
+                            errorMsg = `API Error [${err.response.status}]: ${JSON.stringify(err.response.data) || err.message}`;
+                        }
+                        
                         this.log(`Tool Failed: ${errorMsg}`);
                         toolResult = `Error: ${errorMsg}`;
                         traceCategory = 'analyzing'; 
