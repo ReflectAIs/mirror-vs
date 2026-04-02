@@ -136,10 +136,15 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.tool-trace-card:hover {
+.tool-trace-card.clickable {
+  cursor: pointer;
+}
+
+.tool-trace-card.clickable:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
-  border-color: hsla(0, 0%, 100%, 0.15);
+  border-color: hsla(0, 0%, 100%, 0.25);
+  background: var(--bg-hover-subtle, rgba(255, 255, 255, 0.05));
 }
 
 .trace-header {

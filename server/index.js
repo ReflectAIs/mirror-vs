@@ -118,6 +118,12 @@ app.post('/tools/list_dir', async (req, res) => {
         if (!fs.existsSync(dirpath)) {
             return res.status(404).json({ error: `Directory not found at: ${dirpath}` });
         }
+        
+        const stats = fs.statSync(dirpath);
+        if (!stats.isDirectory()) {
+            return res.status(400).json({ error: `Not a directory. Use <read_file filepath="${path.basename(dirpath)}" /> instead.` });
+        }
+
         const files = fs.readdirSync(dirpath, { withFileTypes: true });
         const results = files.map(f => ({
             name: f.name,

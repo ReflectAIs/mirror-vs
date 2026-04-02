@@ -63,6 +63,16 @@
           "type": "boolean",
           "default": false,
           "description": "True Autonomy (Overnight Mode): If enabled, the agent will run indefinitely and automatically apply its own file patches without waiting for you."
+        },
+        "mirror-code.defaultReadLines": {
+          "type": "integer",
+          "default": 500,
+          "description": "The default number of lines the agent should read at once when using the sliding window strategy."
+        },
+        "mirror-code.maxToolsPerTurn": {
+          "type": "integer",
+          "default": 8,
+          "description": "The maximum number of tools the agent can call in a single turn before pausing for re-evaluation."
         }
       }
     }

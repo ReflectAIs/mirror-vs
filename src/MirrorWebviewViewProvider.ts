@@ -76,7 +76,9 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         this._agents.get(data.sessionId)?.handleStop();
                     }
 
-                    const agent = new MirrorAgent(data.sessionId, this, this._outputChannel);
+                    const defaultReadLines = config.get('defaultReadLines', 500);
+                    const maxToolsPerTurn = config.get('maxToolsPerTurn', 8);
+                    const agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, maxToolsPerTurn);
                     this._agents.set(data.sessionId, agent);
                     
                     agent.handleUserMessage(data.value).then(() => {
@@ -95,7 +97,9 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             ollamaUrl: config.get('ollamaUrl'),
                             ollamaModel: config.get('ollamaModel'),
                             maxTurns: config.get('maxTurns'),
-                            autonomousMode: config.get('autonomousMode')
+                            autonomousMode: config.get('autonomousMode'),
+                            defaultReadLines: config.get('defaultReadLines'),
+                            maxToolsPerTurn: config.get('maxToolsPerTurn')
                         }
                     });
                     break;
@@ -105,6 +109,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     config.update('ollamaModel', data.value.ollamaModel, vscode.ConfigurationTarget.Global);
                     config.update('maxTurns', Number(data.value.maxTurns), vscode.ConfigurationTarget.Global);
                     config.update('autonomousMode', Boolean(data.value.autonomousMode), vscode.ConfigurationTarget.Global);
+                    config.update('defaultReadLines', Number(data.value.defaultReadLines), vscode.ConfigurationTarget.Global);
+                    config.update('maxToolsPerTurn', Number(data.value.maxToolsPerTurn), vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Settings updated!');
                     break;
                 }

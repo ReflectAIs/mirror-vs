@@ -17,6 +17,7 @@ declare global {
 interface ToolTrace {
   label: string;
   category: 'analyzing' | 'planning' | 'executing';
+  path?: string;
   result?: string;
 }
 
@@ -140,15 +141,22 @@ function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, [currentSessionId]);
 
+  const handleScroll = () => {
+    // No-op for now, used to update isAtBottom state
+  };
+
   useEffect(() => {
     const scroller = chatContainerRef.current;
     if (scroller) {
-      requestAnimationFrame(() => {
-        scroller.scrollTo({
-          top: scroller.scrollHeight,
-          behavior: isGenerating ? 'auto' : 'smooth'
+      const isAtBot = scroller.scrollHeight - scroller.scrollTop <= scroller.clientHeight + 40; // 40px threshold
+      if (isAtBot) {
+        requestAnimationFrame(() => {
+          scroller.scrollTo({
+            top: scroller.scrollHeight,
+            behavior: isGenerating ? 'auto' : 'smooth'
+          });
         });
-      });
+      }
     }
   }, [currentSession.messages, isGenerating]);
 
@@ -182,6 +190,15 @@ function App() {
     const userMsg: Message = { id: Date.now().toString(), text: input, sender: 'user' };
     updateCurrentSession((msg) => [...msg, userMsg], true);
     setGeneratingSessions(prev => ({ ...prev, [currentSessionId]: true }));
+    
+    // Explicitly snap to bottom after user message
+    const scroller = chatContainerRef.current;
+    if (scroller) {
+      setTimeout(() => {
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
+      }, 0);
+    }
+    
     window.vscode.postMessage({ type: 'onUserMessage', value: input, sessionId: currentSessionId });
     setInput('');
   };
@@ -290,7 +307,7 @@ function App() {
 
       {view === 'chat' && (
         <main className="chat-interface">
-          <div className="scroller" ref={chatContainerRef}>
+          <div className="scroller" ref={chatContainerRef} onScroll={handleScroll}>
             {currentSession.messages.map((msg, i) => {
                 const isStacked = i > 0 && currentSession.messages[i-1].sender === msg.sender && currentSession.messages[i-1].type !== 'trace';
                 return (
@@ -298,7 +315,10 @@ function App() {
                     {!isStacked && <div className="label">{msg.sender === 'user' ? 'YOU' : 'MIRROR'}</div>}
                     <div className="bubble">
                       {msg.type === 'trace' ? (
-                        <div className="tool-trace-card">
+                        <div 
+                          className={`tool-trace-card ${msg.traceData?.path ? 'clickable' : ''}`}
+                          onClick={() => msg.traceData?.path && handleFileClick(msg.traceData.path)}
+                        >
                           <div className={`trace-header category-${msg.traceData?.category}`}>
                             {getToolIcon(msg.traceData?.label || '')}
                             <span className="trace-label">{msg.traceData?.label}</span>
