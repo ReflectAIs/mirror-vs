@@ -98,9 +98,11 @@ export class MirrorAgent {
 
     public handleStop() {
         this.log('Stop requested by user.');
-        if (this.abortController) {
-            this.abortController.abort();
-        }
+        this.abortController?.abort();
+    }
+
+    private post(type: string, value: any = null) {
+        this.provider.postMessageToWebview({ type, value, sessionId: this.sessionId });
     }
 
     private resolvePath(p: string): string {
@@ -155,7 +157,7 @@ export class MirrorAgent {
 
     private async performDreamCompaction(ollamaUrl: string, ollamaModel: string): Promise<void> {
         this.log("Starting Auto-Dream Compaction...");
-        this.provider.postMessageToWebview({ type: 'onToolTrace', value: { label: 'Dreaming...', category: 'analyzing', result: 'Compressing 40+ turns of history to free the context window.' }, sessionId: this.sessionId });
+        this.post('onToolTrace', { label: 'Dreaming...', category: 'analyzing', result: 'Compressing 40+ turns of history to free the context window.' });
         
         const rawHistory = this.history.map(t => `${t.role.toUpperCase()}: ${t.content}`).join('\n');
         const prompt = `You are a memory compaction module. Review this recent agent transcript and extract ALL concrete facts, file structures, bugs fixed, and architectural discoveries made. Output ONLY a concise Markdown summary of what you learned. Do not add introductory conversational text.\n\nTRANSCRIPT:\n${rawHistory}`;
@@ -249,7 +251,7 @@ export class MirrorAgent {
                     options: { num_ctx: numCtx, temperature: 0.1, stop: ["[CONTEXT ARCHIVE]", "User:"] } 
                 });
 
-                this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: turnCount === 0 ? "*(Thinking...)* " : "", sessionId: this.sessionId });
+                this.post('onAssistantChunk', turnCount === 0 ? "*(Thinking...)* " : "");
 
                 let fullReply = isThinkingModel ? "" : "<thinking>\n";
                 let buffer = "";
@@ -286,16 +288,16 @@ export class MirrorAgent {
                                             if (fullReply.includes('</thinking>') || fullReply.includes('</thought>')) {
                                                 inThinkingTag = false;
                                                 const afterTag = fullReply.split(/<\/thinking>|<\/thought>/).pop() || "";
-                                                if (afterTag.trim()) this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: afterTag, sessionId: this.sessionId });
+                                                if (afterTag.trim()) this.post('onAssistantChunk', afterTag);
                                             }
                                         } else {
-                                            this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: json.response, sessionId: this.sessionId });
+                                            this.post('onAssistantChunk', json.response);
                                         }
                                     }
                                     if (json.done) {
                                         if (inThinkingTag) {
                                             const afterPotentialTag = fullReply.replace(/<(thinking|thought)>[\s\S]*?(<\/(thinking|thought)>|$)/g, '').trim();
-                                            if (afterPotentialTag) this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: afterPotentialTag, sessionId: this.sessionId });
+                                            if (afterPotentialTag) this.post('onAssistantChunk', afterPotentialTag);
                                         }
                                         resolve(true); 
                                     }
@@ -421,26 +423,21 @@ export class MirrorAgent {
                                                 });
                                                 
                                                 const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
-                                                this.provider.postMessageToWebview({ type: 'onPatchApplied', value: { filepath: fp, diags, sessionId: this.sessionId } });
+                                                this.post('onPatchApplied', { filepath: fp, diags });
                                                 toolResult = diags.length > 0 ? `Patch auto-applied but found issues: ${JSON.stringify(diags)}` : "Patch auto-applied successfully.";
                                             } else {
-                                                this.provider.postMessageToWebview({ 
-                                                    type: 'requestDiffReview', 
-                                                    value: { 
+                                                this.post('requestDiffReview', { 
                                                         filepath: filepathRaw, 
                                                         original: res.data.original, 
                                                         content: res.data.content,
                                                         blocks,
-                                                        messageId: Date.now().toString(),
-                                                        sessionId: this.sessionId
-                                                    }, 
-                                                    sessionId: this.sessionId 
+                                                        messageId: Date.now().toString()
                                                 });
 
                                                 toolResult = "WAITING_FOR_USER_REVIEW";
                                                 this.history.push({ role: 'assistant', content: toolCall });
                                                 this.history.push({ role: 'system', content: "The user is now reviewing the proposed diff. Please wait for their response before continuing." });
-                                                this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+                                                this.post('onAssistantComplete');
                                                 return; 
                                             }
                                         }
@@ -461,20 +458,15 @@ export class MirrorAgent {
                                             toolResult += `\n[SYSTEM: Command exited with code ${res.data.code}. If this was unexpected, analyze the error and try to fix it.]`;
                                         }
                                     } else {
-                                        this.provider.postMessageToWebview({ 
-                                            type: 'requestTerminalReview', 
-                                            value: { 
+                                        this.post('requestTerminalReview', { 
                                                 command: cmd, 
-                                                dir: getAttr('dir') || ".", 
-                                                sessionId: this.sessionId 
-                                            }, 
-                                            sessionId: this.sessionId 
+                                                dir: getAttr('dir') || "." 
                                         });
 
                                         toolResult = "WAITING_FOR_TERMINAL_APPROVAL";
                                         this.history.push({ role: 'assistant', content: toolCall });
                                         this.history.push({ role: 'system', content: "The user is now reviewing this terminal command. Please wait for approval." });
-                                        this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+                                        this.post('onAssistantComplete');
                                         return; 
                                     }
                                 } else if (toolCall.includes('<add_knowledge')) {
@@ -487,14 +479,14 @@ export class MirrorAgent {
                             }
                         } catch (err: any) { toolResult = `Error: ${err.message}`; }
 
-                        this.provider.postMessageToWebview({ type: 'onToolTrace', value: { label: traceLabel, category: traceCategory, path: tracePath, result: toolResult.substring(0, 100) }, sessionId: this.sessionId });
+                        this.post('onToolTrace', { label: traceLabel, category: traceCategory, path: tracePath, result: toolResult.substring(0, 100) });
                         this.history.push({ role: 'assistant', content: toolCall });
                         this.history.push({ role: 'system', content: toolResult });
                         turnCount++;
                     }
                 } else {
                     const cleanReply = fullReply.replace(/<(thinking|thought)>[\s\S]*?(<\/(thinking|thought)>|$)/g, '').trim();
-                    this.provider.postMessageToWebview({ type: 'onAssistantMessage', value: cleanReply, sessionId: this.sessionId });
+                    this.post('onAssistantMessage', cleanReply);
                     this.history.push({ role: 'assistant', content: cleanReply });
                     break;
                 }

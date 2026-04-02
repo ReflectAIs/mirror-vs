@@ -95,16 +95,16 @@ function App() {
              }
            }, false);
            break;
-         case 'onAssistantMessage':
-           updateSession(message.sessionId || currentSessionId, (msg) => [
-             ...msg.filter(m => m.type !== 'status' && m.type !== 'chunk'), 
-             { id: Date.now().toString(), text: message.value, sender: 'assistant' }
-           ], false);
-           if (message.sessionId) {
-             setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
-           }
-           setBuddyStatus('idle');
-           break;
+          case 'onAssistantMessage':
+            updateSession(message.sessionId || currentSessionId, (msg) => [
+              ...msg.filter(m => m.type !== 'status' && m.type !== 'chunk'), 
+              { id: Date.now().toString(), text: message.value, sender: 'assistant' }
+            ], true); // Ensure completion is saved
+            if (message.sessionId) {
+              setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
+            }
+            setBuddyStatus('idle');
+            break;
          case 'onToolTrace':
            setBuddyStatus('working');
            updateSession(message.sessionId || currentSessionId, (msg) => {
@@ -131,13 +131,13 @@ function App() {
              setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
            }
            break;
-         case 'onPatchApplied':
-             updateSession(message.sessionId || currentSessionId, (msg) => [
-                 ...msg,
-                 { id: Date.now().toString(), text: `Patch applied. Diagnosing...`, sender: 'assistant' }
-             ], false);
-             break;
-          case 'requestTerminalReview':
+          case 'onPatchApplied':
+              updateSession(message.sessionId || currentSessionId, (msg) => [
+                  ...msg,
+                  { id: Date.now().toString(), text: `Patch applied. Diagnosing...`, sender: 'assistant' }
+              ], true); // Save the state after application
+              break;
+         case 'requestTerminalReview':
             updateSession(message.sessionId || currentSessionId, (msg) => [
               ...msg, 
               { 
@@ -147,7 +147,7 @@ function App() {
                 type: 'terminal', 
                 terminalData: message.value 
               }
-            ], false);
+            ], true);
             if (message.sessionId) {
               setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
             }
@@ -178,25 +178,31 @@ function App() {
     }
   }, [currentSession.messages, isGenerating]);
 
-  const updateSession = (sid: string, updateFn: (msgs: Message[]) => Message[], shouldSave: boolean = true) => {
-    setSessions(prev => {
-        const newSessions = [...prev];
-        const session = newSessions.find(s => s.id === sid);
-        const newMessages = updateFn(session ? session.messages : []);
-        const title = (session && session.title !== 'New Chat') ? session.title : (newMessages[0]?.text?.substring(0, 30) || 'New Chat');
+   const updateSession = (sid: string, updateFn: (msgs: Message[]) => Message[], shouldSave: boolean = true) => {
+     setSessions(prev => {
+         const sessionIndex = prev.findIndex(s => s.id === sid);
+         const currentSessions = [...prev];
+         let session: Session;
 
-        if (session) {
-            session.messages = newMessages;
-            session.title = title;
-        } else {
-            newSessions.unshift({ id: sid, title, messages: newMessages });
-        }
-        if (shouldSave) {
-            window.vscode.postMessage({ type: 'saveChat', value: newSessions.find(s => s.id === sid) });
-        }
-        return newSessions;
-    });
-  };
+         if (sessionIndex >= 0) {
+             const oldSession = currentSessions[sessionIndex];
+             const newMessages = updateFn(oldSession.messages);
+             const title = (oldSession.title && oldSession.title !== 'New Chat') ? oldSession.title : (newMessages[0]?.text?.substring(0, 30) || 'New Chat');
+             session = { ...oldSession, messages: newMessages, title };
+             currentSessions[sessionIndex] = session;
+         } else {
+             const newMessages = updateFn([]);
+             const title = newMessages[0]?.text?.substring(0, 30) || 'New Chat';
+             session = { id: sid, title, messages: newMessages };
+             currentSessions.unshift(session);
+         }
+
+         if (shouldSave) {
+             window.vscode.postMessage({ type: 'saveChat', value: session });
+         }
+         return currentSessions;
+     });
+   };
   const updateCurrentSession = (fn: (msgs: Message[]) => Message[], bubbleToTop = true) => {
       updateSession(currentSessionId, fn, bubbleToTop);
   };
