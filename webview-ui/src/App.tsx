@@ -42,6 +42,34 @@ interface Session {
 
 declare const vscode: any;
 
+interface ThoughtBlockProps {
+  content: string;
+  isStreaming?: boolean;
+}
+
+const ThoughtBlock: React.FC<ThoughtBlockProps> = ({ content, isStreaming }) => {
+  const [isOpen, setIsOpen] = React.useState(true);
+  
+  return (
+    <div className="thought-section">
+      <div className="thought-header" onClick={() => setIsOpen(!isOpen)}>
+        <div className="icon-group">
+          {isStreaming ? <div className="thought-pulse"></div> : <VscSymbolMethod />}
+          <span>{isStreaming ? 'Thinking...' : 'Thought Process'}</span>
+        </div>
+        <div className="toggle-icon" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+          <VscArrowLeft style={{ transform: 'rotate(-90deg)' }} />
+        </div>
+      </div>
+      {isOpen && (
+        <div className="thought-content">
+          <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [input, setInput] = useState('');
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -406,36 +434,52 @@ function App() {
                         </div>
                       ) : (
                         <div className="text markdown-body">
-                          <ReactMarkdown
-                            components={{
-                              code({node, inline, className, children, ...props}: any) {
-                                const match = /language-(\w+)/.exec(className || '');
-                                const content = String(children).trim();
-                                if (inline && isFilePath(content)) {
-                                    return (
-                                        <span className="file-link" onClick={() => handleFileClick(content)}>
-                                            {children}
-                                        </span>
-                                    );
-                                }
-                                return !inline && match ? (
-                                  <SyntaxHighlighter
-                                    {...props}
-                                    children={String(children).replace(/\n$/, '')}
-                                    style={vscDarkPlus}
-                                    language={match[1]}
-                                    PreTag="div"
-                                  />
-                                ) : (
-                                  <code {...props} className={className}>
-                                    {children}
-                                  </code>
-                                )
-                              }
-                            }}
-                          >
-                            {msg.text}
-                          </ReactMarkdown>
+                             {(() => {
+                               // Logic to split thinking from main content
+                               const thinkingMatch = /<(thinking|thought)>([\s\S]*?)(?:<\/\1>|$)/.exec(msg.text);
+                               const mainText = msg.text.replace(/<(thinking|thought)>[\s\S]*?(?:<\/\1>|$)/, '').trim();
+                               
+                               return (
+                                 <>
+                                   {thinkingMatch && (
+                                     <ThoughtBlock 
+                                       content={thinkingMatch[2]} 
+                                       isStreaming={!msg.text.includes('</thinking>') && !msg.text.includes('</thought>')} 
+                                     />
+                                   )}
+                                   <ReactMarkdown
+                                     components={{
+                                       code({node, inline, className, children, ...props}: any) {
+                                         const match = /language-(\w+)/.exec(className || '');
+                                         const content = String(children).trim();
+                                         if (inline && isFilePath(content)) {
+                                             return (
+                                                 <span className="file-link" onClick={() => handleFileClick(content)}>
+                                                     {children}
+                                                 </span>
+                                             );
+                                         }
+                                         return !inline && match ? (
+                                           <SyntaxHighlighter
+                                             {...props}
+                                             children={String(children).replace(/\n$/, '')}
+                                             style={vscDarkPlus}
+                                             language={match[1]}
+                                             PreTag="div"
+                                           />
+                                         ) : (
+                                           <code {...props} className={className}>
+                                             {children}
+                                           </code>
+                                         )
+                                       }
+                                     }}
+                                   >
+                                     {mainText}
+                                   </ReactMarkdown>
+                                 </>
+                               );
+                             })()}
                         </div>
                       )}
                     </div>

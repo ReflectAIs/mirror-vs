@@ -157,35 +157,55 @@ export class MirrorAgent {
 
     private async performDreamCompaction(ollamaUrl: string, ollamaModel: string): Promise<void> {
         this.log("Starting Auto-Dream Compaction...");
-        this.post('onToolTrace', { label: 'Dreaming...', category: 'analyzing', result: 'Compressing 40+ turns of history to free the context window.' });
+        this.post('onToolTrace', { label: 'Dreaming...', category: 'analyzing', result: 'Consolidating history into a permanent Memory Stone.' });
         
         const rawHistory = this.history.map(t => `${t.role.toUpperCase()}: ${t.content}`).join('\n');
-        const prompt = `You are a memory compaction module. Review this recent agent transcript and extract ALL concrete facts, file structures, bugs fixed, and architectural discoveries made. Output ONLY a concise Markdown summary of what you learned. Do not add introductory conversational text.\n\nTRANSCRIPT:\n${rawHistory}`;
+        const prompt = `You are a memory compaction module for Mirror Code. Review this transcript and extract EVERY concrete architectural discovery, file path, bug fix, and environment detail. 
+Output ONLY a JSON object: {"summary": "Brief 1-sentence recap", "stones": [{"topic": "...", "content": "detailed facts", "tags": ["tag1", "tag2"]}]}.
+No other text.
+
+TRANSCRIPT:
+${rawHistory}`;
         
         try {
             const res = await axios.post(`${ollamaUrl}/api/generate`, { model: ollamaModel, prompt, stream: false });
-            const summary = res.data.response;
+            let response = res.data.response.trim();
+            // Basic JSON cleaning if model adds markdown blocks
+            response = response.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+            const compaction = JSON.parse(response);
             
-            // Add to Knowledge Bank
-            await this.addKnowledge("Auto-Dream Summary", summary);
+            const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
+            const memoryPath = path.join(root, '.mirror', 'memory.json');
+            
+            let memory = { stones: [] };
+            if (fs.existsSync(memoryPath)) {
+                memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
+            }
+            
+            const timestamp = new Date().toISOString();
+            compaction.stones.forEach((s: any) => {
+                (memory as any).stones.push({ ...s, timestamp, id: Math.random().toString(36).substring(7) });
+            });
+            
+            if (!fs.existsSync(path.dirname(memoryPath))) fs.mkdirSync(path.dirname(memoryPath), { recursive: true });
+            fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+            
+            // Still update the Knowledge Bank for human readability
+            await this.addKnowledge(`Dream_${timestamp.replace(/[:.-]/g, '_')}`, compaction.summary);
             
             // Project Index Refresh (Kairos)
-            const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
             const files = await this.recursiveList(root);
-            const indexContent = `# Project Index (Refreshed via Kairos)\n\nLast Refresh: ${new Date().toISOString()}\n\n${files.map(f => `- ${f}`).join('\n')}`;
+            const indexContent = `# Project Index (Refreshed via Kairos)\n\nLast Refresh: ${timestamp}\n\n${files.map(f => `- ${f}`).join('\n')}`;
             const indexPath = path.join(root, '.mirror', 'INDEX.md');
-            
-            if (!fs.existsSync(path.dirname(indexPath))) fs.mkdirSync(path.dirname(indexPath), { recursive: true });
             fs.writeFileSync(indexPath, indexContent);
             
-            this.log("Auto-Dream indexing complete.");
+            this.log(`Memory consolidated. ${compaction.stones.length} new Stones added.`);
             
             // Wipe history but keep initial goal
             const initialGoal = this.history.length > 0 ? this.history[0] : null;
             this.history = initialGoal ? [initialGoal] : [];
-            this.history.push({ role: 'system', content: '[SYSTEM: Previous turns were compacted into .mirror/knowledge/context_compaction.md. You are continuing the same task with a refreshed context window.]' });
+            this.history.push({ role: 'system', content: `[SYSTEM: Previous turns consolidated into a Memory Stone. Summary: ${compaction.summary}. You can use <recall_memory query="..." /> to fetch details if needed.]` });
             
-            this.log("Auto-Dream Compaction complete. History wiped.");
         } catch (e: any) { this.log(`Dreaming failed: ${e.message}`); }
     }
 
@@ -223,7 +243,7 @@ export class MirrorAgent {
         this.abortController = new AbortController();
 
         let turnCount = 0;
-        const completeToolPattern = /<(search_vector_db|grep_search|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal)(\s+[^>]*)?\/?>|<(patch_file|write_file|add_knowledge)(\s+[^>]*)?>([\s\S]*?)<\/\3>/;
+        const completeToolPattern = /<(search_vector_db|grep_search|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal|recall_memory)(\s+[^>]*)?\/?>|<(patch_file|write_file|add_knowledge)(\s+[^>]*)?>([\s\S]*?)<\/\3>/;
 
         while (turnCount < maxTurns) {
             if (this.abortController.signal.aborted) break;
@@ -312,9 +332,11 @@ export class MirrorAgent {
 
                 const globalToolPattern = new RegExp(completeToolPattern.source, 'g');
                 const toolMatches = [...fullReply.matchAll(globalToolPattern)];
+                let pauseForReview = false;
 
                 if (toolMatches.length > 0) {
                     for (const match of toolMatches) {
+                        if (this.abortController.signal.aborted) break;
                         const toolCall = match[0];
                         let toolResult = "";
                         let traceLabel = "";
@@ -437,8 +459,8 @@ export class MirrorAgent {
                                                 toolResult = "WAITING_FOR_USER_REVIEW";
                                                 this.history.push({ role: 'assistant', content: toolCall });
                                                 this.history.push({ role: 'system', content: "The user is now reviewing the proposed diff. Please wait for their response before continuing." });
-                                                this.post('onAssistantComplete');
-                                                return; 
+                                                
+                                                pauseForReview = true;
                                             }
                                         }
                                     }
@@ -466,9 +488,29 @@ export class MirrorAgent {
                                         toolResult = "WAITING_FOR_TERMINAL_APPROVAL";
                                         this.history.push({ role: 'assistant', content: toolCall });
                                         this.history.push({ role: 'system', content: "The user is now reviewing this terminal command. Please wait for approval." });
-                                        this.post('onAssistantComplete');
-                                        return; 
+                                        pauseForReview = true;
                                     }
+                                } else if (toolCall.includes('<recall_memory')) {
+                                    const q = getAttr('query').toLowerCase();
+                                    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
+                                    const memoryPath = path.join(root, '.mirror', 'memory.json');
+                                    
+                                    if (!fs.existsSync(memoryPath)) {
+                                        toolResult = "No memory stones found.";
+                                    } else {
+                                        const memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
+                                        const matches = (memory.stones as any[]).filter((s: any) => 
+                                            s.topic.toLowerCase().includes(q) || 
+                                            s.content.toLowerCase().includes(q) ||
+                                            s.tags.some((t: string) => t.toLowerCase().includes(q))
+                                        ).slice(0, 5);
+                                        
+                                        toolResult = matches.length > 0 
+                                            ? `Found ${matches.length} relevant Memory Stones:\n\n` + matches.map(m => `### Topic: ${m.topic}\nContent: ${m.content}\nTags: ${m.tags.join(', ')}`).join('\n\n')
+                                            : `No memories found matching "${q}". Try a broader query or checking the project directory manually.`;
+                                    }
+                                    traceLabel = `Recalling Memory: ${q}`;
+                                    traceCategory = 'analyzing';
                                 } else if (toolCall.includes('<add_knowledge')) {
                                     const t = getAttr('topic') || "General";
                                     const c = /<add_knowledge[^>]*>([\s\S]*?)<\/add_knowledge>/.exec(toolCall)?.[1]?.trim() || "";
@@ -484,10 +526,14 @@ export class MirrorAgent {
                         this.history.push({ role: 'system', content: toolResult });
                         turnCount++;
                     }
+
+                    if (pauseForReview) {
+                        
+                        return;
+                    }
                 } else {
-                    const cleanReply = fullReply.replace(/<(thinking|thought)>[\s\S]*?(<\/(thinking|thought)>|$)/g, '').trim();
-                    this.post('onAssistantMessage', cleanReply);
-                    this.history.push({ role: 'assistant', content: cleanReply });
+                    this.post('onAssistantMessage', fullReply);
+                    this.history.push({ role: 'assistant', content: fullReply });
                     break;
                 }
             } catch (err: any) { break; }
@@ -553,6 +599,7 @@ History is transient; the Knowledge Bank is eternal.
    - <patch_file filepath="relative/path"><search>exact code to find</search><replace>new code</replace></patch_file>
    - <write_file filepath="relative/path">full content</write_file>
    - <add_knowledge topic="String">markdown documentation</add_knowledge>
+   - <recall_memory query="context to search for" /> (Searches your past consolidations and project history)
    - <get_symbols filepath="path" /> (Lists all classes/methods in a file)
    - <get_diagnostics filepath="path" /> (Checks for Lint/Type errors)
 8. Creation vs Edit: Use <write_file /> exclusively for creating NEW files or completely overwriting existing ones. Use <patch_file /> for targeted edits to existing files.

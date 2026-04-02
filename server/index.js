@@ -193,23 +193,64 @@ app.post('/tools/run_terminal', async (req, res) => {
 function applyPatch(content, blocks) {
     let result = content;
     for (const block of blocks) {
-        const { search, replace } = block;
+        let { search, replace } = block;
         let index = result.indexOf(search);
         
         if (index === -1) {
-            // Fallback: Strip all whitespace to see if the model just messed up the indentation
-            const normalize = (str) => str.replace(/\s+/g, '');
-            const normalizedResult = normalize(result);
+            // SMART FALLBACK: Normalize all whitespace to find a fuzzy match
+            const normalize = (str) => str.replace(/\s+/g, ' ').trim();
+            const normalizedContent = normalize(result);
             const normalizedSearch = normalize(search);
             
-            const normalizedIndex = normalizedResult.indexOf(normalizedSearch);
-            if (normalizedIndex !== -1) {
-                // We throw the error so it feeds back to the LLM in the chat history,
-                // forcing the agent to say "Oops, I messed up the spaces. Let me try again."
-                throw new Error(`Found match but whitespace differs. The LLM needs to provide exact indentation.`);
-            } else {
-                throw new Error(`Could not find search block in file. Ensure the <search> block exactly matches existing code.`);
+            // Search in normalized space
+            const normIndex = normalizedContent.indexOf(normalizedSearch);
+            if (normIndex !== -1) {
+                // Approximate location in original string
+                // We'll use a sliding window of character sequences to find the real index
+                const searchTokens = search.trim().split(/\s+/);
+                const firstToken = searchTokens[0];
+                const lastToken = searchTokens[searchTokens.length - 1];
+                
+                let bestIndex = -1;
+                let minDiff = Infinity;
+                
+                // Find all occurrences of the first token
+                let pos = result.indexOf(firstToken);
+                while (pos !== -1) {
+                    const potentialMatch = result.substring(pos, pos + search.length + 100);
+                    if (normalize(potentialMatch).startsWith(normalizedSearch)) {
+                        bestIndex = pos;
+                        break;
+                    }
+                    pos = result.indexOf(firstToken, pos + 1);
+                }
+                
+                if (bestIndex !== -1) {
+                    // We found it! Now we need to determine the EXACT end of the match in the original string
+                    // to prevent deleting too much or too little.
+                    let searchBuffer = "";
+                    let originalPos = bestIndex;
+                    let searchTokensMatched = 0;
+                    const tokens = search.trim().split(/\s+/);
+                    
+                    while (searchTokensMatched < tokens.length && originalPos < result.length) {
+                        const word = result.substring(originalPos).match(/^\s*\S+/);
+                        if (word && normalize(word[0]) === normalize(tokens[searchTokensMatched])) {
+                            originalPos += word[0].length;
+                            searchTokensMatched++;
+                        } else {
+                            originalPos++;
+                        }
+                    }
+                    
+                    index = bestIndex;
+                    search = result.substring(bestIndex, originalPos);
+                }
             }
+        }
+
+        if (index === -1) {
+            throw new Error(`Could not find search block in file. Ensure the <search> block matches existing code (even if indentation differs).`);
         }
         
         if (result.indexOf(search, index + 1) !== -1) {

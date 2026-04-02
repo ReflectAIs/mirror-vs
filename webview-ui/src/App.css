@@ -469,6 +469,67 @@ body {
   padding: 0;
 }
 
+/* Thinking Blocks */
+.thought-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  margin: 10px 0;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.thought-header {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.thought-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.thought-header .icon-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thought-content {
+  padding: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-style: italic;
+  border-top: 1px solid var(--border-subtle);
+  background: hsla(0, 0%, 0%, 0.2);
+}
+
+.thought-pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 var(--accent-glow);
+  animation: thinking-pulse 2s infinite;
+}
+
+@keyframes thinking-pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 hsla(210, 100%, 60%, 0.5); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px hsla(210, 100%, 60%, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 hsla(210, 100%, 60%, 0); }
+}
+
 /* Thinking */
 .thinking {
   background: transparent !important;
@@ -479,6 +540,7 @@ body {
   gap: 8px;
   font-style: italic;
   font-size: 12px;
+  margin-top: 4px;
 }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
