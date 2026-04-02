@@ -80,6 +80,18 @@ app.post('/tools/read_file', async (req, res) => {
         // Normalize range
         if (start < 1) start = 1;
         if (end > totalLines) end = totalLines;
+        
+        // If start is completely out of bounds, return empty
+        if (start > totalLines) {
+            return res.json({ 
+                content: "",
+                totalLines,
+                start,
+                end: totalLines,
+                note: `EOF reached. Total lines in file: ${totalLines}`
+            });
+        }
+
         if (start > end) {
             return res.status(400).json({ error: `Invalid range: start_line (${start}) is greater than end_line (${end}).` });
         }
