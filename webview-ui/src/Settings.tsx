@@ -14,13 +14,15 @@ interface SettingsData {
   ollamaUrl: string;
   ollamaModel: string;
   maxTurns: number;
+  autonomousMode: boolean;
 }
 
 export default function Settings({ onBack }: SettingsProps) {
   const [settings, setSettings] = useState<SettingsData>({
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'codellama',
-    maxTurns: 20
+    maxTurns: 20,
+    autonomousMode: false
   });
   const [models, setModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -119,11 +121,24 @@ export default function Settings({ onBack }: SettingsProps) {
           <input 
             type="number" 
             min="1" 
-            max="50"
+            max="100"
             value={settings.maxTurns} 
             onChange={(e) => setSettings({ ...settings, maxTurns: parseInt(e.target.value) || 20 })}
           />
           <p className="setting-hint">Maximum reasoning turns before the agent stops.</p>
+        </div>
+
+        <div className="setting-item">
+           <label style={{ color: settings.autonomousMode ? 'var(--success)' : 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+             <input 
+               type="checkbox" 
+               checked={settings.autonomousMode} 
+               onChange={(e) => setSettings({ ...settings, autonomousMode: e.target.checked })}
+               style={{ width: '16px', height: '16px' }}
+             />
+             TRUE AUTONOMY (EXPERIMENTAL)
+           </label>
+           <p className="setting-hint">If enabled, the agent will run indefinitely and auto-apply patches. Perfect for overnight tasks.</p>
         </div>
 
         <button className="save-button" onClick={handleSave}>

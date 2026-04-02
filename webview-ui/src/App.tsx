@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { VscSend, VscHistory, VscSettingsGear, VscTrash, VscArrowLeft, VscLoading, VscTerminal, VscSearch, VscFile, VscFolder, VscStopCircle } from 'react-icons/vsc'
+import { VscSend, VscHistory, VscSettingsGear, VscTrash, VscArrowLeft, VscLoading, VscTerminal, VscSearch, VscFile, VscFolder, VscStopCircle, VscCheck, VscClose, VscSymbolMethod, VscWarning } from 'react-icons/vsc'
 import './App.css'
 import Settings from './Settings'
 import defaultLogo from './assets/logo.png'
@@ -34,7 +34,6 @@ interface Session {
   id: string;
   title: string;
   messages: Message[];
-  mode: 'planning' | 'coding';
 }
 
 declare const vscode: any;
@@ -46,18 +45,19 @@ function App() {
    const [generatingSessions, setGeneratingSessions] = useState<Record<string, boolean>>({});
    const isGenerating = generatingSessions[currentSessionId] || false;
   const [view, setView] = useState<'chat' | 'history' | 'settings'>('chat');
-  const [mode, setMode] = useState<'planning' | 'coding'>('planning');
   const [logoUri, setLogoUri] = useState<string>(defaultLogo);
+  const [autonomousMode, setAutonomousMode] = useState(false);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const currentSession = sessions.find(s => s.id === currentSessionId) || {
-    id: currentSessionId, title: 'New Chat', messages: [], mode: mode
+    id: currentSessionId, title: 'New Chat', messages: []
   };
 
   useEffect(() => {
     window.vscode.postMessage({ type: 'ready' });
     window.vscode.postMessage({ type: 'getHistory' });
+    window.vscode.postMessage({ type: 'getSettings' });
 
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
@@ -65,9 +65,12 @@ function App() {
         case 'onInitialize':
           if (message.value.logoUri) setLogoUri(message.value.logoUri);
           break;
-         case 'onHistory':
-           if (message.value) setSessions(message.value);
-           break;
+        case 'onHistory':
+          if (message.value) setSessions(message.value);
+          break;
+        case 'onSettings':
+          if (message.value) setAutonomousMode(message.value.autonomousMode);
+          break;
          case 'onActiveGenerations':
            if (message.value) {
              const activeMap: Record<string, boolean> = {};
@@ -157,13 +160,13 @@ function App() {
         const title = newMessages.find(m => m.sender === 'user')?.text.substring(0, 30) || 'New Chat';
 
         if (index >= 0) {
-            newSessions[index] = { ...prev[index], messages: newMessages, title, mode };
+            newSessions[index] = { ...prev[index], messages: newMessages, title };
             if (bubbleToTop) {
                 const item = newSessions.splice(index, 1)[0];
                 newSessions.unshift(item);
             }
         } else {
-            newSessions.unshift({ id: sid, title, messages: newMessages, mode });
+            newSessions.unshift({ id: sid, title, messages: newMessages });
         }
         window.vscode.postMessage({ type: 'saveChat', value: newSessions.find(s => s.id === sid) });
         return newSessions;
@@ -179,8 +182,21 @@ function App() {
     const userMsg: Message = { id: Date.now().toString(), text: input, sender: 'user' };
     updateCurrentSession((msg) => [...msg, userMsg], true);
     setGeneratingSessions(prev => ({ ...prev, [currentSessionId]: true }));
-    window.vscode.postMessage({ type: 'onUserMessage', value: input, mode, sessionId: currentSessionId });
+    window.vscode.postMessage({ type: 'onUserMessage', value: input, sessionId: currentSessionId });
     setInput('');
+  };
+
+  const handleFileClick = (path: string) => {
+    window.vscode.postMessage({ type: 'openFile', value: path });
+  };
+
+  const isFilePath = (text: string) => {
+    const t = text.trim();
+    if (!t || t.length > 255) return false;
+    
+    const fileRegex = /^(\.?[\w\-\.\/]+)\.([a-z0-9]+)$|^(Dockerfile|LICENSE|README|Makefile|COMMIT_EDITMSG)$|^\.[\w\-]+$/i;
+    // Basic heuristics: must contain a dot (for extension/hidden) OR be a known suffix-less file
+    return fileRegex.test(t);
   };
 
   const handleStop = () => {
@@ -219,9 +235,39 @@ function App() {
   const getToolIcon = (label: string) => {
     if (label.includes('Listing')) return <VscFolder />;
     if (label.includes('Reading') || label.includes('Skeleton')) return <VscFile />;
-    if (label.includes('Searching')) return <VscSearch />;
+    if (label.includes('Searching') || label.includes('Grep')) return <VscSearch />;
     if (label.includes('Terminal')) return <VscTerminal />;
+    if (label.includes('Symbols')) return <VscSymbolMethod />;
+    if (label.includes('Diagnostics')) return <VscWarning />;
+    if (label.includes('Dreaming')) return <VscLoading className="spinning" />;
     return <VscSettingsGear />;
+  };
+
+  const renderDiffLines = (original: string, modified: string) => {
+    const oldLines = original.split('\n');
+    const newLines = modified.split('\n');
+    const result: any[] = [];
+    
+    // Simple diff logic for UI visualization
+    let i = 0, j = 0;
+    while (i < oldLines.length || j < newLines.length) {
+      if (oldLines[i] === newLines[j]) {
+        result.push({ type: 'context', text: oldLines[i] });
+        i++; j++;
+      } else if (i < oldLines.length && !newLines.includes(oldLines[i])) {
+        result.push({ type: 'removed', text: oldLines[i] });
+        i++;
+      } else if (j < newLines.length && !oldLines.includes(newLines[j])) {
+        result.push({ type: 'added', text: newLines[j] });
+        j++;
+      } else {
+        // Fallback for complex changes
+        if (i < oldLines.length) { result.push({ type: 'removed', text: oldLines[i] }); i++; }
+        if (j < newLines.length) { result.push({ type: 'added', text: newLines[j] }); j++; }
+      }
+      if (result.length > 100) break; // Cap UI diff for performance
+    }
+    return result;
   };
 
   return (
@@ -230,10 +276,11 @@ function App() {
         <div className="brand">
           <img src={logoUri} className="logo-img" alt="logo" />
           <div className="brand-name">MIRROR <span>CODE</span></div>
-          <select className="mode-select" value={mode} onChange={(e) => setMode(e.target.value as any)}>
-            <option value="planning">Planning</option>
-            <option value="coding">Coding</option>
-          </select>
+          {autonomousMode && (
+            <div className="autonomous-badge">
+              <VscSettingsGear className="spinning" /> AUTONOMOUS
+            </div>
+          )}
         </div>
         <div className="header-right">
           <button className="nav-btn" onClick={() => setView('history')}><VscHistory /></button>
@@ -262,15 +309,40 @@ function App() {
                         </div>
                       ) : msg.type === 'diff' ? (
                         <div className="diff-card">
-                          <div className="diff-header">{msg.text}</div>
-                          <button className="apply-btn" onClick={() => commitPatch(msg.diffData)}>Apply Change</button>
+                          <div className="diff-header">
+                            <span className="diff-title">{msg.diffData.filepath}</span>
+                          </div>
+                          <div className="diff-content">
+                            {renderDiffLines(msg.diffData.original || '', msg.diffData.content || '').map((line, idx) => (
+                              <div key={idx} className={`diff-line ${line.type}`}>
+                                <span className="diff-indicator">{line.type === 'added' ? '+' : (line.type === 'removed' ? '-' : ' ')}</span>
+                                <span className="diff-text">{line.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="diff-actions">
+                            <button className="apply-btn" onClick={() => commitPatch(msg.diffData)}>
+                              <VscCheck /> Apply Changes
+                            </button>
+                            <button className="discard-btn" onClick={() => updateCurrentSession(msgs => msgs.filter(m => m.id !== msg.id), false)}>
+                              <VscClose /> Discard
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="text markdown-body">
                           <ReactMarkdown
                             components={{
                               code({node, inline, className, children, ...props}: any) {
-                                const match = /language-(\w+)/.exec(className || '')
+                                const match = /language-(\w+)/.exec(className || '');
+                                const content = String(children).trim();
+                                if (inline && isFilePath(content)) {
+                                    return (
+                                        <span className="file-link" onClick={() => handleFileClick(content)}>
+                                            {children}
+                                        </span>
+                                    );
+                                }
                                 return !inline && match ? (
                                   <SyntaxHighlighter
                                     {...props}
@@ -327,7 +399,6 @@ function App() {
               <div key={s.id} className={`history-item ${s.id === currentSessionId ? 'active' : ''}`} onClick={() => switchSession(s.id)}>
                 <div className="history-info">
                   <div className="history-title">{s.title || 'Empty chat'}</div>
-                  <div className="history-type">{s.mode} mode</div>
                 </div>
                 <button className="delete-btn" onClick={(e) => deleteSession(s.id, e)}><VscTrash /></button>
               </div>

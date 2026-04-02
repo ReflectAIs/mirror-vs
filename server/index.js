@@ -32,6 +32,9 @@ app.post('/index', async (req, res) => {
 app.post('/tools/read_skeleton', async (req, res) => {
     const { filepath } = req.body;
     try {
+        if (!fs.existsSync(filepath)) {
+            return res.status(404).json({ error: `File not found at: ${filepath}` });
+        }
         if (fs.statSync(filepath).isDirectory()) {
             return res.status(400).json({ error: 'This is a directory. Use list_dir instead to see its contents.' });
         }
@@ -55,16 +58,39 @@ app.post('/tools/search_vector_db', async (req, res) => {
 
 // Tool: Read arbitrary file
 app.post('/tools/read_file', async (req, res) => {
-    const { filepath } = req.body;
+    const { filepath, start_line, end_line } = req.body;
     try {
+        if (!fs.existsSync(filepath)) {
+            return res.status(404).json({ error: `File not found at: ${filepath}` });
+        }
         if (filepath.includes('..') || filepath.startsWith('/var') || filepath.startsWith('/etc')) {
              return res.status(403).json({ error: 'Access denied: Path is outside workspace or restricted.' });
         }
         if (fs.statSync(filepath).isDirectory()) {
             return res.status(400).json({ error: 'This is a directory. Use list_dir instead to see its contents.' });
         }
-        const content = fs.readFileSync(filepath, 'utf8');
-        res.json({ content });
+        
+        const fullContent = fs.readFileSync(filepath, 'utf8');
+        const lines = fullContent.split('\n');
+        const totalLines = lines.length;
+        
+        let start = parseInt(start_line) || 1;
+        let end = parseInt(end_line) || totalLines;
+        
+        // Normalize range
+        if (start < 1) start = 1;
+        if (end > totalLines) end = totalLines;
+        if (start > end) {
+            return res.status(400).json({ error: `Invalid range: start_line (${start}) is greater than end_line (${end}).` });
+        }
+
+        const slicedContent = lines.slice(start - 1, end).join('\n');
+        res.json({ 
+            content: slicedContent,
+            totalLines,
+            start,
+            end
+        });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -89,12 +115,52 @@ app.post('/tools/write_file', async (req, res) => {
 app.post('/tools/list_dir', async (req, res) => {
     const { dirpath } = req.body;
     try {
+        if (!fs.existsSync(dirpath)) {
+            return res.status(404).json({ error: `Directory not found at: ${dirpath}` });
+        }
         const files = fs.readdirSync(dirpath, { withFileTypes: true });
         const results = files.map(f => ({
             name: f.name,
             isDirectory: f.isDirectory()
         }));
         res.json({ files: results });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Tool: Grep search (Recursive literal matching)
+app.post('/tools/grep_search', async (req, res) => {
+    const { root, query } = req.body;
+    const results = [];
+    const ignore = ['node_modules', '.git', '.mirror', 'dist', 'out'];
+    
+    function walk(dir) {
+        const files = fs.readdirSync(dir, { withFileTypes: true });
+        for (const f of files) {
+            const fullPath = path.join(dir, f.name);
+            if (ignore.some(i => fullPath.includes(i))) continue;
+            if (f.isDirectory()) {
+                walk(fullPath);
+            } else if (f.isFile()) {
+                try {
+                    const content = fs.readFileSync(fullPath, 'utf8');
+                    if (content.toLowerCase().includes(query.toLowerCase())) {
+                        const lines = content.split('\n');
+                        lines.forEach((l, i) => {
+                            if (l.toLowerCase().includes(query.toLowerCase())) {
+                                results.push({ file: fullPath, line: i + 1, text: l.trim() });
+                            }
+                        });
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
+    try {
+        walk(root || ".");
+        res.json({ results: results.slice(0, 100) }); // Cap at 100 results for context safety
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

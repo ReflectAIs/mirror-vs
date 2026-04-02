@@ -2,10 +2,20 @@ import * as vscode from 'vscode';
 import axios from 'axios';
 import * as path from 'path';
 import * as http from 'http';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+interface Turn {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
 
 export class MirrorAgent {
-    private abortController?: AbortController;
-    private turnSummaries: string[] = [];
+    private abortController: AbortController | undefined;
+    private lastToolCall: string = "";
+    private history: Turn[] = [];
 
     constructor(
         private readonly sessionId: string,
@@ -13,32 +23,68 @@ export class MirrorAgent {
         private readonly output: vscode.OutputChannel
     ) { }
 
-    private async loadMemory(): Promise<string> {
+    private async loadMemoryIndex(): Promise<string> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) return "";
 
-        const memoryPath = path.join(workspaceFolder.uri.fsPath, '.mirror', 'MEMORY.md');
+        const indexPath = path.join(workspaceFolder.uri.fsPath, '.mirror', 'INDEX.md');
         try {
-            const data = await vscode.workspace.fs.readFile(vscode.Uri.file(memoryPath));
+            const data = await vscode.workspace.fs.readFile(vscode.Uri.file(indexPath));
             return Buffer.from(data).toString('utf8');
         } catch {
-            return "No previous project memory found. This is a new session or a new project.";
+            return "No Knowledge Index found. Use <add_knowledge> to start recording facts.";
         }
     }
 
-    private async saveMemory(content: string) {
+    private async addKnowledge(topic: string, content: string): Promise<string> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) return;
+        if (!workspaceFolder) return "Error: No workspace";
 
         const mirrorDir = path.join(workspaceFolder.uri.fsPath, '.mirror');
-        const memoryPath = path.join(mirrorDir, 'MEMORY.md');
+        const knowledgeDir = path.join(mirrorDir, 'knowledge');
+        
+        // Clean topic name for filename
+        const safeTopic = topic.replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 50);
+        const topicPath = path.join(knowledgeDir, `${safeTopic}.md`);
+        const indexPath = path.join(mirrorDir, 'INDEX.md');
         
         try {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(mirrorDir));
-            await vscode.workspace.fs.writeFile(vscode.Uri.file(memoryPath), Buffer.from(content, 'utf8'));
-            this.log(`Memory updated in ${memoryPath}`);
+            await vscode.workspace.fs.createDirectory(vscode.Uri.file(knowledgeDir));
+            
+            // Append to topic file
+            const timestamp = new Date().toISOString();
+            const newContent = `\n## [${timestamp}]\n${content}\n`;
+            
+            let existingContent = "";
+            try {
+                const data = await vscode.workspace.fs.readFile(vscode.Uri.file(topicPath));
+                existingContent = Buffer.from(data).toString('utf8');
+            } catch {
+                existingContent = `# Topic: ${topic}\n`;
+            }
+            
+            await vscode.workspace.fs.writeFile(vscode.Uri.file(topicPath), Buffer.from(existingContent + newContent, 'utf8'));
+            
+            // Update INDEX.md
+            let indexContent = "";
+            try {
+                const data = await vscode.workspace.fs.readFile(vscode.Uri.file(indexPath));
+                indexContent = Buffer.from(data).toString('utf8');
+            } catch {
+                indexContent = "# MASTER KNOWLEDGE INDEX\n\nWhen you need details, use <read_file filepath=\".mirror/knowledge/[topic].md\" />\n\n### KNOWN TOPICS:\n";
+            }
+            
+            if (!indexContent.includes(`- ${safeTopic}.md`)) {
+                indexContent += `- ${safeTopic}.md (Topic: ${topic})\n`;
+                await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(indexContent, 'utf8'));
+            }
+            
+            this.log(`Knowledge added to .mirror/knowledge/${safeTopic}.md`);
+            return `Knowledge successfully appended to .mirror/knowledge/${safeTopic}.md. The INDEX has been updated.`;
         } catch (e) {
-            this.log(`Failed to save memory: ${e}`);
+            this.log(`Failed to save knowledge: ${e}`);
+            return `Failed to save knowledge: ${e}`;
         }
     }
 
@@ -61,21 +107,13 @@ export class MirrorAgent {
         const root = workspaceFolder.uri.fsPath;
         const rootName = workspaceFolder.name;
 
-        // 1. Normalize the path (resolve any .. or //)
         let normalized = path.normalize(p).replace(/[\\\/]+$/, '');
-
-        // 2. Prison Mode (Base behavior): Strip drive letters and leading slashes 
-        // This ensures "C:\Windows\..." becomes "Windows\..." relative to the root.
         let stripped = normalized.replace(/^([a-zA-Z]:)?[\\\/]+/, '').replace(/\.\.\//g, '');
         
-        // 3. Handle Hallucinated Root Prefix recursively
-        // Some models include the workspace folder name multiple times:
-        // "OllamaModels/OllamaModels/test.txt" -> "test.txt"
         let count = 0;
         while (rootName && count < 10) {
             const lowerStripped = stripped.toLowerCase();
             const lowerRootName = rootName.toLowerCase();
-            
             if (lowerStripped.startsWith(lowerRootName + path.sep)) {
                 stripped = stripped.substring(rootName.length).replace(/^[\\\/]+/, '');
             } else if (lowerStripped === lowerRootName) {
@@ -86,124 +124,107 @@ export class MirrorAgent {
             }
             count++;
         }
-
-        // 4. Force interpretation relative to the actual workspace root
         return path.join(root, stripped);
     }
 
-    private async summarizeHistory(history: string, ollamaUrl: string, ollamaModel: string): Promise<string> {
-        this.log("Summarizing history to save context...");
-        this.provider.postMessageToWebview({ 
-            type: 'onToolTrace', 
-            value: { label: 'Compressing Context...', category: 'analyzing' },
-            sessionId: this.sessionId
-        });
+    private compactHistory(history: Turn[]): string {
+        let result = "";
+        
+        // Preserve the first Turn (Initial Goal)
+        if (history.length > 0) {
+            result += `Target Goal: ${history[0].content}\n\n`;
+        }
+
+        const recentTurns = history.slice(-8);
+        const middleTurns = history.slice(1, -8);
+        
+        if (middleTurns.length > 0) {
+            result += `[CONTEXT RECAP: The agent has completed ${middleTurns.length} turns of exploration and research. Key architectural findings are recorded in the .mirror/knowledge bank. Eliding detailed tool logs for efficiency.]\n\n`;
+        }
+        
+        for (const t of recentTurns) {
+            const block = `${t.role === 'user' ? 'User' : (t.role === 'system' ? 'System' : 'Assistant')}: ${t.content}\n`;
+            result += block;
+        }
+        
+        return result;
+    }
+
+    private async performDreamCompaction(ollamaUrl: string, ollamaModel: string): Promise<void> {
+        this.log("Starting Auto-Dream Compaction...");
+        this.provider.postMessageToWebview({ type: 'onToolTrace', value: { label: 'Dreaming...', category: 'analyzing', result: 'Compressing 40+ turns of history to free the context window.' }, sessionId: this.sessionId });
+        
+        const rawHistory = this.history.map(t => `${t.role.toUpperCase()}: ${t.content}`).join('\n');
+        const prompt = `You are a memory compaction module. Review this recent agent transcript and extract ALL concrete facts, file structures, bugs fixed, and architectural discoveries made. Output ONLY a concise Markdown summary of what you learned. Do not add introductory conversational text.\n\nTRANSCRIPT:\n${rawHistory}`;
+        
         try {
             const res = await axios.post(`${ollamaUrl}/api/generate`, {
                 model: ollamaModel,
-                prompt: `Summarize the following conversation history into a concise state description (max 2 sentences) that captures the user's goal and what has been accomplished so far. Focus on facts.\n\n${history}\n\nSummary:`,
+                prompt: prompt,
                 stream: false
-            }, { signal: this.abortController?.signal });
-            return res.data.response;
+            });
+            const summary = res.data.response;
+            await this.addKnowledge("context_compaction", summary);
+            
+            // Wipe history but keep initial goal
+            const initialGoal = this.history.length > 0 ? this.history[0] : null;
+            this.history = initialGoal ? [initialGoal] : [];
+            this.history.push({ role: 'system', content: '[SYSTEM: Previous turns were compacted into .mirror/knowledge/context_compaction.md. You are continuing the same task with a refreshed context window.]' });
+            
+            this.log("Auto-Dream Compaction complete. History wiped.");
         } catch (e) {
-            this.log(`Summarization failed: ${e}`);
-            return "History compression failed. Continuing with raw history.";
+            this.log(`Auto-Dream failed: ${e}`);
         }
     }
 
-    public async handleUserMessage(text: string, mode: 'planning' | 'coding' = 'coding') {
+    public async handleUserMessage(text: string) {
         const config = vscode.workspace.getConfiguration('mirror-code');
-        const maxTurns = config.get<number>('maxTurns') || 20;
-        this.log(`--- New Session (${mode}, maxTurns: ${maxTurns}) ---`);
-        this.log(`User Input: "${text}"`);
+        const isAutonomous = config.get<boolean>('autonomousMode') || false;
+        const maxTurns = isAutonomous ? 1000 : (config.get<number>('maxTurns') || 25);
+        const memoryIndex = await this.loadMemoryIndex();
+        const rootName = vscode.workspace.workspaceFolders?.[0]?.name || "current project";
 
-        let turn = 0;
-        let history = `User: ${text}\n`;
+        if (text) {
+            this.history.push({ role: 'user', content: text });
+        }
         this.abortController = new AbortController();
 
-        const memory = await this.loadMemory();
-        const isNewProject = memory.includes("No previous project memory found");
-        this.log(`Memory Loaded (New: ${isNewProject}). Enforcing Coordinator Protocols.`);
+        let turnCount = 0;
+        const completeToolPattern = /<(search_vector_db|grep_search|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal)\s+[^>]*\/?>|<(patch_file|write_file|add_knowledge)\s+[^>]*>[\s\S]*?<\/\2>/;
 
-        const completeToolPattern = /<(search_vector_db|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal|update_memory)\s+[^>]*\/>|<patch_file\s+[^>]*>[\s\S]*?<\/patch_file>/;
-
-        while (turn < maxTurns) {
-            if (this.abortController.signal.aborted) {
-                this.log('Aborted mid-turn.');
-                break;
-            }
-
-            if (turn > 0 && turn % 5 === 0) {
-                const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
-                const ollamaModel = config.get<string>('ollamaModel') || 'codellama';
-                const summary = await this.summarizeHistory(history, ollamaUrl, ollamaModel);
-                history = `[CONTEXT COMPRESSED] Previous activities: ${summary}\n`;
-            }
+        while (turnCount < maxTurns) {
+            if (this.abortController.signal.aborted) break;
 
             const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
-            const ollamaModel = config.get<string>('ollamaModel') || 'codellama';
+            const ollamaModel = config.get<string>('ollamaModel') || 'qwen3.5:4b';
 
-            const rootName = vscode.workspace.workspaceFolders?.[0]?.name || "current project";
-            const systemPrompt = mode === 'planning' ?
-                `You are Mirror Code in PLANNING mode. Focus on architectural advice. No file writing.
-IMPORTANT: You are OPERATING ONLY WITHIN the "${rootName}" workspace. Use ONLY relative paths.
-If you need to call a tool, output the XML tag and STOP immediately. Do NOT hallucinate results.
-Tools: 
-1. <search_vector_db query="term" />
-2. <read_skeleton filepath="path" />
-3. <read_file filepath="path" />
-4. <list_dir dirpath="path" />` :
-                `You are Mirror Code (Coordinator). Your goal is to solve the user's request by coordinating planning and execution.
+            if (isAutonomous && this.history.length > 40) {
+                await this.performDreamCompaction(ollamaUrl, ollamaModel);
+            }
 
-## TOOLS
-1. <search_vector_db query="term" />
-2. <read_skeleton filepath="path" />
-3. <read_file filepath="path" />
-4. <patch_file filepath="path">
-<search>EXISTING CODE</search>
-<replace>NEW CODE</replace>
-</patch_file>
-5. <get_symbols filepath="path" />
-6. <get_diagnostics filepath="path" />
-7. <list_dir dirpath="path" />
-8. <run_terminal command="cmd" />
-9. <update_memory content="MARKDOWN_CONTENT" />
+            const vramMB = await this.detectHardware();
+            const numCtx = vramMB < 4500 ? 6144 : (vramMB < 9000 ? 12288 : 32768); 
+            const isThinkingModel = /qwen3|llama[4]|phi[4]/.test(ollamaModel.toLowerCase());
 
-## PROJECT MEMORY
-${memory}
-
-## COORDINATOR PROTOCOLS (MANDATORY)
-1. **Initialize First**: If PROJECT MEMORY is empty/new, your FIRST ACTION after listing files MUST be <update_memory>.
-2. **Forbidden**: Do NOT read individual files until you have created a MEMORY.md with a tech stack overview and a TASK_LIST.
-3. **Planning**: Use <update_memory> to record your plan. Keep it updated.
-4. **Environment**: Use relative paths in "${rootName}".
-
-${turn === 0 && isNewProject ? "[IMPORTANT] Project memory is MISSING. Use list_dir now to see the root structure." : ""}
-${turn === 1 && isNewProject && !history.includes('update_memory') ? "[CRITICAL] You have listing results. You MUST now use <update_memory> to save the project context and plan BEFORE reading any files." : ""}
-`;
+            const historyString = this.compactHistory(this.history);
+            const systemPrompt = this.getSystemPrompt(rootName, memoryIndex, turnCount, historyString, vramMB, ollamaModel, isThinkingModel);
 
             try {
-                const statusMsg = `Turn ${turn + 1}: Contacting ${ollamaModel}...`;
-                this.log(statusMsg);
-                this.provider.postMessageToWebview({ 
-                    type: 'onToolTrace', 
-                    value: { label: statusMsg, category: 'analyzing' },
-                    sessionId: this.sessionId
-                });
-
-                this.log(`Turn ${turn + 1}: Contacting Ollama (${ollamaModel}) at ${ollamaUrl}...`);
                 const url = new URL(`${ollamaUrl}/api/generate`);
                 const postData = JSON.stringify({
                     model: ollamaModel,
-                    prompt: `${systemPrompt}\n\nHistory:\n${history}\n\nAssistant:`,
+                    prompt: isThinkingModel ? `${systemPrompt}\n\n[CONTEXT ARCHIVE]\n${historyString}\n\nAssistant Response Phase:` : `${systemPrompt}\n\n[CONTEXT ARCHIVE]\n${historyString}\n\nAssistant: <thinking>\n`,
                     stream: true,
-                    options: { num_ctx: 8192 }
+                    options: { num_ctx: numCtx, temperature: 0.1, stop: ["[CONTEXT ARCHIVE]", "User:"] } 
                 });
 
-                let fullReply = "";
-                let buffer = "";
+                this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: turnCount === 0 ? "*(Thinking...)* " : "", sessionId: this.sessionId });
 
-                await new Promise((resolve, reject) => {
+                let fullReply = isThinkingModel ? "" : "<thinking>\n";
+                let buffer = "";
+                let inThinkingTag = !isThinkingModel;
+
+                await new Promise((resolve) => {
                     const req = http.request({
                         hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -213,225 +234,243 @@ ${turn === 1 && isNewProject && !history.includes('update_memory') ? "[CRITICAL]
                             buffer += chunk.toString();
                             let lines = buffer.split('\n');
                             buffer = lines.pop() || "";
-
                             for (const line of lines) {
                                 if (!line) continue;
                                 try {
                                     const json = JSON.parse(line);
                                     if (json.response) {
                                         fullReply += json.response;
-
-                                        if (completeToolPattern.test(fullReply)) {
-                                            req.destroy();
-                                            resolve(true);
-                                            return;
+                                        if (completeToolPattern.test(fullReply)) { 
+                                            this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: " *(Acting...)*", sessionId: this.sessionId });
+                                            req.destroy(); resolve(true); return; 
                                         }
-
-                                        const lastOpen = fullReply.lastIndexOf('<');
-                                        const isPotentialTool = lastOpen !== -1 && /<[a-zA-Z_]/.test(fullReply.slice(lastOpen));
-
-                                        if (!isPotentialTool) {
-                                            this.provider.postMessageToWebview({ 
-                                                type: 'onAssistantChunk', 
-                                                value: json.response,
-                                                sessionId: this.sessionId
-                                            });
+                                        if (inThinkingTag) {
+                                            if (fullReply.includes('</thinking>') || fullReply.includes('</thought>')) {
+                                                inThinkingTag = false;
+                                                const afterTag = fullReply.split(/<\/thinking>|<\/thought>/).pop() || "";
+                                                if (afterTag.trim()) this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: afterTag, sessionId: this.sessionId });
+                                            }
+                                        } else {
+                                            this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: json.response, sessionId: this.sessionId });
                                         }
                                     }
-                                    if (json.done) resolve(true);
+                                    if (json.done) {
+                                        if (inThinkingTag) {
+                                            const afterPotentialTag = fullReply.replace(/<(thinking|thought)>[\s\S]*?(<\/(thinking|thought)>|$)/g, '').trim();
+                                            if (afterPotentialTag) this.provider.postMessageToWebview({ type: 'onAssistantChunk', value: afterPotentialTag, sessionId: this.sessionId });
+                                        }
+                                        resolve(true); 
+                                    }
                                 } catch (e) {}
                             }
                         });
                     });
-
-                    req.on('error', (e) => {
-                        if (e.message !== 'socket hang up') {
-                            this.log(`Ollama Request Error: ${e.message}`);
-                            reject(e);
-                        } else {
-                            resolve(true);
-                        }
-                    });
+                    req.on('error', (_e) => resolve(true));
                     req.write(postData);
                     req.end();
                 });
 
                 const match = completeToolPattern.exec(fullReply);
-
                 if (match) {
                     const toolCall = match[0];
                     let toolResult = "";
                     let traceLabel = "";
                     let traceCategory: 'analyzing' | 'planning' | 'executing' = 'analyzing';
 
+                    const getAttr = (name: string) => {
+                        const m = new RegExp(`(?:${name})=(?:["']([^"']+)["']|([^\\s/>]+))`).exec(toolCall);
+                        return m?.[1] || m?.[2] || "";
+                    };
+
                     try {
-                        const getAttr = (name: string) => new RegExp(`(?:${name})=["']([^"']+)["']`).exec(toolCall)?.[1] || "";
-                        
-                        if (toolCall.includes('<search_vector_db')) {
+                        if (toolCall === this.lastToolCall) {
+                            this.log(`Stutter Detected: ${toolCall.substring(0, 50)}...`);
+                            toolResult = "[SYSTEM: STUTTER DETECTED. You have already called this exact tool with identical parameters in the previous turn. If the results were insufficient, try a different query, or different tool, or provide your final answer. DO NOT repeat your previous action.]";
+                            traceLabel = "Stutter Intercepted";
+                            traceCategory = 'planning';
+                        } else {
+                            this.lastToolCall = toolCall;
+                            if (toolCall.includes('<search_vector_db')) {
                             const q = getAttr('query');
                             traceLabel = `Searching: ${q}`;
-                            this.log(`Tool: search_vector_db("${q}")`);
-                            this.provider.postMessageToWebview({ 
-                                type: 'onToolTrace', 
-                                value: { label: traceLabel, category: 'analyzing' },
-                                sessionId: this.sessionId
-                            });
                             const res = await axios.post('http://localhost:3000/tools/search_vector_db', { query: q }, { signal: this.abortController.signal });
                             toolResult = JSON.stringify(res.data.results);
-                        } else if (toolCall.includes('<read_skeleton')) {
-                            const fp = this.resolvePath(getAttr('filepath'));
-                            traceLabel = `Skeleton: ${path.basename(fp)}`;
-                            this.log(`Tool: read_skeleton("${fp}")`);
-                            this.provider.postMessageToWebview({ 
-                                type: 'onToolTrace', 
-                                value: { label: traceLabel, category: 'analyzing' },
-                                sessionId: this.sessionId
-                            });
-                            const res = await axios.post('http://localhost:3000/tools/read_skeleton', { filepath: fp }, { signal: this.abortController.signal });
-                            toolResult = JSON.stringify(res.data.signals);
+                        } else if (toolCall.includes('<grep_search')) {
+                            const q = getAttr('query');
+                            const r = this.resolvePath(getAttr('root') || ".");
+                            traceLabel = `Grep: ${q}`;
+                            const res = await axios.post('http://localhost:3000/tools/grep_search', { query: q, root: r }, { signal: this.abortController.signal });
+                            toolResult = JSON.stringify(res.data.results);
                         } else if (toolCall.includes('<read_file')) {
                             const fp = this.resolvePath(getAttr('filepath'));
-                            traceLabel = `Reading: ${path.basename(fp)}`;
-                            this.log(`Tool: read_file("${fp}")`);
-                            this.provider.postMessageToWebview({ 
-                                type: 'onToolTrace', 
-                                value: { label: traceLabel, category: 'analyzing' },
-                                sessionId: this.sessionId
-                            });
-                            const res = await axios.post('http://localhost:3000/tools/read_file', { filepath: fp }, { signal: this.abortController.signal });
-                            toolResult = res.data.content;
-                        } else if (toolCall.includes('<patch_file')) {
+                            const sl = getAttr('start_line');
+                            const el = getAttr('end_line');
+                            traceLabel = `Reading: ${path.basename(fp)}${sl ? ` [${sl}:${el || '?'}]` : ''}`;
+                            const res = await axios.post('http://localhost:3000/tools/read_file', { filepath: fp, start_line: sl, end_line: el }, { signal: this.abortController.signal });
+                            
+                            if (sl || el) {
+                                toolResult = `[Showing lines ${res.data.start}-${res.data.end} of ${res.data.totalLines}]\n${res.data.content}`;
+                            } else {
+                                toolResult = res.data.content;
+                            }
+                        } else if (toolCall.includes('<write_file')) {
                             const fp = this.resolvePath(getAttr('filepath'));
-                            const content = /<patch_file\s+[^>]*>([\s\S]*?)<\/patch_file>/.exec(toolCall)?.[1] || "";
-                            this.log(`Tool: patch_file("${fp}")`);
+                            const content = /<write_file[^>]*>([\s\S]*?)<\/write_file>/.exec(toolCall)?.[1] || "";
+                            traceLabel = `Writing: ${path.basename(fp)}`;
                             traceCategory = 'executing';
-                            const blocks: any[] = [];
-                            const blockRegex = /<search>([\s\S]*?)<\/search>\s*<replace>([\s\S]*?)<\/replace>/g;
-                            let m;
-                            while ((m = blockRegex.exec(content)) !== null) { blocks.push({ search: m[1], replace: m[2] }); }
-                            const res = await axios.post('http://localhost:3000/tools/patch_file', { filepath: fp, blocks, previewOnly: true }, { signal: this.abortController.signal });
-                            this.provider.postMessageToWebview({ 
-                                type: 'requestDiffReview', 
-                                value: { filepath: fp, blocks, original: res.data.original, modified: res.data.content, sessionId: this.sessionId },
-                                sessionId: this.sessionId
-                            });
-                            return;
-                        } else if (toolCall.includes('<get_symbols')) {
-                            const fp = this.resolvePath(getAttr('filepath'));
-                            this.log(`Tool: get_symbols("${fp}")`);
-                            traceLabel = `Symbols: ${path.basename(fp)}`;
-                            const syms = await vscode.commands.executeCommand('mirror-code.getSymbols', vscode.Uri.file(fp).toString());
-                            toolResult = JSON.stringify(syms);
-                        } else if (toolCall.includes('<get_diagnostics')) {
-                            const fp = this.resolvePath(getAttr('filepath'));
-                            traceLabel = `Diagnostics: ${path.basename(fp)}`;
-                            this.log(`Tool: get_diagnostics("${fp}")`);
-                            this.provider.postMessageToWebview({ 
-                                type: 'onToolTrace', 
-                                value: { label: traceLabel, category: 'analyzing' },
-                                sessionId: this.sessionId
-                            });
-                            const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString());
-                            toolResult = JSON.stringify(diags);
+                            const res = await axios.post('http://localhost:3000/tools/write_file', { filepath: fp, content }, { signal: this.abortController.signal });
+                            toolResult = res.data.status === 'success' ? `Successfully wrote to ${fp}` : `Error writing to ${fp}: ${res.data.error}`;
                         } else if (toolCall.includes('<list_dir')) {
                             const dp = this.resolvePath(getAttr('dirpath'));
                             traceLabel = `Listing: ${path.basename(dp)}`;
-                            this.log(`Tool: list_dir("${dp}")`);
-                            this.provider.postMessageToWebview({ 
-                                type: 'onToolTrace', 
-                                value: { label: traceLabel, category: 'analyzing' },
-                                sessionId: this.sessionId
-                            });
                             const res = await axios.post('http://localhost:3000/tools/list_dir', { dirpath: dp }, { signal: this.abortController.signal });
                             toolResult = JSON.stringify(res.data.files);
+                        } else if (toolCall.includes('<get_symbols')) {
+                            const fp = this.resolvePath(getAttr('filepath'));
+                            traceLabel = `Symbols: ${path.basename(fp)}`;
+                            const symbols = await vscode.commands.executeCommand('mirror-code.getSymbols', vscode.Uri.file(fp).toString()) as any[];
+                            toolResult = symbols.length > 0 ? JSON.stringify(symbols) : "No symbols found.";
+                        } else if (toolCall.includes('<get_diagnostics')) {
+                            const fp = this.resolvePath(getAttr('filepath'));
+                            traceLabel = `Diagnostics: ${path.basename(fp)}`;
+                            const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
+                            toolResult = diags.length > 0 ? JSON.stringify(diags) : "No problems found.";
+                        } else if (toolCall.includes('<patch_file')) {
+                            const fp = this.resolvePath(getAttr('filepath'));
+                            const search = /<search>([\s\S]*?)<\/search>/.exec(toolCall)?.[1] || "";
+                            const replace = /<replace>([\s\S]*?)<\/replace>/.exec(toolCall)?.[1] || "";
+                            
+                            traceLabel = `Proposing Patch: ${path.basename(fp)}`;
+                            traceCategory = 'planning';
+                            
+                            // 1. Get the diff from the server first (preview-only)
+                            const res = await axios.post('http://localhost:3000/tools/patch_file', { 
+                                filepath: fp, 
+                                blocks: [{ search, replace }], 
+                                previewOnly: true 
+                            }, { signal: this.abortController.signal });
+
+                            if (isAutonomous) {
+                                // Auto-Apply in Autonomous Mode
+                                this.log(`Auto-Applying patch to ${fp} (Autonomous Mode)`);
+                                await axios.post('http://localhost:3000/tools/patch_file', { 
+                                    filepath: fp, 
+                                    blocks: [{ search, replace }], 
+                                    previewOnly: false 
+                                });
+                                
+                                const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
+                                this.provider.postMessageToWebview({ type: 'onPatchApplied', value: { filepath: fp, diags, sessionId: this.sessionId } });
+                                
+                                toolResult = diags.length > 0 ? `Patch auto-applied but found issues: ${JSON.stringify(diags)}` : "Patch auto-applied successfully.";
+                                this.history.push({ role: 'assistant', content: toolCall });
+                                this.history.push({ role: 'system', content: toolResult });
+                                turnCount++;
+                                continue; // Immediately start next turn
+                            }
+
+                            // Otherwise, send the diff to the UI for user review
+                            this.provider.postMessageToWebview({ 
+                                type: 'requestDiffReview', 
+                                value: { 
+                                    filepath: getAttr('filepath'), 
+                                    original: res.data.original, 
+                                    content: res.data.content,
+                                    blocks: [{ search, replace }],
+                                    messageId: Date.now().toString(),
+                                    sessionId: this.sessionId
+                                }, 
+                                sessionId: this.sessionId 
+                            });
+
+                            // 3. Pause the agent's turn loop until the user approves or rejects
+                            toolResult = "WAITING_FOR_USER_REVIEW";
+                            this.history.push({ role: 'assistant', content: toolCall });
+                            this.history.push({ role: 'system', content: "The user is now reviewing the proposed diff. Please wait for their response before continuing." });
+                            this.log(`Paused for diff review on ${fp}`);
+                            this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+                            return; // Exit the loop until handlePatchResult is called
                         } else if (toolCall.includes('<run_terminal')) {
                             const cmd = getAttr('command');
-                            traceLabel = `Terminal: ${cmd}`;
-                            this.log(`Tool: run_terminal("${cmd}")`);
-                            this.provider.postMessageToWebview({ 
-                                type: 'onToolTrace', 
-                                value: { label: traceLabel, category: 'executing' },
-                                sessionId: this.sessionId
-                            });
-                            const res = await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath }, { signal: this.abortController.signal });
+                            const dir = this.resolvePath(getAttr('dir') || ".");
+                            traceLabel = `Terminal (${path.basename(dir)}): ${cmd}`;
+                            traceCategory = 'executing';
+                            const res = await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: dir }, { signal: this.abortController.signal });
                             toolResult = res.data.stdout + res.data.stderr;
-                        } else if (toolCall.includes('<update_memory')) {
-                            const content = /content=["']([\s\S]*?)["']/.exec(toolCall)?.[1] || "";
-                            await this.saveMemory(content);
-                            toolResult = "Memory updated successfully.";
-                            traceLabel = "Updating Memory";
+                        } else if (toolCall.includes('<add_knowledge')) {
+                            const t = getAttr('topic') || "General";
+                            const c = /<add_knowledge[^>]*>([\s\S]*?)<\/add_knowledge>/.exec(toolCall)?.[1]?.trim() || "";
+                            toolResult = await this.addKnowledge(t, c);
+                            traceLabel = `Learning: ${t}`;
+                            traceCategory = 'planning';
                         }
-                    } catch (err: any) {
-                        this.log(`Tool Exception: ${err.name} - ${err.message}`);
-                        let errorMsg = err.message || 'Unknown error';
-                        if (err.response && err.response.data && err.response.data.error) {
-                            errorMsg = `API Error [${err.response.status}]: ${err.response.data.error}`;
-                        } else if (err.response) {
-                            errorMsg = `API Error [${err.response.status}]: ${JSON.stringify(err.response.data) || err.message}`;
-                        }
-                        
-                        this.log(`Tool Failed: ${errorMsg}`);
-                        toolResult = `Error: ${errorMsg}`;
-                        traceCategory = 'analyzing'; 
-                        traceLabel = "Tool Error";
                     }
+                    } catch (err: any) { toolResult = `Error: ${err.message}`; }
 
-                    const toolSummary = toolResult.length > 100 ? `${toolResult.substring(0, 100)}...` : toolResult;
-                    this.provider.postMessageToWebview({ 
-                        type: 'onToolTrace', 
-                        value: { label: traceLabel, category: traceCategory, result: toolSummary },
-                        sessionId: this.sessionId
-                    });
-
-                    history += `Assistant: ${toolCall}\nSystem: ${toolResult}\n`;
-                    this.turnSummaries.push(`Turn ${turn + 1}: ${toolResult.substring(0, 200)}...`);
-                    turn++;
+                    this.provider.postMessageToWebview({ type: 'onToolTrace', value: { label: traceLabel, category: traceCategory, result: toolResult.substring(0, 100) }, sessionId: this.sessionId });
+                    this.history.push({ role: 'assistant', content: toolCall });
+                    this.history.push({ role: 'system', content: toolResult });
+                    turnCount++;
                 } else {
-                    // --- COORDINATOR ENFORCER ---
-                    if (isNewProject && !history.includes('update_memory') && turn < maxTurns - 1) {
-                        this.log('Enforcer: Mandatory memory update missing. Forcing another turn.');
-                        history += `\n[SYSTEM ERROR]: You attempted to complete the session without initializing PROJECT MEMORY. You MUST call <update_memory> now with a tech stack overview and your plan before you can provide a final answer to the user.`;
-                        turn++;
-                        continue; // Force the loop to run again
-                    }
-
-                    this.log('Turn complete (No more tools called).');
-                    this.provider.postMessageToWebview({ 
-                        type: 'onAssistantMessage', 
-                        value: fullReply,
-                        sessionId: this.sessionId
-                    });
+                    const cleanReply = fullReply.replace(/<(thinking|thought)>[\s\S]*?(<\/(thinking|thought)>|$)/g, '').trim();
+                    this.provider.postMessageToWebview({ type: 'onAssistantMessage', value: cleanReply, sessionId: this.sessionId });
+                    this.history.push({ role: 'assistant', content: cleanReply });
                     break;
                 }
-            } catch (err: any) {
-                const isAbort = err.name === 'CanceledError' || (err.message && err.message.includes('aborted'));
-                let errorMsg = err.message || 'Unknown error';
-                
-                if (axios.isAxiosError(err)) {
-                    errorMsg = err.response ? `API Error [${err.response.status}]: ${err.response.data?.error || err.message}` : `Network Error: could not reach the tool server.`;
-                }
-
-                this.log(`Turn Failed: ${errorMsg}`);
-                this.provider.postMessageToWebview({ 
-                    type: 'onAssistantMessage', 
-                    value: isAbort ? 'Stopped.' : `Error: ${errorMsg}`,
-                    sessionId: this.sessionId
-                });
-                break;
-            }
+            } catch (err: any) { break; }
         }
-        this.log('Session Completed.\n');
         this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
     }
 
     public async handlePatchResult(filepath: string, diags: any[]) {
-        this.log(`Handling patch result for ${filepath}...`);
-        const diagCount = diags.length;
-        const msg = diagCount === 0 
-            ? `The patch was applied successfully and there are no lint errors in ${path.basename(filepath)}.`
-            : `The patch was applied but there are ${diagCount} diagnostic errors remaining in ${path.basename(filepath)}: ${JSON.stringify(diags)}. Please fix them.`;
+        const diagMsg = diags.length > 0 ? `Patch applied but found ${diags.length} issues: ${JSON.stringify(diags)}` : "Patch applied successfully and verified by diagnostics.";
+        this.log(`Resuming agent turn after patch approval for ${filepath}`);
         
-        // This triggers a new agent loop with the diagnostic feedback
-        return this.handleUserMessage(msg, 'coding');
+        // Push the result back into history and resume the thinking loop
+        this.history.push({ role: 'system', content: diagMsg });
+        this.handleUserMessage(""); // Continue from where we left off
+    }
+
+    private async detectHardware(): Promise<number> {
+        try {
+            const { stdout } = await execAsync('nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits');
+            return parseInt(stdout.trim()) || 8192; 
+        } catch { return 4096; }
+    }
+
+    private getSystemPrompt(rootName: string, memoryIndex: string, _turn: number, _history: string, vramMB: number, _model: string, isThinkingModel: boolean): string {
+        const hwNote = vramMB < 4500 ? "\n- Resource Notice: High compression environment. Do NOT omit whitespace." : "";
+        
+        return `You are Mirror Code (v.2026.04), the "Autonomous Architect". Your goal is to solve requests through a strictly enforced 4-Phase Sequence.
+
+## CLAUDE-INSPIRED MEMORY ARCHITECTURE
+History is transient; the Knowledge Bank is eternal. 
+- You maintain a permanent Knowledge Bank using <add_knowledge topic="string">markdown content</add_knowledge>.
+- When you discover how a system works or make an architectural decision, immediately add it to the bank.
+- Your prompt only contains the INDEX. To recall specific details, use <read_file filepath=".mirror/knowledge/[topic].md" />.
+
+## THE BEST SEQUENCE
+1. **EXPLORE**: Find relevant files/patterns. Check the Knowledge INDEX.
+2. **RESEARCH**: Read code directly or read topic files from .mirror/knowledge/.
+3. **PLAN & COMMIT**: Record your findings in the Knowledge Bank using <add_knowledge />. You MUST document what you learn about the architecture, files, and patterns BEFORE providing a final answer.
+4. **EXECUTE**: Apply patch_file or terminal command. Verify outcomes.
+5. **COMPLETE**: When you have enough information and have COMMITTED it to knowledge, DO NOT use any XML tools. Just type your final answer to return control to the user.
+
+## OPERATIONAL DIRECTIVES
+1. Provide ONLY your direct answer and tool calls.
+2. Anti-Loop Rule: NEVER call <list_dir> or <read_file> on the exact same path multiple times.
+3. Durable-First: Every turn that results in a discovery or a successful list/read should be finalized with <add_knowledge /> to ensure persistence.
+4. Actionable Links: Always wrap Workspace-relative file paths in backticks (e.g. \`src/App.tsx\`) to make them clickable for the user.
+5. ${isThinkingModel ? "Utilize native reasoning mode." : "Always encapsulate your reasoning in <thinking> tags before acting."}
+5. Maintain perfect whitespace, indentation, and spaces. Use the [CONTEXT ARCHIVE] for reference.
+6. XML Tools: <read_file filepath="relative/path" start_line="1" end_line="500" />, <grep_search query="string" root="relative/dir" />, <list_dir dirpath="relative/dir" />, <run_terminal command="cmd" dir="relative/path" />, <patch_file><search>...</search><replace>...</replace></patch_file>, <write_file filepath="relative/path">content</write_file>, <add_knowledge topic="String">md</add_knowledge>, <get_symbols filepath="path" />, <get_diagnostics filepath="path" />.
+7. Creation vs Edit: Use <write_file /> exclusively for creating NEW files or completely overwriting existing ones. Use <patch_file /> for targeted edits to existing files.
+8. Terminal Relocation: Use the \`dir\` attribute in <run_terminal /> to execute commands in a specific folder.
+9. Pagination (Sliding Window): Files can be huge. Use \`start_line\` and \`end_line\` (1-indexed) in <read_file /> to read ~500 lines at a time. If you find your answer, stop; otherwise, continue reading the next chunk. The tool will return the total line count to help you navigate.
+
+ENVIRONMENT: ${rootName}${hwNote}
+
+PROJECT INDEX:
+${memoryIndex}`;
     }
 }

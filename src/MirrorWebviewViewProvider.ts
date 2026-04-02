@@ -79,7 +79,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     const agent = new MirrorAgent(data.sessionId, this, this._outputChannel);
                     this._agents.set(data.sessionId, agent);
                     
-                    agent.handleUserMessage(data.value, data.mode).then(() => {
+                    agent.handleUserMessage(data.value).then(() => {
                         this._agents.delete(data.sessionId);
                     });
                     break;
@@ -94,7 +94,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         value: {
                             ollamaUrl: config.get('ollamaUrl'),
                             ollamaModel: config.get('ollamaModel'),
-                            maxTurns: config.get('maxTurns')
+                            maxTurns: config.get('maxTurns'),
+                            autonomousMode: config.get('autonomousMode')
                         }
                     });
                     break;
@@ -103,6 +104,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     config.update('ollamaUrl', data.value.ollamaUrl, vscode.ConfigurationTarget.Global);
                     config.update('ollamaModel', data.value.ollamaModel, vscode.ConfigurationTarget.Global);
                     config.update('maxTurns', Number(data.value.maxTurns), vscode.ConfigurationTarget.Global);
+                    config.update('autonomousMode', Boolean(data.value.autonomousMode), vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Settings updated!');
                     break;
                 }
@@ -184,6 +186,20 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         }
                     } catch (e: any) {
                         vscode.window.showErrorMessage(`Failed to apply patch: ${e.message}`);
+                    }
+                    break;
+                }
+                case 'openFile': {
+                    const filepath = data.value;
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (workspaceFolder) {
+                        const fullPath = path.isAbsolute(filepath) ? filepath : path.join(workspaceFolder.uri.fsPath, filepath);
+                        try {
+                            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+                            await vscode.window.showTextDocument(doc);
+                        } catch (e: any) {
+                            vscode.window.showErrorMessage(`Failed to open file ${filepath}: ${e.message}`);
+                        }
                     }
                     break;
                 }
