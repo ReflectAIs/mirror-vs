@@ -1,44 +1,63 @@
 const Parser = require('tree-sitter');
 const TypeScript = require('tree-sitter-typescript').typescript;
+const Python = require('tree-sitter-python');
+const Go = require('tree-sitter-go');
 const fs = require('fs');
 const path = require('path');
 
+const GRAMMARS = {
+    '.ts': TypeScript,
+    '.tsx': TypeScript,
+    '.js': TypeScript,
+    '.jsx': TypeScript,
+    '.py': Python,
+    '.go': Go
+};
+
 const parser = new Parser();
-parser.setLanguage(TypeScript);
 
 /**
  * Extracts class and function signatures from a file.
  * Returns a JSON skeleton representation.
  */
 function parseFile(filepath) {
-    const content = fs.readFileSync(filepath, 'utf8');
+    const ext = path.extname(filepath);
+    const grammar = GRAMMARS[ext];
+    
     const symbols = [];
+    symbols.push({ type: 'file', name: path.basename(filepath), line: 1 });
 
-    // Add generic file symbol
-    symbols.push({
-        type: 'file',
-        name: path.basename(filepath),
-        line: 1
-    });
+    if (!grammar) return symbols;
 
     try {
+        const content = fs.readFileSync(filepath, 'utf8');
+        parser.setLanguage(grammar);
         const tree = parser.parse(content);
+        
         function traverse(node) {
-            if (node.type === 'class_declaration') {
-                const nameNode = node.childForFieldName('name');
+            let found = null;
+
+            // TS/JS types
+            if (node.type === 'class_declaration' || node.type === 'function_declaration' || node.type === 'method_definition') {
+                found = { type: node.type.includes('class') ? 'class' : 'function', name: node.childForFieldName('name') };
+            } 
+            // Python types
+            else if (node.type === 'class_definition' || node.type === 'function_definition') {
+                found = { type: node.type.includes('class') ? 'class' : 'function', name: node.childForFieldName('name') };
+            }
+            // Go types
+            else if (node.type === 'function_declaration' || node.type === 'method_declaration') {
+                found = { type: 'function', name: node.childForFieldName('name') };
+            }
+
+            if (found) {
                 symbols.push({
-                    type: 'class',
-                    name: nameNode ? nameNode.text : 'anonymous',
-                    line: node.startPosition.row + 1
-                });
-            } else if (node.type === 'function_declaration' || node.type === 'method_definition') {
-                const nameNode = node.childForFieldName('name');
-                symbols.push({
-                    type: 'function',
-                    name: nameNode ? nameNode.text : 'anonymous',
+                    type: found.type,
+                    name: found.name ? found.name.text : 'anonymous',
                     line: node.startPosition.row + 1
                 });
             }
+
             for (let i = 0; i < node.childCount; i++) {
                 traverse(node.child(i));
             }

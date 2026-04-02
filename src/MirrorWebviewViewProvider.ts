@@ -11,6 +11,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _agents: Map<string, MirrorAgent> = new Map();
     private _outputChannel: vscode.OutputChannel;
+    private _currentPersona: string = 'architect';
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -78,8 +79,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     }
 
                     const defaultReadLines = config.get('defaultReadLines', 500);
-                    const maxToolsPerTurn = config.get('maxToolsPerTurn', 8);
-                    const agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, maxToolsPerTurn);
+                    const agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona);
                     this._agents.set(data.sessionId, agent);
                     
                     agent.handleUserMessage(data.value).then(() => {
@@ -100,7 +100,6 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             maxTurns: config.get('maxTurns'),
                             autonomousMode: config.get('autonomousMode'),
                             defaultReadLines: config.get('defaultReadLines'),
-                            maxToolsPerTurn: config.get('maxToolsPerTurn')
                         }
                     });
                     break;
@@ -111,7 +110,6 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     config.update('maxTurns', Number(data.value.maxTurns), vscode.ConfigurationTarget.Global);
                     config.update('autonomousMode', Boolean(data.value.autonomousMode), vscode.ConfigurationTarget.Global);
                     config.update('defaultReadLines', Number(data.value.defaultReadLines), vscode.ConfigurationTarget.Global);
-                    config.update('maxToolsPerTurn', Number(data.value.maxToolsPerTurn), vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Settings updated!');
                     break;
                 }
@@ -202,17 +200,15 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     if (workspaceFolder && filepath) {
                         const fullPath = path.isAbsolute(filepath) ? filepath : path.join(workspaceFolder.uri.fsPath, filepath);
                         try {
-                            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
-                                // If it's a directory (typical for terminal traces), open a terminal there
-                                const terminal = vscode.window.createTerminal({
-                                    name: `Mirror Terminal [${path.basename(fullPath)}]`,
-                                    cwd: fullPath
-                                });
-                                terminal.show();
-                            } else {
-                                // If it's a file, open as a text document
-                                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
-                                await vscode.window.showTextDocument(doc);
+                            if (fs.existsSync(fullPath)) {
+                                if (fs.statSync(fullPath).isDirectory()) {
+                                    // If someone accidentally sent a directory to openFile, show a warning or handle as terminal
+                                    vscode.window.showInformationMessage(`Opening terminal in directory: ${path.basename(fullPath)}`);
+                                    this.openTerminal(fullPath, `Mirror: ${path.basename(fullPath)}`);
+                                } else {
+                                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+                                    await vscode.window.showTextDocument(doc);
+                                }
                             }
                         } catch (e: any) {
                             vscode.window.showErrorMessage(`Failed to open ${filepath}: ${e.message}`);
@@ -220,16 +216,112 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     }
                     break;
                 }
+                case 'openTerminal': {
+                    const { path: dirpath, label } = data.value;
+                    this.openTerminal(dirpath, label);
+                    break;
+                }
+                case 'getFiles': {
+                    const files: string[] = await vscode.commands.executeCommand('mirror-code.getFiles') || [];
+                    this.postMessageToWebview({ type: 'onFiles', value: files });
+                    break;
+                }
+                case 'setPersona': {
+                    this._currentPersona = data.value;
+                    this._outputChannel.appendLine(`[Persona] Switched to ${data.value}`);
+                    break;
+                }
+                case 'getSymbols': {
+                    try {
+                        const symbols: any[] = await vscode.commands.executeCommand('mirror-code.getSymbols', data.value) || [];
+                        this.postMessageToWebview({ type: 'onSymbols', value: symbols });
+                    } catch (e) {
+                        this.postMessageToWebview({ type: 'onSymbols', value: [] });
+                    }
+                    break;
+                }
             }
         });
+    }
+
+    private openTerminal(dirpath: string, label: string = 'Mirror Terminal') {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) return;
+        
+        const fullPath = path.isAbsolute(dirpath) ? dirpath : path.join(workspaceFolder.uri.fsPath, dirpath);
+        
+        // Find existing terminal with same name or create new
+        const name = label.startsWith('Run: ') ? `Mirror: ${label.substring(5)}` : (label === 'Mirror Terminal' ? 'Mirror Terminal' : label);
+        const existing = vscode.window.terminals.find(t => t.name === name);
+        
+        if (existing) {
+            existing.show();
+        } else {
+            const terminal = vscode.window.createTerminal({
+                name,
+                cwd: fullPath
+            });
+            terminal.show();
+        }
     }
 
     public postMessageToWebview(message: any) {
         this._view?.webview.postMessage(message);
         
-        // Auto-save history on assistant messages if it's a final message
-        if (message.type === 'onAssistantMessage' && !message.value.startsWith('[Status]')) {
-            // Webview will handle the primary save logic but we can trigger it here if needed
+        // Auto-persist background activity to history
+        const sessionAwareTypes = ['onAssistantChunk', 'onAssistantMessage', 'onToolTrace', 'onPatchApplied', 'requestDiffReview', 'requestTerminalReview'];
+        if (sessionAwareTypes.includes(message.type) && message.sessionId) {
+            const historyKey = 'mirror-code.history';
+            let history = this._context.workspaceState.get<any[]>(historyKey) || [];
+            let sessionIndex = history.findIndex(s => s.id === message.sessionId);
+            
+            if (sessionIndex === -1) {
+                // If the session isn't in history yet, create a placeholder
+                history.unshift({ id: message.sessionId, title: 'Background Task', messages: [] });
+                sessionIndex = 0;
+            }
+
+            const session = history[sessionIndex];
+            const msgs = session.messages || [];
+
+            switch (message.type) {
+                case 'onAssistantChunk': {
+                    const last = msgs[msgs.length - 1];
+                    if (last && last.sender === 'assistant' && last.type === 'chunk') {
+                        last.text += message.value;
+                    } else {
+                        msgs.push({ id: Date.now().toString(), text: message.value, sender: 'assistant', type: 'chunk' });
+                    }
+                    break;
+                }
+                case 'onAssistantMessage':
+                    // Clean up fragments and add final message
+                    session.messages = [
+                        ...msgs.filter((m: any) => m.type !== 'chunk' && m.type !== 'status'),
+                        { id: Date.now().toString(), text: message.value, sender: 'assistant' }
+                    ];
+                    break;
+                case 'onToolTrace':
+                    const lastTrace = msgs[msgs.length - 1];
+                    if (lastTrace && lastTrace.type === 'trace' && lastTrace.traceData?.label === message.value.label) {
+                        lastTrace.traceData = message.value;
+                    } else {
+                        msgs.push({ id: Date.now().toString(), text: '', sender: 'assistant', type: 'trace', traceData: message.value });
+                    }
+                    break;
+                case 'onPatchApplied':
+                    msgs.push({ id: Date.now().toString(), text: `Patch applied to ${path.basename(message.value.filepath)}`, sender: 'assistant' });
+                    break;
+                case 'requestDiffReview':
+                    msgs.push({ id: Date.now().toString(), text: `Review proposed changes for ${message.value.filepath}`, sender: 'assistant', type: 'diff', diffData: message.value });
+                    break;
+                case 'requestTerminalReview':
+                    msgs.push({ id: Date.now().toString(), text: `Execution Request: ${message.value.command}`, sender: 'assistant', type: 'terminal', terminalData: message.value });
+                    break;
+            }
+
+            session.messages = msgs;
+            this._context.workspaceState.update(historyKey, history);
         }
     }
 

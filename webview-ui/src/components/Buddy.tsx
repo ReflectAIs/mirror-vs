@@ -1,5 +1,5 @@
 import React from 'react';
-import { VscTerminal, VscSearch, VscSettingsGear, VscCheck, VscWarning } from 'react-icons/vsc';
+import { VscSearch, VscSettingsGear, VscCheck, VscWarning } from 'react-icons/vsc';
 
 export type BuddyStatus = 'idle' | 'thinking' | 'working' | 'success' | 'error';
 
@@ -9,66 +9,35 @@ interface BuddyProps {
 }
 
 const Buddy: React.FC<BuddyProps> = ({ status, isAutonomous }) => {
-  const getExpression = () => {
-    switch (status) {
-      case 'thinking':
-        return (
-          <div className="buddy-eyes thinking">
-            <div className="eye left"><span></span></div>
-            <div className="eye right"><span></span></div>
-          </div>
-        );
-      case 'working':
-        return (
-          <div className="buddy-eyes working">
-            <div className="eye left">{">"}</div>
-            <div className="eye right">{"<"}</div>
-          </div>
-        );
-      case 'error':
-        return (
-          <div className="buddy-eyes error">
-            <div className="eye left">×</div>
-            <div className="eye right">×</div>
-          </div>
-        );
-      case 'success':
-        return (
-          <div className="buddy-eyes success">
-            <div className="eye left">^</div>
-            <div className="eye right">^</div>
-          </div>
-        );
-      default:
-        return (
-          <div className="buddy-eyes idle">
-            <div className="eye left"><span></span></div>
-            <div className="eye right"><span></span></div>
-          </div>
-        );
-    }
-  };
-
-  const getIcon = () => {
-    switch (status) {
-      case 'thinking': return <VscSearch className="buddy-status-icon spinning" />;
-      case 'working': return <VscSettingsGear className="buddy-status-icon spinning" />;
-      case 'success': return <VscCheck className="buddy-status-icon" />;
-      case 'error': return <VscWarning className="buddy-status-icon" />;
-      default: return <VscTerminal className={`buddy-status-icon pulse ${isAutonomous ? 'gold' : ''}`} />;
-    }
+  const getFace = () => {
+    return (
+      <div className={`buddy-face ${status}`}>
+        <div className="eyes">
+          <div className="eye left"></div>
+          <div className="eye right"></div>
+        </div>
+        <div className="mouth">
+          <div className="mouth-path"></div>
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className={`buddy-container status-${status} ${isAutonomous ? 'mode-autonomous' : ''}`}>
-      {isAutonomous && <div className="buddy-aura"></div>}
-      <div className="buddy-body">
-        {getExpression()}
+      <div className="buddy-aura"></div>
+      <div className="buddy-wrapper">
+        <div className="buddy-body">
+          {getFace()}
+        </div>
+        <div className="buddy-accessory">
+          {status === 'thinking' && <VscSearch className="spinning" />}
+          {status === 'working' && <VscSettingsGear className="spinning" />}
+          {status === 'success' && <VscCheck />}
+          {status === 'error' && <VscWarning />}
+        </div>
       </div>
-      <div className="buddy-badge">
-        {getIcon()}
-      </div>
-      {isAutonomous && <div className="kairos-label">KAIROS</div>}
+      {isAutonomous && <div className="buddy-label">AUTONOMOUS</div>}
     </div>
   );
 };

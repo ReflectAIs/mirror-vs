@@ -23,7 +23,7 @@ export class MirrorAgent {
         private readonly provider: { postMessageToWebview: (message: any) => void },
         private readonly output: vscode.OutputChannel,
         private readonly defaultReadLines: number = 500,
-        private readonly maxToolsPerTurn: number = 8
+        private readonly persona: string = 'architect'
     ) {}
 
     private async loadMemoryIndex(): Promise<string> {
@@ -277,7 +277,6 @@ ${rawHistory}`;
                 let buffer = "";
                 let inThinkingTag = !isThinkingModel;
 
-                const MAX_TOOLS_PER_TURN = this.maxToolsPerTurn;
                 await new Promise((resolve) => {
                     const req = http.request({
                         hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST',
@@ -295,10 +294,8 @@ ${rawHistory}`;
                                     if (json.response) {
                                         fullReply += json.response;
                                         
-                                        // Aggressive tool batch constraint: Interrupt as soon as an Official Opening Tag is detected
-                                        const toolPattern = /<(read_file|grep_search|list_dir|run_terminal|patch_file|write_file|add_knowledge|get_symbols|get_diagnostics)(\s+|>)/g;
-                                        const toolStarts = fullReply.match(toolPattern) || [];
-                                        if (toolStarts.length > MAX_TOOLS_PER_TURN) {
+                                        // Stop as soon as a complete tool call is detected
+                                        if (completeToolPattern.test(fullReply)) {
                                             req.destroy();
                                             resolve(true);
                                             return;
@@ -330,208 +327,171 @@ ${rawHistory}`;
                     req.end();
                 });
 
-                const globalToolPattern = new RegExp(completeToolPattern.source, 'g');
-                const toolMatches = [...fullReply.matchAll(globalToolPattern)];
-                let pauseForReview = false;
+                // Extract tool and reasoning
+                const toolMatch = fullReply.match(completeToolPattern);
+                
+                if (toolMatch) {
+                    const toolCall = toolMatch[0];
+                    const reasoningText = fullReply.substring(0, toolMatch.index || 0).trim();
+                    
+                    // 1. Push reasoning to history if it's not empty
+                    if (reasoningText && reasoningText !== "<thinking>") {
+                        this.history.push({ role: 'assistant', content: reasoningText });
+                        // We don't post 'onAssistantMessage' yet because we want to show the tool trace
+                    }
 
-                if (toolMatches.length > 0) {
-                    for (const match of toolMatches) {
-                        if (this.abortController.signal.aborted) break;
-                        const toolCall = match[0];
-                        let toolResult = "";
-                        let traceLabel = "";
-                        let traceCategory: 'analyzing' | 'planning' | 'executing' = 'analyzing';
-                        let tracePath: string | undefined;
+                    // 2. Handle the tool
+                    let toolResult = "";
+                    let traceLabel = "";
+                    let traceCategory: 'analyzing' | 'planning' | 'executing' = 'analyzing';
+                    let tracePath: string | undefined;
 
-                        const getAttr = (name: string) => {
-                            const m = new RegExp(`(?:${name})=(?:["']([^"']+)["']|([^\\s/>]+))`).exec(toolCall);
-                            return m?.[1] || m?.[2] || "";
-                        };
+                    const getAttr = (name: string) => {
+                        const m = new RegExp(`(?:${name})=(?:["']([^"']+)["']|([^\\s/>]+))`).exec(toolCall);
+                        return m?.[1] || m?.[2] || "";
+                    };
 
-                        try {
-                            if (toolCall === this.lastToolCall) {
-                                this.log(`Stutter Detected: ${toolCall.substring(0, 50)}...`);
-                                toolResult = "[SYSTEM: STUTTER DETECTED. You have already called this exact tool with identical parameters in the previous turn. If the results were insufficient, provide your final answer or try a different approach. DO NOT repeat your previous action.]";
-                                traceLabel = "Stutter Intercepted";
-                                traceCategory = 'planning';
-                            } else {
-                                this.lastToolCall = toolCall;
-                                if (toolCall.includes('<search_vector_db')) {
-                                    const q = getAttr('query');
-                                    traceLabel = `Searching: ${q}`;
-                                    tracePath = ".";
-                                    const res = await axios.post('http://localhost:3000/tools/search_vector_db', { query: q }, { signal: this.abortController.signal });
-                                    toolResult = JSON.stringify(res.data.results);
-                                } else if (toolCall.includes('<grep_search')) {
-                                    const q = getAttr('query');
-                                    const r = this.resolvePath(getAttr('root') || ".");
-                                    traceLabel = `Grep: ${q}`;
-                                    tracePath = r;
-                                    const res = await axios.post('http://localhost:3000/tools/grep_search', { query: q, root: r }, { signal: this.abortController.signal });
-                                    toolResult = JSON.stringify(res.data.results);
-                                } else if (toolCall.includes('<read_file')) {
-                                    const fp = this.resolvePath(getAttr('filepath'));
-                                    const sl = getAttr('start_line');
-                                    const el = getAttr('end_line');
-                                    traceLabel = `Reading: ${path.basename(fp)}${sl ? ` [${sl}:${el || '?'}]` : ''}`;
-                                    tracePath = fp;
-                                    const res = await axios.post('http://localhost:3000/tools/read_file', { filepath: fp, start_line: sl, end_line: el }, { signal: this.abortController.signal });
-                                    
-                                    if (sl || el) {
-                                        toolResult = `[Showing lines ${res.data.start}-${res.data.end} of ${res.data.totalLines}]\n${res.data.content}`;
-                                    } else {
-                                        toolResult = res.data.content;
+                    try {
+                        if (toolCall === this.lastToolCall && !reasoningText) {
+                            this.log(`Stutter Detected: ${toolCall.substring(0, 50)}...`);
+                            toolResult = "[SYSTEM: STUTTER DETECTED. You are repeating a tool call without any new reasoning. Change your approach.]";
+                            traceLabel = "Stutter Intercepted";
+                            traceCategory = 'planning';
+                        } else {
+                            this.lastToolCall = toolCall;
+                            if (toolCall.includes('<search_vector_db')) {
+                                const q = getAttr('query');
+                                traceLabel = `Searching: ${q}`;
+                                tracePath = ".";
+                                const res = await axios.post('http://localhost:3000/tools/search_vector_db', { query: q }, { signal: this.abortController.signal });
+                                toolResult = JSON.stringify(res.data.results);
+                            } else if (toolCall.includes('<grep_search')) {
+                                const q = getAttr('query');
+                                const r = this.resolvePath(getAttr('root') || ".");
+                                traceLabel = `Grep: ${q}`;
+                                tracePath = r;
+                                const res = await axios.post('http://localhost:3000/tools/grep_search', { query: q, root: r }, { signal: this.abortController.signal });
+                                toolResult = JSON.stringify(res.data.results);
+                            } else if (toolCall.includes('<read_file')) {
+                                const fp = this.resolvePath(getAttr('filepath'));
+                                const sl = getAttr('start_line');
+                                const el = getAttr('end_line');
+                                traceLabel = `Reading: ${path.basename(fp)}`;
+                                tracePath = fp;
+                                const res = await axios.post('http://localhost:3000/tools/read_file', { filepath: fp, start_line: sl, end_line: el }, { signal: this.abortController.signal });
+                                toolResult = (sl || el) ? `[lines ${res.data.start}-${res.data.end}]\n${res.data.content}` : res.data.content;
+                            } else if (toolCall.includes('<write_file')) {
+                                const fp = this.resolvePath(getAttr('filepath'));
+                                const content = /<write_file[^>]*>([\s\S]*?)<\/write_file>/.exec(toolCall)?.[1] || "";
+                                traceLabel = `Writing: ${path.basename(fp)}`;
+                                tracePath = fp;
+                                traceCategory = 'executing';
+                                const res = await axios.post('http://localhost:3000/tools/write_file', { filepath: fp, content }, { signal: this.abortController.signal });
+                                toolResult = res.data.status === 'success' ? `Successfully wrote to ${fp}` : `Error: ${res.data.error}`;
+                            } else if (toolCall.includes('<list_dir')) {
+                                const dp = this.resolvePath(getAttr('dirpath'));
+                                traceLabel = `Listing: ${path.basename(dp)}`;
+                                tracePath = dp;
+                                const res = await axios.post('http://localhost:3000/tools/list_dir', { dirpath: dp }, { signal: this.abortController.signal });
+                                toolResult = JSON.stringify(res.data.files);
+                            } else if (toolCall.includes('<get_symbols')) {
+                                const fp = this.resolvePath(getAttr('filepath'));
+                                traceLabel = `Symbols: ${path.basename(fp)}`;
+                                tracePath = fp;
+                                const symbols = await vscode.commands.executeCommand('mirror-code.getSymbols', vscode.Uri.file(fp).toString()) as any[];
+                                toolResult = symbols.length > 0 ? JSON.stringify(symbols) : "No symbols found.";
+                            } else if (toolCall.includes('<patch_file')) {
+                                const filepathRaw = getAttr('filepath');
+                                if (!filepathRaw) {
+                                    toolResult = "[SYSTEM: Error: Missing 'filepath' attribute.]";
+                                } else {
+                                    const fp = this.resolvePath(filepathRaw);
+                                    const blocks: { search: string, replace: string }[] = [];
+                                    const blockPattern = /<search>([\s\S]*?)<\/search>\s*<replace>([\s\S]*?)<\/replace>/g;
+                                    let bMatch;
+                                    while ((bMatch = blockPattern.exec(toolCall)) !== null) {
+                                        blocks.push({ search: bMatch[1], replace: bMatch[2] });
                                     }
-                                } else if (toolCall.includes('<write_file')) {
-                                    const fp = this.resolvePath(getAttr('filepath'));
-                                    const content = /<write_file[^>]*>([\s\S]*?)<\/write_file>/.exec(toolCall)?.[1] || "";
-                                    traceLabel = `Writing: ${path.basename(fp)}`;
-                                    tracePath = fp;
-                                    traceCategory = 'executing';
-                                    const res = await axios.post('http://localhost:3000/tools/write_file', { filepath: fp, content }, { signal: this.abortController.signal });
-                                    toolResult = res.data.status === 'success' ? `Successfully wrote to ${fp}` : `Error writing to ${fp}: ${res.data.error}`;
-                                } else if (toolCall.includes('<list_dir')) {
-                                    const dp = this.resolvePath(getAttr('dirpath'));
-                                    traceLabel = `Listing: ${path.basename(dp)}`;
-                                    tracePath = dp;
-                                    const res = await axios.post('http://localhost:3000/tools/list_dir', { dirpath: dp }, { signal: this.abortController.signal });
-                                    toolResult = JSON.stringify(res.data.files);
-                                } else if (toolCall.includes('<get_symbols')) {
-                                    const fp = this.resolvePath(getAttr('filepath'));
-                                    traceLabel = `Symbols: ${path.basename(fp)}`;
-                                    tracePath = fp;
-                                    const symbols = await vscode.commands.executeCommand('mirror-code.getSymbols', vscode.Uri.file(fp).toString()) as any[];
-                                    toolResult = symbols.length > 0 ? JSON.stringify(symbols) : "No symbols found.";
-                                } else if (toolCall.includes('<get_diagnostics')) {
-                                    const fp = this.resolvePath(getAttr('filepath'));
-                                    traceLabel = `Diagnostics: ${path.basename(fp)}`;
-                                    tracePath = fp;
-                                    const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
-                                    toolResult = diags.length > 0 ? JSON.stringify(diags) : "No problems found.";
-                                } else if (toolCall.includes('<patch_file')) {
-                                    const filepathRaw = getAttr('filepath');
-                                    if (!filepathRaw) {
-                                        toolResult = "[SYSTEM: Error: You MUST provide a 'filepath' attribute in the <patch_file> tag. Example: <patch_file filepath=\"src/main.ts\">...]";
-                                        traceLabel = "Patch Failed: Missing Filepath";
-                                    } else {
-                                        const fp = this.resolvePath(filepathRaw);
-                                        const blocks: { search: string, replace: string }[] = [];
-                                        const blockPattern = /<search>([\s\S]*?)<\/search>\s*<replace>([\s\S]*?)<\/replace>/g;
-                                        let bMatch;
-                                        while ((bMatch = blockPattern.exec(toolCall)) !== null) {
-                                            blocks.push({ search: bMatch[1], replace: bMatch[2] });
-                                        }
 
-                                        if (blocks.length === 0) {
-                                            toolResult = "[SYSTEM: Error: No search/replace blocks found. Ensure you use <search>...</search> and <replace>...</replace> pairs.]";
-                                            traceLabel = "Patch Failed: Empty Blocks";
+                                    if (blocks.length === 0) {
+                                        toolResult = "[SYSTEM: Error: No search/replace blocks found.]";
+                                    } else {
+                                        traceLabel = `Proposing Patch: ${path.basename(fp)}`;
+                                        tracePath = fp;
+                                        traceCategory = 'planning';
+                                        
+                                        const res = await axios.post('http://localhost:3000/tools/patch_file', { filepath: fp, blocks, previewOnly: true }, { signal: this.abortController.signal });
+
+                                        if (isAutonomous) {
+                                            await axios.post('http://localhost:3000/tools/patch_file', { filepath: fp, blocks, previewOnly: false });
+                                            const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
+                                            this.post('onPatchApplied', { filepath: fp, diags });
+                                            toolResult = "Patch auto-applied.";
                                         } else {
-                                            traceLabel = `Proposing Patch (${blocks.length} blocks): ${path.basename(fp)}`;
-                                            tracePath = fp;
-                                            traceCategory = 'planning';
-                                            
-                                            const res = await axios.post('http://localhost:3000/tools/patch_file', { 
-                                                filepath: fp, 
-                                                blocks, 
-                                                previewOnly: true 
-                                            }, { signal: this.abortController.signal });
-
-                                            if (isAutonomous) {
-                                                this.log(`Auto-Applying patch to ${fp} (Autonomous Mode)`);
-                                                await axios.post('http://localhost:3000/tools/patch_file', { 
-                                                    filepath: fp, 
-                                                    blocks, 
-                                                    previewOnly: false 
-                                                });
-                                                
-                                                const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
-                                                this.post('onPatchApplied', { filepath: fp, diags });
-                                                toolResult = diags.length > 0 ? `Patch auto-applied but found issues: ${JSON.stringify(diags)}` : "Patch auto-applied successfully.";
-                                            } else {
-                                                this.post('requestDiffReview', { 
-                                                        filepath: filepathRaw, 
-                                                        original: res.data.original, 
-                                                        content: res.data.content,
-                                                        blocks,
-                                                        messageId: Date.now().toString()
-                                                });
-
-                                                toolResult = "WAITING_FOR_USER_REVIEW";
-                                                this.history.push({ role: 'assistant', content: toolCall });
-                                                this.history.push({ role: 'system', content: "The user is now reviewing the proposed diff. Please wait for their response before continuing." });
-                                                
-                                                pauseForReview = true;
-                                            }
+                                            this.post('requestDiffReview', { filepath: filepathRaw, original: res.data.original, content: res.data.content, blocks, messageId: Date.now().toString() });
+                                            toolResult = "WAITING_FOR_USER_REVIEW";
+                                            this.history.push({ role: 'assistant', content: toolCall });
+                                            this.history.push({ role: 'system', content: "User is reviewing the patch. Wait." });
+                                            this.post('onAssistantMessage', reasoningText || "I've proposed a patch for your review.");
+                                            return;
                                         }
                                     }
-                                } else if (toolCall.includes('<run_terminal')) {
-                                    const cmd = getAttr('command');
-                                    const dir = this.resolvePath(getAttr('dir') || ".");
-                                    traceLabel = `Terminal (${path.basename(dir)}): ${cmd}`;
-                                    tracePath = dir;
-                                    traceCategory = 'executing';
-                                    
-                                    if (isAutonomous) {
-                                        const res = await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: dir }, { signal: this.abortController.signal });
-                                        toolResult = res.data.stdout + res.data.stderr;
-                                        
-                                        // Self-healing: If command failed, inject a diagnostic reminder
-                                        if (res.data.code !== 0 && res.data.code !== undefined) {
-                                            toolResult += `\n[SYSTEM: Command exited with code ${res.data.code}. If this was unexpected, analyze the error and try to fix it.]`;
-                                        }
-                                    } else {
-                                        this.post('requestTerminalReview', { 
-                                                command: cmd, 
-                                                dir: getAttr('dir') || "." 
-                                        });
-
-                                        toolResult = "WAITING_FOR_TERMINAL_APPROVAL";
-                                        this.history.push({ role: 'assistant', content: toolCall });
-                                        this.history.push({ role: 'system', content: "The user is now reviewing this terminal command. Please wait for approval." });
-                                        pauseForReview = true;
-                                    }
-                                } else if (toolCall.includes('<recall_memory')) {
-                                    const q = getAttr('query').toLowerCase();
-                                    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
-                                    const memoryPath = path.join(root, '.mirror', 'memory.json');
-                                    
-                                    if (!fs.existsSync(memoryPath)) {
-                                        toolResult = "No memory stones found.";
-                                    } else {
-                                        const memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
-                                        const matches = (memory.stones as any[]).filter((s: any) => 
-                                            s.topic.toLowerCase().includes(q) || 
-                                            s.content.toLowerCase().includes(q) ||
-                                            s.tags.some((t: string) => t.toLowerCase().includes(q))
-                                        ).slice(0, 5);
-                                        
-                                        toolResult = matches.length > 0 
-                                            ? `Found ${matches.length} relevant Memory Stones:\n\n` + matches.map(m => `### Topic: ${m.topic}\nContent: ${m.content}\nTags: ${m.tags.join(', ')}`).join('\n\n')
-                                            : `No memories found matching "${q}". Try a broader query or checking the project directory manually.`;
-                                    }
-                                    traceLabel = `Recalling Memory: ${q}`;
-                                    traceCategory = 'analyzing';
-                                } else if (toolCall.includes('<add_knowledge')) {
-                                    const t = getAttr('topic') || "General";
-                                    const c = /<add_knowledge[^>]*>([\s\S]*?)<\/add_knowledge>/.exec(toolCall)?.[1]?.trim() || "";
-                                    toolResult = await this.addKnowledge(t, c);
-                                    traceLabel = `Learning: ${t}`;
-                                    traceCategory = 'planning';
                                 }
+                            } else if (toolCall.includes('<run_terminal')) {
+                                const cmd = getAttr('command');
+                                const dir = this.resolvePath(getAttr('dir') || ".");
+                                traceLabel = `Terminal: ${cmd}`;
+                                tracePath = dir;
+                                traceCategory = 'executing';
+                                
+                                if (isAutonomous) {
+                                    await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: dir }, { signal: this.abortController.signal });
+                                    toolResult = "Terminal command executed. Check logs if needed.";
+                                } else {
+                                    this.post('requestTerminalApproval', { 
+                                        terminalData: { command: cmd, dir, messageId: Date.now().toString() } 
+                                    });
+                                    toolResult = "WAITING_FOR_TERMINAL_APPROVAL";
+                                    this.history.push({ role: 'assistant', content: toolCall });
+                                    this.history.push({ role: 'system', content: "User is reviewing terminal command. Wait." });
+                                    this.post('onAssistantMessage', reasoningText || "I need to run a terminal command.");
+                                    return;
+                                }
+                            } else if (toolCall.includes('<recall_memory')) {
+                                const q = getAttr('query').toLowerCase();
+                                const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
+                                const memoryPath = path.join(root, '.mirror', 'memory.json');
+                                if (!fs.existsSync(memoryPath)) {
+                                    toolResult = "No memories found.";
+                                } else {
+                                    const memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
+                                    const matches = (memory.stones as any[]).filter((s: any) => s.topic.toLowerCase().includes(q) || s.content.toLowerCase().includes(q)).slice(0, 3);
+                                    toolResult = matches.length > 0 ? JSON.stringify(matches) : "No match.";
+                                }
+                                traceLabel = `Recalling: ${q}`;
+                            } else if (toolCall.includes('<add_knowledge')) {
+                                const t = getAttr('topic') || "General";
+                                const c = /<add_knowledge[^>]*>([\s\S]*?)<\/add_knowledge>/.exec(toolCall)?.[1]?.trim() || "";
+                                toolResult = await this.addKnowledge(t, c);
+                                traceLabel = `Learning: ${t}`;
                             }
-                        } catch (err: any) { toolResult = `Error: ${err.message}`; }
+                        }
+                    } catch (err: any) { toolResult = `Error: ${err.message}`; }
 
-                        this.post('onToolTrace', { label: traceLabel, category: traceCategory, path: tracePath, result: toolResult.substring(0, 100) });
-                        this.history.push({ role: 'assistant', content: toolCall });
-                        this.history.push({ role: 'system', content: toolResult });
-                        turnCount++;
+                    this.post('onToolTrace', { label: traceLabel, category: traceCategory, path: tracePath, result: toolResult.substring(0, 150) });
+                    this.history.push({ role: 'assistant', content: toolCall });
+                    this.history.push({ role: 'system', content: toolResult });
+                    
+                    // If reasoning exists, push it to UI now to clear 'Thinking...' state
+                    if (reasoningText) {
+                         // We already streamed it chunk by chunk, so no need to send again
+                         // but we might want to ensure the final state is correct
                     }
-
-                    if (pauseForReview) {
-                        
-                        return;
-                    }
+                    
+                    turnCount++;
+                    // Continue to next turn (loop) - model will now see the toolResult in history
                 } else {
+                    // No tool call - this is a final answer or concluding text
                     this.post('onAssistantMessage', fullReply);
                     this.history.push({ role: 'assistant', content: fullReply });
                     break;
@@ -569,7 +529,21 @@ ${rawHistory}`;
     private getSystemPrompt(rootName: string, memoryIndex: string, _turn: number, _history: string, vramMB: number, _model: string, isThinkingModel: boolean): string {
         const hwNote = vramMB < 4500 ? "\n- Resource Notice: High compression environment. Do NOT omit whitespace." : "";
         
-        return `You are Mirror Code (v.2026.04), the "Autonomous Architect". Your goal is to solve requests through a strictly enforced 4-Phase Sequence.
+        let personaPrompt = "";
+        switch(this.persona) {
+            case 'researcher':
+                personaPrompt = "\n## PERSONA: RESEARCHER\nYour priority is deep code exploration and understanding. Before proposing any changes, you must exhaustively search for patterns, usages, and side effects. Focus heavily on <read_file>, <grep_search>, and <get_symbols>.";
+                break;
+            case 'debugger':
+                personaPrompt = "\n## PERSONA: DEBUGGER\nYour priority is identifying and fixing bugs. Focus on <get_diagnostics>, <read_file> for critical paths, and <run_terminal> to verify issues. Be surgical with <patch_file>.";
+                break;
+            case 'architect':
+            default:
+                personaPrompt = "\n## PERSONA: ARCHITECT\nYour priority is high-level system design and robust implementation. Ensure all changes follow project patterns and are documented in the Knowledge Bank. Use <add_knowledge> for significant decisions.";
+                break;
+        }
+
+        return `You are Mirror Code (v.2026.04), the "${this.persona.charAt(0).toUpperCase() + this.persona.slice(1)}". Your goal is to solve requests through a strictly enforced 4-Phase Sequence.${personaPrompt}
 
 ## CLAUDE-INSPIRED MEMORY ARCHITECTURE
 History is transient; the Knowledge Bank is eternal. 
@@ -578,9 +552,9 @@ History is transient; the Knowledge Bank is eternal.
 - Your prompt only contains the INDEX. To recall specific details, use <read_file filepath=".mirror/knowledge/[topic].md" />.
 
 ## THE BEST SEQUENCE
-1. **EXPLORE & RECOVER**: Find relevant files and patterns. **CRITICAL**: Check if ".mirror/plan.md" exists. If it does, READ it to recover context, but remember that the **User's latest prompt is your primary directive**. If it deviates from the existing plan, you MUST prioritize the new goal.
-2. **PLAN & RECONCILE**: For any multi-step task, create a ".mirror/plan.md" file using <write_file />. If one exists, compare it with the user's current request. If they diverge, your priority is to UPDATE the plan to reflect the new direction.
-3. **ACT & TRACK**: Execute your plan ("<patch_file />", "<run_terminal />"). You MUST update ".mirror/plan.md" religiously as you complete steps (change "[ ]" to "[x]").
+1. **EXPLORE & RECOVER**: Find relevant files and patterns. **CRITICAL**: Check if ".mirror/plan.md" exists. If it does, READ it to recover context, but remember that the **User's latest prompt is your primary directive**.
+2. **PLAN & PRESENT**: For any multi-step task, create or update a ".mirror/plan.md" file using <write_file />. You MUST present this plan to the user in your response and ASK for permission before proceeding to implementation.
+3. **CONSENTED EXECUTION**: Once authorized, execute your plan ("<patch_file />", "<run_terminal />"). You MUST update ".mirror/plan.md" religiously as you complete steps (change "[ ]" to "[x]").
 4. **RECORD**: For complex architecture, add permanent records via <add_knowledge />.
 5. **COMPLETE**: When the task is done, provide your final response to return control to the user.
 
@@ -605,11 +579,12 @@ History is transient; the Knowledge Bank is eternal.
 8. Creation vs Edit: Use <write_file /> exclusively for creating NEW files or completely overwriting existing ones. Use <patch_file /> for targeted edits to existing files.
 9. Terminal Relocation: Use the "dir" attribute in <run_terminal /> to execute commands in a specific folder.
 10. Pagination (Sliding Window): Files can be huge. Use "start_line" and "end_line" (1-indexed) in <read_file /> to read ~${this.defaultReadLines} lines at a time. If you find your answer, stop; otherwise, continue reading the next chunk. The tool will return the total line count to help you navigate.
-11. BIAS FOR ACTION: Priority: Implementation > Exploration. Once you have located the target code and understand the fix, YOUR NEXT TURN SHOULD BE A MODIFICATION TOOL (<patch_file /> or <write_file />).
+11. CONCIERGE EXECUTION: DO NOT MODIFY CODE PREEMPTIVELY. If your plan involves changes to the codebase, you MUST first ask: "Should I apply these changes?" or wait for a "Go ahead". Only use modification tools (<patch_file />, <write_file />) when explicitly authorized or when the user's request is an unambiguous command like "Fix it" or "Run this".
 12. STRUCTURED PROGRESS: For multi-step tasks, you MUST use ".mirror/plan.md" as your living TODO list. Update it religiously so the user can see your current state and progress.
 13. ADAPTIVE PLANNING: The User's latest prompt overrules any previous plan. If you receive a new task, your priority is to reconcile the existing ".mirror/plan.md" with the new request (either by updating or replacing it).
 14. ANTI-STUTTERING: NEVER repeat the same tool call with the same parameters in the same response Turn. If you must iterate, wait for the result of the previous tool before sending the next one via a new Turn.
 15. ATTRIBUTE ENFORCEMENT: ALL file-related tools REQUIRE the 'filepath' or 'dirpath' attribute in the opening XML tag. Failure to provide this will result in a tool error.
+16. STRICT INTENT ADHERENCE: If the user asks for "Analysis", "Review", or "Information", your toolkit is restricted to READ-ONLY operations. DO NOT attempt to fix bugs you discover unless explicitly asked to do so.
 
 ENVIRONMENT: ${rootName}${hwNote}
 

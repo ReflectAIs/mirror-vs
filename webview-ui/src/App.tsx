@@ -75,11 +75,23 @@ function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
    const [currentSessionId, setCurrentSessionId] = useState<string>(Date.now().toString());
    const [generatingSessions, setGeneratingSessions] = useState<Record<string, boolean>>({});
-   const isGenerating = generatingSessions[currentSessionId] || false;
+  
+  // SPRINT 3: Context Mentions & Partial Patches
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
+  const [symbols, setSymbols] = useState<any[]>([]);
+  const [mentionType, setMentionType] = useState<'file' | 'symbol'>('file');
+  const [loadingMentions, setLoadingMentions] = useState(false);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const [selectedHunks, setSelectedHunks] = useState<Record<string, boolean[]>>({});
+
+  const isGenerating = generatingSessions[currentSessionId] || false;
   const [view, setView] = useState<'chat' | 'history' | 'settings'>('chat');
   const [logoUri, setLogoUri] = useState<string>(defaultLogo);
   const [autonomousMode, setAutonomousMode] = useState(false);
   const [buddyStatus, setBuddyStatus] = useState<BuddyStatus>('idle');
+  const [selectedPersona, setSelectedPersona] = useState<string>('architect');
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -148,6 +160,33 @@ function App() {
              ];
            }, false);
            break;
+          case 'onTerminalChunk':
+            updateSession(message.sessionId || currentSessionId, (msg) => {
+              const last = msg[msg.length - 1];
+              if (last && last.type === 'trace') {
+                const newMsg = [...msg];
+                newMsg[newMsg.length - 1] = { 
+                  ...last, 
+                  traceData: { 
+                    ...last.traceData, 
+                    label: last.traceData?.label || 'Terminal',
+                    category: last.traceData?.category || 'executing',
+                    result: (last.traceData?.result || '') + message.value.content 
+                  } 
+                };
+                return newMsg;
+              }
+              return msg;
+            }, false);
+            break;
+          case 'onFiles':
+            setWorkspaceFiles(message.value);
+            setLoadingMentions(false);
+            break;
+          case 'onSymbols':
+            setSymbols(message.value);
+            setLoadingMentions(false);
+            break;
          case 'onAssistantComplete':
            break;
          case 'requestDiffReview':
@@ -186,6 +225,11 @@ function App() {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [currentSessionId]);
+
+  // Prefetch files on mount
+  useEffect(() => {
+    window.vscode.postMessage({ type: 'getFiles' });
+  }, []);
 
   const handleScroll = () => {
     // No-op for now, used to update isAtBottom state
@@ -233,6 +277,60 @@ function App() {
    };
   const updateCurrentSession = (fn: (msgs: Message[]) => Message[], bubbleToTop = true) => {
       updateSession(currentSessionId, fn, bubbleToTop);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    
+    const cursorPos = e.target.selectionStart || 0;
+    const textBeforeCursor = val.substring(0, cursorPos);
+    
+    const symbolMatch = /@#([\w]*)$/.exec(textBeforeCursor);
+    const fileMatch = /@([\w\-\.\/]*)$/.exec(textBeforeCursor);
+
+    if (symbolMatch) {
+        setMentionFilter(symbolMatch[1]);
+        setMentionType('symbol');
+        setShowMentions(true);
+        setSelectedMentionIndex(0);
+        setLoadingMentions(true);
+        window.vscode.postMessage({ type: 'getSymbols' });
+    } else if (fileMatch) {
+        setMentionFilter(fileMatch[1]);
+        setMentionType('file');
+        setShowMentions(true);
+        setSelectedMentionIndex(0);
+        setLoadingMentions(true);
+        window.vscode.postMessage({ type: 'getFiles' });
+    } else {
+        setShowMentions(false);
+    }
+  };
+
+  const handleMentionSelect = (item: string) => {
+    const textarea = document.querySelector('.composer textarea') as HTMLTextAreaElement;
+    const cursorPos = textarea?.selectionStart || input.length;
+    const textBeforeCursor = input.substring(0, cursorPos);
+    const textAfterCursor = input.substring(cursorPos);
+    
+    const pattern = mentionType === 'symbol' ? /@#([\w]*)$/ : /@([\w\-\.\/]*)$/;
+    const match = pattern.exec(textBeforeCursor);
+    
+    if (match) {
+        const pre = textBeforeCursor.substring(0, match.index);
+        const trigger = mentionType === 'symbol' ? '@#' : '@';
+        const newValue = `${pre}${trigger}${item} ${textAfterCursor}`;
+        setInput(newValue);
+        
+        // Refocus and set cursor to after the inserted mention
+        setTimeout(() => {
+            textarea?.focus();
+            const newPos = pre.length + trigger.length + item.length + 1;
+            textarea?.setSelectionRange(newPos, newPos);
+        }, 0);
+    }
+    setShowMentions(false);
   };
 
   const handleSend = () => {
@@ -295,7 +393,20 @@ function App() {
   };
 
   const commitPatch = (diff: any) => {
-    window.vscode.postMessage({ type: 'commitPatch', value: diff });
+    const activeBlocks = selectedHunks[diff.messageId];
+    const filteredBlocks = activeBlocks 
+        ? diff.blocks.filter((_: any, i: number) => activeBlocks[i])
+        : diff.blocks;
+
+    if (filteredBlocks.length === 0) {
+        alert("Please select at least one change to apply.");
+        return;
+    }
+
+    window.vscode.postMessage({ 
+        type: 'commitPatch', 
+        value: { ...diff, blocks: filteredBlocks } 
+    });
     updateCurrentSession((msg) => msg.filter(m => m.id !== diff.messageId), false);
   };
 
@@ -376,6 +487,20 @@ function App() {
         
         <div className="header-center">
           <Buddy status={buddyStatus} isAutonomous={autonomousMode} />
+          <div className="persona-selector">
+            <select 
+              value={selectedPersona} 
+              onChange={(e) => {
+                setSelectedPersona(e.target.value);
+                window.vscode.postMessage({ type: 'setPersona', value: e.target.value });
+              }}
+              className="persona-dropdown"
+            >
+              <option value="architect">Architect</option>
+              <option value="researcher">Researcher</option>
+              <option value="debugger">Debugger</option>
+            </select>
+          </div>
         </div>
 
         <div className="header-right">
@@ -402,17 +527,35 @@ function App() {
                             <VscSymbolMethod />
                             <span className="diff-title">{msg.diffData.filepath}</span>
                           </div>
-                          <div className="diff-content">
-                            {renderDiffLines(msg.diffData.original || '', msg.diffData.content || '').map((line: any, idx: number) => (
-                              <div key={idx} className={`diff-line ${line.type}`}>
-                                <span className="diff-indicator">{line.type === 'added' ? '+' : (line.type === 'removed' ? '-' : ' ')}</span>
-                                <span className="diff-text">{line.text}</span>
-                              </div>
-                            ))}
+                          <div className="diff-blocks">
+                            {msg.diffData.blocks.map((block: any, blockIdx: number) => {
+                                const isChecked = selectedHunks[msg.id]?.[blockIdx] ?? true;
+                                return (
+                                    <div key={blockIdx} className={`diff-block ${isChecked ? 'selected' : 'deselected'}`}>
+                                        <div className="block-header" onClick={() => {
+                                            const current = selectedHunks[msg.id] || msg.diffData.blocks.map(() => true);
+                                            const nuevo = [...current];
+                                            nuevo[blockIdx] = !nuevo[blockIdx];
+                                            setSelectedHunks(prev => ({ ...prev, [msg.id]: nuevo }));
+                                        }}>
+                                            <input type="checkbox" checked={isChecked} readOnly />
+                                            <span>Hunk #{blockIdx + 1}</span>
+                                        </div>
+                                        <div className="diff-content mini">
+                                            {renderDiffLines(block.search, block.replace).map((line: any, idx: number) => (
+                                              <div key={idx} className={`diff-line ${line.type}`}>
+                                                <span className="diff-indicator">{line.type === 'added' ? '+' : (line.type === 'removed' ? '-' : ' ')}</span>
+                                                <span className="diff-text">{line.text}</span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                           </div>
                           <div className="diff-actions">
                             <button className="apply-btn" onClick={() => commitPatch(msg.diffData)}>
-                              <VscCheck /> Apply Changes
+                              <VscCheck /> {selectedHunks[msg.id]?.filter(Boolean).length === 0 ? 'Select Hunks' : `Apply Selected (${selectedHunks[msg.id]?.filter(Boolean).length || msg.diffData.blocks.length})`}
                             </button>
                             <button className="discard-btn" onClick={() => updateCurrentSession(msgs => msgs.filter(m => m.id !== msg.id), false)}>
                               <VscClose /> Discard
@@ -490,11 +633,54 @@ function App() {
           </div>
 
           <footer className="composer">
+            {showMentions && (
+                <div className="mentions-menu">
+                    {loadingMentions ? (
+                        <div className="mention-item loading"><VscLoading className="spin" /> Searching...</div>
+                    ) : (
+                        (mentionType === 'symbol' ? symbols.map(s => s.name) : workspaceFiles)
+                            .filter(f => f.toLowerCase().includes(mentionFilter.toLowerCase()))
+                            .slice(0, 8)
+                            .map((item, idx) => (
+                                <div 
+                                    key={item} 
+                                    className={`mention-item ${idx === selectedMentionIndex ? 'selected' : ''}`}
+                                    onClick={() => handleMentionSelect(item)}
+                                >
+                                    {mentionType === 'symbol' ? <VscSymbolMethod /> : <VscFile />}
+                                    <div className="mention-name">
+                                        <div className="item-label">{item}</div>
+                                        {mentionType === 'symbol' && symbols.find(s => s.name === item) && (
+                                            <div className="item-detail">{symbols.find(s => s.name === item).kind} (Line {symbols.find(s => s.name === item).line})</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                    )}
+                    {!loadingMentions && (mentionType === 'symbol' ? symbols : workspaceFiles).filter(f => (mentionType === 'symbol' ? f.name : f).toLowerCase().includes(mentionFilter.toLowerCase())).length === 0 && (
+                        <div className="mention-item empty">No results found</div>
+                    )}
+                </div>
+            )}
             <div className="input-group">
               <textarea 
                 value={input} 
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onChange={handleInputChange}
+                onKeyDown={(e) => { 
+                    if (showMentions) {
+                        if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedMentionIndex(i => Math.min(i + 1, 7)); }
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedMentionIndex(i => Math.max(i - 1, 0)); }
+                        else if (e.key === 'Enter' || e.key === 'Tab') { 
+                            e.preventDefault(); 
+                            const list = mentionType === 'symbol' ? symbols.map(s => s.name) : workspaceFiles;
+                            const filtered = list.filter(f => f.toLowerCase().includes(mentionFilter.toLowerCase())).slice(0, 8);
+                            if (filtered[selectedMentionIndex]) handleMentionSelect(filtered[selectedMentionIndex]);
+                        }
+                        else if (e.key === 'Escape') { setShowMentions(false); }
+                    } else {
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } 
+                    }
+                }}
                 placeholder="Talk to Mirror..."
                 rows={1}
               />
@@ -531,4 +717,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

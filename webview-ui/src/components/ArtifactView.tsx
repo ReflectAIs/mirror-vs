@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { VscClose, VscFileCode, VscTerminal, VscEye, VscJson, VscBrowser } from 'react-icons/vsc';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';

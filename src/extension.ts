@@ -37,19 +37,23 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    // 2. Index Workspace on Save
-    const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
-        const supported = ['typescript', 'typescriptreact', 'plaintext', 'markdown'];
-        if (supported.includes(doc.languageId)) {
-            try {
-                await axios.post('http://localhost:3000/index', {
-                    filepath: doc.uri.fsPath
-                });
-            } catch (e) {
-                console.error('Failed to index file:', e);
-            }
+    // 2. Automate Indexing with File System Watcher
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.{ts,tsx,js,jsx,py,go}');
+    
+    const triggerIndex = async (uri: vscode.Uri) => {
+        try {
+            await axios.post('http://localhost:3000/index', {
+                filepath: uri.fsPath
+            });
+        } catch (e) {
+            console.error('Failed to auto-index file:', e);
         }
-    });
+    };
+
+    watcher.onDidCreate(triggerIndex);
+    watcher.onDidChange(triggerIndex);
+    
+    context.subscriptions.push(watcher);
 
     // 3. LSP Bridge Command: Get Definition
     const getDefCmd = vscode.commands.registerCommand('mirror-code.getDefinition', async (uriStr: string, line: number, character: number) => {
@@ -111,7 +115,25 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('mirror-code.sidebar.focus');
     });
 
-    context.subscriptions.push(provider, onSave, getDefCmd, openTermCmd, diagCmd, symbolCmd, disposable);
+    const getFilesCmd = vscode.commands.registerCommand('mirror-code.getFiles', async () => {
+        // Get Open editors first
+        const openTabs = vscode.window.tabGroups.all.flatMap(g => g.tabs);
+        const openFiles = new Set(
+            openTabs
+                .filter(t => t.input instanceof vscode.TabInputText)
+                .map(t => vscode.workspace.asRelativePath((t.input as vscode.TabInputText).uri))
+        );
+
+        // Get rest of workspace files
+        const files = await vscode.workspace.findFiles('**/*', '{**/node_modules/**,**/.git/**,dist/**,out/**}');
+        const allFiles = files.map(f => vscode.workspace.asRelativePath(f));
+
+        // Filter and sort: Open files first, then the rest
+        const otherFiles = allFiles.filter(f => !openFiles.has(f));
+        return [...Array.from(openFiles), ...otherFiles];
+    });
+
+    context.subscriptions.push(provider, getDefCmd, openTermCmd, diagCmd, symbolCmd, getFilesCmd, disposable);
 }
 
 export function deactivate() {

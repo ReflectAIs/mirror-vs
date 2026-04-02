@@ -25,6 +25,112 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* PERSONA SELECTOR */
+.persona-selector {
+  display: flex;
+  align-items: center;
+}
+
+.persona-dropdown {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  outline: none;
+  padding: 2px 0;
+  transition: all 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.persona-dropdown:hover {
+  color: var(--text-pure);
+}
+
+.persona-dropdown option {
+  background: var(--bg-elevated);
+  color: var(--text-pure);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  padding: 8px;
+}
+
+/* MENTIONS MENU */
+.mentions-menu {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 16px;
+  right: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.mention-item:hover, .mention-item.selected {
+  background: hsla(0, 0%, 100%, 0.05);
+  color: var(--text-pure);
+}
+
+.mention-item svg {
+  flex-shrink: 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.mention-name {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.item-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.item-detail {
+  font-size: 10px;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-item.loading, .mention-item.empty {
+  justify-content: center;
+  opacity: 0.6;
+  font-style: italic;
+  pointer-events: none;
+  padding: 16px;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -209,19 +315,18 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px 0 16px; /* Added top padding */
+  padding: 0 16px;
   background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
-  height: 60px; /* Increased height to accommodate padding */
+  height: 52px;
   box-sizing: border-box;
-  z-index: 100;
+  z-index: 1000;
   position: sticky;
   top: 0;
 }
- Riverside
-
+/* BRANDING */
 .brand {
   display: flex;
   align-items: center;
@@ -265,10 +370,64 @@ body {
   100% { box-shadow: 0 0 0 0 hsla(150, 100%, 50%, 0); }
 }
 
-.header-right, .header-left {
+.header-center {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  background: hsla(0, 0%, 100%, 0.05);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  height: 32px;
+  transition: all 0.3s ease;
+}
+
+.header-center:hover {
+  background: hsla(0, 0%, 100%, 0.08);
+  border-color: hsla(0, 0%, 100%, 0.2);
+}
+
+.buddy-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.buddy-wrapper {
+  width: 22px;
+  height: 22px;
+  position: relative;
+}
+
+.buddy-body {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), #3ce7e7);
+  box-shadow: 0 2px 8px rgba(0, 163, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: buddy-float 3s ease-in-out infinite;
+}
+
+.buddy-face {
+  scale: 0.7;
+}
+
+.buddy-aura {
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: 8px;
+  background: var(--accent);
+  filter: blur(8px);
+  opacity: 0.3;
+}
+
+.buddy-label {
+    display: none; /* Hide label in header to keep it clean */
 }
 
 /* Chat Interface */

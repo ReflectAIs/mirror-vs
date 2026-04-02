@@ -16,7 +16,6 @@ interface SettingsData {
   maxTurns: number;
   autonomousMode: boolean;
   defaultReadLines: number;
-  maxToolsPerTurn: number;
 }
 
 export default function Settings({ onBack }: SettingsProps) {
@@ -26,7 +25,6 @@ export default function Settings({ onBack }: SettingsProps) {
     maxTurns: 20,
     autonomousMode: false,
     defaultReadLines: 500,
-    maxToolsPerTurn: 8
   });
   const [models, setModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -145,17 +143,7 @@ export default function Settings({ onBack }: SettingsProps) {
           <p className="setting-hint">Number of lines the agent reads at once (sliding window).</p>
         </div>
         
-        <div className="setting-item">
-          <label>Max Tools Per Turn</label>
-          <input 
-            type="number" 
-            min="1" 
-            max="100"
-            value={settings.maxToolsPerTurn} 
-            onChange={(e) => setSettings({ ...settings, maxToolsPerTurn: parseInt(e.target.value) || 8 })}
-          />
-          <p className="setting-hint">Interrupts the agent after N tools to prevent context overload.</p>
-        </div>
+
 
         <div className="setting-item">
            <label style={{ color: settings.autonomousMode ? 'var(--success)' : 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>

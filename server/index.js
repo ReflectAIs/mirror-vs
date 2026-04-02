@@ -125,10 +125,15 @@ app.post('/tools/list_dir', async (req, res) => {
         }
 
         const files = fs.readdirSync(dirpath, { withFileTypes: true });
-        const results = files.map(f => ({
+        let results = files.map(f => ({
             name: f.name,
             isDirectory: f.isDirectory()
         }));
+        
+        if (results.length > 50) {
+            results = results.slice(0, 50);
+            results.push({ name: '[Output Truncated: Use specific subdirectory or grep_search for more]', isDirectory: false });
+        }
         res.json({ files: results });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -176,13 +181,31 @@ app.post('/tools/grep_search', async (req, res) => {
 // if it hallucinates an interactive command (like `npm init` or `python script_that_waits_for_input.py`)
 app.post('/tools/run_terminal', async (req, res) => {
     const { command, cwd } = req.body;
-    exec(command, { cwd, timeout: 30000 }, (error, stdout, stderr) => {
-        res.json({
-            stdout: stdout || '',
-            stderr: stderr || '',
-            exitCode: error ? error.code : 0,
-            killed: error ? error.killed : false
-        });
+    
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    const shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
+    const shellArgs = process.platform === 'win32' ? ['/c', command] : ['-c', command];
+
+    const child = spawn(shell, shellArgs, { cwd, timeout: 60000 });
+
+    child.stdout.on('data', (data) => {
+        res.write(JSON.stringify({ type: 'stdout', content: data.toString() }) + '\n');
+    });
+
+    child.stderr.on('data', (data) => {
+        res.write(JSON.stringify({ type: 'stderr', content: data.toString() }) + '\n');
+    });
+
+    child.on('error', (err) => {
+        res.write(JSON.stringify({ type: 'error', content: err.message }) + '\n');
+    });
+
+    child.on('close', (code) => {
+        res.write(JSON.stringify({ type: 'exit', code: code || 0 }) + '\n');
+        res.end();
     });
 });
 
