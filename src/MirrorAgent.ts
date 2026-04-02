@@ -244,9 +244,10 @@ export class MirrorAgent {
                                     if (json.response) {
                                         fullReply += json.response;
                                         
-                                        // Tool batch constraint: Interrupt stream if model outputs too many tools at once
-                                        const toolMatches = fullReply.match(new RegExp(completeToolPattern.source, 'g')) || [];
-                                        if (toolMatches.length >= MAX_TOOLS_PER_TURN) {
+                                        // Aggressive tool batch constraint: Interrupt as soon as an Official Opening Tag is detected
+                                        const toolPattern = /<(read_file|grep_search|list_dir|run_terminal|patch_file|write_file|add_knowledge|get_symbols|get_diagnostics)(\s+|>)/g;
+                                        const toolStarts = fullReply.match(toolPattern) || [];
+                                        if (toolStarts.length > MAX_TOOLS_PER_TURN) {
                                             req.destroy();
                                             resolve(true);
                                             return;
@@ -482,6 +483,7 @@ History is transient; the Knowledge Bank is eternal.
 11. BIAS FOR ACTION: Priority: Implementation > Exploration. Once you have located the target code and understand the fix, YOUR NEXT TURN SHOULD BE A MODIFICATION TOOL (<patch_file /> or <write_file />).
 12. STRUCTURED PROGRESS: For multi-step tasks, you MUST use ".mirror/plan.md" as your living TODO list. Update it religiously so the user can see your current state and progress.
 13. ADAPTIVE PLANNING: The User's latest prompt overrules any previous plan. If you receive a new task, your priority is to reconcile the existing ".mirror/plan.md" with the new request (either by updating or replacing it).
+14. ANTI-STUTTERING: NEVER repeat the same tool call with the same parameters in the same response Turn. If you must iterate, wait for the result of the previous tool before sending the next one via a new Turn.
 
 ENVIRONMENT: ${rootName}${hwNote}
 
