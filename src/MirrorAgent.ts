@@ -1,6 +1,7 @@
-import * as vscode from 'vscode';
 import axios from 'axios';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as vscode from 'vscode';
 import * as http from 'http';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -160,13 +161,22 @@ export class MirrorAgent {
         const prompt = `You are a memory compaction module. Review this recent agent transcript and extract ALL concrete facts, file structures, bugs fixed, and architectural discoveries made. Output ONLY a concise Markdown summary of what you learned. Do not add introductory conversational text.\n\nTRANSCRIPT:\n${rawHistory}`;
         
         try {
-            const res = await axios.post(`${ollamaUrl}/api/generate`, {
-                model: ollamaModel,
-                prompt: prompt,
-                stream: false
-            });
+            const res = await axios.post(`${ollamaUrl}/api/generate`, { model: ollamaModel, prompt, stream: false });
             const summary = res.data.response;
-            await this.addKnowledge("context_compaction", summary);
+            
+            // Add to Knowledge Bank
+            await this.addKnowledge("Auto-Dream Summary", summary);
+            
+            // Project Index Refresh (Kairos)
+            const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
+            const files = await this.recursiveList(root);
+            const indexContent = `# Project Index (Refreshed via Kairos)\n\nLast Refresh: ${new Date().toISOString()}\n\n${files.map(f => `- ${f}`).join('\n')}`;
+            const indexPath = path.join(root, '.mirror', 'INDEX.md');
+            
+            if (!fs.existsSync(path.dirname(indexPath))) fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+            fs.writeFileSync(indexPath, indexContent);
+            
+            this.log("Auto-Dream indexing complete.");
             
             // Wipe history but keep initial goal
             const initialGoal = this.history.length > 0 ? this.history[0] : null;
@@ -174,9 +184,28 @@ export class MirrorAgent {
             this.history.push({ role: 'system', content: '[SYSTEM: Previous turns were compacted into .mirror/knowledge/context_compaction.md. You are continuing the same task with a refreshed context window.]' });
             
             this.log("Auto-Dream Compaction complete. History wiped.");
-        } catch (e) {
-            this.log(`Auto-Dream failed: ${e}`);
+        } catch (e: any) { this.log(`Dreaming failed: ${e.message}`); }
+    }
+
+    private async recursiveList(dir: string, depth = 0): Promise<string[]> {
+        if (depth > 3) return []; // Limit depth for indexing
+        let results: string[] = [];
+        const list = fs.readdirSync(dir);
+        for (const file of list) {
+            if (file === 'node_modules' || file === '.git' || file === '.mirror') continue;
+            const fullPath = path.join(dir, file);
+            const stat = fs.statSync(fullPath);
+            results.push(this.resolveRelative(fullPath));
+            if (stat.isDirectory()) {
+                results = results.concat(await this.recursiveList(fullPath, depth + 1));
+            }
         }
+        return results;
+    }
+
+    private resolveRelative(fullPath: string): string {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+        return path.relative(root, fullPath);
     }
 
     public async handleUserMessage(text: string) {
@@ -192,7 +221,7 @@ export class MirrorAgent {
         this.abortController = new AbortController();
 
         let turnCount = 0;
-        const completeToolPattern = /<(search_vector_db|grep_search|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal)\s+[^>]*\/?>|<(patch_file|write_file|add_knowledge)\s+[^>]*>[\s\S]*?<\/\2>/;
+        const completeToolPattern = /<(search_vector_db|grep_search|read_skeleton|read_file|get_symbols|get_diagnostics|list_dir|run_terminal)(\s+[^>]*)?\/?>|<(patch_file|write_file|add_knowledge)(\s+[^>]*)?>([\s\S]*?)<\/\3>/;
 
         while (turnCount < maxTurns) {
             if (this.abortController.signal.aborted) break;
@@ -298,7 +327,7 @@ export class MirrorAgent {
                         try {
                             if (toolCall === this.lastToolCall) {
                                 this.log(`Stutter Detected: ${toolCall.substring(0, 50)}...`);
-                                toolResult = "[SYSTEM: STUTTER DETECTED. You have already called this exact tool with identical parameters in the previous turn. If the results were insufficient, try a different query, or different tool, or provide your final answer. DO NOT repeat your previous action.]";
+                                toolResult = "[SYSTEM: STUTTER DETECTED. You have already called this exact tool with identical parameters in the previous turn. If the results were insufficient, provide your final answer or try a different approach. DO NOT repeat your previous action.]";
                                 traceLabel = "Stutter Intercepted";
                                 traceCategory = 'planning';
                             } else {
@@ -356,50 +385,65 @@ export class MirrorAgent {
                                     const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
                                     toolResult = diags.length > 0 ? JSON.stringify(diags) : "No problems found.";
                                 } else if (toolCall.includes('<patch_file')) {
-                                    const fp = this.resolvePath(getAttr('filepath'));
-                                    const search = /<search>([\s\S]*?)<\/search>/.exec(toolCall)?.[1] || "";
-                                    const replace = /<replace>([\s\S]*?)<\/replace>/.exec(toolCall)?.[1] || "";
-                                    
-                                    traceLabel = `Proposing Patch: ${path.basename(fp)}`;
-                                    tracePath = fp;
-                                    traceCategory = 'planning';
-                                    
-                                    const res = await axios.post('http://localhost:3000/tools/patch_file', { 
-                                        filepath: fp, 
-                                        blocks: [{ search, replace }], 
-                                        previewOnly: true 
-                                    }, { signal: this.abortController.signal });
-
-                                    if (isAutonomous) {
-                                        this.log(`Auto-Applying patch to ${fp} (Autonomous Mode)`);
-                                        await axios.post('http://localhost:3000/tools/patch_file', { 
-                                            filepath: fp, 
-                                            blocks: [{ search, replace }], 
-                                            previewOnly: false 
-                                        });
-                                        
-                                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
-                                        this.provider.postMessageToWebview({ type: 'onPatchApplied', value: { filepath: fp, diags, sessionId: this.sessionId } });
-                                        toolResult = diags.length > 0 ? `Patch auto-applied but found issues: ${JSON.stringify(diags)}` : "Patch auto-applied successfully.";
+                                    const filepathRaw = getAttr('filepath');
+                                    if (!filepathRaw) {
+                                        toolResult = "[SYSTEM: Error: You MUST provide a 'filepath' attribute in the <patch_file> tag. Example: <patch_file filepath=\"src/main.ts\">...]";
+                                        traceLabel = "Patch Failed: Missing Filepath";
                                     } else {
-                                        this.provider.postMessageToWebview({ 
-                                            type: 'requestDiffReview', 
-                                            value: { 
-                                                filepath: getAttr('filepath'), 
-                                                original: res.data.original, 
-                                                content: res.data.content,
-                                                blocks: [{ search, replace }],
-                                                messageId: Date.now().toString(),
-                                                sessionId: this.sessionId
-                                            }, 
-                                            sessionId: this.sessionId 
-                                        });
+                                        const fp = this.resolvePath(filepathRaw);
+                                        const blocks: { search: string, replace: string }[] = [];
+                                        const blockPattern = /<search>([\s\S]*?)<\/search>\s*<replace>([\s\S]*?)<\/replace>/g;
+                                        let bMatch;
+                                        while ((bMatch = blockPattern.exec(toolCall)) !== null) {
+                                            blocks.push({ search: bMatch[1], replace: bMatch[2] });
+                                        }
 
-                                        toolResult = "WAITING_FOR_USER_REVIEW";
-                                        this.history.push({ role: 'assistant', content: toolCall });
-                                        this.history.push({ role: 'system', content: "The user is now reviewing the proposed diff. Please wait for their response before continuing." });
-                                        this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
-                                        return; 
+                                        if (blocks.length === 0) {
+                                            toolResult = "[SYSTEM: Error: No search/replace blocks found. Ensure you use <search>...</search> and <replace>...</replace> pairs.]";
+                                            traceLabel = "Patch Failed: Empty Blocks";
+                                        } else {
+                                            traceLabel = `Proposing Patch (${blocks.length} blocks): ${path.basename(fp)}`;
+                                            tracePath = fp;
+                                            traceCategory = 'planning';
+                                            
+                                            const res = await axios.post('http://localhost:3000/tools/patch_file', { 
+                                                filepath: fp, 
+                                                blocks, 
+                                                previewOnly: true 
+                                            }, { signal: this.abortController.signal });
+
+                                            if (isAutonomous) {
+                                                this.log(`Auto-Applying patch to ${fp} (Autonomous Mode)`);
+                                                await axios.post('http://localhost:3000/tools/patch_file', { 
+                                                    filepath: fp, 
+                                                    blocks, 
+                                                    previewOnly: false 
+                                                });
+                                                
+                                                const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
+                                                this.provider.postMessageToWebview({ type: 'onPatchApplied', value: { filepath: fp, diags, sessionId: this.sessionId } });
+                                                toolResult = diags.length > 0 ? `Patch auto-applied but found issues: ${JSON.stringify(diags)}` : "Patch auto-applied successfully.";
+                                            } else {
+                                                this.provider.postMessageToWebview({ 
+                                                    type: 'requestDiffReview', 
+                                                    value: { 
+                                                        filepath: filepathRaw, 
+                                                        original: res.data.original, 
+                                                        content: res.data.content,
+                                                        blocks,
+                                                        messageId: Date.now().toString(),
+                                                        sessionId: this.sessionId
+                                                    }, 
+                                                    sessionId: this.sessionId 
+                                                });
+
+                                                toolResult = "WAITING_FOR_USER_REVIEW";
+                                                this.history.push({ role: 'assistant', content: toolCall });
+                                                this.history.push({ role: 'system', content: "The user is now reviewing the proposed diff. Please wait for their response before continuing." });
+                                                this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+                                                return; 
+                                            }
+                                        }
                                     }
                                 } else if (toolCall.includes('<run_terminal')) {
                                     const cmd = getAttr('command');
@@ -407,8 +451,32 @@ export class MirrorAgent {
                                     traceLabel = `Terminal (${path.basename(dir)}): ${cmd}`;
                                     tracePath = dir;
                                     traceCategory = 'executing';
-                                    const res = await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: dir }, { signal: this.abortController.signal });
-                                    toolResult = res.data.stdout + res.data.stderr;
+                                    
+                                    if (isAutonomous) {
+                                        const res = await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: dir }, { signal: this.abortController.signal });
+                                        toolResult = res.data.stdout + res.data.stderr;
+                                        
+                                        // Self-healing: If command failed, inject a diagnostic reminder
+                                        if (res.data.code !== 0 && res.data.code !== undefined) {
+                                            toolResult += `\n[SYSTEM: Command exited with code ${res.data.code}. If this was unexpected, analyze the error and try to fix it.]`;
+                                        }
+                                    } else {
+                                        this.provider.postMessageToWebview({ 
+                                            type: 'requestTerminalReview', 
+                                            value: { 
+                                                command: cmd, 
+                                                dir: getAttr('dir') || ".", 
+                                                sessionId: this.sessionId 
+                                            }, 
+                                            sessionId: this.sessionId 
+                                        });
+
+                                        toolResult = "WAITING_FOR_TERMINAL_APPROVAL";
+                                        this.history.push({ role: 'assistant', content: toolCall });
+                                        this.history.push({ role: 'system', content: "The user is now reviewing this terminal command. Please wait for approval." });
+                                        this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+                                        return; 
+                                    }
                                 } else if (toolCall.includes('<add_knowledge')) {
                                     const t = getAttr('topic') || "General";
                                     const c = /<add_knowledge[^>]*>([\s\S]*?)<\/add_knowledge>/.exec(toolCall)?.[1]?.trim() || "";
@@ -444,6 +512,15 @@ export class MirrorAgent {
         this.handleUserMessage(""); // Continue from where we left off
     }
 
+    public async handleTerminalResult(stdout: string, stderr: string) {
+        const result = (stdout + stderr) || "Command executed with no output.";
+        this.log(`Resuming agent turn after terminal approval.`);
+        
+        // Push the result back into history and resume the thinking loop
+        this.history.push({ role: 'system', content: result });
+        this.handleUserMessage(""); 
+    }
+
     private async detectHardware(): Promise<number> {
         try {
             const { stdout } = await execAsync('nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits');
@@ -476,7 +553,16 @@ History is transient; the Knowledge Bank is eternal.
 4. Actionable Links: Always wrap Workspace-relative file paths in code blocks or quotes to make them clear for the user.
 5. ${isThinkingModel ? "Utilize native reasoning mode." : "Always encapsulate your reasoning in <thinking> tags before acting."}
 6. Maintain perfect whitespace, indentation, and spaces. Use the [CONTEXT ARCHIVE] for reference.
-7. XML Tools: <read_file filepath="relative/path" start_line="1" end_line="500" />, <grep_search query="string" root="relative/dir" />, <list_dir dirpath="relative/dir" />, <run_terminal command="cmd" dir="relative/path" />, <patch_file><search>...</search><replace>...</replace></patch_file>, <write_file filepath="relative/path">content</write_file>, <add_knowledge topic="String">md</add_knowledge>, <get_symbols filepath="path" />, <get_diagnostics filepath="path" />.
+7. XML Tools: 
+   - <read_file filepath="relative/path" start_line="1" end_line="500" />
+   - <grep_search query="string" root="relative/dir" />
+   - <list_dir dirpath="relative/dir" />
+   - <run_terminal command="cmd" dir="relative/path" />
+   - <patch_file filepath="relative/path"><search>exact code to find</search><replace>new code</replace></patch_file>
+   - <write_file filepath="relative/path">full content</write_file>
+   - <add_knowledge topic="String">markdown documentation</add_knowledge>
+   - <get_symbols filepath="path" /> (Lists all classes/methods in a file)
+   - <get_diagnostics filepath="path" /> (Checks for Lint/Type errors)
 8. Creation vs Edit: Use <write_file /> exclusively for creating NEW files or completely overwriting existing ones. Use <patch_file /> for targeted edits to existing files.
 9. Terminal Relocation: Use the "dir" attribute in <run_terminal /> to execute commands in a specific folder.
 10. Pagination (Sliding Window): Files can be huge. Use "start_line" and "end_line" (1-indexed) in <read_file /> to read ~${this.defaultReadLines} lines at a time. If you find your answer, stop; otherwise, continue reading the next chunk. The tool will return the total line count to help you navigate.
@@ -484,6 +570,7 @@ History is transient; the Knowledge Bank is eternal.
 12. STRUCTURED PROGRESS: For multi-step tasks, you MUST use ".mirror/plan.md" as your living TODO list. Update it religiously so the user can see your current state and progress.
 13. ADAPTIVE PLANNING: The User's latest prompt overrules any previous plan. If you receive a new task, your priority is to reconcile the existing ".mirror/plan.md" with the new request (either by updating or replacing it).
 14. ANTI-STUTTERING: NEVER repeat the same tool call with the same parameters in the same response Turn. If you must iterate, wait for the result of the previous tool before sending the next one via a new Turn.
+15. ATTRIBUTE ENFORCEMENT: ALL file-related tools REQUIRE the 'filepath' or 'dirpath' attribute in the opening XML tag. Failure to provide this will result in a tool error.
 
 ENVIRONMENT: ${rootName}${hwNote}
 

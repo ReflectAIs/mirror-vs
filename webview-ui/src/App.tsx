@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { VscSend, VscHistory, VscSettingsGear, VscTrash, VscArrowLeft, VscLoading, VscTerminal, VscSearch, VscFile, VscFolder, VscStopCircle, VscCheck, VscClose, VscSymbolMethod, VscWarning } from 'react-icons/vsc'
 import './App.css'
 import Settings from './Settings'
+import Buddy from './components/Buddy'
+import type { BuddyStatus } from './components/Buddy'
 import defaultLogo from './assets/logo.png'
 
 import ReactMarkdown from 'react-markdown'
@@ -25,10 +27,11 @@ interface Message {
   id: string;
   text: string;
   sender: 'user' | 'assistant';
-  type?: 'chunk' | 'step' | 'trace' | 'diff' | 'status';
+  type?: 'chunk' | 'step' | 'trace' | 'diff' | 'status' | 'terminal';
   stepData?: any;
   traceData?: ToolTrace;
   diffData?: any;
+  terminalData?: { command: string, dir: string, sessionId: string };
 }
 
 interface Session {
@@ -48,6 +51,7 @@ function App() {
   const [view, setView] = useState<'chat' | 'history' | 'settings'>('chat');
   const [logoUri, setLogoUri] = useState<string>(defaultLogo);
   const [autonomousMode, setAutonomousMode] = useState(false);
+  const [buddyStatus, setBuddyStatus] = useState<BuddyStatus>('idle');
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -99,8 +103,10 @@ function App() {
            if (message.sessionId) {
              setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
            }
+           setBuddyStatus('idle');
            break;
          case 'onToolTrace':
+           setBuddyStatus('working');
            updateSession(message.sessionId || currentSessionId, (msg) => {
              const last = msg[msg.length - 1];
              if (last && last.type === 'trace' && last.traceData?.label === message.value.label) {
@@ -115,9 +121,6 @@ function App() {
            }, false);
            break;
          case 'onAssistantComplete':
-           if (message.sessionId) {
-             setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
-           }
            break;
          case 'requestDiffReview':
            updateSession(message.sessionId || currentSessionId, (msg) => [
@@ -134,6 +137,21 @@ function App() {
                  { id: Date.now().toString(), text: `Patch applied. Diagnosing...`, sender: 'assistant' }
              ], false);
              break;
+          case 'requestTerminalReview':
+            updateSession(message.sessionId || currentSessionId, (msg) => [
+              ...msg, 
+              { 
+                id: Date.now().toString(), 
+                text: `Execution Request: ${message.value.command}`, 
+                sender: 'assistant', 
+                type: 'terminal', 
+                terminalData: message.value 
+              }
+            ], false);
+            if (message.sessionId) {
+              setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
+            }
+            break;
        }
     };
 
@@ -160,27 +178,25 @@ function App() {
     }
   }, [currentSession.messages, isGenerating]);
 
-  const updateSession = (sid: string, fn: (msgs: Message[]) => Message[], bubbleToTop = true) => {
+  const updateSession = (sid: string, updateFn: (msgs: Message[]) => Message[], shouldSave: boolean = true) => {
     setSessions(prev => {
-        const index = prev.findIndex(s => s.id === sid);
-        let newSessions = [...prev];
-        const newMessages = fn(index >= 0 ? prev[index].messages : []);
-        const title = newMessages.find(m => m.sender === 'user')?.text.substring(0, 30) || 'New Chat';
+        const newSessions = [...prev];
+        const session = newSessions.find(s => s.id === sid);
+        const newMessages = updateFn(session ? session.messages : []);
+        const title = (session && session.title !== 'New Chat') ? session.title : (newMessages[0]?.text?.substring(0, 30) || 'New Chat');
 
-        if (index >= 0) {
-            newSessions[index] = { ...prev[index], messages: newMessages, title };
-            if (bubbleToTop) {
-                const item = newSessions.splice(index, 1)[0];
-                newSessions.unshift(item);
-            }
+        if (session) {
+            session.messages = newMessages;
+            session.title = title;
         } else {
             newSessions.unshift({ id: sid, title, messages: newMessages });
         }
-        window.vscode.postMessage({ type: 'saveChat', value: newSessions.find(s => s.id === sid) });
+        if (shouldSave) {
+            window.vscode.postMessage({ type: 'saveChat', value: newSessions.find(s => s.id === sid) });
+        }
         return newSessions;
     });
   };
-
   const updateCurrentSession = (fn: (msgs: Message[]) => Message[], bubbleToTop = true) => {
       updateSession(currentSessionId, fn, bubbleToTop);
   };
@@ -249,6 +265,32 @@ function App() {
     updateCurrentSession((msg) => msg.filter(m => m.id !== diff.messageId), false);
   };
 
+  const renderTerminalReview = (msg: Message) => {
+    const { terminalData } = msg;
+    if (!terminalData) return null;
+
+    return (
+      <div className="terminal-review-card">
+        <div className="terminal-header">
+          <VscTerminal />
+          <span>Security Mailbox: Command Approval</span>
+        </div>
+        <div className="terminal-body">
+          <pre className="terminal-command">{terminalData.command}</pre>
+          <div className="terminal-dir">Directory: <code>{terminalData.dir}</code></div>
+        </div>
+        <div className="terminal-actions">
+          <button className="approve-button" onClick={() => window.vscode.postMessage({ type: 'approveTerminal', value: terminalData })}>
+            <VscCheck /> Run Command
+          </button>
+          <button className="reject-button" onClick={() => window.vscode.postMessage({ type: 'rejectTerminal', value: terminalData })}>
+            <VscClose /> Reject
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const getToolIcon = (label: string) => {
     if (label.includes('Listing')) return <VscFolder />;
     if (label.includes('Reading') || label.includes('Skeleton')) return <VscFile />;
@@ -290,15 +332,18 @@ function App() {
   return (
     <div className="app-container">
       <header className="minimal-header">
-        <div className="brand">
-          <img src={logoUri} className="logo-img" alt="logo" />
-          <div className="brand-name">MIRROR <span>CODE</span></div>
-          {autonomousMode && (
-            <div className="autonomous-badge">
-              <VscSettingsGear className="spinning" /> AUTONOMOUS
-            </div>
-          )}
+        <div className="header-left">
+          <div className="logo-group">
+            <img src={logoUri} className="logo-img" alt="logo" />
+            {autonomousMode && <div className="auto-pulse-dot"></div>}
+          </div>
+          <div className="brand-name">MIRROR</div>
         </div>
+        
+        <div className="header-center">
+          <Buddy status={buddyStatus} isAutonomous={autonomousMode} />
+        </div>
+
         <div className="header-right">
           <button className="nav-btn" onClick={() => setView('history')}><VscHistory /></button>
           <button className="nav-btn" onClick={() => setView('settings')}><VscSettingsGear /></button>
@@ -309,31 +354,22 @@ function App() {
         <main className="chat-interface">
           <div className="scroller" ref={chatContainerRef} onScroll={handleScroll}>
             {currentSession.messages.map((msg, i) => {
-                const isStacked = i > 0 && currentSession.messages[i-1].sender === msg.sender && currentSession.messages[i-1].type !== 'trace';
+                const isStacked = i > 0 && currentSession.messages[i-1].sender === msg.sender && (currentSession.messages[i-1].type || 'text') === (msg.type || 'text') && msg.type !== 'trace';
+                
                 return (
                   <div key={msg.id} className={`message sender-${msg.sender} ${isStacked ? 'stacked' : ''} type-${msg.type || 'text'}`}>
                     {!isStacked && <div className="label">{msg.sender === 'user' ? 'YOU' : 'MIRROR'}</div>}
                     <div className="bubble">
-                      {msg.type === 'trace' ? (
-                        <div 
-                          className={`tool-trace-card ${msg.traceData?.path ? 'clickable' : ''}`}
-                          onClick={() => msg.traceData?.path && handleFileClick(msg.traceData.path)}
-                        >
-                          <div className={`trace-header category-${msg.traceData?.category}`}>
-                            {getToolIcon(msg.traceData?.label || '')}
-                            <span className="trace-label">{msg.traceData?.label}</span>
-                          </div>
-                          {msg.traceData?.result && (
-                            <div className="trace-result">{msg.traceData.result}</div>
-                          )}
-                        </div>
+                      {msg.type === 'terminal' ? (
+                        renderTerminalReview(msg)
                       ) : msg.type === 'diff' ? (
                         <div className="diff-card">
                           <div className="diff-header">
+                            <VscSymbolMethod />
                             <span className="diff-title">{msg.diffData.filepath}</span>
                           </div>
                           <div className="diff-content">
-                            {renderDiffLines(msg.diffData.original || '', msg.diffData.content || '').map((line, idx) => (
+                            {renderDiffLines(msg.diffData.original || '', msg.diffData.content || '').map((line: any, idx: number) => (
                               <div key={idx} className={`diff-line ${line.type}`}>
                                 <span className="diff-indicator">{line.type === 'added' ? '+' : (line.type === 'removed' ? '-' : ' ')}</span>
                                 <span className="diff-text">{line.text}</span>
@@ -348,6 +384,19 @@ function App() {
                               <VscClose /> Discard
                             </button>
                           </div>
+                        </div>
+                      ) : msg.type === 'trace' ? (
+                        <div 
+                          className={`tool-trace-card ${msg.traceData?.path ? 'clickable' : ''}`}
+                          onClick={() => msg.traceData?.path && handleFileClick(msg.traceData.path)}
+                        >
+                          <div className={`trace-header category-${msg.traceData?.category}`}>
+                            {getToolIcon(msg.traceData?.label || '')}
+                            <span className="trace-label">{msg.traceData?.label}</span>
+                          </div>
+                          {msg.traceData?.result && (
+                            <div className="trace-result">{msg.traceData.result}</div>
+                          )}
                         </div>
                       ) : (
                         <div className="text markdown-body">
@@ -385,7 +434,7 @@ function App() {
                       )}
                     </div>
                   </div>
-                )
+                );
             })}
             {isGenerating && <div className="message sender-assistant"><div className="bubble thinking"><VscLoading className="spinning" /> Thinking...</div></div>}
           </div>

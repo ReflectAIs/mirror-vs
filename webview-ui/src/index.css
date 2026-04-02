@@ -24,7 +24,7 @@
 body {
   margin: 0;
   padding: 0;
-  height: 100vh;
+  height: 100%;
   font-family: var(--font-main);
   background-color: var(--bg-pure);
   color: var(--text-pure);
@@ -33,7 +33,7 @@ body {
 }
 
 #root {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }

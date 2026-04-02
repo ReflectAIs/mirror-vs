@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import * as path from 'path';
+import * as fs from 'fs';
 import { MirrorAgent } from './MirrorAgent';
 
 export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
@@ -198,13 +199,23 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 case 'openFile': {
                     const filepath = data.value;
                     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-                    if (workspaceFolder) {
+                    if (workspaceFolder && filepath) {
                         const fullPath = path.isAbsolute(filepath) ? filepath : path.join(workspaceFolder.uri.fsPath, filepath);
                         try {
-                            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
-                            await vscode.window.showTextDocument(doc);
+                            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+                                // If it's a directory (typical for terminal traces), open a terminal there
+                                const terminal = vscode.window.createTerminal({
+                                    name: `Mirror Terminal [${path.basename(fullPath)}]`,
+                                    cwd: fullPath
+                                });
+                                terminal.show();
+                            } else {
+                                // If it's a file, open as a text document
+                                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+                                await vscode.window.showTextDocument(doc);
+                            }
                         } catch (e: any) {
-                            vscode.window.showErrorMessage(`Failed to open file ${filepath}: ${e.message}`);
+                            vscode.window.showErrorMessage(`Failed to open ${filepath}: ${e.message}`);
                         }
                     }
                     break;

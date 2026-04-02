@@ -28,27 +28,199 @@ body {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   width: 100%;
   overflow: hidden;
 }
+
+/* BUDDY COMPANION (Refining for Sleekness) */
+.buddy-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 28px; /* Fixed height to prevent overflow */
+  position: relative;
+  overflow: visible; /* Allow aura to pulse slightly */
+  flex-shrink: 0;
+}
+
+.buddy-body {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 3px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: breathe 4s ease-in-out infinite; /* Slower, non-disruptive animation */
+}
+
+.buddy-eyes {
+  display: flex;
+  gap: 2px;
+  color: #fff;
+  font-size: 7px;
+  font-family: monospace;
+}
+
+.buddy-aura {
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  background: radial-gradient(circle, rgba(88, 166, 255, 0.15) 0%, transparent 70%);
+  border-radius: 20px;
+  animation: aura-pulse 3s infinite;
+  pointer-events: none;
+}
+
+.kairos-label {
+  font-size: 7px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: 1.5px;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.96); opacity: 0.9; }
+}
+
+@keyframes aura-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.1); opacity: 0.6; }
+}
+
+/* Status Specifics */
+.status-thinking .buddy-body { background: var(--accent); }
+.status-working .buddy-body { background: #ffcc00; }
+.status-error .buddy-body { background: var(--error); animation: shake 0.5s infinite; }
+.status-success .buddy-body { background: var(--success); }
+
+.buddy-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.buddy-status-icon.pulse { animation: heartbeat 1.5s infinite; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes searching {
+  0%, 100% { transform: translateX(-1px); }
+  50% { transform: translateX(1px); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* TERMINAL REVIEW CARD */
+.terminal-review-card {
+  background: #1e1e1e;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 10px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.terminal-header {
+  background: #252526;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.terminal-body {
+  padding: 12px;
+}
+
+.terminal-command {
+  background: #000;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: var(--vscode-editor-font-family, 'Courier New');
+  font-size: 12px;
+  color: #fff;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.terminal-dir {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-dark);
+}
+
+.terminal-dir code { background: rgba(255,255,255,0.05); padding: 2px 4px; border-radius: 3px; }
+
+.terminal-actions {
+  display: flex;
+  gap: 1px;
+  background: var(--border-color);
+  border-top: 1px solid var(--border-color);
+}
+
+.terminal-actions button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #2d2d2d;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  transition: background 0.2s;
+}
+
+.terminal-actions button:hover { background: #3c3c3c; }
+.terminal-actions .approve-button:hover { background: var(--success); color: #000; }
+.terminal-actions .reject-button:hover { background: var(--error); }
 
 /* Header Styling */
 .minimal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 16px;
+  padding: 8px 16px 0 16px; /* Added top padding */
   background: var(--bg-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-subtle);
-  height: 52px;
+  height: 60px; /* Increased height to accommodate padding */
   box-sizing: border-box;
   z-index: 100;
   position: sticky;
   top: 0;
 }
+ Riverside
 
 .brand {
   display: flex;
