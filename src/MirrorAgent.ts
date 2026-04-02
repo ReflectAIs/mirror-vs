@@ -24,7 +24,7 @@ export class MirrorAgent {
         private readonly output: vscode.OutputChannel,
         private readonly defaultReadLines: number = 500,
         private readonly persona: string = 'architect'
-    ) {}
+    ) { }
 
     private async loadMemoryIndex(): Promise<string> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -45,20 +45,20 @@ export class MirrorAgent {
 
         const mirrorDir = path.join(workspaceFolder.uri.fsPath, '.mirror');
         const knowledgeDir = path.join(mirrorDir, 'knowledge');
-        
+
         // Clean topic name for filename
         const safeTopic = topic.replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 50);
         const topicPath = path.join(knowledgeDir, `${safeTopic}.md`);
         const indexPath = path.join(mirrorDir, 'INDEX.md');
-        
+
         try {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(mirrorDir));
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(knowledgeDir));
-            
+
             // Append to topic file
             const timestamp = new Date().toISOString();
             const newContent = `\n## [${timestamp}]\n${content}\n`;
-            
+
             let existingContent = "";
             try {
                 const data = await vscode.workspace.fs.readFile(vscode.Uri.file(topicPath));
@@ -66,9 +66,9 @@ export class MirrorAgent {
             } catch {
                 existingContent = `# Topic: ${topic}\n`;
             }
-            
+
             await vscode.workspace.fs.writeFile(vscode.Uri.file(topicPath), Buffer.from(existingContent + newContent, 'utf8'));
-            
+
             // Update INDEX.md
             let indexContent = "";
             try {
@@ -77,12 +77,12 @@ export class MirrorAgent {
             } catch {
                 indexContent = "# MASTER KNOWLEDGE INDEX\n\nWhen you need details, use <read_file filepath=\".mirror/knowledge/[topic].md\" />\n\n### KNOWN TOPICS:\n";
             }
-            
+
             if (!indexContent.includes(`- ${safeTopic}.md`)) {
                 indexContent += `- ${safeTopic}.md (Topic: ${topic})\n`;
                 await vscode.workspace.fs.writeFile(vscode.Uri.file(indexPath), Buffer.from(indexContent, 'utf8'));
             }
-            
+
             this.log(`Knowledge added to .mirror/knowledge/${safeTopic}.md`);
             return `Knowledge successfully appended to .mirror/knowledge/${safeTopic}.md. The INDEX has been updated.`;
         } catch (e) {
@@ -114,7 +114,7 @@ export class MirrorAgent {
 
         let normalized = path.normalize(p).replace(/[\\\/]+$/, '');
         let stripped = normalized.replace(/^([a-zA-Z]:)?[\\\/]+/, '').replace(/\.\.\//g, '');
-        
+
         let count = 0;
         while (rootName && count < 10) {
             const lowerStripped = stripped.toLowerCase();
@@ -132,33 +132,10 @@ export class MirrorAgent {
         return path.join(root, stripped);
     }
 
-    private compactHistory(history: Turn[]): string {
-        let result = "";
-        
-        // Preserve the first Turn (Initial Goal)
-        if (history.length > 0) {
-            result += `Target Goal: ${history[0].content}\n\n`;
-        }
-
-        const recentTurns = history.slice(-8);
-        const middleTurns = history.slice(1, -8);
-        
-        if (middleTurns.length > 0) {
-            result += `[CONTEXT RECAP: The agent has completed ${middleTurns.length} turns of exploration and research. Key architectural findings are recorded in the .mirror/knowledge bank. Eliding detailed tool logs for efficiency.]\n\n`;
-        }
-        
-        for (const t of recentTurns) {
-            const block = `${t.role === 'user' ? 'User' : (t.role === 'system' ? 'System' : 'Assistant')}: ${t.content}\n`;
-            result += block;
-        }
-        
-        return result;
-    }
-
     private async performDreamCompaction(ollamaUrl: string, ollamaModel: string): Promise<void> {
         this.log("Starting Auto-Dream Compaction...");
         this.post('onToolTrace', { label: 'Dreaming...', category: 'analyzing', result: 'Consolidating history into a permanent Memory Stone.' });
-        
+
         const rawHistory = this.history.map(t => `${t.role.toUpperCase()}: ${t.content}`).join('\n');
         const prompt = `You are a memory compaction module for Mirror Code. Review this transcript and extract EVERY concrete architectural discovery, file path, bug fix, and environment detail. 
 Output ONLY a JSON object: {"summary": "Brief 1-sentence recap", "stones": [{"topic": "...", "content": "detailed facts", "tags": ["tag1", "tag2"]}]}.
@@ -166,46 +143,46 @@ No other text.
 
 TRANSCRIPT:
 ${rawHistory}`;
-        
+
         try {
             const res = await axios.post(`${ollamaUrl}/api/generate`, { model: ollamaModel, prompt, stream: false });
             let response = res.data.response.trim();
             // Basic JSON cleaning if model adds markdown blocks
             response = response.replace(/^```json\n?/, '').replace(/\n?```$/, '');
             const compaction = JSON.parse(response);
-            
+
             const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ".";
             const memoryPath = path.join(root, '.mirror', 'memory.json');
-            
+
             let memory = { stones: [] };
             if (fs.existsSync(memoryPath)) {
                 memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
             }
-            
+
             const timestamp = new Date().toISOString();
             compaction.stones.forEach((s: any) => {
                 (memory as any).stones.push({ ...s, timestamp, id: Math.random().toString(36).substring(7) });
             });
-            
+
             if (!fs.existsSync(path.dirname(memoryPath))) fs.mkdirSync(path.dirname(memoryPath), { recursive: true });
             fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
-            
+
             // Still update the Knowledge Bank for human readability
             await this.addKnowledge(`Dream_${timestamp.replace(/[:.-]/g, '_')}`, compaction.summary);
-            
+
             // Project Index Refresh (Kairos)
             const files = await this.recursiveList(root);
             const indexContent = `# Project Index (Refreshed via Kairos)\n\nLast Refresh: ${timestamp}\n\n${files.map(f => `- ${f}`).join('\n')}`;
             const indexPath = path.join(root, '.mirror', 'INDEX.md');
             fs.writeFileSync(indexPath, indexContent);
-            
+
             this.log(`Memory consolidated. ${compaction.stones.length} new Stones added.`);
-            
+
             // Wipe history but keep initial goal
             const initialGoal = this.history.length > 0 ? this.history[0] : null;
             this.history = initialGoal ? [initialGoal] : [];
             this.history.push({ role: 'system', content: `[SYSTEM: Previous turns consolidated into a Memory Stone. Summary: ${compaction.summary}. You can use <recall_memory query="..." /> to fetch details if needed.]` });
-            
+
         } catch (e: any) { this.log(`Dreaming failed: ${e.message}`); }
     }
 
@@ -256,19 +233,23 @@ ${rawHistory}`;
             }
 
             const vramMB = await this.detectHardware();
-            const numCtx = vramMB < 4500 ? 6144 : (vramMB < 9000 ? 12288 : 32768); 
+            const numCtx = vramMB < 4500 ? 6144 : (vramMB < 9000 ? 12288 : 32768);
             const isThinkingModel = /qwen3|llama[4]|phi[4]/.test(ollamaModel.toLowerCase());
 
-            const historyString = this.compactHistory(this.history);
-            const systemPrompt = this.getSystemPrompt(rootName, memoryIndex, turnCount, historyString, vramMB, ollamaModel, isThinkingModel);
+            // Prepare messages for Ollama Chat API
+            const systemPrompt = this.getSystemPrompt(rootName, memoryIndex, turnCount, "", vramMB, ollamaModel, isThinkingModel);
+            const messages = [
+                { role: 'system', content: systemPrompt },
+                ...this.mergeHistory(this.history)
+            ];
 
             try {
-                const url = new URL(`${ollamaUrl}/api/generate`);
+                const url = new URL(`${ollamaUrl}/api/chat`);
                 const postData = JSON.stringify({
                     model: ollamaModel,
-                    prompt: isThinkingModel ? `${systemPrompt}\n\n[CONTEXT ARCHIVE]\n${historyString}\n\nAssistant Response Phase:` : `${systemPrompt}\n\n[CONTEXT ARCHIVE]\n${historyString}\n\nAssistant: <thinking>\n`,
+                    messages: messages,
                     stream: true,
-                    options: { num_ctx: numCtx, temperature: 0.1, stop: ["[CONTEXT ARCHIVE]", "User:"] } 
+                    options: { num_ctx: numCtx, temperature: 0.1 }
                 });
 
                 this.post('onAssistantChunk', turnCount === 0 ? "*(Thinking...)* " : "");
@@ -291,15 +272,8 @@ ${rawHistory}`;
                                 if (!line) continue;
                                 try {
                                     const json = JSON.parse(line);
-                                    if (json.response) {
-                                        fullReply += json.response;
-                                        
-                                        // Stop as soon as a complete tool call is detected
-                                        if (completeToolPattern.test(fullReply)) {
-                                            req.destroy();
-                                            resolve(true);
-                                            return;
-                                        }
+                                    if (json.message?.content) {
+                                        fullReply += json.message.content;
 
                                         if (inThinkingTag) {
                                             if (fullReply.includes('</thinking>') || fullReply.includes('</thought>')) {
@@ -308,7 +282,7 @@ ${rawHistory}`;
                                                 if (afterTag.trim()) this.post('onAssistantChunk', afterTag);
                                             }
                                         } else {
-                                            this.post('onAssistantChunk', json.response);
+                                            this.post('onAssistantChunk', json.message.content);
                                         }
                                     }
                                     if (json.done) {
@@ -316,9 +290,9 @@ ${rawHistory}`;
                                             const afterPotentialTag = fullReply.replace(/<(thinking|thought)>[\s\S]*?(<\/(thinking|thought)>|$)/g, '').trim();
                                             if (afterPotentialTag) this.post('onAssistantChunk', afterPotentialTag);
                                         }
-                                        resolve(true); 
+                                        resolve(true);
                                     }
-                                } catch (e) {}
+                                } catch (e) { }
                             }
                         });
                     });
@@ -329,11 +303,11 @@ ${rawHistory}`;
 
                 // Extract tool and reasoning
                 const toolMatch = fullReply.match(completeToolPattern);
-                
+
                 if (toolMatch) {
                     const toolCall = toolMatch[0];
                     const reasoningText = fullReply.substring(0, toolMatch.index || 0).trim();
-                    
+
                     // 1. Push reasoning to history if it's not empty
                     if (reasoningText && reasoningText !== "<thinking>") {
                         this.history.push({ role: 'assistant', content: reasoningText });
@@ -419,7 +393,7 @@ ${rawHistory}`;
                                         traceLabel = `Proposing Patch: ${path.basename(fp)}`;
                                         tracePath = fp;
                                         traceCategory = 'planning';
-                                        
+
                                         const res = await axios.post('http://localhost:3000/tools/patch_file', { filepath: fp, blocks, previewOnly: true }, { signal: this.abortController.signal });
 
                                         if (isAutonomous) {
@@ -443,13 +417,13 @@ ${rawHistory}`;
                                 traceLabel = `Terminal: ${cmd}`;
                                 tracePath = dir;
                                 traceCategory = 'executing';
-                                
+
                                 if (isAutonomous) {
                                     await axios.post('http://localhost:3000/tools/run_terminal', { command: cmd, cwd: dir }, { signal: this.abortController.signal });
                                     toolResult = "Terminal command executed. Check logs if needed.";
                                 } else {
-                                    this.post('requestTerminalApproval', { 
-                                        terminalData: { command: cmd, dir, messageId: Date.now().toString() } 
+                                    this.post('requestTerminalApproval', {
+                                        terminalData: { command: cmd, dir, messageId: Date.now().toString() }
                                     });
                                     toolResult = "WAITING_FOR_TERMINAL_APPROVAL";
                                     this.history.push({ role: 'assistant', content: toolCall });
@@ -481,13 +455,13 @@ ${rawHistory}`;
                     this.post('onToolTrace', { label: traceLabel, category: traceCategory, path: tracePath, result: toolResult.substring(0, 150) });
                     this.history.push({ role: 'assistant', content: toolCall });
                     this.history.push({ role: 'system', content: toolResult });
-                    
+
                     // If reasoning exists, push it to UI now to clear 'Thinking...' state
                     if (reasoningText) {
-                         // We already streamed it chunk by chunk, so no need to send again
-                         // but we might want to ensure the final state is correct
+                        // We already streamed it chunk by chunk, so no need to send again
+                        // but we might want to ensure the final state is correct
                     }
-                    
+
                     turnCount++;
                     // Continue to next turn (loop) - model will now see the toolResult in history
                 } else {
@@ -504,7 +478,7 @@ ${rawHistory}`;
     public async handlePatchResult(filepath: string, diags: any[]) {
         const diagMsg = diags.length > 0 ? `Patch applied but found ${diags.length} issues: ${JSON.stringify(diags)}` : "Patch applied successfully and verified by diagnostics.";
         this.log(`Resuming agent turn after patch approval for ${filepath}`);
-        
+
         // Push the result back into history and resume the thinking loop
         this.history.push({ role: 'system', content: diagMsg });
         this.handleUserMessage(""); // Continue from where we left off
@@ -513,24 +487,24 @@ ${rawHistory}`;
     public async handleTerminalResult(stdout: string, stderr: string) {
         const result = (stdout + stderr) || "Command executed with no output.";
         this.log(`Resuming agent turn after terminal approval.`);
-        
+
         // Push the result back into history and resume the thinking loop
         this.history.push({ role: 'system', content: result });
-        this.handleUserMessage(""); 
+        this.handleUserMessage("");
     }
 
     private async detectHardware(): Promise<number> {
         try {
             const { stdout } = await execAsync('nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits');
-            return parseInt(stdout.trim()) || 8192; 
+            return parseInt(stdout.trim()) || 8192;
         } catch { return 4096; }
     }
 
     private getSystemPrompt(rootName: string, memoryIndex: string, _turn: number, _history: string, vramMB: number, _model: string, isThinkingModel: boolean): string {
         const hwNote = vramMB < 4500 ? "\n- Resource Notice: High compression environment. Do NOT omit whitespace." : "";
-        
+
         let personaPrompt = "";
-        switch(this.persona) {
+        switch (this.persona) {
             case 'researcher':
                 personaPrompt = "\n## PERSONA: RESEARCHER\nYour priority is deep code exploration and understanding. Before proposing any changes, you must exhaustively search for patterns, usages, and side effects. Focus heavily on <read_file>, <grep_search>, and <get_symbols>.";
                 break;
@@ -545,7 +519,7 @@ ${rawHistory}`;
 
         return `You are Mirror Code (v.2026.04), the "${this.persona.charAt(0).toUpperCase() + this.persona.slice(1)}". Your goal is to solve requests through a strictly enforced 4-Phase Sequence.${personaPrompt}
 
-## CLAUDE-INSPIRED MEMORY ARCHITECTURE
+## MEMORY ARCHITECTURE
 History is transient; the Knowledge Bank is eternal. 
 - You maintain a permanent Knowledge Bank using <add_knowledge topic="string">markdown content</add_knowledge>.
 - When you discover how a system works or make an architectural decision, immediately add it to the bank.
@@ -590,5 +564,19 @@ ENVIRONMENT: ${rootName}${hwNote}
 
 PROJECT INDEX:
 ${memoryIndex}`;
+    }
+
+    private mergeHistory(history: any[]): any[] {
+        if (history.length === 0) return [];
+        const merged: any[] = [];
+        for (const msg of history) {
+            const last = merged[merged.length - 1];
+            if (last && last.role === msg.role) {
+                last.content += "\n\n" + msg.content;
+            } else {
+                merged.push({ ...msg }); // Clone to avoid mutation
+            }
+        }
+        return merged;
     }
 }

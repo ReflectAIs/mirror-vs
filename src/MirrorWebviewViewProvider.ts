@@ -190,7 +190,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             agent.handlePatchResult(filepath, diags);
                         }
                     } catch (e: any) {
-                        vscode.window.showErrorMessage(`Failed to apply patch: ${e.message}`);
+                        const errorMsg = e.response?.data?.error || e.message;
+                        vscode.window.showErrorMessage(`Failed to apply patch: ${errorMsg}`);
                     }
                     break;
                 }

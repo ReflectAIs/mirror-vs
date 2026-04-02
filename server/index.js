@@ -225,55 +225,48 @@ function applyPatch(content, blocks) {
             const normalizedContent = normalize(result);
             const normalizedSearch = normalize(search);
             
-            // Search in normalized space
             const normIndex = normalizedContent.indexOf(normalizedSearch);
             if (normIndex !== -1) {
-                // Approximate location in original string
-                // We'll use a sliding window of character sequences to find the real index
-                const searchTokens = search.trim().split(/\s+/);
-                const firstToken = searchTokens[0];
-                const lastToken = searchTokens[searchTokens.length - 1];
+                // We found a match in normalized space. 
+                // Now find the start and end in the original string.
                 
-                let bestIndex = -1;
-                let minDiff = Infinity;
+                // 1. Find start: search for the first 15 non-whitespace chars of search in result 
+                // near the approximate relative position.
+                const searchHead = search.trim().substring(0, 15).replace(/\s+/g, '');
+                let bestStartIndex = -1;
+                let minDistance = Infinity;
+
+                // Approximate location in original
+                const approxPos = Math.floor((normIndex / normalizedContent.length) * result.length);
                 
-                // Find all occurrences of the first token
-                let pos = result.indexOf(firstToken);
-                while (pos !== -1) {
-                    const potentialMatch = result.substring(pos, pos + search.length + 100);
-                    if (normalize(potentialMatch).startsWith(normalizedSearch)) {
-                        bestIndex = pos;
-                        break;
+                // Scan around approxPos
+                for (let i = Math.max(0, approxPos - 500); i < Math.min(result.length, approxPos + 500); i++) {
+                    const window = result.substring(i, i + 100).replace(/\s+/g, '');
+                    if (window.startsWith(searchHead)) {
+                         bestStartIndex = i;
+                         break;
                     }
-                    pos = result.indexOf(firstToken, pos + 1);
                 }
-                
-                if (bestIndex !== -1) {
-                    // We found it! Now we need to determine the EXACT end of the match in the original string
-                    // to prevent deleting too much or too little.
-                    let searchBuffer = "";
-                    let originalPos = bestIndex;
-                    let searchTokensMatched = 0;
-                    const tokens = search.trim().split(/\s+/);
-                    
-                    while (searchTokensMatched < tokens.length && originalPos < result.length) {
-                        const word = result.substring(originalPos).match(/^\s*\S+/);
-                        if (word && normalize(word[0]) === normalize(tokens[searchTokensMatched])) {
-                            originalPos += word[0].length;
-                            searchTokensMatched++;
-                        } else {
-                            originalPos++;
+
+                if (bestStartIndex !== -1) {
+                    // 2. Find end: consume characters until normalized matched segment equals normalizedSearch
+                    let currentPos = bestStartIndex;
+                    while (currentPos < result.length) {
+                        if (normalize(result.substring(bestStartIndex, currentPos)) === normalizedSearch) {
+                            break;
                         }
+                        currentPos++;
                     }
-                    
-                    index = bestIndex;
-                    search = result.substring(bestIndex, originalPos);
+                    index = bestStartIndex;
+                    search = result.substring(bestStartIndex, currentPos);
                 }
             }
         }
 
         if (index === -1) {
-            throw new Error(`Could not find search block in file. Ensure the <search> block matches existing code (even if indentation differs).`);
+            console.error(`[PATCH ERROR] Search block not found in file.`);
+            console.error(`[EXPECTED (Normalized)]:\n${search.replace(/\s+/g, ' ').trim()}`);
+            throw new Error(`Could not find search block in file. Ensure the <search> block matches existing code exactly.`);
         }
         
         if (result.indexOf(search, index + 1) !== -1) {
