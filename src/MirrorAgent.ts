@@ -36,17 +36,16 @@ export class MirrorAgent {
     private abortController: AbortController | undefined;
     private lastToolCall: string = "";
     private stutterCount: number = 0;
-    private history: Turn[] = [];
+    private history: Turn[];
     private healingAttempts: Map<string, number> = new Map();
     private brainUrl: string = 'http://localhost:3000';
     private readonly osType: 'windows' | 'linux' | 'mac';
     private readonly shellName: string;
     private isProcessing: boolean = false;
-    private messageQueue: string[] = [];
 
     constructor(
         private readonly sessionId: string,
-        private readonly provider: { 
+        private readonly provider: {
             postMessageToWebview: (message: any) => void,
             executeIntegratedTerminal: (command: string, cwd: string) => Promise<{ stdout: string, exitCode: number }>,
             startBackgroundTerminal: (command: string, dir: string) => Promise<string>,
@@ -57,8 +56,10 @@ export class MirrorAgent {
         private readonly defaultReadLines: number = 500,
         private readonly persona: string = 'architect',
         private readonly isSubAgent: boolean = false,
-        private readonly mcpManager?: McpManager
+        private readonly mcpManager?: McpManager,
+        initialHistory?: Turn[]
     ) {
+        this.history = initialHistory || [];
         // OS Detection — critical for correct command generation
         if (process.platform === 'win32') {
             this.osType = 'windows';
@@ -70,6 +71,7 @@ export class MirrorAgent {
             this.osType = 'linux';
             this.shellName = '/bin/sh';
         }
+        this.log(`MirrorAgent initialized for ${this.osType} (Shell: ${this.shellName})`);
     }
 
     // ─── Tool Call Validation ─────────────────────────────────────────
@@ -175,7 +177,7 @@ export class MirrorAgent {
         try {
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(mirrorDir));
             await vscode.workspace.fs.createDirectory(vscode.Uri.file(knowledgeDir));
-            
+
             const timestamp = new Date().toISOString();
             const newEntry = `\n## [${timestamp}]\n${content}\n`;
 
@@ -223,11 +225,11 @@ export class MirrorAgent {
     }
 
     private post(type: string, value: any = null) {
-        this.provider.postMessageToWebview({ 
-            type, 
-            value, 
+        this.provider.postMessageToWebview({
+            type,
+            value,
             sessionId: this.sessionId,
-            isSubAgent: this.isSubAgent 
+            isSubAgent: this.isSubAgent
         });
     }
 
@@ -262,7 +264,7 @@ export class MirrorAgent {
         while (rootName && count < 3) { // Reduced from 10 to 3 for safety
             const lowerStripped = currentStripped.toLowerCase();
             const lowerRootName = rootName.toLowerCase();
-            
+
             let nextStripped = "";
             if (lowerStripped.startsWith(lowerRootName + path.sep) || lowerStripped.startsWith(lowerRootName + '/')) {
                 nextStripped = currentStripped.substring(rootName.length).replace(/^[\\\/]+/, '');
@@ -463,7 +465,7 @@ export class MirrorAgent {
         return attrs;
     }
 
-    private async executeSingleTool(toolCall: ToolCall, isAutonomous: boolean, config: vscode.WorkspaceConfiguration): Promise<ToolResult> {
+    private async executeSingleTool(toolCall: ToolCall, isAutonomous: boolean): Promise<ToolResult> {
         const startTime = Date.now();
         const raw = toolCall.raw;
         const getAttr = (name: string) => this.getAttr(raw, name);
@@ -479,10 +481,10 @@ export class MirrorAgent {
                 const serverName = parts[1];
                 const toolName = parts.slice(2).join('_');
                 const args = this.getAllAttrs(raw);
-                
+
                 traceLabel = `MCP: ${serverName}/${toolName}`;
                 traceCategory = 'executing';
-                
+
                 const result = await this.mcpManager.callTool(serverName, toolName, args);
                 toolResult = JSON.stringify(result);
 
@@ -578,7 +580,7 @@ export class MirrorAgent {
                         traceCategory = 'executing';
 
                         if (isAutonomous) {
-                            const res = await axios.post(`${this.brainUrl}/tools/patch_file`, { filepath: fp, blocks, previewOnly: false });
+                            await axios.post(`${this.brainUrl}/tools/patch_file`, { filepath: fp, blocks, previewOnly: false });
                             const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fp).toString()) as any[];
                             this.post('onPatchApplied', { filepath: fp, diags });
                             toolResult = "Patch applied.";
@@ -622,7 +624,7 @@ export class MirrorAgent {
                         toolResult = `Terminal error: ${err.message}`;
                     }
                 } else {
-                    this.post('requestTerminalApproval', {
+                    this.post('requestTerminalReview', {
                         terminalData: { command: cmd, dir, messageId: Date.now().toString() }
                     });
                     return {
@@ -664,7 +666,7 @@ export class MirrorAgent {
                 const contextFiles = getAttr('files') ? getAttr('files').split(',').map(f => f.trim()) : [];
                 traceLabel = `Delegating: ${mission.substring(0, 40)}...`;
                 traceCategory = 'planning';
-                
+
                 toolResult = await this.runSubAgent(mission, contextFiles);
 
             } else if (raw.includes('<recall_memory')) {
@@ -800,7 +802,8 @@ ${rawHistory}`;
             this.history = lastUserMsgs.length > 0 ? [...lastUserMsgs] : [];
             this.history.push({ role: 'system', content: `[SYSTEM: Previous turns consolidated into Memory Stones. Summary: ${compaction.summary}. Use <recall_memory query="..." /> to fetch details.]` });
 
-        } catch (e: any) { this.log(`Dreaming failed: ${e.message}. Falling back to simple compaction.`); 
+        } catch (e: any) {
+            this.log(`Dreaming failed: ${e.message}. Falling back to simple compaction.`);
             // Hard fallback: just trim history
             if (this.history.length > 10) {
                 const userMsgs = this.history.filter(t => t.role === 'user').slice(-2);
@@ -811,28 +814,6 @@ ${rawHistory}`;
                 ];
             }
         }
-    }
-
-    private async recursiveList(dir: string, depth = 0): Promise<string[]> {
-        if (depth > 2) return []; // Reduced from 3 to 2 for performance
-        let results: string[] = [];
-        const list = fs.readdirSync(dir);
-        for (const file of list) {
-            if (file === 'node_modules' || file === '.git' || file === '.mirror' || file === 'dist' || file === 'out') continue;
-            const fullPath = path.join(dir, file);
-            const stat = fs.statSync(fullPath);
-            results.push(this.resolveRelative(fullPath));
-            if (stat.isDirectory()) {
-                results = results.concat(await this.recursiveList(fullPath, depth + 1));
-            }
-            if (results.length > 50) break; // Hard cap
-        }
-        return results;
-    }
-
-    private resolveRelative(fullPath: string): string {
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-        return path.relative(root, fullPath);
     }
 
     // ─── Main Agent Loop ─────────────────────────────────────────────
@@ -852,7 +833,7 @@ ${rawHistory}`;
         this.isProcessing = true;
         try {
             await this._processMessage(text);
-            
+
             while (this.messageQueue.length > 0) {
                 const nextText = this.messageQueue.shift()!;
                 await this._processMessage(nextText);
@@ -873,211 +854,221 @@ ${rawHistory}`;
         if (text) {
             this.history.push({ role: 'user', content: text });
         }
-        this.abortController = new AbortController();
-        this.healingAttempts.clear();
 
-        let turnCount = 0;
+        if (this.isProcessing) {
+            this.log(`[CONCURRENCY] Agent is already busy. Message ignored: ${text}`);
+            return;
+        }
 
-        while (turnCount < maxTurns) {
-            if (this.abortController.signal.aborted) break;
+        try {
+            this.isProcessing = true;
+            this.abortController = new AbortController();
+            this.healingAttempts.clear();
 
-            const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
-            const ollamaModel = config.get<string>('ollamaModel') || 'qwen3.5:4b';
+            let turnCount = this.history.filter(t => t.role === 'assistant').length;
 
-            const vramMB = await this.detectHardware();
-            const numCtx = vramMB < 4500 ? 6144 : (vramMB < 9000 ? 12288 : 32768);
-            
-            // Proactive Dream Compaction (triggered at 70% of available history budget)
-            const totalHistoryTokens = this.history.reduce((s, t) => s + this.getTokenEstimate(t.content), 0);
-            const compactionThreshold = vramMB < 4500 ? 4000 : 8000;
-            if (isAutonomous && totalHistoryTokens > compactionThreshold) {
-                await this.performDreamCompaction(ollamaUrl, ollamaModel);
-            }
+            while (turnCount < maxTurns) {
+                if (this.abortController.signal.aborted) break;
 
-            // Report usage to UI
-            this.post('onContextUsage', { used: totalHistoryTokens, total: numCtx });
+                const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
+                const ollamaModel = config.get<string>('ollamaModel') || 'qwen3.5:4b';
 
-            // Compact history if nearing context limit
-            this.compactHistoryIfNeeded(numCtx);
+                const vramMB = await this.detectHardware();
+                const numCtx = vramMB < 4500 ? 6144 : (vramMB < 9000 ? 12288 : 32768);
 
-            const systemPrompt = await this.getSystemPrompt(rootName, memoryIndex, turnCount, maxTurns, vramMB, ollamaModel, false);
-            const messages = [
-                { role: 'system', content: systemPrompt },
-                ...this.mergeHistory(this.history)
-            ];
+                // Proactive Dream Compaction (triggered at 70% of available history budget)
+                const totalHistoryTokens = this.history.reduce((s, t) => s + this.getTokenEstimate(t.content), 0);
+                const compactionThreshold = vramMB < 4500 ? 4000 : 8000;
+                if (isAutonomous && totalHistoryTokens > compactionThreshold) {
+                    await this.performDreamCompaction(ollamaUrl, ollamaModel);
+                }
 
-            try {
-                const url = new URL(`${ollamaUrl}/api/chat`);
-                const postData = JSON.stringify({
-                    model: ollamaModel,
-                    messages: messages,
-                    stream: true,
-                    options: { num_ctx: numCtx, temperature: 0.1 }
-                });
+                // Report usage to UI
+                this.post('onContextUsage', { used: totalHistoryTokens, total: numCtx });
 
-                this.post('onAssistantChunk', turnCount === 0 ? "*(Thinking...)* " : "");
+                // Compact history if nearing context limit
+                this.compactHistoryIfNeeded(numCtx);
 
-                let fullReply = "";
-                let buffer = "";
-                let inThinkingTag = false;
-                let thinkingTagDetected = false;
+                const systemPrompt = await this.getSystemPrompt(rootName, memoryIndex, turnCount, maxTurns, vramMB, ollamaModel, false);
+                const messages = [
+                    { role: 'system', content: systemPrompt },
+                    ...this.mergeHistory(this.history)
+                ];
 
-                await new Promise((resolve) => {
-                    const req = http.request({
-                        hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        signal: this.abortController?.signal
-                    }, (res) => {
-                        res.on('data', (chunk) => {
-                            buffer += chunk.toString();
-                            let lines = buffer.split('\n');
-                            buffer = lines.pop() || "";
-                            for (const line of lines) {
-                                if (!line) continue;
-                                try {
-                                    const json = JSON.parse(line);
-                                    if (json.message?.content) {
-                                        const delta = json.message.content;
-                                        fullReply += delta;
-
-                                        // Detection of thinking tags
-                                        if (!thinkingTagDetected && /<(think|thinking|thought)>/.test(fullReply)) {
-                                            thinkingTagDetected = true;
-                                            inThinkingTag = true;
-                                            this.post('onAssistantChunk', "*(Thinking...)* ");
-                                        }
-
-                                        if (inThinkingTag) {
-                                            if (/<\/(think|thinking|thought)>/.test(fullReply)) {
-                                                inThinkingTag = false;
-                                                const parts = fullReply.split(/<\/(think|thinking|thought)>/);
-                                                const afterTag = parts[parts.length - 1];
-                                                if (afterTag.trim()) this.post('onAssistantChunk', afterTag);
-                                            }
-                                        } else {
-                                            // Non-thinking content is streamed to UI
-                                            this.post('onAssistantChunk', delta);
-                                        }
-                                    }
-                                    if (json.done) {
-                                        resolve(true);
-                                    }
-                                } catch (e) { }
-                            }
-                        });
+                try {
+                    const url = new URL(`${ollamaUrl}/api/chat`);
+                    const postData = JSON.stringify({
+                        model: ollamaModel,
+                        messages: messages,
+                        stream: true,
+                        options: { num_ctx: numCtx, temperature: 0.1 }
                     });
-                    req.on('error', (_e) => resolve(true));
-                    req.write(postData);
-                    req.end();
-                });
 
-                // Extract ALL tool calls from the response
-                const toolCalls = this.extractAllToolCalls(fullReply);
+                    this.post('onAssistantChunk', turnCount === 0 ? "*(Thinking...)* " : "");
 
-                // Get text before the first tool call (reasoning)
-                const firstToolIndex = toolCalls.length > 0 ? fullReply.indexOf(toolCalls[0].raw) : -1;
-                const reasoningText = firstToolIndex > 0 ? fullReply.substring(0, firstToolIndex).trim() : (toolCalls.length === 0 ? "" : "");
+                    let fullReply = "";
+                    let buffer = "";
+                    let inThinkingTag = false;
+                    let thinkingTagDetected = false;
 
-                if (toolCalls.length > 0) {
-                    // Push reasoning to history
-                    if (reasoningText && reasoningText !== "<thinking>") {
-                        this.history.push({ role: 'assistant', content: reasoningText });
-                    }
+                    await new Promise((resolve) => {
+                        const req = http.request({
+                            hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: this.abortController?.signal
+                        }, (res) => {
+                            res.on('data', (chunk) => {
+                                buffer += chunk.toString();
+                                let lines = buffer.split('\n');
+                                buffer = lines.pop() || "";
+                                for (const line of lines) {
+                                    if (!line) continue;
+                                    try {
+                                        const json = JSON.parse(line);
+                                        if (json.message?.content) {
+                                            const delta = json.message.content;
+                                            fullReply += delta;
 
-                    // ─── PARALLEL TOOL EXECUTION ───
-                    const MAX_BATCH = 3;
-                    const results: string[] = [];
-                    let lastExecutedTool = "";
+                                            // Detection of thinking tags
+                                            if (!thinkingTagDetected && /<(think|thinking|thought)>/.test(fullReply)) {
+                                                thinkingTagDetected = true;
+                                                inThinkingTag = true;
+                                                this.post('onAssistantChunk', "*(Thinking...)* ");
+                                            }
 
-                    for (let i = 0; i < Math.min(toolCalls.length, MAX_BATCH); i++) {
-                        const tc = toolCalls[i];
-                        
-                        // 1. Validation
-                        const validation = this.validateToolCall(tc.raw, tc.name);
-                        if (!validation.valid) {
-                            results.push(`[SYSTEM: Tool '${tc.name}' rejected: ${validation.error}]`);
-                            break; 
-                        }
+                                            if (inThinkingTag) {
+                                                if (/<\/(think|thinking|thought)>/.test(fullReply)) {
+                                                    inThinkingTag = false;
+                                                    const parts = fullReply.split(/<\/(think|thinking|thought)>/);
+                                                    const afterTag = parts[parts.length - 1];
+                                                    if (afterTag.trim()) this.post('onAssistantChunk', afterTag);
+                                                }
+                                            } else {
+                                                // Non-thinking content is streamed to UI
+                                                this.post('onAssistantChunk', delta);
+                                            }
+                                        }
+                                        if (json.done) {
+                                            resolve(true);
+                                        }
+                                    } catch (e) { }
+                                }
+                            });
+                        });
+                        req.on('error', (_e) => resolve(true));
+                        req.write(postData);
+                        req.end();
+                    });
 
-                        // 2. Stutter Detection
-                        if (i === 0 && tc.raw === this.lastToolCall && !reasoningText) {
-                            this.stutterCount++;
-                            if (this.stutterCount >= 5) {
-                                this.post('onAssistantMessage', `I got stuck repeating the same action 5 times. Please rephrase or check your workspace.`);
+                    // Record the FULL response (reasoning + tools) as a single turn ATOMICALLY
+                    this.history.push({ role: 'assistant', content: fullReply });
+
+                    // Extract ALL tool calls from the response
+                    const toolCalls = this.extractAllToolCalls(fullReply);
+
+                    if (toolCalls.length > 0) {
+                        const results: string[] = [];
+
+                        for (let i = 0; i < Math.min(toolCalls.length, maxToolsPerTurn); i++) {
+                            const tc = toolCalls[i];
+
+                            // 1. Validation
+                            const validation = this.validateToolCall(tc.raw, tc.name);
+                            if (!validation.valid) {
+                                results.push(`[SYSTEM: Tool '${tc.name}' rejected: ${validation.error}]`);
                                 break;
                             }
-                            const recoveryHint = this.osType === 'windows' ? " (Windows: use mkdir not mkdir -p)" : "";
-                            results.push(`[SYSTEM: STUTTER #${this.stutterCount}/5. You MUST try a different approach.${recoveryHint}]`);
-                            break;
+
+                            // 2. Stutter Detection (Repeated tool call with same parameters)
+                            if (i === 0 && tc.raw === this.lastToolCall) {
+                                this.stutterCount++;
+                                if (this.stutterCount >= 5) {
+                                    this.post('onAssistantMessage', `I got stuck repeating the same action 5 times. Please rephrase or check your workspace.`);
+                                    break;
+                                }
+                                const recoveryHint = this.osType === 'windows' ? " (Windows: use mkdir not mkdir -p)" : "";
+                                results.push(`[SYSTEM: STUTTER #${this.stutterCount}/5. You MUST try a different approach.${recoveryHint} Do not repeat the same <${tc.name} /> call.]`);
+                                break;
+                            }
+
+                            // 3. Execution
+                            const isMutation = ['write_file', 'patch_file', 'run_terminal', 'add_knowledge', 'terminal_start', 'terminal_input'].includes(tc.name);
+                            const result = await this.executeSingleTool(tc, isAutonomous);
+
+                            this.post('onToolTrace', {
+                                label: result.label,
+                                category: result.category,
+                                path: result.path,
+                                result: result.result.substring(0, 150),
+                                metadata: result.metadata
+                            });
+
+                            results.push(`TOOL_RESULT (${tc.name}):\n${result.result}`);
+
+                            if (isMutation || result.result.includes('WAITING_FOR')) {
+                                this.lastToolCall = tc.raw;
+                                this.stutterCount = 0;
+                                break;
+                            }
                         }
 
-                        // 3. Execution
-                        const isMutation = ['write_file', 'patch_file', 'run_terminal', 'add_knowledge'].includes(tc.name);
-                        const result = await this.executeSingleTool(tc, isAutonomous, config);
-                        
-                        this.post('onToolTrace', { 
-                            label: result.label, 
-                            category: result.category, 
-                            path: result.path, 
-                            result: result.result.substring(0, 150),
-                            metadata: result.metadata
-                        });
+                        this.history.push({ role: 'system', content: results.join('\n\n---\n\n') });
 
-                        results.push(`TOOL_RESULT (${tc.name}):\n${result.result}`);
-                        lastExecutedTool = tc.raw;
+                        if (results.some(r => r.includes('WAITING_FOR'))) return;
 
-                        if (isMutation || result.result.includes('WAITING_FOR')) {
-                            this.lastToolCall = tc.raw;
-                            this.stutterCount = 0;
-                            break; 
-                        }
-                    }
-
-                    this.history.push({ role: 'assistant', content: reasoningText || toolCalls[0].raw });
-                    this.history.push({ role: 'system', content: results.join('\n\n---\n\n') });
-
-                    if (results.some(r => r.includes('WAITING_FOR'))) return;
-
-                    turnCount++;
-                    continue;
-                } else {
-                    // No tool call — let's see if we should continue in autonomous mode
-                    if (isAutonomous && turnCount < maxTurns && !fullReply.includes("DONE_TASK")) {
-                        this.log("Autonomous continuity check: Model didn't call a tool but hasn't explicitly finished.");
-                        this.history.push({ role: 'assistant', content: fullReply });
-                        this.history.push({ role: 'system', content: "[SYSTEM: You didn't call a tool. If you are finished, output 'DONE_TASK'. Otherwise, continue your task using the tools provided.]" });
                         turnCount++;
                         continue;
-                    }
+                    } else {
+                        // No tool call — let's see if we should continue in autonomous mode
+                        if (isAutonomous && turnCount < maxTurns && !fullReply.includes("DONE_TASK")) {
+                            this.log("Autonomous continuity check: Model didn't call a tool but hasn't explicitly finished.");
+                            // (History already pushed at line 911-912, now we just hint)
+                            this.history.push({ role: 'system', content: "[SYSTEM: You didn't call a tool. If you are finished, output 'DONE_TASK'. Otherwise, continue your task using the tools provided.]" });
+                            turnCount++;
+                            continue;
+                        }
 
-                    // Final answer
-                    this.post('onAssistantMessage', fullReply.replace(/DONE_TASK/g, '').trim());
-                    this.history.push({ role: 'assistant', content: fullReply });
+                        // Final answer
+                        this.post('onAssistantMessage', fullReply.replace(/DONE_TASK/g, '').trim());
+                        break;
+                    }
+                } catch (err: any) {
+                    this.log(`Agent loop error: ${err.message}`);
                     break;
                 }
-            } catch (err: any) {
-                this.log(`Agent loop error: ${err.message}`);
-                break;
             }
-        }
 
-        if (turnCount >= maxTurns) {
-            this.post('onAssistantChunk', `\n\n*[Reached maximum ${maxTurns} turns. Send another message to continue.]*`);
+            if (turnCount >= maxTurns) {
+                this.post('onAssistantChunk', `\n\n*[Reached maximum ${maxTurns} turns. Send another message to continue.]*`);
+            }
+            this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
+        } finally {
+            this.isProcessing = false;
         }
-        this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
     }
 
     public async handlePatchResult(filepath: string, diags: any[]) {
-        const diagMsg = diags.length > 0 ? `Patch applied but found ${diags.length} issues: ${JSON.stringify(diags)}` : "Patch applied successfully and verified by diagnostics.";
+        if (this.isProcessing) {
+            this.log(`[CONCURRENCY] Ignoring patch resumption for ${filepath}. Already busy.`);
+            return;
+        }
+        const diagMsg = diags.length > 0
+            ? `Patch applied but found ${diags.length} issues in ${path.basename(filepath)}: ${JSON.stringify(diags)}`
+            : `Patch successfully applied and verified for ${path.basename(filepath)}.`;
+
         this.log(`Resuming agent turn after patch approval for ${filepath}`);
-        this.history.push({ role: 'system', content: diagMsg });
+        this.history.push({ role: 'system', content: `[SYSTEM: USER APPROVED PATCH. Result: ${diagMsg}]` });
         this.handleUserMessage("");
     }
 
     public async handleTerminalResult(stdout: string, stderr: string) {
+        if (this.isProcessing) {
+            this.log(`[CONCURRENCY] Ignoring terminal resumption. Already busy.`);
+            return;
+        }
         const result = (stdout + stderr) || "Command executed with no output.";
         this.log(`Resuming agent turn after terminal approval.`);
-        this.history.push({ role: 'system', content: result });
+        this.history.push({ role: 'system', content: `[SYSTEM: USER APPROVED TERMINAL. Output:\n${result}]` });
         this.handleUserMessage("");
     }
 
@@ -1109,7 +1100,7 @@ ${rawHistory}`;
 
     private async runSubAgent(mission: string, contextFiles: string[]): Promise<string> {
         this.log(`Spawning sub-agent for mission: ${mission}`);
-        
+
         // Create a specialized sub-agent instance
         // Pass the SAME sessionId but set isSubAgent=true for unified trace
         const subAgent = new MirrorAgent(this.sessionId, this.provider, this.output, this.defaultReadLines, 'sub-task', true);
@@ -1130,11 +1121,11 @@ ${rawHistory}`;
         // Run the agent loop (restricted to 5 turns)
         try {
             await subAgent.handleUserMessage(initialPrompt);
-            
+
             // Extract the result from sub-agent's history
             const history = subAgent.getHistory();
             const lastAssistantMsg = [...history].reverse().find(m => m.role === 'assistant');
-            
+
             return `[SUB-AGENT MISSION COMPLETE]\nSUMMARY: ${lastAssistantMsg?.content || "Mission finished with no summary."}`;
         } catch (e: any) {
             return `[SUB-AGENT MISSION FAILED] Error: ${e.message}`;
@@ -1185,7 +1176,6 @@ ${rawHistory}`;
     private async getSystemPrompt(rootName: string, memoryIndex: string, turn: number, maxTurns: number, vramMB: number, _model: string, _isThinkingModel: boolean): Promise<string> {
         const gitCtx = await this.getGitContext();
         const planState = await this.loadPlanState();
-        // ... (rest of method remains but I need to make it async)
 
         // ── Section 1: IDENTITY (fixed, cacheable) ──
         let personaLine = "";
@@ -1279,6 +1269,8 @@ RULES:
 8. Use <delegate> for intensive research or isolated sub-tasks to save your context.
 9. When using scaffolding tools (like npm create vite), use "." as the target if you are already in the project folder to avoid nested directories (e.g. try_3/try_3).
 ${editorCtx}
+${gitCtx}
+${planState}
 
 KNOWLEDGE:
 ${cappedIndex}

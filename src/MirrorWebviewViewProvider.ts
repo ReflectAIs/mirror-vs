@@ -8,7 +8,7 @@ import * as cp from 'child_process';
 import { McpManager } from './McpManager';
 
 export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
-    public dispose() {}
+    public dispose() { }
 
     public static readonly viewType = 'mirror-code.sidebar';
     private _view?: vscode.WebviewView;
@@ -62,12 +62,12 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         const logoPath = path.join(this._extensionUri.fsPath, 'webview-ui', 'dist', 'assets', 'logo.png');
                         const logoBase64 = Buffer.from(require('fs').readFileSync(logoPath)).toString('base64');
                         const logoDataUri = `data:image/png;base64,${logoBase64}`;
-                        
+
                         this._outputChannel.appendLine(`[Logo DEBUG] Read success. Length: ${logoBase64.length}`);
-                        
-                        webviewView.webview.postMessage({ 
-                            type: 'onInitialize', 
-                            value: { logoUri: logoDataUri } 
+
+                        webviewView.webview.postMessage({
+                            type: 'onInitialize',
+                            value: { logoUri: logoDataUri }
                         });
                     } catch (e: any) {
                         this._outputChannel.appendLine(`[Logo DEBUG] READ FAILED: ${e.message}`);
@@ -77,26 +77,37 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     }
 
                     // Send active generations status
-                    webviewView.webview.postMessage({ 
-                        type: 'onActiveGenerations', 
-                        value: Array.from(this._agents.keys()) 
+                    webviewView.webview.postMessage({
+                        type: 'onActiveGenerations',
+                        value: Array.from(this._agents.keys())
                     });
                     break;
                 }
                 case 'onUserMessage': {
                     if (!data.value || !data.sessionId) return;
-                    
+
                     // Reuse existing agent for the same session (preserves history)
                     let agent = this._agents.get(data.sessionId);
                     if (!agent) {
+                        const historyKey = 'mirror-code.history';
+                        const history = this._context.workspaceState.get<any[]>(historyKey) || [];
+                        const session = history.find(s => s.id === data.sessionId);
+                        const initialHistory = session?.agentHistory;
+
                         const defaultReadLines = config.get('defaultReadLines', 500);
-                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, false, this._mcpManager);
+                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, this._mcpManager, initialHistory);
                         this._agents.set(data.sessionId, agent);
                     }
-                    
+
                     agent.handleUserMessage(data.value).then(() => {
-                        // Don't delete the agent — keep it alive for multi-turn
-                        // It will be cleaned up when the session is explicitly closed
+                        // Persist reasoning history after each turn
+                        const historyKey = 'mirror-code.history';
+                        let history = this._context.workspaceState.get<any[]>(historyKey) || [];
+                        const sessionIndex = history.findIndex(s => s.id === data.sessionId);
+                        if (sessionIndex !== -1 && agent) {
+                            history[sessionIndex].agentHistory = agent.getHistory();
+                            this._context.workspaceState.update(historyKey, history);
+                        }
                     });
                     break;
                 }
@@ -189,18 +200,21 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'commitPatch': {
                     const { filepath, blocks, sessionId } = data.value;
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    const fullPath = (workspaceFolder && !path.isAbsolute(filepath)) ? path.join(workspaceFolder.uri.fsPath, filepath) : filepath;
+
                     try {
-                        await axios.post('http://localhost:3000/tools/patch_file', { 
-                            filepath, 
-                            blocks, 
-                            previewOnly: false 
+                        await axios.post('http://localhost:3000/tools/patch_file', {
+                            filepath: fullPath,
+                            blocks,
+                            previewOnly: false
                         });
                         vscode.window.showInformationMessage(`Applied patch to ${path.basename(filepath)}`);
                         // Trigger diagnostic check automatically
-                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(filepath).toString()) as any[];
-                        
+                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fullPath).toString()) as any[];
+
                         webviewView.webview.postMessage({ type: 'onPatchApplied', value: { filepath, diags, sessionId } });
-                        
+
                         // Self-healing: notify the agent
                         const agent = this._agents.get(sessionId);
                         if (agent) {
@@ -265,12 +279,12 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     try {
                         const res = await axios.post('http://localhost:3000/tools/run_terminal', {
                             command: termData.command,
-                            cwd: termData.dir
+                            dir: termData.dir
                         }, { timeout: 35000 });
                         const result = res.data;
                         const stdout = result.stdout || '';
                         const stderr = result.stderr || '';
-                        
+
                         // Notify the agent to resume
                         const agent = this._agents.get(sessionId);
                         if (agent) {
@@ -298,16 +312,19 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'openDiff': {
                     const { filepath, content } = data.value;
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    const fullPath = (workspaceFolder && !path.isAbsolute(filepath)) ? path.join(workspaceFolder.uri.fsPath, filepath) : filepath;
+
                     const tempDir = os.tmpdir();
                     const tempFileName = `mirror_diff_${Math.random().toString(36).substring(7)}_${path.basename(filepath)}`;
                     const tempFilePath = path.join(tempDir, tempFileName);
-                    
+
                     try {
                         fs.writeFileSync(tempFilePath, content);
-                        
-                        const originalUri = vscode.Uri.file(filepath);
+
+                        const originalUri = vscode.Uri.file(fullPath);
                         const tempUri = vscode.Uri.file(tempFilePath);
-                        
+
                         await vscode.commands.executeCommand('vscode.diff', originalUri, tempUri, `Review: ${path.basename(filepath)} (Proposed)`);
                     } catch (e: any) {
                         vscode.window.showErrorMessage(`Failed to open diff: ${e.message}`);
@@ -346,11 +363,11 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     public async startBackgroundTerminal(command: string, cwd: string): Promise<string> {
         const terminalId = Math.random().toString(36).substring(7);
         const logDir = path.join(cwd, '.mirror', 'logs');
-        
+
         try {
             if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
         } catch (e) { }
-        
+
         const logPath = path.join(logDir, `terminal_${terminalId}.log`);
         const logStream = fs.createWriteStream(logPath);
         logStream.write(`[${new Date().toISOString()}] STARTING: ${command}\n\n`);
@@ -358,7 +375,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
         if (!this._terminal) {
             const pty: vscode.Pseudoterminal = {
                 onDidWrite: this._terminalWriteEmitter.event,
-                open: () => {},
+                open: () => { },
                 close: () => { this._terminal = undefined; },
                 handleInput: (data) => { this._terminalWriteEmitter.fire(data); }
             };
@@ -418,13 +435,13 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     private openTerminal(dirpath: string, label: string = 'Mirror Terminal', command?: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) return;
-        
+
         const fullPath = path.isAbsolute(dirpath) ? dirpath : path.join(workspaceFolder.uri.fsPath, dirpath);
-        
+
         // Find existing terminal with same name or create new
         const name = label.startsWith('Run: ') ? `Mirror: ${label.substring(5)}` : (label === 'Mirror Terminal' ? 'Mirror Terminal' : label);
         const existing = vscode.window.terminals.find(t => t.name === name);
-        
+
         if (existing) {
             existing.show();
             if (command) {
@@ -444,14 +461,14 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
 
     public postMessageToWebview(message: any) {
         this._view?.webview.postMessage(message);
-        
+
         // Auto-persist background activity to history
         const sessionAwareTypes = ['onAssistantChunk', 'onAssistantMessage', 'onToolTrace', 'onPatchApplied', 'requestDiffReview', 'requestTerminalReview'];
         if (sessionAwareTypes.includes(message.type) && message.sessionId) {
             const historyKey = 'mirror-code.history';
             let history = this._context.workspaceState.get<any[]>(historyKey) || [];
             let sessionIndex = history.findIndex(s => s.id === message.sessionId);
-            
+
             if (sessionIndex === -1) {
                 // If the session isn't in history yet, create a placeholder
                 history.unshift({ id: message.sessionId, title: 'Background Task', messages: [] });
