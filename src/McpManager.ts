@@ -32,7 +32,7 @@ export class McpManager {
                     type: 'sse',
                     url: 'http://127.0.0.1:3845/sse'
                 });
-            } catch (e) {
+            } catch (e: any) {
                 console.warn(`[MCP] Figma default connection failed (ensure Figma Desktop is running with Dev Mode): ${e.message}`);
             }
         }
@@ -56,7 +56,10 @@ export class McpManager {
             transport = new StdioClientTransport({
                 command: config.command,
                 args: config.args || [],
-                env: { ...process.env, ...config.env }
+                env: Object.fromEntries(
+                    Object.entries({ ...process.env, ...config.env })
+                        .filter(([_, v]) => v !== undefined)
+                ) as Record<string, string>
             });
         }
 

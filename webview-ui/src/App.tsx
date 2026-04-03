@@ -123,13 +123,21 @@ function App() {
         case 'onSettings':
           if (message.value) setAutonomousMode(message.value.autonomousMode);
           break;
-         case 'onActiveGenerations':
-           if (message.value) {
-             const activeMap: Record<string, boolean> = {};
-             message.value.forEach((id: string) => activeMap[id] = true);
-             setGeneratingSessions(activeMap);
-           }
-           break;
+          case 'onActiveGenerations':
+            if (message.value) {
+              const activeMap: Record<string, boolean> = {};
+              message.value.forEach((id: string) => activeMap[id] = true);
+              setGeneratingSessions(activeMap);
+            }
+            break;
+          case 'onAssistantComplete':
+            if (message.sessionId) {
+              setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
+            } else {
+              setGeneratingSessions(prev => ({ ...prev, [currentSessionId]: false }));
+            }
+            setBuddyStatus('idle');
+            break;
           case 'onAssistantChunk':
             updateSession(message.sessionId || currentSessionId, (msg) => {
               const last = msg[msg.length - 1];

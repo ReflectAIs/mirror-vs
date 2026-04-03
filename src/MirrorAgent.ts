@@ -42,6 +42,8 @@ export class MirrorAgent {
     private readonly osType: 'windows' | 'linux' | 'mac';
     private readonly shellName: string;
     private isProcessing: boolean = false;
+    private isWaiting: boolean = false;
+    private messageQueue: string[] = [];
 
     constructor(
         private readonly sessionId: string,
@@ -221,6 +223,7 @@ export class MirrorAgent {
 
     public handleStop() {
         this.log('Stop requested by user.');
+        this.isWaiting = false;
         this.abortController?.abort();
     }
 
@@ -1017,7 +1020,10 @@ ${rawHistory}`;
 
                         this.history.push({ role: 'system', content: results.join('\n\n---\n\n') });
 
-                        if (results.some(r => r.includes('WAITING_FOR'))) return;
+                        if (results.some(r => r.includes('WAITING_FOR'))) {
+                            this.isWaiting = true;
+                            return;
+                        }
 
                         turnCount++;
                         continue;
@@ -1036,6 +1042,7 @@ ${rawHistory}`;
                             finalMsg = "Task completed successfully. Please review the changes in your workspace.";
                         }
                         this.post('onAssistantMessage', finalMsg);
+                        this.isWaiting = false;
                         break;
                     }
                 } catch (err: any) {
@@ -1053,6 +1060,10 @@ ${rawHistory}`;
         }
     }
 
+    public isWaitingForUser() {
+        return this.isWaiting;
+    }
+
     public async handlePatchResult(filepath: string, diags: any[]) {
         if (this.isProcessing) {
             this.log(`[CONCURRENCY] Ignoring patch resumption for ${filepath}. Already busy.`);
@@ -1064,6 +1075,7 @@ ${rawHistory}`;
 
         this.log(`Resuming agent turn after patch approval for ${filepath}`);
         this.history.push({ role: 'system', content: `[SYSTEM: USER APPROVED PATCH. Result: ${diagMsg}]` });
+        this.isWaiting = false;
         await this.handleUserMessage("");
     }
 
@@ -1075,6 +1087,7 @@ ${rawHistory}`;
         const result = (stdout + stderr) || "Command executed with no output.";
         this.log(`Resuming agent turn after terminal approval.`);
         this.history.push({ role: 'system', content: `[SYSTEM: USER APPROVED TERMINAL. Output:\n${result}]` });
+        this.isWaiting = false;
         await this.handleUserMessage("");
     }
 
@@ -1201,7 +1214,10 @@ IMPORTANT: Do NOT use bash/Linux commands. Specifically:
 - Use "copy" not "cp", "move" not "mv", "type" not "cat", "dir" not "ls"
 - Use "echo." not "touch" to create empty files
 - Prefer write_file tool over terminal for creating files with content
-- Run ONE command at a time, avoid chaining with "&&"`
+- Run ONE command at a time, avoid chaining with "&&"
+- Always use "npx -y" (the -y flag) for npx commands to bypass prompts
+- Add "--template [name]" and "--yes" flags whenever possible for scaffold tools
+- If you use create-vite, the command MUST be "npx -y create-vite . --template react" (or similar) to avoid interaction.`
             : this.osType === 'mac'
                 ? `OS: macOS. Shell: /bin/zsh. Standard Unix commands available.`
                 : `OS: Linux. Shell: /bin/sh. Standard Unix commands available.`;

@@ -18,6 +18,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     private _terminal: vscode.Terminal | undefined;
     private _terminalWriteEmitter = new vscode.EventEmitter<string>();
     private _activeProcesses: Map<string, { child: cp.ChildProcess, output: string, logStream?: fs.WriteStream }> = new Map();
+    private _activeExecutorChild: cp.ChildProcess | undefined;
     private _mcpManager: McpManager;
 
     constructor(
@@ -95,7 +96,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         const initialHistory = session?.agentHistory;
 
                         const defaultReadLines = config.get('defaultReadLines', 500);
-                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, this._mcpManager, initialHistory);
+                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, false, this._mcpManager, initialHistory);
                         this._agents.set(data.sessionId, agent);
                     }
 
@@ -108,7 +109,13 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             history[sessionIndex].agentHistory = agent.getHistory();
                             this._context.workspaceState.update(historyKey, history);
                         }
+                        
+                        if (!agent.isWaitingForUser()) {
+                            this._agents.delete(data.sessionId);
+                        }
+                        this.broadcastActiveGenerations();
                     });
+                     this.broadcastActiveGenerations();
                     break;
                 }
                 case 'openLogs': {
@@ -124,6 +131,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             maxTurns: config.get('maxTurns'),
                             autonomousMode: config.get('autonomousMode'),
                             defaultReadLines: config.get('defaultReadLines'),
+                            env: { ...process.env, ...(config.get('env') as Record<string, string>) },
                             queueMessages: config.get('queueMessages'),
                         }
                     });
@@ -194,6 +202,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         if (agent) {
                             agent.handleStop();
                             this._agents.delete(data.sessionId);
+                            this.broadcastActiveGenerations();
                         }
                     }
                     break;
@@ -249,7 +258,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                                 }
                             }
                         } catch (e: any) {
-                            vscode.window.showErrorMessage(`Failed to open ${filepath}: ${e.message}`);
+                            console.warn(`[MCP] Figma default connection failed (ensure Figma Desktop is running with Dev Mode): ${e.message}`);
                         }
                     }
                     break;
@@ -286,24 +295,18 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     this._outputChannel.appendLine(`[TerminalApproval] Approved: ${termData.command} (Session: ${sessionId})`);
 
                     try {
-                        const res = await axios.post('http://localhost:3000/tools/run_terminal', {
-                            command: termData.command,
-                            cwd: termData.dir
-                        }, { timeout: 35000 });
-                        const result = res.data;
-                        const stdout = result.stdout || '';
-                        const stderr = result.stderr || '';
-
+                        const { stdout, exitCode } = await this.executeIntegratedTerminal(termData.command, termData.dir);
+                        
                         // Notify the agent to resume
                         const agent = this._agents.get(sessionId);
                         if (agent) {
                             this._outputChannel.appendLine(`[TerminalApproval] Found agent ${sessionId}. Notifying to resume...`);
-                            agent.handleTerminalResult(stdout, stderr);
+                            agent.handleTerminalResult(stdout, `Exit Code: ${exitCode}`);
                         } else {
-                            this._outputChannel.appendLine(`[TerminalApproval] WARNING: Agent ${sessionId} not found in active agents map. Available: ${Array.from(this._agents.keys()).join(', ')}`);
+                            this._outputChannel.appendLine(`[TerminalApproval] WARNING: Agent ${sessionId} not found in active agents map.`);
                         }
                     } catch (e: any) {
-                        const errorMsg = e.response?.data?.error || e.message;
+                        const errorMsg = e.message;
                         this._outputChannel.appendLine(`[TerminalApproval] FAILED: ${errorMsg}`);
                         vscode.window.showErrorMessage(`Terminal command failed: ${errorMsg}`);
                         const agent = this._agents.get(sessionId);
@@ -390,8 +393,24 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
             const pty: vscode.Pseudoterminal = {
                 onDidWrite: this._terminalWriteEmitter.event,
                 open: () => { },
-                close: () => { this._terminal = undefined; },
-                handleInput: (data) => { this._terminalWriteEmitter.fire(data); }
+                close: () => { 
+                    this._terminal = undefined;
+                    if (this._activeExecutorChild?.pid) {
+                        try {
+                            // Kill process group on Unix, or just the process on Windows
+                            if (process.platform !== 'win32') {
+                                process.kill(-this._activeExecutorChild.pid);
+                            } else {
+                                this._activeExecutorChild.kill();
+                            }
+                        } catch { }
+                    }
+                },
+                handleInput: (data) => { 
+                    if (this._activeExecutorChild?.stdin?.writable) {
+                        this._activeExecutorChild.stdin.write(data);
+                    }
+                }
             };
             this._terminal = vscode.window.createTerminal({ name: 'Mirror: Executor', pty });
         }
@@ -399,9 +418,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
         this._terminal.show();
         this._terminalWriteEmitter.fire(`\r\n\x1b[35m[Mirror] Terminal ${terminalId} started:\x1b[0m ${command}\r\n\r\n`);
 
-        const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
-        const shellArgs = process.platform === 'win32' ? ['/c', command] : ['-c', command];
-        const child = cp.spawn(shell, shellArgs, { cwd, shell: true });
+        const child = cp.spawn(command, { cwd, shell: true });
+        this._activeExecutorChild = child;
 
         const processInfo = { child, output: '', logStream };
         this._activeProcesses.set(terminalId, processInfo);
@@ -447,29 +465,29 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     }
 
     private openTerminal(dirpath: string, label: string = 'Mirror Terminal', command?: string) {
+        // PRIORITY: If our Mirror: Executor terminal is alive, show it!
+        if (this._terminal) {
+            this._terminal.show();
+            if (command) {
+                // If it's a PTY, we'd need to write to it, but startBackgroundTerminal already did.
+            }
+            return;
+        }
+
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) return;
 
         const fullPath = path.isAbsolute(dirpath) ? dirpath : path.join(workspaceFolder.uri.fsPath, dirpath);
-
-        // Find existing terminal with same name or create new
         const name = label.startsWith('Run: ') ? `Mirror: ${label.substring(5)}` : (label === 'Mirror Terminal' ? 'Mirror Terminal' : label);
         const existing = vscode.window.terminals.find(t => t.name === name);
 
         if (existing) {
             existing.show();
-            if (command) {
-                existing.sendText(command);
-            }
+            if (command) existing.sendText(command);
         } else {
-            const terminal = vscode.window.createTerminal({
-                name,
-                cwd: fullPath
-            });
+            const terminal = vscode.window.createTerminal({ name, cwd: fullPath });
             terminal.show();
-            if (command) {
-                terminal.sendText(command);
-            }
+            if (command) terminal.sendText(command);
         }
     }
 
@@ -531,6 +549,13 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
             session.messages = msgs;
             this._context.workspaceState.update(historyKey, history);
         }
+    }
+
+    public broadcastActiveGenerations() {
+        this._view?.webview.postMessage({
+            type: 'onActiveGenerations',
+            value: Array.from(this._agents.keys())
+        });
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
