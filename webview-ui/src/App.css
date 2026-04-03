@@ -404,15 +404,18 @@ body {
 
 .terminal-actions {
   display: flex;
-  gap: 1px;
-  background: var(--border-color);
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid var(--border-color);
 }
 
 .terminal-actions button {
-  flex: 1;
+  width: 100%;
   padding: 10px;
-  border: none;
+  border-radius: 8px;
+  border: 1px solid transparent;
   background: #2d2d2d;
   color: #fff;
   cursor: pointer;
@@ -421,12 +424,30 @@ body {
   justify-content: center;
   gap: 8px;
   font-size: 11px;
-  transition: background 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.terminal-actions button:hover { background: #3c3c3c; }
-.terminal-actions .approve-button:hover { background: var(--success); color: #000; }
-.terminal-actions .reject-button:hover { background: var(--error); }
+.terminal-actions .approve-button {
+  background: var(--success);
+  color: #000;
+}
+
+.terminal-actions .approve-button:hover:not(:disabled) {
+  filter: brightness(1.2);
+  transform: translateY(-1px);
+}
+
+.terminal-actions .reject-button {
+  background: rgba(255, 68, 68, 0.1);
+  color: var(--error);
+  border-color: rgba(255, 68, 68, 0.2);
+}
+
+.terminal-actions .reject-button:hover:not(:disabled) {
+  background: rgba(255, 68, 68, 0.2);
+  transform: translateY(-1px);
+}
+
 
 /* Header Styling */
 .minimal-header {
@@ -1286,54 +1307,65 @@ textarea {
 
 .diff-actions {
   display: flex;
-  gap: 8px;
-  padding: 10px;
-  background: var(--bg-glass);
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid var(--border-subtle);
 }
 
 .apply-btn, .discard-btn, .preview-btn {
-  flex: 1;
-  padding: 8px;
-  border-radius: 6px;
-  font-size: 11.5px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  border: 1px solid transparent;
 }
 
 .apply-btn {
   background: var(--success);
   color: #000;
-  border: none;
 }
 
-.apply-btn:hover {
+.apply-btn:hover:not(:disabled) {
   filter: brightness(1.2);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px hsla(150, 100%, 50%, 0.3);
 }
 
 .preview-btn {
-  background: hsla(210, 100%, 60%, 0.15);
+  background: hsla(210, 100%, 60%, 0.1);
   color: var(--accent);
-  border: 1px solid var(--accent-glow);
+  border-color: var(--accent-glow);
 }
 
-.preview-btn:hover {
-  background: hsla(210, 100%, 60%, 0.25);
+.preview-btn:hover:not(:disabled) {
+  background: hsla(210, 100%, 60%, 0.2);
   transform: translateY(-1px);
 }
 
 .discard-btn {
-  background: transparent;
-  color: var(--text-pure);
-  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dark);
+  border-color: var(--border-subtle);
 }
 
-.discard-btn:hover {
-  background: hsla(0, 0%, 100%, 0.05);
+.discard-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-pure);
 }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  transform: none !important;
+}
+

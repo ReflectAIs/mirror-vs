@@ -202,6 +202,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     const { filepath, blocks, sessionId } = data.value;
                     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                     const fullPath = (workspaceFolder && !path.isAbsolute(filepath)) ? path.join(workspaceFolder.uri.fsPath, filepath) : filepath;
+                    this._outputChannel.appendLine(`[CommitPatch] Request for ${filepath} (Session: ${sessionId})`);
 
                     try {
                         await axios.post('http://localhost:3000/tools/patch_file', {
@@ -210,18 +211,23 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             previewOnly: false
                         });
                         vscode.window.showInformationMessage(`Applied patch to ${path.basename(filepath)}`);
+                        
                         // Trigger diagnostic check automatically
                         const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fullPath).toString()) as any[];
 
-                        webviewView.webview.postMessage({ type: 'onPatchApplied', value: { filepath, diags, sessionId } });
-
+                        this.postMessageToWebview({ type: 'onPatchApplied', value: { filepath, diags, sessionId }, sessionId });
+                        
                         // Self-healing: notify the agent
                         const agent = this._agents.get(sessionId);
                         if (agent) {
+                            this._outputChannel.appendLine(`[CommitPatch] Found agent ${sessionId}. Notifying to resume...`);
                             agent.handlePatchResult(filepath, diags);
+                        } else {
+                            this._outputChannel.appendLine(`[CommitPatch] WARNING: Agent ${sessionId} not found in active agents map. Available: ${Array.from(this._agents.keys()).join(', ')}`);
                         }
                     } catch (e: any) {
                         const errorMsg = e.response?.data?.error || e.message;
+                        this._outputChannel.appendLine(`[CommitPatch] FAILED: ${errorMsg}`);
                         vscode.window.showErrorMessage(`Failed to apply patch: ${errorMsg}`);
                     }
                     break;
@@ -275,11 +281,14 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 case 'approveTerminal': {
                     const termData = data.value;
                     if (!termData) break;
-                    const sessionId = termData.sessionId || termData.messageId;
+                    const sessionId = termData.sessionId;
+                    
+                    this._outputChannel.appendLine(`[TerminalApproval] Approved: ${termData.command} (Session: ${sessionId})`);
+
                     try {
                         const res = await axios.post('http://localhost:3000/tools/run_terminal', {
                             command: termData.command,
-                            dir: termData.dir
+                            cwd: termData.dir
                         }, { timeout: 35000 });
                         const result = res.data;
                         const stdout = result.stdout || '';
@@ -288,10 +297,14 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                         // Notify the agent to resume
                         const agent = this._agents.get(sessionId);
                         if (agent) {
+                            this._outputChannel.appendLine(`[TerminalApproval] Found agent ${sessionId}. Notifying to resume...`);
                             agent.handleTerminalResult(stdout, stderr);
+                        } else {
+                            this._outputChannel.appendLine(`[TerminalApproval] WARNING: Agent ${sessionId} not found in active agents map. Available: ${Array.from(this._agents.keys()).join(', ')}`);
                         }
                     } catch (e: any) {
                         const errorMsg = e.response?.data?.error || e.message;
+                        this._outputChannel.appendLine(`[TerminalApproval] FAILED: ${errorMsg}`);
                         vscode.window.showErrorMessage(`Terminal command failed: ${errorMsg}`);
                         const agent = this._agents.get(sessionId);
                         if (agent) {
@@ -303,7 +316,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 case 'rejectTerminal': {
                     const termData = data.value;
                     if (!termData) break;
-                    const sessionId = termData.sessionId || termData.messageId;
+                    const sessionId = termData.sessionId;
+                    this._outputChannel.appendLine(`[TerminalApproval] Rejected: Session ${sessionId}`);
                     const agent = this._agents.get(sessionId);
                     if (agent) {
                         agent.handleTerminalResult('', '[User rejected the terminal command.]');

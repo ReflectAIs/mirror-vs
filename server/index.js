@@ -377,12 +377,14 @@ app.post('/tools/search_and_replace', async (req, res) => {
  * FIX 3: Resilient matching to force LLM self-correction on hallucinated spaces/indentation.
  */
 function applyPatch(content, blocks) {
+    console.log(`[PATCH] Applying ${blocks.length} block(s)...`);
     let result = content;
     for (const block of blocks) {
         let { search, replace } = block;
         let index = result.indexOf(search);
         
         if (index === -1) {
+            console.log(`[PATCH] Exact match failed for block. Attempting fuzzy match...`);
             // SMART FALLBACK: Normalize all whitespace to find a fuzzy match
             const normalize = (str) => str.replace(/\s+/g, ' ').trim();
             const normalizedContent = normalize(result);
@@ -458,6 +460,7 @@ app.post('/tools/patch_file', async (req, res) => {
             original: original 
         });
     } catch (e) {
+        console.error(`[PATCH ERROR] ${e.message}`);
         // Send a 400 Bad Request instead of 500 when the patch fails, 
         // as this is an LLM error, not a server crash.
         res.status(400).json({ error: e.message });

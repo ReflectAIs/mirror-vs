@@ -586,10 +586,11 @@ export class MirrorAgent {
                             toolResult = "Patch applied.";
                             toolResult += await this.checkDiagnosticsAfterWrite(fp);
                         } else {
-                            const res = await axios.post(`${this.brainUrl}/tools/patch_file`, { filepath: fp, blocks, previewOnly: true });
+                            const res = await axios.post(`${this.brainUrl}/tools/patch_file`, { filepath: fp, blocks, previewOnly: true }, { signal: this.abortController!.signal });
                             this.post('requestDiffReview', {
                                 filepath: filepathRaw, original: res.data.original,
-                                content: res.data.content, blocks, messageId: Date.now().toString()
+                                content: res.data.content, blocks, messageId: Date.now().toString(),
+                                sessionId: this.sessionId
                             });
                             // Return special sentinel — the caller handles the pause
                             return {
@@ -625,7 +626,8 @@ export class MirrorAgent {
                     }
                 } else {
                     this.post('requestTerminalReview', {
-                        terminalData: { command: cmd, dir, messageId: Date.now().toString() }
+                        command: cmd, dir, messageId: Date.now().toString(),
+                        sessionId: this.sessionId
                     });
                     return {
                         label: traceLabel, category: traceCategory, path: tracePath,
@@ -855,23 +857,22 @@ ${rawHistory}`;
             this.history.push({ role: 'user', content: text });
         }
 
-        if (this.isProcessing) {
-            this.log(`[CONCURRENCY] Agent is already busy. Message ignored: ${text}`);
-            return;
-        }
-
         try {
-            this.isProcessing = true;
+            const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
+            const ollamaModel = config.get<string>('ollamaModel') || 'qwen3.5:4b';
+
+            let turnCount = this.history.filter(t => t.role === 'assistant').length;
+            this.log(`[LOOP] Starting _processMessage. Current turn: ${turnCount}/${maxTurns}`);
+
             this.abortController = new AbortController();
             this.healingAttempts.clear();
 
-            let turnCount = this.history.filter(t => t.role === 'assistant').length;
-
             while (turnCount < maxTurns) {
-                if (this.abortController.signal.aborted) break;
-
-                const ollamaUrl = config.get<string>('ollamaUrl') || 'http://localhost:11434';
-                const ollamaModel = config.get<string>('ollamaModel') || 'qwen3.5:4b';
+                this.log(`[LOOP] Iteration start. Turn: ${turnCount + 1}`);
+                if (this.abortController.signal.aborted) {
+                    this.log(`[LOOP] ABORTED.`);
+                    break;
+                }
 
                 const vramMB = await this.detectHardware();
                 const numCtx = vramMB < 4500 ? 6144 : (vramMB < 9000 ? 12288 : 32768);
@@ -880,6 +881,7 @@ ${rawHistory}`;
                 const totalHistoryTokens = this.history.reduce((s, t) => s + this.getTokenEstimate(t.content), 0);
                 const compactionThreshold = vramMB < 4500 ? 4000 : 8000;
                 if (isAutonomous && totalHistoryTokens > compactionThreshold) {
+                    this.log(`[LOOP] Dreaming...`);
                     await this.performDreamCompaction(ollamaUrl, ollamaModel);
                 }
 
@@ -896,6 +898,7 @@ ${rawHistory}`;
                 ];
 
                 try {
+                    this.log(`[LOOP] Requesting completion from ${ollamaModel}...`);
                     const url = new URL(`${ollamaUrl}/api/chat`);
                     const postData = JSON.stringify({
                         model: ollamaModel,
@@ -904,7 +907,7 @@ ${rawHistory}`;
                         options: { num_ctx: numCtx, temperature: 0.1 }
                     });
 
-                    this.post('onAssistantChunk', turnCount === 0 ? "*(Thinking...)* " : "");
+                    this.post('onAssistantChunk', "*(Thinking...)* ");
 
                     let fullReply = "";
                     let buffer = "";
@@ -1022,14 +1025,17 @@ ${rawHistory}`;
                         // No tool call — let's see if we should continue in autonomous mode
                         if (isAutonomous && turnCount < maxTurns && !fullReply.includes("DONE_TASK")) {
                             this.log("Autonomous continuity check: Model didn't call a tool but hasn't explicitly finished.");
-                            // (History already pushed at line 911-912, now we just hint)
                             this.history.push({ role: 'system', content: "[SYSTEM: You didn't call a tool. If you are finished, output 'DONE_TASK'. Otherwise, continue your task using the tools provided.]" });
                             turnCount++;
                             continue;
                         }
 
                         // Final answer
-                        this.post('onAssistantMessage', fullReply.replace(/DONE_TASK/g, '').trim());
+                        let finalMsg = fullReply.replace(/DONE_TASK/g, '').trim();
+                        if (!finalMsg && fullReply.includes("DONE_TASK")) {
+                            finalMsg = "Task completed successfully. Please review the changes in your workspace.";
+                        }
+                        this.post('onAssistantMessage', finalMsg);
                         break;
                     }
                 } catch (err: any) {
@@ -1042,8 +1048,8 @@ ${rawHistory}`;
                 this.post('onAssistantChunk', `\n\n*[Reached maximum ${maxTurns} turns. Send another message to continue.]*`);
             }
             this.provider.postMessageToWebview({ type: 'onAssistantComplete', sessionId: this.sessionId });
-        } finally {
-            this.isProcessing = false;
+        } catch (err: any) {
+            this.log(`Agent loop error: ${err.message}`);
         }
     }
 
@@ -1058,7 +1064,7 @@ ${rawHistory}`;
 
         this.log(`Resuming agent turn after patch approval for ${filepath}`);
         this.history.push({ role: 'system', content: `[SYSTEM: USER APPROVED PATCH. Result: ${diagMsg}]` });
-        this.handleUserMessage("");
+        await this.handleUserMessage("");
     }
 
     public async handleTerminalResult(stdout: string, stderr: string) {
@@ -1069,7 +1075,7 @@ ${rawHistory}`;
         const result = (stdout + stderr) || "Command executed with no output.";
         this.log(`Resuming agent turn after terminal approval.`);
         this.history.push({ role: 'system', content: `[SYSTEM: USER APPROVED TERMINAL. Output:\n${result}]` });
-        this.handleUserMessage("");
+        await this.handleUserMessage("");
     }
 
     private async detectHardware(): Promise<number> {
@@ -1238,7 +1244,12 @@ Use checkbox markdown. Tick items as you complete them:
 - [ ] Not started
 - [/] In progress  
 - [x] Completed
-After completing a step, use patch_file to change [ ] to [x] in PLAN.md.`;
+CORRECT PATCH EXAMPLE for PLAN.md:
+<patch_file filepath=".mirror/PLAN.md">
+  <search>- [ ] Task description</search>
+  <replace>- [x] Task description</replace>
+</patch_file>
+WARNING: Do NOT append [x] like "- [ ] [x] ...". Always replace the "[ ]" with "[x]".`;
 
         // ── Section 6: CONTEXT (dynamic, capped) ──
         // Cap knowledge index to prevent context overflow
@@ -1262,7 +1273,7 @@ RULES:
 1. Call ONE tool per response. Think → Tool → Wait.
 2. Save state in .mirror/ folder. Plans, logs, knowledge.
 3. Use relative paths to "${rootName}".
-4. Output DONE_TASK only when goal is verified complete.
+4. Format your final turn carefully. Always provide a brief summary of what you accomplished BEFORE outputting "DONE_TASK" to signal completion. Example: "I have updated the records. DONE_TASK"
 5. If a command fails, try write_file instead of retrying.
 6. Use <terminal_start> for interactive processes (repl, dev servers).
 7. Always <terminal_read> after sending <terminal_input> to see the result.

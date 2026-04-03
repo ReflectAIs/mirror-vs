@@ -90,6 +90,7 @@ function App() {
   const [loadingMentions, setLoadingMentions] = useState(false);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const [selectedHunks, setSelectedHunks] = useState<Record<string, boolean[]>>({});
+  const [processingTasks, setProcessingTasks] = useState<Record<string, boolean>>({});
 
   const isGenerating = generatingSessions[currentSessionId] || false;
   const [view, setView] = useState<'chat' | 'history' | 'settings'>('chat');
@@ -425,6 +426,7 @@ function App() {
         return;
     }
 
+    setProcessingTasks(prev => ({ ...prev, [diff.messageId]: true }));
     window.vscode.postMessage({ 
         type: 'commitPatch', 
         value: { ...diff, blocks: filteredBlocks } 
@@ -447,10 +449,25 @@ function App() {
           <div className="terminal-dir">Directory: <code>{terminalData.dir}</code></div>
         </div>
         <div className="terminal-actions">
-          <button className="approve-button" onClick={() => window.vscode.postMessage({ type: 'approveTerminal', value: terminalData })}>
-            <VscCheck /> Run Command
+          <button 
+            className="approve-button" 
+            disabled={processingTasks[msg.id]}
+            onClick={() => {
+              setProcessingTasks(prev => ({ ...prev, [msg.id]: true }));
+              window.vscode.postMessage({ type: 'approveTerminal', value: terminalData });
+            }}
+          >
+            {processingTasks[msg.id] ? <VscLoading className="spinning" /> : <VscCheck />} 
+            {processingTasks[msg.id] ? 'Executing...' : 'Run Command'}
           </button>
-          <button className="reject-button" onClick={() => window.vscode.postMessage({ type: 'rejectTerminal', value: terminalData })}>
+          <button 
+            className="reject-button" 
+            disabled={processingTasks[msg.id]}
+            onClick={() => {
+              setProcessingTasks(prev => ({ ...prev, [msg.id]: true }));
+              window.vscode.postMessage({ type: 'rejectTerminal', value: terminalData });
+            }}
+          >
             <VscClose /> Reject
           </button>
         </div>
@@ -596,13 +613,29 @@ function App() {
                             })}
                           </div>
                           <div className="diff-actions">
-                            <button className="apply-btn" onClick={() => commitPatch(msg.diffData)}>
-                              <VscCheck /> {selectedHunks[msg.id]?.filter(Boolean).length === 0 ? 'Select Hunks' : `Apply Selected (${selectedHunks[msg.id]?.filter(Boolean).length || msg.diffData.blocks.length})`}
+                            <button 
+                              className="apply-btn" 
+                              disabled={processingTasks[msg.id]}
+                              onClick={() => commitPatch({ ...msg.diffData, messageId: msg.id })}
+                            >
+                              {processingTasks[msg.id] ? <VscLoading className="spinning" /> : <VscCheck />}
+                              {processingTasks[msg.id] ? 'Applying...' : (selectedHunks[msg.id]?.filter(Boolean).length === 0 ? 'Select Hunks' : `Apply Selected (${selectedHunks[msg.id]?.filter(Boolean).length || msg.diffData.blocks.length})`)}
                             </button>
-                            <button className="preview-btn" onClick={() => window.vscode.postMessage({ type: 'openDiff', value: { filepath: msg.diffData.filepath, content: msg.diffData.content } })}>
+                            <button 
+                              className="preview-btn" 
+                              disabled={processingTasks[msg.id]}
+                              onClick={() => window.vscode.postMessage({ type: 'openDiff', value: { filepath: msg.diffData.filepath, content: msg.diffData.content } })}
+                            >
                               <VscSearch /> Open Side-by-Side Diff
                             </button>
-                            <button className="discard-btn" onClick={() => updateCurrentSession(msgs => msgs.filter(m => m.id !== msg.id), false)}>
+                            <button 
+                              className="discard-btn" 
+                              disabled={processingTasks[msg.id]}
+                              onClick={() => {
+                                setProcessingTasks(prev => ({ ...prev, [msg.id]: true }));
+                                updateCurrentSession(msgs => msgs.filter(m => m.id !== msg.id), false);
+                              }}
+                            >
                               <VscClose /> Discard
                             </button>
                           </div>
@@ -675,7 +708,10 @@ function App() {
                              {(() => {
                                // Logic to split thinking from main content
                                const thinkingMatch = /<(thinking|thought)>([\s\S]*?)(?:<\/\1>|$)/.exec(msg.text);
-                               const mainText = msg.text.replace(/<(thinking|thought)>[\s\S]*?(?:<\/\1>|$)/, '').trim();
+                               let mainText = msg.text.replace(/<(thinking|thought)>[\s\S]*?(?:<\/\1>|$)/, '');
+                               
+                               // Filter out tool call XML to prevent redundant "boxes" in the UI
+                               mainText = mainText.replace(/<(\w+)\s*([\s\S]*?)(?:\/>|>(?:[\s\S]*?)<\/\1>)/g, '').trim();
                                
                                return (
                                  <>
