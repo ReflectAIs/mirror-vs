@@ -73,6 +73,17 @@
           "type": "integer",
           "default": 1,
           "description": "Strict limit: Mirror now executes exactly one tool per assistant turn for maximum reliability and predictable state changes."
+        },
+        "mirror-code.figmaAccessToken": {
+          "type": "string",
+          "default": "",
+          "description": "Figma Personal Access Token (PAT) for MCP integration.",
+          "tags": ["password"]
+        },
+        "mirror-code.mcpServers": {
+          "type": "object",
+          "default": {},
+          "description": "Custom MCP servers configuration (Name -> {type, url/command, args})."
         }
       }
     }
@@ -95,6 +106,7 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.7.9"
   }
 }

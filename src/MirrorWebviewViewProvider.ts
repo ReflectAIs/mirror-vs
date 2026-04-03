@@ -2,8 +2,10 @@ import * as vscode from 'vscode';
 import axios from 'axios';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { MirrorAgent } from './MirrorAgent';
 import * as cp from 'child_process';
+import { McpManager } from './McpManager';
 
 export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     public dispose() {}
@@ -16,13 +18,20 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     private _terminal: vscode.Terminal | undefined;
     private _terminalWriteEmitter = new vscode.EventEmitter<string>();
     private _activeProcesses: Map<string, { child: cp.ChildProcess, output: string, logStream?: fs.WriteStream }> = new Map();
+    private _mcpManager: McpManager;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _context: vscode.ExtensionContext
     ) {
         this._outputChannel = vscode.window.createOutputChannel('Mirror Code');
+        this._mcpManager = new McpManager();
+        this._mcpManager.initialize().catch(e => {
+            this._outputChannel.appendLine(`[MCP] Initialization failed: ${e.message}`);
+        });
     }
+
+    public get mcpManager() { return this._mcpManager; }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -81,7 +90,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     let agent = this._agents.get(data.sessionId);
                     if (!agent) {
                         const defaultReadLines = config.get('defaultReadLines', 500);
-                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona);
+                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, this._mcpManager);
                         this._agents.set(data.sessionId, agent);
                     }
                     
@@ -282,6 +291,24 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     const agent = this._agents.get(sessionId);
                     if (agent) {
                         agent.handleTerminalResult('', '[User rejected the terminal command.]');
+                    }
+                    break;
+                }
+                case 'openDiff': {
+                    const { filepath, content } = data.value;
+                    const tempDir = os.tmpdir();
+                    const tempFileName = `mirror_diff_${Math.random().toString(36).substring(7)}_${path.basename(filepath)}`;
+                    const tempFilePath = path.join(tempDir, tempFileName);
+                    
+                    try {
+                        fs.writeFileSync(tempFilePath, content);
+                        
+                        const originalUri = vscode.Uri.file(filepath);
+                        const tempUri = vscode.Uri.file(tempFilePath);
+                        
+                        await vscode.commands.executeCommand('vscode.diff', originalUri, tempUri, `Review: ${path.basename(filepath)} (Proposed)`);
+                    } catch (e: any) {
+                        vscode.window.showErrorMessage(`Failed to open diff: ${e.message}`);
                     }
                     break;
                 }

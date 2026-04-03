@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as http from 'http';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { McpManager } from './McpManager';
 
 const execAsync = promisify(exec);
 
@@ -53,7 +54,8 @@ export class MirrorAgent {
         private readonly output: vscode.OutputChannel,
         private readonly defaultReadLines: number = 500,
         private readonly persona: string = 'architect',
-        private readonly isSubAgent: boolean = false
+        private readonly isSubAgent: boolean = false,
+        private readonly mcpManager?: McpManager
     ) {
         // OS Detection — critical for correct command generation
         if (process.platform === 'win32') {
@@ -100,6 +102,7 @@ export class MirrorAgent {
     ];
 
     private validateToolCall(raw: string, name: string): { valid: boolean; error?: string } {
+        if (name.startsWith('mcp_')) return { valid: true };
         // 1. Check required attributes
         const required = this.REQUIRED_ATTRS[name];
         if (required) {
@@ -390,6 +393,9 @@ export class MirrorAgent {
             'g'
         );
 
+        // Match MCP tools: <mcp_server_tool attr="val" />
+        const mcpPattern = /<(mcp_\w+)(\s+[^>]*)?\/?>/g;
+
         let match;
         while ((match = selfClosingPattern.exec(text)) !== null) {
             calls.push({
@@ -405,6 +411,13 @@ export class MirrorAgent {
                 isReadOnly: false
             });
         }
+        while ((match = mcpPattern.exec(text)) !== null) {
+            calls.push({
+                raw: match[0],
+                name: match[1],
+                isReadOnly: false // Assume potentially mutating for safety
+            });
+        }
 
         // Sort by position in original text
         calls.sort((a, b) => text.indexOf(a.raw) - text.indexOf(b.raw));
@@ -418,6 +431,16 @@ export class MirrorAgent {
         return m?.[1] || m?.[2] || "";
     }
 
+    private getAllAttrs(toolCall: string): Record<string, string> {
+        const attrs: Record<string, string> = {};
+        const re = /(\w+)=(?:["']([^"']+)["']|([^\s/>]+))/g;
+        let match;
+        while ((match = re.exec(toolCall)) !== null) {
+            attrs[match[1]] = match[2] || match[3];
+        }
+        return attrs;
+    }
+
     private async executeSingleTool(toolCall: ToolCall, isAutonomous: boolean, config: vscode.WorkspaceConfiguration): Promise<ToolResult> {
         const startTime = Date.now();
         const raw = toolCall.raw;
@@ -429,7 +452,19 @@ export class MirrorAgent {
         let tracePath: string | undefined;
 
         try {
-            if (raw.includes('<search_vector_db')) {
+            if (toolCall.name.startsWith('mcp_') && this.mcpManager) {
+                const parts = toolCall.name.split('_');
+                const serverName = parts[1];
+                const toolName = parts.slice(2).join('_');
+                const args = this.getAllAttrs(raw);
+                
+                traceLabel = `MCP: ${serverName}/${toolName}`;
+                traceCategory = 'executing';
+                
+                const result = await this.mcpManager.callTool(serverName, toolName, args);
+                toolResult = JSON.stringify(result);
+
+            } else if (raw.includes('<search_vector_db')) {
                 const q = getAttr('query');
                 traceLabel = `Searching Code: ${q}`;
                 tracePath = ".";
@@ -1141,11 +1176,24 @@ IMPORTANT: Do NOT use bash/Linux commands. Specifically:
         const hwNote = vramMB < 4500 ? " [Low VRAM — be brief]" : "";
 
         // ── Section 4: TOOLS (concise) ──
-        const toolsDef = `TOOLS (ONE per response, then wait):
+        let toolsDef = `TOOLS (ONE per response, then wait):
 Read: <read_file filepath="p" start_line="N" end_line="N" /> | <read_skeleton filepath="p" /> | <grep_search query="q" root="dir" /> | <list_dir dirpath="d" /> | <get_symbols filepath="p" /> | <get_diagnostics filepath="p" /> | <search_vector_db query="q" /> | <search_web query="q" /> | <recall_memory query="q" />
 Write/Terminal: <write_file filepath="p">content</write_file> | <patch_file filepath="p"><search>old</search><replace>new</replace></patch_file> | <run_terminal command="cmd" dir="d" /> | <add_knowledge topic="t">facts</add_knowledge>
 Interactive: <terminal_start command="cmd" dir="d" /> | <terminal_read terminalId="id" /> | <terminal_input terminalId="id" input="text" />
 Delegate: <delegate mission="m" files="f1,f2" />`;
+
+        if (this.mcpManager) {
+            const mcpTools = await this.mcpManager.getAllTools();
+            if (mcpTools.length > 0) {
+                toolsDef += `\nEXTERNAL TOOLS (Model Context Protocol):\n`;
+                for (const t of mcpTools) {
+                    const params = Object.entries(t.inputSchema?.properties || {})
+                        .map(([k, v]: [string, any]) => `${k}="${v.type || 'any'}"`)
+                        .join(' ');
+                    toolsDef += `<${t.name} ${params} /> : ${t.description}\n`;
+                }
+            }
+        }
 
         // ── Section 5: PLAN FORMAT ──
         const planFormat = `PLAN FORMAT (.mirror/PLAN.md):

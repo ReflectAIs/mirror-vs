@@ -16,6 +16,7 @@ interface SettingsData {
   maxTurns: number;
   autonomousMode: boolean;
   defaultReadLines: number;
+  figmaAccessToken: string;
 }
 
 export default function Settings({ onBack }: SettingsProps) {
@@ -25,6 +26,7 @@ export default function Settings({ onBack }: SettingsProps) {
     maxTurns: 20,
     autonomousMode: false,
     defaultReadLines: 500,
+    figmaAccessToken: '',
   });
   const [models, setModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -145,18 +147,37 @@ export default function Settings({ onBack }: SettingsProps) {
         
 
 
-        <div className="setting-item">
-           <label style={{ color: settings.autonomousMode ? 'var(--success)' : 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-             <input 
-               type="checkbox" 
-               checked={settings.autonomousMode} 
-               onChange={(e) => setSettings({ ...settings, autonomousMode: e.target.checked })}
-               style={{ width: '16px', height: '16px' }}
-             />
-             TRUE AUTONOMY (EXPERIMENTAL)
-           </label>
-           <p className="setting-hint">If enabled, the agent will run indefinitely and auto-apply patches. Perfect for overnight tasks.</p>
-        </div>
+         <div className="setting-item">
+            <label style={{ color: settings.autonomousMode ? 'var(--success)' : 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input 
+                type="checkbox" 
+                checked={settings.autonomousMode} 
+                onChange={(e) => setSettings({ ...settings, autonomousMode: e.target.checked })}
+                style={{ width: '16px', height: '16px' }}
+              />
+              TRUE AUTONOMY (EXPERIMENTAL)
+            </label>
+            <p className="setting-hint">If enabled, the agent will run indefinitely and auto-apply patches. Perfect for overnight tasks.</p>
+         </div>
+
+         <div className="settings-divider"></div>
+
+         <div className="setting-item">
+            <label>Figma MCP Configuration</label>
+            <input 
+              type="password" 
+              value={settings.figmaAccessToken} 
+              onChange={(e) => setSettings({ ...settings, figmaAccessToken: e.target.value })}
+              placeholder="figd_..."
+            />
+            <p className="setting-hint">Figma Personal Access Token. Required for design-to-code tools.</p>
+         </div>
+
+         <div className="setting-item">
+            <p className="setting-hint">
+              <strong>Quick Setup:</strong> To connect to Figma, ensure the Figma Desktop app is running with Dev Mode enabled, or add <code>http://127.0.0.1:3845/sse</code> to your custom MCP servers.
+            </p>
+         </div>
 
         <button className="save-button" onClick={handleSave}>
           Save Settings

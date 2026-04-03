@@ -1288,7 +1288,7 @@ textarea {
   border-top: 1px solid var(--border-subtle);
 }
 
-.apply-btn, .discard-btn {
+.apply-btn, .discard-btn, .preview-btn {
   flex: 1;
   padding: 8px;
   border-radius: 6px;
@@ -1310,6 +1310,17 @@ textarea {
 
 .apply-btn:hover {
   filter: brightness(1.2);
+  transform: translateY(-1px);
+}
+
+.preview-btn {
+  background: hsla(210, 100%, 60%, 0.15);
+  color: var(--accent);
+  border: 1px solid var(--accent-glow);
+}
+
+.preview-btn:hover {
+  background: hsla(210, 100%, 60%, 0.25);
   transform: translateY(-1px);
 }
 

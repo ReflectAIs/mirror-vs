@@ -599,6 +599,9 @@ function App() {
                             <button className="apply-btn" onClick={() => commitPatch(msg.diffData)}>
                               <VscCheck /> {selectedHunks[msg.id]?.filter(Boolean).length === 0 ? 'Select Hunks' : `Apply Selected (${selectedHunks[msg.id]?.filter(Boolean).length || msg.diffData.blocks.length})`}
                             </button>
+                            <button className="preview-btn" onClick={() => window.vscode.postMessage({ type: 'openDiff', value: { filepath: msg.diffData.filepath, content: msg.diffData.content } })}>
+                              <VscSearch /> Open Side-by-Side Diff
+                            </button>
                             <button className="discard-btn" onClick={() => updateCurrentSession(msgs => msgs.filter(m => m.id !== msg.id), false)}>
                               <VscClose /> Discard
                             </button>
