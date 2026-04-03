@@ -3,6 +3,7 @@ import axios from 'axios';
 import * as path from 'path';
 import * as fs from 'fs';
 import { MirrorAgent } from './MirrorAgent';
+import * as cp from 'child_process';
 
 export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     public dispose() {}
@@ -12,6 +13,9 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
     private _agents: Map<string, MirrorAgent> = new Map();
     private _outputChannel: vscode.OutputChannel;
     private _currentPersona: string = 'architect';
+    private _terminal: vscode.Terminal | undefined;
+    private _terminalWriteEmitter = new vscode.EventEmitter<string>();
+    private _activeProcesses: Map<string, { child: cp.ChildProcess, output: string, logStream?: fs.WriteStream }> = new Map();
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -73,17 +77,17 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 case 'onUserMessage': {
                     if (!data.value || !data.sessionId) return;
                     
-                    // Cancel existing agent if any for this session
-                    if (this._agents.has(data.sessionId)) {
-                        this._agents.get(data.sessionId)?.handleStop();
+                    // Reuse existing agent for the same session (preserves history)
+                    let agent = this._agents.get(data.sessionId);
+                    if (!agent) {
+                        const defaultReadLines = config.get('defaultReadLines', 500);
+                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona);
+                        this._agents.set(data.sessionId, agent);
                     }
-
-                    const defaultReadLines = config.get('defaultReadLines', 500);
-                    const agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona);
-                    this._agents.set(data.sessionId, agent);
                     
                     agent.handleUserMessage(data.value).then(() => {
-                        this._agents.delete(data.sessionId);
+                        // Don't delete the agent — keep it alive for multi-turn
+                        // It will be cleaned up when the session is explicitly closed
                     });
                     break;
                 }
@@ -111,6 +115,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     config.update('autonomousMode', Boolean(data.value.autonomousMode), vscode.ConfigurationTarget.Global);
                     config.update('defaultReadLines', Number(data.value.defaultReadLines), vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Settings updated!');
+                    // Immediate broadcast back to the webview to update UI state (like Buddy)
+                    webviewView.webview.postMessage({ type: 'onSettings', value: data.value });
                     break;
                 }
                 case 'getHistory': {
@@ -218,8 +224,8 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     break;
                 }
                 case 'openTerminal': {
-                    const { path: dirpath, label } = data.value;
-                    this.openTerminal(dirpath, label);
+                    const { path: dirpath, label, command } = data.value;
+                    this.openTerminal(dirpath, label, command);
                     break;
                 }
                 case 'getFiles': {
@@ -241,11 +247,146 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     }
                     break;
                 }
+                case 'approveTerminal': {
+                    const termData = data.value;
+                    if (!termData) break;
+                    const sessionId = termData.sessionId || termData.messageId;
+                    try {
+                        const res = await axios.post('http://localhost:3000/tools/run_terminal', {
+                            command: termData.command,
+                            cwd: termData.dir
+                        }, { timeout: 35000 });
+                        const result = res.data;
+                        const stdout = result.stdout || '';
+                        const stderr = result.stderr || '';
+                        
+                        // Notify the agent to resume
+                        const agent = this._agents.get(sessionId);
+                        if (agent) {
+                            agent.handleTerminalResult(stdout, stderr);
+                        }
+                    } catch (e: any) {
+                        const errorMsg = e.response?.data?.error || e.message;
+                        vscode.window.showErrorMessage(`Terminal command failed: ${errorMsg}`);
+                        const agent = this._agents.get(sessionId);
+                        if (agent) {
+                            agent.handleTerminalResult('', `Error: ${errorMsg}`);
+                        }
+                    }
+                    break;
+                }
+                case 'rejectTerminal': {
+                    const termData = data.value;
+                    if (!termData) break;
+                    const sessionId = termData.sessionId || termData.messageId;
+                    const agent = this._agents.get(sessionId);
+                    if (agent) {
+                        agent.handleTerminalResult('', '[User rejected the terminal command.]');
+                    }
+                    break;
+                }
             }
         });
     }
 
-    private openTerminal(dirpath: string, label: string = 'Mirror Terminal') {
+    public async executeIntegratedTerminal(command: string, cwd: string): Promise<{ stdout: string, exitCode: number }> {
+        const terminalId = await this.startBackgroundTerminal(command, cwd);
+        return new Promise((resolve) => {
+            const process = this._activeProcesses.get(terminalId);
+            if (!process) {
+                resolve({ stdout: 'Error: Failed to start process.', exitCode: 1 });
+                return;
+            }
+
+            process.child.on('close', (code) => {
+                const finalProcess = this._activeProcesses.get(terminalId);
+                const stdout = finalProcess?.output || '';
+                this._activeProcesses.delete(terminalId);
+                resolve({ stdout, exitCode: code || 0 });
+            });
+
+            process.child.on('error', (err) => {
+                const finalProcess = this._activeProcesses.get(terminalId);
+                const stdout = finalProcess?.output || '';
+                this._activeProcesses.delete(terminalId);
+                resolve({ stdout: stdout + `\nError: ${err.message}`, exitCode: 1 });
+            });
+        });
+    }
+
+    public async startBackgroundTerminal(command: string, cwd: string): Promise<string> {
+        const terminalId = Math.random().toString(36).substring(7);
+        const logDir = path.join(cwd, '.mirror', 'logs');
+        
+        try {
+            if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+        } catch (e) { }
+        
+        const logPath = path.join(logDir, `terminal_${terminalId}.log`);
+        const logStream = fs.createWriteStream(logPath);
+        logStream.write(`[${new Date().toISOString()}] STARTING: ${command}\n\n`);
+
+        if (!this._terminal) {
+            const pty: vscode.Pseudoterminal = {
+                onDidWrite: this._terminalWriteEmitter.event,
+                open: () => {},
+                close: () => { this._terminal = undefined; },
+                handleInput: (data) => { this._terminalWriteEmitter.fire(data); }
+            };
+            this._terminal = vscode.window.createTerminal({ name: 'Mirror: Executor', pty });
+        }
+
+        this._terminal.show();
+        this._terminalWriteEmitter.fire(`\r\n\x1b[35m[Mirror] Terminal ${terminalId} started:\x1b[0m ${command}\r\n\r\n`);
+
+        const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+        const shellArgs = process.platform === 'win32' ? ['/c', command] : ['-c', command];
+        const child = cp.spawn(shell, shellArgs, { cwd, shell: true });
+
+        const processInfo = { child, output: '', logStream };
+        this._activeProcesses.set(terminalId, processInfo);
+
+        child.stdout?.on('data', (data) => {
+            const str = data.toString();
+            processInfo.output += str;
+            logStream.write(str);
+            this._terminalWriteEmitter.fire(str.replace(/\n/g, '\r\n'));
+        });
+
+        child.stderr?.on('data', (data) => {
+            const str = data.toString();
+            processInfo.output += str;
+            logStream.write(str);
+            this._terminalWriteEmitter.fire(str.replace(/\n/g, '\r\n'));
+        });
+
+        return terminalId;
+    }
+
+    public sendTerminalInput(terminalId: string, input: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const process = this._activeProcesses.get(terminalId);
+            if (!process) {
+                reject(new Error(`No active terminal with ID: ${terminalId}`));
+                return;
+            }
+            if (process.child.stdin) {
+                process.child.stdin.write(input);
+                this._terminalWriteEmitter.fire(`\x1b[34m[Input: ${terminalId}]\x1b[0m ${input.replace(/\n/g, '\\n')}\r\n`);
+                resolve();
+            } else {
+                reject(new Error('stdin is not available for this process.'));
+            }
+        });
+    }
+
+    public readTerminalOutput(terminalId: string): string {
+        const process = this._activeProcesses.get(terminalId);
+        if (!process) return `Error: No active terminal with ID: ${terminalId}`;
+        return process.output;
+    }
+
+    private openTerminal(dirpath: string, label: string = 'Mirror Terminal', command?: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) return;
         
@@ -257,12 +398,18 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
         
         if (existing) {
             existing.show();
+            if (command) {
+                existing.sendText(command);
+            }
         } else {
             const terminal = vscode.window.createTerminal({
                 name,
                 cwd: fullPath
             });
             terminal.show();
+            if (command) {
+                terminal.sendText(command);
+            }
         }
     }
 

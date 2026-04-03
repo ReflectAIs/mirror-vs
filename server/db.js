@@ -1,6 +1,4 @@
-const lancedb = require('@lancedb/lancedb');
 const path = require('path');
-const { pipeline } = require('@xenova/transformers');
 
 let db;
 let table;
@@ -8,8 +6,14 @@ let embedder;
 
 async function getEmbedder() {
     if (!embedder) {
-        // Use a lightweight model optimized for semantic text similarity
-        embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        try {
+            const { pipeline } = require('@xenova/transformers');
+            // Use a lightweight model optimized for semantic text similarity
+            embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        } catch (e) {
+            console.error(`[DB ERROR] Failed to load embedder: ${e.message}`);
+            throw e;
+        }
     }
     return embedder;
 }
@@ -22,7 +26,13 @@ async function generateEmbedding(text) {
 
 async function initDB() {
     if (!db) {
-        db = await lancedb.connect('vector_db');
+        try {
+            const lancedb = require('@lancedb/lancedb');
+            db = await lancedb.connect('vector_db');
+        } catch (e) {
+            console.error(`[DB ERROR] Failed to connect to LanceDB: ${e.message}`);
+            throw e;
+        }
         try {
             table = await db.openTable('symbols');
         } catch (e) {

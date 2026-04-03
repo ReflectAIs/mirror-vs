@@ -12,11 +12,11 @@ const Buddy: React.FC<BuddyProps> = ({ status, isAutonomous }) => {
   const getFace = () => {
     return (
       <div className={`buddy-face ${status}`}>
-        <div className="eyes">
+        <div className="buddy-eyes">
           <div className="eye left"></div>
           <div className="eye right"></div>
         </div>
-        <div className="mouth">
+        <div className="buddy-mouth">
           <div className="mouth-path"></div>
         </div>
       </div>

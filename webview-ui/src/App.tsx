@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { VscSend, VscHistory, VscSettingsGear, VscTrash, VscArrowLeft, VscLoading, VscTerminal, VscSearch, VscFile, VscFolder, VscStopCircle, VscCheck, VscClose, VscSymbolMethod, VscWarning } from 'react-icons/vsc'
+import { VscSend, VscHistory, VscSettingsGear, VscTrash, VscArrowLeft, VscLoading, VscTerminal, VscSearch, VscFile, VscFolder, VscStopCircle, VscCheck, VscClose, VscSymbolMethod, VscWarning, VscCopy } from 'react-icons/vsc'
 import './App.css'
 import Settings from './Settings'
 import Buddy from './components/Buddy'
@@ -21,6 +21,10 @@ interface ToolTrace {
   category: 'analyzing' | 'planning' | 'executing';
   path?: string;
   result?: string;
+  metadata?: {
+    command?: string;
+    dir?: string;
+  };
 }
 
 interface Message {
@@ -32,6 +36,7 @@ interface Message {
   traceData?: ToolTrace;
   diffData?: any;
   terminalData?: { command: string, dir: string, sessionId: string };
+  isSubAgent?: boolean;
 }
 
 interface Session {
@@ -92,6 +97,7 @@ function App() {
   const [autonomousMode, setAutonomousMode] = useState(false);
   const [buddyStatus, setBuddyStatus] = useState<BuddyStatus>('idle');
   const [selectedPersona, setSelectedPersona] = useState<string>('architect');
+  const [contextUsage, setContextUsage] = useState<{ used: number, total: number } | null>(null);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -123,43 +129,59 @@ function App() {
              setGeneratingSessions(activeMap);
            }
            break;
-         case 'onAssistantChunk':
-           updateSession(message.sessionId || currentSessionId, (msg) => {
-             const last = msg[msg.length - 1];
-             if (last && last.sender === 'assistant' && last.type === 'chunk') {
-                 const newMsg = [...msg];
-                 newMsg[newMsg.length - 1] = { ...last, text: last.text + message.value };
-                 return newMsg;
-             } else {
-                 return [...msg, { id: Date.now().toString(), text: message.value, sender: 'assistant', type: 'chunk' }];
-             }
-           }, false);
-           break;
+          case 'onAssistantChunk':
+            updateSession(message.sessionId || currentSessionId, (msg) => {
+              const last = msg[msg.length - 1];
+              if (last && last.sender === 'assistant' && last.type === 'chunk' && !!last.isSubAgent === !!message.isSubAgent) {
+                  const newMsg = [...msg];
+                  newMsg[newMsg.length - 1] = { ...last, text: last.text + message.value };
+                  return newMsg;
+              } else {
+                  return [...msg, { 
+                    id: Date.now().toString(), 
+                    text: message.value, 
+                    sender: 'assistant', 
+                    type: 'chunk',
+                    isSubAgent: !!message.isSubAgent 
+                  }];
+              }
+            }, false);
+            break;
+          case 'onContextUsage':
+            setContextUsage(message.value);
+            break;
           case 'onAssistantMessage':
             updateSession(message.sessionId || currentSessionId, (msg) => [
               ...msg.filter(m => m.type !== 'status' && m.type !== 'chunk'), 
-              { id: Date.now().toString(), text: message.value, sender: 'assistant' }
+              { id: Date.now().toString(), text: message.value, sender: 'assistant', isSubAgent: !!message.isSubAgent }
             ], true); // Ensure completion is saved
             if (message.sessionId) {
               setGeneratingSessions(prev => ({ ...prev, [message.sessionId]: false }));
             }
             setBuddyStatus('idle');
             break;
-         case 'onToolTrace':
-           setBuddyStatus('working');
-           updateSession(message.sessionId || currentSessionId, (msg) => {
-             const last = msg[msg.length - 1];
-             if (last && last.type === 'trace' && last.traceData?.label === message.value.label) {
-                 const newMsg = [...msg];
-                 newMsg[newMsg.length - 1] = { ...last, traceData: message.value };
-                 return newMsg;
-             }
-             return [
-               ...msg,
-               { id: Date.now().toString(), text: '', sender: 'assistant', type: 'trace', traceData: message.value }
-             ];
-           }, false);
-           break;
+          case 'onToolTrace':
+            setBuddyStatus('working');
+            updateSession(message.sessionId || currentSessionId, (msg) => {
+              const last = msg[msg.length - 1];
+              if (last && last.type === 'trace' && last.traceData?.label === message.value.label && !!last.isSubAgent === !!message.isSubAgent) {
+                  const newMsg = [...msg];
+                  newMsg[newMsg.length - 1] = { ...last, traceData: message.value };
+                  return newMsg;
+              }
+              return [
+                ...msg,
+                { 
+                  id: Date.now().toString(), 
+                  text: '', 
+                  sender: 'assistant', 
+                  type: 'trace', 
+                  traceData: message.value,
+                  isSubAgent: !!message.isSubAgent
+                }
+              ];
+            }, false);
+            break;
           case 'onTerminalChunk':
             updateSession(message.sessionId || currentSessionId, (msg) => {
               const last = msg[msg.length - 1];
@@ -476,6 +498,22 @@ function App() {
 
   return (
     <div className="app-container">
+      {contextUsage && (
+        <div className="context-bar">
+          <div className="context-info">
+            <span>Context: {contextUsage.used} / {contextUsage.total} tokens</span>
+          </div>
+          <div className="context-track">
+            <div 
+              className="context-fill" 
+              style={{ 
+                width: `${Math.min(100, (contextUsage.used / contextUsage.total) * 100)}%`,
+                backgroundColor: (contextUsage.used / contextUsage.total) > 0.8 ? 'var(--vscode-errorForeground)' : 'var(--vscode-progressBar-background)'
+              }}
+            ></div>
+          </div>
+        </div>
+      )}
       <header className="minimal-header">
         <div className="header-left">
           <div className="logo-group">
@@ -513,11 +551,15 @@ function App() {
         <main className="chat-interface">
           <div className="scroller" ref={chatContainerRef} onScroll={handleScroll}>
             {currentSession.messages.map((msg, i) => {
-                const isStacked = i > 0 && currentSession.messages[i-1].sender === msg.sender && (currentSession.messages[i-1].type || 'text') === (msg.type || 'text') && msg.type !== 'trace';
+                const isStacked = i > 0 && currentSession.messages[i-1].sender === msg.sender && (currentSession.messages[i-1].type || 'text') === (msg.type || 'text') && msg.type !== 'trace' && !!currentSession.messages[i-1].isSubAgent === !!msg.isSubAgent;
                 
                 return (
-                  <div key={msg.id} className={`message sender-${msg.sender} ${isStacked ? 'stacked' : ''} type-${msg.type || 'text'}`}>
-                    {!isStacked && <div className="label">{msg.sender === 'user' ? 'YOU' : 'MIRROR'}</div>}
+                  <div key={msg.id} className={`message sender-${msg.sender} ${isStacked ? 'stacked' : ''} type-${msg.type || 'text'} ${msg.isSubAgent ? 'subagent' : ''}`}>
+                    {!isStacked && (
+                      <div className="label">
+                        {msg.sender === 'user' ? 'YOU' : (msg.isSubAgent ? 'MIRROR (HELPER)' : 'MIRROR')}
+                      </div>
+                    )}
                     <div className="bubble">
                       {msg.type === 'terminal' ? (
                         renderTerminalReview(msg)
@@ -562,17 +604,67 @@ function App() {
                             </button>
                           </div>
                         </div>
-                      ) : msg.type === 'trace' ? (
+                      ) : msg.type === 'trace' && msg.traceData ? (
                         <div 
-                          className={`tool-trace-card ${msg.traceData?.path ? 'clickable' : ''}`}
-                          onClick={() => msg.traceData?.path && handleFileClick(msg.traceData.path)}
+                          className={`tool-trace-card ${msg.traceData.path ? 'clickable' : ''}`}
+                          onClick={(e) => {
+                            // Only handle file click if not clicking metadata or actions
+                            if (!(e.target as HTMLElement).closest('.trace-terminal-meta') && !(e.target as HTMLElement).closest('.trace-actions')) {
+                              msg.traceData?.path && handleFileClick(msg.traceData.path);
+                            }
+                          }}
                         >
-                          <div className={`trace-header category-${msg.traceData?.category}`}>
-                            {getToolIcon(msg.traceData?.label || '')}
-                            <span className="trace-label">{msg.traceData?.label}</span>
+                          <div className={`trace-header category-${msg.traceData.category}`}>
+                            {getToolIcon(msg.traceData.label || '')}
+                            <span className="trace-label">{msg.traceData.label}</span>
                           </div>
-                          {msg.traceData?.result && (
+
+                          {msg.traceData.metadata?.command && (
+                            <div className="trace-terminal-meta">
+                              <div className="trace-meta-row">
+                                <span className="trace-meta-label">CMD</span>
+                                <span className="trace-meta-value">{msg.traceData.metadata.command}</span>
+                              </div>
+                              <div className="trace-meta-row">
+                                <span className="trace-meta-label">DIR</span>
+                                <span className="trace-meta-value">{msg.traceData.metadata.dir || '.'}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {msg.traceData.result && (
                             <div className="trace-result">{msg.traceData.result}</div>
+                          )}
+
+                          {msg.traceData.metadata?.command && (
+                            <div className="trace-actions">
+                              <button 
+                                className="trace-action-btn"
+                                onClick={(e) => {
+                                  if (!msg.traceData?.metadata?.command) return;
+                                  e.stopPropagation();
+                                  window.vscode.postMessage({ 
+                                    type: 'openTerminal', 
+                                    value: { 
+                                      path: msg.traceData.metadata.dir,
+                                      label: `Mirror: Executor`
+                                    } 
+                                  });
+                                }}
+                              >
+                                <VscTerminal /> Show Live
+                              </button>
+                              <button 
+                                className="trace-action-btn"
+                                onClick={(e) => {
+                                  if (!msg.traceData?.metadata?.command) return;
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(msg.traceData.metadata.command);
+                                }}
+                              >
+                                <VscCopy /> Copy
+                              </button>
+                            </div>
                           )}
                         </div>
                       ) : (

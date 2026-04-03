@@ -1,15 +1,56 @@
 const express = require('express');
-const { parseFile } = require('./parser');
-const { indexSymbols, searchSymbols } = require('./db');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const axios = require('axios');
+const { exec, spawn } = require('child_process');
+
+let dbModule; // Late-loaded
+
+// Global Exception Handlers
+process.on('uncaughtException', (err) => {
+    console.error(`[FATAL] Uncaught Exception: ${err.message}\n${err.stack}`);
+    // Keep alive if possible, or exit gracefully
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error(`[FATAL] Unhandled Rejection at:`, promise, `reason:`, reason);
+});
 
 const app = express();
 const port = 3000;
 
-// FIX 1: Increased payload limit to 50mb to handle full codebase file reads/writes
+// Increased payload limit to 50mb to handle full codebase file reads/writes
 app.use(express.json({ limit: '50mb' }));
+
+// CORS middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
+
+// Request validation middleware
+app.use((req, res, next) => {
+    if (req.method === 'POST' && (!req.body || Object.keys(req.body).length === 0)) {
+        return res.status(400).json({ error: 'Request body is required.' });
+    }
+    next();
+});
+
+// Path safety helper — validates paths don't escape workspace
+function validatePath(filepath) {
+    if (!filepath || typeof filepath !== 'string') return false;
+    // Block null bytes
+    if (filepath.includes('\0')) return false;
+    // Block absolute paths to sensitive system directories
+    const dangerous = ['/etc/', '/var/', '/root/', '/proc/', '/sys/', 'C:\\Windows', 'C:\\Program'];
+    for (const d of dangerous) {
+        if (filepath.toLowerCase().startsWith(d.toLowerCase())) return false;
+    }
+    return true;
+}
 
 // Basic health check
 app.get('/health', (req, res) => {
@@ -20,8 +61,11 @@ app.get('/health', (req, res) => {
 app.post('/index', async (req, res) => {
     const { filepath } = req.body;
     try {
+        const { parseFile } = require('./parser');
+        if (!dbModule) dbModule = require('./db');
+        
         const symbols = parseFile(filepath);
-        await indexSymbols(symbols, filepath);
+        await dbModule.indexSymbols(symbols, filepath);
         res.json({ status: 'success', count: symbols.length });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -32,6 +76,7 @@ app.post('/index', async (req, res) => {
 app.post('/tools/read_skeleton', async (req, res) => {
     const { filepath } = req.body;
     try {
+        const { parseFile } = require('./parser');
         if (!fs.existsSync(filepath)) {
             return res.status(404).json({ error: `File not found at: ${filepath}` });
         }
@@ -49,7 +94,8 @@ app.post('/tools/read_skeleton', async (req, res) => {
 app.post('/tools/search_vector_db', async (req, res) => {
     const { query } = req.body;
     try {
-        const results = await searchSymbols(query);
+        if (!dbModule) dbModule = require('./db');
+        const results = await dbModule.searchSymbols(query);
         res.json({ results });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -60,6 +106,9 @@ app.post('/tools/search_vector_db', async (req, res) => {
 app.post('/tools/read_file', async (req, res) => {
     const { filepath, start_line, end_line } = req.body;
     try {
+        if (!validatePath(filepath)) {
+            return res.status(403).json({ error: 'Invalid or restricted path.' });
+        }
         if (!fs.existsSync(filepath)) {
             return res.status(404).json({ error: `File not found at: ${filepath}` });
         }
@@ -112,6 +161,9 @@ app.post('/tools/read_file', async (req, res) => {
 app.post('/tools/write_file', async (req, res) => {
     const { filepath, content } = req.body;
     try {
+        if (!validatePath(filepath)) {
+            return res.status(403).json({ error: 'Invalid or restricted path.' });
+        }
         const dir = path.dirname(filepath);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -189,36 +241,135 @@ app.post('/tools/grep_search', async (req, res) => {
     }
 });
 
-// FIX 2: Added a 30-second timeout to prevent the agent from hanging indefinitely 
-// if it hallucinates an interactive command (like `npm init` or `python script_that_waits_for_input.py`)
+// Tool: Web Search (Scraping Mojeek for resiliency)
+app.post('/tools/search_web', async (req, res) => {
+    const { query } = req.body;
+    if (!query) return res.status(400).json({ error: 'Query is required.' });
+
+    // Specialized Logic: If query looks like a version check, hit NPM registry directly
+    const versionMatch = query.match(/latest version of ([a-z0-9\-@\/]+)/i) || query.match(/version ([a-z0-9\-@\/]+)/i);
+    if (versionMatch) {
+        try {
+            const pkg = versionMatch[1];
+            const npmRes = await axios.get(`https://registry.npmjs.org/${pkg}/latest`);
+            return res.json({ results: [{
+                url: `https://www.npmjs.com/package/${pkg}`,
+                title: `NPM Registry: ${pkg} v${npmRes.data.version}`,
+                snippet: `${npmRes.data.description || "No description."} Fixed Version: ${npmRes.data.version}`
+            }] });
+        } catch (e) {
+            // Fallback to normal search if NPM fails
+        }
+    }
+
+    try {
+        const response = await axios.get(`https://www.mojeek.com/search?q=${encodeURIComponent(query)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+        });
+        const html = response.data;
+        const results = [];
+        
+        // Mojeek structure: <a class="title" [^>]*href="([^"]+)"[^>]*>([\s\S]+?)<\/a>[\s\S]*?<p class="s">([\s\S]*?)<\/p>
+        const re = /<a class="title" [^>]*href="([^"]+)"[^>]*>([\s\S]+?)<\/a>[\s\S]*?<p class="s">([\s\S]*?)<\/p>/g;
+        let match;
+        while ((match = re.exec(html)) !== null && results.length < 8) {
+            results.push({
+                url: match[1],
+                title: match[2].replace(/<[^>]+>/g, '').trim(),
+                snippet: match[3].replace(/<[^>]+>/g, '').trim()
+            });
+        }
+
+        if (results.length === 0) {
+            // Backup match for title only if snippet structure differs
+            const backupRe = /<a class="title" [^>]*href="([^"]+)"[^>]*>([\s\S]+?)<\/a>/g;
+            while ((match = backupRe.exec(html)) !== null && results.length < 5) {
+                results.push({
+                    url: match[1],
+                    title: match[2].replace(/<[^>]+>/g, '').trim(),
+                    snippet: "No snippet found."
+                });
+            }
+        }
+
+        res.json({ results });
+    } catch (e) {
+        // Fallback: Try DuckDuckGo Lite
+        try {
+            const ddgRes = await axios.get(`https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+            });
+            const ddgHtml = ddgRes.data;
+            const ddgResults = [];
+            const ddgRe = /<a rel="nofollow" href="([^"]+)" class='result-link'>([\s\S]*?)<\/a>/g;
+            let ddgMatch;
+            while ((ddgMatch = ddgRe.exec(ddgHtml)) !== null && ddgResults.length < 5) {
+                ddgResults.push({
+                    url: ddgMatch[1],
+                    title: ddgMatch[2].replace(/<[^>]+>/g, '').trim(),
+                    snippet: 'No snippet (fallback search)'
+                });
+            }
+            if (ddgResults.length > 0) {
+                return res.json({ results: ddgResults });
+            }
+        } catch (e2) { }
+        
+        res.status(500).json({ error: `Search failed: ${e.message}` });
+    }
+});
+
+// Terminal: Buffered execution with 30s timeout. Returns JSON, not NDJSON streaming.
 app.post('/tools/run_terminal', async (req, res) => {
     const { command, cwd } = req.body;
-    
-    // Set headers for streaming
-    res.setHeader('Content-Type', 'application/x-ndjson');
-    res.setHeader('Transfer-Encoding', 'chunked');
+    if (!command) {
+        return res.status(400).json({ error: 'Missing required field: command' });
+    }
 
-    const shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
-    const shellArgs = process.platform === 'win32' ? ['/c', command] : ['-c', command];
+    const timeout = 30000; // 30 seconds
+    const options = { cwd: cwd || process.cwd(), timeout, maxBuffer: 1024 * 1024 * 5 }; // 5MB buffer
 
-    const child = spawn(shell, shellArgs, { cwd, timeout: 60000 });
+    try {
+        exec(command, options, (error, stdout, stderr) => {
+            const output = {
+                stdout: stdout ? stdout.substring(0, 50000) : '',  // Cap at 50k chars
+                stderr: stderr ? stderr.substring(0, 20000) : '',
+                exitCode: error ? (error.code || 1) : 0,
+                timedOut: error && error.killed ? true : false
+            };
+            
+            if (output.timedOut) {
+                output.stderr += '\n[MIRROR: Command timed out after 30 seconds. Use a shorter command or check if it requires interactive input.]';
+            }
+            
+            res.json(output);
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
-    child.stdout.on('data', (data) => {
-        res.write(JSON.stringify({ type: 'stdout', content: data.toString() }) + '\n');
-    });
-
-    child.stderr.on('data', (data) => {
-        res.write(JSON.stringify({ type: 'stderr', content: data.toString() }) + '\n');
-    });
-
-    child.on('error', (err) => {
-        res.write(JSON.stringify({ type: 'error', content: err.message }) + '\n');
-    });
-
-    child.on('close', (code) => {
-        res.write(JSON.stringify({ type: 'exit', code: code || 0 }) + '\n');
-        res.end();
-    });
+// Tool: Simple search and replace in a file
+app.post('/tools/search_and_replace', async (req, res) => {
+    const { filepath, search, replace, replaceAll } = req.body;
+    if (!filepath || search === undefined || replace === undefined) {
+        return res.status(400).json({ error: 'Missing required fields: filepath, search, replace' });
+    }
+    try {
+        if (!fs.existsSync(filepath)) {
+            return res.status(404).json({ error: `File not found: ${filepath}` });
+        }
+        const content = fs.readFileSync(filepath, 'utf8');
+        const count = content.split(search).length - 1;
+        if (count === 0) {
+            return res.status(400).json({ error: 'Search string not found in file.' });
+        }
+        const result = replaceAll ? content.replaceAll(search, replace) : content.replace(search, replace);
+        fs.writeFileSync(filepath, result, 'utf8');
+        res.json({ status: 'success', matchesFound: count, matchesReplaced: replaceAll ? count : 1 });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 /**
