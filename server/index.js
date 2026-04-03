@@ -467,6 +467,18 @@ app.post('/tools/patch_file', async (req, res) => {
     }
 });
 
+// Tool: Update Mirror Plan
+app.post('/tools/update_plan', async (req, res) => {
+    const { rootPath, name, status, newTasks } = req.body;
+    try {
+        const { updateTask } = require('./planner');
+        const result = updateTask(rootPath, name, status, newTasks);
+        res.json({ status: 'success', result });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Mirror Code Brain listening at http://localhost:${port}`);
 });

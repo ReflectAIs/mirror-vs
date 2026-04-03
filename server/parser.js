@@ -54,7 +54,8 @@ function parseFile(filepath) {
                 symbols.push({
                     type: found.type,
                     name: found.name ? found.name.text : 'anonymous',
-                    line: node.startPosition.row + 1
+                    line: node.startPosition.row + 1,
+                    content: node.text?.substring(0, 1000) || "" // Capture up to 1000 chars of code
                 });
             }
 

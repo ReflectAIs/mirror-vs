@@ -53,20 +53,38 @@ async function initDB() {
 
 async function indexSymbols(symbols, filepath) {
     const table = await initDB();
+
+    // De-duplicate: Remove existing entries for this file before adding new ones
+    try {
+        // Use SQL-style filter for deletion. Escape single quotes in filepath.
+        const filter = `file = '${filepath.replace(/'/g, "''")}'`;
+        await table.delete(filter);
+    } catch (e) {
+        console.warn(`[DB WARNING] De-duplication failed for ${filepath}: ${e.message}`);
+    }
+
     const data = await Promise.all(symbols.map(async s => {
-        const content = `${s.type} ${s.name} in ${filepath}`;
-        const vector = await generateEmbedding(content);
+        // Use a richer representation for embedding: header + content
+        const embeddingContent = `FILE: ${filepath}\nTYPE: ${s.type}\nNAME: ${s.name}\nCONTENT:\n${s.content || ''}`;
+        const vector = await generateEmbedding(embeddingContent);
         return {
             name: s.name,
             type: s.type,
             file: filepath,
             line: s.line,
-            content: content,
+            content: s.content || embeddingContent, // Store the snippet itself
             vector: vector
         };
     }));
     
     await table.add(data);
+    
+    // Periodically optimize to reclaim space from deleted rows
+    try {
+        await table.optimize();
+    } catch (e) {
+        // Optimization might fail if concurrent operations are happening; ignore for now
+    }
 }
 
 async function searchSymbols(query) {

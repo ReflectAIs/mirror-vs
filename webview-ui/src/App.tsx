@@ -54,20 +54,28 @@ interface ThoughtBlockProps {
 
 const ThoughtBlock: React.FC<ThoughtBlockProps> = ({ content, isStreaming }) => {
   const [isOpen, setIsOpen] = React.useState(true);
+  const wasStreaming = useRef(isStreaming);
+
+  useEffect(() => {
+    if (wasStreaming.current && !isStreaming) {
+      setIsOpen(false);
+    }
+    wasStreaming.current = isStreaming;
+  }, [isStreaming]);
   
   return (
     <div className="thought-section">
       <div className="thought-header" onClick={() => setIsOpen(!isOpen)}>
         <div className="icon-group">
           {isStreaming ? <div className="thought-pulse"></div> : <VscSymbolMethod />}
-          <span>{isStreaming ? 'Thinking...' : 'Thought Process'}</span>
+          <span>{isStreaming ? 'Reasoning...' : 'Thought Process'}</span>
         </div>
-        <div className="toggle-icon" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+        <div className="toggle-icon" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
           <VscArrowLeft style={{ transform: 'rotate(-90deg)' }} />
         </div>
       </div>
       {isOpen && (
-        <div className="thought-content">
+        <div className="thought-content markdown-body">
           <ReactMarkdown>{content}</ReactMarkdown>
         </div>
       )}
