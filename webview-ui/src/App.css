@@ -1091,6 +1091,7 @@ textarea {
   height: 100%;
   padding: 16px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .settings-header {
@@ -1127,6 +1128,9 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px; /* Space for scrollbar */
 }
 
 .setting-item {

@@ -17,6 +17,7 @@ interface SettingsData {
   autonomousMode: boolean;
   defaultReadLines: number;
   figmaAccessToken: string;
+  queueMessages: boolean;
 }
 
 export default function Settings({ onBack }: SettingsProps) {
@@ -27,6 +28,7 @@ export default function Settings({ onBack }: SettingsProps) {
     autonomousMode: false,
     defaultReadLines: 500,
     figmaAccessToken: '',
+    queueMessages: true,
   });
   const [models, setModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -163,6 +165,16 @@ export default function Settings({ onBack }: SettingsProps) {
          <div className="settings-divider"></div>
 
          <div className="setting-item">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input 
+                type="checkbox" 
+                checked={settings.queueMessages} 
+                onChange={(e) => setSettings({ ...settings, queueMessages: e.target.checked })}
+                style={{ width: '16px', height: '16px' }}
+              />
+              QUEUE MESSAGES
+            </label>
+            <p className="setting-hint" style={{ marginBottom: '20px' }}>If enabled, sending a message while the agent is busy will queue it for sequential processing.</p>
             <label>Figma MCP Configuration</label>
             <input 
               type="password" 

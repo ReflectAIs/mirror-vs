@@ -90,7 +90,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     let agent = this._agents.get(data.sessionId);
                     if (!agent) {
                         const defaultReadLines = config.get('defaultReadLines', 500);
-                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, this._mcpManager);
+                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, false, this._mcpManager);
                         this._agents.set(data.sessionId, agent);
                     }
                     
@@ -113,6 +113,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                             maxTurns: config.get('maxTurns'),
                             autonomousMode: config.get('autonomousMode'),
                             defaultReadLines: config.get('defaultReadLines'),
+                            queueMessages: config.get('queueMessages'),
                         }
                     });
                     break;
@@ -123,6 +124,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     config.update('maxTurns', Number(data.value.maxTurns), vscode.ConfigurationTarget.Global);
                     config.update('autonomousMode', Boolean(data.value.autonomousMode), vscode.ConfigurationTarget.Global);
                     config.update('defaultReadLines', Number(data.value.defaultReadLines), vscode.ConfigurationTarget.Global);
+                    config.update('queueMessages', Boolean(data.value.queueMessages), vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Settings updated!');
                     // Immediate broadcast back to the webview to update UI state (like Buddy)
                     webviewView.webview.postMessage({ type: 'onSettings', value: data.value });

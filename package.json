@@ -84,6 +84,11 @@
           "type": "object",
           "default": {},
           "description": "Custom MCP servers configuration (Name -> {type, url/command, args})."
+        },
+        "mirror-code.queueMessages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Queue Messages: If enabled, sending a message while the agent is busy will queue it for sequential processing."
         }
       }
     }

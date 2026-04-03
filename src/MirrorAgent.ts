@@ -41,6 +41,8 @@ export class MirrorAgent {
     private brainUrl: string = 'http://localhost:3000';
     private readonly osType: 'windows' | 'linux' | 'mac';
     private readonly shellName: string;
+    private isProcessing: boolean = false;
+    private messageQueue: string[] = [];
 
     constructor(
         private readonly sessionId: string,
@@ -235,7 +237,7 @@ export class MirrorAgent {
 
         const root = workspaceFolder.uri.fsPath;
 
-        // If it's already an absolute path that exists, use it directly
+        // 1. If it's already an absolute path that exists, use it directly
         if (path.isAbsolute(p)) {
             try {
                 if (fs.existsSync(p)) return p;
@@ -246,22 +248,42 @@ export class MirrorAgent {
         let normalized = path.normalize(p).replace(/[\\\/]+$/, '');
         let stripped = normalized.replace(/^([a-zA-Z]:)?[\\\/]+/, '');
 
-        // Strip repeated workspace folder name from the front 
+        // 2. CHECK: If the current path already exists relative to root, DO NOT STRIP.
+        // This prevents breaking paths like "try_3/try_3/package.json" when the root is "try_3".
+        const directPath = path.join(root, stripped);
+        try {
+            if (fs.existsSync(directPath)) return directPath;
+        } catch { }
+
+        // 3. LEGACY STRIPPING: Only if the direct path doesn't exist, try stripping redundant root names.
         const rootName = workspaceFolder.name;
         let count = 0;
-        while (rootName && count < 10) {
-            const lowerStripped = stripped.toLowerCase();
+        let currentStripped = stripped;
+        while (rootName && count < 3) { // Reduced from 10 to 3 for safety
+            const lowerStripped = currentStripped.toLowerCase();
             const lowerRootName = rootName.toLowerCase();
+            
+            let nextStripped = "";
             if (lowerStripped.startsWith(lowerRootName + path.sep) || lowerStripped.startsWith(lowerRootName + '/')) {
-                stripped = stripped.substring(rootName.length).replace(/^[\\\/]+/, '');
+                nextStripped = currentStripped.substring(rootName.length).replace(/^[\\\/]+/, '');
             } else if (lowerStripped === lowerRootName) {
-                stripped = '.';
-                break;
+                nextStripped = '.';
+            }
+
+            if (nextStripped) {
+                const testPath = path.join(root, nextStripped);
+                try {
+                    if (fs.existsSync(testPath)) {
+                        return testPath;
+                    }
+                } catch { }
+                currentStripped = nextStripped;
             } else {
                 break;
             }
             count++;
         }
+
         return path.join(root, stripped);
     }
 
@@ -817,6 +839,31 @@ ${rawHistory}`;
 
     public async handleUserMessage(text: string) {
         const config = vscode.workspace.getConfiguration('mirror-code');
+        const queueEnabled = config.get<boolean>('queueMessages') ?? true;
+
+        if (this.isProcessing && queueEnabled) {
+            if (text) {
+                this.messageQueue.push(text);
+                this.post('onAssistantChunk', `\n\n*[Message queued. ${this.messageQueue.length} message(s) pending...]*`);
+            }
+            return;
+        }
+
+        this.isProcessing = true;
+        try {
+            await this._processMessage(text);
+            
+            while (this.messageQueue.length > 0) {
+                const nextText = this.messageQueue.shift()!;
+                await this._processMessage(nextText);
+            }
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    private async _processMessage(text: string) {
+        const config = vscode.workspace.getConfiguration('mirror-code');
         const isAutonomous = config.get<boolean>('autonomousMode') || false;
         const maxTurns = isAutonomous ? 1000 : (config.get<number>('maxTurns') || 25);
         const maxToolsPerTurn = config.get<number>('maxToolsPerTurn') || 8;
@@ -1230,6 +1277,7 @@ RULES:
 6. Use <terminal_start> for interactive processes (repl, dev servers).
 7. Always <terminal_read> after sending <terminal_input> to see the result.
 8. Use <delegate> for intensive research or isolated sub-tasks to save your context.
+9. When using scaffolding tools (like npm create vite), use "." as the target if you are already in the project folder to avoid nested directories (e.g. try_3/try_3).
 ${editorCtx}
 
 KNOWLEDGE:
