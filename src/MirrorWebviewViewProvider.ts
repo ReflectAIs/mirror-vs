@@ -89,14 +89,25 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     // Reuse existing agent for the same session (preserves history)
                     let agent = this._agents.get(data.sessionId);
                     if (!agent) {
+                        const historyKey = 'mirror-code.history';
+                        const history = this._context.workspaceState.get<any[]>(historyKey) || [];
+                        const session = history.find(s => s.id === data.sessionId);
+                        const initialHistory = session?.agentHistory;
+
                         const defaultReadLines = config.get('defaultReadLines', 500);
-                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, this._mcpManager);
+                        agent = new MirrorAgent(data.sessionId, this, this._outputChannel, defaultReadLines, this._currentPersona, this._mcpManager, initialHistory);
                         this._agents.set(data.sessionId, agent);
                     }
                     
                     agent.handleUserMessage(data.value).then(() => {
-                        // Don't delete the agent — keep it alive for multi-turn
-                        // It will be cleaned up when the session is explicitly closed
+                        // Persist reasoning history after each turn
+                        const historyKey = 'mirror-code.history';
+                        let history = this._context.workspaceState.get<any[]>(historyKey) || [];
+                        const sessionIndex = history.findIndex(s => s.id === data.sessionId);
+                        if (sessionIndex !== -1 && agent) {
+                            history[sessionIndex].agentHistory = agent.getHistory();
+                            this._context.workspaceState.update(historyKey, history);
+                        }
                     });
                     break;
                 }
@@ -187,15 +198,18 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'commitPatch': {
                     const { filepath, blocks, sessionId } = data.value;
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    const fullPath = (workspaceFolder && !path.isAbsolute(filepath)) ? path.join(workspaceFolder.uri.fsPath, filepath) : filepath;
+                    
                     try {
                         await axios.post('http://localhost:3000/tools/patch_file', { 
-                            filepath, 
+                            filepath: fullPath, 
                             blocks, 
                             previewOnly: false 
                         });
                         vscode.window.showInformationMessage(`Applied patch to ${path.basename(filepath)}`);
                         // Trigger diagnostic check automatically
-                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(filepath).toString()) as any[];
+                        const diags = await vscode.commands.executeCommand('mirror-code.getDiagnostics', vscode.Uri.file(fullPath).toString()) as any[];
                         
                         webviewView.webview.postMessage({ type: 'onPatchApplied', value: { filepath, diags, sessionId } });
                         
@@ -263,7 +277,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     try {
                         const res = await axios.post('http://localhost:3000/tools/run_terminal', {
                             command: termData.command,
-                            cwd: termData.dir
+                            dir: termData.dir
                         }, { timeout: 35000 });
                         const result = res.data;
                         const stdout = result.stdout || '';
@@ -296,6 +310,9 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                 }
                 case 'openDiff': {
                     const { filepath, content } = data.value;
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    const fullPath = (workspaceFolder && !path.isAbsolute(filepath)) ? path.join(workspaceFolder.uri.fsPath, filepath) : filepath;
+                    
                     const tempDir = os.tmpdir();
                     const tempFileName = `mirror_diff_${Math.random().toString(36).substring(7)}_${path.basename(filepath)}`;
                     const tempFilePath = path.join(tempDir, tempFileName);
@@ -303,7 +320,7 @@ export class MirrorWebviewViewProvider implements vscode.WebviewViewProvider {
                     try {
                         fs.writeFileSync(tempFilePath, content);
                         
-                        const originalUri = vscode.Uri.file(filepath);
+                        const originalUri = vscode.Uri.file(fullPath);
                         const tempUri = vscode.Uri.file(tempFilePath);
                         
                         await vscode.commands.executeCommand('vscode.diff', originalUri, tempUri, `Review: ${path.basename(filepath)} (Proposed)`);

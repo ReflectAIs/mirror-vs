@@ -78,7 +78,9 @@
           "type": "string",
           "default": "",
           "description": "Figma Personal Access Token (PAT) for MCP integration.",
-          "tags": ["password"]
+          "tags": [
+            "password"
+          ]
         },
         "mirror-code.mcpServers": {
           "type": "object",
