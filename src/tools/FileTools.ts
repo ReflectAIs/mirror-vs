@@ -39,8 +39,12 @@ export class FileTools {
             const absolutePath = path.resolve(filePath);
             const content = await fs.promises.readFile(absolutePath, 'utf8');
             
-            if (!content.includes(search)) {
-                return `Error: Search block not found in ${filePath}. Ensure you have the exact text including whitespace.`;
+            const count = (content.match(new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+            if (count > 1) {
+                return `Error: Search block occurs ${count} times in ${filePath}. Please provide a more specific search block with more context to ensure uniqueness.`;
+            }
+            if (count === 0) {
+                return `Error: Search block not found in ${filePath}. Check whitespace and exact indentation.`;
             }
 
             const newContent = content.replace(search, replace);

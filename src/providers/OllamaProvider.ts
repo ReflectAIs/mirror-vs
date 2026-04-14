@@ -12,6 +12,7 @@ export class OllamaProvider implements LLMProvider {
     }
 
     async generateResponse(messages: Message[], options: GenerationOptions = {}): Promise<LLMResponse> {
+        const startTime = Date.now();
         try {
             const response = await this.client.chat({
                 model: this.model,
@@ -19,7 +20,7 @@ export class OllamaProvider implements LLMProvider {
                 stream: true,
                 options: {
                     num_ctx: options.numCtx || 4096,
-                    temperature: options.temperature || 0.1,
+                    temperature: options.temperature || 0.3,
                 }
             });
 
@@ -45,6 +46,11 @@ export class OllamaProvider implements LLMProvider {
                         totalTokens: (part.prompt_eval_count || 0) + (part.eval_count || 0)
                     };
                 }
+            }
+
+            const endTime = Date.now();
+            if (fullContent.length === 0) {
+                console.warn(`[Ollama] Warning: Generated empty response in ${endTime - startTime}ms`);
             }
 
             return {

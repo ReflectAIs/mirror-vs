@@ -4,19 +4,17 @@ import { Message } from '../providers/types';
 export class ContextManager {
     private maxTokens: number;
     private history: Message[] = [];
-    private compressionThreshold: number = 0.8; // 80%
+    private compressionThreshold: number = 0.9; // 90%
 
     constructor() {
         this.maxTokens = this.calculateOptimalContext();
     }
 
     private calculateOptimalContext(): number {
-        const totalMemory = os.totalmem() / (1024 * 1024 * 1024); // GB
-        
-        if (totalMemory >= 32) return 16384;
-        if (totalMemory >= 16) return 8192;
-        if (totalMemory >= 8) return 4096;
-        return 2048; // Safe minimum for small devices
+        // Optimization for CPU inference: 
+        // 4096 is the standard context window for most Gemma 4B setups.
+        // Larger windows cause slow attention computation on non-GPU hardware.
+        return 4096;
     }
 
     getMaxTokens(): number {
@@ -31,23 +29,24 @@ export class ContextManager {
         return this.history;
     }
 
+    setHistory(messages: Message[]) {
+        this.history = messages;
+    }
+
     /**
-     * Simple pruning strategy: keep the system prompt + recent messages.
-     * Future enhancement: Call LLM to summarize middle messages.
+     * Managed context pruning.
      */
-    pruneContext(tokenEstimator: (text: string) => number): Message[] {
+    pruneContext(tokenEstimator: (text: string) => number, systemPromptText?: string): Message[] {
         let totalTokens = 0;
         const prunedHistory: Message[] = [];
-        const systemPrompt = this.history.find(m => m.role === 'system');
         
-        if (systemPrompt) {
-            totalTokens += tokenEstimator(systemPrompt.content);
+        if (systemPromptText) {
+            totalTokens += tokenEstimator(systemPromptText);
         }
 
-        // Add messages from newest to oldest until limit reached
         for (let i = this.history.length - 1; i >= 0; i--) {
             const msg = this.history[i];
-            if (msg.role === 'system') continue;
+            if (msg.role === 'system') continue; // Ignore old system prompts
             
             const tokens = tokenEstimator(msg.content);
             if (totalTokens + tokens < this.maxTokens * this.compressionThreshold) {
@@ -58,8 +57,8 @@ export class ContextManager {
             }
         }
 
-        if (systemPrompt) {
-            prunedHistory.unshift(systemPrompt);
+        if (systemPromptText) {
+            prunedHistory.unshift({ role: 'system', content: systemPromptText });
         }
 
         return prunedHistory;

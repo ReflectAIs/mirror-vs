@@ -25,8 +25,14 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
     ) {
         this._view = webviewView;
 
-        this.orchestrator.setUpdateCallback((messages) => {
-            webviewView.webview.postMessage({ type: 'updateMessages', value: messages });
+        this.orchestrator.setUpdateCallback((data) => {
+            webviewView.webview.postMessage({ 
+                type: 'updateMessages', 
+                value: { 
+                    messages: data.messages, 
+                    isThinking: data.isThinking 
+                } 
+            });
         });
 
         webviewView.webview.options = {
@@ -45,17 +51,18 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     this.orchestrator.reset();
                     break;
                 case 'loadHistory':
-                    const sessions = this.orchestrator.getSessionManager()?.getSessions() || [];
+                    const sessions = this.orchestrator.getSessions();
                     webviewView.webview.postMessage({ type: 'historyList', value: sessions });
                     break;
                 case 'selectSession':
                     this.orchestrator.loadSession(data.value);
-                    const history = this.orchestrator.getSessionManager()?.getSessions().find(s => s.id === data.value)?.messages || [];
+                    const session = this.orchestrator.getSessions().find((s: any) => s.id === data.value);
+                    const history = session?.messages || [];
                     webviewView.webview.postMessage({ type: 'sessionSelected', value: history });
                     break;
                 case 'deleteSession':
                     this.orchestrator.deleteSession(data.value);
-                    const updatedSessions = this.orchestrator.getSessionManager()?.getSessions() || [];
+                    const updatedSessions = this.orchestrator.getSessions();
                     webviewView.webview.postMessage({ type: 'historyList', value: updatedSessions });
                     break;
                 case 'openLogs':
@@ -472,7 +479,7 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                         const message = event.data;
                         switch (message.type) {
                             case 'updateMessages':
-                                updateChat(message.value);
+                                updateChat(message.value.messages, false, message.value.isThinking);
                                 break;
                             case 'historyList':
                                 renderHistory(message.value);
@@ -484,7 +491,7 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                         }
                     });
 
-                    function updateChat(history, forceFullRedraw = false) {
+                    function updateChat(history, forceFullRedraw = false, isThinking = false) {
                         if (forceFullRedraw) {
                             messagesContainer.innerHTML = '';
                         }
@@ -507,11 +514,19 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                             }
                         });
 
-                        // Scroll management
-                        const lastMsg = history[history.length - 1];
-                        if (lastMsg && lastMsg.role === 'user') {
+                        // Thinking indicator management
+                        const indicatorText = thinkingIndicator.querySelector('.thinking');
+                        if (isThinking) {
                             thinkingIndicator.classList.remove('hidden');
                             document.getElementById('stop-btn').classList.remove('hidden');
+                            
+                            // Subtly change text if it's taking a while (working on tools)
+                            const lastMsg = history[history.length - 1];
+                            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.includes('<')) {
+                                indicatorText.innerHTML = '<div class="dot"></div> Mirror is executing tools...';
+                            } else {
+                                indicatorText.innerHTML = '<div class="dot"></div> Mirror is thinking...';
+                            }
                         } else {
                             thinkingIndicator.classList.add('hidden');
                             document.getElementById('stop-btn').classList.add('hidden');

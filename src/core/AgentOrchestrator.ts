@@ -21,8 +21,9 @@ export class AgentOrchestrator {
     private channel?: vscode.OutputChannel;
     private currentSessionId: string;
     private loopCounter: Map<string, number> = new Map();
-    private onUpdate?: (messages: Message[]) => void;
+    private onUpdate?: (data: { messages: Message[], isThinking: boolean }) => void;
     private abortController?: AbortController;
+    private isThinking: boolean = false;
 
     constructor(provider: LLMProvider, contextManager: ContextManager, workspaceRoot?: string, channel?: vscode.OutputChannel) {
         this.provider = provider;
@@ -39,7 +40,7 @@ export class AgentOrchestrator {
         this.initializeMemory();
     }
 
-    public setUpdateCallback(callback: (messages: Message[]) => void) {
+    public setUpdateCallback(callback: (data: { messages: Message[], isThinking: boolean }) => void) {
         this.onUpdate = callback;
     }
 
@@ -61,77 +62,114 @@ export class AgentOrchestrator {
         }
     }
 
-    async processMessage(userMessage: string) {
+    public async processMessage(userMessage: string, maxTurns: number = 15) {
+        this.isThinking = true;
         this.addHistory({ role: 'user', content: userMessage });
-        const historyPath = this.workspaceRoot ? path.join(this.workspaceRoot, '.mirror', 'debug.log') : '';
         this.logDebug(`USER: ${userMessage}`);
+        this.triggerUpdate();
         
-        let turns = 0;
-        const maxTurns = 15;
-
-        while (turns < maxTurns) {
-            this.logDebug(`THINKING: Mode=${this.mode}, Turn=${turns + 1}`);
-            this.triggerUpdate();
-            const systemPrompt = this.getPromptForMode();
-            
-            // Temporary strategy: inject system prompt as first message if not present
-            const messages = this.history.pruneContext((text) => this.provider.tokenize(text));
-            if (!messages.find(m => m.role === 'system')) {
-                messages.unshift({ role: 'system', content: systemPrompt });
-            }
-
-            this.abortController = new AbortController();
-            let turnTokenBuffer = '';
-            
-            const response = await this.provider.generateResponse(messages, {
-                numCtx: this.history.getMaxTokens(),
-                signal: this.abortController.signal,
-                onToken: (token) => {
-                    turnTokenBuffer += token;
-                    // Create/Update the assistant message in history incrementally
-                    const hist = this.history.getHistory();
-                    let lastMsg = hist[hist.length - 1];
-                    
-                    if (lastMsg && lastMsg.role === 'assistant') {
-                        lastMsg.content += token;
-                    } else {
-                        const newMsg: Message = { role: 'assistant', content: token };
-                        this.history.addMessage(newMsg);
+        try {
+            let turns = 0;
+            while (turns < maxTurns) {
+                this.logDebug(`THINKING: Mode=${this.mode}, Turn=${turns + 1}`);
+                const systemPrompt = this.getPromptForMode();
+                
+                const messages = this.history.pruneContext((text) => this.provider.tokenize(text), systemPrompt);
+                
+                const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
+                this.logDebug(`CONTEXT METRICS: Messages=${messages.length}, Chars=${totalChars}, Window=${this.history.getMaxTokens()}`);
+                
+                this.abortController = new AbortController();
+                const startTime = Date.now();
+                
+                const response = await this.provider.generateResponse(messages, {
+                    numCtx: this.history.getMaxTokens(),
+                    signal: this.abortController.signal,
+                    onToken: (token) => {
+                        const hist = this.history.getHistory();
+                        let lastMsg = hist[hist.length - 1];
+                        
+                        if (lastMsg && lastMsg.role === 'assistant') {
+                            lastMsg.content += token;
+                        } else {
+                            const newMsg: Message = { role: 'assistant', content: token };
+                            this.history.addMessage(newMsg);
+                        }
+                        this.triggerUpdate();
                     }
+                });
+
+                this.logDebug(`ASSISTANT [Mode: ${this.mode}] (${Date.now() - startTime}ms):\n${response.content}`);
+                this.saveSession();
+                this.triggerUpdate();
+                
+                if (response.content.trim().length === 0) {
+                    this.addHistory({ 
+                        role: 'user', 
+                        content: "You returned an empty response. Please proceed with the next technical step using the appropriate tools." 
+                    });
+                    turns++;
+                    continue;
+                }
+
+                const toolCalls = ToolParser.parseHeuristic(response.content);
+                if (toolCalls.length === 0) {
+                    break;
+                }
+
+                for (const tool of toolCalls) {
+                    if (this.detectLoop(tool)) {
+                        this.addHistory({ 
+                            role: 'user', 
+                            content: `LOOP DETECTED: You have called ${tool.name} with these arguments/params multiple times. Please rethink your strategy.` 
+                        });
+                        continue;
+                    }
+
+                    const result = await this.executeTool(tool);
+                    this.logDebug(`TOOL [${tool.name}]: ${result}`);
+                    this.addHistory({ 
+                        role: 'user', 
+                        content: `TOOL_RESULT [${tool.name}]:\n--- [EXTERNAL DATA START] ---\n${result}\n--- [EXTERNAL DATA END] ---` 
+                    });
                     this.triggerUpdate();
                 }
-            });
 
-            this.logDebug(`ASSISTANT [Mode: ${this.mode}]:\n${response.content}`);
-            // Ensure the final content is saved (it was already being built by onToken)
-            this.saveSession();
+                turns++;
+            }
+        } catch (error: any) {
+            this.logDebug(`ERROR: ${error.message}`);
+        } finally {
+            this.isThinking = false;
             this.triggerUpdate();
-            
-            const toolCalls = ToolParser.parseHeuristic(response.content);
-            if (toolCalls.length === 0) {
-                // Agent is done or just chatting
-                break;
-            }
+        }
+    }
 
-            for (const tool of toolCalls) {
-                if (this.detectLoop(tool)) {
-                    this.history.addMessage({ 
-                        role: 'user', 
-                        content: `LOOP DETECTED: You have called ${tool.name} with these arguments/params multiple times. Please rethink your strategy.` 
-                    });
-                    continue; // Skip this one but allow others
-                }
+    private async executeTool(tool: ToolCall): Promise<string> {
+        return this.executor.execute(tool);
+    }
 
-                const result = await this.executeTool(tool);
-                this.logDebug(`TOOL [${tool.name}]: ${result}`);
-                this.addHistory({ 
-                    role: 'user', 
-                    content: `TOOL_RESULT [${tool.name}]:\n${result}` 
-                });
-                this.triggerUpdate();
-            }
+    private addHistory(msg: Message) {
+        this.history.addMessage(msg);
+    }
 
-            turns++;
+    private logDebug(msg: string) {
+        if (this.channel) {
+            this.channel.appendLine(`[${new Date().toISOString()}] ${msg}`);
+        }
+        // Also log to file in .mirror/debug.log
+        if (this.workspaceRoot) {
+            const logPath = path.join(this.workspaceRoot, '.mirror', 'debug.log');
+            fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+        }
+    }
+
+    private triggerUpdate() {
+        if (this.onUpdate) {
+            this.onUpdate({
+                messages: this.history.getHistory(),
+                isThinking: this.isThinking
+            });
         }
     }
 
@@ -144,17 +182,14 @@ export class AgentOrchestrator {
         }
     }
 
-    private logDebug(message: string) {
-        const timestamp = new Date().toISOString();
-        const formatted = `[${timestamp}] ${message}\n---\n`;
-        
-        if (this.channel) {
-            this.channel.appendLine(formatted);
-        }
-
-        if (this.workspaceRoot) {
-            const logPath = path.join(this.workspaceRoot, '.mirror', 'debug.log');
-            fs.appendFileSync(logPath, formatted);
+    private saveSession() {
+        if (this.sessionManager) {
+            this.sessionManager.saveSession({
+                id: this.currentSessionId,
+                title: this.history.getHistory()[0]?.content.slice(0, 50) || 'New Session',
+                timestamp: Date.now(),
+                messages: this.history.getHistory()
+            });
         }
     }
 
@@ -165,75 +200,36 @@ export class AgentOrchestrator {
         return count >= 3;
     }
 
-    private async executeTool(tool: ToolCall): Promise<string> {
-        return await this.executor.execute(tool);
-    }
-
     public stop() {
         if (this.abortController) {
             this.abortController.abort();
-            this.logDebug('GENERATION STOPPED BY USER');
         }
-    }
-
-    public reset() {
-        this.history.clear();
-        this.currentSessionId = uuidv4();
-        this.mode = 'COORDINATOR';
+        this.isThinking = false;
         this.triggerUpdate();
-        this.logDebug('NEW CHAT STARTED');
     }
 
-    public loadSession(sessionId: string) {
-        if (!this.sessionManager) return;
-        const sessions = this.sessionManager.getSessions();
-        const session = sessions.find(s => s.id === sessionId);
-        
-        if (session) {
-            this.currentSessionId = session.id;
-            this.history.clear();
-            session.messages.forEach(m => this.history.addMessage(m));
-            this.logDebug(`LOADED SESSION: ${sessionId}`);
-            this.triggerUpdate();
-        }
+    public loadSession(session: Session) {
+        this.currentSessionId = session.id;
+        this.history.setHistory(session.messages);
+        this.triggerUpdate();
+    }
+
+    public getSessions() {
+        return this.sessionManager?.getSessions() || [];
     }
 
     public getSessionManager() {
         return this.sessionManager;
     }
 
-    public deleteSession(sessionId: string) {
-        if (this.sessionManager) {
-            this.sessionManager.deleteSession(sessionId);
-            this.logDebug(`DELETED SESSION: ${sessionId}`);
-        }
+    public reset() {
+        this.currentSessionId = uuidv4();
+        this.history.clear();
+        this.triggerUpdate();
     }
 
-    private addHistory(message: Message) {
-        this.history.addMessage(message);
-        this.saveSession();
-    }
-
-    private saveSession() {
-        if (this.sessionManager) {
-            const messages = this.history.getHistory();
-            const title = messages.find(m => m.role === 'user')?.content.substring(0, 30) || 'New Chat';
-            this.sessionManager.saveSession({
-                id: this.currentSessionId,
-                title,
-                timestamp: Date.now(),
-                messages
-            });
-        }
-    }
-
-    private triggerUpdate() {
-        if (this.onUpdate) {
-            this.onUpdate(this.history.getHistory());
-        }
-    }
-
-    setMode(mode: AgentMode) {
-        this.mode = mode;
+    public deleteSession(id: string) {
+        this.sessionManager?.deleteSession(id);
+        this.triggerUpdate();
     }
 }
