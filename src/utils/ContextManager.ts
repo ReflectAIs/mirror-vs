@@ -12,9 +12,8 @@ export class ContextManager {
 
     private calculateOptimalContext(): number {
         // Optimization for CPU inference: 
-        // 4096 is the standard context window for most Gemma 4B setups.
-        // Larger windows cause slow attention computation on non-GPU hardware.
-        return 4096;
+        // 8192 provides a better balance for complex tasks.
+        return 8192;
     }
 
     getMaxTokens(): number {
@@ -34,20 +33,33 @@ export class ContextManager {
     }
 
     /**
-     * Managed context pruning.
+     * Managed context pruning with high-level objective pinning.
      */
     pruneContext(tokenEstimator: (text: string) => number, systemPromptText?: string): Message[] {
         let totalTokens = 0;
         const prunedHistory: Message[] = [];
         
+        let headerTokens = 0;
         if (systemPromptText) {
-            totalTokens += tokenEstimator(systemPromptText);
+            headerTokens += tokenEstimator(systemPromptText);
         }
 
+        // Pin the first user message (the original request)
+        const firstUserMsg = this.history.find(m => m.role === 'user');
+        let pinnedMsg: Message | undefined;
+        if (firstUserMsg) {
+            pinnedMsg = firstUserMsg;
+            headerTokens += tokenEstimator(pinnedMsg.content);
+        }
+
+        totalTokens = headerTokens;
+
+        // Iterate backwards from the end, skipping the first user message if pinned
         for (let i = this.history.length - 1; i >= 0; i--) {
             const msg = this.history[i];
-            if (msg.role === 'system') continue; // Ignore old system prompts
-            
+            if (msg.role === 'system') continue; 
+            if (msg === pinnedMsg) continue; // Already counted in header
+
             const tokens = tokenEstimator(msg.content);
             if (totalTokens + tokens < this.maxTokens * this.compressionThreshold) {
                 prunedHistory.unshift(msg);
@@ -57,6 +69,10 @@ export class ContextManager {
             }
         }
 
+        // Assemble the final message list: [System] -> [Pinned Goal] -> [Pruned History]
+        if (pinnedMsg) {
+            prunedHistory.unshift(pinnedMsg);
+        }
         if (systemPromptText) {
             prunedHistory.unshift({ role: 'system', content: systemPromptText });
         }

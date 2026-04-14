@@ -12,7 +12,9 @@ export class FileTools {
             const lines = content.split('\n');
             
             if (lines.length > maxLines) {
-                return lines.slice(0, maxLines).join('\n') + `\n\n... [TRUNCATED ${lines.length - maxLines} LINES] ...`;
+                return lines.slice(0, Math.floor(maxLines/2)).join('\n') + 
+                    `\n\n... [TRUNCATED ${lines.length - maxLines} LINES] ...\n\n` +
+                    lines.slice(-Math.floor(maxLines/2)).join('\n');
             }
             return content;
         } catch (error: any) {

@@ -11,13 +11,16 @@ export class ToolParser {
      * that both standard and self-closing tags are captured accurately.
      */
     static parse(content: string): ToolCall[] {
-        const toolCalls: ToolCall[] = [];
+        const toolCalls: (ToolCall & { index: number })[] = [];
         
         // 1. Hallucination Fixer: Detect <tool_name>name</tool_name><tool_args>args</tool_args>
         const halluRegex = /<tool_name>(\w+)<\/tool_name>\s*<tool_args>([\s\S]*?)<\/tool_args>/g;
         let halluMatch;
         while ((halluMatch = halluRegex.exec(content)) !== null) {
-            toolCalls.push(this.createToolCall(halluMatch[1], halluMatch[2], halluMatch[0]));
+            toolCalls.push({
+                ...this.createToolCall(halluMatch[1], halluMatch[2], halluMatch[0]),
+                index: halluMatch.index
+            });
         }
         if (toolCalls.length > 0) return toolCalls;
 
@@ -29,7 +32,8 @@ export class ToolParser {
                 name: sMatch[1],
                 args: sMatch[3].trim(),
                 params: this.parseAttributes(sMatch[2]),
-                raw: sMatch[0]
+                raw: sMatch[0],
+                index: sMatch.index
             });
         }
 
@@ -38,19 +42,24 @@ export class ToolParser {
         const selfClosingRegex = /<(\w+)\s*([^>]*?)\s*\/>/g;
         let scMatch;
         while ((scMatch = selfClosingRegex.exec(content)) !== null) {
-            // Avoid duplicates (if a standard tag was already matched)
+            // Avoid duplicates (if a standard tag was already matched somehow)
             if (!toolCalls.find(tc => tc.raw === scMatch![0])) {
                 toolCalls.push({
                     name: scMatch[1],
                     args: '',
                     params: this.parseAttributes(scMatch[2]),
-                    raw: scMatch[0]
+                    raw: scMatch[0],
+                    index: scMatch.index
                 });
             }
         }
 
-        return toolCalls;
+        // Sort by appearance in the text so tool execution order matches LLM output
+        toolCalls.sort((a, b) => a.index - b.index);
+
+        return toolCalls.map(({ index, ...rest }) => rest);
     }
+
 
     private static createToolCall(name: string, args: string, raw: string): ToolCall {
         let params: Record<string, string> = {};
@@ -67,13 +76,17 @@ export class ToolParser {
 
     private static parseAttributes(attrStr: string): Record<string, string> {
         const params: Record<string, string> = {};
-        const attrRegex = /(\w+)\s*=\s*"([^"]*)"/g;
+        // Improved regex: handles escaped quotes inside the attribute values
+        const attrRegex = /(\w+)\s*=\s*(["'])((?:(?!\2)[\s\S]|\\.)*)\2/g;
         let match;
         while ((match = attrRegex.exec(attrStr)) !== null) {
-            params[match[1]] = match[2];
+            // Unescape the matched string
+            const val = match[3].replace(new RegExp(`\\\\${match[2]}`, 'g'), match[2]);
+            params[match[1]] = val;
         }
         return params;
     }
+
 
     /**
      * Top-level heuristic parser that falls back to open tags if no closing match is found.

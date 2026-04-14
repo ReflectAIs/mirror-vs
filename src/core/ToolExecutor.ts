@@ -2,6 +2,7 @@ import { ToolCall } from './ToolParser';
 import { FileTools } from '../tools/FileTools';
 import { TerminalTools } from '../tools/TerminalTools';
 import { WebSearchTools } from '../tools/WebSearchTools';
+import { ScraperTools } from '../tools/ScraperTools';
 import * as fs from 'fs';
 
 export class ToolExecutor {
@@ -19,8 +20,9 @@ export class ToolExecutor {
 
                 case 'replace_block':
                     const path = this.resolvePath(tool.params.path || '');
-                    const search = tool.params.search || this.extractTag(tool.args, 'search');
-                    const replace = tool.params.replace || this.extractTag(tool.args, 'replace');
+                    // Prioritize <search> and <replace> tags in the body over attributes
+                    const search = this.extractTag(tool.args, 'search') || tool.params.search;
+                    const replace = this.extractTag(tool.args, 'replace') || tool.params.replace;
                     
                     if (path && search && replace) {
                         return FileTools.replaceBlock(path, search, replace);
@@ -38,6 +40,9 @@ export class ToolExecutor {
                 case 'web_search':
                     return WebSearchTools.search(tool.params.query || tool.args);
 
+                case 'read_url':
+                    return ScraperTools.scrapeUrl(tool.params.url || tool.args, this.workspaceRoot);
+
                 default:
                     return `Error: Unknown tool "${tool.name}".`;
             }
@@ -47,9 +52,26 @@ export class ToolExecutor {
     }
 
     private extractTag(content: string, tag: string): string | null {
-        const regex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`);
-        const match = content.match(regex);
-        return match ? match[1].trim() : null;
+        // First try the standard strict match
+        const strictRegex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`);
+        const strictMatch = content.match(strictRegex);
+        if (strictMatch) return strictMatch[1].trim();
+
+        // Fallback: Relaxed match (especially for <search> followed by <replace>)
+        // This handles cases where the model forgets the closing tag for the first block.
+        if (tag === 'search') {
+            const searchStartRegex = /<search>([\s\S]*?)(?:<\/search>|<replace>)/;
+            const match = content.match(searchStartRegex);
+            return match ? match[1].trim() : null;
+        }
+
+        if (tag === 'replace') {
+            const replaceStartRegex = /<replace>([\s\S]*?)(?:<\/replace>|<\/replace_block>|$)/;
+            const match = content.match(replaceStartRegex);
+            return match ? match[1].trim() : null;
+        }
+
+        return null;
     }
 
     private resolvePath(filePath: string): string {

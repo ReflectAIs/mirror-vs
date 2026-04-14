@@ -20,7 +20,7 @@ export class AgentOrchestrator {
     private workspaceRoot: string | undefined;
     private channel?: vscode.OutputChannel;
     private currentSessionId: string;
-    private loopCounter: Map<string, number> = new Map();
+    private toolHistory: string[] = [];
     private onUpdate?: (data: { messages: Message[], isThinking: boolean }) => void;
     private abortController?: AbortController;
     private isThinking: boolean = false;
@@ -119,18 +119,21 @@ export class AgentOrchestrator {
 
                 for (const tool of toolCalls) {
                     if (this.detectLoop(tool)) {
+                        this.mode = 'EXPLORER'; // Focus on understanding why it failed
                         this.addHistory({ 
                             role: 'user', 
-                            content: `LOOP DETECTED: You have called ${tool.name} with these arguments/params multiple times. Please rethink your strategy.` 
+                            content: `LOOP DETECTED: You have called ${tool.name} with these arguments multiple times. I am switching your mode to EXPLORER. Please re-examine the file contents or environment state before trying again.` 
                         });
                         continue;
                     }
 
                     const result = await this.executeTool(tool);
-                    this.logDebug(`TOOL [${tool.name}]: ${result}`);
+                    const formattedResult = result.trim() || 'Command executed successfully with no output.';
+                    this.logDebug(`TOOL [${tool.name}]: ${formattedResult}`);
+                    
                     this.addHistory({ 
                         role: 'user', 
-                        content: `TOOL_RESULT [${tool.name}]:\n--- [EXTERNAL DATA START] ---\n${result}\n--- [EXTERNAL DATA END] ---` 
+                        content: `[TOOL_RESULT: ${tool.name}]\n${formattedResult}` 
                     });
                     this.triggerUpdate();
                 }
@@ -195,8 +198,18 @@ export class AgentOrchestrator {
 
     private detectLoop(tool: ToolCall): boolean {
         const key = `${tool.name}:${tool.args}:${JSON.stringify(tool.params)}`;
-        const count = (this.loopCounter.get(key) || 0) + 1;
-        this.loopCounter.set(key, count);
+        
+        // Add to history
+        this.toolHistory.push(key);
+        
+        // Keep window at 5 turns
+        if (this.toolHistory.length > 5) {
+            this.toolHistory.shift();
+        }
+
+        // Count occurrences in the current window
+        const count = this.toolHistory.filter(k => k === key).length;
+        
         return count >= 3;
     }
 
