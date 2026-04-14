@@ -1,0 +1,12 @@
+# Node
+node_modules/
+dist/
+out/
+*.log
+
+# VS Code
+.vscode-test/
+.history/
+
+# OS
+.DS_Store
