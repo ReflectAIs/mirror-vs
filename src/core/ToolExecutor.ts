@@ -1,6 +1,7 @@
 import { ToolCall } from './ToolParser';
 import { FileTools } from '../tools/FileTools';
 import { TerminalTools } from '../tools/TerminalTools';
+import { WebSearchTools } from '../tools/WebSearchTools';
 import * as fs from 'fs';
 
 export class ToolExecutor {
@@ -33,6 +34,9 @@ export class ToolExecutor {
                     const dirPath = this.resolvePath(tool.params.path || tool.args || '.');
                     const items = fs.readdirSync(dirPath, { withFileTypes: true });
                     return items.map(i => `${i.isDirectory() ? '[DIR]' : '[FILE]'} ${i.name}`).join('\n');
+
+                case 'web_search':
+                    return WebSearchTools.search(tool.params.query || tool.args);
 
                 default:
                     return `Error: Unknown tool "${tool.name}".`;

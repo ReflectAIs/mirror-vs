@@ -106,7 +106,7 @@ export class AgentOrchestrator {
                 if (response.content.trim().length === 0) {
                     this.addHistory({ 
                         role: 'user', 
-                        content: "You returned an empty response. Please proceed with the next technical step using the appropriate tools." 
+                        content: "You returned an empty response. If you are stuck on a technical error, use <web_search query='...' /> to find a solution." 
                     });
                     turns++;
                     continue;
