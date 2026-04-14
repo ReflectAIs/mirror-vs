@@ -1,2 +1,0 @@
-# PLAN
-- [ ] Test Task
