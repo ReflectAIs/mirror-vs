@@ -6,6 +6,11 @@ export interface ToolCall {
 }
 
 export class ToolParser {
+    private static readonly ALLOWED_TOOLS = [
+        'write_file', 'read_file', 'replace_block', 
+        'run_command', 'list_dir', 'web_search', 'read_url'
+    ];
+
     /**
      * Parses tool calls using a multi-pattern approach to ensure
      * that both standard and self-closing tags are captured accurately.
@@ -17,10 +22,12 @@ export class ToolParser {
         const halluRegex = /<tool_name>(\w+)<\/tool_name>\s*<tool_args>([\s\S]*?)<\/tool_args>/g;
         let halluMatch;
         while ((halluMatch = halluRegex.exec(content)) !== null) {
-            toolCalls.push({
-                ...this.createToolCall(halluMatch[1], halluMatch[2], halluMatch[0]),
-                index: halluMatch.index
-            });
+            if (ToolParser.ALLOWED_TOOLS.includes(halluMatch[1])) {
+                toolCalls.push({
+                    ...this.createToolCall(halluMatch[1], halluMatch[2], halluMatch[0]),
+                    index: halluMatch.index
+                });
+            }
         }
         if (toolCalls.length > 0) return toolCalls;
 
@@ -28,22 +35,22 @@ export class ToolParser {
         const standardRegex = /<(\w+)\s*([^>]*?)>([\s\S]*?)<\/\1>/g;
         let sMatch;
         while ((sMatch = standardRegex.exec(content)) !== null) {
-            toolCalls.push({
-                name: sMatch[1],
-                args: sMatch[3].trim(),
-                params: this.parseAttributes(sMatch[2]),
-                raw: sMatch[0],
-                index: sMatch.index
-            });
+            if (ToolParser.ALLOWED_TOOLS.includes(sMatch[1])) {
+                toolCalls.push({
+                    name: sMatch[1],
+                    args: sMatch[3].trim(),
+                    params: this.parseAttributes(sMatch[2]),
+                    raw: sMatch[0],
+                    index: sMatch.index
+                });
+            }
         }
 
         // 3. Self-Closing Tag Parser: Matches <tag attrs />
-        // Note: We use a separate pass to avoid regex complexity and backtracking issues
         const selfClosingRegex = /<(\w+)\s*([^>]*?)\s*\/>/g;
         let scMatch;
         while ((scMatch = selfClosingRegex.exec(content)) !== null) {
-            // Avoid duplicates (if a standard tag was already matched somehow)
-            if (!toolCalls.find(tc => tc.raw === scMatch![0])) {
+            if (ToolParser.ALLOWED_TOOLS.includes(scMatch[1]) && !toolCalls.find(tc => tc.raw === scMatch![0])) {
                 toolCalls.push({
                     name: scMatch[1],
                     args: '',
@@ -54,9 +61,7 @@ export class ToolParser {
             }
         }
 
-        // Sort by appearance in the text so tool execution order matches LLM output
         toolCalls.sort((a, b) => a.index - b.index);
-
         return toolCalls.map(({ index, ...rest }) => rest);
     }
 
@@ -98,7 +103,7 @@ export class ToolParser {
         // Fallback: look for <tag ...> at the very end of the string (partial output)
         const openTagRegex = /<(\w+)\s*([^>]*)>([\s\S]*)$/;
         const match = content.match(openTagRegex);
-        if (match) {
+        if (match && ToolParser.ALLOWED_TOOLS.includes(match[1])) {
             return [{
                 name: match[1],
                 args: match[3].trim(),

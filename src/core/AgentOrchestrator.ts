@@ -114,6 +114,13 @@ export class AgentOrchestrator {
 
                 const toolCalls = ToolParser.parseHeuristic(response.content);
                 if (toolCalls.length === 0) {
+                    // Semi-autonomous mode recovery: 
+                    // If we were in EXPLORER mode and just finished an analysis turn (no tools called),
+                    // switch back to CODER mode so the model can apply the fix in the next turn.
+                    if (this.mode === 'EXPLORER') {
+                        this.logDebug("EXPLORER analysis complete. Switching to CODER mode for the next turn.");
+                        this.mode = 'CODER';
+                    }
                     break;
                 }
 
