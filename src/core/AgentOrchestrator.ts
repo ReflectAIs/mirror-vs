@@ -32,11 +32,11 @@ export class AgentOrchestrator {
         this.executor = new ToolExecutor(workspaceRoot);
         this.channel = channel;
         this.currentSessionId = uuidv4();
-        
+
         if (workspaceRoot) {
             this.sessionManager = new SessionManager(workspaceRoot);
         }
-        
+
         this.initializeMemory();
     }
 
@@ -67,28 +67,28 @@ export class AgentOrchestrator {
         this.addHistory({ role: 'user', content: userMessage });
         this.logDebug(`USER: ${userMessage}`);
         this.triggerUpdate();
-        
+
         try {
             let turns = 0;
             while (turns < maxTurns) {
                 this.logDebug(`THINKING: Mode=${this.mode}, Turn=${turns + 1}`);
                 const systemPrompt = this.getPromptForMode();
-                
+
                 const messages = this.history.pruneContext((text) => this.provider.tokenize(text), systemPrompt);
-                
+
                 const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
                 this.logDebug(`CONTEXT METRICS: Messages=${messages.length}, Chars=${totalChars}, Window=${this.history.getMaxTokens()}`);
-                
+
                 this.abortController = new AbortController();
                 const startTime = Date.now();
-                
+
                 const response = await this.provider.generateResponse(messages, {
                     numCtx: this.history.getMaxTokens(),
                     signal: this.abortController.signal,
                     onToken: (token) => {
                         const hist = this.history.getHistory();
                         let lastMsg = hist[hist.length - 1];
-                        
+
                         if (lastMsg && lastMsg.role === 'assistant') {
                             lastMsg.content += token;
                         } else {
@@ -102,11 +102,11 @@ export class AgentOrchestrator {
                 this.logDebug(`ASSISTANT [Mode: ${this.mode}] (${Date.now() - startTime}ms):\n${response.content}`);
                 this.saveSession();
                 this.triggerUpdate();
-                
+
                 if (response.content.trim().length === 0) {
-                    this.addHistory({ 
-                        role: 'user', 
-                        content: "You returned an empty response. If you are stuck on a technical error, use <web_search query='...' /> to find a solution." 
+                    this.addHistory({
+                        role: 'user',
+                        content: "You returned an empty response. If you are stuck on a technical error, use <web_search query='...' /> to find a solution."
                     });
                     turns++;
                     continue;
@@ -120,9 +120,9 @@ export class AgentOrchestrator {
                 for (const tool of toolCalls) {
                     if (this.detectLoop(tool)) {
                         this.mode = 'EXPLORER'; // Focus on understanding why it failed
-                        this.addHistory({ 
-                            role: 'user', 
-                            content: `LOOP DETECTED: You have called ${tool.name} with these arguments multiple times. I am switching your mode to EXPLORER. Please re-examine the file contents or environment state before trying again.` 
+                        this.addHistory({
+                            role: 'user',
+                            content: `LOOP DETECTED: You have called ${tool.name} with these arguments multiple times. I am switching your mode to EXPLORER. Please re-examine the file contents or environment state before trying again.`
                         });
                         continue;
                     }
@@ -130,10 +130,17 @@ export class AgentOrchestrator {
                     const result = await this.executeTool(tool);
                     const formattedResult = result.trim() || 'Command executed successfully with no output.';
                     this.logDebug(`TOOL [${tool.name}]: ${formattedResult}`);
-                    
-                    this.addHistory({ 
-                        role: 'user', 
-                        content: `[TOOL_RESULT: ${tool.name}]\n${formattedResult}` 
+
+                    let feedbackContent = `[TOOL_RESULT: ${tool.name}]\n${formattedResult}`;
+
+                    // Inject a harsh override if the tool failed
+                    if (formattedResult.startsWith('Error:') || formattedResult.startsWith('Execution Error:')) {
+                        feedbackContent += '\n\nCRITICAL: The previous action failed. Do not continue to the next step. You MUST fix this error first.';
+                    }
+
+                    this.addHistory({
+                        role: 'user',
+                        content: feedbackContent
                     });
                     this.triggerUpdate();
                 }
@@ -198,10 +205,10 @@ export class AgentOrchestrator {
 
     private detectLoop(tool: ToolCall): boolean {
         const key = `${tool.name}:${tool.args}:${JSON.stringify(tool.params)}`;
-        
+
         // Add to history
         this.toolHistory.push(key);
-        
+
         // Keep window at 5 turns
         if (this.toolHistory.length > 5) {
             this.toolHistory.shift();
@@ -209,7 +216,7 @@ export class AgentOrchestrator {
 
         // Count occurrences in the current window
         const count = this.toolHistory.filter(k => k === key).length;
-        
+
         return count >= 3;
     }
 

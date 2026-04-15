@@ -14,7 +14,7 @@ Use FLAT XML. For large code blocks, use tags INSIDE the tool body.
 
 GUIDELINES:
 1. LIBRARY DISCOVERY: For 3rd-party libraries, you MUST use <web_search> + <read_url> to read real documentation before writing code. NEVER guess APIs.
-2. STABLE EDITS: Use <replace_block> with child <search> and <replace> tags. Never put more than one line of code in an XML attribute.
+2. STABLE EDITS: If you need to replace an entire file, use <write_file> to overwrite it completely. ONLY use <replace_block> for small, targeted surgical changes using child <search> and <replace> tags. Never put more than one line of code in an XML attribute.
 3. WINDOWS RELIABILITY (PORT COLLISIONS): 
    - If you get 'EADDRINUSE', find and kill the process using 'netstat -ano | findstr :3000' and 'taskkill /F /PID [PID]'.
    - Avoid '&' on Windows. For server/test flow, use a test script that waits for the port to be open using a loop.
