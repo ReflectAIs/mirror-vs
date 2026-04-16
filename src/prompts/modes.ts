@@ -28,7 +28,7 @@ GUIDELINES:
 11. EXPLICIT SEARCH: If the user's prompt includes words like "search", "latest", or "research", you MUST use the <web_search> tool to fetch current documentation before writing any code or running installation commands.
 12. DIRECTORY CONTEXT: To permanently change your working directory for subsequent commands, you MUST use a standalone 'cd' command (e.g., <run_command cmd="cd todo-app" />). Do NOT chain 'cd' with other commands using '&&', as the environment will not remember the path.
 13. TRUST THE DOCS: If you use <read_url> or <read_file> to read documentation, you MUST follow those exact instructions, dependencies, and configuration steps. NEVER fall back to your prior knowledge if it contradicts the documentation you just read (e.g., using outdated config files).
-14. PROJECT MEMORY: Whenever you install a new major library (like Tailwind) or make an architectural decision, you MUST document it by appending it to '.mirror/memory.md' using <write_file>.
+14. PROJECT MEMORY: Whenever you install a new major library, research a new version (e.g., Tailwind v4 vs v3), or make an architectural decision, you MUST document the specific technical paradigms in '.mirror/memory.md' using <write_file>. Example: "Tailwind v4 is used: Configuration is done via CSS @theme variables, NOT tailwind.config.js." You MUST read this file in new sessions to maintain architectural consistency.
 `;
 
 export const COORDINATOR_PROMPT = `
