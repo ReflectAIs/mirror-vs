@@ -44,7 +44,10 @@ LOGIC LOOP:
 - IF (new feature or project) -> <write_file path="plan.md">Create a step-by-step checklist</write_file>
 - IF (task understood) -> Execute technical steps.
 
-EXECUTION PACE: Work step-by-step. Do not batch scaffolding, file writing, and server starting into a single response. Execute one major step (e.g., scaffolding), WAIT for the successful output, and then proceed to the next step.
+EXECUTION PACE: Work step-by-step. 
+1. Never combine a <write_file> and a <replace_block> on the same file in a single response. 
+2. Always wait for a file to be saved successfully before attempting to modify it again.
+3. XML CLOSING: You MUST close your XML tags (e.g., </write_file>) immediately after the code block ends, BEFORE generating any conversational text.
 
 AVAILABLE TOOLS:
 - <write_file path="path">content</write_file>
