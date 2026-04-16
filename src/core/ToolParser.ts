@@ -7,8 +7,8 @@ export interface ToolCall {
 
 export class ToolParser {
     private static readonly ALLOWED_TOOLS = [
-        'write_file', 'read_file', 'replace_block', 
-        'run_command', 'list_dir', 'web_search', 'read_url'
+        'write_file', 'read_file', 'replace_block', 'append_memory',
+        'run_command', 'list_dir', 'web_search', 'read_url', 'search_file'
     ];
 
     /**

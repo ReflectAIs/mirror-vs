@@ -17,8 +17,26 @@ export class ToolExecutor {
         console.log(`[ToolExecutor] [CWD: ${this.currentWorkingDir}] Executing ${tool.name} with params:`, tool.params);
         try {
             switch (tool.name) {
-                case 'read_file':
-                    return FileTools.readFile(this.resolvePath(tool.params.path || tool.args));
+                case 'read_file': {
+                    const filePath = this.resolvePath(tool.params.path || tool.args);
+                    const start = tool.params.start ? parseInt(tool.params.start) : undefined;
+                    const end = tool.params.end ? parseInt(tool.params.end) : undefined;
+                    return FileTools.readFile(filePath, start, end);
+                }
+                
+                case 'append_memory': {
+                    if (!this.workspaceRoot) return "Error: No workspace root defined for memory.";
+                    const memoryPath = path.join(this.workspaceRoot, '.mirror', 'memory.md');
+                    const content = tool.args.trim();
+                    return FileTools.appendFile(memoryPath, `- ${content}`);
+                }
+
+                case 'search_file': {
+                    const filePath = this.resolvePath(tool.params.path || '');
+                    const query = tool.params.query || tool.args;
+                    if (!filePath) return "Error: search_file requires a path.";
+                    return FileTools.searchFile(filePath, query);
+                }
                 
                 case 'write_file': {
                     const filePath = this.resolvePath(tool.params.path || tool.args);

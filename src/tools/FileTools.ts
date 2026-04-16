@@ -5,19 +5,30 @@ export class FileTools {
     /**
      * Reads a file, with hard truncation to prevent context flooding.
      */
-    static async readFile(filePath: string, maxLines: number = 300): Promise<string> {
+    /**
+     * Reads a file, with pagination and truncation to prevent context flooding.
+     */
+    static async readFile(filePath: string, startLine?: number, endLine?: number): Promise<string> {
         try {
             const absolutePath = path.resolve(filePath);
             const content = await fs.promises.readFile(absolutePath, 'utf8');
             const lines = content.split('\n');
             
-            // Increase limit for documentation/markdown files to 500 lines
-            const limit = filePath.endsWith('.md') ? 500 : maxLines;
-            
+            // If start/end are provided, return that specific slice
+            if (startLine !== undefined || endLine !== undefined) {
+                const start = Math.max(0, (startLine || 1) - 1);
+                const end = endLine || lines.length;
+                const slice = lines.slice(start, end);
+                return slice.join('\n') + `\n\n[FILE: ${filePath} | LINES ${start + 1} TO ${Math.min(end, lines.length)} OF ${lines.length}]`;
+            }
+
+            // Default behavior: 500 line limit
+            const limit = 500;
             if (lines.length > limit) {
-                return lines.slice(0, Math.floor(limit/2)).join('\n') + 
+                return lines.slice(0, 250).join('\n') + 
                     `\n\n... [TRUNCATED ${lines.length - limit} LINES] ...\n\n` +
-                    lines.slice(-Math.floor(limit/2)).join('\n');
+                    lines.slice(-250).join('\n') +
+                    `\n\n[FILE: ${filePath} | TRUNCATED TO 500 LINES (250 START + 250 END) OUT OF ${lines.length}]`;
             }
             return content;
         } catch (error: any) {
@@ -36,6 +47,56 @@ export class FileTools {
             return `Successfully wrote to ${filePath}`;
         } catch (error: any) {
             return `Error writing file: ${error.message}`;
+        }
+    }
+
+    /**
+     * Appends a single line to a file. Useful for project memory.
+     */
+    static async appendFile(filePath: string, content: string): Promise<string> {
+        try {
+            const absolutePath = path.resolve(filePath);
+            const dir = path.dirname(absolutePath);
+            if (!fs.existsSync(dir)) {
+                await fs.promises.mkdir(dir, { recursive: true });
+            }
+            const cleanContent = content.trim() + '\n';
+            await fs.promises.appendFile(absolutePath, cleanContent, 'utf8');
+            return `Successfully appended to ${filePath}`;
+        } catch (error: any) {
+            return `Error appending to file: ${error.message}`;
+        }
+    }
+
+    /**
+     * Searches for a pattern in a file and returns line numbers.
+     */
+    static async searchFile(filePath: string, query: string): Promise<string> {
+        try {
+            const absolutePath = path.resolve(filePath);
+            const content = await fs.promises.readFile(absolutePath, 'utf8');
+            const lines = content.split('\n');
+            const results: string[] = [];
+            
+            const regex = new RegExp(query, 'gi');
+            
+            lines.forEach((line, index) => {
+                if (regex.test(line)) {
+                    results.push(`L${index + 1}: ${line.trim()}`);
+                }
+            });
+
+            if (results.length === 0) {
+                return `No matches found for "${query}" in ${filePath}.`;
+            }
+
+            if (results.length > 50) {
+                return results.slice(0, 50).join('\n') + `\n\n... [TRUNCATED ${results.length - 50} MORE MATCHES] ...`;
+            }
+
+            return results.join('\n');
+        } catch (error: any) {
+            return `Error searching file: ${error.message}`;
         }
     }
 

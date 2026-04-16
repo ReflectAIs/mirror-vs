@@ -62,7 +62,7 @@ export class AgentOrchestrator {
         }
     }
 
-    public async processMessage(userMessage: string, maxTurns: number = 15) {
+    public async processMessage(userMessage: string, maxTurns: number = 100) {
         this.isThinking = true;
         this.addHistory({ role: 'user', content: userMessage });
         this.logDebug(`USER: ${userMessage}`);
@@ -113,6 +113,18 @@ export class AgentOrchestrator {
                 }
 
                 const toolCalls = ToolParser.parseHeuristic(response.content);
+
+                // 1. Markdown Leak Interceptor
+                if (toolCalls.length === 0 && response.content.includes('```')) {
+                    this.logDebug("INTERCEPTOR: Markdown detected without XML tags.");
+                    this.addHistory({
+                        role: 'user',
+                        content: "CRITICAL ERROR: You output raw Markdown code blocks (```) instead of using the required XML tool tags (<write_file> or <replace_block>). You MUST wrap all code changes in the appropriate tool tags. Please retry the previous step using the correct schema."
+                    });
+                    turns++;
+                    continue;
+                }
+
                 if (toolCalls.length === 0) {
                     // Semi-autonomous mode recovery: 
                     // If we were in EXPLORER mode and just finished an analysis turn (no tools called),
@@ -139,6 +151,11 @@ export class AgentOrchestrator {
                     this.logDebug(`TOOL [${tool.name}]: ${formattedResult}`);
 
                     let feedbackContent = `[TOOL_RESULT: ${tool.name}]\n${formattedResult}`;
+
+                    // 2. npm install Interceptor (Amnesia by Omission Fix)
+                    if (tool.name === 'run_command' && (tool.args.includes('install') || tool.params.cmd?.includes('install'))) {
+                        feedbackContent += '\n\nIMPORTANT: You just installed/updated a dependency. You MUST now use <append_memory> to document the specific technical paradigms or versions for this library in .mirror/memory.md.';
+                    }
 
                     // Inject a harsh override if the tool failed
                     if (formattedResult.startsWith('Error:') || formattedResult.startsWith('Execution Error:')) {
@@ -199,7 +216,7 @@ export class AgentOrchestrator {
             default: basePrompt = COORDINATOR_PROMPT;
         }
 
-        // Automatically inject the project dependencies so the model always knows the tech stack
+        // 1. Automated Dependency Injection
         if (this.workspaceRoot) {
             const pkgPath = path.join(this.workspaceRoot, 'package.json');
             if (fs.existsSync(pkgPath)) {
@@ -209,9 +226,23 @@ export class AgentOrchestrator {
                     if (deps) {
                         basePrompt += `\n\nCURRENT PROJECT DEPENDENCIES: ${deps}`;
                     }
-                } catch (e) {
-                    // Ignore parsing errors
-                }
+                } catch (e) { /* Ignore */ }
+            }
+        }
+
+        // 2. Automated Memory Injection (Truncated to 2000 chars)
+        if (this.workspaceRoot) {
+            const memoryPath = path.join(this.workspaceRoot, '.mirror', 'memory.md');
+            if (fs.existsSync(memoryPath)) {
+                try {
+                    let memory = fs.readFileSync(memoryPath, 'utf8');
+                    if (memory.length > 2000) {
+                        const head = memory.substring(0, 1000);
+                        const tail = memory.substring(memory.length - 1000);
+                        memory = `${head}\n\n...[ARCHIVED OLDER PARADIGMS]...\n\n${tail}`;
+                    }
+                    basePrompt += `\n\nTECHNICAL LEDGER / PROJECT MEMORY:\n${memory}`;
+                } catch (e) { /* Ignore */ }
             }
         }
 
