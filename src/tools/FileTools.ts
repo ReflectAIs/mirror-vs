@@ -5,16 +5,19 @@ export class FileTools {
     /**
      * Reads a file, with hard truncation to prevent context flooding.
      */
-    static async readFile(filePath: string, maxLines: number = 100): Promise<string> {
+    static async readFile(filePath: string, maxLines: number = 300): Promise<string> {
         try {
             const absolutePath = path.resolve(filePath);
             const content = await fs.promises.readFile(absolutePath, 'utf8');
             const lines = content.split('\n');
-
-            if (lines.length > maxLines) {
-                return lines.slice(0, Math.floor(maxLines / 2)).join('\n') +
-                    `\n\n... [TRUNCATED ${lines.length - maxLines} LINES] ...\n\n` +
-                    lines.slice(-Math.floor(maxLines / 2)).join('\n');
+            
+            // Increase limit for documentation/markdown files to 500 lines
+            const limit = filePath.endsWith('.md') ? 500 : maxLines;
+            
+            if (lines.length > limit) {
+                return lines.slice(0, Math.floor(limit/2)).join('\n') + 
+                    `\n\n... [TRUNCATED ${lines.length - limit} LINES] ...\n\n` +
+                    lines.slice(-Math.floor(limit/2)).join('\n');
             }
             return content;
         } catch (error: any) {
