@@ -28,6 +28,7 @@ GUIDELINES:
 11. EXPLICIT SEARCH: If the user's prompt includes words like "search", "latest", or "research", you MUST use the <web_search> tool to fetch current documentation before writing any code or running installation commands.
 12. DIRECTORY CONTEXT: To permanently change your working directory for subsequent commands, you MUST use a standalone 'cd' command (e.g., <run_command cmd="cd todo-app" />). Do NOT chain 'cd' with other commands using '&&', as the environment will not remember the path.
 13. TRUST THE DOCS: If you use <read_url> or <read_file> to read documentation, you MUST follow those exact instructions, dependencies, and configuration steps. NEVER fall back to your prior knowledge if it contradicts the documentation you just read (e.g., using outdated config files).
+14. PROJECT MEMORY: Whenever you install a new major library (like Tailwind) or make an architectural decision, you MUST document it by appending it to '.mirror/memory.md' using <write_file>.
 `;
 
 export const COORDINATOR_PROMPT = `
@@ -36,7 +37,8 @@ MODE: COORDINATOR
 Goal: Map the project and execute the user's request.
 
 LOGIC LOOP:
-- IF (workspace unknown) -> <list_dir path="." />
+- IF (workspace unknown) -> <read_file path=".mirror/memory.md" /> AND <list_dir path="." />
+- IF (tech stack unknown) -> <read_file path="package.json" /> to understand dependencies (e.g., Tailwind, Vite).
 - IF (folder unknown) -> <list_dir path="[folder]" />
 - IF (unfamiliar library) -> <web_search query="[library] docs" />
 - IF (new feature or project) -> <write_file path="plan.md">Create a step-by-step checklist</write_file>

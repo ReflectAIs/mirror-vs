@@ -191,12 +191,31 @@ export class AgentOrchestrator {
     }
 
     private getPromptForMode(): string {
+        let basePrompt = '';
         switch (this.mode) {
-            case 'COORDINATOR': return COORDINATOR_PROMPT;
-            case 'EXPLORER': return EXPLORER_PROMPT;
-            case 'CODER': return CODER_PROMPT;
-            default: return COORDINATOR_PROMPT;
+            case 'COORDINATOR': basePrompt = COORDINATOR_PROMPT; break;
+            case 'EXPLORER': basePrompt = EXPLORER_PROMPT; break;
+            case 'CODER': basePrompt = CODER_PROMPT; break;
+            default: basePrompt = COORDINATOR_PROMPT;
         }
+
+        // Automatically inject the project dependencies so the model always knows the tech stack
+        if (this.workspaceRoot) {
+            const pkgPath = path.join(this.workspaceRoot, 'package.json');
+            if (fs.existsSync(pkgPath)) {
+                try {
+                    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                    const deps = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {})).join(', ');
+                    if (deps) {
+                        basePrompt += `\n\nCURRENT PROJECT DEPENDENCIES: ${deps}`;
+                    }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+        }
+
+        return basePrompt;
     }
 
     private saveSession() {
