@@ -17,6 +17,8 @@ export interface FigmaNode {
     children?: FigmaNode[];
     characters?: string;
     style?: any;
+    strokeWeight?: number;
+    strokes?: any[];
 }
 
 export class FigmaTools {
@@ -26,73 +28,58 @@ export class FigmaTools {
         if (!token) return "Error: Figma Access Token missing in settings.";
         
         try {
-            // URL encode nodeId as it often contains special chars like : or -
             const encodedNodeId = encodeURIComponent(nodeId);
             const response = await axios.get(`${this.BASE_URL}/files/${fileId}/nodes?ids=${encodedNodeId}`, {
                 headers: { 'X-Figma-Token': token }
             });
 
             if (!response.data.nodes) {
-                return `Error: No nodes returned from Figma for ID ${nodeId}. Check if the ID is correct.`;
+                return `Error: No nodes returned for ID ${nodeId}. Check if the ID is correct.`;
             }
 
-            // The API sometimes returns nodes with a slightly different ID format (e.g., swapping - for :)
-            // We take the first available node if our exact ID isn't a direct key
             const nodeResponse = response.data.nodes[nodeId] || Object.values(response.data.nodes)[0];
-            
             if (!nodeResponse || !nodeResponse.document) {
-                return `Error: Node "${nodeId}" not found in response. Available IDs: ${Object.keys(response.data.nodes).join(', ')}`;
+                return `Error: Node "${nodeId}" not found.`;
             }
 
-            return this.processNode(nodeResponse.document);
+            // 1. Extract Theme Metadata (Colors & Fonts across the entire tree)
+            const theme = this.extractTheme(nodeResponse.document);
+            let themeHeader = "--- PROJECT THEME SUMMARY ---\n";
+            themeHeader += `COLORS: ${Array.from(theme.colors).join(', ')}\n`;
+            themeHeader += `FONTS: ${Array.from(theme.fonts).join(', ')}\n`;
+            themeHeader += "----------------------------\n\n";
+
+            // 2. Generate Enhanced Pseudo-DOM
+            const layout = this.processNode(nodeResponse.document);
+            
+            return themeHeader + layout;
         } catch (error: any) {
             return `Error fetching Figma layout: ${error.message}`;
         }
     }
 
+    // Deprecated for Free plans - Redirecting to Unified Layout
     static async getColors(fileId: string, token: string): Promise<string> {
-        if (!token) return "Error: Figma Access Token missing.";
-        try {
-            const response = await axios.get(`${this.BASE_URL}/files/${fileId}/variables/local`, {
-                headers: { 'X-Figma-Token': token }
-            });
-            
-            const variables = response.data.meta?.variables || [];
-            let css = "@theme {\n";
-            variables.forEach((v: any) => {
-                if (v.resolvedType === 'COLOR') {
-                    css += `  --color-${v.name.toLowerCase().replace(/\//g, '-')}: ${this.rgbaToHex(v.valuesByMode[Object.keys(v.valuesByMode)[0]])};\n`;
-                }
-            });
-            css += "}";
-            return css;
-        } catch (error: any) {
-            if (error.response?.status === 403) {
-                return `[FIGMA_PLAN_RESTRICTION] 403 Forbidden: The Figma Variables API is restricted to Pro/Enterprise plans.
-RECOVERY HINT: Proceed by using <get_figma_layout> instead. You can extract individual 'fills' (background colors) directly from the Pseudo-DOM layout tree. Do NOT try to use get_figma_colors again for this file.`;
-            }
-            return `Error fetching Figma colors: ${error.message}`;
-        }
+        return "INFO: get_figma_colors is deprecated for Free plans. Please use <get_figma_layout> on your main container to see all project colors in the Theme Summary.";
     }
 
     static async getTypography(fileId: string, token: string): Promise<string> {
-        if (!token) return "Error: Figma Access Token missing.";
-        try {
-            const response = await axios.get(`${this.BASE_URL}/files/${fileId}?depth=1`, {
-                headers: { 'X-Figma-Token': token }
+        return "INFO: get_figma_typography is deprecated for Free plans. Please use <get_figma_layout> on your main container to see all typography in the Theme Summary.";
+    }
+
+    private static extractTheme(node: FigmaNode, theme: { colors: Set<string>, fonts: Set<string> } = { colors: new Set(), fonts: new Set() }) {
+        if (node.fills) {
+            node.fills.forEach(f => {
+                if (f.type === 'SOLID' && f.color) theme.colors.add(this.rgbaToHex(f.color));
             });
-            
-            const styles = response.data.styles || {};
-            let output = "Figma Typography Tokens:\n";
-            Object.keys(styles).forEach(id => {
-                if (styles[id].styleType === 'TEXT') {
-                    output += `- ${styles[id].name}: font-sans text-[size] leading-[height]\n`;
-                }
-            });
-            return output;
-        } catch (error: any) {
-            return `Error fetching typography: ${error.message}`;
         }
+        if (node.type === 'TEXT' && node.style) {
+            if (node.style.fontFamily) theme.fonts.add(node.style.fontFamily);
+        }
+        if (node.children) {
+            node.children.forEach(c => this.extractTheme(c, theme));
+        }
+        return theme;
     }
 
     private static processNode(node: FigmaNode, depth: number = 0): string {
@@ -119,46 +106,51 @@ RECOVERY HINT: Proceed by using <get_figma_layout> instead. You can extract indi
     private static mapToTailwind(node: FigmaNode): string {
         const classes: string[] = [];
 
-        // 1. Colors (Differentiates between Text and Frame)
+        // 1. Text Properties
+        if (node.type === 'TEXT' && node.style) {
+            if (node.style.fontSize) classes.push(`text-[${Math.round(node.style.fontSize)}px]`);
+            if (node.style.fontWeight) classes.push(`font-[${node.style.fontWeight}]`);
+            if (node.style.lineHeightPx) classes.push(`leading-[${Math.round(node.style.lineHeightPx)}px]`);
+            if (node.style.textAlignHorizontal === 'CENTER') classes.push('text-center');
+        }
+
+        // 2. Colors
         if (node.fills && node.fills.length > 0) {
             const fill = node.fills[0];
             if (fill.type === 'SOLID') {
                 const hex = this.rgbaToHex(fill.color);
-                if (node.type === 'TEXT') {
-                    classes.push(`text-[${hex}]`);
-                } else {
-                    classes.push(`bg-[${hex}]`);
-                }
+                classes.push(node.type === 'TEXT' ? `text-[${hex}]` : `bg-[${hex}]`);
             }
         }
 
-        // 2. Typography (Only for TEXT nodes)
-        if (node.type === 'TEXT' && node.style) {
-            if (node.style.fontSize) classes.push(`text-[${Math.round(node.style.fontSize)}px]`);
-            if (node.style.fontWeight && node.style.fontWeight > 400) {
-                classes.push(`font-[${node.style.fontWeight}]`);
-            }
-        }
-
-        // 3. Layout (Only for Frames/Components)
+        // 3. Layout (Flexbox)
         if (node.layoutMode === 'HORIZONTAL') classes.push('flex', 'flex-row');
         if (node.layoutMode === 'VERTICAL') classes.push('flex', 'flex-col');
         
-        if (node.itemSpacing) classes.push(`gap-${Math.round(node.itemSpacing / 4)}`);
+        if (node.itemSpacing) classes.push(`gap-[${node.itemSpacing}px]`);
 
         // Padding
-        if (node.paddingTop) classes.push(`pt-${Math.round(node.paddingTop / 4)}`);
-        if (node.paddingBottom) classes.push(`pb-${Math.round(node.paddingBottom / 4)}`);
-        if (node.paddingLeft) classes.push(`pl-${Math.round(node.paddingLeft / 4)}`);
-        if (node.paddingRight) classes.push(`pr-${Math.round(node.paddingRight / 4)}`);
+        if (node.paddingTop) classes.push(`pt-[${node.paddingTop}px]`);
+        if (node.paddingBottom) classes.push(`pb-[${node.paddingBottom}px]`);
+        if (node.paddingLeft) classes.push(`pl-[${node.paddingLeft}px]`);
+        if (node.paddingRight) classes.push(`pr-[${node.paddingRight}px]`);
 
         // Alignment
         if (node.primaryAxisAlignItems === 'CENTER') classes.push('justify-center');
         if (node.counterAxisAlignItems === 'CENTER') classes.push('items-center');
 
-        // Border Radius
-        if (node.cornerRadius) classes.push('rounded-xl');
-        
+        // 4. Borders & Radius
+        if (node.cornerRadius) classes.push(`rounded-[${node.cornerRadius}px]`);
+        if (node.strokeWeight) {
+            classes.push(`border-[${node.strokeWeight}px]`);
+            if (node.strokes && node.strokes.length > 0 && node.strokes[0].color) {
+                classes.push(`border-[${this.rgbaToHex(node.strokes[0].color)}]`);
+            }
+        }
+
+        // 5. Dimension Awareness (Hugging/Fixed)
+        // If no layout mode but has width/height, it's absolute
+        // but here we just give a hint
         return classes.join(' ');
     }
 

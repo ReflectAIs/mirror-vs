@@ -32,7 +32,7 @@ export class ToolExecutor {
                     let content = await FileTools.readFile(filePath, start, end);
 
                     if (filePath.toLowerCase().includes('web_cache')) {
-                        content = `[IMPORTANT DOCUMENTATION: WEB-CACHE]\nThis document contains official, real-time documentation retrieved from the web. It is MORE AUTHORITATIVE than your general knowledge. Follow its specific versions, parameters, and patterns strictly.\n\n${content}`;
+                        content = `[TECHNICAL DOCUMENTATION: WEB-CACHE]\nFollow this document for library versions and configuration patterns, but ALWAYS use your OWN native XML tools (e.g., use get_figma_layout instead of get_design_context).\n\n${content}`;
                     }
 
                     result = content;
@@ -60,27 +60,12 @@ export class ToolExecutor {
                     result = await FileTools.searchFile(filePath, query);
                     break;
                 }
-
-                case 'get_figma_colors': {
-                    const fileId = tool.params.file_id || tool.args;
-                    const token = vscode.workspace.getConfiguration('mirror-vs').get<string>('figmaAccessToken') || '';
-                    result = await FigmaTools.getColors(fileId, token);
-                    break;
-                }
-
-                case 'get_figma_typography': {
-                    const fileId = tool.params.file_id || tool.args;
-                    const token = vscode.workspace.getConfiguration('mirror-vs').get<string>('figmaAccessToken') || '';
-                    result = await FigmaTools.getTypography(fileId, token);
-                    break;
-                }
-
                 case 'get_figma_layout': {
-                    const fileId = tool.params.file_id;
-                    const nodeId = tool.params.node_id;
+                    const fileId = tool.params.file_id || tool.args.match(/file_id="([^"]+)"/)?.[1];
+                    const nodeId = tool.params.node_id || tool.args.match(/node_id="([^"]+)"/)?.[1];
                     const token = vscode.workspace.getConfiguration('mirror-vs').get<string>('figmaAccessToken') || '';
-                    if (!fileId || !nodeId) {
-                        result = "Error: get_figma_layout requires file_id and node_id.";
+                    if (!fileId || !nodeId || nodeId === '...') {
+                        result = "Error: get_figma_layout requires a valid file_id and node_id. Do NOT use '...' as a placeholder. You must extract these from the Figma URL: https://figma.com/design/:file_id/:name?node-id=:node_id";
                         break;
                     }
                     result = await FigmaTools.getLayout(fileId, nodeId, token);

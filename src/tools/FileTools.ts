@@ -22,21 +22,23 @@ export class FileTools {
                 return slice.join('\n') + `\n\n[FILE: ${filePath} | LINES ${start + 1} TO ${Math.min(end, lines.length)} OF ${lines.length}]`;
             }
 
-            // Default behavior: 500 line limit
-            const limit = 500;
+            // Calibrated reading limits
+            const ext = path.extname(filePath).toLowerCase();
+            const docExtensions = ['.md', '.txt', '.json', '.yml', '.yaml', '.xml'];
+            const limit = docExtensions.includes(ext) ? 500 : 300;
+
             let result = '';
             if (lines.length > limit) {
-                result = lines.slice(0, 250).join('\n') + 
-                    `\n\n... [TRUNCATED ${lines.length - limit} LINES] ...\n\n` +
-                    lines.slice(-250).join('\n') +
-                    `\n\n[FILE: ${filePath} | TRUNCATED TO 500 LINES (250 START + 250 END) OUT OF ${lines.length}]`;
+                result = lines.slice(0, limit).join('\n');
+                result += `\n\n...[FILE TRUNCATED DUE TO LENGTH]...\n`;
+                result += `SYSTEM ALERT: This file has been truncated because it is too large. You are only seeing the first ${limit} lines. You MUST use the <search_file> tool or provide start="..." end="..." attributes to <read_file> to see the rest of the file before making modifications.`;
             } else {
                 result = content;
             }
 
             // Hard character limit: Prevent context flooding (Fixes Overload Amnesia)
-            if (result.length > 8000) {
-                result = result.substring(0, 8000) + "\n\n...[TRUNCATED DUE TO LENGTH]...\nSYSTEM ALERT: This file is too large. Use <search_file> to find specific keywords.";
+            if (result.length > 8192) {
+                result = result.substring(0, 8192) + "\n\n...[FILE TRUNCATED DUE TO CHARACTER LIMIT]...\nSYSTEM ALERT: This file is extremely large. The readable content has been cut to 8192 characters. You MUST use <search_file> to find specific code blocks or use start/end attributes to read specific sections.";
             }
 
             return result;
