@@ -42,6 +42,10 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+        // Sync initial config
+        const figmaToken = vscode.workspace.getConfiguration('mirror-vs').get('figmaAccessToken');
+        webviewView.webview.postMessage({ type: 'initialConfig', value: { figmaAccessToken: figmaToken } });
+
         webviewView.webview.onDidReceiveMessage(async (data) => {
             switch (data.type) {
                 case 'sendMessage':
@@ -73,6 +77,10 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'log':
                     this._channel.appendLine(`[WEBVIEW]: ${data.value}`);
+                    break;
+                case 'updateFigmaToken':
+                    await vscode.workspace.getConfiguration('mirror-vs').update('figmaAccessToken', data.value, vscode.ConfigurationTarget.Global);
+                    vscode.window.showInformationMessage('Figma Access Token saved!');
                     break;
             }
         });
@@ -134,17 +142,82 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                         border: 1px solid var(--border);
                         border-radius: 8px;
                         padding: 8px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
                         z-index: 200;
-                        min-width: 150px;
+                        min-width: 180px;
+                        animation: fadeIn 0.1s ease-out;
                     }
+                    @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+                    
                     .settings-item {
-                        padding: 8px 12px;
+                        padding: 10px 14px;
                         cursor: pointer;
-                        font-size: 12px;
-                        border-radius: 4px;
+                        font-size: 13px;
+                        border-radius: 6px;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        transition: background 0.2s;
                     }
-                    .settings-item:hover { background: rgba(255,255,255,0.1); }
+                    .settings-item:hover { background: rgba(255,255,255,0.08); }
+                    .settings-item svg { opacity: 0.6; }
+
+                    /* Figma Settings Modal */
+                    #figma-modal {
+                        position: fixed;
+                        top: 0; left: 0; width: 100%; height: 100%;
+                        background: rgba(0,0,0,0.6);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 1000;
+                        backdrop-filter: blur(4px);
+                    }
+                    .modal-content {
+                        background: var(--container-bg);
+                        border: 1px solid var(--border);
+                        padding: 24px;
+                        border-radius: 12px;
+                        width: 80%;
+                        max-width: 300px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+                        animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                    }
+                    @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } }
+                    
+                    .modal-header h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+                    .modal-body p { margin: 0; font-size: 12px; opacity: 0.6; line-height: 1.4; }
+                    
+                    .token-input {
+                        background: var(--input-bg);
+                        border: 1px solid var(--border);
+                        color: var(--text);
+                        padding: 10px 12px;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        font-family: monospace;
+                        width: calc(100% - 24px);
+                        outline: none;
+                    }
+                    .token-input:focus { border-color: var(--accent); }
+                    
+                    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+                    .btn {
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        cursor: pointer;
+                        border: none;
+                        font-weight: 600;
+                        transition: all 0.2s;
+                    }
+                    .btn-primary { background: var(--accent); color: var(--vscode-button-foreground); }
+                    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+                    .btn-secondary { background: transparent; color: var(--text); opacity: 0.6; }
+                    .btn-secondary:hover { opacity: 1; background: rgba(255,255,255,0.05); }
 
                     /* Chat Container */
                     #chat-page, #history-page {
@@ -346,8 +419,34 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                 </div>
 
                 <div id="settings-menu" class="hidden">
-                    <div class="settings-item" id="open-logs-btn">Open Output Logs</div>
-                    <div class="settings-item" onclick="location.reload()">Reload UI</div>
+                    <div class="settings-item" id="figma-settings-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+                        Figma Settings
+                    </div>
+                    <div class="settings-item" id="open-logs-btn">
+                        <svg width="14" height="14" viewBox="0 0 16 16"><path fill="currentColor" d="M13.5 1H2.5A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 13.5 1zM2 13.5v-11h12v11H2z"/></svg>
+                        Open Output Logs
+                    </div>
+                    <div class="settings-item" onclick="location.reload()">
+                        <svg width="14" height="14" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 12.5A5.5 5.5 0 1 1 13.5 8 5.51 5.51 0 0 1 8 13.5z"/></svg>
+                        Reload UI
+                    </div>
+                </div>
+
+                <div id="figma-modal" class="hidden">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Figma Access Token</h3>
+                        </div>
+                        <div class="modal-body">
+                            <p>Enter your Figma Personal Access Token to enable DESIGNER mode tools.</p>
+                            <input type="password" id="figma-token-input" class="token-input" placeholder="figd_..." />
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" id="close-figma-modal">Cancel</button>
+                            <button class="btn btn-primary" id="save-figma-token">Save Token</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="chat-page">
@@ -448,7 +547,30 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                         settingsMenu.classList.add('hidden');
                     });
 
-                    document.addEventListener('click', () => settingsMenu.classList.add('hidden'));
+                    // Figma Modal Logic
+                    const figmaModal = document.getElementById('figma-modal');
+                    const figmaTokenInput = document.getElementById('figma-token-input');
+
+                    document.getElementById('figma-settings-btn').addEventListener('click', () => {
+                        settingsMenu.classList.add('hidden');
+                        figmaModal.classList.remove('hidden');
+                    });
+
+                    document.getElementById('close-figma-modal').addEventListener('click', () => {
+                        figmaModal.classList.add('hidden');
+                    });
+
+                    document.getElementById('save-figma-token').addEventListener('click', () => {
+                        const token = figmaTokenInput.value.trim();
+                        vscode.postMessage({ type: 'updateFigmaToken', value: token });
+                        figmaModal.classList.add('hidden');
+                    });
+
+                    document.addEventListener('click', (e) => {
+                        if (!settingsMenu.contains(e.target) && !document.getElementById('settings-toggle').contains(e.target)) {
+                            settingsMenu.classList.add('hidden');
+                        }
+                    });
 
                     function appendMessage(msg) {
                         const div = document.createElement('div');
@@ -487,6 +609,11 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                             case 'sessionSelected':
                                 updateChat(message.value, true); 
                                 showChat();
+                                break;
+                            case 'initialConfig':
+                                if (message.value.figmaAccessToken) {
+                                    figmaTokenInput.value = message.value.figmaAccessToken;
+                                }
                                 break;
                         }
                     });

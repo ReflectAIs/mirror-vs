@@ -12,6 +12,16 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Mirror VS",
+      "properties": {
+        "mirror-vs.figmaAccessToken": {
+          "type": "string",
+          "default": "",
+          "description": "Figma Personal Access Token (for DESIGNER mode integration)"
+        }
+      }
+    },
     "commands": [
       {
         "command": "mirror-vs.start",

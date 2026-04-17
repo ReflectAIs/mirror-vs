@@ -3,13 +3,13 @@ import { ContextManager } from '../utils/ContextManager';
 import { ToolParser, ToolCall } from './ToolParser';
 import { ToolExecutor } from './ToolExecutor';
 import { SessionManager, Session } from './SessionManager';
-import { COORDINATOR_PROMPT, EXPLORER_PROMPT, CODER_PROMPT } from '../prompts/modes';
+import { COORDINATOR_PROMPT, EXPLORER_PROMPT, CODER_PROMPT, DESIGNER_PROMPT } from '../prompts/modes';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import * as vscode from 'vscode';
 
-export type AgentMode = 'COORDINATOR' | 'EXPLORER' | 'CODER';
+export type AgentMode = 'COORDINATOR' | 'EXPLORER' | 'CODER' | 'DESIGNER';
 
 export class AgentOrchestrator {
     private mode: AgentMode = 'COORDINATOR';
@@ -67,6 +67,12 @@ export class AgentOrchestrator {
 
         const cwd = this.executor.getCurrentDir();
         let enrichedMessage = `[CURRENT LOCATION: ${cwd}]\n\n${userMessage}`;
+
+        // Phase 2: Figma Integration - DESIGNER Mode Trigger
+        if (userMessage.includes('figma.com')) {
+            this.logDebug("DESIGNER TRIGGER: Figma URL detected. Switching mode to DESIGNER.");
+            this.mode = 'DESIGNER';
+        }
 
         // 5. Keyword Cheat Codes (Tailwind v3 Fallback Fix)
         if (userMessage.toLowerCase().includes('tailwind')) {
@@ -180,6 +186,13 @@ export class AgentOrchestrator {
                         this.logDebug("EXPLORER analysis complete. Switching to CODER mode for the next turn.");
                         this.mode = 'CODER';
                     }
+
+                    // Phase 2: Design Reversion
+                    if (this.mode === 'DESIGNER') {
+                        this.logDebug("DESIGNER task completed. Reverting to COORDINATOR.");
+                        this.mode = 'COORDINATOR';
+                    }
+
                     break;
                 }
 
@@ -260,6 +273,7 @@ export class AgentOrchestrator {
             case 'COORDINATOR': basePrompt = COORDINATOR_PROMPT; break;
             case 'EXPLORER': basePrompt = EXPLORER_PROMPT; break;
             case 'CODER': basePrompt = CODER_PROMPT; break;
+            case 'DESIGNER': basePrompt = DESIGNER_PROMPT; break;
             default: basePrompt = COORDINATOR_PROMPT;
         }
 

@@ -8,7 +8,8 @@ export interface ToolCall {
 export class ToolParser {
     private static readonly ALLOWED_TOOLS = [
         'write_file', 'read_file', 'replace_block', 'append_memory',
-        'run_command', 'list_dir', 'web_search', 'read_url', 'search_file'
+        'run_command', 'list_dir', 'web_search', 'read_url', 'search_file',
+        'get_figma_colors', 'get_figma_typography', 'get_figma_layout'
     ];
 
     /**

@@ -3,8 +3,10 @@ import { FileTools } from '../tools/FileTools';
 import { TerminalTools } from '../tools/TerminalTools';
 import { WebSearchTools } from '../tools/WebSearchTools';
 import { ScraperTools } from '../tools/ScraperTools';
+import { FigmaTools } from '../tools/FigmaTools';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { execSync } from 'child_process';
 
 export class ToolExecutor {
@@ -56,6 +58,32 @@ export class ToolExecutor {
                         break;
                     }
                     result = await FileTools.searchFile(filePath, query);
+                    break;
+                }
+
+                case 'get_figma_colors': {
+                    const fileId = tool.params.file_id || tool.args;
+                    const token = vscode.workspace.getConfiguration('mirror-vs').get<string>('figmaAccessToken') || '';
+                    result = await FigmaTools.getColors(fileId, token);
+                    break;
+                }
+
+                case 'get_figma_typography': {
+                    const fileId = tool.params.file_id || tool.args;
+                    const token = vscode.workspace.getConfiguration('mirror-vs').get<string>('figmaAccessToken') || '';
+                    result = await FigmaTools.getTypography(fileId, token);
+                    break;
+                }
+
+                case 'get_figma_layout': {
+                    const fileId = tool.params.file_id;
+                    const nodeId = tool.params.node_id;
+                    const token = vscode.workspace.getConfiguration('mirror-vs').get<string>('figmaAccessToken') || '';
+                    if (!fileId || !nodeId) {
+                        result = "Error: get_figma_layout requires file_id and node_id.";
+                        break;
+                    }
+                    result = await FigmaTools.getLayout(fileId, nodeId, token);
                     break;
                 }
                 
