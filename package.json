@@ -19,6 +19,11 @@
           "type": "string",
           "default": "",
           "description": "Figma Personal Access Token (for DESIGNER mode integration)"
+        },
+        "mirror-vs.ollamaModel": {
+          "type": "string",
+          "default": "gemma4:e4b",
+          "description": "The default Ollama model to use for the Mirror Agent."
         }
       }
     },

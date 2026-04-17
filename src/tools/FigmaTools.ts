@@ -100,7 +100,12 @@ RECOVERY HINT: Proceed by using <get_figma_layout> instead. You can extract indi
         const twClasses = this.mapToTailwind(node);
         const tag = node.type === 'TEXT' ? 'p' : (node.name.toLowerCase().includes('button') ? 'button' : 'div');
         
-        let result = `${indent}${node.type} "${node.name}" (${tag}) [Tailwind: ${twClasses}]\n`;
+        let contentInfo = '';
+        if (node.type === 'TEXT' && node.characters) {
+            contentInfo = ` "${node.characters.replace(/\n/g, ' ')}"`;
+        }
+
+        let result = `${indent}${node.type}${contentInfo} ("${node.name}") (${tag}) [Tailwind: ${twClasses}]\n`;
 
         if (node.children) {
             node.children.forEach(child => {
@@ -114,7 +119,28 @@ RECOVERY HINT: Proceed by using <get_figma_layout> instead. You can extract indi
     private static mapToTailwind(node: FigmaNode): string {
         const classes: string[] = [];
 
-        // Layout
+        // 1. Colors (Differentiates between Text and Frame)
+        if (node.fills && node.fills.length > 0) {
+            const fill = node.fills[0];
+            if (fill.type === 'SOLID') {
+                const hex = this.rgbaToHex(fill.color);
+                if (node.type === 'TEXT') {
+                    classes.push(`text-[${hex}]`);
+                } else {
+                    classes.push(`bg-[${hex}]`);
+                }
+            }
+        }
+
+        // 2. Typography (Only for TEXT nodes)
+        if (node.type === 'TEXT' && node.style) {
+            if (node.style.fontSize) classes.push(`text-[${Math.round(node.style.fontSize)}px]`);
+            if (node.style.fontWeight && node.style.fontWeight > 400) {
+                classes.push(`font-[${node.style.fontWeight}]`);
+            }
+        }
+
+        // 3. Layout (Only for Frames/Components)
         if (node.layoutMode === 'HORIZONTAL') classes.push('flex', 'flex-row');
         if (node.layoutMode === 'VERTICAL') classes.push('flex', 'flex-col');
         
@@ -130,16 +156,9 @@ RECOVERY HINT: Proceed by using <get_figma_layout> instead. You can extract indi
         if (node.primaryAxisAlignItems === 'CENTER') classes.push('justify-center');
         if (node.counterAxisAlignItems === 'CENTER') classes.push('items-center');
 
-        // Styles
+        // Border Radius
         if (node.cornerRadius) classes.push('rounded-xl');
         
-        if (node.fills && node.fills.length > 0) {
-            const fill = node.fills[0];
-            if (fill.type === 'SOLID') {
-                classes.push(`bg-[${this.rgbaToHex(fill.color)}]`);
-            }
-        }
-
         return classes.join(' ');
     }
 

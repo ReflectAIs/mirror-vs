@@ -44,6 +44,10 @@ export class AgentOrchestrator {
         this.onUpdate = callback;
     }
 
+    public getProvider(): LLMProvider {
+        return this.provider;
+    }
+
     private initializeMemory() {
         if (!this.workspaceRoot) return;
 

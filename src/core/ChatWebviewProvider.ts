@@ -12,7 +12,10 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
         private readonly _extensionUri: vscode.Uri,
         private readonly _channel: vscode.OutputChannel
     ) {
-        const provider = new OllamaProvider();
+        const config = vscode.workspace.getConfiguration('mirror-vs');
+        const model = config.get<string>('ollamaModel') || 'gemma4:e4b';
+        
+        const provider = new OllamaProvider(model);
         const context = new ContextManager();
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
         this.orchestrator = new AgentOrchestrator(provider, context, workspaceRoot, _channel);
@@ -43,8 +46,16 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
         // Sync initial config
-        const figmaToken = vscode.workspace.getConfiguration('mirror-vs').get('figmaAccessToken');
-        webviewView.webview.postMessage({ type: 'initialConfig', value: { figmaAccessToken: figmaToken } });
+        const config = vscode.workspace.getConfiguration('mirror-vs');
+        const figmaToken = config.get('figmaAccessToken');
+        const ollamaModel = config.get('ollamaModel');
+        webviewView.webview.postMessage({ 
+            type: 'initialConfig', 
+            value: { 
+                figmaAccessToken: figmaToken,
+                ollamaModel: ollamaModel
+            } 
+        });
 
         webviewView.webview.onDidReceiveMessage(async (data) => {
             switch (data.type) {
@@ -82,6 +93,37 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     await vscode.workspace.getConfiguration('mirror-vs').update('figmaAccessToken', data.value, vscode.ConfigurationTarget.Global);
                     vscode.window.showInformationMessage('Figma Access Token saved!');
                     break;
+                case 'fetchModels': {
+                    const provider = this.orchestrator.getProvider() as OllamaProvider;
+                    const models = await provider.listLocalModels();
+                    webviewView.webview.postMessage({ type: 'modelsList', value: models });
+                    break;
+                }
+                case 'pullModel': {
+                    const provider = this.orchestrator.getProvider() as OllamaProvider;
+                    try {
+                        await provider.pullModel(data.value, (percent, status) => {
+                            webviewView.webview.postMessage({ 
+                                type: 'pullProgress', 
+                                value: { percent, status, model: data.value } 
+                            });
+                        });
+                        vscode.window.showInformationMessage(`Model ${data.value} pulled successfully!`);
+                        // Refresh list after pull
+                        const models = await provider.listLocalModels();
+                        webviewView.webview.postMessage({ type: 'modelsList', value: models });
+                    } catch (err: any) {
+                        vscode.window.showErrorMessage(`Pull failed: ${err.message}`);
+                    }
+                    break;
+                }
+                case 'selectModel': {
+                    const provider = this.orchestrator.getProvider() as OllamaProvider;
+                    provider.updateModel(data.value);
+                    await vscode.workspace.getConfiguration('mirror-vs').update('ollamaModel', data.value, vscode.ConfigurationTarget.Global);
+                    vscode.window.showInformationMessage(`Active model switched to ${data.value}`);
+                    break;
+                }
             }
         });
     }
@@ -218,6 +260,46 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
                     .btn-secondary { background: transparent; color: var(--text); opacity: 0.6; }
                     .btn-secondary:hover { opacity: 1; background: rgba(255,255,255,0.05); }
+
+                    /* Model Selection */
+                    .setting-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+                    .setting-label { font-size: 11px; font-weight: 600; text-transform: uppercase; opacity: 0.5; letter-spacing: 0.5px; }
+                    
+                    #model-select {
+                        background: var(--input-bg);
+                        border: 1px solid var(--border);
+                        color: var(--text);
+                        padding: 8px;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        outline: none;
+                        width: 100%;
+                    }
+
+                    .pull-input-group {
+                        display: flex;
+                        gap: 8px;
+                    }
+                    
+                    #pull-progress-container {
+                        margin-top: 8px;
+                        background: rgba(255,255,255,0.05);
+                        border-radius: 4px;
+                        height: 4px;
+                        overflow: hidden;
+                    }
+                    #pull-progress-bar {
+                        height: 100%;
+                        background: var(--accent);
+                        width: 0%;
+                        transition: width 0.3s;
+                    }
+                    #pull-status {
+                        font-size: 10px;
+                        margin-top: 4px;
+                        opacity: 0.7;
+                        text-align: right;
+                    }
 
                     /* Chat Container */
                     #chat-page, #history-page {
@@ -419,6 +501,10 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                 </div>
 
                 <div id="settings-menu" class="hidden">
+                    <div class="settings-item" id="model-settings-btn">
+                        <svg width="14" height="14" viewBox="0 0 16 16"><path fill="currentColor" d="M12.44 1.54a2.9 2.9 0 0 0-4.1 0l-3.2 3.2a1.51 1.51 0 0 0 0 2.12l1.34 1.34L1.75 13l-.5.5V16h2.5l.5-.5 4.81-4.81 1.34 1.34a1.51 1.51 0 0 0 2.12 0l3.2-3.2a2.9 2.9 0 0 0 0-4.1zM11.67 6H10V4.33a2 2 0 0 1 1.67 1.67z"/></svg>
+                        Model Settings
+                    </div>
                     <div class="settings-item" id="figma-settings-btn">
                         <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
                         Figma Settings
@@ -449,7 +535,37 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                     </div>
                 </div>
 
-                <div id="chat-page">
+                <div id="model-modal" class="hidden">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Model Settings</h3>
+                        </div>
+                        <div class="modal-body">
+                            <div class="setting-row">
+                                <span class="setting-label">Select Active Model</span>
+                                <select id="model-select">
+                                    <option value="">Loading models...</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <span class="setting-label">Pull New Model</span>
+                                <div class="pull-input-group">
+                                    <input type="text" id="pull-model-input" class="token-input" placeholder="e.g., llama3" style="width: 100%; margin: 0;"/>
+                                    <button class="btn btn-primary" id="pull-model-btn" style="padding: 0 12px;">Pull</button>
+                                </div>
+                                <div id="pull-status-container" class="hidden">
+                                    <div id="pull-progress-container">
+                                        <div id="pull-progress-bar"></div>
+                                    </div>
+                                    <div id="pull-status">Downloading...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" id="close-model-modal">Close</button>
+                        </div>
+                    </div>
+                </div>
                     <div id="messages">
                         <div class="message assistant">Hello! I am Mirror. How can I assist you today?</div>
                     </div>
@@ -572,6 +688,39 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                         }
                     });
 
+                    // Model Modal Logic
+                    const modelModal = document.getElementById('model-modal');
+                    const modelSelect = document.getElementById('model-select');
+                    const pullModelInput = document.getElementById('pull-model-input');
+                    const pullStatusContainer = document.getElementById('pull-status-container');
+                    const pullProgressBar = document.getElementById('pull-progress-bar');
+                    const pullStatusText = document.getElementById('pull-status');
+
+                    document.getElementById('model-settings-btn').addEventListener('click', () => {
+                        settingsMenu.classList.add('hidden');
+                        modelModal.classList.remove('hidden');
+                        vscode.postMessage({ type: 'fetchModels' });
+                    });
+
+                    document.getElementById('close-model-modal').addEventListener('click', () => {
+                        modelModal.classList.add('hidden');
+                        pullStatusContainer.classList.add('hidden');
+                    });
+
+                    modelSelect.addEventListener('change', () => {
+                        vscode.postMessage({ type: 'selectModel', value: modelSelect.value });
+                    });
+
+                    document.getElementById('pull-model-btn').addEventListener('click', () => {
+                        const modelName = pullModelInput.value.trim();
+                        if (modelName) {
+                            pullStatusContainer.classList.remove('hidden');
+                            pullProgressBar.style.width = '0%';
+                            pullStatusText.innerText = 'Initializing...';
+                            vscode.postMessage({ type: 'pullModel', value: modelName });
+                        }
+                    });
+
                     function appendMessage(msg) {
                         const div = document.createElement('div');
                         div.className = 'message ' + msg.role;
@@ -613,6 +762,22 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                             case 'initialConfig':
                                 if (message.value.figmaAccessToken) {
                                     figmaTokenInput.value = message.value.figmaAccessToken;
+                                }
+                                if (message.value.ollamaModel) {
+                                    // Use a temporary marked value to ensure selection after list loads
+                                    window._currentModel = message.value.ollamaModel;
+                                }
+                                break;
+                            case 'modelsList':
+                                modelSelect.innerHTML = message.value.map(m => 
+                                    \`<option value="\${m}" \${m === window._currentModel ? 'selected' : ''}>\${m}</option>\`
+                                ).join('');
+                                break;
+                            case 'pullProgress':
+                                pullProgressBar.style.width = \`\${message.value.percent}%\`;
+                                pullStatusText.innerText = \`\${message.value.status} (\${message.value.percent}%)\`;
+                                if (message.value.percent === 100 && message.value.status === 'success') {
+                                    setTimeout(() => pullStatusContainer.classList.add('hidden'), 2000);
                                 }
                                 break;
                         }

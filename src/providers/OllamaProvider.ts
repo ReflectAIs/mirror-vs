@@ -68,4 +68,39 @@ export class OllamaProvider implements LLMProvider {
         // For E4B, we'll use a conservative 3.5 chars/token estimate for pruning.
         return Math.ceil(text.length / 3.5);
     }
+
+    async listLocalModels(): Promise<string[]> {
+        try {
+            const response = await this.client.list();
+            return response.models.map(m => m.name);
+        } catch (error) {
+            console.error('Error listing models:', error);
+            return [];
+        }
+    }
+
+    async pullModel(name: string, onProgress: (percent: number, status: string) => void): Promise<void> {
+        try {
+            const response = await this.client.pull({ model: name, stream: true });
+            for await (const part of response) {
+                if (part.total && part.completed) {
+                    const percent = Math.round((part.completed / part.total) * 100);
+                    onProgress(percent, part.status);
+                } else {
+                    onProgress(0, part.status);
+                }
+            }
+        } catch (error: any) {
+            throw new Error(`Failed to pull model ${name}: ${error.message}`);
+        }
+    }
+
+    updateModel(name: string) {
+        this.model = name;
+        console.log(`[OllamaProvider] Model updated to: ${name}`);
+    }
+
+    getCurrentModel(): string {
+        return this.model;
+    }
 }
