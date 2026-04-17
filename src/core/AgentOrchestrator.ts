@@ -62,10 +62,19 @@ export class AgentOrchestrator {
         }
     }
 
-    public async processMessage(userMessage: string, maxTurns: number = 100) {
+    public async processMessage(userMessage: string, maxTurns: number = 1000) {
         this.isThinking = true;
-        this.addHistory({ role: 'user', content: userMessage });
-        this.logDebug(`USER: ${userMessage}`);
+
+        const cwd = this.executor.getCurrentDir();
+        let enrichedMessage = `[CURRENT LOCATION: ${cwd}]\n\n${userMessage}`;
+
+        // 5. Keyword Cheat Codes (Tailwind v3 Fallback Fix)
+        if (userMessage.toLowerCase().includes('tailwind')) {
+            enrichedMessage += `\n\n[CHEAT SHEET: TAILWIND v4]\nTailwind v4 is a significant departure from v3. Key rules:\n1. NO tailwind.config.js - Configuration is now handled via CSS @theme variables.\n2. USE @import "tailwindcss"; in your main CSS file.\n3. POSTCSS or VITE integration: Use '@tailwindcss/vite' plugin, NOT 'tailwindcss' postcss plugin.\n4. CONTENT: v4 auto-detects classes, no 'content' array needed in config.`;
+        }
+
+        this.addHistory({ role: 'user', content: enrichedMessage });
+        this.logDebug(`USER [Enriched]: ${enrichedMessage}`);
         this.triggerUpdate();
 
         try {
@@ -94,7 +103,20 @@ export class AgentOrchestrator {
                         } else {
                             const newMsg: Message = { role: 'assistant', content: token };
                             this.history.addMessage(newMsg);
+                            lastMsg = newMsg;
                         }
+
+                        // EARLY TERMINATION: Stop as soon as a Mirror tool call is complete
+                        // Precision regex to avoid mistaking React JSX for Mirror tools (Fixes JSX Truncation)
+                        const content = lastMsg.content.trim();
+                        const closingToolsRegex = /<\/(write_file|replace_block|append_memory|search_file)>$/;
+                        const selfClosingToolsRegex = /<(read_file|list_dir|run_command|web_search|read_url)[^>]*\/>$/;
+
+                        if (closingToolsRegex.test(content) || selfClosingToolsRegex.test(content)) {
+                            this.logDebug(`EARLY TERMINATION: Detected end of VALID tool call. Aborting stream.`);
+                            this.abortController?.abort();
+                        }
+
                         this.triggerUpdate();
                     }
                 });
@@ -104,25 +126,50 @@ export class AgentOrchestrator {
                 this.triggerUpdate();
 
                 if (response.content.trim().length === 0) {
+                    this.logDebug("INTERCEPTOR: Empty response detected. Switching to EXPLORER mode.");
+                    this.mode = 'EXPLORER';
                     this.addHistory({
                         role: 'user',
-                        content: "You returned an empty response. If you are stuck on a technical error, use <web_search query='...' /> to find a solution."
+                        content: "You returned an empty response. I have switched your mode to EXPLORER. If you are stuck on a technical error, use <web_search query='...' /> to find a solution."
                     });
                     turns++;
                     continue;
                 }
 
-                const toolCalls = ToolParser.parseHeuristic(response.content);
+                // 4. THE CONTROL TOKEN SANITIZER
+                // Strip leaked internal tokens from Gemma 4B before parsing (Fixes Parser Collision)
+                const cleanContent = response.content.replace(/<channel\|>|<\|"\|>|<\|endoftext\|>|<eos>|<\|im_start\|>|<\|im_end\|>/g, '');
+                let toolCalls = ToolParser.parseHeuristic(cleanContent);
 
                 // 1. Markdown Leak Interceptor
                 if (toolCalls.length === 0 && response.content.includes('```')) {
-                    this.logDebug("INTERCEPTOR: Markdown detected without XML tags.");
+                    this.logDebug("INTERCEPTOR: Markdown detected without XML tags. Switching to EXPLORER mode.");
+                    this.mode = 'EXPLORER';
                     this.addHistory({
                         role: 'user',
-                        content: "CRITICAL ERROR: You output raw Markdown code blocks (```) instead of using the required XML tool tags (<write_file> or <replace_block>). You MUST wrap all code changes in the appropriate tool tags. Please retry the previous step using the correct schema."
+                        content: "CRITICAL ERROR: You output raw Markdown code blocks (```) instead of using the required XML tool tags (<write_file> or <replace_block>). You MUST wrap all code changes in the appropriate tool tags. I have switched your mode to EXPLORER. Please retry the previous step using the correct schema."
                     });
                     turns++;
                     continue;
+                }
+
+                // 2. The Hard Tool Execution Limit (Fixes the Tool Cannon)
+                if (toolCalls.length > 2) {
+                    this.logDebug(`INTERCEPTED: Tool Cannon Detected. Slicing from ${toolCalls.length} down to 2.`);
+
+                    // Grab the names of the dropped tools to tell the model exactly what it lost (Fixes the Desync Deadlock)
+                    const droppedTools = toolCalls.slice(2).map(t => t.name).join(', ');
+                    const originalCount = toolCalls.length;
+
+                    toolCalls = toolCalls.slice(0, 2);
+
+                    // CRITICAL FIX: Force the model into EXPLORER mode to break the Attention Tunnel
+                    this.mode = 'EXPLORER';
+
+                    this.addHistory({
+                        role: 'user',
+                        content: `CRITICAL SYSTEM OVERRIDE: You attempted to execute ${originalCount} tools at once, which violates the pacing limit. Only the first two tools were executed.\n\nThe following tools were CANCELLED and ignored: [${droppedTools}]. \n\nDO NOT wait for their output. I have switched your mode to EXPLORER. You MUST evaluate the current results, verify the environment state, and re-issue the remaining tools in your next response, strictly two at a time.`
+                    });
                 }
 
                 if (toolCalls.length === 0) {
@@ -242,6 +289,17 @@ export class AgentOrchestrator {
                         memory = `${head}\n\n...[ARCHIVED OLDER PARADIGMS]...\n\n${tail}`;
                     }
                     basePrompt += `\n\nTECHNICAL LEDGER / PROJECT MEMORY:\n${memory}`;
+                } catch (e) { /* Ignore */ }
+            }
+        }
+
+        // 3. Automated Task Plan Injection (Fixes Long-Task Amnesia)
+        if (this.workspaceRoot) {
+            const planPath = path.join(this.workspaceRoot, '.mirror', 'plan.md');
+            if (fs.existsSync(planPath)) {
+                try {
+                    const plan = fs.readFileSync(planPath, 'utf8');
+                    basePrompt += `\n\nCURRENT PROJECT PLAN (Checklist):\n${plan}`;
                 } catch (e) { /* Ignore */ }
             }
         }

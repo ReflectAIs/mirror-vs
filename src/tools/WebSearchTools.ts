@@ -1,4 +1,7 @@
 import axios from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
+import crypto from 'crypto';
 
 export class WebSearchTools {
     private static lastSearchTime = 0;
@@ -6,9 +9,9 @@ export class WebSearchTools {
 
     /**
      * Searches the web using DuckDuckGo Lite (Anonymous Access).
-     * This bypasses the StackOverflow API restriction and provides official documentation links.
+     * Results are cached to .mirror/web_cache for persistence.
      */
-    static async search(query: string): Promise<string> {
+    static async search(query: string, workspaceRoot?: string): Promise<string> {
         const now = Date.now();
         if (now - this.lastSearchTime < this.COOL_DOWN_MS) {
             return `Error: Search cool-down in effect. Please wait a few seconds.`;
@@ -46,6 +49,29 @@ export class WebSearchTools {
             });
 
             summary += `SUGGESTION: If one of these URLs looks like official documentation or a helpful guide, use the <read_url url="..." /> tool to scrape its detailed contents!`;
+
+            // --- Cache Persistence Layer ---
+            if (workspaceRoot) {
+                try {
+                    const cacheDir = path.join(workspaceRoot, '.mirror', 'web_cache');
+                    if (!fs.existsSync(cacheDir)) {
+                        fs.mkdirSync(cacheDir, { recursive: true });
+                    }
+
+                    // Create a safe filename from the query
+                    const safeQuery = query.toLowerCase().replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').substring(0, 40);
+                    const hash = crypto.createHash('md5').update(query).digest('hex').substring(0, 6);
+                    const filename = `search_${safeQuery}_${hash}.md`;
+                    const filepath = path.join(cacheDir, filename);
+
+                    const fileContent = `<!-- Search Query: ${query} -->\n# Web Search Results: ${query}\n\n${summary}`;
+                    fs.writeFileSync(filepath, fileContent, 'utf8');
+                    
+                    summary += `\n\n✅ Results cached to: ${filepath}`;
+                } catch (cacheError) {
+                    console.error(`[WebSearchTools] Caching failed:`, cacheError);
+                }
+            }
 
             return summary;
         } catch (error: any) {

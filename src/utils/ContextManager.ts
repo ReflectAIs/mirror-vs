@@ -12,8 +12,8 @@ export class ContextManager {
 
     private calculateOptimalContext(): number {
         // Optimization for CPU inference: 
-        // 8192 provides a better balance for complex tasks.
-        return 8192;
+        // 16384 provides a great balance for complex tasks in Ollama.
+        return 16384;
     }
 
     getMaxTokens(): number {

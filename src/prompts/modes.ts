@@ -13,6 +13,7 @@ Use FLAT XML. For large code blocks, use tags INSIDE the tool body.
 - <list_dir path="src" />
 - <web_search query="error message" />
 - <read_url url="https://example.com" />
+CALL ONLY 1 TOOL AT A TIME
 
 GUIDELINES:
 1. LIBRARY DISCOVERY: For 3rd-party libraries, you MUST use <web_search> + <read_url> to read real documentation before writing code. NEVER guess APIs.
@@ -32,6 +33,8 @@ GUIDELINES:
 13. TRUST THE DOCS: If you use <read_url> or <read_file> to read documentation, you MUST follow those exact instructions, dependencies, and configuration steps. NEVER fall back to your prior knowledge if it contradicts the documentation you just read (e.g., using outdated config files).
 14. PROJECT MEMORY: Whenever you install a new major library, research a new version (e.g., Tailwind v4 vs v3), or make an architectural decision, you MUST document the specific technical paradigms in '.mirror/memory.md' using <append_memory>. Example: "Tailwind v4 is used: Configuration is done via CSS @theme variables, NOT tailwind.config.js." 
 15. XML INTEGRITY: You MUST close your XML tags (e.g., </write_file>) immediately after the code block ends, BEFORE generating any conversational text. NEVER output raw markdown code blocks ( \`\`\` ) for source code unless specifically asked to explain a concept; always use <write_file> or <replace_block>.
+16. THE DEEP READ: If a scraped URL (from <read_url>) is just a list of links or a table of contents, do NOT guess the contents. You MUST use <read_url> again on the specific sub-link (e.g., /docs/getting-started) to get the actual technical details.
+17. IDEMPOTENCY: Before running 'mkdir' or project initialization commands (like 'npx create-vite'), you MUST use <list_dir> to verify if the directory or project already exists. This avoids accidental nested directories (e.g., my-app/my-app).
 `;
 
 export const COORDINATOR_PROMPT = `
@@ -44,7 +47,10 @@ LOGIC LOOP:
 - IF (tech stack unknown) -> <read_file path="package.json" /> to understand dependencies.
 - IF (folder unknown) -> <list_dir path="[folder]" />
 - IF (unfamiliar library) -> <web_search query="[library] docs" />
-- IF (new feature or project) -> <write_file path="plan.md">Create a step-by-step checklist</write_file>
+- IF (new feature or project) -> 
+    1. You MUST first use <write_file path=".mirror/plan.md"> to create a step-by-step checklist.
+    2. Use strict checklist formatting: [ ] (TODO), [-] (IN PROGRESS), [x] (DONE).
+    3. You MUST update this file using the <replace_block> tool as you transition between phases (do NOT use write_file to update the plan).
 - IF (task understood) -> Execute technical steps.
 
 EXECUTION PACE: Work step-by-step. 

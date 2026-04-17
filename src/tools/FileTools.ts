@@ -24,13 +24,22 @@ export class FileTools {
 
             // Default behavior: 500 line limit
             const limit = 500;
+            let result = '';
             if (lines.length > limit) {
-                return lines.slice(0, 250).join('\n') + 
+                result = lines.slice(0, 250).join('\n') + 
                     `\n\n... [TRUNCATED ${lines.length - limit} LINES] ...\n\n` +
                     lines.slice(-250).join('\n') +
                     `\n\n[FILE: ${filePath} | TRUNCATED TO 500 LINES (250 START + 250 END) OUT OF ${lines.length}]`;
+            } else {
+                result = content;
             }
-            return content;
+
+            // Hard character limit: Prevent context flooding (Fixes Overload Amnesia)
+            if (result.length > 8000) {
+                result = result.substring(0, 8000) + "\n\n...[TRUNCATED DUE TO LENGTH]...\nSYSTEM ALERT: This file is too large. Use <search_file> to find specific keywords.";
+            }
+
+            return result;
         } catch (error: any) {
             return `Error reading file: ${error.message}`;
         }

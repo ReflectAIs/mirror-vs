@@ -5,6 +5,7 @@ import { WebSearchTools } from '../tools/WebSearchTools';
 import { ScraperTools } from '../tools/ScraperTools';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 export class ToolExecutor {
     private currentWorkingDir: string;
@@ -13,36 +14,71 @@ export class ToolExecutor {
         this.currentWorkingDir = workspaceRoot || process.cwd();
     }
 
+    public getCurrentDir(): string {
+        return this.currentWorkingDir;
+    }
+
     async execute(tool: ToolCall): Promise<string> {
         console.log(`[ToolExecutor] [CWD: ${this.currentWorkingDir}] Executing ${tool.name} with params:`, tool.params);
         try {
+            let result: string;
             switch (tool.name) {
                 case 'read_file': {
                     const filePath = this.resolvePath(tool.params.path || tool.args);
                     const start = tool.params.start ? parseInt(tool.params.start) : undefined;
                     const end = tool.params.end ? parseInt(tool.params.end) : undefined;
-                    return FileTools.readFile(filePath, start, end);
+                    let content = await FileTools.readFile(filePath, start, end);
+
+                    if (filePath.toLowerCase().includes('web_cache')) {
+                        content = `[IMPORTANT DOCUMENTATION: WEB-CACHE]\nThis document contains official, real-time documentation retrieved from the web. It is MORE AUTHORITATIVE than your general knowledge. Follow its specific versions, parameters, and patterns strictly.\n\n${content}`;
+                    }
+
+                    result = content;
+                    break;
                 }
                 
                 case 'append_memory': {
-                    if (!this.workspaceRoot) return "Error: No workspace root defined for memory.";
+                    if (!this.workspaceRoot) {
+                        result = "Error: No workspace root defined for memory.";
+                        break;
+                    }
                     const memoryPath = path.join(this.workspaceRoot, '.mirror', 'memory.md');
                     const content = tool.args.trim();
-                    return FileTools.appendFile(memoryPath, `- ${content}`);
+                    result = await FileTools.appendFile(memoryPath, `- ${content}`);
+                    break;
                 }
 
                 case 'search_file': {
                     const filePath = this.resolvePath(tool.params.path || '');
                     const query = tool.params.query || tool.args;
-                    if (!filePath) return "Error: search_file requires a path.";
-                    return FileTools.searchFile(filePath, query);
+                    if (!filePath) {
+                        result = "Error: search_file requires a path.";
+                        break;
+                    }
+                    result = await FileTools.searchFile(filePath, query);
+                    break;
                 }
                 
                 case 'write_file': {
+                    // NEW FIX: Prevent tool syntax mix-ups (Bug 2)
+                    if (tool.args.includes('<search>') && tool.args.includes('<replace>')) {
+                        result = "Execution Error: You used <search> and <replace> tags inside <write_file>. If you want to modify an existing file, you MUST use the <replace_block> tool instead.";
+                        break;
+                    }
+
                     const filePath = this.resolvePath(tool.params.path || tool.args);
                     // Strip common Gemma/LLM leaked control tokens
-                    const cleanContent = tool.args.replace(/<\|"\|>|<\|endoftext\|>|<eos>/g, '').trim();
-                    return FileTools.writeFile(filePath, cleanContent);
+                    let cleanContent = tool.args.replace(/<\|"\|>|<\|endoftext\|>|<eos>|<channel\|>/g, '').trim();
+
+                    // Fix stringified newlines and quotes (Fixes the \n Bug)
+                    if (cleanContent.includes('\\n') && !cleanContent.includes('\n')) {
+                        cleanContent = cleanContent.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    }
+
+                    const writeResult = await FileTools.writeFile(filePath, cleanContent);
+                    const validation = await this.validateFile(filePath);
+                    result = validation ? `${writeResult}\n\n[CRITICAL NUDGE: LINT/SYNTAX ERRORS DETECTED]\nYour last update introduced errors. You MUST <read_file> the affected lines to verify the exact state before attempting to fix them. DO NOT fix blindly.\n\n${validation}` : writeResult;
+                    break;
                 }
 
                 case 'replace_block': {
@@ -55,9 +91,27 @@ export class ToolExecutor {
                         // Sanitize inputs
                         search = search.replace(/<\|"\|>|<\|endoftext\|>|<eos>/g, '');
                         replace = replace.replace(/<\|"\|>|<\|endoftext\|>|<eos>/g, '');
-                        return FileTools.replaceBlock(filePath, search, replace);
+                        
+                        let replaceResult = await FileTools.replaceBlock(filePath, search, replace);
+                        
+                        // ENRICHED ERROR HANDLING: If search block not found, give adaptive nudges
+                        if (replaceResult.includes("Search block not found") && fs.existsSync(filePath)) {
+                            const content = fs.readFileSync(filePath, 'utf8');
+                            const lineCount = content.split('\n').length;
+                            
+                            if (lineCount < 100) {
+                                replaceResult += `\n\n[CRITICAL ERROR NUDGE]\nThe file is small (${lineCount} lines). Do not keep trying replace_block. Instead, use <read_file> to see the current state, and then use <write_file> to rewrite the entire file with your changes. This is much more reliable for small files.`;
+                            } else {
+                                replaceResult += `\n\n[CRITICAL ERROR NUDGE]\nThe search block was not found. Please use <read_file> (possibly with start/end lines) to verify the EXACT whitespace, indentation, and content of the block you are trying to replace before trying again.`;
+                            }
+                        }
+
+                        const validation = await this.validateFile(filePath);
+                        result = validation ? `${replaceResult}\n\n[CRITICAL NUDGE: LINT/SYNTAX ERRORS DETECTED]\nYour last update introduced errors. You MUST <read_file> the affected lines to verify the exact state before attempting to fix them. DO NOT fix blindly.\n\n${validation}` : replaceResult;
+                    } else {
+                        result = "Error: replace_block requires path, search, and replace (as attributes or tags).";
                     }
-                    return "Error: replace_block requires path, search, and replace (as attributes or tags).";
+                    break;
                 }
 
                 case 'run_command':
@@ -71,28 +125,34 @@ export class ToolExecutor {
                         
                         if (fs.existsSync(newPath) && fs.statSync(newPath).isDirectory()) {
                             this.currentWorkingDir = newPath;
-                            return `CWD updated to: ${this.currentWorkingDir}`;
+                            result = `CWD updated to: ${this.currentWorkingDir}`;
                         } else {
-                            return `Error: Directory "${targetDir}" not found.`;
+                            result = `Error: Directory "${targetDir}" not found.`;
                         }
+                    } else {
+                        result = await TerminalTools.runCommand(cmd, this.currentWorkingDir);
                     }
-                    
-                    return TerminalTools.runCommand(cmd, this.currentWorkingDir);
+                    break;
 
                 case 'list_dir':
                     const dirPath = this.resolvePath(tool.params.path || tool.args || '.');
                     const items = fs.readdirSync(dirPath, { withFileTypes: true });
-                    return items.map(i => `${i.isDirectory() ? '[DIR]' : '[FILE]'} ${i.name}`).join('\n');
+                    result = items.map(i => `${i.isDirectory() ? '[DIR]' : '[FILE]'} ${i.name}`).join('\n');
+                    break;
 
                 case 'web_search':
-                    return WebSearchTools.search(tool.params.query || tool.args);
+                    result = await WebSearchTools.search(tool.params.query || tool.args, this.workspaceRoot || this.currentWorkingDir);
+                    break;
 
                 case 'read_url':
-                    return ScraperTools.scrapeUrl(tool.params.url || tool.args, this.currentWorkingDir);
+                    result = await ScraperTools.scrapeUrl(tool.params.url || tool.args, this.workspaceRoot || this.currentWorkingDir);
+                    break;
 
                 default:
-                    return `Error: Unknown tool "${tool.name}".`;
+                    result = `Error: Unknown tool "${tool.name}".`;
+                    break;
             }
+            return `[CURRENT DIRECTORY: ${this.currentWorkingDir}]\n\n${result}`;
         } catch (error: any) {
             return `Execution Error: ${error.message}`;
         }
@@ -120,10 +180,58 @@ export class ToolExecutor {
         return null;
     }
 
+    private async validateFile(filePath: string): Promise<string | null> {
+        const ext = path.extname(filePath);
+        if (!['.js', '.jsx', '.ts', '.tsx'].includes(ext)) {
+            return null;
+        }
+
+        try {
+            // Prioritize the current working directory as it's likely the project root the agent is working in
+            const cwd = this.currentWorkingDir || this.workspaceRoot || process.cwd();
+            
+            // Look for package.json to verify eslint is set up
+            const pkgPath = path.join(cwd, 'package.json');
+            if (!fs.existsSync(pkgPath)) {
+                console.log(`[Validator] Skipped: No package.json found at ${cwd}`);
+                return null;
+            }
+
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            const hasEslint = (pkg.dependencies?.eslint) || (pkg.devDependencies?.eslint);
+            
+            if (hasEslint) {
+                try {
+                    // Execute quiet linting
+                    const output = execSync(`npx eslint "${filePath}" --quiet`, { cwd, stdio: 'pipe' });
+                    return null; // Success
+                } catch (err: any) {
+                    // ESLint exits with code 1 when errors are found
+                    const errorOutput = (err.stdout?.toString() || err.stderr?.toString() || '').trim();
+                    if (errorOutput) {
+                        console.log(`[Validator] Detected errors in ${filePath}`);
+                        return errorOutput;
+                    }
+                    return null;
+                }
+            }
+            return null;
+        } catch (e: any) {
+            console.error(`[Validator] Error during validation: ${e.message}`);
+            return null; // Fail silently but log it
+        }
+    }
+
     private resolvePath(filePath: string): string {
         if (path.isAbsolute(filePath)) {
             return filePath;
         }
+
+        // CRITICAL FIX: Lock system files to the workspace root (Bug 1: Floating Mirror fix)
+        if (filePath.startsWith('.mirror') && this.workspaceRoot) {
+            return path.resolve(this.workspaceRoot, filePath);
+        }
+
         return path.resolve(this.currentWorkingDir, filePath);
     }
 }
