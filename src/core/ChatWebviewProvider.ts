@@ -566,6 +566,7 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
                         </div>
                     </div>
                 </div>
+                <div id="chat-page">
                     <div id="messages">
                         <div class="message assistant">Hello! I am Mirror. How can I assist you today?</div>
                     </div>

@@ -216,6 +216,19 @@ export class AgentOrchestrator {
 
                     let feedbackContent = `[TOOL_RESULT: ${tool.name}]\n${formattedResult}`;
 
+                    // THE AUTOMATED PLAN NUDGE (Fixes Multi-Step Forgetfulness)
+                    if (['write_file', 'replace_block'].includes(tool.name) && this.workspaceRoot) {
+                        const planPath = path.join(this.workspaceRoot, '.mirror', 'plan.md');
+                        if (fs.existsSync(planPath)) {
+                            try {
+                                const planContent = fs.readFileSync(planPath, 'utf8');
+                                feedbackContent += `\n\n[PLAN UPDATED NUDGE: .mirror/plan.md]\nThe current project plan is below. Since this file is small, YOU MUST update it now using <write_file> to overwrite the ENTIRE file with your latest progress. Do NOT use <replace_block> on plan.md as it may cause duplication.\n\n${planContent}`;
+                            } catch (e) { /* Ignore */ }
+                        } else {
+                            feedbackContent += `\n\n[SYSTEM NUDGE: PLANNING]\nYou just made persistent file changes. If this is a multi-step task, please create a project plan at .mirror/plan.md to track your progress.`;
+                        }
+                    }
+
                     // 2. npm install Interceptor (Amnesia by Omission Fix)
                     if (tool.name === 'run_command' && (tool.args.includes('install') || tool.params.cmd?.includes('install'))) {
                         feedbackContent += '\n\nIMPORTANT: You just installed/updated a dependency. You MUST now use <append_memory> to document the specific technical paradigms or versions for this library in .mirror/memory.md.';
