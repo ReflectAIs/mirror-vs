@@ -217,7 +217,10 @@ export class AgentOrchestrator {
                     let feedbackContent = `[TOOL_RESULT: ${tool.name}]\n${formattedResult}`;
 
                     // THE AUTOMATED PLAN NUDGE (Fixes Multi-Step Forgetfulness)
-                    if (['write_file', 'replace_block'].includes(tool.name) && this.workspaceRoot) {
+                    // CRITICAL FIX: Do NOT nudge if the model JUST updated the plan file, to avoid feedback loops.
+                    const isPlanUpdate = (tool.params.path || tool.args || '').includes('plan.md');
+                    
+                    if (['write_file', 'replace_block'].includes(tool.name) && this.workspaceRoot && !isPlanUpdate) {
                         const planPath = path.join(this.workspaceRoot, '.mirror', 'plan.md');
                         if (fs.existsSync(planPath)) {
                             try {

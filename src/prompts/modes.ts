@@ -50,7 +50,7 @@ LOGIC LOOP:
 - IF (new feature or project) -> 
     1. You MUST first use <write_file path=".mirror/plan.md"> to create a step-by-step checklist.
     2. Use strict checklist formatting: [ ] (TODO), [-] (IN PROGRESS), [x] (DONE).
-    3. You MUST update this file using the <replace_block> tool as you transition between phases (do NOT use write_file to update the plan).
+    3. You MUST update this file manually using <write_file> as you finish each step. Do NOT use <replace_block> on plan.md as it is more reliable to overwrite the entire small file.
 - IF (task understood) -> Execute technical steps.
 
 EXECUTION PACE: Work step-by-step. 
