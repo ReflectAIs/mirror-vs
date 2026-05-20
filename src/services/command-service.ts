@@ -76,9 +76,46 @@ export class CommandService {
    * Generate a unique terminal name for a command.
    */
   private getTerminalName(command: string): string {
-    // Truncate command for the name
-    const shortName = command.length > 30 ? command.substring(0, 30) + '…' : command;
+    const shortName = command.length > 30 ? command.substring(0, 30) + '\u2026' : command;
     return `Mirror: ${shortName}`;
+  }
+
+  /**
+   * Resolve a command that may contain a leading `cd <dir>` prefix.
+   * Instead of rewriting shell syntax (which breaks across shells), we extract
+   * the directory and set it as the spawn cwd. This is shell-agnostic and
+   * works identically on PowerShell, cmd.exe, bash, and zsh.
+   *
+   * Examples:
+   *   "cd todoa-app && python -m http.server"  → { cmd: "python -m http.server", cwd: ".../todoa-app" }
+   *   "cd todoa-app; python -m http.server"    → { cmd: "python -m http.server", cwd: ".../todoa-app" }
+   *   "python -m http.server"                  → { cmd: "python -m http.server", cwd: unchanged }
+   */
+  private resolveCommandAndCwd(command: string, baseCwd: string): { cmd: string; cwd: string } {
+    // Match: cd <dir> followed by && or ; or end-of-string
+    // Use greedy + (not lazy +?) so the full directory name is captured,
+    // not just the first character.
+    const cdPattern = /^\s*cd\s+(['"]?)([^'"&;|\r\n]+)\1\s*(?:&&|;)?\s*/i;
+    const cdMatch = command.match(cdPattern);
+
+    if (cdMatch) {
+      const dir = cdMatch[2].trim();
+      const resolvedCwd = path.resolve(baseCwd, dir);
+      const remainingCmd = command.slice(cdMatch[0].length).trim();
+      this.logToDebug(`cd prefix extracted: cwd set to "${resolvedCwd}", running: "${remainingCmd}"`);
+      return { cmd: remainingCmd || command, cwd: resolvedCwd };
+    }
+
+    return { cmd: command, cwd: baseCwd };
+  }
+
+  /**
+   * Returns the shell option for child_process.spawn.
+   * Since resolveCommandAndCwd strips all `cd X &&` prefixes before spawning,
+   * commands never contain shell-specific syntax — cmd.exe (shell: true) works fine.
+   */
+  private getSpawnShell(): boolean {
+    return true;
   }
 
   /**
@@ -124,57 +161,122 @@ export class CommandService {
       throw new Error('No workspace folder is currently open.');
     }
 
-    this.logToDebug(`Executing command: "${commandString}"`);
+    // Extract any leading `cd <dir>` prefix and resolve it as the spawn cwd.
+    // This is shell-agnostic — avoids Set-Location vs cd inconsistencies.
+    const { cmd, cwd } = this.resolveCommandAndCwd(commandString, workspaceFolder);
 
-    const isServer = this.isServerCommand(commandString);
+    this.logToDebug(`Executing command: "${cmd}" (cwd: "${cwd}")`);
 
-    // For server/watcher commands, use a VS Code terminal
+    const isServer = this.isServerCommand(cmd);
+
     if (isServer) {
-      return this.executeInTerminal(commandString, workspaceFolder);
+      // For VS Code terminal, send the ORIGINAL command string (terminal handles its own cwd)
+      return this.executeInTerminal(cmd, cwd, commandString);
     }
 
-    // For short commands, use hidden child process with timeout
-    return this.executeInBackground(commandString, workspaceFolder);
+    return this.executeInBackground(cmd, cwd);
   }
 
   /**
-   * Execute a command in a VS Code terminal so the user can see/interact.
+   * Extract port number from a server command string.
    */
-  private async executeInTerminal(commandString: string, cwd: string): Promise<string> {
-    const terminalName = this.getTerminalName(commandString);
+  private extractPort(command: string): number | null {
+    const patterns = [
+      /http\.server\s+(\d+)/i,          // python -m http.server 8080
+      /(?:-p|--port)[=\s]+(\d+)/i,      // -p 3000 or --port=3000
+      /:(\d{4,5})\b/,                   // :8080
+      /\b(\d{4,5})\s*$/,                // trailing port number
+    ];
+    for (const p of patterns) {
+      const m = command.match(p);
+      if (m) { return parseInt(m[1], 10); }
+    }
+    return null;
+  }
 
-    // Check if we already have a terminal running this command
-    let terminal = this.activeTerminals.get(terminalName);
+  /**
+   * Probe a local TCP port. Returns true if something is listening.
+   */
+  private probePort(port: number, timeoutMs = 1500): Promise<boolean> {
+    return new Promise((resolve) => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const net = require('net') as typeof import('net');
+      const socket = new net.Socket();
+      socket.setTimeout(timeoutMs);
+      socket.once('connect', () => { socket.destroy(); resolve(true); });
+      socket.once('timeout', () => { socket.destroy(); resolve(false); });
+      socket.once('error', () => { resolve(false); });
+      socket.connect(port, '127.0.0.1');
+    });
+  }
 
-    if (!terminal || terminal.exitStatus !== undefined) {
-      // Create a new terminal
-      terminal = vscode.window.createTerminal({
-        name: terminalName,
-        cwd: cwd,
-        // Preserve the environment so user's PATH etc. is available
-      });
+  /**
+   * Execute a server/long-running command in a VS Code terminal (visible to user).
+   * Uses TCP port probing instead of a parallel hidden spawn to avoid port conflicts.
+   * - If the terminal already exists: return immediately (do NOT re-launch the server).
+   * - If the terminal is new: wait for the server to boot, probe the port, report status.
+   */
+  private async executeInTerminal(commandString: string, cwd: string, originalCommand?: string): Promise<string> {
+    const terminalName = this.getTerminalName(originalCommand || commandString);
 
-      // Track it
-      this.activeTerminals.set(terminalName, terminal);
-      this.terminalCommandMap.set(terminalName, {
-        command: commandString,
-        isServer: true,
-      });
-
-      // Send the command
-      terminal.sendText(commandString, true);
-
-      this.logToDebug(`Created VS Code terminal "${terminalName}" for server command: "${commandString}"`);
-
-      // Show the terminal to the user so they can see progress
-      terminal.show(false); // false = don't steal focus from sidebar
-    } else {
-      // Terminal already exists — just reveal it
-      terminal.show(false);
-      this.logToDebug(`Revealed existing VS Code terminal "${terminalName}"`);
+    // --- Pre-launch: check if the target port is already occupied ---
+    // This catches the case where a DIFFERENT server (different terminal name)
+    // is already using the port, preventing EADDRINUSE crashes.
+    const port = this.extractPort(commandString);
+    if (port) {
+      const portOccupied = await this.probePort(port, 800);
+      if (portOccupied) {
+        this.logToDebug(`Port ${port} already occupied before launch — skipping new terminal.`);
+        return [
+          `⚠️ Port ${port} is already in use — a server is already running there.`,
+          `Do NOT start another server. Navigate directly to the existing one:`,
+          `Use: browser_navigate url="http://localhost:${port}"`,
+        ].join('\n');
+      }
     }
 
-    return `Command is running in VS Code terminal "${terminalName}".\n\nOpen the terminal from the VS Code Terminal panel or use the Mirror VS terminal toggle button to view progress.`;
+    // --- Deduplication by terminal name ---
+    let terminal = this.activeTerminals.get(terminalName);
+    const alreadyRunning = !!(terminal && terminal.exitStatus === undefined);
+
+    if (!alreadyRunning) {
+      terminal = vscode.window.createTerminal({ name: terminalName, cwd });
+      this.activeTerminals.set(terminalName, terminal);
+      this.terminalCommandMap.set(terminalName, { command: commandString, isServer: true });
+      terminal.sendText(commandString, true);
+      this.logToDebug(`Created VS Code terminal "${terminalName}" (cwd: "${cwd}"): "${commandString}"`);
+      terminal.show(false);
+    } else {
+      terminal!.show(false);
+      this.logToDebug(`Terminal "${terminalName}" already running — not re-launching.`);
+      return `Server is already running in VS Code terminal "${terminalName}". Use browser_navigate to verify it is accessible.`;
+    }
+
+    // --- Post-launch: wait then probe the port ---
+    const BOOT_WAIT_MS = 4000;
+    this.logToDebug(`Waiting ${BOOT_WAIT_MS}ms for server to boot on port ${port ?? '(unknown)'}...`);
+    await new Promise(r => setTimeout(r, BOOT_WAIT_MS));
+
+    if (port) {
+      const isUp = await this.probePort(port);
+      if (isUp) {
+        this.logToDebug(`Port ${port} is OPEN — server is up.`);
+        return [
+          `✅ Server is UP on port ${port}.`,
+          `NEXT STEP: You MUST navigate to http://localhost:${port} — do NOT use any other port.`,
+          `Use: browser_navigate url="http://localhost:${port}"`,
+        ].join('\n');
+      } else {
+        this.logToDebug(`Port ${port} did not respond after ${BOOT_WAIT_MS}ms.`);
+        return [
+          `⚠️ Server launched but port ${port} is not responding yet after ${BOOT_WAIT_MS / 1000}s.`,
+          `Check terminal "${terminalName}" for errors.`,
+          `If the server is still starting, use: browser_navigate url="http://localhost:${port}"`,
+        ].join('\n');
+      }
+    }
+
+    return `Server command launched in terminal "${terminalName}". No port detected in command — use browser_navigate to verify the app is accessible.`;
   }
 
   /**
@@ -185,8 +287,8 @@ export class CommandService {
 
     return new Promise((resolve, reject) => {
       const child = child_process.spawn(commandString, {
-        shell: true,
-        cwd: cwd,
+        shell: this.getSpawnShell(),
+        cwd,
         env: { ...process.env, FORCE_COLOR: '1' }
       });
 
@@ -237,27 +339,29 @@ export class CommandService {
 
       child.on('close', (code) => {
         clearTimeout(backgroundTimeout);
-        if (pid) {
-          this.activeProcesses.delete(pid);
-        }
-
-        const combinedOutput = [stdoutBuffer.trim(), stderrBuffer.trim()].filter(Boolean).join('\n');
+        if (pid) { this.activeProcesses.delete(pid); }
         this.logToDebug(`Command PID ${pid} closed with exit code: ${code}`);
 
+        const stdout = stdoutBuffer.trim();
+        const stderr = stderrBuffer.trim();
+
+        // Always surface BOTH stdout and stderr — many tools write real errors
+        // to stderr even with exit code 0 (e.g. curl option errors, python warnings)
+        const combined = [
+          stdout && `STDOUT:\n${stdout}`,
+          stderr && `STDERR:\n${stderr}`,
+        ].filter(Boolean).join('\n\n');
+
         if (code === 0 || code === null) {
-          safeResolve(combinedOutput || 'Command completed successfully with no output.');
+          safeResolve(combined || 'Command completed with no output.');
         } else {
-          safeReject(
-            new Error(`Command failed with exit code ${code}.\nOutput:\n${combinedOutput || '[No output]'}`)
-          );
+          safeReject(new Error(`Command failed (exit code ${code}).\n\nOutput:\n${combined || '[No output]'}`));
         }
       });
 
       child.on('error', (err) => {
         clearTimeout(backgroundTimeout);
-        if (pid) {
-          this.activeProcesses.delete(pid);
-        }
+        if (pid) { this.activeProcesses.delete(pid); }
         this.logToDebug(`Command PID ${pid} error: ${err.message}`);
         safeReject(new Error(`Failed to start command: ${err.message}`));
       });

@@ -58,8 +58,13 @@ export class BrowserService {
         const executablePath = await this.getChromePath();
         this.browser = await puppeteer.launch({
           executablePath,
-          headless: false, // Make it visible to the user!
+          headless: false,
           defaultViewport: { width: 1280, height: 800 },
+          args: [
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-extensions',
+          ],
         });
         this.browser.on('disconnected', () => {
           this.browser = null;
@@ -82,7 +87,11 @@ export class BrowserService {
   public async navigate(url: string): Promise<string> {
     try {
       const page = await this.getPage();
-      await page.goto(url, { waitUntil: 'networkidle2' });
+      // Use 'domcontentloaded' — 'networkidle2' hangs indefinitely on dev servers
+      // that maintain persistent connections (e.g. python http.server, vite HMR).
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      // Give scripts a moment to execute before reading the DOM
+      await new Promise(r => setTimeout(r, 800));
       return `Navigated to ${url}`;
     } catch (error) {
       this.logError(`navigate(${url})`, error);
@@ -109,6 +118,62 @@ export class BrowserService {
     } catch (error) {
       this.logError(`type(${selector})`, error);
       throw error;
+    }
+  }
+
+  public async getPageSummary(): Promise<{ title: string; url: string; contentText: string; interactiveElements: string[] }> {
+    try {
+      const page = await this.getPage();
+      const title = await page.title();
+      const url = page.url();
+      
+      const summary = await page.evaluate(() => {
+        const elements: string[] = [];
+        const interactive = document.querySelectorAll('input, button, select, textarea, a, h1, h2, h3, [role="button"], [role="link"]');
+        
+        interactive.forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          const isVisible = rect.width > 0 && rect.height > 0;
+          if (!isVisible) return;
+
+          let desc = el.tagName.toLowerCase();
+          if (el.id) {
+            desc += `#${el.id}`;
+          } else if (el.className) {
+            const firstClass = el.className.trim().split(/\s+/)[0];
+            if (firstClass) desc += `.${firstClass}`;
+          }
+
+          if (el instanceof HTMLInputElement) {
+            desc += ` [type="${el.type || 'text'}"]`;
+            if (el.placeholder) desc += ` [placeholder="${el.placeholder}"]`;
+          } else if (el instanceof HTMLButtonElement || el instanceof HTMLAnchorElement || el.getAttribute('role') === 'button') {
+            const text = (el.textContent || '').trim().substring(0, 30);
+            if (text) desc += ` (text: "${text}")`;
+          }
+          elements.push(desc);
+        });
+
+        const pageText = (document.body?.innerText || '').trim();
+        return {
+          elements: elements.slice(0, 30),
+          bodyText: pageText.substring(0, 400)
+        };
+      });
+
+      return {
+        title,
+        url,
+        contentText: summary.bodyText,
+        interactiveElements: summary.elements
+      };
+    } catch (error: any) {
+      return {
+        title: 'Error retrieving page status',
+        url: '',
+        contentText: `Browser page is not fully loaded or unreachable. Details: ${error.message}`,
+        interactiveElements: []
+      };
     }
   }
 

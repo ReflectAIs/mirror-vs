@@ -16,6 +16,7 @@
   const deepseekPanel = document.getElementById('deepseek-panel');
   
   const ollamaHostInput = document.getElementById('ollama-host');
+  const ollamaHostValidationIndicator = document.getElementById('ollama-host-validation-indicator');
   const ollamaModelSelect = document.getElementById('ollama-model-select');
   const refreshModelsBtn = document.getElementById('refresh-models-btn');
   
@@ -35,6 +36,10 @@
   const promptInput = document.getElementById('prompt-input');
   const sendBtn = document.getElementById('send-btn');
 
+  // Autocomplete & Context Chips Elements
+  const contextChipsContainer = document.getElementById('context-chips-container');
+  const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
+
   // Application State
   let chatHistory = [];
   let currentStreamingBubble = null;
@@ -43,6 +48,14 @@
   let isSending = false;
   let savedDefaultOllamaModel = 'llama3';
   let activeSessionId = null;
+
+  // New features state
+  let workspaceFiles = [];
+  let linkedFiles = new Set();
+  let autocompleteQuery = '';
+  let autocompleteActiveIndex = 0;
+  let isAutocompleteOpen = false;
+  let validationTimeout = null;
 
   // Map to store parsed created/updated file contents from assistant messages
   const parsedToolContents = new Map();
@@ -165,8 +178,27 @@
     settingsDrawer.classList.add('collapsed');
   });
 
-  // 6. Textarea Auto-grow & Enter Key Submit
-  promptInput.addEventListener('input', autoGrowTextarea);
+  // 5b. Ollama Host Live Validation on Type (Debounced)
+  ollamaHostInput.addEventListener('input', () => {
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+    ollamaHostValidationIndicator.textContent = 'Checking...';
+    ollamaHostValidationIndicator.className = 'validation-badge checking';
+    
+    validationTimeout = setTimeout(() => {
+      vscode.postMessage({
+        type: 'validateHost',
+        host: ollamaHostInput.value.trim()
+      });
+    }, 600);
+  });
+
+  // 6. Textarea Auto-grow & Enter Key Submit & Autocomplete Keys
+  promptInput.addEventListener('input', () => {
+    autoGrowTextarea();
+    handleAutocompleteSearch();
+  });
 
   function autoGrowTextarea() {
     promptInput.style.height = 'auto';
@@ -174,20 +206,163 @@
   }
 
   promptInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submitMessage();
+    if (isAutocompleteOpen) {
+      const items = autocompleteDropdown.querySelectorAll('.autocomplete-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        autocompleteActiveIndex = (autocompleteActiveIndex + 1) % items.length;
+        updateAutocompleteHighlight(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        autocompleteActiveIndex = (autocompleteActiveIndex - 1 + items.length) % items.length;
+        updateAutocompleteHighlight(items);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        if (items[autocompleteActiveIndex]) {
+          selectAutocompleteItem(items[autocompleteActiveIndex].getAttribute('data-path'));
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeAutocomplete();
+      }
+    } else {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitMessage();
+      }
     }
   });
 
   sendBtn.addEventListener('click', submitMessage);
 
+  // 6b. Autocomplete Logic
+  function handleAutocompleteSearch() {
+    const text = promptInput.value;
+    const cursorPos = promptInput.selectionStart;
+    
+    // Find if we are typing a file path reference starting with '@'
+    const textBeforeCursor = text.substring(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1 && (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1]))) {
+      const query = textBeforeCursor.substring(atIndex + 1);
+      
+      // Stop showing autocomplete if there are spaces after '@'
+      if (/\s/.test(query)) {
+        closeAutocomplete();
+        return;
+      }
+      
+      autocompleteQuery = query;
+      filterAndShowAutocomplete(query);
+    } else {
+      closeAutocomplete();
+    }
+  }
+
+  function filterAndShowAutocomplete(query) {
+    const filtered = workspaceFiles.filter(f => 
+      f.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 10); // cap at 10 items for speed
+
+    if (filtered.length === 0) {
+      closeAutocomplete();
+      return;
+    }
+
+    autocompleteDropdown.innerHTML = '';
+    autocompleteActiveIndex = 0;
+    isAutocompleteOpen = true;
+
+    filtered.forEach((file, index) => {
+      const item = document.createElement('div');
+      item.className = `autocomplete-item${index === 0 ? ' active' : ''}`;
+      item.setAttribute('data-path', file);
+      
+      const fileExt = file.split('.').pop() || 'txt';
+      item.innerHTML = `
+        <span class="autocomplete-item-icon">&#128196;</span>
+        <span class="autocomplete-item-path" style="flex: 1; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${file}</span>
+        <span class="autocomplete-item-ext" style="opacity: 0.4; font-size: 9px; text-transform: uppercase;">${fileExt}</span>
+      `;
+      
+      item.addEventListener('click', () => {
+        selectAutocompleteItem(file);
+      });
+      
+      autocompleteDropdown.appendChild(item);
+    });
+
+    autocompleteDropdown.classList.remove('hidden');
+  }
+
+  function updateAutocompleteHighlight(items) {
+    items.forEach((item, idx) => {
+      if (idx === autocompleteActiveIndex) {
+        item.classList.add('active');
+        item.scrollIntoView({ block: 'nearest' });
+      } else {
+        item.classList.remove('active');
+      }
+    });
+  }
+
+  function selectAutocompleteItem(filePath) {
+    linkedFiles.add(filePath);
+    renderChips();
+    
+    // Replace the '@query' segment in promptInput with clean text
+    const text = promptInput.value;
+    const cursorPos = promptInput.selectionStart;
+    const textBeforeCursor = text.substring(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      const textAfterCursor = text.substring(cursorPos);
+      promptInput.value = text.substring(0, atIndex) + textAfterCursor;
+      promptInput.selectionStart = atIndex;
+      promptInput.selectionEnd = atIndex;
+    }
+    
+    closeAutocomplete();
+    promptInput.focus();
+    autoGrowTextarea();
+  }
+
+  function renderChips() {
+    contextChipsContainer.innerHTML = '';
+    linkedFiles.forEach((file) => {
+      const chip = document.createElement('div');
+      chip.className = 'context-chip';
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = file.split('/').pop() || file;
+      nameSpan.title = file;
+      
+      const removeBtn = document.createElement('span');
+      removeBtn.className = 'context-chip-remove';
+      removeBtn.innerHTML = '&#x2715;';
+      removeBtn.addEventListener('click', () => {
+        linkedFiles.delete(file);
+        renderChips();
+      });
+      
+      chip.appendChild(nameSpan);
+      chip.appendChild(removeBtn);
+      contextChipsContainer.appendChild(chip);
+    });
+  }
+
+  function closeAutocomplete() {
+    isAutocompleteOpen = false;
+    autocompleteDropdown.classList.add('hidden');
+  }
+
   // 7. Core Message Submission
   function submitMessage() {
     const text = promptInput.value.trim();
-    if (!text || isSending) {
-      return;
-    }
+    if (!text && linkedFiles.size === 0) return;
+    if (isSending) return;
 
     // Hide welcome card if present
     if (welcomeCard) {
@@ -200,8 +375,15 @@
     promptInput.disabled = true;
     sendBtn.disabled = true;
 
-    // Append User message bubble
-    appendMessageBubble('user', text);
+    // Compile linked file references
+    const selectedFiles = Array.from(linkedFiles);
+    
+    // Append User message bubble with linked tags
+    let userDisplayMessage = text;
+    if (selectedFiles.length > 0) {
+      userDisplayMessage += `\n\n_Referenced Context: ${selectedFiles.map(f => '`@' + f.split('/').pop() + '`').join(', ')}_`;
+    }
+    appendMessageBubble('user', userDisplayMessage);
     scrollChatToBottom();
 
     // Append Assistant placeholder bubble
@@ -215,12 +397,17 @@
 
     scrollChatToBottom();
 
-    // Forward message payload to host
+    // Forward message payload to host including explicit file linkages
     vscode.postMessage({
       type: 'sendMessage',
       text,
-      history: chatHistory
+      history: chatHistory,
+      linkedFiles: selectedFiles
     });
+
+    // Clear context chips state
+    linkedFiles.clear();
+    renderChips();
   }
 
   let currentToolCardElement = null;
@@ -317,8 +504,6 @@
       if (toolName === 'run_command' && target) {
         const termBtn = document.createElement('button');
         termBtn.className = 'tool-revert-btn';
-        // If the agent already opened a VS Code terminal, label it "Show Terminal"
-        // Otherwise label it "Run in Terminal" (will create a new one)
         const hasExistingTerminal = !!terminalName;
         termBtn.title = hasExistingTerminal ? `Show terminal: ${terminalName}` : 'Re-run in VS Code Terminal';
         termBtn.innerHTML = `
@@ -332,8 +517,6 @@
         termBtn.style.borderColor = 'rgba(34,211,238,0.25)';
         termBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          // Send terminalName so the host can call revealTerminal() for agent terminals.
-          // The host will fall back to creating a new terminal if not found.
           vscode.postMessage({ type: 'openTerminal', command: target, terminalName: terminalName || null });
         });
         controlsContainer.insertBefore(termBtn, controlsContainer.firstChild);
@@ -517,12 +700,40 @@
           deepseekKeyStatus.style.color = '#ef4444';
         }
 
-        // Set default selects temporarily, they will match once loaded
         deepseekModelSelect.value = s.defaultDeepSeekModel;
 
-        // If ollamaModelSelect already has options (e.g. from subsequent loads), select it
         if (ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`)) {
           ollamaModelSelect.value = s.defaultOllamaModel;
+        }
+
+        // Trigger connection validation check
+        vscode.postMessage({ type: 'validateHost', host: s.ollamaHost });
+        break;
+      }
+
+      case 'hostValidationResult': {
+        if (message.isValid) {
+          ollamaHostValidationIndicator.textContent = 'Online';
+          ollamaHostValidationIndicator.className = 'validation-badge online';
+          
+          // Re-render select options dynamically if we received new models
+          if (message.models && message.models.length > 0) {
+            ollamaModelSelect.innerHTML = '';
+            message.models.forEach((m) => {
+              const opt = document.createElement('option');
+              opt.value = m;
+              opt.textContent = m;
+              ollamaModelSelect.appendChild(opt);
+            });
+            if (ollamaModelSelect.querySelector(`option[value="${savedDefaultOllamaModel}"]`)) {
+              ollamaModelSelect.value = savedDefaultOllamaModel;
+            } else {
+              ollamaModelSelect.value = message.models[0];
+            }
+          }
+        } else {
+          ollamaHostValidationIndicator.textContent = 'Offline';
+          ollamaHostValidationIndicator.className = 'validation-badge offline';
         }
         break;
       }
@@ -537,7 +748,6 @@
             opt.textContent = m;
             ollamaModelSelect.appendChild(opt);
           });
-          // Set selected option using local saved model
           if (ollamaModelSelect.querySelector(`option[value="${savedDefaultOllamaModel}"]`)) {
             ollamaModelSelect.value = savedDefaultOllamaModel;
           } else {
@@ -546,6 +756,11 @@
         } else {
           ollamaModelSelect.innerHTML = '<option value="none">No models found</option>';
         }
+        break;
+      }
+
+      case 'workspaceFiles': {
+        workspaceFiles = message.files || [];
         break;
       }
 
@@ -571,7 +786,6 @@
           return;
         }
 
-        // Remove typing indicator if present
         const loader = currentStreamingBubble.querySelector('.typing-indicator');
         if (loader) {
           currentStreamingBubble.removeChild(loader);
@@ -643,6 +857,11 @@
             currentStreamingBubble.removeChild(loader);
           }
           currentStreamingBubble.innerHTML = `<div style="color: #ef4444; font-weight: 600;">Error: ${message.error}</div>`;
+        } else {
+          const bubble = appendMessageBubble('assistant', '');
+          if (bubble) {
+            bubble.innerHTML = `<div style="color: #ef4444; font-weight: 600;">Error: ${message.error}</div>`;
+          }
         }
 
         isSending = false;
@@ -670,9 +889,8 @@
         chatHistory = history || [];
         
         parsedToolContents.clear();
-        
-        // Clear existing messages
         chatMessages.innerHTML = '';
+        currentStreamingBubble = null;
         
         if (chatHistory.length > 0) {
           if (welcomeCard) {
@@ -722,7 +940,7 @@
             deleteBtn.innerHTML = `
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                <path fill-rule="even-rule" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
               </svg>
             `;
             
@@ -783,7 +1001,6 @@
 
   // 9. Markdown Parser Implementation
   function parseMarkdown(text) {
-    // 1. Strip out XML tool tags from displayed text bubble completely
     let cleanText = text;
     
     // Clean block tools: create_file, write_file, patch_file
@@ -796,18 +1013,13 @@
       while (openIndex !== -1) {
         let closeIndex = cleanText.toLowerCase().indexOf(closeTag, openIndex);
         if (closeIndex !== -1) {
-          // Extract target to create placeholder
           let tagContent = cleanText.substring(openIndex, closeIndex + closeTag.length);
           let targetMatch = tagContent.match(/path\s*=\s*["']([^"']+)["']/i) || tagContent.match(/query\s*=\s*["']([^"']+)["']/i);
           let target = targetMatch ? targetMatch[1].trim() : '';
           
           let placeholderToken = `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
-          
-          // Replace completed block with placeholder token
           cleanText = cleanText.substring(0, openIndex) + placeholderToken + cleanText.substring(closeIndex + closeTag.length);
         } else {
-          // Streaming is in progress inside this block. 
-          // Extract what is inside the tag so far and display it as a streaming code block!
           let streamingContent = cleanText.substring(openIndex);
           let firstCloseBracket = streamingContent.indexOf('>');
           
@@ -818,10 +1030,8 @@
             if (pathMatch) {
               pathExt = pathMatch[1].split('.').pop() || 'plaintext';
             }
-            // Replace the open tag with a markdown code block format so the parser picks it up
             cleanText = cleanText.substring(0, openIndex) + `\n\`\`\`${pathExt}\n${actualCode}`;
           } else {
-            // Still streaming the tag itself, just hide the half-baked tag
             cleanText = cleanText.substring(0, openIndex);
           }
           break;
@@ -830,7 +1040,7 @@
       }
     }
 
-    // Clean self-closing or simple tools: read_file, list_dir, grep_search, browser tools
+    // Clean self-closing or simple tools
     const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command'];
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}([\\s\\S]*?)\\/?>`, 'gi');
@@ -868,7 +1078,6 @@
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Check code blocks
       if (line.trim().startsWith('```')) {
         if (inCodeBlock) {
           inCodeBlock = false;
@@ -898,7 +1107,7 @@
       } else {
         let processedLine = line;
 
-        // Escape generic HTML tags to prevent cross-site execution
+        // Escape generic HTML tags
         processedLine = processedLine.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         // Inline Bold (**text**)
@@ -933,7 +1142,6 @@
       }
     }
 
-    // Capture unfinished streaming code block
     if (inCodeBlock && codeBuffer.trim()) {
       const escapedCode = escapeHtml(codeBuffer);
       html += `
@@ -947,11 +1155,9 @@
       `;
     }
 
-    // Restore placeholders safely
     html = html.replace(/<p>%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%<\/p>/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
     html = html.replace(/%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
 
-    // Concatenate sibling tags for cleaner block styling
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
   }
 
@@ -966,10 +1172,8 @@
 
   // 10. Bind Click Events to Dynamic Code Block Buttons
   function bindCodeBlockButtons(bubbleElement) {
-    // Copy Buttons
     const copyButtons = bubbleElement.querySelectorAll('.copy-btn');
     copyButtons.forEach((btn) => {
-      // Avoid double binding
       if (btn.getAttribute('data-bound')) {
         return;
       }

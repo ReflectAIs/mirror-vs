@@ -57,7 +57,10 @@
         <!-- Ollama Config Panel -->
         <div id="ollama-panel" class="config-panel">
           <div class="form-group">
-            <label for="ollama-host">Ollama API Host</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label for="ollama-host">Ollama API Host</label>
+              <span id="ollama-host-validation-indicator" class="validation-badge offline">Checking...</span>
+            </div>
             <input type="text" id="ollama-host" placeholder="http://localhost:11434" value="http://localhost:11434">
           </div>
           <div class="form-group">
@@ -124,8 +127,8 @@
             <div class="feature-item">
               <span class="feature-icon">&#128196;</span>
               <div class="feature-text">
-                <strong>Context Aware</strong>
-                <span>Automatically reads the active editor file for instant code reference.</span>
+                <strong>Context Aware & Reference Links</strong>
+                <span>Link workspace files explicitly in your prompt by typing <code>@</code> inside the chat input.</span>
               </div>
             </div>
             <div class="feature-item">
@@ -157,10 +160,14 @@
         <span class="context-dot"></span>
         <span id="context-file-name" class="context-file-name">No active file open</span>
       </div>
-      
+
+      <!-- Autocomplete Dropdown and Chips -->
+      <div id="context-chips-container" class="context-chips-container"></div>
+      <div id="autocomplete-dropdown" class="autocomplete-dropdown hidden"></div>
+
       <!-- Input Box -->
       <div class="textarea-container">
-        <textarea id="prompt-input" placeholder="Type a message or ask to modify code... (Shift+Enter for new line)" rows="1"></textarea>
+        <textarea id="prompt-input" placeholder="Ask to modify code... Type '@' to link files" rows="1"></textarea>
         <button id="send-btn" class="send-btn" title="Send Request">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm-.708-.707L1.225 6.602l11.758-4.703-7.055 7.464Z"/>

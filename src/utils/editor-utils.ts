@@ -154,12 +154,17 @@ export function getActiveFileContext(maxContextLength: number = 12000): string {
   const doc = editor.document;
   const fileName = getActiveFileName();
   const fileText = doc.getText();
+
+  if (!fileText.trim()) {
+    return ''; // Skip empty files entirely to prevent rendering empty code blocks
+  }
   
   const truncatedText = fileText.length > maxContextLength
     ? fileText.substring(0, maxContextLength) + '\n\n[... content truncated due to length ...]'
     : fileText;
 
-  return `\n\n[Active File Context: ${fileName}]\n\`\`\`\n${truncatedText}\n\`\`\``;
+  const fileExt = fileName.split('.').pop() || 'plaintext';
+  return `\n\n[Active File Context: ${fileName}]\n\`\`\`${fileExt}\n${truncatedText}\n\`\`\``;
 }
 
 /**
