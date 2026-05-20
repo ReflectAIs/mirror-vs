@@ -9,7 +9,7 @@ import { BrowserService } from '../services/browser-service';
 import { CommandService } from '../services/command-service';
 
 interface ToolCall {
-  name: 'read_file' | 'create_file' | 'write_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command';
+  name: 'read_file' | 'create_file' | 'write_file' | 'patch_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command';
   path?: string;
   query?: string;
   content?: string;
@@ -28,7 +28,7 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 ### IMPORTANT TOOL USAGE RULES:
 1. Always output valid XML tags. All parameters (like path and query) MUST be enclosed in double quotes.
 2. Self-closing tags MUST end with " />".
-3. When creating or writing files, always provide the COMPLETE, FULL file content. Do NOT use ellipsis, comments like "// rest of code", or placeholders/stubs, because the file will be written exactly as you provide it.
+3. When creating or writing files, always provide the COMPLETE, FULL file content. Do NOT use ellipsis, comments like "// rest of code", or placeholders/stubs, because the file will be written exactly as you provide it. When using patch_file, always make sure the SEARCH blocks match the target file content exactly, and provide complete and functional changes in the REPLACE blocks.
 4. CRITICAL: You MUST call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING. Do not hallucinate the tool result. The system will execute the tool and provide the result to you in the next turn.
 5. In every turn, if a tool result indicates a failure, read the error message carefully and correct your input in the next turn.
 6. NEVER say "let me check", "I will verify", "let me look", or any similar phrase WITHOUT immediately outputting a tool tag in the same response. If you intend to check something, DO IT NOW by outputting the appropriate tool tag. Stating an intention without a tool tag is FORBIDDEN and will cause the agent loop to terminate prematurely.
@@ -61,37 +61,51 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    // full contents of the file here
    </write_file>
 
-4. LIST DIRECTORY:
+4. PATCH FILE:
+   Apply targeted search-and-replace edits to an existing file without rewriting it entirely.
+   Always prefer patch_file over write_file when making partial changes to large files, as it is faster and safer.
+   Usage:
+   <patch_file path="relative/path/to/existing_file.ts">
+   <<<<<<< SEARCH
+   // exact lines to find (must match exactly, including whitespace and indentation)
+   =======
+   // replacement lines
+   >>>>>>> REPLACE
+   </patch_file>
+   You can include multiple SEARCH/REPLACE blocks in one patch_file call.
+   IMPORTANT: The SEARCH block must match existing file content exactly.
+
+5. LIST DIRECTORY:
    List all files and subdirectories directly inside the specified directory path.
    Usage:
    <list_dir path="relative/path/to/directory" />
 
-5. GREP SEARCH:
+6. GREP SEARCH:
    Search for a string or pattern within files across the workspace. Ignores standard ignored paths (node_modules, .git, etc.).
    Usage:
    <grep_search query="pattern_to_find" />
 
-6. BROWSER NAVIGATE:
+7. BROWSER NAVIGATE:
    Open a URL in the browser.
    Usage:
    <browser_navigate url="http://localhost:3000" />
 
-7. BROWSER CLICK:
+8. BROWSER CLICK:
    Click an element in the browser.
    Usage:
    <browser_click selector="#my-button" />
 
-8. BROWSER TYPE:
+9. BROWSER TYPE:
    Type text into an input field in the browser.
    Usage:
    <browser_type selector="#search-input" text="hello world" />
 
-9. BROWSER SCREENSHOT:
-   Take a screenshot of the current page (returns base64 image).
-   Usage:
-   <browser_screenshot />
+10. BROWSER SCREENSHOT:
+    Take a screenshot of the current page (returns base64 image).
+    Usage:
+    <browser_screenshot />
 
-10. RUN COMMAND:
+11. RUN COMMAND:
     Execute a terminal command in the workspace folder.
     - Short commands (ls, cat, curl, npm run build, npm install, etc.) run and return full output.
     - Server/watcher commands (npm run dev, npm start, python -m http.server) run in the background and return initial output. Always follow up with a verification command.
@@ -552,7 +566,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    const blockTools = ['create_file', 'write_file'];
+    const blockTools = ['create_file', 'write_file', 'patch_file'];
     for (const tool of blockTools) {
       const regex = new RegExp(`</${tool}\\s*>`, 'i');
       if (regex.test(text)) {
@@ -680,6 +694,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       const pathMatch = attrs.match(/path\s*=\s*["']([^"']+)["']/i);
       if (pathMatch) {
         tools.push({ name: 'create_file', path: pathMatch[1].trim(), content });
+      }
+    }
+
+    // 5b. patch_file
+    const patchFileRegex = /<patch_file([\s\S]*?)>([\s\S]*?)<\/patch_file\s*>/gi;
+    while ((match = patchFileRegex.exec(text)) !== null) {
+      const attrs = match[1];
+      const content = match[2];
+      const pathMatch = attrs.match(/path\s*=\s*["']([^"']+)["']/i);
+      if (pathMatch) {
+        tools.push({ name: 'patch_file', path: pathMatch[1].trim(), content });
       }
     }
 
@@ -852,6 +877,40 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         }
 
         return `File updated and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
+      }
+
+      case 'patch_file': {
+        if (!tool.path) throw new Error('Missing "path" attribute for patch_file.');
+        const safePath = this.getSafePath(tool.path);
+        if (!fs.existsSync(safePath)) {
+          throw new Error(`File does not exist: ${tool.path}`);
+        }
+
+        let fileContent = fs.readFileSync(safePath, 'utf8').replace(/\r\n/g, '\n');
+        const patches = parsePatchBlocks(tool.content || '');
+        if (patches.length === 0) {
+          throw new Error('No valid SEARCH/REPLACE blocks found in patch_file content.');
+        }
+
+        for (let i = 0; i < patches.length; i++) {
+          const { search, replace } = patches[i];
+          if (!fileContent.includes(search)) {
+            throw new Error(`SEARCH block #${i + 1} not found in file. Make sure the search block matches the file content exactly (including whitespace and indentation).\nSearch target:\n${search}`);
+          }
+          fileContent = fileContent.replace(search, replace);
+        }
+
+        const checkpointId = await createCheckpoint(safePath, 'replace');
+        fs.writeFileSync(safePath, fileContent, 'utf8');
+
+        try {
+          const doc = await vscode.workspace.openTextDocument(safePath);
+          await vscode.window.showTextDocument(doc);
+        } catch (e) {
+          // ignore editor open failures
+        }
+
+        return `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;
       }
 
       case 'browser_navigate': {
@@ -1083,4 +1142,16 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       activeSessionId,
     });
   }
+}
+
+function parsePatchBlocks(content: string): { search: string; replace: string }[] {
+  const blocks: { search: string; replace: string }[] = [];
+  const regex = /<<<<<<< SEARCH[\r\n]+([\s\S]*?)[\r\n]+=======[\r\n]+([\s\S]*?)[\r\n]+>>>>>>> REPLACE/gi;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const search = match[1].replace(/\r\n/g, '\n');
+    const replace = match[2].replace(/\r\n/g, '\n');
+    blocks.push({ search, replace });
+  }
+  return blocks;
 }

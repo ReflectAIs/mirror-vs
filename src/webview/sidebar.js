@@ -71,6 +71,16 @@
         parsedToolContents.set(pathMatch[1].trim(), content);
       }
     }
+
+    const patchFileRegex = /<patch_file([\s\S]*?)>([\s\S]*?)<\/patch_file\s*>/gi;
+    while ((match = patchFileRegex.exec(text)) !== null) {
+      const attrs = match[1];
+      const content = match[2];
+      const pathMatch = attrs.match(/path\s*=\s*["']([^"']+)["']/i);
+      if (pathMatch) {
+        parsedToolContents.set(pathMatch[1].trim(), content);
+      }
+    }
   }
 
   // Initialize
@@ -236,6 +246,9 @@
     } else if (toolName === 'write_file') {
       friendlyName = 'Update File';
       iconHtml = '💾';
+    } else if (toolName === 'patch_file') {
+      friendlyName = 'Patch File';
+      iconHtml = '✏️';
     } else if (toolName === 'list_dir') {
       friendlyName = 'List Folder';
       iconHtml = '📁';
@@ -271,7 +284,7 @@
     card.appendChild(header);
 
     const targetSpan = header.querySelector('.tool-target');
-    if (targetSpan && target && (toolName === 'create_file' || toolName === 'write_file' || toolName === 'read_file')) {
+    if (targetSpan && target && (toolName === 'create_file' || toolName === 'write_file' || toolName === 'read_file' || toolName === 'patch_file')) {
       targetSpan.style.cursor = 'pointer';
       targetSpan.style.textDecoration = 'underline';
       targetSpan.style.color = '#a855f7';
@@ -773,8 +786,8 @@
     // 1. Strip out XML tool tags from displayed text bubble completely
     let cleanText = text;
     
-    // Clean block tools: create_file, write_file
-    const blockTools = ['create_file', 'write_file'];
+    // Clean block tools: create_file, write_file, patch_file
+    const blockTools = ['create_file', 'write_file', 'patch_file'];
     for (const tool of blockTools) {
       const openTag = `<${tool}`;
       const closeTag = `</${tool}>`;
