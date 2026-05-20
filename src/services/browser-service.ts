@@ -1,5 +1,7 @@
 import * as puppeteer from 'puppeteer-core';
 import * as fs from 'fs';
+import * as path from 'path';
+import * as vscode from 'vscode';
 
 export class BrowserService {
   private static instance: BrowserService;
@@ -13,6 +15,24 @@ export class BrowserService {
       BrowserService.instance = new BrowserService();
     }
     return BrowserService.instance;
+  }
+
+  private logError(operation: string, error: any) {
+    try {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (workspaceFolder) {
+        const logDir = path.join(workspaceFolder, '.mirror-vs');
+        if (!fs.existsSync(logDir)) {
+          fs.mkdirSync(logDir, { recursive: true });
+        }
+        const logFile = path.join(logDir, 'debug.log');
+        const timestamp = new Date().toISOString();
+        const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
+        fs.appendFileSync(logFile, `[${timestamp}] [BrowserService] ${operation} failed: ${errorMessage}\n\n`);
+      }
+    } catch (e) {
+      console.error('Failed to write debug log', e);
+    }
   }
 
   private async getChromePath(): Promise<string> {
@@ -33,50 +53,75 @@ export class BrowserService {
   }
 
   public async getPage(): Promise<puppeteer.Page> {
-    if (!this.browser) {
-      const executablePath = await this.getChromePath();
-      this.browser = await puppeteer.launch({
-        executablePath,
-        headless: false, // Make it visible to the user!
-        defaultViewport: { width: 1280, height: 800 },
-      });
-      this.browser.on('disconnected', () => {
-        this.browser = null;
-        this.page = null;
-      });
-    }
+    try {
+      if (!this.browser) {
+        const executablePath = await this.getChromePath();
+        this.browser = await puppeteer.launch({
+          executablePath,
+          headless: false, // Make it visible to the user!
+          defaultViewport: { width: 1280, height: 800 },
+        });
+        this.browser.on('disconnected', () => {
+          this.browser = null;
+          this.page = null;
+        });
+      }
 
-    if (!this.page || this.page.isClosed()) {
-      const pages = await this.browser.pages();
-      this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
-    }
+      if (!this.page || this.page.isClosed()) {
+        const pages = await this.browser.pages();
+        this.page = pages.length > 0 ? pages[0] : await this.browser.newPage();
+      }
 
-    return this.page;
+      return this.page;
+    } catch (error) {
+      this.logError('getPage/launch', error);
+      throw error;
+    }
   }
 
   public async navigate(url: string): Promise<string> {
-    const page = await this.getPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
-    return `Navigated to ${url}`;
+    try {
+      const page = await this.getPage();
+      await page.goto(url, { waitUntil: 'networkidle2' });
+      return `Navigated to ${url}`;
+    } catch (error) {
+      this.logError(`navigate(${url})`, error);
+      throw error;
+    }
   }
 
   public async click(selector: string): Promise<string> {
-    const page = await this.getPage();
-    await page.click(selector);
-    return `Clicked on ${selector}`;
+    try {
+      const page = await this.getPage();
+      await page.click(selector);
+      return `Clicked on ${selector}`;
+    } catch (error) {
+      this.logError(`click(${selector})`, error);
+      throw error;
+    }
   }
 
   public async type(selector: string, text: string): Promise<string> {
-    const page = await this.getPage();
-    await page.type(selector, text);
-    return `Typed "${text}" into ${selector}`;
+    try {
+      const page = await this.getPage();
+      await page.type(selector, text);
+      return `Typed "${text}" into ${selector}`;
+    } catch (error) {
+      this.logError(`type(${selector})`, error);
+      throw error;
+    }
   }
 
   public async screenshot(): Promise<string> {
-    const page = await this.getPage();
-    // Return base64 encoded image
-    const buffer = await page.screenshot({ type: 'png', encoding: 'base64' });
-    return buffer as string;
+    try {
+      const page = await this.getPage();
+      // Return base64 encoded image
+      const buffer = await page.screenshot({ type: 'png', encoding: 'base64' });
+      return buffer as string;
+    } catch (error) {
+      this.logError('screenshot', error);
+      throw error;
+    }
   }
 
   public async close(): Promise<string> {

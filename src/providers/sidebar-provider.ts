@@ -410,6 +410,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         // Notify webview that LLM completion turn has started
         this._view.webview.postMessage({ type: 'chatResponseStart' });
 
+        const completionController = new AbortController();
+        const mainAbortListener = () => completionController.abort();
+        signal.addEventListener('abort', mainAbortListener);
+
         // Retrieve full response string from LLM
         const assistantResponse = await this._getLLMCompletion(
           provider,
@@ -417,8 +421,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel,
           apiKey,
           payload,
-          signal
+          completionController.signal,
+          completionController
         );
+
+        signal.removeEventListener('abort', mainAbortListener);
 
         // Save assistant response to conversation history
         currentMessages.push({ role: 'assistant', content: assistantResponse });
@@ -431,7 +438,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const toolResults: string[] = [];
 
           for (const tool of toolCalls) {
-            const target = tool.path || tool.query || '';
+            const target = tool.path || tool.query || tool.url || tool.selector || '';
             this._sendToolStatusToWebview(tool.name, 'running', target);
 
             try {
@@ -491,13 +498,34 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private hasCompleteToolCall(text: string): boolean {
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot'];
+    for (const tool of selfClosingTools) {
+      const regex = new RegExp(`<${tool}[^>]*>`, 'i');
+      if (regex.test(text)) {
+        return true;
+      }
+    }
+
+    const blockTools = ['create_file', 'write_file'];
+    for (const tool of blockTools) {
+      const regex = new RegExp(`</${tool}\\s*>`, 'i');
+      if (regex.test(text)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private async _getLLMCompletion(
     provider: LLMProvider,
     host: string,
     model: string,
     apiKey: string,
     messages: { role: 'user' | 'assistant' | 'system'; content: string; images?: string[] }[],
-    signal: AbortSignal
+    signal: AbortSignal,
+    completionController?: AbortController
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       let fullText = '';
@@ -511,6 +539,12 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           (chunk) => {
             fullText += chunk;
             this._view?.webview.postMessage({ type: 'chatResponseChunk', text: chunk });
+            
+            if (this.hasCompleteToolCall(fullText)) {
+              completionController?.abort();
+              this._view?.webview.postMessage({ type: 'chatResponseComplete', fullText });
+              resolve(fullText);
+            }
           },
           (completedText) => {
             this._view?.webview.postMessage({ type: 'chatResponseComplete', fullText: completedText });
@@ -529,6 +563,12 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           (chunk) => {
             fullText += chunk;
             this._view?.webview.postMessage({ type: 'chatResponseChunk', text: chunk });
+            
+            if (this.hasCompleteToolCall(fullText)) {
+              completionController?.abort();
+              this._view?.webview.postMessage({ type: 'chatResponseComplete', fullText });
+              resolve(fullText);
+            }
           },
           (completedText) => {
             this._view?.webview.postMessage({ type: 'chatResponseComplete', fullText: completedText });

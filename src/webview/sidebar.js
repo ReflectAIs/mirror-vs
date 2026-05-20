@@ -380,7 +380,7 @@
   function appendToolCardFromHistory(text) {
     const results = text.split('\n\n');
     results.forEach(res => {
-      const match = res.match(/\[Tool Result for (\w+) on "([^"]+)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
+      const match = res.match(/\[Tool Result for (\w+) on "([^"]*)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
       if (match) {
         const [_, toolName, target, statusString, details] = match;
         const status = statusString.toLowerCase() === 'success' ? 'success' : 'error';
