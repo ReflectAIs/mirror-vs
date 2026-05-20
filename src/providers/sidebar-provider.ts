@@ -389,7 +389,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     let loopCount = 0;
-    const maxLoops = 5; // Guard against infinite run loops
+    const maxLoops = 10; // Guard against infinite run loops
     let continueLoop = true;
 
     try {
