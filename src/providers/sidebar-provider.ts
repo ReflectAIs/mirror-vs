@@ -6,14 +6,17 @@ import { SecretService } from '../services/secret-service';
 import { getActiveFileName, getActiveFileContext, applyCodeToActiveEditor, createCheckpoint, revertCheckpoint } from '../utils/editor-utils';
 import { LLMProvider, ExtensionSettings, ChatMessage, WebviewToExtensionMessage, ChatSession } from '../types';
 import { BrowserService } from '../services/browser-service';
+import { CommandService } from '../services/command-service';
+
 interface ToolCall {
-  name: 'read_file' | 'create_file' | 'write_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot';
+  name: 'read_file' | 'create_file' | 'write_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command';
   path?: string;
   query?: string;
   content?: string;
   url?: string;
   selector?: string;
   text?: string;
+  command?: string;
 }
 
 const AGENT_SYSTEM_PROMPT = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
@@ -80,6 +83,11 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    Take a screenshot of the current page (returns base64 image).
    Usage:
    <browser_screenshot />
+
+10. RUN COMMAND:
+    Execute a terminal command in the workspace folder. Short commands run immediately and return the output. Long-running tasks (like starting a server) run in the background and return initial details within 2.5 seconds.
+    Usage:
+    <run_command command="npm run dev" />
 
 ### EXECUTION WORKFLOW EXAMPLE:
 Developer: "Add a sum function in a new file under src/utils/math.ts and test it."
@@ -438,7 +446,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const toolResults: string[] = [];
 
           for (const tool of toolCalls) {
-            const target = tool.path || tool.query || tool.url || tool.selector || '';
+            const target = tool.path || tool.query || tool.url || tool.selector || tool.command || '';
             this._sendToolStatusToWebview(tool.name, 'running', target);
 
             try {
@@ -499,7 +507,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private hasCompleteToolCall(text: string): boolean {
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command'];
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}[^>]*>`, 'i');
       if (regex.test(text)) {
@@ -675,6 +683,16 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       tools.push({ name: 'browser_screenshot' });
     }
 
+    // 10. run_command
+    const runCommandRegex = /<run_command([\s\S]*?)\/?>/gi;
+    while ((match = runCommandRegex.exec(text)) !== null) {
+      const attrs = match[1];
+      const cmdMatch = attrs.match(/command\s*=\s*["']([^"']+)["']/i);
+      if (cmdMatch) {
+        tools.push({ name: 'run_command', command: cmdMatch[1] });
+      }
+    }
+
     return tools;
   }
 
@@ -818,6 +836,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       case 'browser_screenshot': {
         const base64Image = await BrowserService.getInstance().screenshot();
         return `Screenshot taken successfully. (Base64 data hidden from output but sent to vision model: ${base64Image})`;
+      }
+
+      case 'run_command': {
+        if (!tool.command) throw new Error('Missing "command" attribute for run_command.');
+        return await CommandService.getInstance().executeCommand(tool.command);
       }
 
       default:

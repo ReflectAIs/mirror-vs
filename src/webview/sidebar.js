@@ -242,6 +242,9 @@
     } else if (toolName === 'grep_search') {
       friendlyName = 'Search Workspace';
       iconHtml = '🔍';
+    } else if (toolName === 'run_command') {
+      friendlyName = 'Run Command';
+      iconHtml = '💻';
     }
 
     const header = document.createElement('div');
@@ -776,14 +779,15 @@
     }
 
     // Clean self-closing or simple tools: read_file, list_dir, grep_search, browser tools
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command'];
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}([\\s\\S]*?)\\/?>`, 'gi');
       cleanText = cleanText.replace(regex, (match, attrs) => {
         let targetMatch = attrs.match(/path\s*=\s*["']([^"']+)["']/i) 
           || attrs.match(/query\s*=\s*["']([^"']+)["']/i)
           || attrs.match(/url\s*=\s*["']([^"']+)["']/i)
-          || attrs.match(/selector\s*=\s*["']([^"']+)["']/i);
+          || attrs.match(/selector\s*=\s*["']([^"']+)["']/i)
+          || attrs.match(/command\s*=\s*["']([^"']+)["']/i);
         let target = targetMatch ? targetMatch[1].trim() : '';
         return `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
       });
