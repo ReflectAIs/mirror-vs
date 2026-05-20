@@ -218,6 +218,22 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
+        case 'openTerminal': {
+          if (!data.command) break;
+          const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          // Create a dedicated terminal named after the command (truncated for readability)
+          const terminalName = `Mirror: ${data.command.length > 40 ? data.command.substring(0, 40) + '…' : data.command}`;
+          const terminal = vscode.window.createTerminal({
+            name: terminalName,
+            cwd: workspaceFolder,
+          });
+          terminal.show(false); // false = don't steal focus from the sidebar
+          // Small delay to ensure the terminal is ready before sending the command
+          setTimeout(() => {
+            terminal.sendText(data.command, true); // true = press Enter automatically
+          }, 300);
+          break;
+        }
         case 'revertCheckpoint': {
           console.log(`[Host] revertCheckpoint received for ID: ${data.checkpointId}`);
           const success = await revertCheckpoint(data.checkpointId);

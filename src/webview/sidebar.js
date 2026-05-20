@@ -281,12 +281,46 @@
       });
     }
 
+    // run_command: clicking the command string opens it in a live VS Code terminal
+    if (targetSpan && target && toolName === 'run_command') {
+      targetSpan.style.cursor = 'pointer';
+      targetSpan.style.fontFamily = 'monospace';
+      targetSpan.style.color = '#22d3ee';
+      targetSpan.title = 'Click to open in VS Code Terminal';
+      targetSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ type: 'openTerminal', command: target });
+      });
+    }
+
     if (status === 'running') {
       const scanning = document.createElement('div');
       scanning.className = 'scanning-bar';
       card.appendChild(scanning);
     } else {
       const controlsContainer = header.querySelector('.tool-header-controls');
+
+      // For run_command cards: add an "Open Terminal" button next to the status badge
+      if (toolName === 'run_command' && target) {
+        const termBtn = document.createElement('button');
+        termBtn.className = 'tool-revert-btn';
+        termBtn.title = 'Re-run in VS Code Terminal';
+        termBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px">
+            <path d="M6 9a.5.5 0 0 1 .5-.5h3.793l-1.147-1.146a.5.5 0 0 1 .708-.708l2 2a.5.5 0 0 1 0 .708l-2 2a.5.5 0 0 1-.708-.708L10.293 9.5H6.5A.5.5 0 0 1 6 9z"/>
+            <path d="M3.854 2.146a.5.5 0 0 0-.707 0l-2.5 2.5a.5.5 0 0 0 0 .707l2.5 2.5a.5.5 0 1 0 .707-.707L1.707 5H11.5a.5.5 0 0 1 .5.5v7a.5.5 0 0 0 1 0v-7A1.5 1.5 0 0 0 11.5 4H1.707l2.147-2.146a.5.5 0 0 0 0-.708z"/>
+          </svg>
+          Terminal
+        `;
+        termBtn.style.color = '#22d3ee';
+        termBtn.style.borderColor = 'rgba(34,211,238,0.25)';
+        termBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({ type: 'openTerminal', command: target });
+        });
+        controlsContainer.insertBefore(termBtn, controlsContainer.firstChild);
+      }
+
       if (checkpointId) {
         const revertBtn = document.createElement('button');
         revertBtn.className = 'tool-revert-btn';

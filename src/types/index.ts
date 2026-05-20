@@ -32,7 +32,9 @@ export type WebviewToExtensionMessage =
   | { type: 'newSession' }
   | { type: 'selectSession'; sessionId: string }
   | { type: 'deleteSession'; sessionId: string }
-  | { type: 'revertCheckpoint'; checkpointId: string };
+  | { type: 'revertCheckpoint'; checkpointId: string }
+  | { type: 'openFile'; path: string }
+  | { type: 'openTerminal'; command: string };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
