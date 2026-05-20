@@ -1,0 +1,310 @@
+import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
+
+interface OllamaTag {
+  name: string;
+}
+
+interface OllamaTagsResponse {
+  models?: OllamaTag[];
+}
+
+/**
+ * Parses a base URL and routes it to either http or https request modules.
+ */
+function makeRequest(
+  urlStr: string,
+  options: http.RequestOptions | https.RequestOptions,
+  bodyData?: string,
+  signal?: AbortSignal
+): Promise<{ response: http.IncomingMessage; body: string }> {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(urlStr);
+    const isHttps = parsedUrl.protocol === 'https:';
+    const requestModule = isHttps ? https : http;
+
+    const requestOptions: http.RequestOptions | https.RequestOptions = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: options.method || 'GET',
+      headers: options.headers || {},
+    };
+
+    const req = requestModule.request(requestOptions, (res) => {
+      let body = '';
+      res.on('data', (chunk) => {
+        body += chunk;
+      });
+      res.on('end', () => {
+        resolve({ response: res, body });
+      });
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    if (signal) {
+      if (signal.aborted) {
+        req.destroy();
+        reject(new Error('Request aborted'));
+        return;
+      }
+      signal.addEventListener('abort', () => {
+        req.destroy();
+        reject(new Error('Request aborted'));
+      });
+    }
+
+    if (bodyData) {
+      req.write(bodyData);
+    }
+    req.end();
+  });
+}
+
+/**
+ * Fetches the list of installed Ollama models.
+ */
+export async function fetchOllamaModels(host: string): Promise<string[]> {
+  const url = `${host.replace(/\/$/, '')}/api/tags`;
+  try {
+    const { response, body } = await makeRequest(url, { method: 'GET' });
+    
+    if (response.statusCode !== 200) {
+      throw new Error(`Failed to fetch models: HTTP ${response.statusCode}`);
+    }
+
+    const data = JSON.parse(body) as OllamaTagsResponse;
+    if (data.models && Array.isArray(data.models)) {
+      return data.models.map((m) => m.name);
+    }
+    return [];
+  } catch (error: any) {
+    console.error('Error fetching Ollama models:', error);
+    throw new Error(`Ollama offline or unreachable at ${host}. Details: ${error.message}`);
+  }
+}
+
+/**
+ * Streams a chat completion response from Ollama.
+ */
+export function streamOllamaChat(
+  host: string,
+  model: string,
+  messages: { role: string; content: string; images?: string[] }[],
+  signal: AbortSignal,
+  onChunk: (text: string) => void,
+  onComplete: (fullText: string) => void,
+  onError: (err: any) => void
+): void {
+  const urlStr = `${host.replace(/\/$/, '')}/api/chat`;
+  const parsedUrl = new URL(urlStr);
+  const isHttps = parsedUrl.protocol === 'https:';
+  const requestModule = isHttps ? https : http;
+
+  const bodyData = JSON.stringify({
+    model,
+    messages,
+    stream: true,
+  });
+
+  const requestOptions: http.RequestOptions | https.RequestOptions = {
+    hostname: parsedUrl.hostname,
+    port: parsedUrl.port || (isHttps ? 443 : 80),
+    path: parsedUrl.pathname,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(bodyData),
+    },
+  };
+
+  const req = requestModule.request(requestOptions, (res) => {
+    if (res.statusCode !== 200) {
+      let errBody = '';
+      res.on('data', (chunk) => (errBody += chunk));
+      res.on('end', () => {
+        onError(new Error(`Ollama streaming error: HTTP ${res.statusCode} - ${errBody}`));
+      });
+      return;
+    }
+
+    let fullText = '';
+    let buffer = '';
+
+    res.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Hold the last incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.trim()) {
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(line);
+          const chunkText = parsed.message?.content || '';
+          if (chunkText) {
+            fullText += chunkText;
+            onChunk(chunkText);
+          }
+          if (parsed.done) {
+            onComplete(fullText);
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to parse NDJSON line:', line, e);
+        }
+      }
+    });
+
+    res.on('end', () => {
+      // Parse any remaining buffer
+      if (buffer.trim()) {
+        try {
+          const parsed = JSON.parse(buffer);
+          const chunkText = parsed.message?.content || '';
+          if (chunkText) {
+            fullText += chunkText;
+            onChunk(chunkText);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      onComplete(fullText);
+    });
+  });
+
+  req.on('error', (err) => {
+    if (signal.aborted) {
+      return;
+    }
+    onError(err);
+  });
+
+  if (signal.aborted) {
+    req.destroy();
+    return;
+  }
+
+  signal.addEventListener('abort', () => {
+    req.destroy();
+  });
+
+  req.write(bodyData);
+  req.end();
+}
+
+/**
+ * Streams a chat completion response from DeepSeek API.
+ */
+export function streamDeepSeekChat(
+  apiKey: string,
+  model: string,
+  messages: { role: string; content: string; images?: string[] }[],
+  signal: AbortSignal,
+  onChunk: (text: string) => void,
+  onComplete: (fullText: string) => void,
+  onError: (err: any) => void
+): void {
+  const urlStr = 'https://api.deepseek.com/chat/completions';
+  const parsedUrl = new URL(urlStr);
+
+  const bodyData = JSON.stringify({
+    model,
+    messages,
+    stream: true,
+  });
+
+  const requestOptions: https.RequestOptions = {
+    hostname: parsedUrl.hostname,
+    port: 443,
+    path: parsedUrl.pathname,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Length': Buffer.byteLength(bodyData),
+    },
+  };
+
+  const req = https.request(requestOptions, (res) => {
+    if (res.statusCode !== 200) {
+      let errBody = '';
+      res.on('data', (chunk) => (errBody += chunk));
+      res.on('end', () => {
+        let parsedErr = errBody;
+        try {
+          const jsonErr = JSON.parse(errBody);
+          parsedErr = jsonErr.error?.message || errBody;
+        } catch (e) {
+          // ignore
+        }
+        onError(new Error(`DeepSeek API error: HTTP ${res.statusCode} - ${parsedErr}`));
+      });
+      return;
+    }
+
+    let fullText = '';
+    let buffer = '';
+
+    res.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Hold the last incomplete line in buffer
+
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (!cleanLine) {
+          continue;
+        }
+
+        if (cleanLine === 'data: [DONE]') {
+          onComplete(fullText);
+          return;
+        }
+
+        if (cleanLine.startsWith('data:')) {
+          const jsonStr = cleanLine.substring(5).trim();
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const chunkText = parsed.choices?.[0]?.delta?.content || '';
+            if (chunkText) {
+              fullText += chunkText;
+              onChunk(chunkText);
+            }
+          } catch (e) {
+            console.warn('Failed to parse SSE data block:', jsonStr, e);
+          }
+        }
+      }
+    });
+
+    res.on('end', () => {
+      onComplete(fullText);
+    });
+  });
+
+  req.on('error', (err) => {
+    if (signal.aborted) {
+      return;
+    }
+    onError(err);
+  });
+
+  if (signal.aborted) {
+    req.destroy();
+    return;
+  }
+
+  signal.addEventListener('abort', () => {
+    req.destroy();
+  });
+
+  req.write(bodyData);
+  req.end();
+}

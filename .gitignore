@@ -1,12 +1,8 @@
-# Node
 node_modules/
 dist/
 out/
-*.log
-
-# VS Code
 .vscode-test/
-.history/
-
-# OS
+*.vsix
 .DS_Store
+.mirror-vs/
+scratch/

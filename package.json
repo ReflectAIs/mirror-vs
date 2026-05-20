@@ -1,85 +1,98 @@
 {
   "name": "mirror-vs",
   "displayName": "Mirror VS",
-  "description": "SOTA Autonomous Developer Agent for Gemma 4 E4B",
+  "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
   "version": "0.0.1",
+  "publisher": "mirror-vs",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
-    "Other"
+    "AI",
+    "Machine Learning",
+    "Programming Languages",
+    "Keybindings",
+    "Formatters"
   ],
-  "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:mirror-vs.sidebar"
+  ],
   "contributes": {
-    "configuration": {
-      "title": "Mirror VS",
-      "properties": {
-        "mirror-vs.figmaAccessToken": {
-          "type": "string",
-          "default": "",
-          "description": "Figma Personal Access Token (for DESIGNER mode integration)"
-        },
-        "mirror-vs.ollamaModel": {
-          "type": "string",
-          "default": "gemma4:e4b",
-          "description": "The default Ollama model to use for the Mirror Agent."
-        }
-      }
-    },
-    "commands": [
-      {
-        "command": "mirror-vs.start",
-        "title": "Mirror VS: Start Agent"
-      }
-    ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "mirror-vs-sidebar",
+          "id": "mirror-vs-container",
           "title": "Mirror VS",
-          "icon": "$(mirror)"
+          "icon": "resources/icon.svg"
         }
       ]
     },
     "views": {
-      "mirror-vs-sidebar": [
+      "mirror-vs-container": [
         {
           "type": "webview",
-          "id": "mirror-vs.chatView",
-          "name": "Mirror Chat"
+          "id": "mirror-vs.sidebar",
+          "name": "Mirror VS Assistant",
+          "visibility": "visible"
         }
       ]
+    },
+    "commands": [
+      {
+        "command": "mirror-vs.focusSidebar",
+        "title": "Focus Mirror VS Sidebar",
+        "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.clearChat",
+        "title": "Clear Active Chat Session",
+        "category": "Mirror VS"
+      }
+    ],
+    "configuration": {
+      "title": "Mirror VS Assistant Settings",
+      "properties": {
+        "mirror-vs.ollamaHost": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "The API base URL for your local Ollama instance."
+        },
+        "mirror-vs.defaultOllamaModel": {
+          "type": "string",
+          "default": "llama3",
+          "description": "The default local Ollama model to use when starting a chat."
+        },
+        "mirror-vs.defaultDeepSeekModel": {
+          "type": "string",
+          "default": "deepseek-chat",
+          "description": "The DeepSeek model to use (e.g., deepseek-chat, deepseek-coder)."
+        },
+        "mirror-vs.defaultProvider": {
+          "type": "string",
+          "enum": [
+            "ollama",
+            "deepseek"
+          ],
+          "default": "ollama",
+          "description": "The default active LLM provider when launching the assistant."
+        }
+      }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "vscode:prepublish": "node esbuild.js --minify",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "postinstall": "npm run compile"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
-    "@types/turndown": "^5.0.6",
-    "@types/uuid": "^9.0.7",
-    "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
-    "@vscode/test-electron": "^2.3.8",
-    "eslint": "^8.56.0",
-    "glob": "^10.3.10",
-    "mocha": "^10.2.0",
-    "typescript": "^5.3.3"
+    "@types/node": "^18.17.1",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.1.6"
   },
   "dependencies": {
-    "axios": "^1.6.7",
-    "cheerio": "^1.2.0",
-    "ollama": "^0.5.0",
-    "turndown": "^7.2.4",
-    "uuid": "^9.0.1"
+    "puppeteer-core": "^25.0.4"
   }
 }
