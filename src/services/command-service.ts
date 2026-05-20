@@ -37,9 +37,33 @@ export class CommandService {
   }
 
   /**
+   * Returns true if the command looks like a long-running server/watcher.
+   * These background quickly (4s). Everything else (installs, builds, tests)
+   * waits up to 60s to collect the full output before backgrounding.
+   */
+  private isServerCommand(cmd: string): boolean {
+    const serverPatterns = [
+      /\bnpm\s+(run\s+)?(start|dev|serve|watch|preview)\b/i,
+      /\bpnpm\s+(run\s+)?(start|dev|serve|watch|preview)\b/i,
+      /\byarn\s+(start|dev|serve|watch|preview)\b/i,
+      /\bpython\d*\s+-m\s+http\.server\b/i,
+      /\bpython\d*\s+.*server\b/i,
+      /\blive-server\b/i,
+      /\bserve\b/i,
+      /\bnodemon\b/i,
+      /\bvite\b(?!.*build)/i,
+      /\bnext\s+dev\b/i,
+    ];
+    return serverPatterns.some(p => p.test(cmd));
+  }
+
+  /**
    * Executes a terminal command within the active workspace root.
-   * If the command completes quickly (within 2 seconds), it returns the complete output.
-   * If it keeps running (like a dev server), it is run in the background and returns the initial output.
+   *
+   * - Server/watcher commands (npm run dev, python -m http.server, etc.) are
+   *   backgrounded after 4 seconds and return their initial output.
+   * - All other commands (npm install, npm run build, tests, etc.) wait up to
+   *   60 seconds for full completion before being considered a background task.
    */
   public async executeCommand(commandString: string): Promise<string> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -49,8 +73,11 @@ export class CommandService {
 
     this.logToDebug(`Executing command: "${commandString}"`);
 
+    const isServer = this.isServerCommand(commandString);
+    // Server commands background after 4s; install/build commands wait up to 60s.
+    const backgroundAfterMs = isServer ? 4000 : 60000;
+
     return new Promise((resolve, reject) => {
-      // Use shell: true to support chained commands, pipes, and environment variables
       const child = child_process.spawn(commandString, {
         shell: true,
         cwd: workspaceFolder,
@@ -59,12 +86,25 @@ export class CommandService {
 
       let stdoutBuffer = '';
       let stderrBuffer = '';
-      let hasCompleted = false;
+      let hasResolved = false;
 
       const pid = child.pid;
       if (pid) {
         this.activeProcesses.set(pid, child);
       }
+
+      const safeResolve = (value: string) => {
+        if (!hasResolved) {
+          hasResolved = true;
+          resolve(value);
+        }
+      };
+      const safeReject = (err: Error) => {
+        if (!hasResolved) {
+          hasResolved = true;
+          reject(err);
+        }
+      };
 
       child.stdout?.on('data', (data) => {
         const str = data.toString();
@@ -78,45 +118,44 @@ export class CommandService {
         this.logToDebug(`[PID ${pid} STDERR] ${str.trim()}`);
       });
 
-      // Timer to check if it's a long-running background command
+      // Background fallback timer
       const backgroundTimeout = setTimeout(() => {
-        if (!hasCompleted && pid) {
-          this.logToDebug(`Command PID ${pid} assumed to be running in background.`);
-          resolve(
-            `Command is running in the background (PID: ${pid}).\n\nInitial Output:\n${stdoutBuffer || '[No stdout yet]'}\n${stderrBuffer ? `\nErrors:\n${stderrBuffer}` : ''}`
-          );
+        if (pid) {
+          this.logToDebug(`Command PID ${pid} backgrounded after ${backgroundAfterMs}ms (isServer=${isServer}).`);
         }
-      }, 2500);
+        const partialOutput = [stdoutBuffer.trim(), stderrBuffer.trim()].filter(Boolean).join('\n');
+        safeResolve(
+          isServer
+            ? `Server command is running in the background (PID: ${pid}).\n\nInitial Output:\n${partialOutput || '[No output yet]'}\n\nUse a browser tool or run_command to verify it is ready.`
+            : `Command timed out after ${backgroundAfterMs / 1000}s and is still running in the background (PID: ${pid}).\n\nPartial Output:\n${partialOutput || '[No output yet]'}\n\nVerify completion by checking the expected output (e.g. list the directory or run a follow-up command).`
+        );
+      }, backgroundAfterMs);
 
       child.on('close', (code) => {
-        hasCompleted = true;
         clearTimeout(backgroundTimeout);
         if (pid) {
           this.activeProcesses.delete(pid);
         }
 
-        const combinedOutput = `${stdoutBuffer.trim()}\n${stderrBuffer.trim()}`.trim();
+        const combinedOutput = [stdoutBuffer.trim(), stderrBuffer.trim()].filter(Boolean).join('\n');
         this.logToDebug(`Command PID ${pid} closed with exit code: ${code}`);
 
-        if (code === 0) {
-          resolve(combinedOutput || 'Command executed successfully with no output.');
+        if (code === 0 || code === null) {
+          safeResolve(combinedOutput || 'Command completed successfully with no output.');
         } else {
-          reject(
-            new Error(
-              `Command failed with exit code ${code}.\nOutput:\n${combinedOutput || '[No output]'}`
-            )
+          safeReject(
+            new Error(`Command failed with exit code ${code}.\nOutput:\n${combinedOutput || '[No output]'}`)
           );
         }
       });
 
       child.on('error', (err) => {
-        hasCompleted = true;
         clearTimeout(backgroundTimeout);
         if (pid) {
           this.activeProcesses.delete(pid);
         }
         this.logToDebug(`Command PID ${pid} error: ${err.message}`);
-        reject(new Error(`Failed to start command: ${err.message}`));
+        safeReject(new Error(`Failed to start command: ${err.message}`));
       });
     });
   }

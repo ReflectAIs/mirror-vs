@@ -31,6 +31,13 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 3. When creating or writing files, always provide the COMPLETE, FULL file content. Do NOT use ellipsis, comments like "// rest of code", or placeholders/stubs, because the file will be written exactly as you provide it.
 4. CRITICAL: You MUST call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING. Do not hallucinate the tool result. The system will execute the tool and provide the result to you in the next turn.
 5. In every turn, if a tool result indicates a failure, read the error message carefully and correct your input in the next turn.
+6. NEVER say "let me check", "I will verify", "let me look", or any similar phrase WITHOUT immediately outputting a tool tag in the same response. If you intend to check something, DO IT NOW by outputting the appropriate tool tag. Stating an intention without a tool tag is FORBIDDEN and will cause the agent loop to terminate prematurely.
+7. BACKGROUND COMMANDS: If a run_command result says a command is "running in the background", you MUST immediately verify its side effects in the next turn using a tool. For example:
+   - After "npm install" backgrounds → run: <run_command command="ls node_modules | head -5" />
+   - After a dev server backgrounds → run: <run_command command="curl -s -o /dev/null -w '%{http_code}' http://localhost:PORT" />
+   - After "npm run build" backgrounds → run: <run_command command="ls dist" /> or <list_dir path="dist" />
+   Never assume a background command succeeded. Always verify with a follow-up tool call.
+8. Keep explanations minimal. Prefer action over narration. Do the work, don't describe it.
 
 ### AVAILABLE TOOLS:
 
@@ -85,30 +92,27 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    <browser_screenshot />
 
 10. RUN COMMAND:
-    Execute a terminal command in the workspace folder. Short commands run immediately and return the output. Long-running tasks (like starting a server) run in the background and return initial details within 2.5 seconds.
+    Execute a terminal command in the workspace folder.
+    - Short commands (ls, cat, curl, npm run build, npm install, etc.) run and return full output.
+    - Server/watcher commands (npm run dev, npm start, python -m http.server) run in the background and return initial output. Always follow up with a verification command.
     Usage:
-    <run_command command="npm run dev" />
+    <run_command command="npm install" />
 
 ### EXECUTION WORKFLOW EXAMPLE:
-Developer: "Add a sum function in a new file under src/utils/math.ts and test it."
-Your Turn 1:
-"I will create the math utility file with a sum function first."
-<create_file path="src/utils/math.ts">
-export function sum(a: number, b: number): number {
-  return a + b;
-}
-</create_file>
-Host Turn (System):
-"[Tool Result for create_file on \"src/utils/math.ts\"]: Success - File created and opened in editor: src/utils/math.ts. Revert ID: cp_123456"
+Developer: "Install deps and start the todo app dev server."
+Your Turn 1: "Installing dependencies."
+<run_command command="cd todo-app && npm install" />
+Host (System): "[Tool Result for run_command on \"cd todo-app && npm install\"]: Success - added 312 packages..."
 Your Turn 2:
-"Now that the file is created, I will read it to verify its contents."
-<read_file path="src/utils/math.ts" />
-Host Turn (System):
-"[Tool Result for read_file on \"src/utils/math.ts\"]: Success - export function sum(a: number, b: number): number {\n  return a + b;\n}"
-Your Turn 3:
-"Excellent, the file was created and verified correctly. The math utility exports the sum function as expected."
+<run_command command="cd todo-app && npm run dev" />
+Host (System): "[Tool Result for run_command on \"cd todo-app && npm run dev\"]: Server command is running in the background (PID: 1234). Initial Output: VITE v5.0 ready on http://localhost:5173"
+Your Turn 3: "Verifying the server is up."
+<run_command command="curl -s -o /dev/null -w '%{http_code}' http://localhost:5173" />
+Host (System): "[Tool Result for run_command on \"curl ...\"]: Success - 200"
+Your Turn 4: "Server is confirmed running. Navigating to the app."
+<browser_navigate url="http://localhost:5173" />
 
-Remember: Work step-by-step, run tools to investigate and verify, and always write full, high-quality, production-ready code. Minimize explanations of simple file actions—just do them!`;
+Remember: Every intention to check, verify, or investigate MUST be followed immediately by a tool tag in the same response turn. Outputting text without a tool tag ends your turn and stops the agent loop.`;
 
 export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
@@ -295,7 +299,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
     const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
-    
+
     const hasDeepSeekKey = await this._secretService.hasSecret('deepseek_api_key');
 
     const settings: ExtensionSettings = {
@@ -397,7 +401,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     let loopCount = 0;
-    const maxLoops = 10; // Guard against infinite run loops
+    const maxLoops = 25; // Guard against infinite run loops
     let continueLoop = true;
 
     try {
@@ -408,8 +412,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         // Build full payload prepended with System Prompt instructions
         const payload: { role: 'user' | 'assistant' | 'system'; content: string; images?: string[] }[] = [
           { role: 'system' as const, content: AGENT_SYSTEM_PROMPT },
-          ...currentMessages.map(msg => ({ 
-            role: msg.role as 'user' | 'assistant' | 'system', 
+          ...currentMessages.map(msg => ({
+            role: msg.role as 'user' | 'assistant' | 'system',
             content: msg.content,
             images: msg.images
           }))
@@ -547,7 +551,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           (chunk) => {
             fullText += chunk;
             this._view?.webview.postMessage({ type: 'chatResponseChunk', text: chunk });
-            
+
             if (this.hasCompleteToolCall(fullText)) {
               completionController?.abort();
               this._view?.webview.postMessage({ type: 'chatResponseComplete', fullText });
@@ -571,7 +575,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           (chunk) => {
             fullText += chunk;
             this._view?.webview.postMessage({ type: 'chatResponseChunk', text: chunk });
-            
+
             if (this.hasCompleteToolCall(fullText)) {
               completionController?.abort();
               this._view?.webview.postMessage({ type: 'chatResponseComplete', fullText });
@@ -872,7 +876,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
    */
   private _getHtmlForWebview(webview: vscode.Webview): string {
     const htmlPath = vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.html');
-    
+
     let htmlContent = '';
     try {
       htmlContent = fs.readFileSync(htmlPath.fsPath, 'utf8');
@@ -929,7 +933,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       }
       sessions[sessionIndex].timestamp = Date.now();
       await this._saveChatSessions(sessions);
-      
+
       this._sendChatSessionsToWebview();
     }
     await this._context.workspaceState.update('mirror-vs.chatHistory', history);
@@ -979,7 +983,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     sessions.unshift(newSession);
     await this._saveChatSessions(sessions);
     await this._saveActiveSessionId(newSession.id);
-    
+
     this._sendChatSessionsToWebview();
     this._sendChatHistoryToWebview();
   }
@@ -997,10 +1001,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   private async _deleteSession(sessionId: string): Promise<void> {
     let sessions = this._getChatSessions();
     const activeId = this._getActiveSessionId();
-    
+
     sessions = sessions.filter(s => s.id !== sessionId);
     await this._saveChatSessions(sessions);
-    
+
     if (activeId === sessionId) {
       if (sessions.length > 0) {
         await this._saveActiveSessionId(sessions[0].id);
@@ -1011,7 +1015,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     } else {
       await this._ensureDefaultSession();
     }
-    
+
     this._sendChatSessionsToWebview();
     this._sendChatHistoryToWebview();
   }
