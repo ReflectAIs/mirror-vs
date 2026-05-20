@@ -220,18 +220,25 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         }
         case 'openTerminal': {
           if (!data.command) break;
-          const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-          // Create a dedicated terminal named after the command (truncated for readability)
-          const terminalName = `Mirror: ${data.command.length > 40 ? data.command.substring(0, 40) + '…' : data.command}`;
-          const terminal = vscode.window.createTerminal({
-            name: terminalName,
-            cwd: workspaceFolder,
-          });
-          terminal.show(false); // false = don't steal focus from the sidebar
-          // Small delay to ensure the terminal is ready before sending the command
-          setTimeout(() => {
-            terminal.sendText(data.command, true); // true = press Enter automatically
-          }, 300);
+          const svc = CommandService.getInstance();
+          // Use the terminalName sent by the webview if provided (agent-spawned terminal),
+          // otherwise derive it from the command the same way CommandService does.
+          const termName = (data as any).terminalName
+            || `Mirror: ${data.command.length > 30 ? data.command.substring(0, 30) + '…' : data.command}`;
+          // Try to reveal an existing agent-managed terminal first
+          const revealed = svc.revealTerminal(termName);
+          if (!revealed) {
+            // No tracked terminal found — create a fresh one and run the command
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const newTerminal = vscode.window.createTerminal({
+              name: termName,
+              cwd: workspaceFolder,
+            });
+            newTerminal.show(false);
+            setTimeout(() => {
+              newTerminal.sendText(data.command, true);
+            }, 300);
+          }
           break;
         }
         case 'revertCheckpoint': {
@@ -479,7 +486,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 checkpointId = cpMatch[1];
               }
 
-              this._sendToolStatusToWebview(tool.name, 'success', target, result, checkpointId, tool.content);
+              // For run_command server tools, extract the terminal name so the
+              // webview button can reveal the exact terminal that was opened.
+              let terminalName: string | undefined;
+              if (tool.name === 'run_command') {
+                const tnMatch = result.match(/VS Code terminal "([^"]+)"/);
+                if (tnMatch) {
+                  terminalName = tnMatch[1];
+                }
+              }
+
+              this._sendToolStatusToWebview(tool.name, 'success', target, result, checkpointId, tool.content, terminalName);
               toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Success - ${result}`);
             } catch (err: any) {
               this._sendToolStatusToWebview(tool.name, 'error', target, err.message);
@@ -874,7 +891,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     target: string,
     result?: string,
     checkpointId?: string,
-    code?: string
+    code?: string,
+    terminalName?: string
   ) {
     this._view?.webview.postMessage({
       type: 'toolStatus',
@@ -883,7 +901,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       target,
       result,
       checkpointId,
-      code
+      code,
+      terminalName
     });
   }
 

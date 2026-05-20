@@ -215,7 +215,7 @@
 
   let currentToolCardElement = null;
 
-  function createToolCardDOM(toolName, status, target, result, checkpointId, isReverted = false, code = null) {
+  function createToolCardDOM(toolName, status, target, result, checkpointId, isReverted = false, code = null, terminalName = null) {
     const card = document.createElement('div');
     card.className = `tool-card ${status}`;
     if (isReverted) {
@@ -304,19 +304,24 @@
       if (toolName === 'run_command' && target) {
         const termBtn = document.createElement('button');
         termBtn.className = 'tool-revert-btn';
-        termBtn.title = 'Re-run in VS Code Terminal';
+        // If the agent already opened a VS Code terminal, label it "Show Terminal"
+        // Otherwise label it "Run in Terminal" (will create a new one)
+        const hasExistingTerminal = !!terminalName;
+        termBtn.title = hasExistingTerminal ? `Show terminal: ${terminalName}` : 'Re-run in VS Code Terminal';
         termBtn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px">
             <path d="M6 9a.5.5 0 0 1 .5-.5h3.793l-1.147-1.146a.5.5 0 0 1 .708-.708l2 2a.5.5 0 0 1 0 .708l-2 2a.5.5 0 0 1-.708-.708L10.293 9.5H6.5A.5.5 0 0 1 6 9z"/>
             <path d="M3.854 2.146a.5.5 0 0 0-.707 0l-2.5 2.5a.5.5 0 0 0 0 .707l2.5 2.5a.5.5 0 1 0 .707-.707L1.707 5H11.5a.5.5 0 0 1 .5.5v7a.5.5 0 0 0 1 0v-7A1.5 1.5 0 0 0 11.5 4H1.707l2.147-2.146a.5.5 0 0 0 0-.708z"/>
           </svg>
-          Terminal
+          ${hasExistingTerminal ? 'Show Terminal' : 'Terminal'}
         `;
         termBtn.style.color = '#22d3ee';
         termBtn.style.borderColor = 'rgba(34,211,238,0.25)';
         termBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          vscode.postMessage({ type: 'openTerminal', command: target });
+          // Send terminalName so the host can call revealTerminal() for agent terminals.
+          // The host will fall back to creating a new terminal if not found.
+          vscode.postMessage({ type: 'openTerminal', command: target, terminalName: terminalName || null });
         });
         controlsContainer.insertBefore(termBtn, controlsContainer.firstChild);
       }
@@ -588,19 +593,19 @@
       }
 
       case 'toolStatus': {
-        const { toolName, status, target, result, checkpointId, code } = message;
+        const { toolName, status, target, result, checkpointId, code, terminalName } = message;
         if (status === 'running') {
-          currentToolCardElement = createToolCardDOM(toolName, status, target, null, null);
+          currentToolCardElement = createToolCardDOM(toolName, status, target, null, null, false, null, null);
           placeCardInPlaceholder(currentToolCardElement, toolName, target);
         } else if (currentToolCardElement) {
           const parent = currentToolCardElement.parentNode;
           if (parent) {
-            const updatedCard = createToolCardDOM(toolName, status, target, result, checkpointId, false, code);
+            const updatedCard = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
             parent.replaceChild(updatedCard, currentToolCardElement);
             currentToolCardElement = null;
           }
         } else {
-          const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code);
+          const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
           placeCardInPlaceholder(card, toolName, target);
         }
         scrollChatToBottom();
