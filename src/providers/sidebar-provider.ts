@@ -194,6 +194,74 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
+        case 'getGitStatus': {
+          const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (!wsFolder) break;
+          try {
+            const { execSync } = require('child_process') as typeof import('child_process');
+            const gitStatus = execSync('git status --porcelain', { cwd: wsFolder, encoding: 'utf8' });
+            const changes: { file: string; status: string }[] = [];
+            gitStatus.split('\n').filter(Boolean).forEach(line => {
+              const status = line.substring(0, 2).trim() || '?';
+              // For staged files (first char) and unstaged files (second char), prioritize staged
+              const stagedStatus = line[0].trim();
+              const unstagedStatus = line[1].trim();
+              let file = line.substring(3).trim();
+              // Handle "both modified" or copied/renamed patterns
+              if (file.includes(' -> ')) {
+                // Rename or copy: take the new name
+                file = file.split(' -> ').pop() || file;
+              }
+              const effectiveStatus = stagedStatus || unstagedStatus || '?';
+              changes.push({ file, status: effectiveStatus });
+            });
+            this._view?.webview.postMessage({
+              type: 'gitChanges',
+              changes
+            });
+          } catch (e) {
+            // Not a git repo or git not installed
+            this._view?.webview.postMessage({
+              type: 'gitChanges',
+              changes: []
+            });
+          }
+          break;
+        }
+        case 'openDiff': {
+          const wsf = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (!wsf || !data.file) break;
+          const filePath = path.resolve(wsf, data.file);
+          if (!filePath.startsWith(wsf)) break;
+          try {
+            const uri = vscode.Uri.file(filePath);
+            // Open file with gutter diff visible (VS Code auto-shows git diff decorations)
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc);
+          } catch (e) {
+            vscode.window.showErrorMessage(`Could not open file for diff: ${data.file}`);
+          }
+          break;
+        }
+        case 'commitGitChanges': {
+          const wsF = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (!wsF) break;
+          try {
+            const { execSync } = require('child_process') as typeof import('child_process');
+            execSync('git add -A', { cwd: wsF, encoding: 'utf8' });
+            execSync('git commit -m "Mirror VS: agent changes committed"', { cwd: wsF, encoding: 'utf8' });
+            vscode.window.showInformationMessage('✅ All changes committed.');
+            // Refresh git status
+            this._view?.webview.postMessage({ type: 'gitChanges', changes: [] });
+          } catch (e: any) {
+            if (e.message && e.message.includes('nothing to commit')) {
+              this._view?.webview.postMessage({ type: 'gitChanges', changes: [] });
+            } else {
+              vscode.window.showErrorMessage(`Commit failed: ${e.message}`);
+            }
+          }
+          break;
+        }
         case 'revertCheckpoint': {
           console.log(`[Host] revertCheckpoint received for ID: ${data.checkpointId}`);
           const success = await revertCheckpoint(data.checkpointId);

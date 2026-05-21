@@ -50,6 +50,7 @@
   let isSending = false;
   let savedDefaultOllamaModel = 'llama3';
   let activeSessionId = null;
+  let gitChanges = [];
 
   const stopBtn = document.getElementById('stop-btn');
   const imageAttachmentsContainer = document.getElementById('image-attachments-container');
@@ -108,16 +109,65 @@
   vscode.postMessage({ type: 'getSettings' });
   vscode.postMessage({ type: 'fetchModels' });
 
-  // 1. Settings Drawer Toggle
-  toggleSettingsBtn.addEventListener('click', () => {
-    settingsDrawer.classList.toggle('collapsed');
+  // 1. Settings Drawer Toggle (replaced by 1d above)
+  // Kept for reference but replaced above.
+
+  // 1b. Git Drawer Toggle
+  const toggleGitBtn = document.getElementById('toggle-git-btn');
+  const gitDrawer = document.getElementById('git-drawer');
+  const gitChangesList = document.getElementById('git-changes-list');
+  const refreshGitBtn = document.getElementById('refresh-git-btn');
+  const commitGitBtn = document.getElementById('commit-git-btn');
+  const gitAddedCount = document.getElementById('git-added-count');
+  const gitModifiedCount = document.getElementById('git-modified-count');
+  const gitDeletedCount = document.getElementById('git-deleted-count');
+  const gitUntrackedCount = document.getElementById('git-untracked-count');
+
+  function refreshGitStatus() {
+    vscode.postMessage({ type: 'getGitStatus' });
+  }
+
+  function closeAllDrawers() {
+    settingsDrawer.classList.add('collapsed');
     historyDrawer.classList.add('collapsed');
+    gitDrawer.classList.add('collapsed');
+  }
+
+  toggleGitBtn.addEventListener('click', () => {
+    const isOpening = gitDrawer.classList.contains('collapsed');
+    closeAllDrawers();
+    if (isOpening) {
+      gitDrawer.classList.remove('collapsed');
+      refreshGitStatus();
+    }
   });
 
-  // 1b. History Drawer Toggle
+  refreshGitBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    refreshGitStatus();
+  });
+
+  commitGitBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    vscode.postMessage({ type: 'commitGitChanges' });
+  });
+
+  // 1c. History Drawer Toggle
   toggleHistoryBtn.addEventListener('click', () => {
-    historyDrawer.classList.toggle('collapsed');
-    settingsDrawer.classList.add('collapsed');
+    const isOpening = historyDrawer.classList.contains('collapsed');
+    closeAllDrawers();
+    if (isOpening) {
+      historyDrawer.classList.remove('collapsed');
+    }
+  });
+
+  // 1d. Settings Drawer Toggle
+  toggleSettingsBtn.addEventListener('click', () => {
+    const isOpening = settingsDrawer.classList.contains('collapsed');
+    closeAllDrawers();
+    if (isOpening) {
+      settingsDrawer.classList.remove('collapsed');
+    }
   });
 
   // 1c. New Chat Session Action
@@ -1106,6 +1156,11 @@
         break;
       }
       
+      case 'gitChanges': {
+        renderGitChanges(message.changes);
+        break;
+      }
+
       case 'checkpointReverted': {
         const { checkpointId, success } = message;
         const card = document.querySelector(`.tool-card[data-checkpoint-id="${checkpointId}"]`);
@@ -1306,6 +1361,86 @@
     html = html.replace(/%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
 
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
+  }
+
+  function renderGitChanges(changes) {
+    gitChanges = changes || [];
+    
+    // Update counts
+    let added = 0, modified = 0, deleted = 0, untracked = 0;
+    gitChanges.forEach(f => {
+      if (f.status === 'A') added++;
+      else if (f.status === 'M') modified++;
+      else if (f.status === 'D') deleted++;
+      else if (f.status === '?') untracked++;
+    });
+    gitAddedCount.textContent = added;
+    gitModifiedCount.textContent = modified;
+    gitDeletedCount.textContent = deleted;
+    gitUntrackedCount.textContent = untracked;
+
+    // Render list
+    gitChangesList.innerHTML = '';
+    if (gitChanges.length === 0) {
+      gitChangesList.innerHTML = '<div class="no-changes">✅ All changes committed</div>';
+      return;
+    }
+
+    gitChanges.forEach(file => {
+      const item = document.createElement('div');
+      item.className = 'git-change-item';
+      
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `git-change-status ${file.status}`;
+      let statusLabel = file.status;
+      if (statusLabel === '?') statusLabel = '?';
+      else if (statusLabel === 'M') statusLabel = 'M';
+      else if (statusLabel === 'A') statusLabel = 'A';
+      else if (statusLabel === 'D') statusLabel = 'D';
+      statusBadge.textContent = statusLabel;
+      
+      const filename = document.createElement('span');
+      filename.className = 'git-change-filename';
+      filename.textContent = file.file;
+      filename.title = file.file;
+      
+      const actions = document.createElement('div');
+      actions.className = 'git-change-actions';
+      
+      // View diff button
+      const diffBtn = document.createElement('button');
+      diffBtn.className = 'git-change-action-btn diff';
+      diffBtn.title = 'View diff';
+      diffBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>`;
+      diffBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ type: 'openDiff', file: file.file });
+      });
+      
+      // Open file button
+      const openBtn = document.createElement('button');
+      openBtn.className = 'git-change-action-btn';
+      openBtn.title = 'Open file';
+      openBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>`;
+      openBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ type: 'openFile', path: file.file });
+      });
+      
+      actions.appendChild(diffBtn);
+      actions.appendChild(openBtn);
+      
+      item.appendChild(statusBadge);
+      item.appendChild(filename);
+      item.appendChild(actions);
+      
+      // Click on item itself opens diff
+      item.addEventListener('click', () => {
+        vscode.postMessage({ type: 'openDiff', file: file.file });
+      });
+      
+      gitChangesList.appendChild(item);
+    });
   }
 
   function escapeHtml(unsafe) {

@@ -1616,6 +1616,208 @@ input:focus, select:focus {
   background: #f87171;
 }
 
+/* ==========================================================================
+   Git Changes Drawer
+   ========================================================================== */
+.git-drawer {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  right: 0;
+  background: rgba(30, 30, 34, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  z-index: 9;
+  transition: var(--transition-smooth);
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.git-drawer.collapsed {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}
+
+.git-drawer .drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 4px 16px;
+}
+
+.git-drawer .drawer-header h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+
+.drawer-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.git-changes-summary {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
+}
+
+.git-changes-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.git-stat {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 16px;
+  text-align: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.git-stat.added {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.git-stat.modified {
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+}
+
+.git-stat.deleted {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.git-stat.untracked {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+.git-changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.no-changes {
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 16px 0;
+  font-style: italic;
+}
+
+.git-change-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.git-change-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.git-change-status {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  min-width: 14px;
+  text-align: center;
+}
+
+.git-change-status.M {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+}
+
+.git-change-status.A {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.git-change-status.D {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.git-change-status.\\? {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+.git-change-filename {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, Consolas, monospace);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--vscode-sideBar-foreground, #cccccc);
+}
+
+.git-change-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.git-change-item:hover .git-change-actions {
+  opacity: 1;
+}
+
+.git-change-action-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-sideBar-foreground, #cccccc);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-smooth);
+}
+
+.git-change-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.git-change-action-btn.diff:hover {
+  color: #818cf8;
+}
+
+.git-change-action-btn.revert:hover {
+  color: #f87171;
+}
+
 /* Inline Message Bubble Image Layout */
 .bubble-images-container {
   display: flex;

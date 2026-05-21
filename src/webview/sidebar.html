@@ -32,6 +32,12 @@
             <path d="M8.5 4.5A.5.5 0 0 0 8 4v4H5a.5.5 0 0 0 0 1h4V4.5a.5.5 0 0 0-.5-.5z"/>
           </svg>
         </button>
+        <button id="toggle-git-btn" class="icon-btn" title="Toggle Git Changes View">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M2 6.5A4.5 4.5 0 0 1 6.5 2h3A4.5 4.5 0 0 1 14 6.5v3A4.5 4.5 0 0 1 9.5 14h-3A4.5 4.5 0 0 1 2 9.5v-3zM6.5 3A3.5 3.5 0 0 0 3 6.5v3A3.5 3.5 0 0 0 6.5 13h3A3.5 3.5 0 0 0 13 9.5v-3A3.5 3.5 0 0 0 9.5 3h-3z"/>
+            <path d="M6.5 5.5v5h1v-5h-1zm2 0v5h1v-5h-1zM5.5 6.5h5v1h-5v-1z"/>
+          </svg>
+        </button>
         <button id="toggle-settings-btn" class="icon-btn" title="Toggle Configuration Drawer">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path d="M9.405 1.02c.28-.558 1.078-.558 1.357 0l.87 1.737 1.916.279c.617.09.862.846.416 1.29L12.57 5.688l.328 1.908c.106.617-.54 1.087-1.09.8L10 7.5l-1.808.996c-.55.286-1.196-.183-1.09-.8l.328-1.908L6.038 4.326c-.446-.443-.2-.199.416-1.29l1.916-.28.87-1.736z"/>
@@ -127,6 +133,49 @@
       <div class="drawer-content">
         <div id="sessions-list" class="sessions-list">
           <div class="no-sessions">No previous sessions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Git Changes Drawer (Collapsible) -->
+    <div id="git-drawer" class="git-drawer collapsed">
+      <div class="drawer-header">
+        <h3>Git Changes</h3>
+        <div class="drawer-header-actions">
+          <button id="refresh-git-btn" class="icon-btn" title="Refresh Git Status">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+              <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+            </svg>
+          </button>
+          <button id="commit-git-btn" class="icon-btn" title="Commit All Changes">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="drawer-content">
+        <div id="git-changes-summary" class="git-changes-summary">
+          <div class="git-changes-stat">
+            <span class="git-stat added" id="git-added-count">0</span>
+            <span>Added</span>
+          </div>
+          <div class="git-changes-stat">
+            <span class="git-stat modified" id="git-modified-count">0</span>
+            <span>Modified</span>
+          </div>
+          <div class="git-changes-stat">
+            <span class="git-stat deleted" id="git-deleted-count">0</span>
+            <span>Deleted</span>
+          </div>
+          <div class="git-changes-stat">
+            <span class="git-stat untracked" id="git-untracked-count">0</span>
+            <span>Untracked</span>
+          </div>
+        </div>
+        <div id="git-changes-list" class="git-changes-list">
+          <div class="no-changes">No changes detected</div>
         </div>
       </div>
     </div>

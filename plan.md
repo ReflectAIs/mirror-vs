@@ -15,17 +15,29 @@
 
 ## Enhancement Opportunities (Priority Order)
 
-### 1. 🧪 TESTING (Missing Entirely)
-- No test framework configured
-- No unit tests, integration tests, or end-to-end tests
-- **Impact**: High - any refactoring risks regression
+### ✅ DONE: TESTING
+- Vitest configured with vscode module mock (`src/vscode-shim.ts`)
+- 23 unit tests across 2 test files
+- `npm run test`, `npm run test:watch`, `npm run test:coverage`
+- Note: Must use `powershell -Command npx vitest ...` on Windows
 
-### 2. 📝 CODE QUALITY & LINTING
-- No ESLint configuration
-- No Prettier configuration
-- No commit hooks (husky/lint-staged)
-- No TypeScript strict mode (not verified)
-- **Impact**: Medium - code consistency and early error detection
+### ✅ DONE: CODE QUALITY & LINTING
+- ESLint configured with TypeScript plugin and Prettier integration
+- Prettier configured with 2-space, single quotes, trailing commas
+- `npm run lint`, `npm run format`, `npm run check`
+- TypeScript strict mode enabled in tsconfig.json
+
+### ✅ DONE: GIT CHANGES UI (Unified UX)
+- **Git Changes button** added to header bar (3-bar icon)
+- **Git Changes drawer**: collapsible panel showing:
+  - Summary stats: Added / Modified / Deleted / Untracked file counts
+  - File list with status badges (A=green, M=yellow, D=red, ?=gray)
+  - Each file has: Diff button, Open file button
+  - Clicking a file opens it in editor with VS Code gutter diff
+- **Refresh button**: re-fetches git status
+- **Commit button**: commits all changes with message "Mirror VS: agent changes committed"
+- **Backend handlers**: `getGitStatus`, `openDiff`, `commitGitChanges` in sidebar-provider.ts
+- **Type definitions**: Updated `WebviewToExtensionMessage` and `ExtensionToWebviewMessage`
 
 ### 3. 🔧 CI/CD
 - No GitHub Actions workflow for build verification

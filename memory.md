@@ -8,7 +8,7 @@ Mirror VS is a VS Code extension that serves as an interactive, sidebar-based AI
 - **Extension Host**: TypeScript (VS Code API)
 - **Frontend**: HTML/CSS/JS webview (no framework, vanilla JS)
 - **Build**: esbuild (no webpack/vite)
-- **No Unit/Integration/E2E testing framework set up**
+- **Testing**: Vitest (v1.6.0) with vscode shim for unit tests
 
 ## Key Components
 1. **`src/extension.ts`** - Entry point, registers sidebar provider & commands
@@ -34,12 +34,45 @@ Mirror VS is a VS Code extension that serves as an interactive, sidebar-based AI
 - ✅ Checkpoint revert for file operations
 - ✅ Context compression for long conversations
 - ✅ Git baseline commit for diff gutter visualization
+- ✅ Git Changes UI drawer (view modified/added/deleted files, view diff, commit)
 - ✅ Avatar state machine with animated emoji
 - ✅ Infinite scroll history loading
 - ✅ Settings drawer with host validation
 - ✅ turns.log for debugging agent loops
 - ✅ Active file context bar
 - ✅ Open file in editor from tool card
+
+### Git Changes UI (New)
+- **Button**: Grid icon in header, toggles git drawer
+- **Drawer**: Shows summary stats (Added/Modified/Deleted/Untracked counts)
+- **File List**: Each file with status badge + "View Diff" + "Open File" buttons
+- **Refresh**: Re-fetches `git status --porcelain`
+- **Commit**: Runs `git add -A && git commit -m "Mirror VS: agent changes committed"`
+- **Click file**: Opens in editor with VS Code's built-in git diff gutter highlights
+- **Backend**: `getGitStatus`, `openDiff`, `commitGitChanges` handlers in sidebar-provider.ts
+
+## Testing (Vitest)
+- **Framework**: Vitest v1.6.0
+- **Config**: `vitest.config.ts` - uses `resolve.alias` to map `vscode` -> `src/vscode-shim.ts`
+- **VS Code Mock**: `src/vscode-shim.ts` provides mock implementations for workspace, window, commands, Uri, ConfigurationTarget
+- **Test Location**: `src/**/*.test.ts` (vitest include pattern)
+- **Coverage**: v8 provider, output in text/lcov/html, excludes test files, webview, types, orchestrator, providers, browser-service
+- **Run**: `npm run test` (vitest run), `npm run test:watch` (vitest watch), `npm run test:coverage` (with coverage)
+- **Note**: Must use `powershell -Command npx vitest ...` on Windows when running directly
+
+### Test Files
+| File | Tests | Status |
+|------|-------|--------|
+| `src/agent/tools/__tests__/file-tools.test.ts` | 11 | ✅ Passing |
+| `src/agent/tools/__tests__/tool-registry.test.ts` | 12 | ✅ Passing |
+
+### Test Commands
+- `npm run test` — runs all tests
+- `npm run test:watch` — watch mode
+- `npm run test:coverage` — with coverage report
+- `npm run lint` — eslint check
+- `npm run format` — prettier format
+- `npm run check` — lint + format:check + test (CI gate)
 
 ## Build & Run
 - Compile: `npm run compile` (runs `node esbuild.js`)
