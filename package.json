@@ -134,8 +134,16 @@
   "devDependencies": {
     "@types/node": "^18.17.1",
     "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "@vitest/coverage-v8": "^1.6.0",
     "esbuild": "^0.20.0",
-    "typescript": "^5.1.6"
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.3",
+    "typescript": "^5.1.6",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "puppeteer-core": "^25.0.4"
