@@ -6,6 +6,10 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    deps: {
+      // vscode is a native module, we must shim it in tests
+      inline: [/vscode/],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
