@@ -1583,9 +1583,10 @@
     }
   });
 
-  // Avatar Interactive Emoji Controller
-  const avatarContainer = document.getElementById('avatar-container');
-  const avatarEmoji = document.getElementById('avatar-emoji');
+  // Buddy Avatar - Interactive Entertaining Mascot
+  const buddyContainer = document.getElementById('buddy-container');
+  const buddyEmoji = document.getElementById('buddy-emoji');
+  const buddyTooltip = document.getElementById('buddy-tooltip');
 
   let avatarState = 'idle';
   let idleInterval = null;
@@ -1604,8 +1605,8 @@
     avatarState = state;
     
     // Remove state classes and add new one
-    avatarContainer.classList.remove('state-idle', 'state-thinking', 'state-coding', 'state-tool_calling', 'state-error');
-    avatarContainer.classList.add(`state-${state === 'click' ? 'idle' : state}`);
+    buddyContainer.classList.remove('state-idle', 'state-thinking', 'state-coding', 'state-tool_calling', 'state-error');
+    buddyContainer.classList.add(`state-${state === 'click' ? 'idle' : state}`);
     
     if (idleInterval) {
       clearInterval(idleInterval);
@@ -1617,11 +1618,23 @@
     }
 
     const list = EMOJIS[state] || EMOJIS.idle;
-    avatarEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+    buddyEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+
+    // Update tooltip text
+    const tooltips = {
+      idle: 'Ready to help!',
+      thinking: 'Thinking...',
+      coding: 'Writing code...',
+      tool_calling: 'Running tools...',
+      error: 'Oops! Something went wrong',
+      click: '👋 Hey!'
+    };
+    buddyTooltip.textContent = tooltips[state] || 'Ready to help!';
 
     if (state === 'idle') {
       startIdleRoutine();
     } else if (state === 'error') {
+      buddyTooltip.textContent = '😰 Uh oh!';
       errorResetTimeout = setTimeout(() => {
         setAvatarState('idle');
       }, 5000);
@@ -1635,28 +1648,45 @@
         const chance = Math.random();
         if (chance < 0.35) {
           const list = EMOJIS.idle;
-          avatarEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+          buddyEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+          // Random tooltip messages to entertain
+          const messages = [
+            'Ready to help!',
+            'Waiting for your command...',
+            'I can write code!',
+            'Try asking me something',
+            'Type @ to link files',
+            'I support Ollama + DeepSeek'
+          ];
+          buddyTooltip.textContent = messages[Math.floor(Math.random() * messages.length)];
         }
       }
-    }, 6000);
+    }, 8000);
   }
 
   // Hook up winking/reactions on click
-  if (avatarContainer) {
-    avatarContainer.addEventListener('click', () => {
+  if (buddyContainer) {
+    buddyContainer.addEventListener('click', () => {
       const current = avatarState;
       
-      avatarContainer.style.transform = 'scale(1.25) rotate(360deg)';
+      buddyContainer.style.transform = 'scale(1.3) rotate(360deg)';
+      buddyContainer.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
       
       const clicks = EMOJIS.click;
-      avatarEmoji.textContent = clicks[Math.floor(Math.random() * clicks.length)];
+      buddyEmoji.textContent = clicks[Math.floor(Math.random() * clicks.length)];
+      buddyTooltip.textContent = '👋 Hey there!';
+      buddyTooltip.style.opacity = '1';
+      buddyTooltip.style.transform = 'translateX(-50%) translateY(0)';
       
       setTimeout(() => {
-        avatarContainer.style.transform = '';
+        buddyContainer.style.transform = '';
+        buddyContainer.style.transition = '';
+        buddyTooltip.style.opacity = '';
+        buddyTooltip.style.transform = '';
         if (avatarState !== 'error') {
           setAvatarState(current);
         }
-      }, 800);
+      }, 1000);
     });
   }
 

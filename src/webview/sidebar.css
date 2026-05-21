@@ -1816,7 +1816,198 @@ select:focus {
 }
 
 /* ==========================================================================
-   AVATAR
+   BUDDY AVATAR - Floating Entertaining Mascot
+   ========================================================================== */
+.buddy-container {
+  position: absolute;
+  right: 16px;
+  top: 70px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.3s var(--ease-spring);
+  animation: buddy-float 4s var(--ease-spring) infinite;
+}
+
+.buddy-container:hover {
+  transform: scale(1.15);
+}
+
+@keyframes buddy-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.buddy-glow {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(99, 102, 241, 0.3),
+    transparent,
+    rgba(168, 85, 247, 0.3),
+    transparent
+  );
+  animation: buddy-glow-spin 3s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.buddy-container:hover .buddy-glow {
+  opacity: 1;
+}
+
+.buddy-container.state-thinking .buddy-glow {
+  opacity: 1;
+  animation: buddy-glow-spin 1.5s linear infinite;
+}
+
+.buddy-container.state-coding .buddy-glow {
+  opacity: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(52, 211, 153, 0.3),
+    transparent,
+    rgba(34, 197, 94, 0.3),
+    transparent
+  );
+}
+
+.buddy-container.state-error .buddy-glow {
+  opacity: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(248, 113, 113, 0.4),
+    transparent,
+    rgba(239, 68, 68, 0.4),
+    transparent
+  );
+}
+
+@keyframes buddy-glow-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.buddy-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s var(--ease-spring);
+}
+
+.buddy-container.state-thinking .buddy-avatar {
+  border-color: rgba(129, 140, 248, 0.4);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.buddy-container.state-coding .buddy-avatar {
+  border-color: rgba(52, 211, 153, 0.4);
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.3);
+}
+
+.buddy-container.state-tool_calling .buddy-avatar {
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.buddy-container.state-error .buddy-avatar {
+  border-color: rgba(248, 113, 113, 0.5);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.4);
+  animation: buddy-shake 0.5s ease-in-out;
+}
+
+@keyframes buddy-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px) rotate(-5deg); }
+  40% { transform: translateX(4px) rotate(5deg); }
+  60% { transform: translateX(-3px) rotate(-3deg); }
+  80% { transform: translateX(3px) rotate(3deg); }
+}
+
+.buddy-emoji {
+  font-size: 22px;
+  display: inline-block;
+  transform-origin: center bottom;
+  transition: transform 0.2s ease;
+}
+
+.buddy-container.state-thinking .buddy-emoji {
+  animation: buddy-think 1.5s infinite ease-in-out;
+}
+
+.buddy-container.state-coding .buddy-emoji {
+  animation: buddy-type 0.3s infinite alternate;
+}
+
+.buddy-container.state-tool_calling .buddy-emoji {
+  animation: buddy-hammer 0.8s infinite ease-in-out;
+}
+
+@keyframes buddy-think {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-15deg) scale(1.1); }
+  75% { transform: rotate(15deg) scale(1.1); }
+}
+
+@keyframes buddy-type {
+  from { transform: translateY(0) scaleY(1); }
+  to { transform: translateY(-2px) scaleY(0.9); }
+}
+
+@keyframes buddy-hammer {
+  0%, 100% { transform: rotate(0deg); }
+  35% { transform: rotate(-20deg) translateY(-2px); }
+  70% { transform: rotate(25deg) translateY(1px); }
+}
+
+.buddy-tooltip {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 15, 23, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 9px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateX(-50%) translateY(4px);
+}
+
+.buddy-container:hover .buddy-tooltip,
+.buddy-container.state-thinking .buddy-tooltip,
+.buddy-container.state-coding .buddy-tooltip,
+.buddy-container.state-tool_calling .buddy-tooltip,
+.buddy-container.state-error .buddy-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ==========================================================================
+   AVATAR (original, kept for compatibility)
    ========================================================================== */
 .avatar-container {
   width: 32px;
