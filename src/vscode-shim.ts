@@ -1,7 +1,5 @@
 
-// This file provides a mock VSCode module for vitest tests.
-// It's used via vitest's alias configuration.
-
+// VS Code mock for vitest testing
 export const workspace = {
   fs: {
     writeFile: async () => {},
@@ -47,5 +45,7 @@ export const EventEmitter = class {
   dispose() {}
 };
 export const SecretStorage = class {};
+export const OverviewRulerLane = { Left: 1 };
+export const ThemeColor = {};
 
 export default { workspace, window, commands, Uri, ConfigurationTarget };
