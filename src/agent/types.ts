@@ -1,5 +1,6 @@
+
 export interface ToolCall {
-  name: 'read_file' | 'create_file' | 'write_file' | 'patch_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command';
+  name: 'read_file' | 'create_file' | 'write_file' | 'patch_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command' | 'send_terminal_input' | 'close_terminal';
   path?: string;
   query?: string;
   content?: string;
@@ -7,6 +8,7 @@ export interface ToolCall {
   selector?: string;
   text?: string;
   command?: string;
+  terminal_name?: string;
 }
 
 export type ToolStatus = 'running' | 'success' | 'error';
