@@ -751,8 +751,11 @@
   function placeCardInPlaceholder(card, toolName, target) {
     const placeholders = document.querySelectorAll('.tool-card-placeholder');
     let placed = false;
+    const cleanTarget = unescapeHtml(target).trim();
     for (let i = 0; i < placeholders.length; i++) {
-      if (placeholders[i].getAttribute('data-tool') === toolName && placeholders[i].getAttribute('data-target') === target && placeholders[i].children.length === 0) {
+      const placeholderTool = placeholders[i].getAttribute('data-tool');
+      const placeholderTarget = unescapeHtml(placeholders[i].getAttribute('data-target')).trim();
+      if (placeholderTool === toolName && placeholderTarget === cleanTarget && placeholders[i].children.length === 0) {
         placeholders[i].appendChild(card);
         placed = true;
         break;
@@ -766,7 +769,7 @@
   function appendToolCardFromHistory(text) {
     const results = text.split('\n\n');
     results.forEach(res => {
-      const match = res.match(/\[Tool Result for (\w+) on "([^"]*)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
+      const match = res.match(/\[Tool Result for (\w+) on "([\s\S]*?)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
       if (match) {
         const [_, toolName, target, statusString, details] = match;
         const status = statusString.toLowerCase() === 'success' ? 'success' : 'error';
@@ -1224,10 +1227,14 @@
           const closeIndex = openIndex + match.index;
           const matchLength = match[0].length;
           let tagContent = cleanText.substring(openIndex, closeIndex + matchLength);
-          let targetMatch = tagContent.match(/path\s*=\s*["']([^"']+)["']/i) 
-            || tagContent.match(/query\s*=\s*["']([^"']+)["']/i)
-            || tagContent.match(/terminal_name\s*=\s*["']([^"']+)["']/i);
-          let target = targetMatch ? targetMatch[1].trim() : '';
+          
+          const attrsEnd = tagContent.indexOf('>');
+          const attrs = attrsEnd !== -1 ? tagContent.substring(0, attrsEnd) : tagContent;
+          let target = getAttrValue(attrs, 'path')
+            || getAttrValue(attrs, 'query')
+            || getAttrValue(attrs, 'terminal_name')
+            || '';
+          target = target.trim();
           
           let placeholderToken = `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
           cleanText = cleanText.substring(0, openIndex) + placeholderToken + cleanText.substring(closeIndex + matchLength);
@@ -1238,9 +1245,10 @@
           if (firstCloseBracket !== -1) {
             let actualCode = streamingContent.substring(firstCloseBracket + 1);
             let pathExt = 'plaintext';
-            let pathMatch = streamingContent.match(/path\s*=\s*["']([^"']+)["']/i);
-            if (pathMatch) {
-              pathExt = pathMatch[1].split('.').pop() || 'plaintext';
+            const attrs = streamingContent.substring(0, firstCloseBracket);
+            const pathVal = getAttrValue(attrs, 'path');
+            if (pathVal) {
+              pathExt = pathVal.split('.').pop() || 'plaintext';
             }
             cleanText = cleanText.substring(0, openIndex) + `\n\`\`\`${pathExt}\n${actualCode}`;
           } else {
@@ -1257,13 +1265,14 @@
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}([\\s\\S]*?)\\/?>`, 'gi');
       cleanText = cleanText.replace(regex, (match, attrs) => {
-        let targetMatch = attrs.match(/path\s*=\s*["']([^"']+)["']/i) 
-          || attrs.match(/query\s*=\s*["']([^"']+)["']/i)
-          || attrs.match(/url\s*=\s*["']([^"']+)["']/i)
-          || attrs.match(/selector\s*=\s*["']([^"']+)["']/i)
-          || attrs.match(/command\s*=\s*["']([^"']+)["']/i)
-          || attrs.match(/terminal_name\s*=\s*["']([^"']+)["']/i);
-        let target = targetMatch ? targetMatch[1].trim() : '';
+        let target = getAttrValue(attrs, 'path')
+          || getAttrValue(attrs, 'query')
+          || getAttrValue(attrs, 'url')
+          || getAttrValue(attrs, 'selector')
+          || getAttrValue(attrs, 'command')
+          || getAttrValue(attrs, 'terminal_name')
+          || '';
+        target = target.trim();
         return `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
       });
     }
@@ -1605,6 +1614,29 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function unescapeHtml(safe) {
+    if (!safe) return '';
+    return safe
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&apos;/g, "'");
+  }
+
+  function getAttrValue(attrs, name) {
+    if (!attrs) return null;
+    const dq = new RegExp(`${name}\\s*=\\s*"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"`, 'i').exec(attrs);
+    if (dq) { return dq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'); }
+    const sq = new RegExp(`${name}\\s*=\\s*'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'`, 'i').exec(attrs);
+    if (sq) { return sq[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\'); }
+    // Fallback to simple match if quotes are missing or something
+    const simple = new RegExp(`${name}\\s*=\\s*([^\\s>]+)`, 'i').exec(attrs);
+    if (simple) return simple[1];
+    return null;
   }
 
   // 10. Bind Click Events to Dynamic Code Block Buttons

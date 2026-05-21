@@ -317,6 +317,16 @@ export class AgentOrchestrator {
           const found = cleanedMessages.find(m => m === msgToSummarize);
           if (found) {
             found.summarized = true;
+            // Compact the content of the summarized message to prevent memory & state bloat
+            if (found.content.length > 2000) {
+              found.content = found.content.substring(0, 1000) + 
+                '\n\n... [CONTENT REMOVED AFTER CONTEXT CONSOLIDATION] ...\n\n' + 
+                found.content.substring(found.content.length - 1000);
+            }
+            // Clear raw images from summarized messages to save massive amounts of space
+            if (found.images) {
+              found.images = [];
+            }
           }
         });
 
@@ -416,7 +426,24 @@ export class AgentOrchestrator {
                 }
               }
 
-              this._sendToolStatusToWebview(tool.name, 'success', target, result, checkpointId, tool.content, terminalName);
+              // Truncate result if it is too long to prevent context bloat & API errors (e.g. DeepSeek 413)
+              let displayResult = result;
+              if (tool.name === 'browser_screenshot') {
+                // Keep screenshot base64 intact for the vision extraction match below,
+                // but we will clean the card display value sent to webview
+                const match = result.match(/\(Base64 data hidden from output but sent to vision model: (.*)\)/);
+                if (match) {
+                  displayResult = result.replace(match[0], '(Image successfully captured and sent to vision model)');
+                }
+              } else if (result.length > 35000) {
+                const keepLength = 17500;
+                const truncatedCount = result.length - 35000;
+                displayResult = result.substring(0, keepLength) + 
+                  `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` + 
+                  result.substring(result.length - keepLength);
+              }
+
+              this._sendToolStatusToWebview(tool.name, 'success', target, displayResult, checkpointId, tool.content, terminalName);
               toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Success - ${result}`);
             } catch (err: any) {
               this._sendToolStatusToWebview(tool.name, 'error', target, err.message);
@@ -435,6 +462,16 @@ export class AgentOrchestrator {
               // Post the screenshot to the webview chat for inline display
               this._postMessage({ type: 'screenshotCapture', base64 });
               return res.replace(match[0], '(Image successfully captured and sent to vision model)');
+            }
+            if (res.length > 35000) {
+              const prefixMatch = res.match(/^\[Tool Result for \w+ on "[^"]*"\]: (Success|Error) - /);
+              const prefix = prefixMatch ? prefixMatch[0] : '';
+              const content = prefix ? res.substring(prefix.length) : res;
+              const keepLength = 17500;
+              const truncatedCount = content.length - 35000;
+              return prefix + content.substring(0, keepLength) +
+                `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` +
+                content.substring(content.length - keepLength);
             }
             return res;
           });
@@ -524,12 +561,45 @@ USER/ENVIRONMENT TOOL RESPONSE:
     return text.replace(/```[\s\S]*?```/g, '');
   }
 
+  private isTagFullyClosed(text: string, toolName: string): boolean {
+    const openTag = `<${toolName}`;
+    const startIdx = text.toLowerCase().indexOf(openTag);
+    if (startIdx === -1) return false;
+
+    let inDq = false;
+    let inSq = false;
+    let escaped = false;
+
+    for (let i = startIdx + openTag.length; i < text.length; i++) {
+      const char = text[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"' && !inSq) {
+        inDq = !inDq;
+        continue;
+      }
+      if (char === "'" && !inDq) {
+        inSq = !inSq;
+        continue;
+      }
+      if (char === '>' && !inDq && !inSq) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private hasCompleteToolCall(text: string): boolean {
     const stripped = this._stripCodeBlocks(text);
     const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
     for (const tool of selfClosingTools) {
-      const regex = new RegExp(`<${tool}[^>]*>`, 'i');
-      if (regex.test(stripped)) {
+      if (this.isTagFullyClosed(stripped, tool)) {
         return true;
       }
     }
@@ -622,10 +692,10 @@ USER/ENVIRONMENT TOOL RESPONSE:
      * Tries double-quoted first, then single-quoted.
      */
     const attr = (attrs: string, name: string): string | null => {
-      const dq = new RegExp(`${name}\\s*=\\s*"([^"]+)"`, 'i').exec(attrs);
-      if (dq) { return dq[1]; }
-      const sq = new RegExp(`${name}\\s*=\\s*'([^']+)'`, 'i').exec(attrs);
-      if (sq) { return sq[1]; }
+      const dq = new RegExp(`${name}\\s*=\\s*"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"`, 'i').exec(attrs);
+      if (dq) { return dq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'); }
+      const sq = new RegExp(`${name}\\s*=\\s*'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'`, 'i').exec(attrs);
+      if (sq) { return sq[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\'); }
       return null;
     };
 

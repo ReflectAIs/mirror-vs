@@ -120,7 +120,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 const safePath = path.resolve(workspaceFolder, relPath);
                 if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
                   try {
-                    const content = fs.readFileSync(safePath, 'utf8');
+                    let content = fs.readFileSync(safePath, 'utf8');
+                    if (content.length > 25000) {
+                      const keepLength = 12500;
+                      const truncatedCount = content.length - 25000;
+                      content = content.substring(0, keepLength) +
+                        `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` +
+                        content.substring(content.length - keepLength);
+                    }
                     linkedContent += `\n--- File: ${relPath} ---\n${content}\n`;
                   } catch (e) {
                     console.warn(`Could not load context file: ${relPath}`, e);
