@@ -17,6 +17,11 @@ vi.mock('../terminal-tools', () => ({
   executeTerminalTool: vi.fn().mockResolvedValue('terminal result'),
 }));
 
+vi.mock('../../../utils/editor-utils', () => ({
+  createCheckpoint: vi.fn().mockResolvedValue('cp_test'),
+  revertCheckpoint: vi.fn().mockResolvedValue(true),
+}));
+
 import { executeTool } from '../tool-registry';
 
 describe('executeTool', () => {
@@ -76,5 +81,10 @@ describe('executeTool', () => {
     await expect(executeTool({ name: 'unknown_tool' as any }, getSafePath)).rejects.toThrow(
       'Unsupported tool call: unknown_tool',
     );
+  });
+
+  it('should route send_terminal_input correctly', async () => {
+    const result = await executeTool({ name: 'send_terminal_input', terminal_name: 'test', text: 'Ctrl+C' }, getSafePath);
+    expect(result).toBe('terminal result');
   });
 });

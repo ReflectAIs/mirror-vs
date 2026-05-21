@@ -3,30 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Mock vscode entirely
-vi.mock('vscode', () => ({
-  workspace: {
-    fs: {
-      writeFile: vi.fn(),
-    },
-    workspaceFolders: [{ uri: { fsPath: '/mock/workspace' } }],
-    getConfiguration: vi.fn().mockReturnValue({
-      get: vi.fn().mockReturnValue('ollama'),
-    }),
-  },
-  window: {
-    showInformationMessage: vi.fn(),
-    showErrorMessage: vi.fn(),
-    showTextDocument: vi.fn(),
-    activeTextEditor: null,
-  },
-  Uri: {
-    file: (p: string) => ({ fsPath: p }),
-  },
-  ConfigurationTarget: { Global: 1 },
-}));
-
-// Mock the editor-utils createCheckpoint
+// Mock editor-utils
 vi.mock('../../../utils/editor-utils', () => ({
   createCheckpoint: vi.fn().mockResolvedValue('cp_test123'),
   revertCheckpoint: vi.fn().mockResolvedValue(true),
@@ -34,7 +11,6 @@ vi.mock('../../../utils/editor-utils', () => ({
 
 import { executeFileTool } from '../file-tools';
 
-// Helper to create a temp dir for fs operations
 function createTempDir(): string {
   const tmpDir = path.join(__dirname, '__temp_test_fs__');
   if (!fs.existsSync(tmpDir)) {
@@ -125,7 +101,11 @@ describe('executeFileTool', () => {
     });
 
     it('should throw if file does not exist', async () => {
-      const tool = { name: 'patch_file', path: 'nonexistent.ts', content: '<<<<<<< SEARCH\na\n=======\nb\n>>>>>>> REPLACE' };
+      const tool = {
+        name: 'patch_file',
+        path: 'nonexistent.ts',
+        content: '<<<<<<< SEARCH\na\n=======\nb\n>>>>>>> REPLACE',
+      };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
         'File does not exist: nonexistent.ts',
       );

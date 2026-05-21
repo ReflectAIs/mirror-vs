@@ -1,15 +1,17 @@
 
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      vscode: path.resolve(__dirname, 'src/vscode-shim.ts'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    deps: {
-      // vscode is a native module, we must shim it in tests
-      inline: [/vscode/],
-    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
