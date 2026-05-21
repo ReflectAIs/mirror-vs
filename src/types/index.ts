@@ -6,12 +6,15 @@ export interface ExtensionSettings {
   defaultOllamaModel: string;
   defaultDeepSeekModel: string;
   hasDeepSeekKey: boolean; // Tells the webview if a key is stored without exposing the key itself
+  maxTurnsBeforeSummarize: number;
+  turnsToRetain: number;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   images?: string[]; // Array of base64 encoded images
+  summarized?: boolean; // Flag to exclude from LLM context while preserving in user history
 }
 
 export interface ChatSession {
@@ -25,7 +28,7 @@ export interface ChatSession {
 export type WebviewToExtensionMessage =
   | { type: 'sendMessage'; text: string; history: ChatMessage[] }
   | { type: 'getSettings' }
-  | { type: 'saveSettings'; provider: LLMProvider; ollamaHost: string; defaultOllamaModel: string; defaultDeepSeekModel: string; deepSeekKey?: string }
+  | { type: 'saveSettings'; provider: LLMProvider; ollamaHost: string; defaultOllamaModel: string; defaultDeepSeekModel: string; deepSeekKey?: string; maxTurnsBeforeSummarize?: number; turnsToRetain?: number }
   | { type: 'fetchModels' }
   | { type: 'applyCode'; code: string; mode: 'insert' | 'replace' | 'create' }
   | { type: 'clearChat' }

@@ -68,6 +68,13 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           await config.update('defaultOllamaModel', data.defaultOllamaModel, vscode.ConfigurationTarget.Global);
           await config.update('defaultDeepSeekModel', data.defaultDeepSeekModel, vscode.ConfigurationTarget.Global);
 
+          if (data.maxTurnsBeforeSummarize !== undefined) {
+            await config.update('maxTurnsBeforeSummarize', data.maxTurnsBeforeSummarize, vscode.ConfigurationTarget.Global);
+          }
+          if (data.turnsToRetain !== undefined) {
+            await config.update('turnsToRetain', data.turnsToRetain, vscode.ConfigurationTarget.Global);
+          }
+
           if (data.deepSeekKey !== undefined) {
             if (data.deepSeekKey.trim() === '') {
               await this._secretService.deleteSecret('deepseek_api_key');
@@ -128,7 +135,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const contextPrompt = getActiveFileContext();
           fullMessageText += contextPrompt;
 
-          await this._orchestrator.handleMessageStream(fullMessageText, data.history);
+          await this._orchestrator.handleMessageStream(fullMessageText, data.history, (data as any).images);
+          break;
+        }
+        case 'cancelStream': {
+          this._orchestrator.cancelActiveStream();
           break;
         }
         case 'applyCode': {
@@ -249,6 +260,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
     const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
+    const maxTurnsBeforeSummarize = config.get<number>('maxTurnsBeforeSummarize', 16);
+    const turnsToRetain = config.get<number>('turnsToRetain', 6);
 
     const hasDeepSeekKey = await this._secretService.hasSecret('deepseek_api_key');
 
@@ -258,6 +271,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       defaultOllamaModel,
       defaultDeepSeekModel,
       hasDeepSeekKey,
+      maxTurnsBeforeSummarize,
+      turnsToRetain,
     };
 
     this._view.webview.postMessage({

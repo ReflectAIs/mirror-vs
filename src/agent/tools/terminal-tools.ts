@@ -58,6 +58,15 @@ function isSensitiveCommand(command: string): boolean {
   return false;
 }
 
+/**
+ * Checks if a command contains a blocked git action (push or remote manipulations).
+ */
+function containsBlockedGitCommand(cmd: string): boolean {
+  const cmdLower = cmd.toLowerCase();
+  return /\bgit\s+push\b/i.test(cmdLower) || 
+         /\bgit\s+remote\s+(add|set-url|remove|rm|rename)\b/i.test(cmdLower);
+}
+
 export async function executeTerminalTool(
   tool: ToolCall
 ): Promise<string> {
@@ -69,6 +78,11 @@ export async function executeTerminalTool(
     }
 
     const command = tool.command.trim();
+
+    // Block forbidden Git operations
+    if (containsBlockedGitCommand(command)) {
+      throw new Error(`Git push or remote modifications are forbidden by user policy: "${command}"`);
+    }
 
     // Safety Confirmation Guardrail (Only blocks if command is destructive or traverses outside the workspace)
     if (isSensitiveCommand(command)) {
@@ -96,6 +110,11 @@ export async function executeTerminalTool(
     }
     if (!input) {
       throw new Error('Missing terminal input content.');
+    }
+
+    // Block forbidden Git operations
+    if (containsBlockedGitCommand(input)) {
+      throw new Error(`Git push or remote modifications are forbidden by user policy: "${input}"`);
     }
 
     const success = service.sendInputToTerminal(termName, input);

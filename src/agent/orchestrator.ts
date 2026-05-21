@@ -12,6 +12,14 @@ Your primary mission is to help the developer implement features, refactor code,
 
 To accomplish these tasks, you have access to a set of special workspace tools that you can invoke using XML-like tags. When you use one of these tags in your response, the execution host will automatically intercept it, run the requested tool, and feed the exact result back to you in a subsequent "system" role message. You will then continue your work using those results in a multi-turn autonomous loop.
 
+### SYSTEMATIC PLAN-EXECUTE-MEMORY CYCLE RULES:
+1. **Plan & Memory Maintenance**: In the workspace, you must systematically maintain two living markdown documents:
+   - \`plan.md\`: Your active task checklist. Always read it or initialize it first at the start of any new task. Update it regularly with task progress as you execute sub-tasks.
+   - \`memory.md\`: Your project memory cache. Store essential configurations, setup decisions, file structures, and critical workspace context parameters here so they persist between turns.
+2. **Git Workspace Access & Safety Guards**:
+   - You have **full access** to git diagnostics and modifications (e.g., \`git status\`, \`git diff\`, \`git log\`, \`git add\`, \`git commit\`) to easily monitor changes in the codebase.
+   - **CRITICAL**: Remote operations via \`git push\` or altering remote urls via \`git remote\` are strictly blocked by the tool execution host for safety. Never attempt to push.
+
 ### IMPORTANT TOOL USAGE RULES:
 1. Always output valid XML tags. All parameters (like path and query) MUST be enclosed in double quotes.
 2. Self-closing tags MUST end with " />".
@@ -224,7 +232,7 @@ export class AgentOrchestrator {
     }
   }
 
-  public async handleMessageStream(text: string, history: ChatMessage[]) {
+  public async handleMessageStream(text: string, history: ChatMessage[], images?: string[]) {
     this.cancelActiveStream();
     this._activeAbortController = new AbortController();
     const signal = this._activeAbortController.signal;
@@ -252,8 +260,87 @@ export class AgentOrchestrator {
 
     if (text) {
       // User message + context
-      currentMessages.push({ role: 'user', content: text });
+      const userMsg: ChatMessage = { role: 'user', content: text };
+      if (images && images.length > 0) {
+        userMsg.images = images;
+      }
+      currentMessages.push(userMsg);
       await this._saveChatHistory(currentMessages);
+    }
+
+    // Context Optimization Guardrail: when message history exceeds maxTurnsBeforeSummarize, compress turns in the middle
+    const maxTurns = config.get<number>('maxTurnsBeforeSummarize', 16);
+    const turnsToRetain = config.get<number>('turnsToRetain', 6);
+
+    const activeMessages = currentMessages.filter((msg, idx) => {
+      if (idx === 0) return false;
+      if (msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')) return false;
+      return !msg.summarized;
+    });
+
+    if (activeMessages.length > maxTurns) {
+      try {
+        const activeToSummarize = activeMessages.slice(0, activeMessages.length - turnsToRetain);
+        const existingSummaries = currentMessages.filter(
+          msg => msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')
+        );
+
+        // Notify user about background optimization
+        this._postMessage({
+          type: 'chatResponseStart'
+        });
+        this._postMessage({
+          type: 'chatResponseChunk',
+          text: `🔄 _Pair programming context is getting long. Compressing middle turns to optimize speed..._`
+        });
+
+        const summary = await this._summarizeHistory(
+          provider,
+          ollamaHost,
+          provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel,
+          apiKey,
+          [...existingSummaries, ...activeToSummarize]
+        );
+
+        const summaryMessage: ChatMessage = {
+          role: 'system',
+          content: `### [CONSOLIDATED CONTEXT SUMMARY]\n${summary}`
+        };
+
+        // Filter out old system summaries from currentMessages completely
+        const cleanedMessages = currentMessages.filter(
+          msg => !(msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]'))
+        );
+
+        // Mark the activeToSummarize messages as summarized: true in cleanedMessages
+        activeToSummarize.forEach(msgToSummarize => {
+          const found = cleanedMessages.find(m => m === msgToSummarize);
+          if (found) {
+            found.summarized = true;
+          }
+        });
+
+        // Insert new summary message right after the first message (index 0)
+        const firstMsg = cleanedMessages[0];
+        const remainingMsgs = cleanedMessages.slice(1);
+        currentMessages = [firstMsg, summaryMessage, ...remainingMsgs];
+
+        await this._saveChatHistory(currentMessages);
+        
+        // Notify webview with the newly updated chat history
+        this._postMessage({
+          type: 'updateChatHistory',
+          history: currentMessages
+        });
+
+        this._postMessage({
+          type: 'chatResponseComplete',
+          fullText: `✅ _Context optimized successfully. Continuing task._`
+        });
+
+      } catch (e: any) {
+        console.warn('Failed to summarize history:', e.message);
+      }
     }
 
     // Ensure workspace has a git baseline so agent changes show as git diff gutters
@@ -270,14 +357,16 @@ export class AgentOrchestrator {
 
         const payload: { role: 'user' | 'assistant' | 'system'; content: string; images?: string[] }[] = [
           { role: 'system' as const, content: buildSystemPrompt() },
-          ...currentMessages.map(msg => {
-            const role = msg.role === 'system' ? 'user' : msg.role;
-            return {
-              role: role as 'user' | 'assistant' | 'system',
-              content: msg.content,
-              images: msg.images
-            };
-          })
+          ...currentMessages
+            .filter(msg => !msg.summarized)
+            .map(msg => {
+              const role = msg.role === 'system' ? 'user' : msg.role;
+              return {
+                role: role as 'user' | 'assistant' | 'system',
+                content: msg.content,
+                images: msg.images
+              };
+            })
         ];
 
         this._postMessage({ type: 'chatResponseStart' });
@@ -425,11 +514,22 @@ USER/ENVIRONMENT TOOL RESPONSE:
     }
   }
 
+  /**
+   * Remove fenced code blocks (``` ... ```) from the text before tool-tag scanning.
+   * This prevents tool tags that appear *inside* code examples from being
+   * mistakenly treated as real invocations.
+   */
+  private _stripCodeBlocks(text: string): string {
+    // Match triple-backtick blocks (with or without a language label)
+    return text.replace(/```[\s\S]*?```/g, '');
+  }
+
   private hasCompleteToolCall(text: string): boolean {
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'send_terminal_input', 'close_terminal'];
+    const stripped = this._stripCodeBlocks(text);
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}[^>]*>`, 'i');
-      if (regex.test(text)) {
+      if (regex.test(stripped)) {
         return true;
       }
     }
@@ -437,7 +537,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
     const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
     for (const tool of blockTools) {
       const regex = new RegExp(`</${tool}\\s*>`, 'i');
-      if (regex.test(text)) {
+      if (regex.test(stripped)) {
         return true;
       }
     }
@@ -513,7 +613,10 @@ USER/ENVIRONMENT TOOL RESPONSE:
     });
   }
 
-  private _parseToolCalls(text: string): ToolCall[] {
+  private _parseToolCalls(rawText: string): ToolCall[] {
+    // Strip code blocks first so tags inside examples aren't treated as real calls
+    const text = this._stripCodeBlocks(rawText);
+
     /**
      * Parse a named attribute value, handling inner quotes correctly.
      * Tries double-quoted first, then single-quoted.
@@ -689,17 +792,48 @@ USER/ENVIRONMENT TOOL RESPONSE:
     });
   }
 
+  private autoCloseToolTags(text: string): string {
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
+    let adjustedText = text;
+
+    for (const tool of blockTools) {
+      // Find if there is an opening tag for this tool
+      const openRegex = new RegExp(`<${tool}(\\s+[^>]*?)?>`, 'i');
+      const closeRegex = new RegExp(`</${tool}\\s*>`, 'i');
+
+      const openMatch = openRegex.exec(adjustedText);
+      if (openMatch) {
+        // If there's an opening tag but no closing tag, append the closing tag
+        if (!closeRegex.test(adjustedText)) {
+          // Auto-append closing tag
+          adjustedText = adjustedText.trimEnd() + `\n</${tool}>`;
+        }
+      }
+    }
+
+    return adjustedText;
+  }
+
   private getCleanedToolResponse(text: string): string {
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'send_terminal_input', 'close_terminal'];
+    const closedText = this.autoCloseToolTags(text);
+    // Use code-block-stripped copy for locating tool-tag positions,
+    // but track offsets against the ORIGINAL text so we truncate correctly.
+    const stripped = this._stripCodeBlocks(closedText);
+
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
     let earliestEnd = -1;
 
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}[^>]*>`, 'i');
-      const m = regex.exec(text);
+      const m = regex.exec(stripped);
       if (m) {
-        const endIdx = m.index + m[0].length;
-        if (earliestEnd === -1 || endIdx < earliestEnd) {
-          earliestEnd = endIdx;
+        // Re-locate the same match in original text to get the real offset
+        const origM = new RegExp(m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).exec(closedText);
+        if (origM) {
+          const endIdx = origM.index + origM[0].length;
+          if (earliestEnd === -1 || endIdx < earliestEnd) {
+            earliestEnd = endIdx;
+          }
         }
       }
     }
@@ -707,18 +841,59 @@ USER/ENVIRONMENT TOOL RESPONSE:
     const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
     for (const tool of blockTools) {
       const regex = new RegExp(`</${tool}\\s*>`, 'i');
-      const m = regex.exec(text);
+      const m = regex.exec(stripped);
       if (m) {
-        const endIdx = m.index + m[0].length;
-        if (earliestEnd === -1 || endIdx < earliestEnd) {
-          earliestEnd = endIdx;
+        const origM = new RegExp(m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).exec(closedText);
+        if (origM) {
+          const endIdx = origM.index + origM[0].length;
+          if (earliestEnd === -1 || endIdx < earliestEnd) {
+            earliestEnd = endIdx;
+          }
         }
       }
     }
 
     if (earliestEnd !== -1) {
-      return text.substring(0, earliestEnd);
+      return closedText.substring(0, earliestEnd);
     }
-    return text;
+    return closedText;
+  }
+
+  private async _summarizeHistory(
+    provider: LLMProvider,
+    host: string,
+    model: string,
+    apiKey: string,
+    historyToSummarize: ChatMessage[]
+  ): Promise<string> {
+    const summarizePrompt = `You are a helpful pair programming assistant. Please summarize the following conversation history between a developer and an AI assistant. Provide a highly dense, bulleted summary of key decisions, context details, executed actions, and technical changes. Do not lose key file names, error messages, or environment information:
+\n${historyToSummarize.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n\n')}`;
+
+    const messages = [{ role: 'user', content: summarizePrompt }];
+
+    return new Promise<string>((resolve, reject) => {
+      const controller = new AbortController();
+      if (provider === 'ollama') {
+        streamOllamaChat(
+          host,
+          model,
+          messages,
+          controller.signal,
+          () => {}, // ignore chunks
+          (fullText) => resolve(fullText),
+          (err) => reject(err)
+        );
+      } else {
+        streamDeepSeekChat(
+          apiKey,
+          model,
+          messages,
+          controller.signal,
+          () => {}, // ignore chunks
+          (fullText) => resolve(fullText),
+          (err) => reject(err)
+        );
+      }
+    });
   }
 }

@@ -91,6 +91,16 @@
           ],
           "default": "ollama",
           "description": "The default active LLM provider when launching the assistant."
+        },
+        "mirror-vs.maxTurnsBeforeSummarize": {
+          "type": "integer",
+          "default": 16,
+          "description": "Maximum turns before the conversation context is compressed."
+        },
+        "mirror-vs.turnsToRetain": {
+          "type": "integer",
+          "default": 6,
+          "description": "Number of recent turns to retain as active conversation context after compression."
         }
       }
     }

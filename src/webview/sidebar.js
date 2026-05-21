@@ -26,6 +26,8 @@
   const deepseekModelSelect = document.getElementById('deepseek-model-select');
   
   const saveSettingsBtn = document.getElementById('save-settings-btn');
+  const maxTurnsInput = document.getElementById('max-turns-input');
+  const turnsToRetainInput = document.getElementById('turns-to-retain-input');
   
   const chatMessages = document.getElementById('chat-messages');
   const welcomeCard = document.getElementById('welcome-card');
@@ -48,6 +50,12 @@
   let isSending = false;
   let savedDefaultOllamaModel = 'llama3';
   let activeSessionId = null;
+
+  const stopBtn = document.getElementById('stop-btn');
+  const imageAttachmentsContainer = document.getElementById('image-attachments-container');
+
+  // Attached Images State
+  let attachedImages = [];
 
   // New features state
   let workspaceFiles = [];
@@ -165,6 +173,8 @@
     const defaultOllamaModel = ollamaModelSelect.value;
     const defaultDeepSeekModel = deepseekModelSelect.value;
     const deepSeekKey = deepseekKeyInput.value.trim();
+    const maxTurns = parseInt(maxTurnsInput.value.trim(), 10) || 16;
+    const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
     vscode.postMessage({
       type: 'saveSettings',
@@ -172,7 +182,9 @@
       ollamaHost,
       defaultOllamaModel,
       defaultDeepSeekModel,
-      deepSeekKey: deepSeekKey || undefined // only send key if typed
+      deepSeekKey: deepSeekKey || undefined, // only send key if typed
+      maxTurnsBeforeSummarize: maxTurns,
+      turnsToRetain: turnsToRetain
     });
 
     settingsDrawer.classList.add('collapsed');
@@ -358,10 +370,65 @@
     autocompleteDropdown.classList.add('hidden');
   }
 
+  // Paste Event Listener for Images
+  promptInput.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const base64 = event.target.result.split(',')[1];
+          attachImage(base64);
+        };
+        reader.readAsDataURL(file);
+        e.preventDefault(); // Stop default pasting of image as raw text
+      }
+    }
+  });
+
+  function attachImage(base64) {
+    attachedImages.push(base64);
+    renderImageAttachments();
+  }
+
+  function removeAttachedImage(index) {
+    attachedImages.splice(index, 1);
+    renderImageAttachments();
+  }
+
+  function renderImageAttachments() {
+    imageAttachmentsContainer.innerHTML = '';
+    attachedImages.forEach((base64, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'image-attachment-chip';
+      chip.style.backgroundImage = `url(data:image/png;base64,${base64})`;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'image-attachment-remove';
+      removeBtn.innerHTML = '&#x2715;';
+      removeBtn.addEventListener('click', () => removeAttachedImage(index));
+
+      chip.appendChild(removeBtn);
+      imageAttachmentsContainer.appendChild(chip);
+    });
+  }
+
+  // Stop button handler
+  stopBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'cancelStream' });
+    isSending = false;
+    promptInput.disabled = false;
+    sendBtn.disabled = false;
+    stopBtn.classList.add('hidden');
+    sendBtn.classList.remove('hidden');
+    setAvatarState('idle');
+  });
+
   // 7. Core Message Submission
   function submitMessage() {
     const text = promptInput.value.trim();
-    if (!text && linkedFiles.size === 0) return;
+    if (!text && linkedFiles.size === 0 && attachedImages.length === 0) return;
     if (isSending) return;
 
     // Hide welcome card if present
@@ -375,16 +442,20 @@
     promptInput.disabled = true;
     sendBtn.disabled = true;
 
+    // Toggle stop button in place of send button
+    sendBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+
     // Compile linked file references
     const selectedFiles = Array.from(linkedFiles);
     
-    // Append User message bubble with linked tags
+    // Append User message bubble with linked tags and images
     let userDisplayMessage = text;
     if (selectedFiles.length > 0) {
       userDisplayMessage += `\n\n_Referenced Context: ${selectedFiles.map(f => '`@' + f.split('/').pop() + '`').join(', ')}_`;
     }
-    appendMessageBubble('user', userDisplayMessage);
-    scrollChatToBottom();
+    appendMessageBubble('user', userDisplayMessage, attachedImages);
+    scrollChatToBottom(true);
 
     // Append Assistant placeholder bubble
     const assistantBubble = appendMessageBubble('assistant', '');
@@ -395,19 +466,22 @@
     currentStreamingBubble = assistantBubble;
     currentStreamingText = '';
 
-    scrollChatToBottom();
+    scrollChatToBottom(true);
 
-    // Forward message payload to host including explicit file linkages
+    // Forward message payload to host including explicit file linkages and attached images
     vscode.postMessage({
       type: 'sendMessage',
       text,
       history: chatHistory,
-      linkedFiles: selectedFiles
+      linkedFiles: selectedFiles,
+      images: attachedImages
     });
 
-    // Clear context chips state
+    // Clear context chips and attached images state
     linkedFiles.clear();
     renderChips();
+    attachedImages = [];
+    renderImageAttachments();
   }
 
   let currentToolCardElement = null;
@@ -445,6 +519,24 @@
     } else if (toolName === 'run_command') {
       friendlyName = 'Run Command';
       iconHtml = '💻';
+    } else if (toolName === 'send_terminal_input') {
+      friendlyName = 'Send Terminal Input';
+      iconHtml = '⌨️';
+    } else if (toolName === 'close_terminal') {
+      friendlyName = 'Close Terminal';
+      iconHtml = '🛑';
+    } else if (toolName === 'browser_navigate') {
+      friendlyName = 'Browser Navigate';
+      iconHtml = '🌐';
+    } else if (toolName === 'browser_click') {
+      friendlyName = 'Browser Click';
+      iconHtml = '🖱️';
+    } else if (toolName === 'browser_type') {
+      friendlyName = 'Browser Type';
+      iconHtml = '🔤';
+    } else if (toolName === 'browser_screenshot') {
+      friendlyName = 'Browser Screenshot';
+      iconHtml = '📸';
     }
 
     const header = document.createElement('div');
@@ -645,11 +737,38 @@
   }
 
   // Helper: Append a message bubble to DOM
-  function appendMessageBubble(role, text) {
+  function appendMessageBubble(role, text, images) {
     if (role === 'system') {
       if (text.startsWith('[Tool Result')) {
         appendToolCardFromHistory(text);
         return null;
+      }
+      if (text.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
+        const msgElement = document.createElement('div');
+        msgElement.className = 'message system-context';
+        
+        const banner = document.createElement('div');
+        banner.className = 'system-context-banner';
+        banner.innerHTML = `
+          <div class="system-context-header">
+            <span>🔄 Pair Programming Context Consolidated</span>
+            <span class="system-context-toggle">Show Details</span>
+          </div>
+          <div class="system-context-body collapsed">
+            ${parseMarkdown(text)}
+          </div>
+        `;
+        
+        banner.querySelector('.system-context-header').addEventListener('click', () => {
+          const body = banner.querySelector('.system-context-body');
+          const toggle = banner.querySelector('.system-context-toggle');
+          body.classList.toggle('collapsed');
+          toggle.textContent = body.classList.contains('collapsed') ? 'Show Details' : 'Hide Details';
+        });
+        
+        msgElement.appendChild(banner);
+        chatMessages.appendChild(msgElement);
+        return banner;
       }
       return null;
     }
@@ -669,9 +788,24 @@
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     
+    if (images && images.length > 0) {
+      const imagesContainer = document.createElement('div');
+      imagesContainer.className = 'bubble-images-container';
+      images.forEach((imgBase64) => {
+        const img = document.createElement('img');
+        img.className = 'bubble-inline-image';
+        img.src = `data:image/png;base64,${imgBase64}`;
+        imagesContainer.appendChild(img);
+      });
+      bubble.appendChild(imagesContainer);
+    }
+    
     if (text) {
-      bubble.innerHTML = parseMarkdown(text);
-      bindCodeBlockButtons(bubble);
+      const textContainer = document.createElement('div');
+      textContainer.className = 'bubble-text-container';
+      textContainer.innerHTML = parseMarkdown(text);
+      bindCodeBlockButtons(textContainer);
+      bubble.appendChild(textContainer);
     }
     
     msgElement.appendChild(bubble);
@@ -701,6 +835,13 @@
         }
 
         deepseekModelSelect.value = s.defaultDeepSeekModel;
+
+        if (s.maxTurnsBeforeSummarize !== undefined) {
+          maxTurnsInput.value = s.maxTurnsBeforeSummarize;
+        }
+        if (s.turnsToRetain !== undefined) {
+          turnsToRetainInput.value = s.turnsToRetain;
+        }
 
         if (ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`)) {
           ollamaModelSelect.value = s.defaultOllamaModel;
@@ -768,6 +909,10 @@
         promptInput.disabled = true;
         sendBtn.disabled = true;
         isSending = true;
+        setAvatarState('thinking');
+
+        sendBtn.classList.add('hidden');
+        stopBtn.classList.remove('hidden');
 
         if (!currentStreamingBubble) {
           const assistantBubble = appendMessageBubble('assistant', '');
@@ -785,6 +930,7 @@
         if (!currentStreamingBubble) {
           return;
         }
+        setAvatarState('coding');
 
         const loader = currentStreamingBubble.querySelector('.typing-indicator');
         if (loader) {
@@ -799,6 +945,7 @@
       }
 
       case 'chatResponseComplete': {
+        setAvatarState('idle');
         if (!currentStreamingBubble) {
           return;
         }
@@ -822,6 +969,7 @@
       case 'toolStatus': {
         const { toolName, status, target, result, checkpointId, code, terminalName } = message;
         if (status === 'running') {
+          setAvatarState('tool_calling');
           currentToolCardElement = createToolCardDOM(toolName, status, target, null, null, false, null, null);
           placeCardInPlaceholder(currentToolCardElement, toolName, target);
         } else if (currentToolCardElement) {
@@ -846,11 +994,15 @@
         promptInput.focus();
         currentStreamingBubble = null;
         currentStreamingText = '';
+        setAvatarState('idle');
+        sendBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
         scrollChatToBottom();
         break;
       }
 
       case 'chatResponseError': {
+        setAvatarState('error');
         if (currentStreamingBubble) {
           const loader = currentStreamingBubble.querySelector('.typing-indicator');
           if (loader) {
@@ -868,6 +1020,8 @@
         promptInput.disabled = false;
         sendBtn.disabled = false;
         currentStreamingBubble = null;
+        sendBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
         scrollChatToBottom();
         break;
       }
@@ -888,23 +1042,11 @@
         const history = message.history;
         chatHistory = history || [];
         
+        renderedLimit = 15;
         parsedToolContents.clear();
-        chatMessages.innerHTML = '';
         currentStreamingBubble = null;
         
-        if (chatHistory.length > 0) {
-          if (welcomeCard) {
-            welcomeCard.style.display = 'none';
-          }
-          chatHistory.forEach((msg) => {
-            appendMessageBubble(msg.role, msg.content);
-          });
-          scrollChatToBottom();
-        } else {
-          if (welcomeCard) {
-            welcomeCard.style.display = 'block';
-          }
-        }
+        renderVisibleHistory();
         break;
       }
 
@@ -1003,22 +1145,26 @@
   function parseMarkdown(text) {
     let cleanText = text;
     
-    // Clean block tools: create_file, write_file, patch_file
-    const blockTools = ['create_file', 'write_file', 'patch_file'];
+    // Clean block tools: create_file, write_file, patch_file, send_terminal_input
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
     for (const tool of blockTools) {
       const openTag = `<${tool}`;
-      const closeTag = `</${tool}>`;
       
       let openIndex = cleanText.toLowerCase().indexOf(openTag);
       while (openIndex !== -1) {
-        let closeIndex = cleanText.toLowerCase().indexOf(closeTag, openIndex);
-        if (closeIndex !== -1) {
-          let tagContent = cleanText.substring(openIndex, closeIndex + closeTag.length);
-          let targetMatch = tagContent.match(/path\s*=\s*["']([^"']+)["']/i) || tagContent.match(/query\s*=\s*["']([^"']+)["']/i);
+        const closeRegex = new RegExp(`</${tool}\\s*>`, 'i');
+        const match = closeRegex.exec(cleanText.substring(openIndex));
+        if (match) {
+          const closeIndex = openIndex + match.index;
+          const matchLength = match[0].length;
+          let tagContent = cleanText.substring(openIndex, closeIndex + matchLength);
+          let targetMatch = tagContent.match(/path\s*=\s*["']([^"']+)["']/i) 
+            || tagContent.match(/query\s*=\s*["']([^"']+)["']/i)
+            || tagContent.match(/terminal_name\s*=\s*["']([^"']+)["']/i);
           let target = targetMatch ? targetMatch[1].trim() : '';
           
           let placeholderToken = `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
-          cleanText = cleanText.substring(0, openIndex) + placeholderToken + cleanText.substring(closeIndex + closeTag.length);
+          cleanText = cleanText.substring(0, openIndex) + placeholderToken + cleanText.substring(closeIndex + matchLength);
         } else {
           let streamingContent = cleanText.substring(openIndex);
           let firstCloseBracket = streamingContent.indexOf('>');
@@ -1041,7 +1187,7 @@
     }
 
     // Clean self-closing or simple tools
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}([\\s\\S]*?)\\/?>`, 'gi');
       cleanText = cleanText.replace(regex, (match, attrs) => {
@@ -1049,7 +1195,8 @@
           || attrs.match(/query\s*=\s*["']([^"']+)["']/i)
           || attrs.match(/url\s*=\s*["']([^"']+)["']/i)
           || attrs.match(/selector\s*=\s*["']([^"']+)["']/i)
-          || attrs.match(/command\s*=\s*["']([^"']+)["']/i);
+          || attrs.match(/command\s*=\s*["']([^"']+)["']/i)
+          || attrs.match(/terminal_name\s*=\s*["']([^"']+)["']/i);
         let target = targetMatch ? targetMatch[1].trim() : '';
         return `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
       });
@@ -1197,10 +1344,15 @@
     });
   }
 
-  function scrollChatToBottom() {
-    setTimeout(() => {
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }, 50);
+  let userIsAtBottom = true;
+
+  function scrollChatToBottom(force = false) {
+    if (force || userIsAtBottom) {
+      setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        userIsAtBottom = true;
+      }, 50);
+    }
   }
 
   function formatRelativeTime(timestamp) {
@@ -1217,4 +1369,156 @@
     if (days === 1) return 'Yesterday';
     return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
+
+  // ==========================================================================
+  // Infinite Scroll & Avatar State Manager Implementations
+  // ==========================================================================
+  let renderedLimit = 15;
+
+  function renderVisibleHistory(preserveScroll = false) {
+    const oldScrollHeight = chatMessages.scrollHeight;
+    const oldScrollTop = chatMessages.scrollTop;
+
+    chatMessages.innerHTML = '';
+    
+    if (chatHistory.length === 0) {
+      if (welcomeCard) {
+        welcomeCard.style.display = 'block';
+        chatMessages.appendChild(welcomeCard);
+      }
+      return;
+    }
+
+    if (welcomeCard) {
+      welcomeCard.style.display = 'none';
+    }
+
+    const totalMessages = chatHistory.length;
+    const startIdx = Math.max(0, totalMessages - renderedLimit);
+    
+    // Prepend the load more trigger if we have older logs
+    if (startIdx > 0) {
+      const loadTrigger = document.createElement('div');
+      loadTrigger.className = 'history-loading-trigger';
+      loadTrigger.innerHTML = '<span>💬</span> Load older messages...';
+      loadTrigger.addEventListener('click', () => {
+        loadMoreHistory();
+      });
+      chatMessages.appendChild(loadTrigger);
+    }
+
+    // Append visible messages
+    const visibleSlice = chatHistory.slice(startIdx);
+    visibleSlice.forEach((msg) => {
+      appendMessageBubble(msg.role, msg.content, msg.images);
+    });
+
+    if (preserveScroll) {
+      // Maintain scroll position perfectly so there are no sudden jumps
+      chatMessages.scrollTop = chatMessages.scrollHeight - oldScrollHeight + oldScrollTop;
+    } else {
+      scrollChatToBottom();
+    }
+  }
+
+  function loadMoreHistory() {
+    if (chatHistory.length > renderedLimit) {
+      renderedLimit += 15;
+      renderVisibleHistory(true);
+    }
+  }
+
+  // Scroll pagination trigger
+  chatMessages.addEventListener('scroll', () => {
+    const threshold = 40;
+    const isAtBottom = (chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight) <= threshold;
+    userIsAtBottom = isAtBottom;
+
+    if (chatMessages.scrollTop <= 10) {
+      const totalMessages = chatHistory.length;
+      if (totalMessages > renderedLimit) {
+        loadMoreHistory();
+      }
+    }
+  });
+
+  // Avatar Interactive Emoji Controller
+  const avatarContainer = document.getElementById('avatar-container');
+  const avatarEmoji = document.getElementById('avatar-emoji');
+
+  let avatarState = 'idle';
+  let idleInterval = null;
+  let errorResetTimeout = null;
+
+  const EMOJIS = {
+    idle: ['🤖', '🤖', '🤖', '👾', '🤖', '😉', '🥱', '🤓', '🤪'],
+    thinking: ['🤔', '💭', '🧠', '🧐'],
+    coding: ['💻', '⌨️', '🚀', '👨‍💻', '👩‍💻'],
+    tool_calling: ['🛠️', '⚙️', '🔨', '🔧'],
+    error: ['💥', '❌', '😱', '🤕', '😭'],
+    click: ['😮', '🥰', '🤪', '😎', '🎉']
+  };
+
+  function setAvatarState(state) {
+    avatarState = state;
+    
+    // Remove state classes and add new one
+    avatarContainer.classList.remove('state-idle', 'state-thinking', 'state-coding', 'state-tool_calling', 'state-error');
+    avatarContainer.classList.add(`state-${state === 'click' ? 'idle' : state}`);
+    
+    if (idleInterval) {
+      clearInterval(idleInterval);
+      idleInterval = null;
+    }
+    if (errorResetTimeout) {
+      clearTimeout(errorResetTimeout);
+      errorResetTimeout = null;
+    }
+
+    const list = EMOJIS[state] || EMOJIS.idle;
+    avatarEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+
+    if (state === 'idle') {
+      startIdleRoutine();
+    } else if (state === 'error') {
+      errorResetTimeout = setTimeout(() => {
+        setAvatarState('idle');
+      }, 5000);
+    }
+  }
+
+  function startIdleRoutine() {
+    if (idleInterval) clearInterval(idleInterval);
+    idleInterval = setInterval(() => {
+      if (avatarState === 'idle') {
+        const chance = Math.random();
+        if (chance < 0.35) {
+          const list = EMOJIS.idle;
+          avatarEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+        }
+      }
+    }, 6000);
+  }
+
+  // Hook up winking/reactions on click
+  if (avatarContainer) {
+    avatarContainer.addEventListener('click', () => {
+      const current = avatarState;
+      
+      avatarContainer.style.transform = 'scale(1.25) rotate(360deg)';
+      
+      const clicks = EMOJIS.click;
+      avatarEmoji.textContent = clicks[Math.floor(Math.random() * clicks.length)];
+      
+      setTimeout(() => {
+        avatarContainer.style.transform = '';
+        if (avatarState !== 'error') {
+          setAvatarState(current);
+        }
+      }, 800);
+    });
+  }
+
+  // Initialize avatar state
+  setAvatarState('idle');
 })();
