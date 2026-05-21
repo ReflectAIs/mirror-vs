@@ -3,7 +3,27 @@
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
   "version": "0.0.1",
-  "publisher": "mirror-vs",
+  "publisher": "DipeshMajithia",
+  "author": "Dipesh Majithia",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DipeshMajithia/mirror-vs"
+  },
+  "bugs": {
+    "url": "https://github.com/DipeshMajithia/mirror-vs/issues"
+  },
+  "homepage": "https://github.com/DipeshMajithia/mirror-vs#readme",
+  "keywords": [
+    "ai",
+    "assistant",
+    "copilot",
+    "chat",
+    "ollama",
+    "deepseek",
+    "autonomous",
+    "agent"
+  ],
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -11,7 +31,7 @@
     "AI",
     "Machine Learning",
     "Programming Languages",
-    "Keybindings",
+    "Keymaps",
     "Formatters"
   ],
   "main": "./dist/extension.js",

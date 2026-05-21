@@ -1,0 +1,21 @@
+.git/**
+.github/**
+.vscode/**
+.DS_Store
+.gitignore
+tsconfig.json
+esbuild.js
+package-lock.json
+node_modules/**
+out/**
+scratch/**
+turns.log
+*.vsix
+
+# Ignore all source code files except the webview static assets
+src/agent/**
+src/providers/**
+src/services/**
+src/types/**
+src/utils/**
+src/extension.ts
