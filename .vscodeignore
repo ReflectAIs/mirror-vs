@@ -19,3 +19,16 @@ src/services/**
 src/types/**
 src/utils/**
 src/extension.ts
+
+# But include webview static assets and media
+!media/logo.png
+!src/webview/sidebar.html
+!src/webview/sidebar.css
+!src/webview/sidebar.js
+
+# Exclude duplicate root-level files
+logo.png
+memory.md
+plan.md
+vitest.config.ts
+.mirror-vs/**
