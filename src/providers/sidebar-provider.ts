@@ -408,10 +408,12 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
     const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.css'));
     const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.js'));
+    const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'media', 'logo.png'));
     const cspSource = webview.cspSource;
 
     htmlContent = htmlContent.replace('{{styleUri}}', cssUri.toString());
     htmlContent = htmlContent.replace('{{scriptUri}}', jsUri.toString());
+    htmlContent = htmlContent.replace('{{logoUri}}', logoUri.toString());
     htmlContent = htmlContent.replace(/{{cspSource}}/g, cspSource);
 
     return htmlContent;

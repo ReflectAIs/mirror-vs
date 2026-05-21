@@ -1,240 +1,250 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'unsafe-inline'; img-src {{cspSource}} data:; font-src {{cspSource}};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'unsafe-inline'; img-src {{cspSource}} data: https:; font-src {{cspSource}};">
   <link rel="stylesheet" href="{{styleUri}}">
   <title>Mirror VS Assistant</title>
 </head>
 <body>
   <div class="app-container">
-    <!-- Header -->
+    <!-- ===== HEADER WITH LOGO ===== -->
     <header class="app-header">
-      <div class="logo-area">
-        <div id="avatar-container" class="avatar-container" title="Mirror VS Assistant State">
-          <span id="avatar-emoji" class="avatar-emoji">🤖</span>
+      <div class="header-bg"></div>
+      <div class="header-content">
+        <div class="logo-area">
+          <img class="logo-img" src="{{logoUri}}" alt="Mirror VS" />
+          <div class="logo-text">
+            <span class="title">Mirror <span class="title-accent">VS</span></span>
+            <span class="subtitle">AI Coding Assistant</span>
+          </div>
         </div>
-        <div class="logo-text">
-          <span class="title">Mirror VS</span>
-          <span class="subtitle">AI Coding Assistant</span>
+        <div class="header-actions">
+          <button id="new-chat-btn" class="icon-btn" title="New Chat Session">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>
+          </button>
+          <button id="toggle-history-btn" class="icon-btn" title="Chat Sessions">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2zm3.5 4.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+          </button>
+          <button id="toggle-git-btn" class="icon-btn" title="Git Changes">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M2 6.5A4.5 4.5 0 0 1 6.5 2h3A4.5 4.5 0 0 1 14 6.5v3A4.5 4.5 0 0 1 9.5 14h-3A4.5 4.5 0 0 1 2 9.5v-3zM6.5 3A3.5 3.5 0 0 0 3 6.5v3A3.5 3.5 0 0 0 6.5 13h3A3.5 3.5 0 0 0 13 9.5v-3A3.5 3.5 0 0 0 9.5 3h-3z"/>
+              <path d="M6.5 5.5v5h1v-5h-1zm2 0v5h1v-5h-1zM5.5 6.5h5v1h-5v-1z"/>
+            </svg>
+          </button>
+          <button id="toggle-settings-btn" class="icon-btn" title="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M9.405 1.02c.28-.558 1.078-.558 1.357 0l.87 1.737 1.916.279c.617.09.862.846.416 1.29L12.57 5.688l.328 1.908c.106.617-.54 1.087-1.09.8L10 7.5l-1.808.996c-.55.286-1.196-.183-1.09-.8l.328-1.908L6.038 4.326c-.446-.443-.2-.199.416-1.29l1.916-.28.87-1.736z"/>
+              <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+            </svg>
+          </button>
         </div>
-      </div>
-      <div class="header-actions" style="display: flex; gap: 4px;">
-        <button id="new-chat-btn" class="icon-btn" title="New Chat Session">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-          </svg>
-        </button>
-        <button id="toggle-history-btn" class="icon-btn" title="Toggle Chat History">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997zm2.004.45a7 7 0 0 0-.985-.299l.156-.988c.37.058.73.153 1.077.283l-.248.804zm1.882.996c.287.22.553.468.797.742l.745-.667a8.043 8.043 0 0 0-.974-.913l-.568.838zm1.536 1.63a7 7 0 0 0-.583-.787l.746-.666c.245.275.465.57.659.882l-.822.571zM15 8c0 .382-.027.76-.08 1.13l.989.14C15.97 8.83 16 8.418 16 8h-1zm-.104 2.012a7.002 7.002 0 0 0 .277-.99l.985.156a8.006 8.006 0 0 1-.365 1.177l-.897-.343zm-.575 1.884a7 7 0 0 0 .546-.723l.82.574a8.041 8.041 0 0 1-.689.907l-.677-.758zm-1.127 1.537a7 7 0 0 0 .72-.544l.676.759c.277.247.528.518.751.81l-.747.665zm-1.63 1.128c.356-.164.697-.36 1.011-.586l.568.837a8.009 8.009 0 0 1-1.248.72l-.331-.971zm-1.885.575a7 7 0 0 0 .984-.275l.343.897a8.026 8.026 0 0 1-1.176.366l-.151-.988zM8.5 15a6.994 6.994 0 0 0 1-.072l-.152-.988a6.002 6.002 0 0 1-.848.06v1zM8 15V14c-.06 0-.12 0-.18-.002L7.67 15H8zm-2.012-.104a6.998 6.998 0 0 0 .99-.277l-.156-.985a5.986 5.986 0 0 1-.834.233l-.001 1.029zm-1.884-.575a7 7 0 0 0 .723-.546l-.574-.82a6.037 6.037 0 0 1-.682.513l.533.853zm-1.537-1.127c.247-.277.518-.528.81-.751l-.665.747a7.994 7.994 0 0 1-.865-1.01l.72-.546zm-1.128-1.63a7 7 0 0 0 .586-1.011l-.837-.568c-.198.397-.436.77-.708 1.118l.959.461zM1 8.5a6.994 6.994 0 0 0 .072-1l.988.152A5.992 5.992 0 0 1 2 8.5H1zM1 8V7.67l.988-.152A5.992 5.992 0 0 1 2 8H1zm.104-2.012c.058-.337.137-.67.233-.99l.985.156c-.08.27-.147.55-.2.834h-1.018zm.575-1.884c.143-.277.306-.543.488-.797l.838.568a6.044 6.044 0 0 0-.411.671l-.915-.442zm1.127-1.537c.22-.287.468-.553.742-.797l.667.745a6.041 6.041 0 0 0-.629.673l-.78-.621zm1.63-1.128c.314-.226.655-.422 1.011-.586l.331.971c-.301.14-.589.306-.856.498l-.486-.883zm1.885-.575c.337-.058.67-.137.99-.233l-.156-.985a7.986 7.986 0 0 0-.834.197l.001 1.021zM8 1v1c.06 0 .12 0 .18.002L8.33 1H8z"/>
-            <path d="M8.5 4.5A.5.5 0 0 0 8 4v4H5a.5.5 0 0 0 0 1h4V4.5a.5.5 0 0 0-.5-.5z"/>
-          </svg>
-        </button>
-        <button id="toggle-git-btn" class="icon-btn" title="Toggle Git Changes View">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M2 6.5A4.5 4.5 0 0 1 6.5 2h3A4.5 4.5 0 0 1 14 6.5v3A4.5 4.5 0 0 1 9.5 14h-3A4.5 4.5 0 0 1 2 9.5v-3zM6.5 3A3.5 3.5 0 0 0 3 6.5v3A3.5 3.5 0 0 0 6.5 13h3A3.5 3.5 0 0 0 13 9.5v-3A3.5 3.5 0 0 0 9.5 3h-3z"/>
-            <path d="M6.5 5.5v5h1v-5h-1zm2 0v5h1v-5h-1zM5.5 6.5h5v1h-5v-1z"/>
-          </svg>
-        </button>
-        <button id="toggle-settings-btn" class="icon-btn" title="Toggle Configuration Drawer">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M9.405 1.02c.28-.558 1.078-.558 1.357 0l.87 1.737 1.916.279c.617.09.862.846.416 1.29L12.57 5.688l.328 1.908c.106.617-.54 1.087-1.09.8L10 7.5l-1.808.996c-.55.286-1.196-.183-1.09-.8l.328-1.908L6.038 4.326c-.446-.443-.2-.199.416-1.29l1.916-.28.87-1.736z"/>
-            <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-          </svg>
-        </button>
       </div>
     </header>
 
-    <!-- Settings Drawer (Collapsible) -->
-    <div id="settings-drawer" class="settings-drawer collapsed">
-      <div class="drawer-header">
-        <h3>Configuration</h3>
-      </div>
-      <div class="drawer-content">
-        <!-- Provider Select -->
-        <div class="form-group">
-          <label>AI Provider</label>
-          <div class="provider-switch">
-            <button type="button" id="provider-ollama-btn" class="switch-btn active" data-provider="ollama">Ollama</button>
-            <button type="button" id="provider-deepseek-btn" class="switch-btn" data-provider="deepseek">DeepSeek</button>
-          </div>
+    <!-- ===== DRAWERS ===== -->
+    
+    <!-- Settings Drawer -->
+    <div id="settings-drawer" class="drawer collapsed" data-drawer="settings">
+      <div class="drawer-inner">
+        <div class="drawer-header">
+          <h3>⚙️ Configuration</h3>
+          <button class="drawer-close-btn" data-drawer="settings">✕</button>
         </div>
-
-        <!-- Ollama Config Panel -->
-        <div id="ollama-panel" class="config-panel">
+        <div class="drawer-body">
           <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label for="ollama-host">Ollama API Host</label>
-              <span id="ollama-host-validation-indicator" class="validation-badge offline">Checking...</span>
+            <label>AI Provider</label>
+            <div class="provider-switch">
+              <button type="button" id="provider-ollama-btn" class="switch-btn active" data-provider="ollama">Ollama</button>
+              <button type="button" id="provider-deepseek-btn" class="switch-btn" data-provider="deepseek">DeepSeek</button>
             </div>
-            <input type="text" id="ollama-host" placeholder="http://localhost:11434" value="http://localhost:11434">
           </div>
-          <div class="form-group">
-            <label for="ollama-model-select">Local Model</label>
-            <div class="select-container">
-              <select id="ollama-model-select">
-                <option value="loading">Loading models...</option>
+          <div id="ollama-panel" class="config-panel">
+            <div class="form-group">
+              <div class="label-row">
+                <label for="ollama-host">Ollama API Host</label>
+                <span id="ollama-host-validation-indicator" class="validation-badge offline">Checking...</span>
+              </div>
+              <input type="text" id="ollama-host" placeholder="http://localhost:11434" value="http://localhost:11434">
+            </div>
+            <div class="form-group">
+              <label for="ollama-model-select">Local Model</label>
+              <div class="input-row">
+                <select id="ollama-model-select">
+                  <option value="loading">Loading models...</option>
+                </select>
+                <button id="refresh-models-btn" class="btn btn-secondary" title="Refresh local models list">↻</button>
+              </div>
+            </div>
+          </div>
+          <div id="deepseek-panel" class="config-panel hidden">
+            <div class="form-group">
+              <label for="deepseek-key">DeepSeek API Key</label>
+              <div class="password-input-container">
+                <input type="password" id="deepseek-key" placeholder="Enter DeepSeek API Key..." value="">
+                <button type="button" id="toggle-key-visibility" class="toggle-visibility-btn">Show</button>
+              </div>
+              <span class="field-hint" id="deepseek-key-status">Key is not configured</span>
+            </div>
+            <div class="form-group">
+              <label for="deepseek-model-select">Cloud Model</label>
+              <select id="deepseek-model-select">
+                <option value="deepseek-chat">deepseek-chat (Default)</option>
+                <option value="deepseek-coder">deepseek-coder</option>
               </select>
-              <button id="refresh-models-btn" class="btn btn-secondary" title="Refresh local models list">
-                &#8635;
-              </button>
             </div>
           </div>
-        </div>
-
-        <!-- DeepSeek Config Panel -->
-        <div id="deepseek-panel" class="config-panel hidden">
+          <div class="form-divider"></div>
+          <div class="form-section-label">Context Settings</div>
           <div class="form-group">
-            <label for="deepseek-key">DeepSeek API Key</label>
-            <div class="password-input-container">
-              <input type="password" id="deepseek-key" placeholder="Enter DeepSeek API Key..." value="">
-              <button type="button" id="toggle-key-visibility" class="toggle-visibility-btn">Show</button>
+            <label for="max-turns-input">Max Active Turns</label>
+            <input type="number" id="max-turns-input" min="2" max="100" value="16">
+            <span class="field-hint">Trigger compaction when history exceeds this limit</span>
+          </div>
+          <div class="form-group">
+            <label for="turns-to-retain-input">Turns to Retain</label>
+            <input type="number" id="turns-to-retain-input" min="1" max="50" value="6">
+            <span class="field-hint">Number of recent messages to keep unsummarized</span>
+          </div>
+          <div class="drawer-footer">
+            <button id="save-settings-btn" class="btn btn-primary">Save Configuration</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Drawer -->
+    <div id="history-drawer" class="drawer collapsed" data-drawer="history">
+      <div class="drawer-inner">
+        <div class="drawer-header">
+          <h3>💬 Chat Sessions</h3>
+          <button class="drawer-close-btn" data-drawer="history">✕</button>
+        </div>
+        <div class="drawer-body">
+          <div id="sessions-list" class="sessions-list">
+            <div class="no-sessions">No previous sessions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Git Changes Drawer -->
+    <div id="git-drawer" class="drawer collapsed" data-drawer="git">
+      <div class="drawer-inner">
+        <div class="drawer-header">
+          <h3>🔀 Git Changes</h3>
+          <div class="drawer-header-actions">
+            <button id="commit-git-btn" class="icon-btn" title="Commit All Changes">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+              </svg>
+            </button>
+            <button id="refresh-git-btn" class="icon-btn" title="Refresh Git Status">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+              </svg>
+            </button>
+            <button class="drawer-close-btn" data-drawer="git">✕</button>
+          </div>
+        </div>
+        <div class="drawer-body">
+          <div id="git-changes-summary" class="git-changes-summary">
+            <div class="git-changes-stat">
+              <span class="git-stat added" id="git-added-count">0</span>
+              <span>Added</span>
             </div>
-            <span class="field-hint" id="deepseek-key-status">Key is not configured</span>
+            <div class="git-changes-stat">
+              <span class="git-stat modified" id="git-modified-count">0</span>
+              <span>Modified</span>
+            </div>
+            <div class="git-changes-stat">
+              <span class="git-stat deleted" id="git-deleted-count">0</span>
+              <span>Deleted</span>
+            </div>
+            <div class="git-changes-stat">
+              <span class="git-stat untracked" id="git-untracked-count">0</span>
+              <span>Untracked</span>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="deepseek-model-select">Cloud Model</label>
-            <select id="deepseek-model-select">
-              <option value="deepseek-chat">deepseek-chat (Default)</option>
-              <option value="deepseek-coder">deepseek-coder</option>
-            </select>
+          <div id="git-changes-list" class="git-changes-list">
+            <div class="no-changes">No changes detected</div>
           </div>
-        </div>
-
-        <!-- Global Settings Panel -->
-        <div class="form-group-section" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
-          <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; margin-bottom: 8px; color: #a855f7;">Global Context Settings</h4>
-          <div class="form-group">
-            <label for="max-turns-input">Max Active Turns Before Compression</label>
-            <input type="number" id="max-turns-input" min="2" max="100" value="16" style="width: 100%;">
-            <span class="field-hint" style="font-size: 10px; opacity: 0.5;">Trigger compaction when history exceeds this limit</span>
-          </div>
-          <div class="form-group" style="margin-top: 8px;">
-            <label for="turns-to-retain-input">Turns to Retain After Compression</label>
-            <input type="number" id="turns-to-retain-input" min="1" max="50" value="6" style="width: 100%;">
-            <span class="field-hint" style="font-size: 10px; opacity: 0.5;">Number of recent messages to keep unsummarized</span>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="drawer-actions">
-          <button id="save-settings-btn" class="btn btn-primary">Save Configuration</button>
         </div>
       </div>
     </div>
 
-    <!-- History Drawer (Collapsible) -->
-    <div id="history-drawer" class="history-drawer collapsed">
-      <div class="drawer-header">
-        <h3>Chat Sessions</h3>
-      </div>
-      <div class="drawer-content">
-        <div id="sessions-list" class="sessions-list">
-          <div class="no-sessions">No previous sessions</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Git Changes Drawer (Collapsible) -->
-    <div id="git-drawer" class="git-drawer collapsed">
-      <div class="drawer-header">
-        <h3>Git Changes</h3>
-        <div class="drawer-header-actions">
-          <button id="refresh-git-btn" class="icon-btn" title="Refresh Git Status">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-              <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
-              <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
-            </svg>
-          </button>
-          <button id="commit-git-btn" class="icon-btn" title="Commit All Changes">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="drawer-content">
-        <div id="git-changes-summary" class="git-changes-summary">
-          <div class="git-changes-stat">
-            <span class="git-stat added" id="git-added-count">0</span>
-            <span>Added</span>
-          </div>
-          <div class="git-changes-stat">
-            <span class="git-stat modified" id="git-modified-count">0</span>
-            <span>Modified</span>
-          </div>
-          <div class="git-changes-stat">
-            <span class="git-stat deleted" id="git-deleted-count">0</span>
-            <span>Deleted</span>
-          </div>
-          <div class="git-changes-stat">
-            <span class="git-stat untracked" id="git-untracked-count">0</span>
-            <span>Untracked</span>
-          </div>
-        </div>
-        <div id="git-changes-list" class="git-changes-list">
-          <div class="no-changes">No changes detected</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Chat Area -->
+    <!-- ===== CHAT AREA ===== -->
     <main class="chat-container">
       <div id="chat-messages" class="messages-list">
         <!-- Welcome Screen -->
         <div class="welcome-card" id="welcome-card">
+          <div class="welcome-glow"></div>
           <div class="welcome-header">
-            <h3>Welcome to Mirror VS</h3>
-            <p>Your interactive AI pair programmer.</p>
+            <div class="welcome-logo">
+              <img src="{{logoUri}}" alt="Mirror VS" />
+            </div>
+            <h3>Mirror VS</h3>
+            <p>Your interactive AI pair programmer</p>
           </div>
           <div class="welcome-features">
             <div class="feature-item">
-              <span class="feature-icon">&#128196;</span>
+              <div class="feature-icon-wrapper">
+                <span class="feature-icon">📎</span>
+              </div>
               <div class="feature-text">
-                <strong>Context Aware & Reference Links</strong>
-                <span>Link workspace files explicitly in your prompt by typing <code>@</code> inside the chat input.</span>
+                <strong>Context-Aware</strong>
+                <span>Link files by typing <code>@</code> in your prompt</span>
               </div>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">&#9889;</span>
+              <div class="feature-icon-wrapper">
+                <span class="feature-icon">⚡</span>
+              </div>
               <div class="feature-text">
                 <strong>Apply Code Instantly</strong>
-                <span>Run generation and apply blocks back into your editor with one click.</span>
+                <span>One-click apply with smart checkpoints</span>
               </div>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">&#128295;</span>
+              <div class="feature-icon-wrapper">
+                <span class="feature-icon">🔄</span>
+              </div>
               <div class="feature-text">
-                <strong>Dual Provider Support</strong>
-                <span>Switch seamlessly between local Ollama and high-speed DeepSeek API.</span>
+                <strong>Dual Provider</strong>
+                <span>Seamlessly switch between Ollama &amp; DeepSeek</span>
               </div>
             </div>
           </div>
           <div class="welcome-hint">
-            Open any code file and type a request below to get started!
+            Open a file and start typing below ⬇️
           </div>
         </div>
       </div>
     </main>
 
-    <!-- Context Bar & Input Panel -->
+    <!-- ===== INPUT PANEL ===== -->
     <div class="input-panel">
-      <!-- Active File Context Bar -->
+      <!-- Active File Context -->
       <div id="context-bar" class="context-bar">
-        <span class="context-dot"></span>
+        <span class="context-dot" id="context-dot"></span>
         <span id="context-file-name" class="context-file-name">No active file open</span>
       </div>
 
-      <!-- Autocomplete Dropdown and Chips -->
+      <!-- Autocomplete + Chips -->
       <div id="context-chips-container" class="context-chips-container"></div>
       <div id="autocomplete-dropdown" class="autocomplete-dropdown hidden"></div>
 
-      <!-- Attached Images Container -->
+      <!-- Attached Images -->
       <div id="image-attachments-container" class="image-attachments-container"></div>
 
-      <!-- Input Box -->
+      <!-- Text Input -->
       <div class="textarea-container">
         <textarea id="prompt-input" placeholder="Ask to modify code... Type '@' to link files" rows="1"></textarea>
         <button id="send-btn" class="send-btn" title="Send Request">
@@ -250,7 +260,6 @@
       </div>
     </div>
   </div>
-
   <script src="{{scriptUri}}"></script>
 </body>
 </html>

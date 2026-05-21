@@ -32,7 +32,7 @@
   const chatMessages = document.getElementById('chat-messages');
   const welcomeCard = document.getElementById('welcome-card');
   
-  const contextDot = document.querySelector('.context-dot');
+  const contextDot = document.getElementById('context-dot');
   const contextFileName = document.getElementById('context-file-name');
   
   const promptInput = document.getElementById('prompt-input');
@@ -109,8 +109,14 @@
   vscode.postMessage({ type: 'getSettings' });
   vscode.postMessage({ type: 'fetchModels' });
 
-  // 1. Settings Drawer Toggle (replaced by 1d above)
-  // Kept for reference but replaced above.
+  // Drawer Close Buttons
+  document.querySelectorAll('.drawer-close-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const drawerId = btn.getAttribute('data-drawer');
+      const drawer = document.getElementById(`${drawerId}-drawer`);
+      if (drawer) drawer.classList.add('collapsed');
+    });
+  });
 
   // 1b. Git Drawer Toggle
   const toggleGitBtn = document.getElementById('toggle-git-btn');
