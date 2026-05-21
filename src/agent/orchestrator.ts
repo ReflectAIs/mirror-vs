@@ -42,6 +42,8 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    Read the complete contents of an existing file.
    Usage:
    <read_file path="relative/path/to/file.ts" />
+   For large files, read a specific line range (1-indexed, inclusive):
+   <read_file path="relative/path/to/file.ts" start_line="100" end_line="200" />
    Note: The path is relative to the open workspace directory.
 
 2. CREATE FILE:
@@ -776,7 +778,14 @@ USER/ENVIRONMENT TOOL RESPONSE:
     const readFileRegex = /<read_file([\s\S]*?)\/?>/gi;
     while ((match = readFileRegex.exec(text)) !== null) {
       const p = attr(match[1], 'path');
-      if (p) { candidates.push({ index: match.index, tool: { name: 'read_file', path: p.trim() } }); }
+      if (p) {
+        const sl = attr(match[1], 'start_line');
+        const el = attr(match[1], 'end_line');
+        const tool: ToolCall = { name: 'read_file', path: p.trim() };
+        if (sl) { tool.start_line = parseInt(sl, 10); }
+        if (el) { tool.end_line = parseInt(el, 10); }
+        candidates.push({ index: match.index, tool });
+      }
     }
 
     // list_dir

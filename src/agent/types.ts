@@ -9,6 +9,8 @@ export interface ToolCall {
   text?: string;
   command?: string;
   terminal_name?: string;
+  start_line?: number;
+  end_line?: number;
 }
 
 export type ToolStatus = 'running' | 'success' | 'error';

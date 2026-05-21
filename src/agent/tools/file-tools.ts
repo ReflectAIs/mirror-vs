@@ -86,7 +86,28 @@ export async function executeFileTool(
       if (!fs.existsSync(safePath)) {
         throw new Error(`File does not exist: ${tool.path}`);
       }
-      return fs.readFileSync(safePath, 'utf8');
+      const fullContent = fs.readFileSync(safePath, 'utf8');
+
+      // If start_line / end_line are provided, return only that range
+      const startLine = tool.start_line;
+      const endLine = tool.end_line;
+
+      if (startLine !== undefined || endLine !== undefined) {
+        const allLines = fullContent.split('\n');
+        const totalLines = allLines.length;
+        const s = Math.max(1, startLine ?? 1);
+        const e = Math.min(totalLines, endLine ?? totalLines);
+
+        if (s > totalLines) {
+          throw new Error(`start_line ${s} exceeds file length (${totalLines} lines).`);
+        }
+
+        const selectedLines = allLines.slice(s - 1, e);
+        const numbered = selectedLines.map((line, i) => `${s + i}: ${line}`).join('\n');
+        return `[File: ${tool.path} — showing lines ${s}-${e} of ${totalLines} total]\n${numbered}`;
+      }
+
+      return fullContent;
     }
 
     case 'list_dir': {
