@@ -103,9 +103,9 @@ To accomplish these tasks, you have access to a set of special workspace tools t
     <browser_screenshot />
 
 11. RUN COMMAND:
-    Execute a terminal command in the workspace folder.
-    - Short commands (ls, cat, curl, npm run build, npm install, etc.) run and return full output.
-    - Server/watcher commands (npm run dev, npm start, python -m http.server) run in the background and return initial output. Always follow up with a verification command.
+    Execute a terminal command in the workspace folder. ALL commands open a visible VS Code terminal.
+    - Short commands (ls, cat, curl, npm run build, npm install, etc.) run and return full output when done.
+    - Server/watcher commands (npm run dev, npm start, python -m http.server) run persistently in the terminal. Always follow up with a verification command.
     Usage:
     <run_command command="npm install" />
 
@@ -120,6 +120,18 @@ To accomplish these tasks, you have access to a set of special workspace tools t
     Usage:
     <close_terminal terminal_name="Mirror: npm run dev" />
 
+14. READ TERMINAL:
+    Read recent output from an active VS Code terminal. Useful to check server logs, build output, or error messages.
+    Usage:
+    <read_terminal terminal_name="Mirror: npm run dev" />
+    Optional: specify how many characters to read (default 5000):
+    <read_terminal terminal_name="Mirror: npm run dev" chars="10000" />
+
+15. LIST TERMINALS:
+    List all active agent-managed terminals with their names, commands, and running status.
+    Usage:
+    <list_terminals />
+
 ### EXECUTION WORKFLOW EXAMPLE:
 Developer: "Install deps and start the todo app dev server."
 Your Turn 1: "Installing dependencies."
@@ -127,7 +139,7 @@ Your Turn 1: "Installing dependencies."
 Host (System): "[Tool Result for run_command on \"cd todo-app && npm install\"]: Success - added 312 packages..."
 Your Turn 2:
 <run_command command="cd todo-app && npm run dev" />
-Host (System): "[Tool Result for run_command on \"cd todo-app && npm run dev\"]: Server command is running in the background (PID: 1234). Initial Output: VITE v5.0 ready on http://localhost:5173"
+Host (System): "[Tool Result for run_command on \"cd todo-app && npm run dev\"]: ✅ Server is UP on port 5173. Terminal: \"Mirror: npm run dev\""
 Your Turn 3: "Verifying the server is up."
 <browser_navigate url="http://localhost:5173" />
 Host (System): "Navigated to http://localhost:5173. Page Title: \"Todo App\". Interactive Elements: - input#todo-input [type=\"text\"] [placeholder=\"Enter a task...\"] ..."
@@ -156,8 +168,11 @@ export function buildSystemPrompt(): string {
   let terminalContext = '';
   if (terminals.length > 0) {
     terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\n' +
-      terminals.map(t => `- "${t.name}" (Running Command: "${t.command}")`).join('\n') +
-      '\nUse <send_terminal_input terminal_name="..." /> to interact, or <close_terminal terminal_name="..." /> to stop/kill the terminal.';
+      terminals.map(t => {
+        const status = t.running ? '🟢 RUNNING' : `🔴 EXITED (code: ${t.exitCode})`;
+        return `- "${t.name}" ${status} (Command: "${t.command}")`;
+      }).join('\n') +
+      '\nUse <read_terminal terminal_name="..." /> to read output, <send_terminal_input terminal_name="...">input</send_terminal_input> to interact, or <close_terminal terminal_name="..." /> to close.';
   } else {
     terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\nNone';
   }
@@ -359,6 +374,8 @@ export class AgentOrchestrator {
     let loopCount = 0;
     const maxLoops = 50;
     let continueLoop = true;
+    let consecutiveMalformedCount = 0;
+    const maxMalformedRetries = 3;
 
     try {
       while (continueLoop && loopCount < maxLoops) {
@@ -510,13 +527,60 @@ ${combinedToolResult}
           }
 
           continueLoop = true;
+          consecutiveMalformedCount = 0; // Reset on successful tool execution
         } else {
-          // Write conversational turn to turns.log at the workspace root
-          try {
-            const logFilePath = this._getSafePath('turns.log');
-            const timestamp = new Date().toISOString();
-            const systemContent = buildSystemPrompt();
-            const logEntry = `
+          // ---- Malformed tool tag recovery ----
+          // Check if the model tried to call a tool but the tag was incomplete/broken.
+          // If so, inject an error feedback message and continue the loop so the model can retry.
+          const allToolNames = [
+            'read_file', 'create_file', 'write_file', 'patch_file',
+            'list_dir', 'grep_search', 'run_command', 'browser_navigate',
+            'browser_click', 'browser_type', 'browser_screenshot',
+            'send_terminal_input', 'close_terminal', 'read_terminal', 'list_terminals'
+          ];
+          const strippedForCheck = this._stripCodeBlocks(assistantResponse);
+          const partialPattern = new RegExp(
+            `<(${allToolNames.join('|')})\\b`, 'i'
+          );
+          const partialMatch = strippedForCheck.match(partialPattern);
+
+          if (partialMatch && consecutiveMalformedCount < maxMalformedRetries) {
+            consecutiveMalformedCount++;
+            const errorMsg = `[Tool Parsing Error]: Your "${partialMatch[1]}" tool call was malformed or incomplete (attempt ${consecutiveMalformedCount}/${maxMalformedRetries}). The XML tag was not properly closed or had invalid syntax. Please retry with correct XML syntax. Example for run_command: <run_command command="your command here" />`;
+
+            currentMessages.push({ role: 'system', content: errorMsg });
+            await this._saveChatHistory(currentMessages);
+
+            // Log the malformed attempt
+            try {
+              const logFilePath = this._getSafePath('turns.log');
+              const timestamp = new Date().toISOString();
+              const logEntry = `
+========================================
+[TURN TIMESTAMP: ${timestamp}]
+========================================
+MODEL GENERATED (MALFORMED TOOL TAG):
+${assistantResponse}
+
+SYSTEM RECOVERY:
+${errorMsg}
+
+========================================
+\n`;
+              fs.appendFileSync(logFilePath, logEntry, 'utf8');
+            } catch (e: any) {
+              console.warn('Failed to write to turns.log:', e.message);
+            }
+
+            continueLoop = true;
+          } else {
+            // Genuine conversational response or max retries exhausted — end the loop
+            // Write conversational turn to turns.log at the workspace root
+            try {
+              const logFilePath = this._getSafePath('turns.log');
+              const timestamp = new Date().toISOString();
+              const systemContent = buildSystemPrompt();
+              const logEntry = `
 ========================================
 [TURN TIMESTAMP: ${timestamp}]
 ========================================
@@ -531,9 +595,10 @@ USER/ENVIRONMENT TOOL RESPONSE:
 
 ========================================
 \n`;
-            fs.appendFileSync(logFilePath, logEntry, 'utf8');
-          } catch (e: any) {
-            console.warn('Failed to write to turns.log:', e.message);
+              fs.appendFileSync(logFilePath, logEntry, 'utf8');
+            } catch (e: any) {
+              console.warn('Failed to write to turns.log:', e.message);
+            }
           }
         }
       }
@@ -597,7 +662,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
 
   private hasCompleteToolCall(text: string): boolean {
     const stripped = this._stripCodeBlocks(text);
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals'];
     for (const tool of selfClosingTools) {
       if (this.isTagFullyClosed(stripped, tool)) {
         return true;
@@ -833,6 +898,32 @@ USER/ENVIRONMENT TOOL RESPONSE:
       }
     }
 
+    // read_terminal
+    const readTerminalRegex = /<read_terminal([\s\S]*?)\/?>/gi;
+    while ((match = readTerminalRegex.exec(text)) !== null) {
+      const termName = attr(match[1], 'terminal_name');
+      if (termName) {
+        const chars = attr(match[1], 'chars');
+        candidates.push({
+          index: match.index,
+          tool: {
+            name: 'read_terminal',
+            terminal_name: termName.trim(),
+            chars: chars || undefined
+          } as any
+        });
+      }
+    }
+
+    // list_terminals
+    const listTerminalsRegex = /<list_terminals[\s\S]*?\/?>/gi;
+    while ((match = listTerminalsRegex.exec(text)) !== null) {
+      candidates.push({
+        index: match.index,
+        tool: { name: 'list_terminals' }
+      });
+    }
+
     if (candidates.length === 0) { return []; }
 
     // Sort by position and return ONLY the first tool call found in the text.
@@ -890,7 +981,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
     // but track offsets against the ORIGINAL text so we truncate correctly.
     const stripped = this._stripCodeBlocks(closedText);
 
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals'];
     let earliestEnd = -1;
 
     for (const tool of selfClosingTools) {

@@ -36,7 +36,9 @@ export async function executeTool(
   if (
     name === 'run_command' ||
     name === 'send_terminal_input' ||
-    name === 'close_terminal'
+    name === 'close_terminal' ||
+    name === 'read_terminal' ||
+    name === 'list_terminals'
   ) {
     return await executeTerminalTool(tool);
   }

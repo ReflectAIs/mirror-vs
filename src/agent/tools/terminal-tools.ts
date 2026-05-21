@@ -36,7 +36,7 @@ function isSensitiveCommand(command: string): boolean {
     const workspaceFolderLower = workspaceFolder.toLowerCase();
 
     // Match Windows drive-letter paths (e.g. C:\path or D:/path)
-    const winAbsMatch = command.match(/\b([a-zA-Z]:[\\/][^"'\s]*)/);
+    const winAbsMatch = command.match(/\b([a-zA-Z]:[\\\/][^"'\s]*)/);
     if (winAbsMatch) {
       const absPath = winAbsMatch[1].toLowerCase();
       if (!absPath.startsWith(workspaceFolderLower)) {
@@ -72,6 +72,7 @@ export async function executeTerminalTool(
 ): Promise<string> {
   const service = CommandService.getInstance();
 
+  // ---- run_command ----
   if (tool.name === 'run_command') {
     if (!tool.command) {
       throw new Error('Missing "command" attribute for run_command.');
@@ -101,6 +102,7 @@ export async function executeTerminalTool(
     return await service.executeCommand(command);
   }
 
+  // ---- send_terminal_input ----
   if (tool.name === 'send_terminal_input') {
     const termName = (tool as any).terminal_name || '';
     const input = tool.content || '';
@@ -119,12 +121,17 @@ export async function executeTerminalTool(
 
     const success = service.sendInputToTerminal(termName, input);
     if (!success) {
-      throw new Error(`Active terminal "${termName}" not found. Active terminals: ${vscode.window.terminals.map(t => `"${t.name}"`).join(', ') || 'none'}`);
+      const activeTerminals = service.getActiveTerminals();
+      const terminalList = activeTerminals.length > 0
+        ? activeTerminals.map(t => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
+        : 'none';
+      throw new Error(`Active terminal "${termName}" not found. Active terminals: ${terminalList}`);
     }
 
     return `Successfully sent input to terminal "${termName}": "${input}"`;
   }
 
+  // ---- close_terminal ----
   if (tool.name === 'close_terminal') {
     const termName = (tool as any).terminal_name || '';
 
@@ -134,10 +141,58 @@ export async function executeTerminalTool(
 
     const success = service.closeTerminal(termName);
     if (!success) {
-      throw new Error(`Active terminal "${termName}" not found. Active terminals: ${vscode.window.terminals.map(t => `"${t.name}"`).join(', ') || 'none'}`);
+      const activeTerminals = service.getActiveTerminals();
+      const terminalList = activeTerminals.length > 0
+        ? activeTerminals.map(t => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
+        : 'none';
+      throw new Error(`Active terminal "${termName}" not found. Active terminals: ${terminalList}`);
     }
 
     return `Successfully closed and terminated terminal "${termName}"`;
+  }
+
+  // ---- read_terminal ----
+  if (tool.name === 'read_terminal') {
+    const termName = (tool as any).terminal_name || '';
+
+    if (!termName) {
+      throw new Error('Missing "terminal_name" attribute for read_terminal. Use list_terminals first to see available terminal names.');
+    }
+
+    // Parse optional chars/lines parameter
+    const chars = parseInt((tool as any).chars || '5000', 10) || 5000;
+
+    const result = service.readTerminalOutput(termName, chars);
+    if (!result) {
+      const activeTerminals = service.getActiveTerminals();
+      const terminalList = activeTerminals.length > 0
+        ? activeTerminals.map(t => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
+        : 'none';
+      throw new Error(`Terminal "${termName}" not found. Active terminals: ${terminalList}`);
+    }
+
+    const statusLine = result.running
+      ? '🟢 Process is still RUNNING'
+      : `🔴 Process has EXITED (code: ${result.exitCode})`;
+
+    return `${statusLine}\n\n--- Terminal Output (last ${chars} chars) ---\n${result.output || '[No output]'}`;
+  }
+
+  // ---- list_terminals ----
+  if (tool.name === 'list_terminals') {
+    const terminals = service.getActiveTerminals();
+
+    if (terminals.length === 0) {
+      return 'No active agent-managed terminals. Use <run_command command="..." /> to start one.';
+    }
+
+    const lines = terminals.map((t, i) => {
+      const status = t.running ? '🟢 RUNNING' : `🔴 EXITED (code: ${t.exitCode})`;
+      const type = t.isServer ? '[SERVER]' : '[SHORT]';
+      return `${i + 1}. "${t.name}" ${type} ${status}\n   Command: "${t.command}"`;
+    });
+
+    return `Active terminals (${terminals.length}):\n\n${lines.join('\n\n')}\n\nUse <read_terminal terminal_name="..." /> to read output, <send_terminal_input terminal_name="...">input</send_terminal_input> to interact, or <close_terminal terminal_name="..." /> to close.`;
   }
 
   throw new Error(`Invalid terminal tool: ${tool.name}`);

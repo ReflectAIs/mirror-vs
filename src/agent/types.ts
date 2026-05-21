@@ -1,6 +1,6 @@
 
 export interface ToolCall {
-  name: 'read_file' | 'create_file' | 'write_file' | 'patch_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command' | 'send_terminal_input' | 'close_terminal';
+  name: 'read_file' | 'create_file' | 'write_file' | 'patch_file' | 'list_dir' | 'grep_search' | 'browser_navigate' | 'browser_click' | 'browser_type' | 'browser_screenshot' | 'run_command' | 'send_terminal_input' | 'close_terminal' | 'read_terminal' | 'list_terminals';
   path?: string;
   query?: string;
   content?: string;
