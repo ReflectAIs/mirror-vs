@@ -1,3 +1,4 @@
+
 export type LLMProvider = 'ollama' | 'deepseek';
 
 export interface ExtensionSettings {
@@ -24,6 +25,25 @@ export interface ChatSession {
   messages: ChatMessage[];
 }
 
+export interface GitDiffLine {
+  type: 'add' | 'del' | 'ctx';
+  content: string;
+  oldLine?: number;
+  newLine?: number;
+}
+
+export interface GitFileDiff {
+  file: string;
+  status: string;
+  hunks: {
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+    lines: GitDiffLine[];
+  }[];
+}
+
 // Messages sent from Webview -> Extension Host
 export type WebviewToExtensionMessage =
   | { type: 'sendMessage'; text: string; history: ChatMessage[] }
@@ -41,7 +61,9 @@ export type WebviewToExtensionMessage =
   | { type: 'openTerminal'; command: string; terminalName?: string }
   | { type: 'getGitStatus' }
   | { type: 'openDiff'; file: string }
-  | { type: 'commitGitChanges' };
+  | { type: 'commitGitChanges' }
+  | { type: 'getGitDiff'; file: string }
+  | { type: 'applyGitDiff'; file: string; action: 'accept' | 'reject' };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
@@ -61,5 +83,5 @@ export type ExtensionToWebviewMessage =
   | { type: 'checkpointReverted'; checkpointId: string; success: boolean }
   | { type: 'screenshotCapture'; base64: string }
   | { type: 'gitChanges'; changes: { file: string; status: string }[] }
-  | { type: 'cancelStream' };
-
+  | { type: 'cancelStream' }
+  | { type: 'gitDiffContent'; file: string; diff: GitFileDiff | null };

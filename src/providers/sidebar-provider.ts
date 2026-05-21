@@ -243,6 +243,86 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
+        case 'getGitDiff': {
+          const wsFolderDiff = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (!wsFolderDiff || !data.file) break;
+          try {
+            const { execSync } = require('child_process') as typeof import('child_process');
+            const diffOutput = execSync(`git diff --unified=10 "${data.file}"`, { cwd: wsFolderDiff, encoding: 'utf8' });
+            
+            if (!diffOutput.trim()) {
+              this._view?.webview.postMessage({ type: 'gitDiffContent', file: data.file, diff: null });
+              break;
+            }
+
+            const lines: { type: string; content: string }[] = [];
+            const hunks: any[] = [];
+            let currentHunk: any = null;
+            
+            diffOutput.split('\n').forEach(line => {
+              if (line.startsWith('@@ ')) {
+                if (currentHunk) hunks.push(currentHunk);
+                const match = line.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
+                currentHunk = {
+                  oldStart: parseInt(match?.[1] || '0'),
+                  oldLines: parseInt(match?.[2] || '1'),
+                  newStart: parseInt(match?.[3] || '0'),
+                  newLines: parseInt(match?.[4] || '1'),
+                  lines: []
+                };
+              } else if (currentHunk) {
+                if (line.startsWith('+')) {
+                  currentHunk.lines.push({ type: 'add', content: line.substring(1) });
+                } else if (line.startsWith('-')) {
+                  currentHunk.lines.push({ type: 'del', content: line.substring(1) });
+                } else if (line.startsWith(' ')) {
+                  currentHunk.lines.push({ type: 'ctx', content: line.substring(1) });
+                }
+              }
+            });
+            if (currentHunk) hunks.push(currentHunk);
+
+            this._view?.webview.postMessage({
+              type: 'gitDiffContent',
+              file: data.file,
+              diff: {
+                file: data.file,
+                status: 'M',
+                hunks
+              }
+            });
+          } catch (e) {
+            this._view?.webview.postMessage({ type: 'gitDiffContent', file: data.file, diff: null });
+          }
+          break;
+        }
+        case 'applyGitDiff': {
+          const wsFolderApply = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (!wsFolderApply || !data.file) break;
+          try {
+            const { execSync } = require('child_process') as typeof import('child_process');
+            
+            if (data.action === 'accept') {
+              // Stage the file (accept changes)
+              execSync(`git add "${data.file}"`, { cwd: wsFolderApply, encoding: 'utf8' });
+              vscode.window.showInformationMessage(`✅ Changes accepted for ${data.file}`);
+            } else if (data.action === 'reject') {
+              // Restore the file (reject changes)
+              execSync(`git checkout -- "${data.file}"`, { cwd: wsFolderApply, encoding: 'utf8' });
+              vscode.window.showInformationMessage(`⏪ Changes rejected for ${data.file}`);
+            }
+            
+            // Refresh git status
+            this._view?.webview.postMessage({ type: 'gitChanges', changes: [] });
+            // Trigger full refresh
+            setTimeout(() => {
+              vscode.commands.executeCommand('mirror-vs.refreshGitStatus');
+            }, 500);
+          } catch (e: any) {
+            vscode.window.showErrorMessage(`Failed to ${data.action} changes: ${e.message}`);
+          }
+          break;
+        }
         case 'commitGitChanges': {
           const wsF = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsF) break;
@@ -308,6 +388,35 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     this._sendChatSessionsToWebview();
     this._sendChatHistoryToWebview();
     this._sendWorkspaceFiles();
+  }
+
+  public refreshGitStatus(): void {
+    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wsFolder) return;
+    try {
+      const { execSync } = require('child_process') as typeof import('child_process');
+      const gitStatus = execSync('git status --porcelain', { cwd: wsFolder, encoding: 'utf8' });
+      const changes: { file: string; status: string }[] = [];
+      gitStatus.split('\n').filter(Boolean).forEach(line => {
+        const stagedStatus = line[0].trim();
+        const unstagedStatus = line[1].trim();
+        let file = line.substring(3).trim();
+        if (file.includes(' -> ')) {
+          file = file.split(' -> ').pop() || file;
+        }
+        const effectiveStatus = stagedStatus || unstagedStatus || '?';
+        changes.push({ file, status: effectiveStatus });
+      });
+      this._view?.webview.postMessage({
+        type: 'gitChanges',
+        changes
+      });
+    } catch (e) {
+      this._view?.webview.postMessage({
+        type: 'gitChanges',
+        changes: []
+      });
+    }
   }
 
   public async clearActiveChat() {

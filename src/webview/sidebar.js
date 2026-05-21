@@ -1167,6 +1167,11 @@
         break;
       }
 
+      case 'gitDiffContent': {
+        renderInlineDiff(message.file, message.diff);
+        break;
+      }
+
       case 'checkpointReverted': {
         const { checkpointId, success } = message;
         const card = document.querySelector(`.tool-card[data-checkpoint-id="${checkpointId}"]`);
@@ -1413,14 +1418,24 @@
       const actions = document.createElement('div');
       actions.className = 'git-change-actions';
       
-      // View diff button
+      // View diff button (opens VS Code diff editor)
       const diffBtn = document.createElement('button');
       diffBtn.className = 'git-change-action-btn diff';
-      diffBtn.title = 'View diff';
+      diffBtn.title = 'View diff in VS Code';
       diffBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>`;
       diffBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         vscode.postMessage({ type: 'openDiff', file: file.file });
+      });
+      
+      // Inline diff button (opens inline accept/reject viewer)
+      const inlineDiffBtn = document.createElement('button');
+      inlineDiffBtn.className = 'git-change-action-btn';
+      inlineDiffBtn.title = 'View inline diff with accept/reject';
+      inlineDiffBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>`;
+      inlineDiffBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ type: 'getGitDiff', file: file.file });
       });
       
       // Open file button
@@ -1434,6 +1449,7 @@
       });
       
       actions.appendChild(diffBtn);
+      actions.appendChild(inlineDiffBtn);
       actions.appendChild(openBtn);
       
       item.appendChild(statusBadge);
@@ -1447,6 +1463,139 @@
       
       gitChangesList.appendChild(item);
     });
+  }
+
+  // Inline Diff Viewer State
+  let openDiffFile = null;
+
+  function renderInlineDiff(file, diff) {
+    openDiffFile = file;
+    
+    // Find the git change item and inject the diff viewer
+    const items = gitChangesList.querySelectorAll('.git-change-item');
+    let targetItem = null;
+    items.forEach(item => {
+      const filename = item.querySelector('.git-change-filename');
+      if (filename && filename.textContent === file) {
+        targetItem = item;
+      }
+    });
+    
+    if (!targetItem) return;
+    
+    // Remove any existing inline diff for this item
+    const existingDiff = targetItem.nextElementSibling;
+    if (existingDiff && existingDiff.classList.contains('inline-diff-viewer')) {
+      existingDiff.remove();
+      return; // toggle off
+    }
+
+    const diffViewer = document.createElement('div');
+    diffViewer.className = 'inline-diff-viewer';
+    diffViewer.style.margin = '4px 0 4px 24px';
+    
+    if (!diff || !diff.hunks || diff.hunks.length === 0) {
+      diffViewer.innerHTML = `
+        <div class="inline-diff-empty" style="padding: 8px; font-size: 10px; color: var(--text-muted); text-align: center;">
+          No inline diff available (file is untracked or binary)
+        </div>
+      `;
+    } else {
+      let diffHtml = '';
+      
+      // Action bar
+      diffHtml += `
+        <div class="inline-diff-actions" style="display: flex; gap: 6px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px 6px 0 0; border: 1px solid var(--border-glass); border-bottom: none;">
+          <button class="diff-accept-btn" data-file="${escapeHtml(file)}" style="flex: 1; padding: 6px; border: none; border-radius: 4px; background: rgba(52, 211, 153, 0.12); color: #34d399; font-weight: 700; font-size: 10px; cursor: pointer; transition: all 0.15s ease;">
+            ✅ Accept Changes
+          </button>
+          <button class="diff-reject-btn" data-file="${escapeHtml(file)}" style="flex: 1; padding: 6px; border: none; border-radius: 4px; background: rgba(248, 113, 113, 0.12); color: #f87171; font-weight: 700; font-size: 10px; cursor: pointer; transition: all 0.15s ease;">
+            ⏪ Reject Changes
+          </button>
+        </div>
+      `;
+      
+      // Diff hunks
+      diffHtml += `<div class="inline-diff-hunks" style="border: 1px solid var(--border-glass); border-radius: 0 0 6px 6px; overflow: hidden;">`;
+      
+      diff.hunks.forEach((hunk, hunkIdx) => {
+        diffHtml += `<div class="diff-hunk" style="border-bottom: ${hunkIdx < diff.hunks.length - 1 ? '1px solid var(--border-glass)' : 'none'};">`;
+        
+        // Hunk header
+        diffHtml += `
+          <div class="diff-hunk-header" style="padding: 3px 8px; font-size: 9px; font-family: var(--font-mono); background: rgba(255,255,255,0.02); color: var(--text-muted); border-bottom: 1px solid var(--border-glass);">
+            @@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@
+          </div>
+        `;
+        
+        // Lines
+        hunk.lines.forEach((line) => {
+          let lineClass = 'diff-ctx-line';
+          let prefix = ' ';
+          let bgColor = 'transparent';
+          let textColor = 'var(--text-secondary)';
+          
+          if (line.type === 'add') {
+            lineClass = 'diff-add-line';
+            prefix = '+';
+            bgColor = 'rgba(52, 211, 153, 0.06)';
+            textColor = '#34d399';
+          } else if (line.type === 'del') {
+            lineClass = 'diff-del-line';
+            prefix = '-';
+            bgColor = 'rgba(248, 113, 113, 0.06)';
+            textColor = '#f87171';
+          }
+          
+          const escapedContent = escapeHtml(line.content);
+          diffHtml += `
+            <div class="diff-line ${lineClass}" style="padding: 1px 8px; font-size: 10px; font-family: var(--font-mono); background: ${bgColor}; color: ${textColor}; white-space: pre-wrap; word-break: break-all; line-height: 1.5; border-bottom: 1px solid rgba(255,255,255,0.02);">
+              <span style="opacity: 0.3; margin-right: 8px; user-select: none;">${prefix}</span>
+              <span>${escapedContent || ' '}</span>
+            </div>
+          `;
+        });
+        
+        diffHtml += `</div>`;
+      });
+      
+      diffHtml += `</div>`;
+      
+      diffViewer.innerHTML = diffHtml;
+      
+      // Wire up accept/reject buttons
+      const acceptBtn = diffViewer.querySelector('.diff-accept-btn');
+      const rejectBtn = diffViewer.querySelector('.diff-reject-btn');
+      
+      if (acceptBtn) {
+        acceptBtn.addEventListener('click', () => {
+          acceptBtn.textContent = '⏳ Applying...';
+          acceptBtn.disabled = true;
+          rejectBtn.disabled = true;
+          vscode.postMessage({ type: 'applyGitDiff', file, action: 'accept' });
+          // Optimistically update
+          setTimeout(() => {
+            refreshGitStatus();
+          }, 600);
+        });
+      }
+      
+      if (rejectBtn) {
+        rejectBtn.addEventListener('click', () => {
+          rejectBtn.textContent = '⏳ Reverting...';
+          rejectBtn.disabled = true;
+          acceptBtn.disabled = true;
+          vscode.postMessage({ type: 'applyGitDiff', file, action: 'reject' });
+          // Optimistically update
+          setTimeout(() => {
+            refreshGitStatus();
+          }, 600);
+        });
+      }
+    }
+    
+    // Insert after the target item
+    targetItem.parentNode.insertBefore(diffViewer, targetItem.nextSibling);
   }
 
   function escapeHtml(unsafe) {

@@ -30,6 +30,12 @@ export function activate(context: vscode.ExtensionContext) {
       provider.clearActiveChat();
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('mirror-vs.refreshGitStatus', () => {
+      provider.refreshGitStatus();
+    })
+  );
 }
 
 export function deactivate() {}

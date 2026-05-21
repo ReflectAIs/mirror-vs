@@ -1816,6 +1816,81 @@ select:focus {
 }
 
 /* ==========================================================================
+   INLINE DIFF VIEWER
+   ========================================================================== */
+.inline-diff-viewer {
+  animation: message-in 0.25s var(--ease-spring) forwards;
+}
+
+.inline-diff-empty {
+  border: 1px dashed var(--border-glass);
+  border-radius: 6px;
+  background: var(--bg-glass);
+}
+
+.inline-diff-actions {
+  gap: 6px;
+}
+
+.diff-accept-btn:hover {
+  background: rgba(52, 211, 153, 0.2) !important;
+  transform: translateY(-1px);
+}
+
+.diff-reject-btn:hover {
+  background: rgba(248, 113, 113, 0.2) !important;
+  transform: translateY(-1px);
+}
+
+.diff-accept-btn:disabled,
+.diff-reject-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.diff-hunk-header {
+  user-select: none;
+}
+
+.diff-line {
+  transition: background 0.15s ease;
+}
+
+.diff-line.diff-add-line:hover {
+  background: rgba(52, 211, 153, 0.12) !important;
+}
+
+.diff-line.diff-del-line:hover {
+  background: rgba(248, 113, 113, 0.12) !important;
+}
+
+.diff-line.diff-ctx-line:last-child {
+  border-bottom: none !important;
+}
+
+/* Scrollbar for long diffs */
+.inline-diff-hunks {
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-glass) transparent;
+}
+
+.inline-diff-hunks::-webkit-scrollbar {
+  width: 4px;
+}
+
+.inline-diff-hunks::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inline-diff-hunks::-webkit-scrollbar-thumb {
+  background: var(--border-glass);
+  border-radius: 4px;
+}
+
+/* ==========================================================================
    BUDDY AVATAR - Floating Entertaining Mascot
    ========================================================================== */
 .buddy-container {
