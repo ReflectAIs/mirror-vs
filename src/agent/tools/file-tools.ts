@@ -42,16 +42,37 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
 }
 
 /**
- * Visual split diff confirmation.
+ * Writes changes to the file instantly and silently, opening it in the active editor.
+ * Returns accepted: true immediately so the model never blocks or halts.
  */
 async function confirmChangesWithDiff(
   originalPath: string,
   proposedContent: string,
-  fileName: string
-): Promise<boolean> {
-  // Autonomous mode: bypass split diff and return true immediately
-  // Allows instantaneous code application without human intervention
-  return true;
+  fileName: string,
+  checkpointAction: 'create' | 'replace'
+): Promise<{ accepted: boolean; checkpointId: string | null }> {
+  // Ensure parent directory exists before writing
+  const parentDir = path.dirname(originalPath);
+  if (!fs.existsSync(parentDir)) {
+    fs.mkdirSync(parentDir, { recursive: true });
+  }
+
+  // Create checkpoint first so the user can easily revert if needed
+  const checkpointId = await createCheckpoint(originalPath, checkpointAction);
+
+  // Write proposed content to actual file so it shows inline instantly and triggers Git colors
+  const encoder = new TextEncoder();
+  await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(proposedContent));
+
+  // Open the file in the active editor so they can review and utilize standard VS Code/Git tools
+  try {
+    const doc = await vscode.workspace.openTextDocument(originalPath);
+    await vscode.window.showTextDocument(doc);
+  } catch (e) {
+    // ignore opening error
+  }
+
+  return { accepted: true, checkpointId };
 }
 
 export async function executeFileTool(
@@ -90,25 +111,9 @@ export async function executeFileTool(
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
       
-      const confirmed = await confirmChangesWithDiff(safePath, proposedContent, path.basename(tool.path));
-      if (!confirmed) {
+      const { accepted, checkpointId } = await confirmChangesWithDiff(safePath, proposedContent, path.basename(tool.path), 'create');
+      if (!accepted) {
         throw new Error('User rejected file creation.');
-      }
-
-      // Ensure parent directories are created recursively before writing the file
-      const parentDir = path.dirname(safePath);
-      if (!fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
-      }
-
-      const checkpointId = await createCheckpoint(safePath, 'create');
-      fs.writeFileSync(safePath, proposedContent, 'utf8');
-
-      try {
-        const doc = await vscode.workspace.openTextDocument(safePath);
-        await vscode.window.showTextDocument(doc);
-      } catch (e) {
-        // ignore editor errors
       }
 
       return `File created and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
@@ -119,25 +124,9 @@ export async function executeFileTool(
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
 
-      const confirmed = await confirmChangesWithDiff(safePath, proposedContent, path.basename(tool.path));
-      if (!confirmed) {
+      const { accepted, checkpointId } = await confirmChangesWithDiff(safePath, proposedContent, path.basename(tool.path), 'replace');
+      if (!accepted) {
         throw new Error('User rejected file overwrite changes.');
-      }
-
-      // Ensure parent directories are created recursively before writing the file
-      const parentDir = path.dirname(safePath);
-      if (!fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
-      }
-
-      const checkpointId = await createCheckpoint(safePath, 'replace');
-      fs.writeFileSync(safePath, proposedContent, 'utf8');
-
-      try {
-        const doc = await vscode.workspace.openTextDocument(safePath);
-        await vscode.window.showTextDocument(doc);
-      } catch (e) {
-        // ignore editor errors
       }
 
       return `File updated and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
@@ -182,19 +171,9 @@ export async function executeFileTool(
         }
       }
 
-      const confirmed = await confirmChangesWithDiff(safePath, fileContent, path.basename(tool.path));
-      if (!confirmed) {
+      const { accepted, checkpointId } = await confirmChangesWithDiff(safePath, fileContent, path.basename(tool.path), 'replace');
+      if (!accepted) {
         throw new Error('User rejected patch edits.');
-      }
-
-      const checkpointId = await createCheckpoint(safePath, 'replace');
-      fs.writeFileSync(safePath, fileContent, 'utf8');
-
-      try {
-        const doc = await vscode.workspace.openTextDocument(safePath);
-        await vscode.window.showTextDocument(doc);
-      } catch (e) {
-        // ignore editor errors
       }
 
       return `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;

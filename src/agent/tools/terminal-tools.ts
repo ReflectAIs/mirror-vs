@@ -61,29 +61,65 @@ function isSensitiveCommand(command: string): boolean {
 export async function executeTerminalTool(
   tool: ToolCall
 ): Promise<string> {
-  if (tool.name !== 'run_command') {
-    throw new Error(`Invalid terminal tool: ${tool.name}`);
-  }
+  const service = CommandService.getInstance();
 
-  if (!tool.command) {
-    throw new Error('Missing "command" attribute for run_command.');
-  }
-
-  const command = tool.command.trim();
-
-  // Safety Confirmation Guardrail (Only blocks if command is destructive or traverses outside the workspace)
-  if (isSensitiveCommand(command)) {
-    const choice = await vscode.window.showWarningMessage(
-      `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
-      { modal: true }, // Modal dialog blocks safely and secures active developer attention
-      'Allow Execution',
-      'Deny'
-    );
-
-    if (choice !== 'Allow Execution') {
-      throw new Error(`Command execution denied by user: "${command}"`);
+  if (tool.name === 'run_command') {
+    if (!tool.command) {
+      throw new Error('Missing "command" attribute for run_command.');
     }
+
+    const command = tool.command.trim();
+
+    // Safety Confirmation Guardrail (Only blocks if command is destructive or traverses outside the workspace)
+    if (isSensitiveCommand(command)) {
+      const choice = await vscode.window.showWarningMessage(
+        `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
+        { modal: true }, // Modal dialog blocks safely and secures active developer attention
+        'Allow Execution',
+        'Deny'
+      );
+
+      if (choice !== 'Allow Execution') {
+        throw new Error(`Command execution denied by user: "${command}"`);
+      }
+    }
+
+    return await service.executeCommand(command);
   }
 
-  return await CommandService.getInstance().executeCommand(command);
+  if (tool.name === 'send_terminal_input') {
+    const termName = (tool as any).terminal_name || '';
+    const input = tool.content || '';
+
+    if (!termName) {
+      throw new Error('Missing "terminal_name" attribute for send_terminal_input.');
+    }
+    if (!input) {
+      throw new Error('Missing terminal input content.');
+    }
+
+    const success = service.sendInputToTerminal(termName, input);
+    if (!success) {
+      throw new Error(`Active terminal "${termName}" not found. Active terminals: ${vscode.window.terminals.map(t => `"${t.name}"`).join(', ') || 'none'}`);
+    }
+
+    return `Successfully sent input to terminal "${termName}": "${input}"`;
+  }
+
+  if (tool.name === 'close_terminal') {
+    const termName = (tool as any).terminal_name || '';
+
+    if (!termName) {
+      throw new Error('Missing "terminal_name" attribute for close_terminal.');
+    }
+
+    const success = service.closeTerminal(termName);
+    if (!success) {
+      throw new Error(`Active terminal "${termName}" not found. Active terminals: ${vscode.window.terminals.map(t => `"${t.name}"`).join(', ') || 'none'}`);
+    }
+
+    return `Successfully closed and terminated terminal "${termName}"`;
+  }
+
+  throw new Error(`Invalid terminal tool: ${tool.name}`);
 }

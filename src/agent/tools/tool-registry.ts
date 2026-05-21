@@ -33,7 +33,11 @@ export async function executeTool(
     return await executeBrowserTool(tool);
   }
 
-  if (name === 'run_command') {
+  if (
+    name === 'run_command' ||
+    name === 'send_terminal_input' ||
+    name === 'close_terminal'
+  ) {
     return await executeTerminalTool(tool);
   }
 

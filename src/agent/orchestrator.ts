@@ -3,6 +3,8 @@ import { LLMProvider, ChatMessage } from '../types';
 import { ToolCall } from './types';
 import { executeTool } from './tools/tool-registry';
 import { fetchOllamaModels, streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
+import { CommandService } from '../services/command-service';
+import * as fs from 'fs';
 
 const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
 
@@ -13,7 +15,7 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 ### IMPORTANT TOOL USAGE RULES:
 1. Always output valid XML tags. All parameters (like path and query) MUST be enclosed in double quotes.
 2. Self-closing tags MUST end with " />".
-3. When creating or writing files, always provide the COMPLETE, FULL file content. Do NOT use ellipsis, comments like "// rest of code", or placeholders/stubs, because the file will be written exactly as you provide it. When using patch_file, always make sure the SEARCH blocks match the target file content exactly, and provide complete and functional changes in the REPLACE blocks.
+3. DO NOT use write_file to modify existing files. You MUST use patch_file for all edits/modifications to existing files, regardless of size. Only use create_file when creating a completely new file for the first time. When using patch_file, always make sure the SEARCH blocks match the target file content exactly, and provide complete and functional changes in the REPLACE blocks. IF it fails 
 4. CRITICAL: You MUST call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING. Do not hallucinate the tool result. The system will execute the tool and provide the result to you in the next turn.
 5. In every turn, if a tool result indicates a failure, read the error message carefully and correct your input in the next turn.
 6. NEVER say "let me check", "I will verify", "let me look", or any similar phrase WITHOUT immediately outputting a tool tag in the same response. If you intend to check something, DO IT NOW by outputting the appropriate tool tag. Stating an intention without a tool tag is FORBIDDEN and will cause the agent loop to terminate prematurely.
@@ -42,7 +44,7 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    </create_file>
 
 3. WRITE FILE:
-   Overwrite or update the contents of an existing file.
+   Overwrite or update the contents of an existing file. WARNING: Only use this if you are completely replacing a file's entire content. If you are modifying/editing an existing file, you MUST use patch_file instead.
    Usage:
    <write_file path="relative/path/to/existing_file.ts">
    // full contents of the file here
@@ -50,7 +52,7 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 
 4. PATCH FILE:
    Apply targeted search-and-replace edits to an existing file without rewriting it entirely.
-   Always prefer patch_file over write_file when making partial changes to large files, as it is faster and safer.
+   You MUST always use patch_file instead of write_file for all edits/modifications to existing files. It is faster, safer, and preserves Git history and line-based changes.
    Usage:
    <patch_file path="relative/path/to/existing_file.ts">
    <<<<<<< SEARCH
@@ -99,6 +101,17 @@ To accomplish these tasks, you have access to a set of special workspace tools t
     Usage:
     <run_command command="npm install" />
 
+12. SEND TERMINAL INPUT:
+    Send key strokes, text input, or control characters (like Ctrl+C) to a running VS Code terminal.
+    Usage:
+    <send_terminal_input terminal_name="Mirror: npm run dev">Ctrl+C</send_terminal_input>
+    Note: To stop/kill a running server or command in a terminal, always send "Ctrl+C" as the input content.
+
+13. CLOSE TERMINAL:
+    Explicitly close/kill a running VS Code terminal.
+    Usage:
+    <close_terminal terminal_name="Mirror: npm run dev" />
+
 ### EXECUTION WORKFLOW EXAMPLE:
 Developer: "Install deps and start the todo app dev server."
 Your Turn 1: "Installing dependencies."
@@ -129,7 +142,20 @@ function getShellEnvDescription(): string {
 }
 
 export function buildSystemPrompt(): string {
-  return AGENT_SYSTEM_PROMPT_TEMPLATE.replace('{{SHELL_ENV}}', getShellEnvDescription());
+  const service = CommandService.getInstance();
+  const terminals = service.getActiveTerminals();
+
+  let terminalContext = '';
+  if (terminals.length > 0) {
+    terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\n' +
+      terminals.map(t => `- "${t.name}" (Running Command: "${t.command}")`).join('\n') +
+      '\nUse <send_terminal_input terminal_name="..." /> to interact, or <close_terminal terminal_name="..." /> to stop/kill the terminal.';
+  } else {
+    terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\nNone';
+  }
+
+  return AGENT_SYSTEM_PROMPT_TEMPLATE
+    .replace('{{SHELL_ENV}}', getShellEnvDescription()) + terminalContext;
 }
 
 export class AgentOrchestrator {
@@ -147,6 +173,54 @@ export class AgentOrchestrator {
     if (this._activeAbortController) {
       this._activeAbortController.abort();
       this._activeAbortController = undefined;
+    }
+  }
+
+  /**
+   * Ensures the workspace has a git repo with a clean baseline commit so that
+   * every agent file write shows up as a coloured diff gutter (yellow/green/red) in VS Code.
+   */
+  private async _ensureGitBaseline(): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceFolder) { return; }
+
+    const { execSync } = require('child_process') as typeof import('child_process');
+    const run = (cmd: string) => {
+      try { return execSync(cmd, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' }); }
+      catch { return ''; }
+    };
+
+    // 1. Init git if not already a repo
+    const isRepo = run('git rev-parse --is-inside-work-tree').trim() === 'true';
+    if (!isRepo) {
+      run('git init');
+    }
+
+    // 2. Ensure .gitignore has noise exclusions
+    const gitignorePath = `${workspaceFolder}/.gitignore`;
+    let gitignoreContent = '';
+    try { gitignoreContent = fs.readFileSync(gitignorePath, 'utf8'); } catch { }
+    const patterns = ['node_modules/', '.mirror-vs/', 'turns.log'];
+    const missingPatterns = patterns.filter(p => !gitignoreContent.includes(p));
+    if (missingPatterns.length > 0) {
+      const newContent = gitignoreContent.trimEnd() + '\n' + missingPatterns.join('\n') + '\n';
+      fs.writeFileSync(gitignorePath, newContent, 'utf8');
+      run('git add .gitignore');
+    }
+
+    // 3. Check if there are any tracked modified files already — commit them as baseline
+    const dirty = run('git status --porcelain').trim();
+    if (dirty) {
+      run('git add -A');
+      // Only commit tracked files — untracked files (new) will remain unstaged so they show green in VS Code
+      run('git commit -m "Mirror VS: baseline snapshot before agent task"');
+    } else {
+      // Ensure at least one commit exists (needed for diff gutters to work)
+      const hasCommit = run('git log --oneline -1').trim();
+      if (!hasCommit) {
+        run('git add -A');
+        run('git commit -m "Mirror VS: initial baseline"');
+      }
     }
   }
 
@@ -181,6 +255,9 @@ export class AgentOrchestrator {
       currentMessages.push({ role: 'user', content: text });
       await this._saveChatHistory(currentMessages);
     }
+
+    // Ensure workspace has a git baseline so agent changes show as git diff gutters
+    await this._ensureGitBaseline();
 
     let loopCount = 0;
     const maxLoops = 50;
@@ -281,7 +358,57 @@ export class AgentOrchestrator {
           currentMessages.push(systemMessage);
           await this._saveChatHistory(currentMessages);
 
+          // Write tool execution turn to turns.log at the workspace root
+          try {
+            const logFilePath = this._getSafePath('turns.log');
+            const timestamp = new Date().toISOString();
+            const systemContent = buildSystemPrompt();
+            const logEntry = `
+========================================
+[TURN TIMESTAMP: ${timestamp}]
+========================================
+SYSTEM RULES:
+${systemContent}
+
+MODEL GENERATED:
+${assistantResponse}
+
+USER/ENVIRONMENT TOOL RESPONSE:
+${combinedToolResult}
+
+========================================
+\n`;
+            fs.appendFileSync(logFilePath, logEntry, 'utf8');
+          } catch (e: any) {
+            console.warn('Failed to write to turns.log:', e.message);
+          }
+
           continueLoop = true;
+        } else {
+          // Write conversational turn to turns.log at the workspace root
+          try {
+            const logFilePath = this._getSafePath('turns.log');
+            const timestamp = new Date().toISOString();
+            const systemContent = buildSystemPrompt();
+            const logEntry = `
+========================================
+[TURN TIMESTAMP: ${timestamp}]
+========================================
+SYSTEM RULES:
+${systemContent}
+
+MODEL GENERATED:
+${assistantResponse}
+
+USER/ENVIRONMENT TOOL RESPONSE:
+(No tool calls made in this turn - loop complete)
+
+========================================
+\n`;
+            fs.appendFileSync(logFilePath, logEntry, 'utf8');
+          } catch (e: any) {
+            console.warn('Failed to write to turns.log:', e.message);
+          }
         }
       }
 
@@ -299,7 +426,7 @@ export class AgentOrchestrator {
   }
 
   private hasCompleteToolCall(text: string): boolean {
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'send_terminal_input', 'close_terminal'];
     for (const tool of selfClosingTools) {
       const regex = new RegExp(`<${tool}[^>]*>`, 'i');
       if (regex.test(text)) {
@@ -307,7 +434,7 @@ export class AgentOrchestrator {
       }
     }
 
-    const blockTools = ['create_file', 'write_file', 'patch_file'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
     for (const tool of blockTools) {
       const regex = new RegExp(`</${tool}\\s*>`, 'i');
       if (regex.test(text)) {
@@ -484,6 +611,55 @@ export class AgentOrchestrator {
       if (c) { candidates.push({ index: match.index, tool: { name: 'run_command', command: c } }); }
     }
 
+    // send_terminal_input (block style)
+    const sendTerminalInputBlockRegex = /<send_terminal_input([\s\S]*?)>([\s\S]*?)<\/send_terminal_input\s*>/gi;
+    while ((match = sendTerminalInputBlockRegex.exec(text)) !== null) {
+      const termName = attr(match[1], 'terminal_name');
+      if (termName) {
+        candidates.push({
+          index: match.index,
+          tool: {
+            name: 'send_terminal_input',
+            terminal_name: termName.trim(),
+            content: match[2]
+          } as any
+        });
+      }
+    }
+
+    // send_terminal_input (self-closing style)
+    const sendTerminalInputSelfRegex = /<send_terminal_input([\s\S]*?)\/?>/gi;
+    while ((match = sendTerminalInputSelfRegex.exec(text)) !== null) {
+      if (match[0].includes('</send_terminal_input')) continue;
+      const termName = attr(match[1], 'terminal_name');
+      const input = attr(match[1], 'input');
+      if (termName && input) {
+        candidates.push({
+          index: match.index,
+          tool: {
+            name: 'send_terminal_input',
+            terminal_name: termName.trim(),
+            content: input
+          } as any
+        });
+      }
+    }
+
+    // close_terminal
+    const closeTerminalRegex = /<close_terminal([\s\S]*?)\/?>/gi;
+    while ((match = closeTerminalRegex.exec(text)) !== null) {
+      const termName = attr(match[1], 'terminal_name');
+      if (termName) {
+        candidates.push({
+          index: match.index,
+          tool: {
+            name: 'close_terminal',
+            terminal_name: termName.trim()
+          } as any
+        });
+      }
+    }
+
     if (candidates.length === 0) { return []; }
 
     // Sort by position and return ONLY the first tool call found in the text.
@@ -514,7 +690,7 @@ export class AgentOrchestrator {
   }
 
   private getCleanedToolResponse(text: string): string {
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'send_terminal_input', 'close_terminal'];
     let earliestEnd = -1;
 
     for (const tool of selfClosingTools) {
@@ -528,7 +704,7 @@ export class AgentOrchestrator {
       }
     }
 
-    const blockTools = ['create_file', 'write_file', 'patch_file'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
     for (const tool of blockTools) {
       const regex = new RegExp(`</${tool}\\s*>`, 'i');
       const m = regex.exec(text);

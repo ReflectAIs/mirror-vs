@@ -48,6 +48,21 @@
         "command": "mirror-vs.clearChat",
         "title": "Clear Active Chat Session",
         "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.acceptReview",
+        "title": "Accept Changes",
+        "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.rejectReview",
+        "title": "Reject Changes",
+        "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.diffReview",
+        "title": "Compare Changes",
+        "category": "Mirror VS"
       }
     ],
     "configuration": {

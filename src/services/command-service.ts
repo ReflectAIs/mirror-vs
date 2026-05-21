@@ -383,6 +383,48 @@ export class CommandService {
   }
 
   /**
+   * Sends input text or keys (like Ctrl+C) to a specific active terminal.
+   */
+  public sendInputToTerminal(terminalName: string, input: string): boolean {
+    let terminal = this.activeTerminals.get(terminalName);
+    if (!terminal) {
+      // Fallback search across all active VS Code terminals by name
+      terminal = vscode.window.terminals.find(t => t.name === terminalName);
+    }
+
+    if (terminal) {
+      this.logToDebug(`Sending input to terminal "${terminalName}": "${input}"`);
+      if (input === 'Ctrl+C' || input === 'ctrl+c' || input === '\u0003') {
+        terminal.sendText('\u0003', false);
+      } else {
+        terminal.sendText(input, true);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Closes and disposes a specific active terminal.
+   */
+  public closeTerminal(terminalName: string): boolean {
+    let terminal = this.activeTerminals.get(terminalName);
+    if (!terminal) {
+      // Fallback search
+      terminal = vscode.window.terminals.find(t => t.name === terminalName);
+    }
+
+    if (terminal) {
+      this.logToDebug(`Disposing/closing terminal "${terminalName}"`);
+      terminal.dispose();
+      this.activeTerminals.delete(terminalName);
+      this.terminalCommandMap.delete(terminalName);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Terminate all background processes and clean up terminals on shutdown.
    */
   public cleanup() {
@@ -393,8 +435,15 @@ export class CommandService {
     }
     this.activeProcesses.clear();
 
-    // Don't kill VS Code terminals — they belong to the user now.
-    // Just clear our tracking maps.
+    // Kill VS Code terminals that we started so they don't carry forward!
+    this.logToDebug('Cleaning up active VS Code terminals...');
+    for (const [name, terminal] of this.activeTerminals.entries()) {
+      try {
+        terminal.dispose();
+      } catch (e) {
+        // ignore
+      }
+    }
     this.activeTerminals.clear();
     this.terminalCommandMap.clear();
   }
