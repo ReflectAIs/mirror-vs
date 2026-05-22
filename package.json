@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -180,9 +180,9 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "powershell -Command vitest run",
+    "test:watch": "powershell -Command vitest",
+    "test:coverage": "powershell -Command vitest run --coverage",
     "check": "npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {

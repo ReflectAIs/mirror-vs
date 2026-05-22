@@ -36,7 +36,7 @@ function isSensitiveCommand(command: string): boolean {
     const workspaceFolderLower = workspaceFolder.toLowerCase();
 
     // Match Windows drive-letter paths (e.g. C:\path or D:/path)
-    const winAbsMatch = command.match(/\b([a-zA-Z]:[\\\/][^"'\s]*)/);
+    const winAbsMatch = command.match(/\b([a-zA-Z]:[\\/][^"'\s]*)/);
     if (winAbsMatch) {
       const absPath = winAbsMatch[1].toLowerCase();
       if (!absPath.startsWith(workspaceFolderLower)) {
@@ -45,7 +45,7 @@ function isSensitiveCommand(command: string): boolean {
     }
 
     // Match Unix absolute paths (e.g. /etc/passwd or /usr/bin)
-    const unixAbsMatch = command.match(/\b(\/[a-zA-Z0-9_\-\.\/]+)/);
+    const unixAbsMatch = command.match(/\b(\/[a-zA-Z0-9_\-\./]+)/);
     if (unixAbsMatch) {
       const absPath = unixAbsMatch[1].toLowerCase();
       const workspaceUnix = workspaceFolderLower.replace(/\\/g, '/');

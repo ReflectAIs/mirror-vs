@@ -20,6 +20,15 @@ Mirror VS is a VS Code extension that serves as an interactive, sidebar-based AI
 7. **`src/utils/editor-utils.ts`** - File access, code application, checkpoint/revert utilities
 8. **`src/webview/`** - Static webview: sidebar.html, sidebar.css, sidebar.js
 
+## CI/CD Pipeline (New in 0.0.6)
+- **GitHub Actions Workflow**: `.github/workflows/ci.yml`
+- **Test Job**: Runs on Ubuntu, Node.js 18 & 20 matrix
+  - `npm ci` → `npm run compile` → `npm run lint` → `npm run format:check` → `npm test`
+- **Package Job**: Only on tags matching `v*` (needs test job to pass)
+  - Packages VSIX via `@vscode/vsce`
+  - Creates GitHub Release with attached VSIX
+- **Triggers**: Every push to any branch, every PR to main
+
 ## Current Features
 - ✅ Dual LLM provider (Ollama local / DeepSeek cloud)
 - ✅ Streaming completions with tool tag parsing

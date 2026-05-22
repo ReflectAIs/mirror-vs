@@ -5,6 +5,7 @@ import { executeTool } from './tools/tool-registry';
 import { fetchOllamaModels, streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
 import { CommandService } from '../services/command-service';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
 
@@ -138,13 +139,13 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 Developer: "Install deps and start the todo app dev server."
 Your Turn 1: "Installing dependencies."
 <run_command command="cd todo-app && npm install" />
-Host (System): "[Tool Result for run_command on \"cd todo-app && npm install\"]: Success - added 312 packages..."
+Host (System): "[Tool Result for run_command on "cd todo-app && npm install"]: Success - added 312 packages..."
 Your Turn 2:
 <run_command command="cd todo-app && npm run dev" />
-Host (System): "[Tool Result for run_command on \"cd todo-app && npm run dev\"]: ✅ Server is UP on port 5173. Terminal: \"Mirror: npm run dev\""
+Host (System): "[Tool Result for run_command on "cd todo-app && npm run dev"]: ✅ Server is UP on port 5173. Terminal: "Mirror: npm run dev""
 Your Turn 3: "Verifying the server is up."
 <browser_navigate url="http://localhost:5173" />
-Host (System): "Navigated to http://localhost:5173. Page Title: \"Todo App\". Interactive Elements: - input#todo-input [type=\"text\"] [placeholder=\"Enter a task...\"] ..."
+Host (System): "Navigated to http://localhost:5173. Page Title: "Todo App". Interactive Elements: - input#todo-input [type="text"] [placeholder="Enter a task..."] ..."
 Your Turn 4: "App is loading correctly. Taking a screenshot to confirm visual state."
 <browser_screenshot />
 
@@ -209,7 +210,6 @@ export class AgentOrchestrator {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceFolder) { return; }
 
-    const { execSync } = require('child_process') as typeof import('child_process');
     const run = (cmd: string) => {
       try { return execSync(cmd, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' }); }
       catch { return ''; }
@@ -224,7 +224,7 @@ export class AgentOrchestrator {
     // 2. Ensure .gitignore has noise exclusions
     const gitignorePath = `${workspaceFolder}/.gitignore`;
     let gitignoreContent = '';
-    try { gitignoreContent = fs.readFileSync(gitignorePath, 'utf8'); } catch { }
+    try { gitignoreContent = fs.readFileSync(gitignorePath, 'utf8'); } catch { /* file may not exist */ }
     const patterns = ['node_modules/', '.mirror-vs/', 'turns.log'];
     const missingPatterns = patterns.filter(p => !gitignoreContent.includes(p));
     if (missingPatterns.length > 0) {

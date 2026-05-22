@@ -48,9 +48,10 @@
 - File list with status badges and action buttons
 - Refresh, commit, open file, view diff operations
 
-### 3. 🔧 CI/CD
-- No GitHub Actions workflow for build verification
-- No automatic VSIX packaging on tag
+### ✅ DONE: CI/CD
+- GitHub Actions workflow at `.github/workflows/ci.yml`
+- Runs tests, lint, format check on every push/PR (Node 18 & 20 matrix)
+- Automatic VSIX packaging on version tags with GitHub release
 
 ### 4. 🧠 AGENT IMPROVEMENTS
 - Streaming Tool Detection optimization
