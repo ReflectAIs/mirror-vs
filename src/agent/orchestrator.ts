@@ -608,6 +608,7 @@ ${combinedToolResult}
             'browser_type',
             'browser_evaluate_script',
             'browser_screenshot',
+            'figma_inspect',
             'send_terminal_input',
             'close_terminal',
             'read_terminal',

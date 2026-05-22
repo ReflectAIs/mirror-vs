@@ -81,8 +81,9 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
     // Show the command being executed
     this.writeEmitter.fire(`\x1b[90m$ ${this.command}\x1b[0m\r\n`);
 
+    const shellExecutable = process.platform === 'win32' ? 'powershell.exe' : true;
     this.process = child_process.spawn(this.command, {
-      shell: true,
+      shell: shellExecutable,
       cwd: this.cwd,
       env: { ...process.env, FORCE_COLOR: '1' },
     });
