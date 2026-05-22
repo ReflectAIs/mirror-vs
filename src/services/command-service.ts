@@ -104,7 +104,10 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
       this._exitCode = code;
       this.writeEmitter.fire(`\r\n\x1b[90m[Process exited with code ${code ?? 0}]\x1b[0m\r\n`);
       this._resolveExit({ code, output: this.outputBuffer });
-      this.closeEmitter.fire(code ?? 0);
+      // Delay closing the PTY to prevent VS Code 'exit code 255' crash on fast-finishing commands
+      setTimeout(() => {
+        this.closeEmitter.fire(0); // Always emit 0 to prevent VS Code from showing error notifications
+      }, 1500);
     });
 
     this.process.on('error', (err) => {
@@ -114,7 +117,9 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
       this.appendOutput(msg);
       this.writeEmitter.fire(`\r\n\x1b[31m${msg}\x1b[0m\r\n`);
       this._resolveExit({ code: -1, output: this.outputBuffer });
-      this.closeEmitter.fire(1);
+      setTimeout(() => {
+        this.closeEmitter.fire(0); // Always emit 0 to prevent VS Code from showing error notifications
+      }, 1500);
     });
   }
 
@@ -605,6 +610,15 @@ export class CommandService {
     // Process exited (result is from pty.exitPromise)
     const { code, output } = result;
     this.logToDebug(`Command in terminal "${terminalName}" exited with code ${code}`);
+
+    // Clean up the terminal UI to prevent VS Code PTY slot exhaustion (which causes exit code 9 / 255)
+    setTimeout(() => {
+      try {
+        terminal.dispose();
+      } catch (e) {
+        // ignore
+      }
+    }, 2000);
 
     if (code === 0 || code === null) {
       return output.trim() || 'Command completed with no output.';

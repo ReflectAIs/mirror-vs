@@ -597,6 +597,9 @@
     } else if (toolName === 'browser_type') {
       friendlyName = 'Browser Type';
       iconHtml = '🔤';
+    } else if (toolName === 'browser_evaluate_script') {
+      friendlyName = 'Execute Script';
+      iconHtml = '⚡';
     } else if (toolName === 'browser_screenshot') {
       friendlyName = 'Browser Screenshot';
       iconHtml = '📸';
@@ -846,6 +849,9 @@
     const msgElement = document.createElement('div');
     msgElement.className = `message ${role}`;
 
+    // Compute message index based on current chatHistory
+    const msgIndex = chatHistory.findIndex(m => m.role === role && m.content === text);
+    
     const meta = document.createElement('div');
     meta.className = 'message-meta';
     meta.textContent = role === 'user' ? 'You' : 'Mirror VS';
@@ -858,27 +864,25 @@
       const editBtn = document.createElement('button');
       editBtn.className = 'message-action-btn';
       editBtn.innerHTML = '✏️ Edit';
-      editBtn.title = 'Edit Message';
+      editBtn.title = 'Edit & revert chat to this point';
       editBtn.addEventListener('click', () => {
         const promptInput = document.getElementById('prompt-input');
         if (promptInput) {
-          promptInput.value = text;
+          let rawText = text;
+          const contextIndex = rawText.indexOf('\n\n[Additional Workspace Files Context]:');
+          if (contextIndex !== -1) rawText = rawText.substring(0, contextIndex);
+          const activeIndex = rawText.indexOf('\n\n[Active File Context - ');
+          if (activeIndex !== -1) rawText = rawText.substring(0, activeIndex);
+          
+          promptInput.value = rawText.trim();
           promptInput.style.height = 'auto';
           promptInput.style.height = (promptInput.scrollHeight) + 'px';
           promptInput.focus();
         }
-        vscode.postMessage({ type: 'revertHistory', text, role: 'user', inclusive: false });
+        // Use index-based revert for reliability
+        vscode.postMessage({ type: 'revertHistory', text, role: 'user', inclusive: false, messageIndex: msgIndex });
       });
       actions.appendChild(editBtn);
-    } else if (role === 'assistant' || role === 'system') {
-      const revertBtn = document.createElement('button');
-      revertBtn.className = 'message-action-btn';
-      revertBtn.innerHTML = '⏪ Revert Here';
-      revertBtn.title = 'Revert Conversation to this Point';
-      revertBtn.addEventListener('click', () => {
-        vscode.postMessage({ type: 'revertHistory', text, role, inclusive: true });
-      });
-      actions.appendChild(revertBtn);
     }
     
     if (actions.children.length > 0) {

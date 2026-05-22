@@ -117,6 +117,17 @@ export class BrowserService {
     }
   }
 
+  public async evaluate(script: string): Promise<string> {
+    try {
+      const page = await this.getPage();
+      const result = await page.evaluate(script);
+      return `Script executed. Result: ${JSON.stringify(result) || 'undefined'}`;
+    } catch (error) {
+      this.logError('evaluate', error);
+      throw error;
+    }
+  }
+
   public async getPageSummary(): Promise<{
     title: string;
     url: string;

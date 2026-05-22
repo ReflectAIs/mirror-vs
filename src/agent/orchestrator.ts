@@ -74,6 +74,7 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    </patch_file>
    You can include multiple SEARCH/REPLACE blocks in one patch_file call.
    IMPORTANT: The SEARCH block must match existing file content exactly.
+   HANDLING LONG FILES: If a file is long, read it in chunks using the start_line and end_line parameters in read_file. Only patch the specific lines that need to be changed instead of rewriting the whole file.
 
 5. LIST DIRECTORY:
    List all files and subdirectories directly inside the specified directory path.
@@ -105,8 +106,14 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    Usage:
    <browser_type selector="#search-input" text="hello world" />
 
-12. BROWSER SCREENSHOT:
-    Take a screenshot of the current page (returns base64 image). Saves to .mirror-vs/screenshots.
+12. BROWSER EVALUATE SCRIPT:
+    Execute arbitrary JavaScript in the browser context. Useful for complex interactions.
+    Usage:
+    <browser_evaluate_script script="document.querySelectorAll('a.sap-card')[0].click()" />
+
+13. BROWSER SCREENSHOT:
+    Take a screenshot of the current page (returns base64 image). Automatically saves to .mirror-vs/screenshots.
+    To create project documents, you can write markdown files and embed these saved screenshots using standard syntax: '![Screenshot](.mirror-vs/screenshots/filename.png)'.
     Usage:
     <browser_screenshot />
 
@@ -591,6 +598,7 @@ ${combinedToolResult}
             'browser_navigate',
             'browser_click',
             'browser_type',
+            'browser_evaluate_script',
             'browser_screenshot',
             'send_terminal_input',
             'close_terminal',
@@ -725,6 +733,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
       'browser_navigate',
       'browser_click',
       'browser_type',
+      'browser_evaluate_script',
       'browser_screenshot',
       'run_command',
       'close_terminal',
@@ -970,6 +979,15 @@ USER/ENVIRONMENT TOOL RESPONSE:
       const t = attr(match[1], 'text');
       if (s && t) {
         candidates.push({ index: match.index, tool: { name: 'browser_type', selector: s, text: t } });
+      }
+    }
+
+    // browser_evaluate_script
+    const browserEvalRegex = /<browser_evaluate_script([\s\S]*?)\/?>/gi;
+    while ((match = browserEvalRegex.exec(text)) !== null) {
+      const scriptAttr = attr(match[1], 'script');
+      if (scriptAttr) {
+        candidates.push({ index: match.index, tool: { name: 'browser_evaluate_script', script: scriptAttr } });
       }
     }
 

@@ -44,6 +44,15 @@ Post-click Visible Text (preview): ${summary.contentText || '(empty)'}`;
       return await browserService.type(tool.selector, tool.text);
     }
 
+    case 'browser_evaluate_script': {
+      if (!tool.script) throw new Error('Missing "script" attribute for browser_evaluate_script.');
+      const evalResult = await browserService.evaluate(tool.script);
+      const summary = await browserService.getPageSummary();
+      return `${evalResult}
+Post-eval Page Title: "${summary.title}"
+Post-eval Visible Text (preview): ${summary.contentText || '(empty)'}`;
+    }
+
     case 'browser_screenshot': {
       // Capture real base64 screenshot for display in chat + vision models
       const base64 = await browserService.screenshot();

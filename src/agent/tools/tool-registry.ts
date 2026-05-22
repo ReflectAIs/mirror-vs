@@ -25,6 +25,7 @@ export async function executeTool(tool: ToolCall, getSafePath: (p: string) => st
     name === 'browser_navigate' ||
     name === 'browser_click' ||
     name === 'browser_type' ||
+    name === 'browser_evaluate_script' ||
     name === 'browser_screenshot'
   ) {
     return await executeBrowserTool(tool);
