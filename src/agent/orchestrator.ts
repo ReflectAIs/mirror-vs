@@ -147,6 +147,11 @@ To accomplish these tasks, you have access to a set of special workspace tools t
     Usage:
     <list_terminals />
 
+18. FIGMA INSPECT:
+    Fetch the component tree from a Figma node URL and save the raw JSON representation to a file. 
+    Usage:
+    <figma_inspect url="https://www.figma.com/design/123/My-App?node-id=1-11" />
+
 ### EXECUTION WORKFLOW EXAMPLE:
 Developer: "Install deps and start the todo app dev server."
 Your Turn 1: "Installing dependencies."
@@ -211,7 +216,7 @@ export class AgentOrchestrator {
     private readonly _saveChatHistory: (history: ChatMessage[]) => Promise<void>,
     private readonly _postMessage: (msg: any) => void,
     private readonly _getSafePath: (targetPath: string) => string,
-  ) {}
+  ) { }
 
   public cancelActiveStream() {
     if (this._activeAbortController) {
@@ -461,8 +466,11 @@ export class AgentOrchestrator {
             const target = tool.path || tool.query || tool.url || tool.selector || tool.command || '';
             this._sendToolStatusToWebview(tool.name, 'running', target);
 
+            let result: string;
             try {
-              const result = await executeTool(tool, this._getSafePath);
+              const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+              const figmaKey = await this._getSecret('figma_api_key') || '';
+              result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
 
               let checkpointId: string | undefined;
               const cpMatch = result.match(/Revert ID: (\w+)/);
@@ -514,7 +522,7 @@ export class AgentOrchestrator {
                 `[Tool Result for ${tool.name} on "${target}"]: Error - ${err.message}. Please correct your approach and try again.`,
               );
             }
-            
+
             if (signal.aborted) {
               console.log('Execution aborted after running tool:', tool.name);
               continueLoop = false;
@@ -735,6 +743,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
       'browser_type',
       'browser_evaluate_script',
       'browser_screenshot',
+      'figma_inspect',
       'run_command',
       'close_terminal',
       'read_terminal',
@@ -906,6 +915,15 @@ USER/ENVIRONMENT TOOL RESPONSE:
           tool.end_line = parseInt(el, 10);
         }
         candidates.push({ index: match.index, tool });
+      }
+    }
+
+    // figma_inspect
+    const figmaInspectRegex = /<figma_inspect([\s\S]*?)\/?>/gi;
+    while ((match = figmaInspectRegex.exec(text)) !== null) {
+      const u = attr(match[1], 'url');
+      if (u) {
+        candidates.push({ index: match.index, tool: { name: 'figma_inspect', url: u } });
       }
     }
 
@@ -1147,7 +1165,9 @@ USER/ENVIRONMENT TOOL RESPONSE:
       'browser_navigate',
       'browser_click',
       'browser_type',
+      'browser_evaluate_script',
       'browser_screenshot',
+      'figma_inspect',
       'run_command',
       'close_terminal',
       'read_terminal',
@@ -1211,7 +1231,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           model,
           messages,
           controller.signal,
-          () => {}, // ignore chunks
+          () => { }, // ignore chunks
           (fullText) => resolve(fullText),
           (err) => reject(err),
         );
@@ -1221,7 +1241,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           model,
           messages,
           controller.signal,
-          () => {}, // ignore chunks
+          () => { }, // ignore chunks
           (fullText) => resolve(fullText),
           (err) => reject(err),
         );

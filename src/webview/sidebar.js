@@ -217,6 +217,18 @@
     }
   });
 
+  const toggleFigmaKeyVisibilityBtn = document.getElementById('toggle-figma-key-visibility');
+  const figmaKeyInput = document.getElementById('figma-key');
+  toggleFigmaKeyVisibilityBtn.addEventListener('click', () => {
+    if (figmaKeyInput.type === 'password') {
+      figmaKeyInput.type = 'text';
+      toggleFigmaKeyVisibilityBtn.textContent = 'Hide';
+    } else {
+      figmaKeyInput.type = 'password';
+      toggleFigmaKeyVisibilityBtn.textContent = 'Show';
+    }
+  });
+
   // 4. Refresh Models button
   refreshModelsBtn.addEventListener('click', () => {
     ollamaModelSelect.innerHTML = '<option value="loading">Loading models...</option>';
@@ -230,6 +242,7 @@
     const defaultOllamaModel = ollamaModelSelect.value;
     const defaultDeepSeekModel = deepseekModelSelect.value;
     const deepSeekKey = deepseekKeyInput.value.trim();
+    const figmaKey = document.getElementById('figma-key').value.trim();
     const maxTurns = parseInt(maxTurnsInput.value.trim(), 10) || 16;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
@@ -240,6 +253,7 @@
       defaultOllamaModel,
       defaultDeepSeekModel,
       deepSeekKey: deepSeekKey || undefined, // only send key if typed
+      figmaKey: figmaKey || undefined, // only send key if typed
       maxTurnsBeforeSummarize: maxTurns,
       turnsToRetain: turnsToRetain
     });
@@ -603,6 +617,9 @@
     } else if (toolName === 'browser_screenshot') {
       friendlyName = 'Browser Screenshot';
       iconHtml = '📸';
+    } else if (toolName === 'figma_inspect') {
+      friendlyName = 'Figma Inspect';
+      iconHtml = '🎨';
     }
 
     const header = document.createElement('div');
@@ -936,6 +953,15 @@
         } else {
           deepseekKeyStatus.textContent = 'Key is not configured';
           deepseekKeyStatus.style.color = '#ef4444';
+        }
+
+        const figmaKeyStatus = document.getElementById('figma-key-status');
+        if (s.hasFigmaKey) {
+          figmaKeyStatus.textContent = 'Token is configured (Securely stored)';
+          figmaKeyStatus.style.color = '#22c55e';
+        } else {
+          figmaKeyStatus.textContent = 'Token is not configured';
+          figmaKeyStatus.style.color = '#ef4444';
         }
 
         deepseekModelSelect.value = s.defaultDeepSeekModel;

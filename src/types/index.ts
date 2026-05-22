@@ -6,6 +6,7 @@ export interface ExtensionSettings {
   defaultOllamaModel: string;
   defaultDeepSeekModel: string;
   hasDeepSeekKey: boolean; // Tells the webview if a key is stored without exposing the key itself
+  hasFigmaKey: boolean; // Tells the webview if a Figma PAT is stored
   maxTurnsBeforeSummarize: number;
   turnsToRetain: number;
 }
@@ -63,6 +64,7 @@ export type WebviewToExtensionMessage =
       defaultOllamaModel: string;
       defaultDeepSeekModel: string;
       deepSeekKey?: string;
+      figmaKey?: string;
       maxTurnsBeforeSummarize?: number;
       turnsToRetain?: number;
     }

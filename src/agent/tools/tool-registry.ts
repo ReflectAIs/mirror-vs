@@ -3,8 +3,14 @@ import { executeFileTool } from './file-tools';
 import { executeSearchTool } from './search-tools';
 import { executeBrowserTool } from './browser-tools';
 import { executeTerminalTool } from './terminal-tools';
+import { executeFigmaTool } from './figma-tools';
 
-export async function executeTool(tool: ToolCall, getSafePath: (p: string) => string): Promise<string> {
+export async function executeTool(
+  tool: ToolCall,
+  getSafePath: (p: string) => string,
+  figmaKey?: string,
+  workspacePath?: string,
+): Promise<string> {
   const name = tool.name;
 
   if (
@@ -39,6 +45,10 @@ export async function executeTool(tool: ToolCall, getSafePath: (p: string) => st
     name === 'list_terminals'
   ) {
     return await executeTerminalTool(tool);
+  }
+
+  if (name === 'figma_inspect') {
+    return await executeFigmaTool(tool, figmaKey, workspacePath);
   }
 
   throw new Error(`Unsupported tool call: ${name}`);

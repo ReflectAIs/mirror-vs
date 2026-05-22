@@ -42,6 +42,11 @@ function makeRequest(
       });
     });
 
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Ollama API request timed out after 120 seconds.'));
+    });
+
     req.on('error', (err) => {
       reject(err);
     });
@@ -116,6 +121,7 @@ export function streamOllamaChat(
     port: parsedUrl.port || (isHttps ? 443 : 80),
     path: parsedUrl.pathname,
     method: 'POST',
+    timeout: 120000, // 120 second timeout for local processing
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(bodyData),
@@ -242,6 +248,7 @@ export function streamDeepSeekChat(
     port: 443,
     path: parsedUrl.pathname,
     method: 'POST',
+    timeout: 60000, // 60 second timeout
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,

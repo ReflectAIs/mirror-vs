@@ -106,6 +106,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
           }
 
+          if (data.figmaKey !== undefined) {
+            if (data.figmaKey.trim() === '') {
+              await this._secretService.deleteSecret('figma_api_key');
+            } else {
+              await this._secretService.storeSecret('figma_api_key', data.figmaKey.trim());
+            }
+          }
+
           vscode.window.showInformationMessage('Mirror VS Settings saved successfully!');
           await this._sendSettingsToWebview();
           break;
@@ -513,6 +521,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const turnsToRetain = config.get<number>('turnsToRetain', 6);
 
     const hasDeepSeekKey = await this._secretService.hasSecret('deepseek_api_key');
+    const hasFigmaKey = await this._secretService.hasSecret('figma_api_key');
 
     const settings: ExtensionSettings = {
       provider,
@@ -520,6 +529,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       defaultOllamaModel,
       defaultDeepSeekModel,
       hasDeepSeekKey,
+      hasFigmaKey,
       maxTurnsBeforeSummarize,
       turnsToRetain,
     };
