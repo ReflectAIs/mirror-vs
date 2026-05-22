@@ -1,4 +1,3 @@
-
 export type LLMProvider = 'ollama' | 'deepseek';
 
 export interface ExtensionSettings {
@@ -57,7 +56,16 @@ export interface GitFileDiff {
 export type WebviewToExtensionMessage =
   | { type: 'sendMessage'; text: string; history: ChatMessage[] }
   | { type: 'getSettings' }
-  | { type: 'saveSettings'; provider: LLMProvider; ollamaHost: string; defaultOllamaModel: string; defaultDeepSeekModel: string; deepSeekKey?: string; maxTurnsBeforeSummarize?: number; turnsToRetain?: number }
+  | {
+      type: 'saveSettings';
+      provider: LLMProvider;
+      ollamaHost: string;
+      defaultOllamaModel: string;
+      defaultDeepSeekModel: string;
+      deepSeekKey?: string;
+      maxTurnsBeforeSummarize?: number;
+      turnsToRetain?: number;
+    }
   | { type: 'fetchModels' }
   | { type: 'validateHost'; host: string }
   | { type: 'applyCode'; code: string; mode: 'insert' | 'replace' | 'create' }
@@ -82,7 +90,16 @@ export type ExtensionToWebviewMessage =
   | { type: 'chatResponseError'; error: string }
   | { type: 'chatResponseStart' }
   | { type: 'loopComplete' }
-  | { type: 'toolStatus'; toolName: string; status: string; target: string; result?: string; checkpointId?: string; code?: string; terminalName?: string }
+  | {
+      type: 'toolStatus';
+      toolName: string;
+      status: string;
+      target: string;
+      result?: string;
+      checkpointId?: string;
+      code?: string;
+      terminalName?: string;
+    }
   | { type: 'updateSettings'; settings: ExtensionSettings }
   | { type: 'updateModels'; models: string[] }
   | { type: 'hostValidationResult'; isValid: boolean; models?: string[] }

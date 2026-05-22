@@ -4,10 +4,7 @@ import { executeSearchTool } from './search-tools';
 import { executeBrowserTool } from './browser-tools';
 import { executeTerminalTool } from './terminal-tools';
 
-export async function executeTool(
-  tool: ToolCall,
-  getSafePath: (p: string) => string
-): Promise<string> {
+export async function executeTool(tool: ToolCall, getSafePath: (p: string) => string): Promise<string> {
   const name = tool.name;
 
   if (
@@ -20,7 +17,7 @@ export async function executeTool(
     return await executeFileTool(tool, getSafePath);
   }
 
-  if (name === 'grep_search') {
+  if (name === 'grep_search' || name === 'web_search') {
     return await executeSearchTool(tool);
   }
 

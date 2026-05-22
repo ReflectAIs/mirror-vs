@@ -1,9 +1,15 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { SecretService } from '../services/secret-service';
 import { StorageService } from '../services/storage-service';
-import { getActiveFileName, getActiveFileContext, applyCodeToActiveEditor, revertCheckpoint } from '../utils/editor-utils';
+import {
+  getActiveFileName,
+  getActiveFileContext,
+  applyCodeToActiveEditor,
+  revertCheckpoint,
+} from '../utils/editor-utils';
 import { LLMProvider, ExtensionSettings, ChatMessage, WebviewToExtensionMessage, ChatSession } from '../types';
 import { CommandService } from '../services/command-service';
 import { AgentOrchestrator } from '../agent/orchestrator';
@@ -32,14 +38,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       () => this._getChatHistory(),
       (history) => this._saveChatHistory(history),
       (msg) => this._view?.webview.postMessage(msg),
-      (targetPath) => this.getSafePath(targetPath)
+      (targetPath) => this.getSafePath(targetPath),
     );
   }
 
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
+    _token: vscode.CancellationToken,
   ): Promise<void> {
     this._view = webviewView;
 
@@ -82,7 +88,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           await config.update('defaultDeepSeekModel', data.defaultDeepSeekModel, vscode.ConfigurationTarget.Global);
 
           if (data.maxTurnsBeforeSummarize !== undefined) {
-            await config.update('maxTurnsBeforeSummarize', data.maxTurnsBeforeSummarize, vscode.ConfigurationTarget.Global);
+            await config.update(
+              'maxTurnsBeforeSummarize',
+              data.maxTurnsBeforeSummarize,
+              vscode.ConfigurationTarget.Global,
+            );
           }
           if (data.turnsToRetain !== undefined) {
             await config.update('turnsToRetain', data.turnsToRetain, vscode.ConfigurationTarget.Global);
@@ -110,13 +120,13 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             this._view?.webview.postMessage({
               type: 'hostValidationResult',
               isValid: true,
-              models
+              models,
             });
           } catch (e) {
             this._view?.webview.postMessage({
               type: 'hostValidationResult',
               isValid: false,
-              models: []
+              models: [],
             });
           }
           break;
@@ -137,7 +147,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                     if (content.length > 25000) {
                       const keepLength = 12500;
                       const truncatedCount = content.length - 25000;
-                      content = content.substring(0, keepLength) +
+                      content =
+                        content.substring(0, keepLength) +
                         `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` +
                         content.substring(content.length - keepLength);
                     }
@@ -170,6 +181,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           await this.clearActiveChat();
           break;
         }
+        case 'revertHistory': {
+          const { text, role, inclusive } = data;
+          const idx = this._chatHistory.findIndex(m => m.role === role && m.content === text);
+          if (idx !== -1) {
+            this._orchestrator.cancelActiveStream(); // Cancel any running generation
+            this._chatHistory = this._chatHistory.slice(0, inclusive ? idx + 1 : idx);
+            this.updateWebviewHistory();
+            this.saveState();
+          }
+          break;
+        }
         case 'newSession': {
           await this._createNewSession();
           break;
@@ -188,7 +210,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             const safePath = path.resolve(workspaceFolder, data.path);
             if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
               const doc = await vscode.workspace.openTextDocument(safePath);
-              await vscode.window.showTextDocument(doc);
+              await vscode.window.showTextDocument(doc, { preview: false });
             } else {
               vscode.window.showErrorMessage(`File not found: ${data.path}`);
             }
@@ -198,8 +220,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         case 'openTerminal': {
           if (!data.command) break;
           const svc = CommandService.getInstance();
-          const termName = (data as any).terminalName
-            || `Mirror: ${data.command.length > 30 ? data.command.substring(0, 30) + '…' : data.command}`;
+          const termName =
+            (data as any).terminalName ||
+            `Mirror: ${data.command.length > 30 ? data.command.substring(0, 30) + '…' : data.command}`;
           const revealed = svc.revealTerminal(termName);
           if (!revealed) {
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -218,32 +241,34 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsFolder) break;
           try {
-            const { execSync } = require('child_process') as typeof import('child_process');
             const gitStatus = execSync('git status --porcelain', { cwd: wsFolder, encoding: 'utf8' });
             const changes: { file: string; status: string }[] = [];
-            gitStatus.split('\n').filter(Boolean).forEach(line => {
-              const status = line.substring(0, 2).trim() || '?';
-              // For staged files (first char) and unstaged files (second char), prioritize staged
-              const stagedStatus = line[0].trim();
-              const unstagedStatus = line[1].trim();
-              let file = line.substring(3).trim();
-              // Handle "both modified" or copied/renamed patterns
-              if (file.includes(' -> ')) {
-                // Rename or copy: take the new name
-                file = file.split(' -> ').pop() || file;
-              }
-              const effectiveStatus = stagedStatus || unstagedStatus || '?';
-              changes.push({ file, status: effectiveStatus });
-            });
+            gitStatus
+              .split('\n')
+              .filter(Boolean)
+              .forEach((line) => {
+                const status = line.substring(0, 2).trim() || '?';
+                // For staged files (first char) and unstaged files (second char), prioritize staged
+                const stagedStatus = line[0].trim();
+                const unstagedStatus = line[1].trim();
+                let file = line.substring(3).trim();
+                // Handle "both modified" or copied/renamed patterns
+                if (file.includes(' -> ')) {
+                  // Rename or copy: take the new name
+                  file = file.split(' -> ').pop() || file;
+                }
+                const effectiveStatus = stagedStatus || unstagedStatus || '?';
+                changes.push({ file, status: effectiveStatus });
+              });
             this._view?.webview.postMessage({
               type: 'gitChanges',
-              changes
+              changes,
             });
           } catch (e) {
             // Not a git repo or git not installed
             this._view?.webview.postMessage({
               type: 'gitChanges',
-              changes: []
+              changes: [],
             });
           }
           break;
@@ -257,7 +282,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             const uri = vscode.Uri.file(filePath);
             // Open file with gutter diff visible (VS Code auto-shows git diff decorations)
             const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc);
+            await vscode.window.showTextDocument(doc, { preview: false });
           } catch (e) {
             vscode.window.showErrorMessage(`Could not open file for diff: ${data.file}`);
           }
@@ -267,9 +292,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsFolderDiff = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsFolderDiff || !data.file) break;
           try {
-            const { execSync } = require('child_process') as typeof import('child_process');
-            const diffOutput = execSync(`git diff --unified=10 "${data.file}"`, { cwd: wsFolderDiff, encoding: 'utf8' });
-            
+            const diffOutput = execSync(`git diff --unified=10 "${data.file}"`, {
+              cwd: wsFolderDiff,
+              encoding: 'utf8',
+            });
+
             if (!diffOutput.trim()) {
               this._view?.webview.postMessage({ type: 'gitDiffContent', file: data.file, diff: null });
               break;
@@ -278,8 +305,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             const lines: { type: string; content: string }[] = [];
             const hunks: any[] = [];
             let currentHunk: any = null;
-            
-            diffOutput.split('\n').forEach(line => {
+
+            diffOutput.split('\n').forEach((line) => {
               if (line.startsWith('@@ ')) {
                 if (currentHunk) hunks.push(currentHunk);
                 const match = line.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
@@ -288,7 +315,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                   oldLines: parseInt(match?.[2] || '1'),
                   newStart: parseInt(match?.[3] || '0'),
                   newLines: parseInt(match?.[4] || '1'),
-                  lines: []
+                  lines: [],
                 };
               } else if (currentHunk) {
                 if (line.startsWith('+')) {
@@ -308,8 +335,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               diff: {
                 file: data.file,
                 status: 'M',
-                hunks
-              }
+                hunks,
+              },
             });
           } catch (e) {
             this._view?.webview.postMessage({ type: 'gitDiffContent', file: data.file, diff: null });
@@ -320,8 +347,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsFolderApply = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsFolderApply || !data.file) break;
           try {
-            const { execSync } = require('child_process') as typeof import('child_process');
-            
             if (data.action === 'accept') {
               // Stage the file (accept changes)
               execSync(`git add "${data.file}"`, { cwd: wsFolderApply, encoding: 'utf8' });
@@ -331,7 +356,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               execSync(`git checkout -- "${data.file}"`, { cwd: wsFolderApply, encoding: 'utf8' });
               vscode.window.showInformationMessage(`⏪ Changes rejected for ${data.file}`);
             }
-            
+
             // Refresh git status
             this._view?.webview.postMessage({ type: 'gitChanges', changes: [] });
             // Trigger full refresh
@@ -347,7 +372,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsF = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsF) break;
           try {
-            const { execSync } = require('child_process') as typeof import('child_process');
             execSync('git add -A', { cwd: wsF, encoding: 'utf8' });
             execSync('git commit -m "Mirror VS: agent changes committed"', { cwd: wsF, encoding: 'utf8' });
             vscode.window.showInformationMessage('✅ All changes committed.');
@@ -370,17 +394,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           this._view?.webview.postMessage({
             type: 'checkpointReverted',
             checkpointId: data.checkpointId,
-            success
+            success,
           });
 
           if (success) {
             const history = this._getChatHistory();
             let updated = false;
-            const newHistory = history.map(msg => {
+            const newHistory = history.map((msg) => {
               if (msg.role === 'system' && msg.content.includes(data.checkpointId)) {
                 const newContent = msg.content.replace(
                   new RegExp(`Revert ID:\\s*${data.checkpointId}`, 'g'),
-                  `Reverted ID: ${data.checkpointId}`
+                  `Reverted ID: ${data.checkpointId}`,
                 );
 
                 if (newContent !== msg.content) {
@@ -419,27 +443,29 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!wsFolder) return;
     try {
-      const { execSync } = require('child_process') as typeof import('child_process');
       const gitStatus = execSync('git status --porcelain', { cwd: wsFolder, encoding: 'utf8' });
       const changes: { file: string; status: string }[] = [];
-      gitStatus.split('\n').filter(Boolean).forEach(line => {
-        const stagedStatus = line[0].trim();
-        const unstagedStatus = line[1].trim();
-        let file = line.substring(3).trim();
-        if (file.includes(' -> ')) {
-          file = file.split(' -> ').pop() || file;
-        }
-        const effectiveStatus = stagedStatus || unstagedStatus || '?';
-        changes.push({ file, status: effectiveStatus });
-      });
+      gitStatus
+        .split('\n')
+        .filter(Boolean)
+        .forEach((line) => {
+          const stagedStatus = line[0].trim();
+          const unstagedStatus = line[1].trim();
+          let file = line.substring(3).trim();
+          if (file.includes(' -> ')) {
+            file = file.split(' -> ').pop() || file;
+          }
+          const effectiveStatus = stagedStatus || unstagedStatus || '?';
+          changes.push({ file, status: effectiveStatus });
+        });
       this._view?.webview.postMessage({
         type: 'gitChanges',
-        changes
+        changes,
       });
     } catch (e) {
       this._view?.webview.postMessage({
         type: 'gitChanges',
-        changes: []
+        changes: [],
       });
     }
   }
@@ -497,7 +523,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const count = ReviewManager.getInstance().getActiveReviewsCount();
     this._view.webview.postMessage({
       type: 'activeReviewsChanged',
-      count: count
+      count: count,
     });
   }
 
@@ -528,11 +554,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       throw new Error('No workspace folder open.');
     }
     const resolved = path.resolve(workspaceFolder, targetPath);
-    
+
     // Normalize both paths for case-insensitive drive letter comparisons on Windows
     const workspaceFolderLower = workspaceFolder.toLowerCase();
     const resolvedLower = resolved.toLowerCase();
-    
+
     if (!resolvedLower.startsWith(workspaceFolderLower)) {
       throw new Error('Access denied: File path is outside of workspace.');
     }
@@ -549,7 +575,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       return `<h3>Error loading webview template</h3><p>${err}</p>`;
     }
 
-    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.css'));
+    const cssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.css'),
+    );
     const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.js'));
     const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'media', 'logo.png'));
     const cspSource = webview.cspSource;
@@ -574,10 +602,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
     // Update session metadata
     const sessions = this._storageService.getSessions();
-    const sessionIndex = sessions.findIndex(s => s.id === activeId);
+    const sessionIndex = sessions.findIndex((s) => s.id === activeId);
     if (sessionIndex !== -1) {
       if (sessions[sessionIndex].title === 'New Session' && history.length > 0) {
-        const firstUser = history.find(m => m.role === 'user');
+        const firstUser = history.find((m) => m.role === 'user');
         if (firstUser) {
           let text = firstUser.content.trim();
           const contextIndex = text.indexOf('\n\n[Active File Context:');
@@ -595,7 +623,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     this._sendChatSessionsToWebview();
 
     // Persist messages to per-session key (strip base64 images to avoid bloat)
-    const stripped = history.map(msg => ({
+    const stripped = history.map((msg) => ({
       ...msg,
       images: msg.images ? msg.images.map(() => '[IMAGE STRIPPED]') : undefined,
     }));
@@ -627,7 +655,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       activeId = defaultSession.id;
       await this._storageService.saveSessions(sessions);
       await this._saveActiveSessionId(activeId);
-    } else if (!activeId || !sessions.find(s => s.id === activeId)) {
+    } else if (!activeId || !sessions.find((s) => s.id === activeId)) {
       activeId = sessions[0].id;
       await this._saveActiveSessionId(activeId);
     }
@@ -651,7 +679,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
   private async _selectSession(sessionId: string): Promise<void> {
     const sessions = this._storageService.getSessions();
-    const session = sessions.find(s => s.id === sessionId);
+    const session = sessions.find((s) => s.id === sessionId);
     if (session) {
       await this._saveActiveSessionId(sessionId);
       this._sendChatSessionsToWebview();
@@ -663,7 +691,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const sessions = this._storageService.getSessions();
     const activeId = this._getActiveSessionId();
 
-    const filtered = sessions.filter(s => s.id !== sessionId);
+    const filtered = sessions.filter((s) => s.id !== sessionId);
     await this._storageService.saveSessions(filtered);
 
     // Also delete the messages key for this session
@@ -714,7 +742,12 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const traverse = (dir: string) => {
       const list = fs.readdirSync(dir);
       for (const item of list) {
-        if (['node_modules', 'dist', 'out', '.git', '.mirror-vs', '.new_file_placeholder_'].some(ignored => item.includes(ignored))) continue;
+        if (
+          ['node_modules', 'dist', 'out', '.git', '.mirror-vs', '.new_file_placeholder_'].some((ignored) =>
+            item.includes(ignored),
+          )
+        )
+          continue;
         const fullPath = path.join(dir, item);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
@@ -729,7 +762,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       traverse(workspaceFolder);
       this._view.webview.postMessage({
         type: 'workspaceFiles',
-        files
+        files,
       });
     } catch (e) {
       console.warn('Workspace files fetch failed:', e);
@@ -745,13 +778,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const formattedText = action === 'fix' 
-      ? `Fix the following code:\n\`\`\`\n${text}\n\`\`\``
-      : `Explain the following code:\n\`\`\`\n${text}\n\`\`\``;
+    const formattedText =
+      action === 'fix'
+        ? `Fix the following code:\n\`\`\`\n${text}\n\`\`\``
+        : `Explain the following code:\n\`\`\`\n${text}\n\`\`\``;
 
     this._view.webview.postMessage({
       type: 'prefillPrompt',
-      text: formattedText
+      text: formattedText,
     });
   }
 }

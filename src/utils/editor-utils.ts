@@ -70,7 +70,7 @@ export async function createCheckpoint(filePath: string, type: 'replace' | 'crea
  */
 export async function revertCheckpoint(id: string): Promise<boolean> {
   let checkpoint = activeCheckpoints.get(id);
-  
+
   if (!checkpoint) {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (workspaceFolder) {
@@ -78,7 +78,7 @@ export async function revertCheckpoint(id: string): Promise<boolean> {
       try {
         if (fs.existsSync(manifestPath)) {
           const manifest: Checkpoint[] = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          const found = manifest.find(cp => cp.id === id);
+          const found = manifest.find((cp) => cp.id === id);
           if (found) {
             checkpoint = found;
             activeCheckpoints.set(id, checkpoint);
@@ -113,7 +113,7 @@ export async function revertCheckpoint(id: string): Promise<boolean> {
       }
       vscode.window.showInformationMessage(`Reverted file creation. Deleted ${path.basename(checkpoint.filePath)}!`);
     }
-    
+
     // Remove from active list
     activeCheckpoints.delete(id);
     return true;
@@ -150,7 +150,7 @@ export function getActiveFileContext(maxContextLength: number = 12000): string {
   if (!editor) {
     return '';
   }
-  
+
   const doc = editor.document;
   const fileName = getActiveFileName();
   const fileText = doc.getText();
@@ -158,10 +158,11 @@ export function getActiveFileContext(maxContextLength: number = 12000): string {
   if (!fileText.trim()) {
     return ''; // Skip empty files entirely to prevent rendering empty code blocks
   }
-  
-  const truncatedText = fileText.length > maxContextLength
-    ? fileText.substring(0, maxContextLength) + '\n\n[... content truncated due to length ...]'
-    : fileText;
+
+  const truncatedText =
+    fileText.length > maxContextLength
+      ? fileText.substring(0, maxContextLength) + '\n\n[... content truncated due to length ...]'
+      : fileText;
 
   const fileExt = fileName.split('.').pop() || 'plaintext';
   return `\n\n[Active File Context: ${fileName}]\n\`\`\`${fileExt}\n${truncatedText}\n\`\`\``;
@@ -215,24 +216,20 @@ export async function applyCodeToActiveEditor(code: string, mode: 'insert' | 're
     }
 
     try {
-      const entireRange = new vscode.Range(
-        doc.positionAt(0),
-        doc.positionAt(doc.getText().length)
-      );
+      const entireRange = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
       const success = await editor.edit((editBuilder) => {
         editBuilder.replace(entireRange, code);
       });
 
       if (success) {
         if (checkpointId) {
-          vscode.window.showInformationMessage(
-            `Successfully replaced active file contents! Checkpoint saved.`,
-            'Revert'
-          ).then(async (selection) => {
-            if (selection === 'Revert') {
-              await revertCheckpoint(checkpointId);
-            }
-          });
+          vscode.window
+            .showInformationMessage(`Successfully replaced active file contents! Checkpoint saved.`, 'Revert')
+            .then(async (selection) => {
+              if (selection === 'Revert') {
+                await revertCheckpoint(checkpointId);
+              }
+            });
         } else {
           vscode.window.showInformationMessage('Successfully replaced active file contents!');
         }
@@ -255,7 +252,7 @@ export async function applyCodeToActiveEditor(code: string, mode: 'insert' | 're
     const relativePath = await vscode.window.showInputBox({
       prompt: 'Enter relative file path to create',
       placeHolder: 'e.g., src/utils/math.ts',
-      value: 'src/'
+      value: 'src/',
     });
 
     if (!relativePath) {
@@ -287,17 +284,19 @@ export async function applyCodeToActiveEditor(code: string, mode: 'insert' | 're
 
       // Open the newly created file in the editor
       const newDoc = await vscode.workspace.openTextDocument(absolutePath);
-      await vscode.window.showTextDocument(newDoc);
+      await vscode.window.showTextDocument(newDoc, { preview: false });
 
       if (checkpointId) {
-        vscode.window.showInformationMessage(
-          `Successfully created file ${path.basename(absolutePath)}! Checkpoint saved.`,
-          'Revert'
-        ).then(async (selection) => {
-          if (selection === 'Revert') {
-            await revertCheckpoint(checkpointId);
-          }
-        });
+        vscode.window
+          .showInformationMessage(
+            `Successfully created file ${path.basename(absolutePath)}! Checkpoint saved.`,
+            'Revert',
+          )
+          .then(async (selection) => {
+            if (selection === 'Revert') {
+              await revertCheckpoint(checkpointId);
+            }
+          });
       } else {
         vscode.window.showInformationMessage(`Successfully created file ${path.basename(absolutePath)}!`);
       }

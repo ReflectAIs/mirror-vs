@@ -98,6 +98,16 @@
         "command": "mirror-vs.explainSelection",
         "title": "Explain with Mirror VS",
         "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.prevChange",
+        "title": "Previous Review Change",
+        "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.nextChange",
+        "title": "Next Review Change",
+        "category": "Mirror VS"
       }
     ],
     "menus": {
@@ -129,6 +139,30 @@
         "command": "mirror-vs.rejectReview",
         "key": "shift+alt+backspace",
         "mac": "shift+alt+backspace"
+      },
+      {
+        "command": "mirror-vs.acceptReview",
+        "key": "ctrl+enter",
+        "mac": "ctrl+enter",
+        "when": "mirror-vs.inReview"
+      },
+      {
+        "command": "mirror-vs.rejectReview",
+        "key": "ctrl+backspace",
+        "mac": "ctrl+backspace",
+        "when": "mirror-vs.inReview"
+      },
+      {
+        "command": "mirror-vs.prevChange",
+        "key": "alt+k",
+        "mac": "alt+k",
+        "when": "mirror-vs.inReview"
+      },
+      {
+        "command": "mirror-vs.nextChange",
+        "key": "alt+j",
+        "mac": "alt+j",
+        "when": "mirror-vs.inReview"
       }
     ],
     "configuration": {

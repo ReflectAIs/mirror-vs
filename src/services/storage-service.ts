@@ -1,4 +1,3 @@
-
 import * as vscode from 'vscode';
 import { ChatMessage, ChatSession } from '../types';
 
@@ -24,7 +23,7 @@ export class StorageService {
    */
   async saveSessions(sessions: ChatSession[]): Promise<void> {
     // Strip message content — only keep count for the session list
-    const metaOnly = sessions.map(s => ({
+    const metaOnly = sessions.map((s) => ({
       id: s.id,
       title: s.title,
       timestamp: s.timestamp,
@@ -68,7 +67,7 @@ export class StorageService {
 
       for (const session of legacy) {
         // Strip images from all messages to avoid bloating workspaceState with base64
-        const cleaned = session.messages.map(msg => ({
+        const cleaned = session.messages.map((msg) => ({
           ...msg,
           images: msg.images ? msg.images.slice(0, 0) : undefined, // keep the array key but empty
         }));
@@ -76,7 +75,7 @@ export class StorageService {
       }
 
       // Save light metadata (no messages)
-      const metaOnly = legacy.map(s => ({
+      const metaOnly = legacy.map((s) => ({
         id: s.id,
         title: s.title,
         timestamp: s.timestamp,
@@ -90,7 +89,7 @@ export class StorageService {
     } else if (legacyPerSession && activeId) {
       // Migration from single per-workspace chatHistory key to per-session
       console.log('[StorageService] Migrating legacy chatHistory to per-session key...');
-      const cleaned = legacyPerSession.map(msg => ({
+      const cleaned = legacyPerSession.map((msg) => ({
         ...msg,
         images: msg.images ? msg.images.slice(0, 0) : undefined,
       }));

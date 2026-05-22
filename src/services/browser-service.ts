@@ -42,7 +42,7 @@ export class BrowserService {
       '/Applications/Chromium.app/Contents/MacOS/Chromium',
       'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      '/usr/bin/google-chrome'
+      '/usr/bin/google-chrome',
     ];
     for (const p of paths) {
       if (fs.existsSync(p)) {
@@ -60,11 +60,7 @@ export class BrowserService {
           executablePath,
           headless: false,
           defaultViewport: { width: 1280, height: 800 },
-          args: [
-            '--no-first-run',
-            '--no-default-browser-check',
-            '--disable-extensions',
-          ],
+          args: ['--no-first-run', '--no-default-browser-check', '--disable-extensions'],
         });
         this.browser.on('disconnected', () => {
           this.browser = null;
@@ -91,7 +87,7 @@ export class BrowserService {
       // that maintain persistent connections (e.g. python http.server, vite HMR).
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
       // Give scripts a moment to execute before reading the DOM
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 800));
       return `Navigated to ${url}`;
     } catch (error) {
       this.logError(`navigate(${url})`, error);
@@ -121,16 +117,23 @@ export class BrowserService {
     }
   }
 
-  public async getPageSummary(): Promise<{ title: string; url: string; contentText: string; interactiveElements: string[] }> {
+  public async getPageSummary(): Promise<{
+    title: string;
+    url: string;
+    contentText: string;
+    interactiveElements: string[];
+  }> {
     try {
       const page = await this.getPage();
       const title = await page.title();
       const url = page.url();
-      
+
       const summary = await page.evaluate(() => {
         const elements: string[] = [];
-        const interactive = document.querySelectorAll('input, button, select, textarea, a, h1, h2, h3, [role="button"], [role="link"]');
-        
+        const interactive = document.querySelectorAll(
+          'input, button, select, textarea, a, h1, h2, h3, [role="button"], [role="link"]',
+        );
+
         interactive.forEach((el) => {
           const rect = el.getBoundingClientRect();
           const isVisible = rect.width > 0 && rect.height > 0;
@@ -147,7 +150,11 @@ export class BrowserService {
           if (el instanceof HTMLInputElement) {
             desc += ` [type="${el.type || 'text'}"]`;
             if (el.placeholder) desc += ` [placeholder="${el.placeholder}"]`;
-          } else if (el instanceof HTMLButtonElement || el instanceof HTMLAnchorElement || el.getAttribute('role') === 'button') {
+          } else if (
+            el instanceof HTMLButtonElement ||
+            el instanceof HTMLAnchorElement ||
+            el.getAttribute('role') === 'button'
+          ) {
             const text = (el.textContent || '').trim().substring(0, 30);
             if (text) desc += ` (text: "${text}")`;
           }
@@ -157,7 +164,7 @@ export class BrowserService {
         const pageText = (document.body?.innerText || '').trim();
         return {
           elements: elements.slice(0, 30),
-          bodyText: pageText.substring(0, 400)
+          bodyText: pageText.substring(0, 400),
         };
       });
 
@@ -165,14 +172,14 @@ export class BrowserService {
         title,
         url,
         contentText: summary.bodyText,
-        interactiveElements: summary.elements
+        interactiveElements: summary.elements,
       };
     } catch (error: any) {
       return {
         title: 'Error retrieving page status',
         url: '',
         contentText: `Browser page is not fully loaded or unreachable. Details: ${error.message}`,
-        interactiveElements: []
+        interactiveElements: [],
       };
     }
   }

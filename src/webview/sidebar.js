@@ -851,6 +851,40 @@
     meta.textContent = role === 'user' ? 'You' : 'Mirror VS';
     msgElement.appendChild(meta);
 
+    const actions = document.createElement('div');
+    actions.className = 'message-actions';
+
+    if (role === 'user') {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'message-action-btn';
+      editBtn.innerHTML = '✏️ Edit';
+      editBtn.title = 'Edit Message';
+      editBtn.addEventListener('click', () => {
+        const promptInput = document.getElementById('prompt-input');
+        if (promptInput) {
+          promptInput.value = text;
+          promptInput.style.height = 'auto';
+          promptInput.style.height = (promptInput.scrollHeight) + 'px';
+          promptInput.focus();
+        }
+        vscode.postMessage({ type: 'revertHistory', text, role: 'user', inclusive: false });
+      });
+      actions.appendChild(editBtn);
+    } else if (role === 'assistant' || role === 'system') {
+      const revertBtn = document.createElement('button');
+      revertBtn.className = 'message-action-btn';
+      revertBtn.innerHTML = '⏪ Revert Here';
+      revertBtn.title = 'Revert Conversation to this Point';
+      revertBtn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'revertHistory', text, role, inclusive: true });
+      });
+      actions.appendChild(revertBtn);
+    }
+    
+    if (actions.children.length > 0) {
+      msgElement.appendChild(actions);
+    }
+
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     

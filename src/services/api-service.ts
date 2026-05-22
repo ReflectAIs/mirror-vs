@@ -17,7 +17,7 @@ function makeRequest(
   urlStr: string,
   options: http.RequestOptions | https.RequestOptions,
   bodyData?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<{ response: http.IncomingMessage; body: string }> {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(urlStr);
@@ -72,7 +72,7 @@ export async function fetchOllamaModels(host: string): Promise<string[]> {
   const url = `${host.replace(/\/$/, '')}/api/tags`;
   try {
     const { response, body } = await makeRequest(url, { method: 'GET' });
-    
+
     if (response.statusCode !== 200) {
       throw new Error(`Failed to fetch models: HTTP ${response.statusCode}`);
     }
@@ -98,7 +98,7 @@ export function streamOllamaChat(
   signal: AbortSignal,
   onChunk: (text: string) => void,
   onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
-  onError: (err: any) => void
+  onError: (err: any) => void,
 ): void {
   const urlStr = `${host.replace(/\/$/, '')}/api/chat`;
   const parsedUrl = new URL(urlStr);
@@ -152,10 +152,13 @@ export function streamOllamaChat(
             onChunk(chunkText);
           }
           if (parsed.done) {
-            const usage = (parsed.prompt_eval_count || parsed.eval_count) ? {
-              promptTokens: parsed.prompt_eval_count || 0,
-              completionTokens: parsed.eval_count || 0
-            } : undefined;
+            const usage =
+              parsed.prompt_eval_count || parsed.eval_count
+                ? {
+                    promptTokens: parsed.prompt_eval_count || 0,
+                    completionTokens: parsed.eval_count || 0,
+                  }
+                : undefined;
             onComplete(fullText, usage);
             return;
           }
@@ -179,7 +182,7 @@ export function streamOllamaChat(
           if (parsed.prompt_eval_count || parsed.eval_count) {
             finalUsage = {
               promptTokens: parsed.prompt_eval_count || 0,
-              completionTokens: parsed.eval_count || 0
+              completionTokens: parsed.eval_count || 0,
             };
           }
         } catch (e) {
@@ -220,7 +223,7 @@ export function streamDeepSeekChat(
   signal: AbortSignal,
   onChunk: (text: string) => void,
   onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
-  onError: (err: any) => void
+  onError: (err: any) => void,
 ): void {
   const urlStr = 'https://api.deepseek.com/chat/completions';
   const parsedUrl = new URL(urlStr);
@@ -230,8 +233,8 @@ export function streamDeepSeekChat(
     messages,
     stream: true,
     stream_options: {
-      include_usage: true
-    }
+      include_usage: true,
+    },
   });
 
   const requestOptions: https.RequestOptions = {
@@ -241,7 +244,7 @@ export function streamDeepSeekChat(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Length': Buffer.byteLength(bodyData),
     },
   };
@@ -295,7 +298,7 @@ export function streamDeepSeekChat(
             if (parsed.usage) {
               usage = {
                 promptTokens: parsed.usage.prompt_tokens,
-                completionTokens: parsed.usage.completion_tokens
+                completionTokens: parsed.usage.completion_tokens,
               };
             }
           } catch (e) {

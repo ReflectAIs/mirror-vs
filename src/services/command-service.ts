@@ -1,4 +1,3 @@
-
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -45,7 +44,7 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
 
   constructor(
     private readonly command: string,
-    private readonly cwd: string
+    private readonly cwd: string,
   ) {
     this.exitPromise = new Promise((resolve) => {
       this._resolveExit = resolve;
@@ -54,15 +53,23 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
 
   // ---- Public getters ----
 
-  get running(): boolean { return this._running; }
-  get exitCode(): number | null { return this._exitCode; }
+  get running(): boolean {
+    return this._running;
+  }
+  get exitCode(): number | null {
+    return this._exitCode;
+  }
 
   /** Returns the full buffered output (ANSI-stripped). */
-  getFullOutput(): string { return this.outputBuffer; }
+  getFullOutput(): string {
+    return this.outputBuffer;
+  }
 
   /** Returns the last `chars` characters of buffered output. */
   getRecentOutput(chars: number = 5000): string {
-    if (this.outputBuffer.length <= chars) { return this.outputBuffer; }
+    if (this.outputBuffer.length <= chars) {
+      return this.outputBuffer;
+    }
     return this.outputBuffer.slice(-chars);
   }
 
@@ -77,7 +84,7 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
     this.process = child_process.spawn(this.command, {
       shell: true,
       cwd: this.cwd,
-      env: { ...process.env, FORCE_COLOR: '1' }
+      env: { ...process.env, FORCE_COLOR: '1' },
     });
 
     this.process.stdout?.on('data', (data: Buffer) => {
@@ -118,7 +125,9 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
   }
 
   handleInput(data: string): void {
-    if (!this.process || !this._running) { return; }
+    if (!this.process || !this._running) {
+      return;
+    }
     // Ctrl+C
     if (data === '\x03') {
       this.process.kill('SIGINT');
@@ -222,7 +231,7 @@ export class CommandService {
       /\bwebpack-dev-server\b/i,
       /\bts-node\b/i,
     ];
-    return serverPatterns.some(p => p.test(cmd));
+    return serverPatterns.some((p) => p.test(cmd));
   }
 
   // -----------------------------------------------------------------------
@@ -264,15 +273,12 @@ export class CommandService {
 
   /** Extract port number from a server command string. */
   private extractPort(command: string): number | null {
-    const patterns = [
-      /http\.server\s+(\d+)/i,
-      /(?:-p|--port)[=\s]+(\d+)/i,
-      /:(\d{4,5})\b/,
-      /\b(\d{4,5})\s*$/,
-    ];
+    const patterns = [/http\.server\s+(\d+)/i, /(?:-p|--port)[=\s]+(\d+)/i, /:(\d{4,5})\b/, /\b(\d{4,5})\s*$/];
     for (const p of patterns) {
       const m = command.match(p);
-      if (m) { return parseInt(m[1], 10); }
+      if (m) {
+        return parseInt(m[1], 10);
+      }
     }
     return null;
   }
@@ -284,9 +290,17 @@ export class CommandService {
       const net = require('net') as typeof import('net');
       const socket = new net.Socket();
       socket.setTimeout(timeoutMs);
-      socket.once('connect', () => { socket.destroy(); resolve(true); });
-      socket.once('timeout', () => { socket.destroy(); resolve(false); });
-      socket.once('error', () => { resolve(false); });
+      socket.once('connect', () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once('timeout', () => {
+        socket.destroy();
+        resolve(false);
+      });
+      socket.once('error', () => {
+        resolve(false);
+      });
       socket.connect(port, '127.0.0.1');
     });
   }
@@ -296,8 +310,15 @@ export class CommandService {
   // -----------------------------------------------------------------------
 
   /** Returns all active agent-managed VS Code terminals with their metadata. */
-  public getActiveTerminals(): { name: string; command: string; isServer: boolean; running: boolean; exitCode: number | null }[] {
-    const result: { name: string; command: string; isServer: boolean; running: boolean; exitCode: number | null }[] = [];
+  public getActiveTerminals(): {
+    name: string;
+    command: string;
+    isServer: boolean;
+    running: boolean;
+    exitCode: number | null;
+  }[] {
+    const result: { name: string; command: string; isServer: boolean; running: boolean; exitCode: number | null }[] =
+      [];
     for (const [name, info] of this.terminalCommandMap) {
       const terminal = this.activeTerminals.get(name);
       if (terminal && terminal.exitStatus === undefined) {
@@ -307,7 +328,7 @@ export class CommandService {
           command: info.command,
           isServer: info.isServer,
           running: pty?.running ?? false,
-          exitCode: pty?.exitCode ?? null
+          exitCode: pty?.exitCode ?? null,
         });
       } else {
         // Clean up stale entries
@@ -333,7 +354,10 @@ export class CommandService {
    * Read recent output from a terminal's pseudoterminal buffer.
    * Returns null if the terminal is not found.
    */
-  public readTerminalOutput(terminalName: string, chars: number = 5000): { output: string; running: boolean; exitCode: number | null } | null {
+  public readTerminalOutput(
+    terminalName: string,
+    chars: number = 5000,
+  ): { output: string; running: boolean; exitCode: number | null } | null {
     const pty = this.activePtys.get(terminalName);
     if (!pty) {
       // Fuzzy match: try to find a terminal whose name contains the search string
@@ -342,7 +366,7 @@ export class CommandService {
           return {
             output: p.getRecentOutput(chars),
             running: p.running,
-            exitCode: p.exitCode
+            exitCode: p.exitCode,
           };
         }
       }
@@ -351,7 +375,7 @@ export class CommandService {
     return {
       output: pty.getRecentOutput(chars),
       running: pty.running,
-      exitCode: pty.exitCode
+      exitCode: pty.exitCode,
     };
   }
 
@@ -424,7 +448,7 @@ export class CommandService {
 
     // Wait for server to boot then probe the port
     this.logToDebug(`Waiting ${SERVER_BOOT_WAIT_MS}ms for server to boot on port ${port ?? '(unknown)'}...`);
-    await new Promise(r => setTimeout(r, SERVER_BOOT_WAIT_MS));
+    await new Promise((r) => setTimeout(r, SERVER_BOOT_WAIT_MS));
 
     if (port) {
       const isUp = await this.probePort(port);
@@ -468,7 +492,7 @@ export class CommandService {
 
     // Race: wait for exit OR timeout OR inactivity/interactive prompt monitor
     const timeoutPromise = new Promise<'timeout'>((resolve) =>
-      setTimeout(() => resolve('timeout'), SHORT_CMD_TIMEOUT_MS)
+      setTimeout(() => resolve('timeout'), SHORT_CMD_TIMEOUT_MS),
     );
 
     let lastOutputLength = 0;
@@ -499,16 +523,22 @@ export class CommandService {
 
         const trimmedOutput = currentOutput.trim();
         // Check if output ends in a standard prompt ending or confirmation query
-        const endsWithPrompt = /([?:]\s*$)|(\[y\/n\]\s*$)|(\(y\/n\)\s*$)|(confirm\s*$)|(choice\s*$)/i.test(trimmedOutput);
+        const endsWithPrompt = /([?:]\s*$)|(\[y\/n\]\s*$)|(\(y\/n\)\s*$)|(confirm\s*$)|(choice\s*$)/i.test(
+          trimmedOutput,
+        );
 
         if (endsWithPrompt && inactiveTicks >= promptInactivityTimeoutSeconds) {
-          this.logToDebug(`Command in terminal "${terminalName}" appears to be hung waiting for input (prompt detected).`);
+          this.logToDebug(
+            `Command in terminal "${terminalName}" appears to be hung waiting for input (prompt detected).`,
+          );
           if (monitorInterval) {
             clearInterval(monitorInterval);
           }
           resolve('prompt');
         } else if (inactiveTicks >= inactivityTimeoutSeconds) {
-          this.logToDebug(`Command in terminal "${terminalName}" has been inactive (no output) for ${inactivityTimeoutSeconds}s.`);
+          this.logToDebug(
+            `Command in terminal "${terminalName}" has been inactive (no output) for ${inactivityTimeoutSeconds}s.`,
+          );
           if (monitorInterval) {
             clearInterval(monitorInterval);
           }
@@ -524,7 +554,9 @@ export class CommandService {
     }
 
     if (result === 'timeout') {
-      this.logToDebug(`Command in terminal "${terminalName}" timed out after ${SHORT_CMD_TIMEOUT_MS}ms, still running.`);
+      this.logToDebug(
+        `Command in terminal "${terminalName}" timed out after ${SHORT_CMD_TIMEOUT_MS}ms, still running.`,
+      );
       const partialOutput = pty.getRecentOutput(10000);
       return [
         `Command timed out after ${SHORT_CMD_TIMEOUT_MS / 1000}s and is still running in terminal "${terminalName}".`,
@@ -552,7 +584,9 @@ export class CommandService {
     }
 
     if (result === 'inactive') {
-      this.logToDebug(`Command in terminal "${terminalName}" early resolved due to ${inactivityTimeoutSeconds}s of silence.`);
+      this.logToDebug(
+        `Command in terminal "${terminalName}" early resolved due to ${inactivityTimeoutSeconds}s of silence.`,
+      );
       const partialOutput = pty.getRecentOutput(10000);
       return [
         `⚠️ Command has been running but was inactive (produced no new output) for ${inactivityTimeoutSeconds} seconds.`,
@@ -586,7 +620,7 @@ export class CommandService {
   /** Sends input text or keys (like Ctrl+C) to a specific active terminal. */
   public sendInputToTerminal(terminalName: string, input: string): boolean {
     // First check our pseudoterminals
-    let pty = this.activePtys.get(terminalName);
+    const pty = this.activePtys.get(terminalName);
     if (pty && pty.running) {
       this.logToDebug(`Sending input to pseudoterminal "${terminalName}": "${input}"`);
       if (input === 'Ctrl+C' || input === 'ctrl+c' || input === '\u0003') {
@@ -613,7 +647,7 @@ export class CommandService {
     // Fallback: try VS Code terminal API (for non-pty terminals)
     let terminal = this.activeTerminals.get(terminalName);
     if (!terminal) {
-      terminal = vscode.window.terminals.find(t => t.name === terminalName);
+      terminal = vscode.window.terminals.find((t) => t.name === terminalName);
     }
 
     if (terminal) {
@@ -646,7 +680,7 @@ export class CommandService {
 
     // Fallback search across all VS Code terminals
     if (!terminal) {
-      terminal = vscode.window.terminals.find(t => t.name === terminalName);
+      terminal = vscode.window.terminals.find((t) => t.name === terminalName);
     }
 
     if (terminal) {

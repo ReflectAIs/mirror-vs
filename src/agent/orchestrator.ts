@@ -85,52 +85,57 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    Usage:
    <grep_search query="pattern_to_find" />
 
-7. BROWSER NAVIGATE:
+8. WEB SEARCH:
+   Perform a live web search using DuckDuckGo to find information, documentation, or solutions.
+   Usage:
+   <web_search query="pattern_to_find" />
+
+9. BROWSER NAVIGATE:
    Open a URL in the browser.
    Usage:
    <browser_navigate url="http://localhost:3000" />
 
-8. BROWSER CLICK:
+10. BROWSER CLICK:
    Click an element in the browser.
    Usage:
    <browser_click selector="#my-button" />
 
-9. BROWSER TYPE:
+11. BROWSER TYPE:
    Type text into an input field in the browser.
    Usage:
    <browser_type selector="#search-input" text="hello world" />
 
-10. BROWSER SCREENSHOT:
-    Take a screenshot of the current page (returns base64 image).
+12. BROWSER SCREENSHOT:
+    Take a screenshot of the current page (returns base64 image). Saves to .mirror-vs/screenshots.
     Usage:
     <browser_screenshot />
 
-11. RUN COMMAND:
+13. RUN COMMAND:
     Execute a terminal command in the workspace folder. ALL commands open a visible VS Code terminal.
     - Short commands (ls, cat, curl, npm run build, npm install, etc.) run and return full output when done.
     - Server/watcher commands (npm run dev, npm start, python -m http.server) run persistently in the terminal. Always follow up with a verification command.
     Usage:
     <run_command command="npm install" />
 
-12. SEND TERMINAL INPUT:
+14. SEND TERMINAL INPUT:
     Send key strokes, text input, or control characters (like Ctrl+C) to a running VS Code terminal.
     Usage:
     <send_terminal_input terminal_name="Mirror: npm run dev">Ctrl+C</send_terminal_input>
     Note: To stop/kill a running server or command in a terminal, always send "Ctrl+C" as the input content.
 
-13. CLOSE TERMINAL:
+15. CLOSE TERMINAL:
     Explicitly close/kill a running VS Code terminal.
     Usage:
     <close_terminal terminal_name="Mirror: npm run dev" />
 
-14. READ TERMINAL:
+16. READ TERMINAL:
     Read recent output from an active VS Code terminal. Useful to check server logs, build output, or error messages.
     Usage:
     <read_terminal terminal_name="Mirror: npm run dev" />
     Optional: specify how many characters to read (default 5000):
     <read_terminal terminal_name="Mirror: npm run dev" chars="10000" />
 
-15. LIST TERMINALS:
+17. LIST TERMINALS:
     List all active agent-managed terminals with their names, commands, and running status.
     Usage:
     <list_terminals />
@@ -154,14 +159,18 @@ If a tool returns an error, correct your approach in the next turn — do NOT gi
 
 function getShellEnvDescription(): string {
   if (process.platform === 'win32') {
-    return 'This is a WINDOWS machine running PowerShell. ' +
+    return (
+      'This is a WINDOWS machine running PowerShell. ' +
       'Do NOT use && to chain commands — use semicolons (;) or separate tool calls instead. ' +
       'Do NOT use Unix-only commands (grep, head, tail, ls) — use dir, findstr, Get-Content, or the file read/list tools. ' +
-      'To verify a server is up, use browser_navigate rather than curl -w.';
+      'To verify a server is up, use browser_navigate rather than curl -w.'
+    );
   }
-  return 'This is a macOS/Linux machine running bash/zsh. ' +
+  return (
+    'This is a macOS/Linux machine running bash/zsh. ' +
     'Standard Unix commands (ls, grep, head, curl, etc.) are available. ' +
-    'You may chain commands with &&.';
+    'You may chain commands with &&.'
+  );
 }
 
 export function buildSystemPrompt(): string {
@@ -170,18 +179,20 @@ export function buildSystemPrompt(): string {
 
   let terminalContext = '';
   if (terminals.length > 0) {
-    terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\n' +
-      terminals.map(t => {
-        const status = t.running ? '🟢 RUNNING' : `🔴 EXITED (code: ${t.exitCode})`;
-        return `- "${t.name}" ${status} (Command: "${t.command}")`;
-      }).join('\n') +
+    terminalContext =
+      '\n\n### ACTIVE RUNNING TERMINALS:\n' +
+      terminals
+        .map((t) => {
+          const status = t.running ? '🟢 RUNNING' : `🔴 EXITED (code: ${t.exitCode})`;
+          return `- "${t.name}" ${status} (Command: "${t.command}")`;
+        })
+        .join('\n') +
       '\nUse <read_terminal terminal_name="..." /> to read output, <send_terminal_input terminal_name="...">input</send_terminal_input> to interact, or <close_terminal terminal_name="..." /> to close.';
   } else {
     terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\nNone';
   }
 
-  return AGENT_SYSTEM_PROMPT_TEMPLATE
-    .replace('{{SHELL_ENV}}', getShellEnvDescription()) + terminalContext;
+  return AGENT_SYSTEM_PROMPT_TEMPLATE.replace('{{SHELL_ENV}}', getShellEnvDescription()) + terminalContext;
 }
 
 export class AgentOrchestrator {
@@ -192,8 +203,8 @@ export class AgentOrchestrator {
     private readonly _getChatHistory: () => ChatMessage[],
     private readonly _saveChatHistory: (history: ChatMessage[]) => Promise<void>,
     private readonly _postMessage: (msg: any) => void,
-    private readonly _getSafePath: (targetPath: string) => string
-  ) { }
+    private readonly _getSafePath: (targetPath: string) => string,
+  ) {}
 
   public cancelActiveStream() {
     if (this._activeAbortController) {
@@ -208,11 +219,16 @@ export class AgentOrchestrator {
    */
   private async _ensureGitBaseline(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceFolder) { return; }
+    if (!workspaceFolder) {
+      return;
+    }
 
     const run = (cmd: string) => {
-      try { return execSync(cmd, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' }); }
-      catch { return ''; }
+      try {
+        return execSync(cmd, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' });
+      } catch {
+        return '';
+      }
     };
 
     // 1. Init git if not already a repo
@@ -224,9 +240,13 @@ export class AgentOrchestrator {
     // 2. Ensure .gitignore has noise exclusions
     const gitignorePath = `${workspaceFolder}/.gitignore`;
     let gitignoreContent = '';
-    try { gitignoreContent = fs.readFileSync(gitignorePath, 'utf8'); } catch { /* file may not exist */ }
+    try {
+      gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+    } catch {
+      /* file may not exist */
+    }
     const patterns = ['node_modules/', '.mirror-vs/', 'turns.log'];
-    const missingPatterns = patterns.filter(p => !gitignoreContent.includes(p));
+    const missingPatterns = patterns.filter((p) => !gitignoreContent.includes(p));
     if (missingPatterns.length > 0) {
       const newContent = gitignoreContent.trimEnd() + '\n' + missingPatterns.join('\n') + '\n';
       fs.writeFileSync(gitignorePath, newContent, 'utf8');
@@ -263,11 +283,11 @@ export class AgentOrchestrator {
 
     let apiKey = '';
     if (provider === 'deepseek') {
-      apiKey = await this._getSecret('deepseek_api_key') || '';
+      apiKey = (await this._getSecret('deepseek_api_key')) || '';
       if (!apiKey) {
         this._postMessage({
           type: 'chatResponseError',
-          error: 'DeepSeek API Key is missing. Please add your key in the settings drawer.'
+          error: 'DeepSeek API Key is missing. Please add your key in the settings drawer.',
         });
         return;
       }
@@ -299,16 +319,16 @@ export class AgentOrchestrator {
       try {
         const activeToSummarize = activeMessages.slice(0, activeMessages.length - turnsToRetain);
         const existingSummaries = currentMessages.filter(
-          msg => msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')
+          (msg) => msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]'),
         );
 
         // Notify user about background optimization
         this._postMessage({
-          type: 'chatResponseStart'
+          type: 'chatResponseStart',
         });
         this._postMessage({
           type: 'chatResponseChunk',
-          text: `🔄 _Pair programming context is getting long. Compressing middle turns to optimize speed..._`
+          text: `🔄 _Pair programming context is getting long. Compressing middle turns to optimize speed..._`,
         });
 
         const summary = await this._summarizeHistory(
@@ -316,28 +336,29 @@ export class AgentOrchestrator {
           ollamaHost,
           provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel,
           apiKey,
-          [...existingSummaries, ...activeToSummarize]
+          [...existingSummaries, ...activeToSummarize],
         );
 
         const summaryMessage: ChatMessage = {
           role: 'system',
-          content: `### [CONSOLIDATED CONTEXT SUMMARY]\n${summary}`
+          content: `### [CONSOLIDATED CONTEXT SUMMARY]\n${summary}`,
         };
 
         // Filter out old system summaries from currentMessages completely
         const cleanedMessages = currentMessages.filter(
-          msg => !(msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]'))
+          (msg) => !(msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')),
         );
 
         // Mark the activeToSummarize messages as summarized: true in cleanedMessages
-        activeToSummarize.forEach(msgToSummarize => {
-          const found = cleanedMessages.find(m => m === msgToSummarize);
+        activeToSummarize.forEach((msgToSummarize) => {
+          const found = cleanedMessages.find((m) => m === msgToSummarize);
           if (found) {
             found.summarized = true;
             // Compact the content of the summarized message to prevent memory & state bloat
             if (found.content.length > 2000) {
-              found.content = found.content.substring(0, 1000) + 
-                '\n\n... [CONTENT REMOVED AFTER CONTEXT CONSOLIDATION] ...\n\n' + 
+              found.content =
+                found.content.substring(0, 1000) +
+                '\n\n... [CONTENT REMOVED AFTER CONTEXT CONSOLIDATION] ...\n\n' +
                 found.content.substring(found.content.length - 1000);
             }
             // Clear raw images from summarized messages to save massive amounts of space
@@ -353,18 +374,17 @@ export class AgentOrchestrator {
         currentMessages = [firstMsg, summaryMessage, ...remainingMsgs];
 
         await this._saveChatHistory(currentMessages);
-        
+
         // Notify webview with the newly updated chat history
         this._postMessage({
           type: 'updateChatHistory',
-          history: currentMessages
+          history: currentMessages,
         });
 
         this._postMessage({
           type: 'chatResponseComplete',
-          fullText: `✅ _Context optimized successfully. Continuing task._`
+          fullText: `✅ _Context optimized successfully. Continuing task._`,
         });
-
       } catch (e: any) {
         console.warn('Failed to summarize history:', e.message);
       }
@@ -387,15 +407,15 @@ export class AgentOrchestrator {
         const payload: { role: 'user' | 'assistant' | 'system'; content: string; images?: string[] }[] = [
           { role: 'system' as const, content: buildSystemPrompt() },
           ...currentMessages
-            .filter(msg => !msg.summarized)
-            .map(msg => {
+            .filter((msg) => !msg.summarized)
+            .map((msg) => {
               const role = msg.role === 'system' ? 'user' : msg.role;
               return {
                 role: role as 'user' | 'assistant' | 'system',
                 content: msg.content,
-                images: msg.images
+                images: msg.images,
               };
-            })
+            }),
         ];
 
         this._postMessage({ type: 'chatResponseStart' });
@@ -411,7 +431,7 @@ export class AgentOrchestrator {
           apiKey,
           payload,
           completionController.signal,
-          completionController
+          completionController,
         );
 
         signal.removeEventListener('abort', mainAbortListener);
@@ -425,6 +445,12 @@ export class AgentOrchestrator {
           const toolResults: string[] = [];
 
           for (const tool of toolCalls) {
+            if (signal.aborted) {
+              console.log('Execution aborted before running tool:', tool.name);
+              continueLoop = false;
+              break;
+            }
+
             const target = tool.path || tool.query || tool.url || tool.selector || tool.command || '';
             this._sendToolStatusToWebview(tool.name, 'running', target);
 
@@ -457,23 +483,40 @@ export class AgentOrchestrator {
               } else if (result.length > 35000) {
                 const keepLength = 17500;
                 const truncatedCount = result.length - 35000;
-                displayResult = result.substring(0, keepLength) + 
-                  `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` + 
+                displayResult =
+                  result.substring(0, keepLength) +
+                  `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` +
                   result.substring(result.length - keepLength);
               }
 
-              this._sendToolStatusToWebview(tool.name, 'success', target, displayResult, checkpointId, tool.content, terminalName);
+              this._sendToolStatusToWebview(
+                tool.name,
+                'success',
+                target,
+                displayResult,
+                checkpointId,
+                tool.content,
+                terminalName,
+              );
               toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Success - ${result}`);
             } catch (err: any) {
               this._sendToolStatusToWebview(tool.name, 'error', target, err.message);
               // IMPORTANT: Push error as a result so the LLM can self-correct in the next turn
               // Do NOT throw — throwing would abort the entire loop and leave the user with a frozen UI
-              toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${err.message}. Please correct your approach and try again.`);
+              toolResults.push(
+                `[Tool Result for ${tool.name} on "${target}"]: Error - ${err.message}. Please correct your approach and try again.`,
+              );
+            }
+            
+            if (signal.aborted) {
+              console.log('Execution aborted after running tool:', tool.name);
+              continueLoop = false;
+              break;
             }
           }
 
           const images: string[] = [];
-          const cleanedToolResults = toolResults.map(res => {
+          const cleanedToolResults = toolResults.map((res) => {
             const match = res.match(/\(Base64 data hidden from output but sent to vision model: (.*)\)/);
             if (match) {
               const base64 = match[1];
@@ -488,9 +531,12 @@ export class AgentOrchestrator {
               const content = prefix ? res.substring(prefix.length) : res;
               const keepLength = 17500;
               const truncatedCount = content.length - 35000;
-              return prefix + content.substring(0, keepLength) +
+              return (
+                prefix +
+                content.substring(0, keepLength) +
                 `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` +
-                content.substring(content.length - keepLength);
+                content.substring(content.length - keepLength)
+              );
             }
             return res;
           });
@@ -535,15 +581,24 @@ ${combinedToolResult}
           // Check if the model tried to call a tool but the tag was incomplete/broken.
           // If so, inject an error feedback message and continue the loop so the model can retry.
           const allToolNames = [
-            'read_file', 'create_file', 'write_file', 'patch_file',
-            'list_dir', 'grep_search', 'run_command', 'browser_navigate',
-            'browser_click', 'browser_type', 'browser_screenshot',
-            'send_terminal_input', 'close_terminal', 'read_terminal', 'list_terminals'
+            'read_file',
+            'create_file',
+            'write_file',
+            'patch_file',
+            'list_dir',
+            'grep_search',
+            'run_command',
+            'browser_navigate',
+            'browser_click',
+            'browser_type',
+            'browser_screenshot',
+            'send_terminal_input',
+            'close_terminal',
+            'read_terminal',
+            'list_terminals',
           ];
           const strippedForCheck = this._stripCodeBlocks(assistantResponse);
-          const partialPattern = new RegExp(
-            `<(${allToolNames.join('|')})\\b`, 'i'
-          );
+          const partialPattern = new RegExp(`<(${allToolNames.join('|')})\\b`, 'i');
           const partialMatch = strippedForCheck.match(partialPattern);
 
           if (partialMatch && consecutiveMalformedCount < maxMalformedRetries) {
@@ -606,7 +661,6 @@ USER/ENVIRONMENT TOOL RESPONSE:
       }
 
       this._postMessage({ type: 'loopComplete' });
-
     } catch (err: any) {
       if (signal.aborted) {
         console.log('Agent stream aborted.');
@@ -664,7 +718,19 @@ USER/ENVIRONMENT TOOL RESPONSE:
 
   private hasCompleteToolCall(text: string): boolean {
     const stripped = this._stripCodeBlocks(text);
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals'];
+    const selfClosingTools = [
+      'read_file',
+      'list_dir',
+      'grep_search',
+      'browser_navigate',
+      'browser_click',
+      'browser_type',
+      'browser_screenshot',
+      'run_command',
+      'close_terminal',
+      'read_terminal',
+      'list_terminals',
+    ];
     for (const tool of selfClosingTools) {
       if (this.isTagFullyClosed(stripped, tool)) {
         return true;
@@ -689,7 +755,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
     apiKey: string,
     messages: { role: 'user' | 'assistant' | 'system'; content: string; images?: string[] }[],
     signal: AbortSignal,
-    completionController?: AbortController
+    completionController?: AbortController,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       let fullText = '';
@@ -726,8 +792,8 @@ USER/ENVIRONMENT TOOL RESPONSE:
                   input: usage.promptTokens,
                   output: usage.completionTokens,
                   total: usage.promptTokens + usage.completionTokens,
-                  cost: 0
-                }
+                  cost: 0,
+                },
               });
             }
             resolve(cleaned);
@@ -736,7 +802,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
             if (isFinished) return;
             isFinished = true;
             reject(err);
-          }
+          },
         );
       } else {
         streamDeepSeekChat(
@@ -772,8 +838,8 @@ USER/ENVIRONMENT TOOL RESPONSE:
                   input: usage.promptTokens,
                   output: usage.completionTokens,
                   total: usage.promptTokens + usage.completionTokens,
-                  cost: totalCost
-                }
+                  cost: totalCost,
+                },
               });
             }
             resolve(cleaned);
@@ -782,7 +848,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
             if (isFinished) return;
             isFinished = true;
             reject(err);
-          }
+          },
         );
       }
     });
@@ -798,9 +864,13 @@ USER/ENVIRONMENT TOOL RESPONSE:
      */
     const attr = (attrs: string, name: string): string | null => {
       const dq = new RegExp(`${name}\\s*=\\s*"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"`, 'i').exec(attrs);
-      if (dq) { return dq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'); }
+      if (dq) {
+        return dq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
       const sq = new RegExp(`${name}\\s*=\\s*'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'`, 'i').exec(attrs);
-      if (sq) { return sq[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\'); }
+      if (sq) {
+        return sq[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+      }
       return null;
     };
 
@@ -820,8 +890,12 @@ USER/ENVIRONMENT TOOL RESPONSE:
         const sl = attr(match[1], 'start_line');
         const el = attr(match[1], 'end_line');
         const tool: ToolCall = { name: 'read_file', path: p.trim() };
-        if (sl) { tool.start_line = parseInt(sl, 10); }
-        if (el) { tool.end_line = parseInt(el, 10); }
+        if (sl) {
+          tool.start_line = parseInt(sl, 10);
+        }
+        if (el) {
+          tool.end_line = parseInt(el, 10);
+        }
         candidates.push({ index: match.index, tool });
       }
     }
@@ -830,49 +904,63 @@ USER/ENVIRONMENT TOOL RESPONSE:
     const listDirRegex = /<list_dir([\s\S]*?)\/?>/gi;
     while ((match = listDirRegex.exec(text)) !== null) {
       const p = attr(match[1], 'path');
-      if (p) { candidates.push({ index: match.index, tool: { name: 'list_dir', path: p.trim() } }); }
+      if (p) {
+        candidates.push({ index: match.index, tool: { name: 'list_dir', path: p.trim() } });
+      }
     }
 
     // grep_search
     const grepSearchRegex = /<grep_search([\s\S]*?)\/?>/gi;
     while ((match = grepSearchRegex.exec(text)) !== null) {
       const q = attr(match[1], 'query');
-      if (q) { candidates.push({ index: match.index, tool: { name: 'grep_search', query: q } }); }
+      if (q) {
+        candidates.push({ index: match.index, tool: { name: 'grep_search', query: q } });
+      }
     }
 
     // write_file
     const writeFileRegex = /<write_file([\s\S]*?)>([\s\S]*?)<\/write_file\s*>/gi;
     while ((match = writeFileRegex.exec(text)) !== null) {
       const p = attr(match[1], 'path');
-      if (p) { candidates.push({ index: match.index, tool: { name: 'write_file', path: p.trim(), content: match[2] } }); }
+      if (p) {
+        candidates.push({ index: match.index, tool: { name: 'write_file', path: p.trim(), content: match[2] } });
+      }
     }
 
     // create_file
     const createFileRegex = /<create_file([\s\S]*?)>([\s\S]*?)<\/create_file\s*>/gi;
     while ((match = createFileRegex.exec(text)) !== null) {
       const p = attr(match[1], 'path');
-      if (p) { candidates.push({ index: match.index, tool: { name: 'create_file', path: p.trim(), content: match[2] } }); }
+      if (p) {
+        candidates.push({ index: match.index, tool: { name: 'create_file', path: p.trim(), content: match[2] } });
+      }
     }
 
     // patch_file
     const patchFileRegex = /<patch_file([\s\S]*?)>([\s\S]*?)<\/patch_file\s*>/gi;
     while ((match = patchFileRegex.exec(text)) !== null) {
       const p = attr(match[1], 'path');
-      if (p) { candidates.push({ index: match.index, tool: { name: 'patch_file', path: p.trim(), content: match[2] } }); }
+      if (p) {
+        candidates.push({ index: match.index, tool: { name: 'patch_file', path: p.trim(), content: match[2] } });
+      }
     }
 
     // browser_navigate
     const browserNavRegex = /<browser_navigate([\s\S]*?)\/?>/gi;
     while ((match = browserNavRegex.exec(text)) !== null) {
       const u = attr(match[1], 'url');
-      if (u) { candidates.push({ index: match.index, tool: { name: 'browser_navigate', url: u } }); }
+      if (u) {
+        candidates.push({ index: match.index, tool: { name: 'browser_navigate', url: u } });
+      }
     }
 
     // browser_click
     const browserClickRegex = /<browser_click([\s\S]*?)\/?>/gi;
     while ((match = browserClickRegex.exec(text)) !== null) {
       const s = attr(match[1], 'selector');
-      if (s) { candidates.push({ index: match.index, tool: { name: 'browser_click', selector: s } }); }
+      if (s) {
+        candidates.push({ index: match.index, tool: { name: 'browser_click', selector: s } });
+      }
     }
 
     // browser_type
@@ -880,7 +968,9 @@ USER/ENVIRONMENT TOOL RESPONSE:
     while ((match = browserTypeRegex.exec(text)) !== null) {
       const s = attr(match[1], 'selector');
       const t = attr(match[1], 'text');
-      if (s && t) { candidates.push({ index: match.index, tool: { name: 'browser_type', selector: s, text: t } }); }
+      if (s && t) {
+        candidates.push({ index: match.index, tool: { name: 'browser_type', selector: s, text: t } });
+      }
     }
 
     // browser_screenshot
@@ -893,7 +983,9 @@ USER/ENVIRONMENT TOOL RESPONSE:
     const runCommandRegex = /<run_command([\s\S]*?)\/?>/gi;
     while ((match = runCommandRegex.exec(text)) !== null) {
       const c = attr(match[1], 'command');
-      if (c) { candidates.push({ index: match.index, tool: { name: 'run_command', command: c } }); }
+      if (c) {
+        candidates.push({ index: match.index, tool: { name: 'run_command', command: c } });
+      }
     }
 
     // send_terminal_input (block style)
@@ -906,8 +998,8 @@ USER/ENVIRONMENT TOOL RESPONSE:
           tool: {
             name: 'send_terminal_input',
             terminal_name: termName.trim(),
-            content: match[2]
-          } as any
+            content: match[2],
+          } as any,
         });
       }
     }
@@ -924,8 +1016,8 @@ USER/ENVIRONMENT TOOL RESPONSE:
           tool: {
             name: 'send_terminal_input',
             terminal_name: termName.trim(),
-            content: input
-          } as any
+            content: input,
+          } as any,
         });
       }
     }
@@ -939,8 +1031,8 @@ USER/ENVIRONMENT TOOL RESPONSE:
           index: match.index,
           tool: {
             name: 'close_terminal',
-            terminal_name: termName.trim()
-          } as any
+            terminal_name: termName.trim(),
+          } as any,
         });
       }
     }
@@ -956,8 +1048,8 @@ USER/ENVIRONMENT TOOL RESPONSE:
           tool: {
             name: 'read_terminal',
             terminal_name: termName.trim(),
-            chars: chars || undefined
-          } as any
+            chars: chars || undefined,
+          } as any,
         });
       }
     }
@@ -967,11 +1059,13 @@ USER/ENVIRONMENT TOOL RESPONSE:
     while ((match = listTerminalsRegex.exec(text)) !== null) {
       candidates.push({
         index: match.index,
-        tool: { name: 'list_terminals' }
+        tool: { name: 'list_terminals' },
       });
     }
 
-    if (candidates.length === 0) { return []; }
+    if (candidates.length === 0) {
+      return [];
+    }
 
     // Sort by position and return ONLY the first tool call found in the text.
     // This enforces the one-tool-per-turn rule at the parsing level.
@@ -986,7 +1080,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
     result?: string,
     checkpointId?: string,
     code?: string,
-    terminalName?: string
+    terminalName?: string,
   ) {
     this._postMessage({
       type: 'toolStatus',
@@ -996,7 +1090,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
       result,
       checkpointId,
       code,
-      terminalName
+      terminalName,
     });
   }
 
@@ -1028,7 +1122,19 @@ USER/ENVIRONMENT TOOL RESPONSE:
     // but track offsets against the ORIGINAL text so we truncate correctly.
     const stripped = this._stripCodeBlocks(closedText);
 
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals'];
+    const selfClosingTools = [
+      'read_file',
+      'list_dir',
+      'grep_search',
+      'browser_navigate',
+      'browser_click',
+      'browser_type',
+      'browser_screenshot',
+      'run_command',
+      'close_terminal',
+      'read_terminal',
+      'list_terminals',
+    ];
     let earliestEnd = -1;
 
     for (const tool of selfClosingTools) {
@@ -1072,10 +1178,10 @@ USER/ENVIRONMENT TOOL RESPONSE:
     host: string,
     model: string,
     apiKey: string,
-    historyToSummarize: ChatMessage[]
+    historyToSummarize: ChatMessage[],
   ): Promise<string> {
     const summarizePrompt = `You are a helpful pair programming assistant. Please summarize the following conversation history between a developer and an AI assistant. Provide a highly dense, bulleted summary of key decisions, context details, executed actions, and technical changes. Do not lose key file names, error messages, or environment information:
-\n${historyToSummarize.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n\n')}`;
+\n${historyToSummarize.map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n\n')}`;
 
     const messages = [{ role: 'user', content: summarizePrompt }];
 
@@ -1089,7 +1195,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           controller.signal,
           () => {}, // ignore chunks
           (fullText) => resolve(fullText),
-          (err) => reject(err)
+          (err) => reject(err),
         );
       } else {
         streamDeepSeekChat(
@@ -1099,7 +1205,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           controller.signal,
           () => {}, // ignore chunks
           (fullText) => resolve(fullText),
-          (err) => reject(err)
+          (err) => reject(err),
         );
       }
     });

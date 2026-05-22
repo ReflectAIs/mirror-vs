@@ -1,4 +1,3 @@
-
 // VS Code mock for vitest testing
 export const workspace = {
   fs: {
@@ -24,6 +23,14 @@ export const window = {
   }),
   onDidChangeActiveTextEditor: () => ({ dispose: () => {} }),
   onDidChangeVisibleTextEditors: () => ({ dispose: () => {} }),
+  createStatusBarItem: () => ({
+    show: () => {},
+    hide: () => {},
+    dispose: () => {},
+    text: '',
+    command: '',
+    tooltip: '',
+  }),
 };
 
 export const commands = {
@@ -46,6 +53,8 @@ export const EventEmitter = class {
 };
 export const SecretStorage = class {};
 export const OverviewRulerLane = { Left: 1 };
+export const StatusBarAlignment = { Left: 1, Right: 2 };
 export const ThemeColor = {};
 
-export default { workspace, window, commands, Uri, ConfigurationTarget };
+export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment };
+

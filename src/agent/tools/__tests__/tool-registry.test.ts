@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../file-tools', () => ({
@@ -84,7 +83,10 @@ describe('executeTool', () => {
   });
 
   it('should route send_terminal_input correctly', async () => {
-    const result = await executeTool({ name: 'send_terminal_input', terminal_name: 'test', text: 'Ctrl+C' }, getSafePath);
+    const result = await executeTool(
+      { name: 'send_terminal_input', terminal_name: 'test', text: 'Ctrl+C' },
+      getSafePath,
+    );
     expect(result).toBe('terminal result');
   });
 });

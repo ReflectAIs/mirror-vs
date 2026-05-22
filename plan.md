@@ -48,10 +48,13 @@
 - File list with status badges and action buttons
 - Refresh, commit, open file, view diff operations
 
-### ✅ DONE: CI/CD
+### ✅ DONE: CI/CD (0.0.6)
 - GitHub Actions workflow at `.github/workflows/ci.yml`
 - Runs tests, lint, format check on every push/PR (Node 18 & 20 matrix)
 - Automatic VSIX packaging on version tags with GitHub release
+- Lint errors fixed: no-useless-escape, no-var-requires, no-empty, prefer-const
+- Prettier formatting applied across all source files
+- VSIX packaged: `mirror-vs-0.0.6.vsix` (1.8 MB)
 
 ### 4. 🧠 AGENT IMPROVEMENTS
 - Streaming Tool Detection optimization

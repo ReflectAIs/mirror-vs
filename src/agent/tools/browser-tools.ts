@@ -1,9 +1,10 @@
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ToolCall } from '../types';
 import { BrowserService } from '../../services/browser-service';
 
-export async function executeBrowserTool(
-  tool: ToolCall
-): Promise<string> {
+export async function executeBrowserTool(tool: ToolCall): Promise<string> {
   const browserService = BrowserService.getInstance();
 
   switch (tool.name) {
@@ -13,9 +14,10 @@ export async function executeBrowserTool(
 
       // After navigation, always return a page summary so the LLM has real DOM context
       const summary = await browserService.getPageSummary();
-      const elementList = summary.interactiveElements.length > 0
-        ? summary.interactiveElements.map(e => `  - ${e}`).join('\n')
-        : '  (no interactive elements found — page may have failed to load)';
+      const elementList =
+        summary.interactiveElements.length > 0
+          ? summary.interactiveElements.map((e) => `  - ${e}`).join('\n')
+          : '  (no interactive elements found — page may have failed to load)';
 
       return `${navResult}
 Page Title: "${summary.title}"
@@ -46,11 +48,30 @@ Post-click Visible Text (preview): ${summary.contentText || '(empty)'}`;
       // Capture real base64 screenshot for display in chat + vision models
       const base64 = await browserService.screenshot();
 
+      // Store screenshot to the .mirror-vs/screenshots folder in the workspace root
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      let fileSavedMsg = '';
+      if (workspaceFolder) {
+        try {
+          const mirrorDir = path.join(workspaceFolder, '.mirror-vs', 'screenshots');
+          if (!fs.existsSync(mirrorDir)) {
+            fs.mkdirSync(mirrorDir, { recursive: true });
+          }
+          const fileName = `screenshot_${Date.now()}.png`;
+          const filePath = path.join(mirrorDir, fileName);
+          fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+          fileSavedMsg = `Saved screenshot to .mirror-vs/screenshots/${fileName}\n`;
+        } catch (err: any) {
+          fileSavedMsg = `Failed to save screenshot to .mirror-vs/screenshots: ${err.message}\n`;
+        }
+      }
+
       // Also get DOM summary for text-only reasoning
       const summary = await browserService.getPageSummary();
-      const elementList = summary.interactiveElements.length > 0
-        ? summary.interactiveElements.map(e => `  - ${e}`).join('\n')
-        : '  (no interactive elements detected)';
+      const elementList =
+        summary.interactiveElements.length > 0
+          ? summary.interactiveElements.map((e) => `  - ${e}`).join('\n')
+          : '  (no interactive elements detected)';
 
       const textSummary = `Page Title: "${summary.title}"
 Current URL: ${summary.url}
@@ -60,7 +81,7 @@ ${elementList}`;
 
       // The orchestrator strips out the base64 and sends it as a vision attachment.
       // Format must exactly match the extraction regex in orchestrator.ts.
-      return `Screenshot taken successfully.
+      return `${fileSavedMsg}Screenshot taken successfully.
 ${textSummary}
 (Base64 data hidden from output but sent to vision model: ${base64})`;
     }

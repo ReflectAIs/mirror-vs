@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,41 +34,31 @@ describe('executeFileTool', () => {
   describe('list_dir', () => {
     it('should throw if path is missing', async () => {
       const tool = { name: 'list_dir', path: undefined as any };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Missing "path" attribute for list_dir.',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for list_dir.');
     });
 
     it('should throw if directory does not exist', async () => {
       const tool = { name: 'list_dir', path: 'nonexistent' };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Directory does not exist: nonexistent',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Directory does not exist: nonexistent');
     });
   });
 
   describe('read_file', () => {
     it('should throw if path is missing', async () => {
       const tool = { name: 'read_file', path: undefined as any };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Missing "path" attribute for read_file.',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for read_file.');
     });
 
     it('should throw if file does not exist', async () => {
       const tool = { name: 'read_file', path: 'missing.ts' };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'File does not exist: missing.ts',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('File does not exist: missing.ts');
     });
   });
 
   describe('create_file', () => {
     it('should throw if path is missing', async () => {
       const tool = { name: 'create_file', path: undefined as any, content: 'test' };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Missing "path" attribute for create_file.',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for create_file.');
     });
 
     it('should throw if path escapes workspace', async () => {
@@ -77,27 +66,21 @@ describe('executeFileTool', () => {
       const unsafeGetPath = () => {
         throw new Error('Access denied: File path is outside of workspace.');
       };
-      await expect(executeFileTool(tool, unsafeGetPath)).rejects.toThrow(
-        'Access denied',
-      );
+      await expect(executeFileTool(tool, unsafeGetPath)).rejects.toThrow('Access denied');
     });
   });
 
   describe('write_file', () => {
     it('should throw if path is missing', async () => {
       const tool = { name: 'write_file', path: undefined as any, content: 'data' };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Missing "path" attribute for write_file.',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for write_file.');
     });
   });
 
   describe('patch_file', () => {
     it('should throw if path is missing', async () => {
       const tool = { name: 'patch_file', path: undefined as any, content: 'data' };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Missing "path" attribute for patch_file.',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for patch_file.');
     });
 
     it('should throw if file does not exist', async () => {
@@ -106,9 +89,7 @@ describe('executeFileTool', () => {
         path: 'nonexistent.ts',
         content: '<<<<<<< SEARCH\na\n=======\nb\n>>>>>>> REPLACE',
       };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'File does not exist: nonexistent.ts',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('File does not exist: nonexistent.ts');
     });
 
     it('should throw if no valid SEARCH/REPLACE blocks', async () => {
@@ -131,9 +112,7 @@ describe('executeFileTool', () => {
   describe('unsupported tool', () => {
     it('should throw for invalid tool name', async () => {
       const tool = { name: 'invalid_tool' as any };
-      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'Invalid file tool: invalid_tool',
-      );
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Invalid file tool: invalid_tool');
     });
   });
 });

@@ -50,7 +50,7 @@ async function confirmChangesWithDiff(
   originalPath: string,
   proposedContent: string,
   fileName: string,
-  checkpointAction: 'create' | 'replace'
+  checkpointAction: 'create' | 'replace',
 ): Promise<{ accepted: boolean; checkpointId: string | null }> {
   // Ensure parent directory exists before writing
   const parentDir = path.dirname(originalPath);
@@ -68,36 +68,27 @@ async function confirmChangesWithDiff(
   const encoder = new TextEncoder();
   await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(proposedContent));
 
-  // Open the file in the active editor so they can review and utilize standard VS Code/Git tools
-  try {
-    const doc = await vscode.workspace.openTextDocument(originalPath);
-    await vscode.window.showTextDocument(doc);
-  } catch (e) {
-    // ignore opening error
-  }
-
   // Start the non-blocking background review
-  ReviewManager.getInstance().startReview(originalPath, originalContent, proposedContent).then(async (accepted) => {
-    if (!accepted) {
-      if (checkpointId) {
-        await revertCheckpoint(checkpointId);
+  ReviewManager.getInstance()
+    .startReview(originalPath, originalContent, proposedContent)
+    .then(async (accepted) => {
+      if (!accepted) {
+        if (checkpointId) {
+          await revertCheckpoint(checkpointId);
+        } else {
+          const encoder = new TextEncoder();
+          await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(originalContent));
+        }
+        vscode.window.showInformationMessage(`⏪ Changes rejected and rolled back for ${fileName}`);
       } else {
-        const encoder = new TextEncoder();
-        await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(originalContent));
+        vscode.window.showInformationMessage(`✅ Changes accepted for ${fileName}`);
       }
-      vscode.window.showInformationMessage(`⏪ Changes rejected and rolled back for ${fileName}`);
-    } else {
-      vscode.window.showInformationMessage(`✅ Changes accepted for ${fileName}`);
-    }
-  });
+    });
 
   return { accepted: true, checkpointId };
 }
 
-export async function executeFileTool(
-  tool: ToolCall,
-  getSafePath: (p: string) => string
-): Promise<string> {
+export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) => string): Promise<string> {
   switch (tool.name) {
     case 'read_file': {
       if (!tool.path) throw new Error('Missing "path" attribute for read_file.');
@@ -140,18 +131,27 @@ export async function executeFileTool(
         throw new Error(`Not a directory: ${tool.path}`);
       }
       const entries = fs.readdirSync(safePath);
-      return entries.map(e => {
-        const isDir = fs.statSync(path.join(safePath, e)).isDirectory();
-        return `${e}${isDir ? '/' : ''}`;
-      }).join('\n') || '[Directory is empty]';
+      return (
+        entries
+          .map((e) => {
+            const isDir = fs.statSync(path.join(safePath, e)).isDirectory();
+            return `${e}${isDir ? '/' : ''}`;
+          })
+          .join('\n') || '[Directory is empty]'
+      );
     }
 
     case 'create_file': {
       if (!tool.path) throw new Error('Missing "path" attribute for create_file.');
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
-      
-      const { accepted, checkpointId } = await confirmChangesWithDiff(safePath, proposedContent, path.basename(tool.path), 'create');
+
+      const { accepted, checkpointId } = await confirmChangesWithDiff(
+        safePath,
+        proposedContent,
+        path.basename(tool.path),
+        'create',
+      );
       if (!accepted) {
         throw new Error('User rejected file creation.');
       }
@@ -164,7 +164,12 @@ export async function executeFileTool(
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
 
-      const { accepted, checkpointId } = await confirmChangesWithDiff(safePath, proposedContent, path.basename(tool.path), 'replace');
+      const { accepted, checkpointId } = await confirmChangesWithDiff(
+        safePath,
+        proposedContent,
+        path.basename(tool.path),
+        'replace',
+      );
       if (!accepted) {
         throw new Error('User rejected file overwrite changes.');
       }
@@ -189,7 +194,7 @@ export async function executeFileTool(
 
       for (let i = 0; i < patches.length; i++) {
         const { search, replace } = patches[i];
-        
+
         // Try exact match first
         if (fileContent.includes(search)) {
           fileContent = fileContent.replace(search, replace);
@@ -201,7 +206,7 @@ export async function executeFileTool(
 
           if (!matchRange) {
             throw new Error(
-              `SEARCH block #${i + 1} not found in file (failed both exact and fuzzy matches).\nSearch target:\n${search}`
+              `SEARCH block #${i + 1} not found in file (failed both exact and fuzzy matches).\nSearch target:\n${search}`,
             );
           }
 
@@ -211,7 +216,12 @@ export async function executeFileTool(
         }
       }
 
-      const { accepted, checkpointId } = await confirmChangesWithDiff(safePath, fileContent, path.basename(tool.path), 'replace');
+      const { accepted, checkpointId } = await confirmChangesWithDiff(
+        safePath,
+        fileContent,
+        path.basename(tool.path),
+        'replace',
+      );
       if (!accepted) {
         throw new Error('User rejected patch edits.');
       }

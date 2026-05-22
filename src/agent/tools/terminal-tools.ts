@@ -11,16 +11,9 @@ function isSensitiveCommand(command: string): boolean {
   const cmdLower = command.toLowerCase();
 
   // 1. Destructive check (rm, rmdir, del, rd, erase, remove-item)
-  const destructivePatterns = [
-    /\brm\b/i,
-    /\brmdir\b/i,
-    /\bdel\b/i,
-    /\brd\b/i,
-    /\berase\b/i,
-    /\bremove-item\b/i
-  ];
+  const destructivePatterns = [/\brm\b/i, /\brmdir\b/i, /\bdel\b/i, /\brd\b/i, /\berase\b/i, /\bremove-item\b/i];
 
-  const isDestructive = destructivePatterns.some(pattern => pattern.test(cmdLower));
+  const isDestructive = destructivePatterns.some((pattern) => pattern.test(cmdLower));
   if (isDestructive) {
     return true;
   }
@@ -45,7 +38,7 @@ function isSensitiveCommand(command: string): boolean {
     }
 
     // Match Unix absolute paths (e.g. /etc/passwd or /usr/bin)
-    const unixAbsMatch = command.match(/\b(\/[a-zA-Z0-9_\-\./]+)/);
+    const unixAbsMatch = command.match(/\b(\/[a-zA-Z0-9_\-./]+)/);
     if (unixAbsMatch) {
       const absPath = unixAbsMatch[1].toLowerCase();
       const workspaceUnix = workspaceFolderLower.replace(/\\/g, '/');
@@ -63,13 +56,10 @@ function isSensitiveCommand(command: string): boolean {
  */
 function containsBlockedGitCommand(cmd: string): boolean {
   const cmdLower = cmd.toLowerCase();
-  return /\bgit\s+push\b/i.test(cmdLower) || 
-         /\bgit\s+remote\s+(add|set-url|remove|rm|rename)\b/i.test(cmdLower);
+  return /\bgit\s+push\b/i.test(cmdLower) || /\bgit\s+remote\s+(add|set-url|remove|rm|rename)\b/i.test(cmdLower);
 }
 
-export async function executeTerminalTool(
-  tool: ToolCall
-): Promise<string> {
+export async function executeTerminalTool(tool: ToolCall): Promise<string> {
   const service = CommandService.getInstance();
 
   // ---- run_command ----
@@ -91,7 +81,7 @@ export async function executeTerminalTool(
         `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
         { modal: true }, // Modal dialog blocks safely and secures active developer attention
         'Allow Execution',
-        'Deny'
+        'Deny',
       );
 
       if (choice !== 'Allow Execution') {
@@ -122,9 +112,10 @@ export async function executeTerminalTool(
     const success = service.sendInputToTerminal(termName, input);
     if (!success) {
       const activeTerminals = service.getActiveTerminals();
-      const terminalList = activeTerminals.length > 0
-        ? activeTerminals.map(t => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
-        : 'none';
+      const terminalList =
+        activeTerminals.length > 0
+          ? activeTerminals.map((t) => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
+          : 'none';
       throw new Error(`Active terminal "${termName}" not found. Active terminals: ${terminalList}`);
     }
 
@@ -142,9 +133,10 @@ export async function executeTerminalTool(
     const success = service.closeTerminal(termName);
     if (!success) {
       const activeTerminals = service.getActiveTerminals();
-      const terminalList = activeTerminals.length > 0
-        ? activeTerminals.map(t => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
-        : 'none';
+      const terminalList =
+        activeTerminals.length > 0
+          ? activeTerminals.map((t) => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
+          : 'none';
       throw new Error(`Active terminal "${termName}" not found. Active terminals: ${terminalList}`);
     }
 
@@ -156,7 +148,9 @@ export async function executeTerminalTool(
     const termName = (tool as any).terminal_name || '';
 
     if (!termName) {
-      throw new Error('Missing "terminal_name" attribute for read_terminal. Use list_terminals first to see available terminal names.');
+      throw new Error(
+        'Missing "terminal_name" attribute for read_terminal. Use list_terminals first to see available terminal names.',
+      );
     }
 
     // Parse optional chars/lines parameter
@@ -165,9 +159,10 @@ export async function executeTerminalTool(
     const result = service.readTerminalOutput(termName, chars);
     if (!result) {
       const activeTerminals = service.getActiveTerminals();
-      const terminalList = activeTerminals.length > 0
-        ? activeTerminals.map(t => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
-        : 'none';
+      const terminalList =
+        activeTerminals.length > 0
+          ? activeTerminals.map((t) => `"${t.name}" (${t.running ? 'running' : 'exited'})`).join(', ')
+          : 'none';
       throw new Error(`Terminal "${termName}" not found. Active terminals: ${terminalList}`);
     }
 

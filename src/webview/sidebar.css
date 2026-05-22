@@ -946,6 +946,7 @@ select:focus {
   display: flex;
   flex-direction: column;
   max-width: 100%;
+  position: relative;
   animation: message-in 0.35s var(--ease-spring) forwards;
 }
 
@@ -986,6 +987,50 @@ select:focus {
 
 .message.assistant .message-meta {
   margin-left: 4px;
+}
+
+.message-actions {
+  display: flex;
+  gap: 6px;
+  position: absolute;
+  top: -8px;
+  right: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-glass);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 10;
+}
+
+.message.user .message-actions {
+  right: auto;
+  left: 12px;
+}
+
+.message:hover .message-actions {
+  opacity: 1;
+}
+
+.message-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--transition-fast);
+}
+
+.message-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .message-bubble {
