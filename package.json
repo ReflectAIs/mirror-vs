@@ -80,9 +80,55 @@
         "category": "Mirror VS"
       },
       {
+        "command": "mirror-vs.acceptAllReviews",
+        "title": "Accept All Changes",
+        "category": "Mirror VS"
+      },
+      {
         "command": "mirror-vs.diffReview",
         "title": "Compare Changes",
         "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.fixSelection",
+        "title": "Fix with Mirror VS",
+        "category": "Mirror VS"
+      },
+      {
+        "command": "mirror-vs.explainSelection",
+        "title": "Explain with Mirror VS",
+        "category": "Mirror VS"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "mirror-vs.fixSelection",
+          "when": "editorHasSelection",
+          "group": "mirror-vs@1"
+        },
+        {
+          "command": "mirror-vs.explainSelection",
+          "when": "editorHasSelection",
+          "group": "mirror-vs@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "mirror-vs.focusSidebar",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m"
+      },
+      {
+        "command": "mirror-vs.acceptReview",
+        "key": "alt+enter",
+        "mac": "alt+enter"
+      },
+      {
+        "command": "mirror-vs.rejectReview",
+        "key": "shift+alt+backspace",
+        "mac": "shift+alt+backspace"
       }
     ],
     "configuration": {
@@ -130,10 +176,10 @@
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "postinstall": "npm run compile",
-    "lint": "eslint 'src/**/*.ts' --max-warnings 100",
-    "lint:fix": "eslint 'src/**/*.ts' --fix",
-    "format": "prettier --write 'src/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts'",
+    "lint": "eslint \"src/**/*.ts\" --max-warnings 100",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

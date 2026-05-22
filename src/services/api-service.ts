@@ -97,7 +97,7 @@ export function streamOllamaChat(
   messages: { role: string; content: string; images?: string[] }[],
   signal: AbortSignal,
   onChunk: (text: string) => void,
-  onComplete: (fullText: string) => void,
+  onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
   onError: (err: any) => void
 ): void {
   const urlStr = `${host.replace(/\/$/, '')}/api/chat`;
@@ -152,7 +152,11 @@ export function streamOllamaChat(
             onChunk(chunkText);
           }
           if (parsed.done) {
-            onComplete(fullText);
+            const usage = (parsed.prompt_eval_count || parsed.eval_count) ? {
+              promptTokens: parsed.prompt_eval_count || 0,
+              completionTokens: parsed.eval_count || 0
+            } : undefined;
+            onComplete(fullText, usage);
             return;
           }
         } catch (e) {
@@ -162,6 +166,7 @@ export function streamOllamaChat(
     });
 
     res.on('end', () => {
+      let finalUsage: { promptTokens: number; completionTokens: number } | undefined = undefined;
       // Parse any remaining buffer
       if (buffer.trim()) {
         try {
@@ -171,11 +176,17 @@ export function streamOllamaChat(
             fullText += chunkText;
             onChunk(chunkText);
           }
+          if (parsed.prompt_eval_count || parsed.eval_count) {
+            finalUsage = {
+              promptTokens: parsed.prompt_eval_count || 0,
+              completionTokens: parsed.eval_count || 0
+            };
+          }
         } catch (e) {
           // ignore
         }
       }
-      onComplete(fullText);
+      onComplete(fullText, finalUsage);
     });
   });
 
@@ -208,7 +219,7 @@ export function streamDeepSeekChat(
   messages: { role: string; content: string; images?: string[] }[],
   signal: AbortSignal,
   onChunk: (text: string) => void,
-  onComplete: (fullText: string) => void,
+  onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
   onError: (err: any) => void
 ): void {
   const urlStr = 'https://api.deepseek.com/chat/completions';
@@ -218,6 +229,9 @@ export function streamDeepSeekChat(
     model,
     messages,
     stream: true,
+    stream_options: {
+      include_usage: true
+    }
   });
 
   const requestOptions: https.RequestOptions = {
@@ -251,6 +265,7 @@ export function streamDeepSeekChat(
 
     let fullText = '';
     let buffer = '';
+    let usage: { promptTokens: number; completionTokens: number } | undefined = undefined;
 
     res.on('data', (chunk) => {
       buffer += chunk.toString();
@@ -264,7 +279,7 @@ export function streamDeepSeekChat(
         }
 
         if (cleanLine === 'data: [DONE]') {
-          onComplete(fullText);
+          onComplete(fullText, usage);
           return;
         }
 
@@ -277,6 +292,12 @@ export function streamDeepSeekChat(
               fullText += chunkText;
               onChunk(chunkText);
             }
+            if (parsed.usage) {
+              usage = {
+                promptTokens: parsed.usage.prompt_tokens,
+                completionTokens: parsed.usage.completion_tokens
+              };
+            }
           } catch (e) {
             console.warn('Failed to parse SSE data block:', jsonStr, e);
           }
@@ -285,7 +306,7 @@ export function streamDeepSeekChat(
     });
 
     res.on('end', () => {
-      onComplete(fullText);
+      onComplete(fullText, usage);
     });
   });
 

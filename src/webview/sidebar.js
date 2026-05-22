@@ -34,6 +34,7 @@
   
   const contextDot = document.getElementById('context-dot');
   const contextFileName = document.getElementById('context-file-name');
+  const acceptAllBtn = document.getElementById('accept-all-btn');
   
   const promptInput = document.getElementById('prompt-input');
   const sendBtn = document.getElementById('send-btn');
@@ -294,7 +295,7 @@
         closeAutocomplete();
       }
     } else {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if ((e.key === 'Enter' && !e.shiftKey) || (e.key === 'Enter' && e.ctrlKey)) {
         e.preventDefault();
         submitMessage();
       }
@@ -302,6 +303,12 @@
   });
 
   sendBtn.addEventListener('click', submitMessage);
+
+  if (acceptAllBtn) {
+    acceptAllBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'acceptAllReviews' });
+    });
+  }
 
   // 6b. Autocomplete Logic
   function handleAutocompleteSearch() {
@@ -1097,6 +1104,39 @@
         break;
       }
 
+      case 'activeReviewsChanged': {
+        const count = message.count;
+        if (acceptAllBtn) {
+          if (count > 0) {
+            acceptAllBtn.textContent = `✨ Accept All (${count})`;
+            acceptAllBtn.classList.remove('hidden');
+          } else {
+            acceptAllBtn.classList.add('hidden');
+          }
+        }
+        break;
+      }
+
+      case 'prefillPrompt': {
+        promptInput.value = message.text;
+        promptInput.focus();
+        autoGrowTextarea();
+        break;
+      }
+
+      case 'tokenUsage': {
+        const { input, output, total, cost } = message.usage;
+        const dash = document.getElementById('usage-dashboard');
+        const tokensEl = document.getElementById('usage-tokens');
+        const costEl = document.getElementById('usage-cost');
+        if (dash && tokensEl && costEl) {
+          tokensEl.textContent = total.toLocaleString();
+          costEl.textContent = `$${cost.toFixed(4)}`;
+          dash.classList.remove('hidden');
+        }
+        break;
+      }
+
       case 'updateChatHistory': {
         const history = message.history;
         chatHistory = history || [];
@@ -1206,6 +1246,16 @@
           }
         }
         break;
+      }
+    }
+  });
+
+  // Window-level escape key listener to stop streaming
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isSending) {
+      e.preventDefault();
+      if (stopBtn && !stopBtn.classList.contains('hidden')) {
+        stopBtn.click();
       }
     }
   });
@@ -1708,6 +1758,15 @@
         welcomeCard.style.display = 'block';
         chatMessages.appendChild(welcomeCard);
       }
+      // Hide and reset usage dashboard when history is empty
+      const dash = document.getElementById('usage-dashboard');
+      const tokensEl = document.getElementById('usage-tokens');
+      const costEl = document.getElementById('usage-cost');
+      if (dash && tokensEl && costEl) {
+        tokensEl.textContent = '0';
+        costEl.textContent = '$0.0000';
+        dash.classList.add('hidden');
+      }
       return;
     }
 
@@ -1752,7 +1811,7 @@
 
   // Scroll pagination trigger
   chatMessages.addEventListener('scroll', () => {
-    const threshold = 40;
+    const threshold = 15;
     const isAtBottom = (chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight) <= threshold;
     userIsAtBottom = isAtBottom;
 

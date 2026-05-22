@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { ToolCall } from '../types';
-import { createCheckpoint } from '../../utils/editor-utils';
+import { createCheckpoint, revertCheckpoint } from '../../utils/editor-utils';
+import { ReviewManager } from '../../services/review-manager';
 
 function normalizeLineEndings(str: string): string {
   return str.replace(/\r\n/g, '\n');
@@ -57,6 +58,9 @@ async function confirmChangesWithDiff(
     fs.mkdirSync(parentDir, { recursive: true });
   }
 
+  // Read original content before it gets overwritten
+  const originalContent = fs.existsSync(originalPath) ? fs.readFileSync(originalPath, 'utf8') : '';
+
   // Create checkpoint first so the user can easily revert if needed
   const checkpointId = await createCheckpoint(originalPath, checkpointAction);
 
@@ -71,6 +75,21 @@ async function confirmChangesWithDiff(
   } catch (e) {
     // ignore opening error
   }
+
+  // Start the non-blocking background review
+  ReviewManager.getInstance().startReview(originalPath, originalContent, proposedContent).then(async (accepted) => {
+    if (!accepted) {
+      if (checkpointId) {
+        await revertCheckpoint(checkpointId);
+      } else {
+        const encoder = new TextEncoder();
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(originalContent));
+      }
+      vscode.window.showInformationMessage(`⏪ Changes rejected and rolled back for ${fileName}`);
+    } else {
+      vscode.window.showInformationMessage(`✅ Changes accepted for ${fileName}`);
+    }
+  });
 
   return { accepted: true, checkpointId };
 }

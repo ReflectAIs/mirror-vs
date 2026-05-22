@@ -72,7 +72,8 @@ export type WebviewToExtensionMessage =
   | { type: 'openDiff'; file: string }
   | { type: 'commitGitChanges' }
   | { type: 'getGitDiff'; file: string }
-  | { type: 'applyGitDiff'; file: string; action: 'accept' | 'reject' };
+  | { type: 'applyGitDiff'; file: string; action: 'accept' | 'reject' }
+  | { type: 'acceptAllReviews' };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
@@ -93,4 +94,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'screenshotCapture'; base64: string }
   | { type: 'gitChanges'; changes: { file: string; status: string }[] }
   | { type: 'cancelStream' }
-  | { type: 'gitDiffContent'; file: string; diff: GitFileDiff | null };
+  | { type: 'gitDiffContent'; file: string; diff: GitFileDiff | null }
+  | { type: 'prefillPrompt'; text: string }
+  | { type: 'tokenUsage'; usage: { input: number; output: number; total: number; cost: number } }
+  | { type: 'activeReviewsChanged'; count: number };

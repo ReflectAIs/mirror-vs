@@ -693,6 +693,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       let fullText = '';
+      let isFinished = false;
 
       if (provider === 'ollama') {
         streamOllamaChat(
@@ -701,22 +702,39 @@ USER/ENVIRONMENT TOOL RESPONSE:
           messages,
           signal,
           (chunk) => {
+            if (isFinished) return;
             fullText += chunk;
             this._postMessage({ type: 'chatResponseChunk', text: chunk });
 
             if (this.hasCompleteToolCall(fullText)) {
+              isFinished = true;
               completionController?.abort();
               const cleaned = this.getCleanedToolResponse(fullText);
               this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
               resolve(cleaned);
             }
           },
-          (completedText) => {
+          (completedText, usage) => {
+            if (isFinished) return;
+            isFinished = true;
             const cleaned = this.getCleanedToolResponse(completedText);
             this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
+            if (usage) {
+              this._postMessage({
+                type: 'tokenUsage',
+                usage: {
+                  input: usage.promptTokens,
+                  output: usage.completionTokens,
+                  total: usage.promptTokens + usage.completionTokens,
+                  cost: 0
+                }
+              });
+            }
             resolve(cleaned);
           },
           (err) => {
+            if (isFinished) return;
+            isFinished = true;
             reject(err);
           }
         );
@@ -727,22 +745,42 @@ USER/ENVIRONMENT TOOL RESPONSE:
           messages,
           signal,
           (chunk) => {
+            if (isFinished) return;
             fullText += chunk;
             this._postMessage({ type: 'chatResponseChunk', text: chunk });
 
             if (this.hasCompleteToolCall(fullText)) {
+              isFinished = true;
               completionController?.abort();
               const cleaned = this.getCleanedToolResponse(fullText);
               this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
               resolve(cleaned);
             }
           },
-          (completedText) => {
+          (completedText, usage) => {
+            if (isFinished) return;
+            isFinished = true;
             const cleaned = this.getCleanedToolResponse(completedText);
             this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
+            if (usage) {
+              const inputCost = (usage.promptTokens / 1000000) * 0.14;
+              const outputCost = (usage.completionTokens / 1000000) * 0.28;
+              const totalCost = inputCost + outputCost;
+              this._postMessage({
+                type: 'tokenUsage',
+                usage: {
+                  input: usage.promptTokens,
+                  output: usage.completionTokens,
+                  total: usage.promptTokens + usage.completionTokens,
+                  cost: totalCost
+                }
+              });
+            }
             resolve(cleaned);
           },
           (err) => {
+            if (isFinished) return;
+            isFinished = true;
             reject(err);
           }
         );

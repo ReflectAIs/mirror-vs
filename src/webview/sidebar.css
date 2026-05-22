@@ -1427,10 +1427,56 @@ select:focus {
 .context-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   font-size: 10px;
   color: var(--text-muted);
   padding: 2px 4px;
+}
+
+.context-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.context-actions {
+  display: flex;
+  align-items: center;
+}
+
+.accept-all-btn {
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  color: var(--color-success);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--transition-normal);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(52, 211, 153, 0.05);
+}
+
+.accept-all-btn:hover {
+  background: rgba(52, 211, 153, 0.16);
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.2);
+  transform: translateY(-0.5px);
+  color: #fff;
+}
+
+.accept-all-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.accept-all-btn.hidden {
+  display: none !important;
 }
 
 .context-dot {
@@ -2125,3 +2171,40 @@ select:focus {
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border-glass); border-radius: 4px; }
+
+/* ==========================================================================
+   Token & Cost Dashboard Panel
+   ========================================================================== */
+.usage-dashboard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  transition: opacity 0.3s var(--ease-smooth), transform 0.3s var(--ease-smooth);
+  animation: message-in 0.3s var(--ease-spring) forwards;
+}
+
+.usage-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.usage-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+#usage-tokens, #usage-cost {
+  font-family: var(--font-mono);
+  color: var(--color-primary-light);
+  font-weight: 700;
+}

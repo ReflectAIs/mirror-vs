@@ -253,8 +253,13 @@
     <div class="input-panel">
       <!-- Active File Context -->
       <div id="context-bar" class="context-bar">
-        <span class="context-dot" id="context-dot"></span>
-        <span id="context-file-name" class="context-file-name">No active file open</span>
+        <div class="context-info">
+          <span class="context-dot" id="context-dot"></span>
+          <span id="context-file-name" class="context-file-name">No active file open</span>
+        </div>
+        <div class="context-actions">
+          <button id="accept-all-btn" class="accept-all-btn hidden" title="Accept All Active Reviews">✨ Accept All</button>
+        </div>
       </div>
 
       <!-- Autocomplete + Chips -->
@@ -278,6 +283,18 @@
             <rect x="4" y="4" width="8" height="8" fill="currentColor" />
           </svg>
         </button>
+      </div>
+
+      <!-- Token & Cost Dashboard -->
+      <div id="usage-dashboard" class="usage-dashboard hidden">
+        <span class="usage-stat">
+          <span class="usage-label">Tokens:</span>
+          <span id="usage-tokens">0</span>
+        </span>
+        <span class="usage-stat">
+          <span class="usage-label">Cost:</span>
+          <span id="usage-cost">$0.0000</span>
+        </span>
       </div>
     </div>
   </div>

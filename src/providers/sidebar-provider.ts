@@ -8,6 +8,7 @@ import { LLMProvider, ExtensionSettings, ChatMessage, WebviewToExtensionMessage,
 import { CommandService } from '../services/command-service';
 import { AgentOrchestrator } from '../agent/orchestrator';
 import { fetchOllamaModels } from '../services/api-service';
+import { ReviewManager } from '../services/review-manager';
 
 export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
@@ -57,9 +58,13 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const visibleEditorsListener = vscode.window.onDidChangeVisibleTextEditors(() => {
       this._sendActiveFileContext();
     });
+    const activeReviewsListener = ReviewManager.getInstance().onDidChangeActiveReviews(() => {
+      this._sendActiveReviewsCount();
+    });
     webviewView.onDidDispose(() => {
       activeEditorListener.dispose();
       visibleEditorsListener.dispose();
+      activeReviewsListener.dispose();
     });
 
     // Set up message listener from Webview
@@ -393,6 +398,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
+        case 'acceptAllReviews': {
+          await vscode.commands.executeCommand('mirror-vs.acceptAllReviews');
+          break;
+        }
       }
     });
 
@@ -400,6 +409,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
     await this._sendSettingsToWebview();
     this._sendActiveFileContext();
+    this._sendActiveReviewsCount();
     this._sendChatSessionsToWebview();
     this._sendChatHistoryToWebview();
     this._sendWorkspaceFiles();
@@ -482,6 +492,15 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private _sendActiveReviewsCount() {
+    if (!this._view) return;
+    const count = ReviewManager.getInstance().getActiveReviewsCount();
+    this._view.webview.postMessage({
+      type: 'activeReviewsChanged',
+      count: count
+    });
+  }
+
   private async _fetchAndSendOllamaModels() {
     if (!this._view) return;
 
@@ -537,7 +556,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
     htmlContent = htmlContent.replace('{{styleUri}}', cssUri.toString());
     htmlContent = htmlContent.replace('{{scriptUri}}', jsUri.toString());
-    htmlContent = htmlContent.replace('{{logoUri}}', logoUri.toString());
+    htmlContent = htmlContent.replace(/{{logoUri}}/g, logoUri.toString());
     htmlContent = htmlContent.replace(/{{cspSource}}/g, cspSource);
 
     return htmlContent;
@@ -715,5 +734,24 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     } catch (e) {
       console.warn('Workspace files fetch failed:', e);
     }
+  }
+
+  public handleSelectionCommand(action: 'fix' | 'explain', text: string) {
+    if (!this._view) {
+      return;
+    }
+    if (!text.trim()) {
+      vscode.window.showWarningMessage('Please select some code in the active editor first!');
+      return;
+    }
+
+    const formattedText = action === 'fix' 
+      ? `Fix the following code:\n\`\`\`\n${text}\n\`\`\``
+      : `Explain the following code:\n\`\`\`\n${text}\n\`\`\``;
+
+    this._view.webview.postMessage({
+      type: 'prefillPrompt',
+      text: formattedText
+    });
   }
 }

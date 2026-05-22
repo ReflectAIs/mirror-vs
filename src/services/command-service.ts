@@ -466,12 +466,62 @@ export class CommandService {
     terminal.show(false);
     this.logToDebug(`Created visible terminal "${terminalName}" for short command (cwd: "${cwd}"): "${cmd}"`);
 
-    // Race: wait for exit OR timeout
+    // Race: wait for exit OR timeout OR inactivity/interactive prompt monitor
     const timeoutPromise = new Promise<'timeout'>((resolve) =>
       setTimeout(() => resolve('timeout'), SHORT_CMD_TIMEOUT_MS)
     );
 
-    const result = await Promise.race([pty.exitPromise, timeoutPromise]);
+    let lastOutputLength = 0;
+    let inactiveTicks = 0;
+    const intervalMs = 1000; // Check every 1 second
+    const inactivityTimeoutSeconds = 15;
+    const promptInactivityTimeoutSeconds = 4;
+    let monitorInterval: NodeJS.Timeout | undefined;
+
+    const monitorPromise = new Promise<'inactive' | 'prompt'>((resolve) => {
+      monitorInterval = setInterval(() => {
+        if (!pty.running) {
+          if (monitorInterval) {
+            clearInterval(monitorInterval);
+          }
+          return;
+        }
+
+        const currentOutput = pty.getFullOutput();
+        const currentLength = currentOutput.length;
+
+        if (currentLength === lastOutputLength) {
+          inactiveTicks++;
+        } else {
+          inactiveTicks = 0;
+          lastOutputLength = currentLength;
+        }
+
+        const trimmedOutput = currentOutput.trim();
+        // Check if output ends in a standard prompt ending or confirmation query
+        const endsWithPrompt = /([?:]\s*$)|(\[y\/n\]\s*$)|(\(y\/n\)\s*$)|(confirm\s*$)|(choice\s*$)/i.test(trimmedOutput);
+
+        if (endsWithPrompt && inactiveTicks >= promptInactivityTimeoutSeconds) {
+          this.logToDebug(`Command in terminal "${terminalName}" appears to be hung waiting for input (prompt detected).`);
+          if (monitorInterval) {
+            clearInterval(monitorInterval);
+          }
+          resolve('prompt');
+        } else if (inactiveTicks >= inactivityTimeoutSeconds) {
+          this.logToDebug(`Command in terminal "${terminalName}" has been inactive (no output) for ${inactivityTimeoutSeconds}s.`);
+          if (monitorInterval) {
+            clearInterval(monitorInterval);
+          }
+          resolve('inactive');
+        }
+      }, intervalMs);
+    });
+
+    const result = await Promise.race([pty.exitPromise, timeoutPromise, monitorPromise]);
+
+    if (monitorInterval) {
+      clearInterval(monitorInterval);
+    }
 
     if (result === 'timeout') {
       this.logToDebug(`Command in terminal "${terminalName}" timed out after ${SHORT_CMD_TIMEOUT_MS}ms, still running.`);
@@ -486,7 +536,39 @@ export class CommandService {
       ].join('\n');
     }
 
-    // Process exited
+    if (result === 'prompt') {
+      this.logToDebug(`Command in terminal "${terminalName}" early resolved due to pending interactive prompt.`);
+      const partialOutput = pty.getRecentOutput(10000);
+      const lines = partialOutput.trim().split('\n');
+      const lastFewLines = lines.slice(-5).join('\n');
+      return [
+        `⚠️ Command appears to be stalled waiting for user input or confirmation.`,
+        ``,
+        `Last output lines:`,
+        lastFewLines || '[No output]',
+        ``,
+        `Use: <send_terminal_input terminal_name="${terminalName}">input_value</send_terminal_input> to submit the response, or <close_terminal terminal_name="${terminalName}" /> to terminate.`,
+      ].join('\n');
+    }
+
+    if (result === 'inactive') {
+      this.logToDebug(`Command in terminal "${terminalName}" early resolved due to ${inactivityTimeoutSeconds}s of silence.`);
+      const partialOutput = pty.getRecentOutput(10000);
+      return [
+        `⚠️ Command has been running but was inactive (produced no new output) for ${inactivityTimeoutSeconds} seconds.`,
+        ``,
+        `Recent Output:`,
+        partialOutput || '[No output]',
+        ``,
+        `The command is still running in terminal "${terminalName}".`,
+        `You can:`,
+        `- Wait longer and read the output again: <read_terminal terminal_name="${terminalName}" />`,
+        `- Send key input/signals (e.g. Ctrl+C): <send_terminal_input terminal_name="${terminalName}">Ctrl+C</send_terminal_input>`,
+        `- Close/kill the terminal: <close_terminal terminal_name="${terminalName}" />`,
+      ].join('\n');
+    }
+
+    // Process exited (result is from pty.exitPromise)
     const { code, output } = result;
     this.logToDebug(`Command in terminal "${terminalName}" exited with code ${code}`);
 
