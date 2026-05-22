@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SecretService } from '../services/secret-service';
+import { StorageService } from '../services/storage-service';
 import { getActiveFileName, getActiveFileContext, applyCodeToActiveEditor, revertCheckpoint } from '../utils/editor-utils';
 import { LLMProvider, ExtensionSettings, ChatMessage, WebviewToExtensionMessage, ChatSession } from '../types';
 import { CommandService } from '../services/command-service';
@@ -12,10 +13,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
   private _view?: vscode.WebviewView;
   private readonly _secretService: SecretService;
+  private readonly _storageService: StorageService;
   private readonly _orchestrator: AgentOrchestrator;
 
   constructor(private readonly _context: vscode.ExtensionContext) {
     this._secretService = new SecretService(_context.secrets);
+    this._storageService = new StorageService(_context.workspaceState);
+
+    // Migrate legacy storage to per-session keys (non-blocking, fires in background)
+    this._storageService.migrateFromLegacyIfNeeded().then(() => {
+      this._storageService.trimOldSessions(50);
+    });
 
     // Initialize decoupled Agent Orchestrator
     this._orchestrator = new AgentOrchestrator(
@@ -538,18 +546,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   private _getChatHistory(): ChatMessage[] {
     const activeId = this._getActiveSessionId();
     if (!activeId) return [];
-    const sessions = this._getChatSessions();
-    const session = sessions.find(s => s.id === activeId);
-    return session ? session.messages : [];
+    return this._storageService.loadMessages(activeId);
   }
 
   private async _saveChatHistory(history: ChatMessage[]): Promise<void> {
     const activeId = this._getActiveSessionId();
     if (!activeId) return;
-    const sessions = this._getChatSessions();
+
+    // Update session metadata
+    const sessions = this._storageService.getSessions();
     const sessionIndex = sessions.findIndex(s => s.id === activeId);
     if (sessionIndex !== -1) {
-      sessions[sessionIndex].messages = history;
       if (sessions[sessionIndex].title === 'New Session' && history.length > 0) {
         const firstUser = history.find(m => m.role === 'user');
         if (firstUser) {
@@ -564,10 +571,16 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         }
       }
       sessions[sessionIndex].timestamp = Date.now();
-      await this._saveChatSessions(sessions);
-      this._sendChatSessionsToWebview();
     }
-    await this._context.workspaceState.update('mirror-vs.chatHistory', history);
+    await this._storageService.saveSessions(sessions);
+    this._sendChatSessionsToWebview();
+
+    // Persist messages to per-session key (strip base64 images to avoid bloat)
+    const stripped = history.map(msg => ({
+      ...msg,
+      images: msg.images ? msg.images.map(() => '[IMAGE STRIPPED]') : undefined,
+    }));
+    await this._storageService.saveMessages(activeId, stripped);
     this._sendChatHistoryToWebview();
   }
 
@@ -581,7 +594,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _ensureDefaultSession(): Promise<void> {
-    const sessions = this._getChatSessions();
+    const sessions = this._storageService.getSessions();
     let activeId = this._getActiveSessionId();
 
     if (sessions.length === 0) {
@@ -593,7 +606,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       };
       sessions.push(defaultSession);
       activeId = defaultSession.id;
-      await this._saveChatSessions(sessions);
+      await this._storageService.saveSessions(sessions);
       await this._saveActiveSessionId(activeId);
     } else if (!activeId || !sessions.find(s => s.id === activeId)) {
       activeId = sessions[0].id;
@@ -602,7 +615,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _createNewSession(): Promise<void> {
-    const sessions = this._getChatSessions();
+    const sessions = this._storageService.getSessions();
     const newSession: ChatSession = {
       id: 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
       title: 'New Session',
@@ -610,7 +623,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       messages: [],
     };
     sessions.unshift(newSession);
-    await this._saveChatSessions(sessions);
+    await this._storageService.saveSessions(sessions);
     await this._saveActiveSessionId(newSession.id);
 
     this._sendChatSessionsToWebview();
@@ -618,7 +631,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _selectSession(sessionId: string): Promise<void> {
-    const sessions = this._getChatSessions();
+    const sessions = this._storageService.getSessions();
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
       await this._saveActiveSessionId(sessionId);
@@ -628,15 +641,18 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async _deleteSession(sessionId: string): Promise<void> {
-    let sessions = this._getChatSessions();
+    const sessions = this._storageService.getSessions();
     const activeId = this._getActiveSessionId();
 
-    sessions = sessions.filter(s => s.id !== sessionId);
-    await this._saveChatSessions(sessions);
+    const filtered = sessions.filter(s => s.id !== sessionId);
+    await this._storageService.saveSessions(filtered);
+
+    // Also delete the messages key for this session
+    await this._storageService.deleteMessages(sessionId);
 
     if (activeId === sessionId) {
-      if (sessions.length > 0) {
-        await this._saveActiveSessionId(sessions[0].id);
+      if (filtered.length > 0) {
+        await this._saveActiveSessionId(filtered[0].id);
       } else {
         await this._saveActiveSessionId('');
         await this._ensureDefaultSession();
@@ -649,14 +665,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     this._sendChatHistoryToWebview();
   }
 
-  private _getChatSessions(): ChatSession[] {
-    return this._context.workspaceState.get<ChatSession[]>('mirror-vs.chatSessions', []);
-  }
-
-  private async _saveChatSessions(sessions: ChatSession[]): Promise<void> {
-    await this._context.workspaceState.update('mirror-vs.chatSessions', sessions);
-  }
-
   private _getActiveSessionId(): string | undefined {
     return this._context.workspaceState.get<string>('mirror-vs.activeSessionId');
   }
@@ -667,8 +675,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
   private _sendChatSessionsToWebview(): void {
     if (!this._view) return;
-    const sessions = this._getChatSessions();
+    const sessions = this._storageService.getSessions();
     const activeSessionId = this._getActiveSessionId() || '';
+    // Send messageCount derived from loaded messages (we don't have the count in meta,
+    // but the webview only needs id/title/timestamp)
     this._view.webview.postMessage({
       type: 'updateChatSessions',
       sessions,

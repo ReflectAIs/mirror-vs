@@ -22,7 +22,16 @@ export interface ChatSession {
   id: string;
   title: string;
   timestamp: number;
+  /** Messages are NOT stored inline here — they are loaded separately via workspaceState keys */
   messages: ChatMessage[];
+}
+
+/** Lightweight session metadata (no messages) used for the sessions list sidebar */
+export interface ChatSessionMeta {
+  id: string;
+  title: string;
+  timestamp: number;
+  messageCount: number;
 }
 
 export interface GitDiffLine {
