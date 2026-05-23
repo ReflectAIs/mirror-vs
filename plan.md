@@ -17,6 +17,8 @@
 
 ### ✅ DONE: PREMIUM UI OVERHAUL
 - **Logo integration**: `logo.png` displayed in both header and welcome card
+- **Logo integration**: `logo.png` displayed in both header and welcome card (via `media/logo.png`)
+- **Marketplace icon**: SVG diamond logo at `resources/icon.svg` (set via `package.json` icon field)
 - **Animated gradient header**: Premium glassmorphic header with backdrop blur
 - **Smooth spring animations**: Drawers use `cubic-bezier(0.34, 1.56, 0.64, 1)` for organic motion
 - **Dark depth**: Radial gradient backgrounds with accent color glows
