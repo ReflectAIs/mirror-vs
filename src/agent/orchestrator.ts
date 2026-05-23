@@ -216,7 +216,7 @@ export class AgentOrchestrator {
     private readonly _saveChatHistory: (history: ChatMessage[]) => Promise<void>,
     private readonly _postMessage: (msg: any) => void,
     private readonly _getSafePath: (targetPath: string) => string,
-  ) { }
+  ) {}
 
   public cancelActiveStream() {
     if (this._activeAbortController) {
@@ -469,7 +469,7 @@ export class AgentOrchestrator {
             let result: string;
             try {
               const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-              const figmaKey = await this._getSecret('figma_api_key') || '';
+              const figmaKey = (await this._getSecret('figma_api_key')) || '';
               result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
 
               let checkpointId: string | undefined;
@@ -1232,7 +1232,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           model,
           messages,
           controller.signal,
-          () => { }, // ignore chunks
+          () => {}, // ignore chunks
           (fullText) => resolve(fullText),
           (err) => reject(err),
         );
@@ -1242,7 +1242,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           model,
           messages,
           controller.signal,
-          () => { }, // ignore chunks
+          () => {}, // ignore chunks
           (fullText) => resolve(fullText),
           (err) => reject(err),
         );

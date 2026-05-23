@@ -43,7 +43,7 @@ export class ReviewManager implements vscode.CodeLensProvider {
     overviewRulerLane: vscode.OverviewRulerLane.Left,
     textDecoration: 'line-through rgba(239, 68, 68, 0.4)', // Strikethrough for deleted lines!
     gutterIconPath: vscode.Uri.parse(
-      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" stroke="%23ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>'
+      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" stroke="%23ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>',
     ),
     gutterIconSize: 'contain',
   });
@@ -164,7 +164,7 @@ export class ReviewManager implements vscode.CodeLensProvider {
             originalUri,
             proposedUri,
             `Review Changes: ${path.basename(review.filePath)}`,
-            { preview: false }
+            { preview: false },
           );
         }
       }),
@@ -200,27 +200,23 @@ export class ReviewManager implements vscode.CodeLensProvider {
   }
 
   private getDeletedContentText(lines: string[], isAtEnd = false): string {
-    const nonBins = lines.map(l => l.trim()).filter(Boolean);
+    const nonBins = lines.map((l) => l.trim()).filter(Boolean);
     if (nonBins.length === 0) {
       return isAtEnd
         ? ` ➖ [deleted ${lines.length} empty line${lines.length > 1 ? 's' : ''} at end of file]`
         : `➖ [deleted ${lines.length} empty line${lines.length > 1 ? 's' : ''}]`;
     }
-    
-    const joined = nonBins
-      .map(l => l.length > 35 ? l.substring(0, 35) + '...' : l)
-      .join(' ‖ ');
-      
+
+    const joined = nonBins.map((l) => (l.length > 35 ? l.substring(0, 35) + '...' : l)).join(' ‖ ');
+
     const truncated = joined.length > 90 ? joined.substring(0, 90) + '...' : joined;
-    
+
     if (isAtEnd) {
       return lines.length === 1
         ? ` ➖ [deleted: "${truncated}" at end of file]`
         : ` ➖ [deleted ${lines.length} lines: "${truncated}" at end of file]`;
     } else {
-      return lines.length === 1
-        ? `➖ [deleted: "${truncated}"]`
-        : `➖ [deleted ${lines.length} lines: "${truncated}"]`;
+      return lines.length === 1 ? `➖ [deleted: "${truncated}"]` : `➖ [deleted ${lines.length} lines: "${truncated}"]`;
     }
   }
 
@@ -318,11 +314,14 @@ export class ReviewManager implements vscode.CodeLensProvider {
       this.updateStatusBar();
 
       // Open the original file in the active editor (now containing the inline diff content)
-      vscode.workspace.openTextDocument(filePath).then((doc) => {
-        vscode.window.showTextDocument(doc, { preview: false }).then((editor) => {
-          this.applyDecorations(editor);
-        });
-      }, () => {});
+      vscode.workspace.openTextDocument(filePath).then(
+        (doc) => {
+          vscode.window.showTextDocument(doc, { preview: false }).then((editor) => {
+            this.applyDecorations(editor);
+          });
+        },
+        () => {},
+      );
 
       // Show dual-mode non-blocking notification toast
       this.showReviewNotification(filePath);
@@ -400,7 +399,8 @@ export class ReviewManager implements vscode.CodeLensProvider {
         (t) =>
           t.input instanceof vscode.TabInputTextDiff &&
           (this.normalizePath(t.input.modified.fsPath) === normPath ||
-            (review.tempOriginalPath && this.normalizePath(t.input.original.fsPath) === this.normalizePath(review.tempOriginalPath)))
+            (review.tempOriginalPath &&
+              this.normalizePath(t.input.original.fsPath) === this.normalizePath(review.tempOriginalPath))),
       );
       if (proposedTab) {
         await vscode.window.tabGroups.close(proposedTab);
