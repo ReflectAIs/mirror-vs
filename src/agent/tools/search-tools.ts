@@ -9,10 +9,10 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
     const query = encodeURIComponent(tool.query);
     try {
       const res = await fetch(`https://html.duckduckgo.com/html/?q=${query}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
       });
       const text = await res.text();
-      
+
       const results = [];
       const regex = /<a class="result__snippet[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gs;
       let match;
@@ -24,7 +24,12 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
         let snippet = match[2].replace(/<b>/g, '').replace(/<\/b>/g, '').trim();
         results.push({ url, snippet });
       }
-      return results.slice(0, 5).map(r => `URL: ${r.url}\nSnippet: ${r.snippet}\n`).join('---\n') || 'No web search results found.';
+      return (
+        results
+          .slice(0, 5)
+          .map((r) => `URL: ${r.url}\nSnippet: ${r.snippet}\n`)
+          .join('---\n') || 'No web search results found.'
+      );
     } catch (e: any) {
       return `Web search failed: ${e.message}`;
     }

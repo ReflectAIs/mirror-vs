@@ -57,4 +57,3 @@ export const StatusBarAlignment = { Left: 1, Right: 2 };
 export const ThemeColor = {};
 
 export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment };
-

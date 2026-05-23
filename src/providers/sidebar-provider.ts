@@ -195,14 +195,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           // Use explicit index if provided, otherwise fall back to content matching
           let idx = messageIndex !== undefined && messageIndex >= 0 ? messageIndex : -1;
           if (idx === -1) {
-            idx = history.findIndex(m => m.role === role && m.content === text);
+            idx = history.findIndex((m) => m.role === role && m.content === text);
           }
           if (idx !== -1 && idx < history.length) {
             this._orchestrator.cancelActiveStream(); // Cancel any running generation
             const sliceIndex = inclusive ? idx + 1 : idx;
             const newHistory = history.slice(0, sliceIndex);
             const deletedHistory = history.slice(sliceIndex);
-            
+
             // Auto-revert any checkpoints in the deleted history
             for (let i = deletedHistory.length - 1; i >= 0; i--) {
               const msg = deletedHistory[i];
@@ -216,7 +216,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 }
               }
             }
-            
+
             await this._saveChatHistory(newHistory);
           }
           break;

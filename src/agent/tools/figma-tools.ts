@@ -34,13 +34,13 @@ export async function executeFigmaTool(tool: ToolCall, figmaKey?: string, worksp
 
   try {
     const simplifiedJson = await figmaService.getSimplifiedNode(fileKey, nodeId, figmaKey);
-    
+
     // Create .mirror-vs/figma directory
     const figmaDir = path.join(workspacePath, '.mirror-vs', 'figma');
     if (!fs.existsSync(figmaDir)) {
       fs.mkdirSync(figmaDir, { recursive: true });
     }
-    
+
     // Save the JSON to a file
     const safeNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${fileKey}_${safeNodeId}.json`;
