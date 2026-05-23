@@ -167,7 +167,8 @@ Your Turn 4: "App is loading correctly. Taking a screenshot to confirm visual st
 <browser_screenshot />
 
 Remember: Every intention to check, verify, or investigate MUST be followed immediately by a tool tag in the same response turn. Outputting text without a tool tag ends your turn and stops the agent loop.
-If a tool returns an error, correct your approach in the next turn — do NOT give up or summarize failure. Always try an alternative.`;
+If a tool returns an error, correct your approach in the next turn — do NOT give up or summarize failure. Always try an alternative.
+STUCK RESOLUTION: If you are stuck on a problem for more than 1 or 2 turns (e.g., encountering repeating errors, failing test assertions, unresolved imports, or failing tool executions), do NOT continue repeating the same failing action. You MUST use <web_search> to search the web for solutions, or use <grep_search> to locate missing code or references in the workspace and resolve the root cause immediately.`;
 
 function getShellEnvDescription(): string {
   if (process.platform === 'win32') {
@@ -216,7 +217,7 @@ export class AgentOrchestrator {
     private readonly _saveChatHistory: (history: ChatMessage[]) => Promise<void>,
     private readonly _postMessage: (msg: any) => void,
     private readonly _getSafePath: (targetPath: string) => string,
-  ) { }
+  ) {}
 
   public cancelActiveStream() {
     if (this._activeAbortController) {
@@ -307,9 +308,9 @@ export class AgentOrchestrator {
 
     let currentMessages = [...history];
 
-    if (text) {
+    if (text || (images && images.length > 0)) {
       // User message + context
-      const userMsg: ChatMessage = { role: 'user', content: text };
+      const userMsg: ChatMessage = { role: 'user', content: text || '[Image provided]' };
       if (images && images.length > 0) {
         userMsg.images = images;
       }
@@ -469,7 +470,7 @@ export class AgentOrchestrator {
             let result: string;
             try {
               const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-              const figmaKey = await this._getSecret('figma_api_key') || '';
+              const figmaKey = (await this._getSecret('figma_api_key')) || '';
               result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
 
               let checkpointId: string | undefined;
@@ -602,6 +603,7 @@ ${combinedToolResult}
             'patch_file',
             'list_dir',
             'grep_search',
+            'web_search',
             'run_command',
             'browser_navigate',
             'browser_click',
@@ -739,6 +741,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
       'read_file',
       'list_dir',
       'grep_search',
+      'web_search',
       'browser_navigate',
       'browser_click',
       'browser_type',
@@ -943,6 +946,15 @@ USER/ENVIRONMENT TOOL RESPONSE:
       const q = attr(match[1], 'query');
       if (q) {
         candidates.push({ index: match.index, tool: { name: 'grep_search', query: q } });
+      }
+    }
+
+    // web_search
+    const webSearchRegex = /<web_search([\s\S]*?)\/?>/gi;
+    while ((match = webSearchRegex.exec(text)) !== null) {
+      const q = attr(match[1], 'query');
+      if (q) {
+        candidates.push({ index: match.index, tool: { name: 'web_search', query: q } });
       }
     }
 
@@ -1163,6 +1175,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
       'read_file',
       'list_dir',
       'grep_search',
+      'web_search',
       'browser_navigate',
       'browser_click',
       'browser_type',
@@ -1232,7 +1245,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           model,
           messages,
           controller.signal,
-          () => { }, // ignore chunks
+          () => {}, // ignore chunks
           (fullText) => resolve(fullText),
           (err) => reject(err),
         );
@@ -1242,7 +1255,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
           model,
           messages,
           controller.signal,
-          () => { }, // ignore chunks
+          () => {}, // ignore chunks
           (fullText) => resolve(fullText),
           (err) => reject(err),
         );

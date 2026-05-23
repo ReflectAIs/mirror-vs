@@ -53,6 +53,29 @@ describe('executeFileTool', () => {
       const tool = { name: 'read_file', path: 'missing.ts' };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('File does not exist: missing.ts');
     });
+
+    it('should return proposed content if file is in active review', async () => {
+      const tmpDir = createTempDir();
+      try {
+        const filePath = 'review.txt';
+        const absolutePath = path.join(tmpDir, filePath);
+        fs.writeFileSync(absolutePath, 'original disk content', 'utf8');
+
+        const { ReviewManager } = await import('../../../services/review-manager');
+        const rm = ReviewManager.getInstance();
+        const spy = vi.spyOn(rm, 'getProposedContent').mockReturnValue('mock proposed clean content');
+
+        const localGetSafe = (p: string) => path.join(tmpDir, p);
+        const tool = { name: 'read_file', path: filePath };
+        const result = await executeFileTool(tool, localGetSafe);
+
+        expect(result).toBe('mock proposed clean content');
+        expect(spy).toHaveBeenCalledWith(absolutePath);
+        spy.mockRestore();
+      } finally {
+        cleanupTempDir(tmpDir);
+      }
+    });
   });
 
   describe('create_file', () => {

@@ -96,7 +96,14 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (!fs.existsSync(safePath)) {
         throw new Error(`File does not exist: ${tool.path}`);
       }
-      const fullContent = fs.readFileSync(safePath, 'utf8');
+
+      let fullContent = '';
+      const proposed = ReviewManager.getInstance().getProposedContent(safePath);
+      if (proposed !== undefined) {
+        fullContent = proposed;
+      } else {
+        fullContent = fs.readFileSync(safePath, 'utf8');
+      }
 
       // If start_line / end_line are provided, return only that range
       const startLine = tool.start_line;
@@ -164,6 +171,10 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
 
+      if (ReviewManager.getInstance().hasActiveReview(safePath)) {
+        await ReviewManager.getInstance().resolveReview(safePath, true);
+      }
+
       const { accepted, checkpointId } = await confirmChangesWithDiff(
         safePath,
         proposedContent,
@@ -182,6 +193,10 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const safePath = getSafePath(tool.path);
       if (!fs.existsSync(safePath)) {
         throw new Error(`File does not exist: ${tool.path}`);
+      }
+
+      if (ReviewManager.getInstance().hasActiveReview(safePath)) {
+        await ReviewManager.getInstance().resolveReview(safePath, true);
       }
 
       let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));

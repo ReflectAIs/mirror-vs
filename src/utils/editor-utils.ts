@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ReviewManager } from '../services/review-manager';
 
 export interface Checkpoint {
   id: string;
@@ -153,7 +154,9 @@ export function getActiveFileContext(maxContextLength: number = 12000): string {
 
   const doc = editor.document;
   const fileName = getActiveFileName();
-  const fileText = doc.getText();
+
+  const proposed = ReviewManager.getInstance().getProposedContent(doc.uri.fsPath);
+  const fileText = proposed !== undefined ? proposed : doc.getText();
 
   if (!fileText.trim()) {
     return ''; // Skip empty files entirely to prevent rendering empty code blocks

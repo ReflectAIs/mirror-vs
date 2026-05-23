@@ -31,6 +31,9 @@ export const window = {
     command: '',
     tooltip: '',
   }),
+  createTextEditorDecorationType: () => ({
+    dispose: () => {},
+  }),
 };
 
 export const commands = {
@@ -43,6 +46,7 @@ export const Uri = {
   joinPath: (base: any, ...segments: string[]) => ({
     fsPath: [base.fsPath || base, ...segments].join('/'),
   }),
+  parse: (s: string) => ({ fsPath: s, path: s, scheme: 'data' }),
 };
 
 export const ConfigurationTarget = { Global: 1, Workspace: 2 };
@@ -57,4 +61,3 @@ export const StatusBarAlignment = { Left: 1, Right: 2 };
 export const ThemeColor = {};
 
 export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment };
-
