@@ -3,6 +3,24 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.0.8] - 2025-04-09
+
+### Added
+- **CI/CD Pipeline**: GitHub Actions workflow for automated testing and packaging
+  - Runs tests, linting, and format checks on every push and PR
+  - Automatically packages VSIX on version tags
+  - Tested against Node.js 18 and 20
+- **Figma Integration**: `figma_inspect` tool for extracting component tree data from Figma nodes
+- **Document Analysis**: Support for parsing and analyzing structured documents
+- **Test Orchestrator**: Enhanced test execution and reporting capabilities
+
+### Changed
+- **Build System**: ESBuild-based compilation with minification support
+- **Project Organization**: Restructured services, tools, and utilities directories
+
+### Fixed
+- Various edge cases in tool parsing and execution pipeline
+
 ## [0.0.7] - 2025-10-17
 
 ### Added
