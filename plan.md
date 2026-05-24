@@ -7,6 +7,15 @@ Mirror VS (v0.0.9) is a VS Code extension providing an autonomous AI coding assi
 
 ---
 
+## ✅ Fixed Issues
+
+### ✅ Build Script (esbuild.js) — Restored & Working
+- Created `esbuild.js` (was missing)
+- `npm run compile` now builds successfully to `dist/extension.js`
+- Supports `--watch` and `--minify` flags
+
+---
+
 ## 🔴 Critical Issues Found
 
 ### 1. Bug: Browser Screenshot Base64 Extraction Broken
@@ -67,6 +76,7 @@ Long sessions render 100s of DOM nodes. Needs virtual scrolling.
 
 | # | Task | Priority | Effort | Status |
 |---|------|----------|--------|--------|
+| 0 | Fix build script (esbuild.js missing) | 🔴 Critical | 🟢 Low | ✅ Done |
 | 1 | Fix screenshot base64 extraction | 🔴 Critical | 🟢 Low | ⬜ |
 | 2 | Fix message type mismatch | 🔴 Critical | 🟢 Low | ⬜ |
 | 3 | Add test suite | 🔴 Critical | 🔴 High | ⬜ |
