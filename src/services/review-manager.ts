@@ -199,25 +199,8 @@ export class ReviewManager implements vscode.CodeLensProvider {
     );
   }
 
-  private getDeletedContentText(lines: string[], isAtEnd = false): string {
-    const nonBins = lines.map((l) => l.trim()).filter(Boolean);
-    if (nonBins.length === 0) {
-      return isAtEnd
-        ? ` ➖ [deleted ${lines.length} empty line${lines.length > 1 ? 's' : ''} at end of file]`
-        : `➖ [deleted ${lines.length} empty line${lines.length > 1 ? 's' : ''}]`;
-    }
-
-    const joined = nonBins.map((l) => (l.length > 35 ? l.substring(0, 35) + '...' : l)).join(' ‖ ');
-
-    const truncated = joined.length > 90 ? joined.substring(0, 90) + '...' : joined;
-
-    if (isAtEnd) {
-      return lines.length === 1
-        ? ` ➖ [deleted: "${truncated}" at end of file]`
-        : ` ➖ [deleted ${lines.length} lines: "${truncated}" at end of file]`;
-    } else {
-      return lines.length === 1 ? `➖ [deleted: "${truncated}"]` : `➖ [deleted ${lines.length} lines: "${truncated}"]`;
-    }
+  private getDeletedContentText(_lines: string[], _isAtEnd = false): string {
+    return `➖ [deleted ${_lines.length} line${_lines.length !== 1 ? 's' : ''}]`;
   }
 
   private applyDecorations(editor: vscode.TextEditor) {

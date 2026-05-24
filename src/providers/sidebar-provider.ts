@@ -282,7 +282,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               .split('\n')
               .filter(Boolean)
               .forEach((line) => {
-                const status = line.substring(0, 2).trim() || '?';
                 // For staged files (first char) and unstaged files (second char), prioritize staged
                 const stagedStatus = line[0].trim();
                 const unstagedStatus = line[1].trim();
@@ -337,7 +336,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               break;
             }
 
-            const lines: { type: string; content: string }[] = [];
             const hunks: any[] = [];
             let currentHunk: any = null;
 

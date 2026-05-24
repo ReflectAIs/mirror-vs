@@ -82,8 +82,8 @@ export class TelemetryService {
     const totalTokensOutput = filtered.reduce((sum, e) => sum + e.tokensOutput, 0);
     const totalCost = filtered.reduce((sum, e) => sum + e.cost, 0);
     const totalLatency = filtered.reduce((sum, e) => sum + e.latency, 0);
-    const totalToolCalls = filtered.reduce((sum, e) => sum + e.toolCalls, 0);
-    const totalErrors = filtered.filter((e) => e.error).length;
+    const _totalToolCalls = filtered.reduce((sum, e) => sum + e.toolCalls, 0);
+    const _totalErrors = filtered.filter((e) => e.error).length;
 
     // Errors by provider
     const errorsByProviderMap = new Map<string, number>();

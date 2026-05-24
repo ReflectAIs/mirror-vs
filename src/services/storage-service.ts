@@ -58,8 +58,8 @@ export class StorageService {
    * Call once on extension activation if the old key exists.
    */
   async migrateFromLegacyIfNeeded(): Promise<void> {
-    const legacy = this._workspaceState.get<ChatSession[]>('mirror-vs.chatSessions', undefined);
-    const legacyPerSession = this._workspaceState.get<ChatMessage[]>('mirror-vs.chatHistory', undefined);
+    const legacy = this._workspaceState.get<ChatSession[]>('mirror-vs.chatSessions') || [];
+    const legacyPerSession = this._workspaceState.get<ChatMessage[]>('mirror-vs.chatHistory') || [];
     const activeId = this._workspaceState.get<string>('mirror-vs.activeSessionId');
 
     if (legacy && legacy.length > 0) {

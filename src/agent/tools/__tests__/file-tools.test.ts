@@ -33,24 +33,24 @@ describe('executeFileTool', () => {
 
   describe('list_dir', () => {
     it('should throw if path is missing', async () => {
-      const tool = { name: 'list_dir', path: undefined as any };
+      const tool = { name: 'list_dir' as const, path: undefined as any };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for list_dir.');
     });
 
     it('should throw if directory does not exist', async () => {
-      const tool = { name: 'list_dir', path: 'nonexistent' };
+      const tool = { name: 'list_dir' as const, path: 'nonexistent' };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Directory does not exist: nonexistent');
     });
   });
 
   describe('read_file', () => {
     it('should throw if path is missing', async () => {
-      const tool = { name: 'read_file', path: undefined as any };
+      const tool = { name: 'read_file' as const, path: undefined as any };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for read_file.');
     });
 
     it('should throw if file does not exist', async () => {
-      const tool = { name: 'read_file', path: 'missing.ts' };
+      const tool = { name: 'read_file' as const, path: 'missing.ts' };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('File does not exist: missing.ts');
     });
 
@@ -61,12 +61,12 @@ describe('executeFileTool', () => {
         const absolutePath = path.join(tmpDir, filePath);
         fs.writeFileSync(absolutePath, 'original disk content', 'utf8');
 
-        const { ReviewManager } = await import('../../../services/review-manager');
+        const { ReviewManager } = await import('../../../services/review-manager.js');
         const rm = ReviewManager.getInstance();
         const spy = vi.spyOn(rm, 'getProposedContent').mockReturnValue('mock proposed clean content');
 
         const localGetSafe = (p: string) => path.join(tmpDir, p);
-        const tool = { name: 'read_file', path: filePath };
+        const tool = { name: 'read_file' as const, path: filePath };
         const result = await executeFileTool(tool, localGetSafe);
 
         expect(result).toBe('mock proposed clean content');
@@ -80,12 +80,12 @@ describe('executeFileTool', () => {
 
   describe('create_file', () => {
     it('should throw if path is missing', async () => {
-      const tool = { name: 'create_file', path: undefined as any, content: 'test' };
+      const tool = { name: 'create_file' as const, path: undefined as any, content: 'test' };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for create_file.');
     });
 
     it('should throw if path escapes workspace', async () => {
-      const tool = { name: 'create_file', path: '../outside.txt', content: 'test' };
+      const tool = { name: 'create_file' as const, path: '../outside.txt', content: 'test' };
       const unsafeGetPath = () => {
         throw new Error('Access denied: File path is outside of workspace.');
       };
@@ -95,20 +95,20 @@ describe('executeFileTool', () => {
 
   describe('write_file', () => {
     it('should throw if path is missing', async () => {
-      const tool = { name: 'write_file', path: undefined as any, content: 'data' };
+      const tool = { name: 'write_file' as const, path: undefined as any, content: 'data' };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for write_file.');
     });
   });
 
   describe('patch_file', () => {
     it('should throw if path is missing', async () => {
-      const tool = { name: 'patch_file', path: undefined as any, content: 'data' };
+      const tool = { name: 'patch_file' as const, path: undefined as any, content: 'data' };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Missing "path" attribute for patch_file.');
     });
 
     it('should throw if file does not exist', async () => {
       const tool = {
-        name: 'patch_file',
+        name: 'patch_file' as const,
         path: 'nonexistent.ts',
         content: '<<<<<<< SEARCH\na\n=======\nb\n>>>>>>> REPLACE',
       };
@@ -122,7 +122,7 @@ describe('executeFileTool', () => {
         fs.writeFileSync(filePath, 'hello world', 'utf8');
 
         const localGetSafe = (p: string) => path.join(tmpDir, p);
-        const tool = { name: 'patch_file', path: 'test.txt', content: 'no valid patch blocks' };
+        const tool = { name: 'patch_file' as const, path: 'test.txt', content: 'no valid patch blocks' };
         await expect(executeFileTool(tool, localGetSafe)).rejects.toThrow(
           'No valid SEARCH/REPLACE blocks found in patch_file content.',
         );
