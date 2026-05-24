@@ -562,12 +562,16 @@
   }
 
   let currentToolCardElement = null;
+  let isStreamingCardExpanded = false;
 
   function createToolCardDOM(toolName, status, target, result, checkpointId, isReverted = false, code = null, terminalName = null) {
     const card = document.createElement('div');
     card.className = `tool-card ${status}`;
     if (isReverted) {
       card.classList.add('reverted');
+    }
+    if (toolName === 'create_file' || toolName === 'write_file' || toolName === 'patch_file') {
+      card.classList.add('write-tool-card');
     }
     if (checkpointId) {
       card.setAttribute('data-checkpoint-id', checkpointId);
@@ -1039,6 +1043,7 @@
         promptInput.disabled = true;
         sendBtn.disabled = true;
         isSending = true;
+        isStreamingCardExpanded = false;
         setAvatarState('thinking');
 
         sendBtn.classList.add('hidden');
@@ -1152,6 +1157,27 @@
         currentStreamingBubble = null;
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
+        scrollChatToBottom();
+        break;
+      }
+
+      case 'providerFallback': {
+        const { message: fallbackMsg, newProvider } = message;
+        selectProvider(newProvider);
+        
+        const msgElement = document.createElement('div');
+        msgElement.className = 'message system-context';
+        msgElement.innerHTML = `
+          <div class="system-context-banner" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
+            <div class="system-context-header" style="color: #f59e0b; cursor: default;">
+              <span>⚠️ Provider Failover</span>
+            </div>
+            <div class="system-context-body" style="color: var(--text-secondary); font-size: 11.5px; margin-top: 4px; line-height: 1.5; font-family: inherit;">
+              ${fallbackMsg}
+            </div>
+          </div>
+        `;
+        chatMessages.appendChild(msgElement);
         scrollChatToBottom();
         break;
       }
@@ -1324,6 +1350,63 @@
     }
   });
 
+  function renderStreamingCard(tool, target, code) {
+    const decodedTarget = unescapeHtml(target);
+    const decodedCode = unescapeHtml(code);
+    
+    let friendlyName = tool;
+    let iconHtml = '✏️';
+    if (tool === 'create_file') {
+      friendlyName = 'Creating File';
+      iconHtml = '🆕';
+    } else if (tool === 'write_file') {
+      friendlyName = 'Writing File';
+      iconHtml = '💾';
+    } else if (tool === 'patch_file') {
+      friendlyName = 'Patching File';
+      iconHtml = '✏️';
+    }
+    
+    const fileExt = decodedTarget.split('.').pop() || 'plaintext';
+    const escapedCode = escapeHtml(decodedCode.trim());
+    
+    const expandedClass = isStreamingCardExpanded ? 'expanded' : '';
+    
+    return `
+      <div class="tool-card running streaming-write-card ${expandedClass}">
+        <div class="tool-card-header" style="cursor: pointer;">
+          <div class="tool-icon-wrapper" style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.15);">
+            <span class="tool-icon">${iconHtml}</span>
+          </div>
+          <div class="tool-info">
+            <span class="tool-name">${friendlyName}...</span>
+            <span class="tool-target" style="font-family: var(--font-mono); color: var(--text-muted); text-decoration: none;">${escapeHtml(decodedTarget)}</span>
+          </div>
+          <div class="tool-header-controls">
+            <span class="tool-status-badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.15);">Writing</span>
+            <span class="tool-expand-chevron">
+              <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div class="scanning-bar" style="background: linear-gradient(90deg, transparent, #a855f7, transparent);"></div>
+        <div class="tool-card-body-wrapper">
+          <div class="tool-card-body" style="border-top: 1px solid var(--border-glass);">
+            <div class="code-block-wrapper" style="margin: 8px; border-color: rgba(168, 85, 247, 0.15);">
+              <div class="code-block-header" style="background: rgba(147, 51, 234, 0.05); border-bottom-color: rgba(168, 85, 247, 0.15);">
+                <span class="code-block-lang">${fileExt}</span>
+                <span class="streaming-label" style="font-size: 9px; opacity: 0.6; color: #c084fc;">Generating...</span>
+              </div>
+              <pre><code>${escapedCode}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // 9. Markdown Parser Implementation
   function parseMarkdown(text) {
     let cleanText = text;
@@ -1364,7 +1447,12 @@
             if (pathVal) {
               pathExt = pathVal.split('.').pop() || 'plaintext';
             }
-            cleanText = cleanText.substring(0, openIndex) + `\n\`\`\`${pathExt}\n${actualCode}`;
+            if (tool === 'create_file' || tool === 'write_file' || tool === 'patch_file') {
+              let placeholderToken = `%%%STREAMING_TOOL_PLACEHOLDER::${tool}::${escapeHtml(pathVal || '')}::${escapeHtml(actualCode)}%%%`;
+              cleanText = cleanText.substring(0, openIndex) + placeholderToken;
+            } else {
+              cleanText = cleanText.substring(0, openIndex) + `\n\`\`\`${pathExt}\n${actualCode}`;
+            }
           } else {
             cleanText = cleanText.substring(0, openIndex);
           }
@@ -1490,6 +1578,9 @@
         </div>
       `;
     }
+
+    html = html.replace(/<p>%%%STREAMING_TOOL_PLACEHOLDER::(.+?)::(.*?)::([\s\S]*?)%%%<\/p>/g, (match, tool, target, code) => renderStreamingCard(tool, target, code));
+    html = html.replace(/%%%STREAMING_TOOL_PLACEHOLDER::(.+?)::(.*?)::([\s\S]*?)%%%/g, (match, tool, target, code) => renderStreamingCard(tool, target, code));
 
     html = html.replace(/<p>%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%<\/p>/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
     html = html.replace(/%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
@@ -1776,6 +1867,21 @@
             btn.style.color = '';
           }, 1500);
         });
+      });
+    });
+
+    const streamingHeaders = bubbleElement.querySelectorAll('.streaming-write-card .tool-card-header');
+    streamingHeaders.forEach((header) => {
+      if (header.getAttribute('data-bound')) {
+        return;
+      }
+      header.setAttribute('data-bound', 'true');
+      header.addEventListener('click', () => {
+        isStreamingCardExpanded = !isStreamingCardExpanded;
+        const card = header.closest('.streaming-write-card');
+        if (card) {
+          card.classList.toggle('expanded', isStreamingCardExpanded);
+        }
       });
     });
   }

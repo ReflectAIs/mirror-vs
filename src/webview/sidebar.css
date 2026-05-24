@@ -986,6 +986,27 @@ select:focus {
 
 .tool-card:hover { border-color: var(--border-glass-hover); }
 
+.tool-card.streaming-write-card {
+  background: rgba(168, 85, 247, 0.03) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.04) !important;
+}
+
+.tool-card.streaming-write-card:hover {
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  background: rgba(168, 85, 247, 0.05) !important;
+}
+
+.tool-card.write-tool-card {
+  background: rgba(168, 85, 247, 0.015);
+  border-color: rgba(168, 85, 247, 0.12);
+}
+
+.tool-card.write-tool-card:hover {
+  border-color: rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.035);
+}
+
 .tool-card-header {
   display: flex;
   align-items: center;

@@ -515,15 +515,37 @@ export class AgentOrchestrator {
         const mainAbortListener = () => completionController.abort();
         signal.addEventListener('abort', mainAbortListener);
 
-        const assistantResponse = await this._getLLMCompletion(
-          provider,
-          ollamaHost,
-          provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel,
-          apiKey,
-          payload,
-          completionController.signal,
-          completionController,
-        );
+        let assistantResponse = '';
+        try {
+          assistantResponse = await this._getLLMCompletion(
+            provider,
+            ollamaHost,
+            provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel,
+            apiKey,
+            payload,
+            completionController.signal,
+            completionController,
+          );
+        } catch (apiErr: any) {
+          signal.removeEventListener('abort', mainAbortListener);
+          const fallbackResult = this._fallback.failover();
+          if (fallbackResult.success && fallbackResult.newProvider) {
+            const nextProvider = fallbackResult.newProvider;
+            const nextApiKey = await tryGetApiKey(nextProvider);
+            this._postMessage({
+              type: 'providerFallback',
+              message: `${apiErr.message || 'API error occurred.'} ${fallbackResult.message}`,
+              newProvider: nextProvider,
+            });
+            provider = nextProvider;
+            apiKey = nextApiKey;
+            loopCount--;
+            continueLoop = true;
+            continue;
+          } else {
+            throw apiErr;
+          }
+        }
 
         signal.removeEventListener('abort', mainAbortListener);
 
@@ -782,7 +804,7 @@ USER/ENVIRONMENT TOOL RESPONSE:
     // Step 3: Remove HTML-escaped tool tags (e.g., &lt;read_file ... /&gt;)
     result = result.replace(/&lt;\/?[a-z_]+[\s\S]*?\/?&gt;/gi, '');
     return result;
-  
+  }
 
   private isTagFullyClosed(text: string, toolName: string): boolean {
     const openTag = `<${toolName}`;
