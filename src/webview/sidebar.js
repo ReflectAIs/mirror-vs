@@ -1073,7 +1073,41 @@
         }
 
         currentStreamingText += message.text;
-        currentStreamingBubble.innerHTML = parseMarkdown(currentStreamingText);
+        const html = parseMarkdown(currentStreamingText);
+
+        const existingCard = currentStreamingBubble.querySelector('.streaming-write-card');
+        if (existingCard) {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = html;
+          const newCard = tempDiv.querySelector('.streaming-write-card');
+          if (newCard) {
+            const existingCode = existingCard.querySelector('.code-block-wrapper pre code');
+            const newCode = newCard.querySelector('.code-block-wrapper pre code');
+            if (existingCode && newCode) {
+              if (existingCode.innerHTML !== newCode.innerHTML) {
+                existingCode.innerHTML = newCode.innerHTML;
+              }
+              
+              const existingTarget = existingCard.querySelector('.tool-target');
+              const newTarget = newCard.querySelector('.tool-target');
+              if (existingTarget && newTarget && existingTarget.textContent !== newTarget.textContent) {
+                existingTarget.textContent = newTarget.textContent;
+              }
+              
+              const existingLang = existingCard.querySelector('.code-block-lang');
+              const newLang = newCard.querySelector('.code-block-lang');
+              if (existingLang && newLang && existingLang.textContent !== newLang.textContent) {
+                existingLang.textContent = newLang.textContent;
+              }
+              
+              bindCodeBlockButtons(existingCard);
+              scrollChatToBottom();
+              break;
+            }
+          }
+        }
+
+        currentStreamingBubble.innerHTML = html;
         bindCodeBlockButtons(currentStreamingBubble);
         scrollChatToBottom();
         break;

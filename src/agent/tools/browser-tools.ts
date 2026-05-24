@@ -1,3 +1,4 @@
+
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -89,10 +90,9 @@ Interactive Elements detected:
 ${elementList}`;
 
       // The orchestrator strips out the base64 and sends it as a vision attachment.
-      // Format must exactly match the extraction regex in orchestrator.ts.
       return `${fileSavedMsg}Screenshot taken successfully.
 ${textSummary}
-(Base64 data hidden from output but sent to vision model: ${base64})`;
+(Image successfully captured and sent to vision model: data:image/png;base64,${base64})`;
     }
 
     default:
