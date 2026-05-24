@@ -23,10 +23,6 @@
 - **Risk**: Any refactor is blind. No regression detection.
 - **Fix**: Add unit tests for orchestrator, browser-tools, file-tools, api-service. Integration test for end-to-end tool pipeline.
 
-### 2. Massive Orchestrator — Single Point of Failure
-- **1382 lines** in `orchestrator.ts` violates Single Responsibility Principle
-- Combines: system prompt generation, streaming, tool parsing, tool execution, context compression, error recovery, telemetry
-- **Fix**: Split into: `AgentSession` (state mgmt), `AgentCompleter` (streaming), `AgentParser` (tool extraction), `AgentExecutor` (tool orchestrator)
 ### 2. ✅ Orchestrator Split — Done (v0.0.9)
 - **1382 lines** in `orchestrator.ts` was Single Point of Failure
 - **Split done**:
