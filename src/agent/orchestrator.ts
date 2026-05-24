@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
-import { ChatMessage } from "../types";
-import type { ToolCall } from "./types";
+import { ChatMessage, LLMProvider } from "../types";
 import { executeTool } from "./tools/tool-registry";
 import { CommandService } from "../services/command-service";
 import { RateLimiter } from "../services/rate-limiter";
@@ -98,7 +97,7 @@ export class AgentOrchestrator {
 
   constructor(
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
-    private readonly _getChatHistory: () => ChatMessage[],
+    _getChatHistory: () => ChatMessage[],
     private readonly _saveChatHistory: (history: ChatMessage[]) => Promise<void>,
     private readonly _postMessage: (msg: any) => void,
     private readonly _getSafePath: (targetPath: string) => string,
@@ -112,7 +111,6 @@ export class AgentOrchestrator {
     );
     this._completer = new AgentCompleter(
       _postMessage,
-      _getSecret,
     );
   }
 
@@ -208,7 +206,6 @@ export class AgentOrchestrator {
       return;
     }
 
-    this._fallback.reset(provider);
     this._fallback.reset(provider as LLMProvider);
 
     let apiKey = "";
@@ -274,7 +271,7 @@ export class AgentOrchestrator {
           text: "Compressing middle turns to optimize speed...",
         });
         const summary = await this._completer.summarizeHistory(
-          provider,
+          provider as LLMProvider,
           ollamaHost,
           provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
           apiKey,
@@ -317,11 +314,13 @@ export class AgentOrchestrator {
         continueLoop = false;
 
         const payload = [
+        const payload: ChatMessage[] = [
           { role: "system", content: buildSystemPrompt() },
           ...currentMessages
             .filter((msg) => !msg.summarized)
             .map((msg) => ({
               role: msg.role === "system" ? "user" : msg.role,
+              role: (msg.role === "system" ? "user" : msg.role) as "user" | "assistant" | "system",
               content: msg.content,
               images: msg.images,
             })),
@@ -336,7 +335,7 @@ export class AgentOrchestrator {
         let assistantResponse = "";
         try {
           assistantResponse = await this._completer.getLLMCompletion(
-            provider,
+            provider as LLMProvider,
             ollamaHost,
             provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
             apiKey,
@@ -446,7 +445,6 @@ export class AgentOrchestrator {
           // Malformed tool tag recovery
           const allTools = ["read_file","create_file","write_file","patch_file","list_dir","grep_search","web_search","run_command","browser_navigate","browser_click","browser_type","browser_evaluate_script","browser_screenshot","figma_inspect","send_terminal_input","close_terminal","read_terminal","list_terminals"];
           const stripped = this._parser.stripCodeBlocks(assistantResponse);
-          const partialPattern = new RegExp("(" + allTools.join("|") + ")\\b", "i");
           // Only check partial tags if we already see what looks like a tool attempt
           const ltChar = String.fromCharCode(60);
           const hasToolAttempt = stripped.includes(ltChar + "read_file") || allTools.some(t => stripped.includes(ltChar + t));

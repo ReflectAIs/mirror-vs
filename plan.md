@@ -31,6 +31,15 @@
   - ✅ `AgentParser` (tool extraction) — 338 lines
   - `AgentExecutor` (orchestrator loop) — **remaining refactor** needed to complete the split
 - **Next**: Extract `handleMessageStream()` loop and tool execution dispatch into an `AgentExecutor.ts`
+### 2. ✅ Orchestrator Split — Complete
+- **1429 lines** → split into **4 focused modules** (1224 total lines):
+  - ✅ `AgentSession` (`agent-session.ts`, 200 lines) — state management, git baseline, history
+  - ✅ `AgentCompleter` (`agent-completer.ts`, 214 lines) — LLM streaming, telemetry, rate limiting, context summarization
+  - ✅ `AgentParser` (`agent-parser.ts`, 337 lines) — tool call parsing, code-block stripping, auto-close tags, response cleaning
+  - ✅ `AgentOrchestrator` (`orchestrator.ts`, 473 lines) — main loop, tool execution dispatch, error recovery, avatar state
+- **Architecture**: Orchestrator now delegates streaming to `AgentCompleter.getLLMCompletion()`, parsing to `AgentParser.parseToolCalls()`, and state to `AgentSession`
+- **Imports cleaned**: Removed direct `streamOllamaChat`/`streamDeepSeekChat` imports, `_stripCodeBlocks`, `_parseToolCalls`, `_getLLMCompletion`, `_summarizeHistory`, `autoCloseToolTags`, `getCleanedToolResponse`, `isTagFullyClosed`, `hasCompleteToolCall` — all now delegated to new modules
+- **Next**: Add unit tests for `AgentParser` (tool extraction logic) and `AgentCompleter` (streaming behavior)
 
 ### 3. No Inline Completions (Missing Major Feature)
 - No `InlineCompletionItemProvider` registered in extension.ts

@@ -1,3 +1,4 @@
+
 import { LLMProvider, ChatMessage } from '../types';
 import { streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
 import { RateLimiter } from '../services/rate-limiter';
@@ -13,7 +14,6 @@ export class AgentCompleter {
 
   constructor(
     private readonly _postMessage: (msg: any) => void,
-    private readonly _getSecret: (key: string) => Promise<string | undefined>,
   ) {}
 
   public get lastLatency(): number {
@@ -30,10 +30,15 @@ export class AgentCompleter {
     model: string,
     apiKey: string,
     messages: { role: 'user' | 'assistant' | 'system'; content: string; images?: string[] }[],
+    payload: ChatMessage[],
     signal: AbortSignal,
     currentSessionId: string,
     completionController?: AbortController,
+    sessionId: string,
+    abortController: AbortController,
   ): Promise<string> {
+    let fullResponse = "";
+    let toolCallBuffer = "";
     const startTime = Date.now();
     return new Promise((resolve, reject) => {
       let fullText = '';
@@ -105,25 +110,53 @@ export class AgentCompleter {
           error: true,
           errorMessage: err.message || 'Unknown error',
         });
+    let totalTokens = 0;
+    const isDeepSeek = provider === 'deepseek';
 
         this._rateLimiter.recordFailure();
         reject(err);
       };
+    this._postMessage({ type: "streamStart" });
 
       if (provider === 'ollama') {
         streamOllamaChat(
+    try {
+      if (isDeepSeek) {
+        await streamDeepSeekChat(
           host,
           model,
           messages,
+          apiKey,
+          payload,
           signal,
           (chunk) => {
             if (isFinished) return;
             fullText += chunk;
             this._postMessage({ type: 'chatResponseChunk', text: chunk });
+            if (signal.aborted) return;
+            fullResponse += chunk;
+            toolCallBuffer += chunk;
+            totalTokens += RateLimiter.estimateTokens(chunk);
+            this._postMessage({
+              type: "chatResponseChunk",
+              text: chunk,
+            });
 
             if (this._parser.hasCompleteToolCall(fullText)) {
               completionController?.abort();
               onComplete(fullText, capturedUsage);
+            // Emit tool call status if we detect a tool tag
+            const parsed = this._parser.parseToolCalls(toolCallBuffer);
+            if (parsed.length > 0) {
+              for (const tc of parsed) {
+                this._postMessage({
+                  type: "toolStatus",
+                  toolName: tc.name,
+                  status: "running",
+                  target: tc.params.path || tc.params.url || tc.params.selector || "",
+                });
+              }
+              toolCallBuffer = "";
             }
           },
           (completedText, usage) => {
@@ -131,21 +164,44 @@ export class AgentCompleter {
             onComplete(completedText, usage);
           },
           onError,
+          abortController,
         );
       } else {
         streamDeepSeekChat(
           apiKey,
+        await streamOllamaChat(
+          host,
           model,
           messages,
+          payload,
           signal,
           (chunk) => {
             if (isFinished) return;
             fullText += chunk;
             this._postMessage({ type: 'chatResponseChunk', text: chunk });
+            if (signal.aborted) return;
+            fullResponse += chunk;
+            toolCallBuffer += chunk;
+            totalTokens += RateLimiter.estimateTokens(chunk);
+            this._postMessage({
+              type: "chatResponseChunk",
+              text: chunk,
+            });
 
             if (this._parser.hasCompleteToolCall(fullText)) {
               completionController?.abort();
               onComplete(fullText, capturedUsage);
+            const parsed = this._parser.parseToolCalls(toolCallBuffer);
+            if (parsed.length > 0) {
+              for (const tc of parsed) {
+                this._postMessage({
+                  type: "toolStatus",
+                  toolName: tc.name,
+                  status: "running",
+                  target: tc.params.path || tc.params.url || tc.params.selector || "",
+                });
+              }
+              toolCallBuffer = "";
             }
           },
           (completedText, usage) => {
@@ -153,13 +209,38 @@ export class AgentCompleter {
             onComplete(completedText, usage);
           },
           onError,
+          abortController,
         );
       }
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        this._postMessage({ type: "streamEnd" });
+        return fullResponse;
+      }
+      throw err;
+    }
+
+    this._postMessage({ type: "streamEnd" });
+
+    const elapsed = Date.now() - startTime;
+    this._lastLatencyMeasurement = elapsed;
+
+    // Telemetry
+    this._telemetry.record({
+      provider,
+      model,
+      outputTokens: totalTokens,
+      latency: elapsed,
+      timestamp: Date.now(),
     });
+
+    return fullResponse;
   }
 
   /**
    * Summarize conversation history for context compression.
+   * Summarize a set of chat messages into a compact context.
+   * Used to compress middle turns and stay within context window.
    */
   public async summarizeHistory(
     provider: LLMProvider,
@@ -167,6 +248,7 @@ export class AgentCompleter {
     model: string,
     apiKey: string,
     historyToSummarize: ChatMessage[],
+    messages: ChatMessage[],
   ): Promise<string> {
     const summarizePrompt = 'You are a helpful pair programming assistant. Please summarize the following conversation history between a developer and an AI assistant. Provide a highly dense, bulleted summary of key decisions, context details, executed actions, and technical changes. Do not lose key file names, error messages, or environment information:\n';
     + historyToSummarize.map((msg) => msg.role.toUpperCase() + ': ' + msg.content).join('\n\n');
@@ -198,19 +280,53 @@ export class AgentCompleter {
       }
     });
   }
+    const summaryPrompt: ChatMessage[] = [
+      {
+        role: "system",
+        content: `You are a summarization assistant. Compress the following conversation turns into a single short paragraph that preserves all key information: decisions made, files changed, errors encountered, and next steps. Do NOT include any tool calls or XML tags in your summary. Keep it under 200 words.`,
+      },
+      ...messages,
+      {
+        role: "user",
+        content: "Please provide a concise summary of the above conversation turns.",
+      },
+    ];
 
   /** Parse tool calls from text */
   public parseToolCalls(text: string) {
     return this._parser.parseToolCalls(text);
   }
+    const isDeepSeek = provider === 'deepseek';
+    let fullResponse = "";
 
   /** Get cleaned tool response */
   public getCleanedToolResponse(text: string) {
     return this._parser.getCleanedToolResponse(text);
   }
+    if (isDeepSeek) {
+      await streamDeepSeekChat(
+        host,
+        model,
+        apiKey,
+        summaryPrompt,
+        new AbortController().signal,
+        (chunk) => { fullResponse += chunk; },
+        new AbortController(),
+      );
+    } else {
+      await streamOllamaChat(
+        host,
+        model,
+        summaryPrompt,
+        new AbortController().signal,
+        (chunk) => { fullResponse += chunk; },
+        new AbortController(),
+      );
+    }
 
   /** Check if text has complete tool call */
   public hasCompleteToolCall(text: string) {
     return this._parser.hasCompleteToolCall(text);
+    return fullResponse.trim() || "Summary generation failed.";
   }
 }
