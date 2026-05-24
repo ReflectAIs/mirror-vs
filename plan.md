@@ -1,39 +1,81 @@
 
-# Mirror VS - Enhancement Opportunities Implementation
+# Mirror VS — Deep Project Analysis & Enhancement Roadmap
 
-## Current Status: ⏳ Working on Task 11 — Write Tool Collapsible UI
+## Project Overview
 
-**All 10 previous enhancement areas are complete. Now implementing collapsible write_file/create_file tool cards.**
-
----
-
-### ✅ 1-10: All Previous Enhancements Complete
+Mirror VS (v0.0.9) is a VS Code extension providing an autonomous AI coding assistant in the sidebar. It supports Ollama (local) and DeepSeek (API) providers with 12+ workspace tools, git-backed review/revert, and streaming chat.
 
 ---
 
-### ⏳ 11. WRITE TOOL COLLAPSIBLE / TERMINAL-STYLE PROGRESS
-- **Goal**: Make write_file (and similar long-content tools: create_file, patch_file) cards collapsed by default with accordion toggle
-- **Goal**: For run_command / terminal commands, show a clean "in progress" indicator (similar to scanning bar) that collapses on completion
-- **Plan**:
-  1. ✅ Analyzed current tool card rendering in sidebar.js (lines 566-776) — `createToolCardDOM()`
-  2. ✅ Identified CSS: `.tool-card-body-wrapper` uses `grid-template-rows: 0fr` → `1fr` on `.expanded`
-  3. ✅ Identified toggle: header click toggles `.expanded` class (lines 766-768)
-  4. ✅ Identified that currently ALL tool cards start expanded (no `expanded` class initially, but body wrapper animates)
-  5. ❌ **Bug**: The `write_file` / `create_file` cards currently show their full code blocks on render without collapsing
-  6. ⏳ **Fix**: Add `.collapsed-by-default` class to `write_file`, `create_file`, `patch_file` cards so body starts collapsed
-  7. ⏳ **Enhancement**: Add distinct progress indicator for file-writing tools (different CSS from scanning bar)
-  8. ⏳ **Enhancement**: Terminal commands (`run_command`) show "Running..." spinner instead of full output until complete
+## 🔴 Critical Issues Found
+
+### 1. Bug: Browser Screenshot Base64 Extraction Broken
+**File**: `src/agent/orchestrator.ts`  
+The regex `\(Image successfully captured and sent to vision model)` has **no capture group** for base64 data, but `match[1]` is accessed. Screenshots are never extracted/transmitted.
+
+### 2. Bug: `cancelStream` & `revertHistory` Type Mismatch
+**Files**: Types vs sidebar-provider handler  
+These message types are emitted by webview but not in the `WebviewToExtensionMessage` union. The handler silently ignores them.
+
+### 3. Missing Coverage: <5% Test Coverage
+- 0 tests for orchestrator (1382 lines)
+- 0 tests for sidebar-provider
+- 0 tests for all 10+ services
+- No integration or E2E tests
+
+### 4. Missing Feature: No Inline Completions
+No `InlineCompletionItemProvider` registered. Users must open sidebar for every interaction.
+
+### 5. Missing Feature: No Diff Review UI
+`review-manager.ts` exists but no visual diff viewer in the webview.
+
+### 6. Missing Tool: `rename_file` & `delete_file`
+File toolset incomplete.
 
 ---
 
-## Implementation Details
+## 🟡 Medium Priority
 
-### Changes to `src/webview/sidebar.js`:
-- In `createToolCardDOM()`: Add `'collapsed-by-default'` class for `write_file`, `create_file`, `patch_file` tools
-- In `createToolCardDOM()`: For completed `run_command` cards, add a "Show Output" collapsed state
-- Modify CSS to support `collapsed-by-default` class
+### 7. Decompose orchestrator (1382 → ~400 lines)
+Massive single file violates SRP. Needs splitting into AgentSession, AgentCompleter, AgentExecutor, AgentParser.
 
-### Changes to `src/webview/sidebar.css`:
-- Add styles for `collapsed-by-default` tool cards (subtle "Expand to view" hint)
-- Add distinct progress indicator for file-writing operations (different color from scanning bar)
-- Add terminal-style progress animation
+### 8. Add `/` slash commands
+`/fix`, `/explain`, `/test`, `/refactor` for quick actions.
+
+### 9. Input validation & cost controls
+No allowlist/blocklist for commands. No token budget enforcement for DeepSeek API (cost explosion risk).
+
+### 10. CI/CD pipeline
+No GitHub Actions, no automated quality gates.
+
+---
+
+## 🟢 Quick Wins
+
+### 11. Token usage display in UI
+`tokenUsage` message type exists but no UI display.
+
+### 12. Keyboard accessibility audit
+No ARIA labels, role attributes, or screen reader support.
+
+### 13. Chat virtualization
+Long sessions render 100s of DOM nodes. Needs virtual scrolling.
+
+---
+
+## Action Items (0.1.0 Release)
+
+| # | Task | Priority | Effort | Status |
+|---|------|----------|--------|--------|
+| 1 | Fix screenshot base64 extraction | 🔴 Critical | 🟢 Low | ⬜ |
+| 2 | Fix message type mismatch | 🔴 Critical | 🟢 Low | ⬜ |
+| 3 | Add test suite | 🔴 Critical | 🔴 High | ⬜ |
+| 4 | Add inline completions | 🔴 Critical | 🟡 Medium | ⬜ |
+| 5 | Add diff review UI | 🔴 Critical | 🟡 Medium | ⬜ |
+| 6 | Add rename/delete tools | 🟡 Medium | 🟢 Low | ⬜ |
+| 7 | Decompose orchestrator | 🟡 Medium | 🔴 High | ⬜ |
+| 8 | Add slash commands | 🟡 Medium | 🟡 Medium | ⬜ |
+| 9 | CI/CD pipeline | 🟡 Medium | 🟡 Medium | ⬜ |
+| 10 | Input validation | 🟡 Medium | 🟡 Medium | ⬜ |
+| 11 | Token usage display | 🟢 Low | 🟢 Low | ⬜ |
+| 12 | Accessibility basics | 🟢 Low | 🟡 Medium | ⬜ |
