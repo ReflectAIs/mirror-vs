@@ -1,50 +1,89 @@
+
 {
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug SST",
-      "type": "node",
+      "name": "Run Extension (Mirror VS)",
+      "type": "extensionHost",
       "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["dev", "--increase-timeout"],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      // sourceMapRenames helps with the loading spinner when debugging and viewing local variables
-      "sourceMapRenames": false,
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "preLaunchTask": "npm: compile",
+      "sourceMaps": true,
       "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
+        "NODE_ENV": "development"
       }
     },
     {
-      "name": "Debug Tests - Unit",
-      "type": "node",
+      "name": "Extension + Webview Debug",
+      "type": "extensionHost",
       "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["bind", "yarn", "\"jest\"", "\"--watch\"", "\"--config\"", "\"./jest.unit.config.cjs\"", "\"${input:scopeTestsFileName}\""],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      },
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "preLaunchTask": "npm: watch",
+      "sourceMaps": true,
+      "trace": true
     },
     {
-      "name": "Debug Tests - E2E",
+      "name": "Debug Unit Tests",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["bind", "yarn", "\"vitest\"", "\"--config\"", "\"./vitest.e2e.config.ts\"", "\"${input:scopeTestsFileName}\""],
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/vitest",
+      "runtimeArgs": [
+        "run",
+        "--config",
+        "${workspaceFolder}/vitest.config.ts",
+        "--reporter=verbose"
+      ],
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      },
+      "cwd": "${workspaceFolder}"
     },
+    {
+      "name": "Debug Specific Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/vitest",
+      "runtimeArgs": [
+        "run",
+        "--config",
+        "${workspaceFolder}/vitest.config.ts",
+        "--reporter=verbose",
+        "${input:testFileName}"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Watch Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/vitest",
+      "runtimeArgs": [
+        "--config",
+        "${workspaceFolder}/vitest.config.ts",
+        "--reporter=verbose"
+      ],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}"
+    }
   ],
   "inputs": [
     {
-      "id": "scopeTestsFileName",
+      "id": "testFileName",
       "type": "promptString",
-      "description": "Partial file name to scope test debugging to. ex. arena. Leave blank to run all tests.",
+      "description": "Enter the test file name or pattern (e.g., file-tools, tool-registry). Leave blank to run all tests.",
+      "default": ""
     }
   ]
 }
