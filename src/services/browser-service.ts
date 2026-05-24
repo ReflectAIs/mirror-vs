@@ -1,4 +1,3 @@
-// @ts-nocheck — puppeteer-core is ESM-only and requires DOM lib; esbuild compiles it fine at runtime
 import * as puppeteer from 'puppeteer-core';
 import * as fs from 'fs';
 import * as path from 'path';

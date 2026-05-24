@@ -58,7 +58,6 @@ export class AgentCompleter {
 
       const onChunk = (chunk: string) => {
         if (signal.aborted) return;
-        fullResponse += chunk;
         toolCallBuffer += chunk;
         totalTokens += RateLimiter.estimateTokens(chunk);
         this._postMessage({
@@ -170,8 +169,6 @@ export class AgentCompleter {
     ];
 
     const isDeepSeek = provider === 'deepseek';
-    let fullResponse = '';
-
     return new Promise<string>((resolve) => {
       const onChunk = (chunk: string) => {
         fullResponse += chunk;

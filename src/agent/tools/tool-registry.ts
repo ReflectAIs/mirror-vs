@@ -61,7 +61,7 @@ export async function executeTool(
 
   // New language tools (run in VS Code host context via executeCommand)
   if (name === 'symbol_search' || name === 'rename_symbol') {
-    const { executeLanguageTool } = require('./language-tools');
+    const { executeLanguageTool } = await import('./language-tools');
     return await executeLanguageTool(tool);
   }
 

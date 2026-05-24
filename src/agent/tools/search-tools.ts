@@ -22,7 +22,7 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
         if (url.startsWith('//duckduckgo.com/l/?uddg=')) {
           url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
         }
-        let snippet = match[2].replace(/<b>/g, '').replace(/<\/b>/g, '').trim();
+        const snippet = match[2].replace(/<b>/g, '').replace(/<\/b>/g, '').trim();
         results.push({ url, snippet });
       }
       return (

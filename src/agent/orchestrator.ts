@@ -132,7 +132,7 @@ export class AgentOrchestrator {
     if (!isRepo) run("git init");
     const gitignorePath = workspaceFolder + "/.gitignore";
     let gitignoreContent = "";
-    try { gitignoreContent = fs.readFileSync(gitignorePath, "utf8"); } catch {}
+    try { gitignoreContent = fs.readFileSync(gitignorePath, "utf8"); } catch { /* ignore */ }
     const patterns = ["node_modules/", ".mirror-vs/", "turns.log"];
     const missing = patterns.filter(p => !gitignoreContent.includes(p));
     if (missing.length > 0) {
@@ -186,8 +186,8 @@ export class AgentOrchestrator {
     const config = vscode.workspace.getConfiguration("mirror-vs");
     let provider = config.get<string>("defaultProvider", "ollama") as string;
     const ollamaHost = config.get<string>("ollamaHost", "http://localhost:11434") as string;
-    let defaultOllamaModel = config.get<string>("defaultOllamaModel", "llama3") as string;
-    let defaultDeepSeekModel = config.get<string>("defaultDeepSeekModel", "deepseek-chat") as string;
+    const defaultOllamaModel = config.get<string>("defaultOllamaModel", "llama3") as string;
+    const defaultDeepSeekModel = config.get<string>("defaultDeepSeekModel", "deepseek-chat") as string;
     this._session.sessionId = "session_" + Date.now();
 
     // Rate limiter: image budget

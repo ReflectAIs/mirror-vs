@@ -1,8 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 import { ToolCall } from '../types';
-import { createCheckpoint, revertCheckpoint } from '../../utils/editor-utils';
+import { createCheckpoint } from '../../utils/editor-utils';
 import { ReviewManager } from '../../services/review-manager';
 
 function normalizeLineEndings(str: string): string {
