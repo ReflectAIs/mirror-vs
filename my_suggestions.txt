@@ -1,0 +1,4 @@
+This project you are working on is your code.
+
+Analyze your history, seee where you were failing and fix it in project.
+I want write tool to be collapsable and collapsed by default as we write long codes. Show only if user clicks to uncollapse or else show a tool in progress like we show for terminal commands. But in a different css
