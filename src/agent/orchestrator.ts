@@ -313,13 +313,11 @@ export class AgentOrchestrator {
         loopCount++;
         continueLoop = false;
 
-        const payload = [
         const payload: ChatMessage[] = [
           { role: "system", content: buildSystemPrompt() },
           ...currentMessages
             .filter((msg) => !msg.summarized)
             .map((msg) => ({
-              role: msg.role === "system" ? "user" : msg.role,
               role: (msg.role === "system" ? "user" : msg.role) as "user" | "assistant" | "system",
               content: msg.content,
               images: msg.images,
