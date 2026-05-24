@@ -537,52 +537,13 @@ select:focus {
 }
 
 .session-meta-row {
-.session-time {
-  font-size: 9px;
-  color: var(--text-muted);
-}
-
-.session-delete-btn {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  opacity: 0;
-  cursor: pointer;
-  border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: center;
-  transition: var(--transition-fast);
 }
 
 .session-time {
   font-size: 9px;
-.session-item:hover .session-delete-btn { opacity: 0.5; }
-
-.session-delete-btn:hover {
-  opacity: 1 !important;
-  background: rgba(248, 113, 113, 0.1);
-  color: var(--color-danger);
-}
-
-/* ─── Git Changes ─────────────────────────────────────────────────────────── */
-.git-changes-summary {
-  display: flex;
-  gap: 16px;
-  padding: 10px 0 14px;
-  border-bottom: 1px solid var(--border-glass);
-  margin-bottom: 12px;
-}
-
-.git-changes-stat {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
   color: var(--text-muted);
 }
 
@@ -590,13 +551,6 @@ select:focus {
   font-size: 9px;
   color: var(--color-primary-light);
   opacity: 0.7;
-.git-stat {
-  font-size: 11px;
-  font-weight: 700;
-  min-width: 20px;
-  text-align: center;
-  padding: 2px 6px;
-  border-radius: 4px;
 }
 
 .session-delete-btn {
@@ -607,48 +561,6 @@ select:focus {
   border: none;
   color: var(--text-muted);
   opacity: 0;
-.git-stat.added {
-  background: rgba(52, 211, 153, 0.08);
-  color: var(--color-success);
-  border: 1px solid rgba(52, 211, 153, 0.12);
-}
-
-.git-stat.modified {
-  background: rgba(251, 191, 36, 0.08);
-  color: var(--color-warning);
-  border: 1px solid rgba(251, 191, 36, 0.12);
-}
-
-.git-stat.deleted {
-  background: rgba(248, 113, 113, 0.08);
-  color: var(--color-danger);
-  border: 1px solid rgba(248, 113, 113, 0.12);
-}
-
-.git-stat.untracked {
-  background: rgba(148, 163, 184, 0.08);
-  color: var(--text-secondary);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.git-changes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 240px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-glass) transparent;
-}
-
-.git-change-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--bg-glass);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
   cursor: pointer;
   border-radius: var(--radius-xs);
   display: flex;
@@ -658,208 +570,64 @@ select:focus {
 }
 
 .session-item:hover .session-delete-btn { opacity: 0.5; }
-.git-change-item:hover {
-  background: rgba(99, 102, 241, 0.04);
-  border-color: rgba(99, 102, 241, 0.12);
-  transform: translateX(3px);
-}
 
 .session-delete-btn:hover {
   opacity: 1 !important;
-.git-change-status {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  min-width: 16px;
-  text-align: center;
-}
-
-.git-change-status.M {
-  background: rgba(251, 191, 36, 0.1);
-  color: var(--color-warning);
-}
-
-.git-change-status.A {
-  background: rgba(52, 211, 153, 0.1);
-  color: var(--color-success);
-}
-
-.git-change-status.D {
   background: rgba(248, 113, 113, 0.1);
   color: var(--color-danger);
 }
 
 /* ─── Git Changes ─────────────────────────────────────────────────────────── */
 .git-changes-summary {
-.git-change-status.\? {
-  background: rgba(148, 163, 184, 0.1);
-  color: var(--text-secondary);
-}
-
-.git-change-filename {
-  flex: 1;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-primary);
-}
-
-.git-change-actions {
   display: flex;
   gap: 16px;
   padding: 10px 0 14px;
   border-bottom: 1px solid var(--border-glass);
   margin-bottom: 12px;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 0.2s var(--ease-out);
 }
 
 .git-changes-stat {
-.git-change-item:hover .git-change-actions { opacity: 1; }
-
-.git-change-action-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 3px;
-  border-radius: 3px;
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 10px;
   color: var(--text-muted);
-  justify-content: center;
-  transition: var(--transition-fast);
 }
 
 .git-stat {
   font-size: 11px;
   font-weight: 700;
   min-width: 20px;
-.git-change-action-btn:hover {
-  background: var(--bg-glass-hover);
-  color: var(--text-primary);
-}
-
-.git-change-action-btn.diff:hover { color: var(--color-primary); }
-
-/* ─── CHAT AREA ───────────────────────────────────────────────────────────── */
-.chat-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 14px;
-  scroll-behavior: smooth;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-glass) transparent;
-}
-
-.chat-container::-webkit-scrollbar { width: 4px; }
-.chat-container::-webkit-scrollbar-track { background: transparent; }
-.chat-container::-webkit-scrollbar-thumb {
-  background: var(--border-glass);
-  border-radius: 4px;
-}
-
-.messages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 100%;
-}
-
-/* ─── WELCOME CARD ────────────────────────────────────────────────────────── */
-.welcome-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-xl);
-  padding: 28px 22px;
-  margin-top: 24px;
-  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.3);
-  position: relative;
-  overflow: hidden;
   text-align: center;
   padding: 2px 6px;
   border-radius: 4px;
-  animation: welcome-in 0.6s var(--ease-spring) forwards;
 }
 
 .git-stat.added {
   background: rgba(52, 211, 153, 0.08);
   color: var(--color-success);
   border: 1px solid rgba(52, 211, 153, 0.12);
-.welcome-glow {
-  position: absolute;
-  top: -60%;
-  left: -60%;
-  width: 220%;
-  height: 220%;
-  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.06), transparent 60%);
-  animation: glow-rotate 8s linear infinite;
 }
 
 .git-stat.modified {
   background: rgba(251, 191, 36, 0.08);
   color: var(--color-warning);
   border: 1px solid rgba(251, 191, 36, 0.12);
-@keyframes glow-rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 .git-stat.deleted {
   background: rgba(248, 113, 113, 0.08);
   color: var(--color-danger);
   border: 1px solid rgba(248, 113, 113, 0.12);
-@keyframes welcome-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .git-stat.untracked {
   background: rgba(148, 163, 184, 0.08);
-.welcome-header {
-  position: relative;
-  margin-bottom: 20px;
-}
-
-.welcome-logo {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 12px;
-}
-
-.welcome-logo img {
-  width: 100%;
-  height: 100%;
-  border-radius: var(--radius-lg);
-  filter: drop-shadow(0 4px 16px rgba(99, 102, 241, 0.25));
-}
-
-.welcome-header h3 {
-  font-size: 16px;
-  font-weight: 800;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 4px;
-}
-
-.welcome-header p {
-  font-size: 12px;
   color: var(--text-secondary);
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .git-changes-list {
-.welcome-features {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -867,56 +635,24 @@ select:focus {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border-glass) transparent;
-  gap: 10px;
-  margin-bottom: 20px;
-  position: relative;
 }
 
 .git-change-item {
-.feature-item {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
   background: var(--bg-glass);
   border: 1px solid transparent;
-  gap: 12px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-md);
-  text-align: left;
-  transition: var(--transition-normal);
-}
-
-.feature-item:hover {
-  background: rgba(255, 255, 255, 0.035);
-  border-color: var(--border-glass-hover);
-}
-
-.feature-icon-wrapper {
-  width: 32px;
-  height: 32px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: var(--transition-fast);
-  background: rgba(99, 102, 241, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .git-change-item:hover {
   background: rgba(99, 102, 241, 0.04);
   border-color: rgba(99, 102, 241, 0.12);
   transform: translateX(3px);
-.feature-icon { font-size: 16px; }
-
-.feature-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
 }
 
 .git-change-status {
@@ -924,66 +660,30 @@ select:focus {
   font-weight: 800;
   letter-spacing: 0.3px;
   padding: 1px 6px;
-.feature-text strong {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.feature-text span {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.feature-text code {
-  background: rgba(168, 85, 247, 0.1);
-  color: var(--color-accent);
-  padding: 0 4px;
   border-radius: 3px;
   flex-shrink: 0;
   min-width: 16px;
   text-align: center;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
 }
 
 .git-change-status.M {
   background: rgba(251, 191, 36, 0.1);
   color: var(--color-warning);
-.welcome-hint {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  position: relative;
 }
 
 .git-change-status.A {
   background: rgba(52, 211, 153, 0.1);
   color: var(--color-success);
-/* ─── MESSAGE BUBBLES ─────────────────────────────────────────────────────── */
-.message {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  animation: message-in 0.3s var(--ease-out) forwards;
 }
 
 .git-change-status.D {
   background: rgba(248, 113, 113, 0.1);
   color: var(--color-danger);
-@keyframes message-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 .git-change-status.\? {
   background: rgba(148, 163, 184, 0.1);
-.message-meta {
-  font-size: 10px;
-  font-weight: 700;
   color: var(--text-secondary);
-  letter-spacing: 0.15px;
-  padding: 0 2px;
 }
 
 .git-change-filename {
@@ -993,29 +693,6 @@ select:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-.message-actions {
-  display: flex;
-  gap: 4px;
-  padding: 0 2px;
-  margin-bottom: 2px;
-}
-
-.message-action-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 10px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
-  transition: var(--transition-fast);
-  opacity: 0.5;
-}
-
-.message:hover .message-action-btn { opacity: 1; }
-
-.message-action-btn:hover {
-  background: var(--bg-glass-hover);
   color: var(--text-primary);
 }
 
@@ -1024,53 +701,11 @@ select:focus {
   gap: 2px;
   opacity: 0;
   transition: opacity 0.2s var(--ease-out);
-.message-bubble {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-primary);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  transition: border-color 0.2s var(--ease-out);
 }
 
 .git-change-item:hover .git-change-actions { opacity: 1; }
-.user .message-bubble {
-  background: rgba(99, 102, 241, 0.04);
-  border-color: rgba(99, 102, 241, 0.12);
-}
 
 .git-change-action-btn {
-.system .message-bubble {
-  background: rgba(168, 85, 247, 0.03);
-  border-color: rgba(168, 85, 247, 0.08);
-}
-
-.message-bubble p { margin-bottom: 8px; }
-.message-bubble p:last-child { margin-bottom: 0; }
-
-.message-bubble code {
-  background: rgba(255, 255, 255, 0.06);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-primary-light);
-}
-
-.message-bubble pre {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.message-bubble pre code {
   background: none;
   border: none;
   color: var(--text-muted);
@@ -1081,27 +716,14 @@ select:focus {
   align-items: center;
   justify-content: center;
   transition: var(--transition-fast);
-  padding: 0;
-  border-radius: 0;
-  font-size: 11px;
-  color: var(--text-primary);
-  line-height: 1.5;
 }
 
 .git-change-action-btn:hover {
   background: var(--bg-glass-hover);
   color: var(--text-primary);
-/* ─── TOOL CARDS ──────────────────────────────────────────────────────────── */
-.tool-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition: var(--transition-normal);
 }
 
 .git-change-action-btn.diff:hover { color: var(--color-primary); }
-.tool-card:hover { border-color: var(--border-glass-hover); }
 
 /* ─── CHAT AREA ───────────────────────────────────────────────────────────── */
 .chat-container {
@@ -1111,10 +733,6 @@ select:focus {
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: var(--border-glass) transparent;
-.tool-card.streaming-write-card {
-  background: rgba(168, 85, 247, 0.03) !important;
-  border-color: rgba(168, 85, 247, 0.2) !important;
-  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.04) !important;
 }
 
 .chat-container::-webkit-scrollbar { width: 4px; }
@@ -1122,87 +740,13 @@ select:focus {
 .chat-container::-webkit-scrollbar-thumb {
   background: var(--border-glass);
   border-radius: 4px;
-.tool-card.streaming-write-card:hover {
-  border-color: rgba(168, 85, 247, 0.35) !important;
-  background: rgba(168, 85, 247, 0.05) !important;
 }
 
 .messages-list {
-.tool-card.write-tool-card {
-  background: rgba(168, 85, 247, 0.015);
-  border-color: rgba(168, 85, 247, 0.12);
-}
-
-.tool-card.write-tool-card:hover {
-  border-color: rgba(168, 85, 247, 0.25);
-  background: rgba(168, 85, 247, 0.035);
-}
-
-/* Custom styles for streaming write card elements */
-.tool-card.streaming-write-card .tool-icon-wrapper {
-  background: rgba(168, 85, 247, 0.08) !important;
-  border: 1px solid rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .tool-status-badge {
-  background: rgba(168, 85, 247, 0.1) !important;
-  color: #c084fc !important;
-  border: 1px solid rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .scanning-bar::after {
-  background: linear-gradient(90deg, transparent, #a855f7, transparent) !important;
-}
-
-.tool-card.streaming-write-card .code-block-wrapper {
-  margin: 8px !important;
-  border-color: rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .code-block-header {
-  background: rgba(147, 51, 234, 0.05) !important;
-  border-bottom-color: rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .code-block-header .streaming-label {
-  font-size: 9px !important;
-  opacity: 0.65 !important;
-  color: #c084fc !important;
-}
-
-.tool-card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.2s var(--ease-out);
-}
-
-.tool-card-header:hover { background: rgba(255, 255, 255, 0.02); }
-
-.tool-icon-wrapper {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  background: rgba(99, 102, 241, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.tool-icon { font-size: 14px; }
-
-.tool-info {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: 100%;
-  gap: 1px;
 }
 
 /* ─── WELCOME CARD ────────────────────────────────────────────────────────── */
@@ -1214,22 +758,9 @@ select:focus {
   margin-top: 24px;
   box-shadow: 0 8px 36px rgba(0, 0, 0, 0.3);
   position: relative;
-.tool-name {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: 0.1px;
-}
-
-.tool-target {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-  white-space: nowrap;
   overflow: hidden;
   text-align: center;
   animation: welcome-in 0.6s var(--ease-spring) forwards;
-  text-overflow: ellipsis;
 }
 
 .welcome-glow {
@@ -1240,48 +771,27 @@ select:focus {
   height: 220%;
   background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.06), transparent 60%);
   animation: glow-rotate 8s linear infinite;
-.tool-header-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
 }
 
 @keyframes glow-rotate {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-.tool-status-badge {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-  letter-spacing: 0.2px;
-  text-transform: uppercase;
 }
 
 @keyframes welcome-in {
   from { opacity: 0; transform: translateY(16px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
-.tool-card[data-status="success"] .tool-status-badge {
-  background: rgba(52, 211, 153, 0.08);
-  color: var(--color-success);
 }
 
 .welcome-header {
   position: relative;
   margin-bottom: 20px;
-.tool-card[data-status="error"] .tool-status-badge {
-  background: rgba(248, 113, 113, 0.08);
-  color: var(--color-danger);
 }
 
 .welcome-logo {
   width: 56px;
   height: 56px;
   margin: 0 auto 12px;
-.tool-card[data-status="running"] .tool-status-badge {
-  background: rgba(56, 189, 248, 0.08);
-  color: var(--color-info);
 }
 
 .welcome-logo img {
@@ -1289,9 +799,6 @@ select:focus {
   height: 100%;
   border-radius: var(--radius-lg);
   filter: drop-shadow(0 4px 16px rgba(99, 102, 241, 0.25));
-.tool-card.reverted .tool-status-badge {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
 }
 
 .welcome-header h3 {
@@ -1302,156 +809,22 @@ select:focus {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin-bottom: 4px;
-.tool-expand-chevron {
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  transition: transform 0.3s var(--ease-out);
 }
 
 .welcome-header p {
   font-size: 12px;
-.tool-card.expanded .tool-expand-chevron { transform: rotate(180deg); }
-
-.chevron-icon { width: 12px; height: 12px; }
-
-/* Tool Revert Button */
-.tool-revert-btn {
-  background: rgba(248, 113, 113, 0.06);
-  border: 1px solid rgba(248, 113, 113, 0.15);
-  color: var(--color-danger);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  transition: var(--transition-fast);
-  white-space: nowrap;
-}
-
-.tool-revert-btn:hover {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.3);
-}
-
-.tool-revert-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Tool Card Body (collapsible) */
-.tool-card-body-wrapper {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s var(--ease-out);
-}
-
-.tool-card.expanded .tool-card-body-wrapper {
-  grid-template-rows: 1fr;
-}
-
-.tool-card-body {
-  overflow: hidden;
-  border-top: 1px solid var(--border-glass);
-}
-
-.tool-details {
-  padding: 10px 14px;
-  font-size: 11px;
   color: var(--text-secondary);
-  font-family: var(--font-mono);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 
 .welcome-features {
-/* Scanning animation for running cards (GPU Accelerated) */
-.scanning-bar {
-  height: 2px;
-  position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.scanning-bar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
-  animation: scan-gpu 1.5s ease-in-out infinite;
-  transform: translateX(-100%);
-}
-
-@keyframes scan-gpu {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-/* ─── CODE BLOCK WRAPPER IN BUBBLES ──────────────────────────────────────── */
-.code-block-wrapper {
-  position: relative;
-  margin: 10px 0;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--border-glass);
-}
-
-.code-block-header {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 20px;
   position: relative;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid var(--border-glass);
-  font-size: 10px;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
 }
 
 .feature-item {
-.copy-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-glass);
-  color: var(--text-muted);
-  font-size: 9px;
-  padding: 3px 8px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: var(--transition-fast);
-  font-weight: 600;
-}
-
-.copy-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary);
-}
-
-.code-block-wrapper pre {
-  margin: 0;
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.15);
-  overflow-x: auto;
-}
-
-.code-block-wrapper pre code {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  line-height: 1.55;
-  color: var(--text-primary);
-}
-
-/* ─── CONTEXT BAR ─────────────────────────────────────────────────────────── */
-.context-bar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1461,21 +834,11 @@ select:focus {
   border-radius: var(--radius-md);
   text-align: left;
   transition: var(--transition-normal);
-  justify-content: space-between;
-  padding: 6px 4px;
-  margin: 0;
-  border-bottom: 1px solid var(--border-glass);
 }
 
 .feature-item:hover {
   background: rgba(255, 255, 255, 0.035);
   border-color: var(--border-glass-hover);
-.context-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
 }
 
 .feature-icon-wrapper {
@@ -1483,139 +846,29 @@ select:focus {
   height: 32px;
   border-radius: var(--radius-sm);
   background: rgba(99, 102, 241, 0.08);
-.context-actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-}
-
-.context-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--color-success);
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
-  animation: dot-pulse 2s infinite;
   flex-shrink: 0;
 }
 
 .feature-icon { font-size: 16px; }
-.context-dot.offline {
-  background: var(--color-danger);
-  box-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
-  animation: none;
-}
 
 .feature-text {
-@keyframes dot-pulse {
-  0%, 100% { opacity: 0.7; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.15); }
-}
-
-.context-file-name {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-secondary);
-}
-
-.accept-all-btn {
-  background: rgba(52, 211, 153, 0.06);
-  border: 1px solid rgba(52, 211, 153, 0.18);
-  color: var(--color-success);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: var(--transition-normal);
-  white-space: nowrap;
-}
-
-.accept-all-btn:hover {
-  background: rgba(52, 211, 153, 0.14);
-  border-color: rgba(52, 211, 153, 0.35);
-  box-shadow: 0 2px 10px rgba(52, 211, 153, 0.15);
-  color: #fff;
-}
-
-.accept-all-btn:active { transform: scale(0.96); }
-.accept-all-btn.hidden { display: none !important; }
-
-/* ─── INPUT PANEL ─────────────────────────────────────────────────────────── */
-.input-panel {
-  padding: 8px 12px 12px;
-  border-top: 1px solid var(--border-glass);
-  background: rgba(10, 10, 15, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.textarea-container {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  align-items: flex-end;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: 8px 12px;
-  position: relative;
-  transition: var(--transition-normal);
-  gap: 6px;
 }
 
 .feature-text strong {
   font-size: 11.5px;
   font-weight: 700;
-.textarea-container:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08), 0 0 24px rgba(99, 102, 241, 0.03);
-}
-
-#prompt-input {
-  flex: 1;
-  background: none;
-  border: none;
   color: var(--text-primary);
-  font-family: inherit;
-  font-size: 12.5px;
-  resize: none;
-  max-height: 130px;
-  min-height: 20px;
-  outline: none;
-  padding-right: 36px;
-  line-height: 1.5;
 }
 
 .feature-text span {
   font-size: 10px;
   color: var(--text-muted);
-#prompt-input::placeholder { color: var(--text-muted); opacity: 0.5; }
-
-.send-btn {
-  background: var(--gradient-primary);
-  color: #fff;
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-spring);
-  position: absolute;
-  right: 8px;
-  bottom: 7px;
-  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.25);
 }
 
 .feature-text code {
@@ -1625,9 +878,6 @@ select:focus {
   border-radius: 3px;
   font-family: var(--font-mono);
   font-size: 9.5px;
-.send-btn:hover {
-  transform: scale(1.12);
-  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.35);
 }
 
 .welcome-hint {
@@ -1635,49 +885,10 @@ select:focus {
   color: var(--text-muted);
   opacity: 0.6;
   position: relative;
-.send-btn:active { transform: scale(0.9); }
-.send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-
-.stop-btn {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: #fff;
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition-spring);
-  position: absolute;
-  right: 8px;
-  bottom: 7px;
-  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.25);
 }
 
 /* ─── MESSAGE BUBBLES ─────────────────────────────────────────────────────── */
 .message {
-.stop-btn:hover {
-  transform: scale(1.12);
-  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.35);
-}
-
-/* ─── AUTOCOMPLETE & CHIPS ───────────────────────────────────────────────── */
-.autocomplete-dropdown {
-  position: absolute;
-  bottom: 100px;
-  left: 14px;
-  right: 14px;
-  max-height: 180px;
-  overflow-y: auto;
-  background: rgba(12, 12, 20, 0.97);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
-  z-index: 100;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1687,151 +898,40 @@ select:focus {
 @keyframes message-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
-.autocomplete-dropdown.hidden { display: none; }
-
-.autocomplete-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  transition: background 0.12s var(--ease-out);
-  border-bottom: 1px solid var(--border-glass);
 }
 
 .message-meta {
-.autocomplete-item:last-child { border-bottom: none; }
-
-.autocomplete-item:hover,
-.autocomplete-item.active {
-  background: rgba(99, 102, 241, 0.08);
-  color: #fff;
-}
-
-.autocomplete-item-icon { opacity: 0.4; }
-
-.context-chips-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 4px 0;
-}
-.context-chips-container:empty { margin: 0; }
-
-.context-chip {
-  background: rgba(168, 85, 247, 0.06);
-  border: 1px solid rgba(168, 85, 247, 0.15);
-  color: var(--color-primary-light);
-  padding: 3px 8px;
-  border-radius: 12px;
   font-size: 10px;
   font-weight: 700;
   color: var(--text-secondary);
   letter-spacing: 0.15px;
   padding: 0 2px;
-  font-family: var(--font-mono);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: var(--transition-fast);
 }
 
 .message-actions {
-.context-chip:hover {
-  background: rgba(168, 85, 247, 0.1);
-  border-color: rgba(168, 85, 247, 0.25);
-}
-
-.context-chip-remove {
-  cursor: pointer;
-  font-weight: bold;
-  opacity: 0.4;
-  font-size: 9px;
-  transition: var(--transition-fast);
-}
-
-.context-chip-remove:hover {
-  opacity: 1;
-  color: var(--color-danger);
-}
-
-/* ─── IMAGE ATTACHMENTS ──────────────────────────────────────────────────── */
-.image-attachments-container {
   display: flex;
   gap: 4px;
   padding: 0 2px;
   margin-bottom: 2px;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 0;
 }
 
 .message-action-btn {
   background: none;
-.image-attachment-chip {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-glass);
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: var(--transition-fast);
-}
-
-.image-attachment-chip:hover {
-  transform: scale(1.06);
-  border-color: var(--border-glass-hover);
-}
-
-.image-attachment-remove {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--color-danger);
-  color: #fff;
   border: none;
   color: var(--text-muted);
   font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-xs);
   transition: var(--transition-fast);
   opacity: 0.5;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  padding: 0;
-  line-height: 1;
 }
 
 .message:hover .message-action-btn { opacity: 1; }
-.bubble-images-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
 
 .message-action-btn:hover {
   background: var(--bg-glass-hover);
   color: var(--text-primary);
-.bubble-inline-image {
-  max-width: 100%;
-  max-height: 180px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-glass);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  cursor: pointer;
-  transition: transform var(--transition-fast);
 }
 
 .message-bubble {
@@ -1845,72 +945,28 @@ select:focus {
   word-wrap: break-word;
   overflow-wrap: break-word;
   transition: border-color 0.2s var(--ease-out);
-.bubble-inline-image:hover { transform: scale(1.015); }
-
-/* ─── SYSTEM CONTEXT BANNER ──────────────────────────────────────────────── */
-.system-context-banner {
-  background: var(--bg-card);
-  border: 1px solid rgba(168, 85, 247, 0.12);
-  border-left: 3px solid var(--color-accent);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  width: 100%;
-  overflow: hidden;
-  transition: var(--transition-normal);
-  animation: message-in 0.3s var(--ease-out) forwards;
 }
 
 .user .message-bubble {
   background: rgba(99, 102, 241, 0.04);
   border-color: rgba(99, 102, 241, 0.12);
-.system-context-banner:hover { border-color: rgba(168, 85, 247, 0.2); }
-
-.system-context-header {
-  padding: 8px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--color-primary-light);
-  gap: 8px;
 }
 
 .system .message-bubble {
   background: rgba(168, 85, 247, 0.03);
   border-color: rgba(168, 85, 247, 0.08);
-.system-context-toggle {
-  font-size: 10px;
-  background: rgba(168, 85, 247, 0.08);
-  padding: 2px 8px;
-  border-radius: var(--radius-xs);
-  color: rgba(233, 213, 255, 0.8);
-  border: 1px solid rgba(168, 85, 247, 0.15);
-  transition: var(--transition-fast);
-  white-space: nowrap;
 }
 
 .message-bubble p { margin-bottom: 8px; }
 .message-bubble p:last-child { margin-bottom: 0; }
-.system-context-banner:hover .system-context-toggle {
-  background: rgba(168, 85, 247, 0.14);
-}
 
 .message-bubble code {
   background: rgba(255, 255, 255, 0.06);
   padding: 1px 5px;
   border-radius: 3px;
   font-family: var(--font-mono);
-.system-context-body {
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.12);
-  border-top: 1px solid var(--border-glass);
   font-size: 11px;
   color: var(--color-primary-light);
-  line-height: 1.5;
-  color: var(--text-secondary);
 }
 
 .message-bubble pre {
@@ -1920,42 +976,15 @@ select:focus {
   padding: 10px 12px;
   overflow-x: auto;
   margin: 8px 0;
-.system-context-body.collapsed { display: none; }
-
-.system-context-body h3 {
-  font-size: 12px;
-  margin-bottom: 6px;
-  color: #f3e8ff;
 }
 
 .message-bubble pre code {
   background: none;
   padding: 0;
   border-radius: 0;
-.system-context-body ul {
-  padding-left: 16px;
-  margin-bottom: 8px;
-}
-
-/* ─── HISTORY LOADING TRIGGER ────────────────────────────────────────────── */
-.history-loading-trigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 14px;
-  margin-bottom: 8px;
-  background: var(--bg-glass);
-  border: 1px dashed var(--border-glass);
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
   font-size: 11px;
   color: var(--text-primary);
   line-height: 1.5;
-  cursor: pointer;
-  transition: var(--transition-normal);
-  gap: 8px;
-  user-select: none;
 }
 
 /* ─── TOOL CARDS ──────────────────────────────────────────────────────────── */
@@ -1965,183 +994,64 @@ select:focus {
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: var(--transition-normal);
-.history-loading-trigger:hover {
-  background: rgba(99, 102, 241, 0.04);
-  border-color: rgba(99, 102, 241, 0.15);
-  color: var(--color-primary);
 }
 
 .tool-card:hover { border-color: var(--border-glass-hover); }
-/* ─── INLINE DIFF VIEWER ─────────────────────────────────────────────────── */
-.inline-diff-viewer {
-  animation: message-in 0.25s var(--ease-spring) forwards;
-}
 
 .tool-card.streaming-write-card {
   background: rgba(168, 85, 247, 0.03) !important;
   border-color: rgba(168, 85, 247, 0.2) !important;
   box-shadow: 0 4px 20px rgba(168, 85, 247, 0.04) !important;
-.inline-diff-empty {
-  border: 1px dashed var(--border-glass);
-  border-radius: 6px;
-  background: var(--bg-glass);
 }
 
 .tool-card.streaming-write-card:hover {
   border-color: rgba(168, 85, 247, 0.35) !important;
   background: rgba(168, 85, 247, 0.05) !important;
-.inline-diff-actions { gap: 6px; }
-
-.diff-accept-btn:hover {
-  background: rgba(52, 211, 153, 0.18) !important;
-  transform: translateY(-1px);
 }
 
 .tool-card.write-tool-card {
   background: rgba(168, 85, 247, 0.015);
   border-color: rgba(168, 85, 247, 0.12);
-.diff-reject-btn:hover {
-  background: rgba(248, 113, 113, 0.18) !important;
-  transform: translateY(-1px);
 }
 
 .tool-card.write-tool-card:hover {
   border-color: rgba(168, 85, 247, 0.25);
   background: rgba(168, 85, 247, 0.035);
-.diff-accept-btn:disabled,
-.diff-reject-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none !important;
 }
 
 /* Custom styles for streaming write card elements */
 .tool-card.streaming-write-card .tool-icon-wrapper {
   background: rgba(168, 85, 247, 0.08) !important;
   border: 1px solid rgba(168, 85, 247, 0.15) !important;
-.diff-hunk-header { user-select: none; }
-
-.diff-line { transition: background 0.12s var(--ease-out); }
-
-.diff-line.diff-add-line:hover {
-  background: rgba(52, 211, 153, 0.1) !important;
 }
 
 .tool-card.streaming-write-card .tool-status-badge {
   background: rgba(168, 85, 247, 0.1) !important;
   color: #c084fc !important;
   border: 1px solid rgba(168, 85, 247, 0.15) !important;
-.diff-line.diff-del-line:hover {
-  background: rgba(248, 113, 113, 0.1) !important;
 }
 
 .tool-card.streaming-write-card .scanning-bar::after {
   background: linear-gradient(90deg, transparent, #a855f7, transparent) !important;
-.diff-line.diff-ctx-line:last-child { border-bottom: none !important; }
-
-.inline-diff-hunks {
-  max-height: 300px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-glass) transparent;
 }
 
 .tool-card.streaming-write-card .code-block-wrapper {
   margin: 8px !important;
   border-color: rgba(168, 85, 247, 0.15) !important;
-.inline-diff-hunks::-webkit-scrollbar { width: 4px; }
-.inline-diff-hunks::-webkit-scrollbar-track { background: transparent; }
-.inline-diff-hunks::-webkit-scrollbar-thumb {
-  background: var(--border-glass);
-  border-radius: 4px;
 }
 
 .tool-card.streaming-write-card .code-block-header {
   background: rgba(147, 51, 234, 0.05) !important;
   border-bottom-color: rgba(168, 85, 247, 0.15) !important;
-/* ─── BUDDY AVATAR ────────────────────────────────────────────────────────── */
-.buddy-container {
-  position: absolute;
-  right: 14px;
-  top: 64px;
-  z-index: 25;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  transition: transform 0.35s var(--ease-out);
 }
 
 .tool-card.streaming-write-card .code-block-header .streaming-label {
   font-size: 9px !important;
   opacity: 0.65 !important;
   color: #c084fc !important;
-.buddy-container:hover { transform: scale(1.12); }
-
-.buddy-glow {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent,
-    rgba(99, 102, 241, 0.25),
-    transparent,
-    rgba(168, 85, 247, 0.25),
-    transparent
-  );
-  animation: spin 3s linear infinite;
-  opacity: 0;
-  transition: opacity 0.3s var(--ease-out);
 }
 
 .tool-card-header {
-.buddy-container:hover .buddy-glow { opacity: 1; }
-
-.buddy-container.state-thinking .buddy-glow {
-  opacity: 1;
-  animation: spin 1.4s linear infinite;
-}
-
-.buddy-container.state-coding .buddy-glow {
-  opacity: 1;
-  background: conic-gradient(
-    from 0deg,
-    transparent,
-    rgba(52, 211, 153, 0.25),
-    transparent,
-    rgba(34, 197, 94, 0.25),
-    transparent
-  );
-}
-
-.buddy-container.state-error .buddy-glow {
-  opacity: 1;
-  background: conic-gradient(
-    from 0deg,
-    transparent,
-    rgba(248, 113, 113, 0.35),
-    transparent,
-    rgba(239, 68, 68, 0.35),
-    transparent
-  );
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-.buddy-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.25),
-    inset 0 2px 4px rgba(255, 255, 255, 0.03);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2149,17 +1059,9 @@ select:focus {
   cursor: pointer;
   user-select: none;
   transition: background 0.2s var(--ease-out);
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s var(--ease-out);
 }
 
 .tool-card-header:hover { background: rgba(255, 255, 255, 0.02); }
-.buddy-container.state-thinking .buddy-avatar {
-  border-color: rgba(129, 140, 248, 0.3);
-  box-shadow: 0 0活着20px rgba(99, 102, 241, 0.2);
-}
 
 .tool-icon-wrapper {
   width: 28px;
@@ -2170,16 +1072,9 @@ select:focus {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-.buddy-container.state-coding .buddy-avatar {
-  border-color: rgba(52, 211, 153, 0.3);
-  box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
 }
 
 .tool-icon { font-size: 14px; }
-.buddy-container.state-tool_calling .buddy-avatar {
-  border-color: rgba(168, 85, 247, 0.3);
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
-}
 
 .tool-info {
   flex: 1;
@@ -2187,10 +1082,6 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 1px;
-.buddy-container.state-error .buddy-avatar {
-  border-color: rgba(248, 113, 113, 0.4);
-  box-shadow: 0 0 20px rgba(248, 113, 113, 0.3);
-  animation: shake 0.45s var(--ease-out);
 }
 
 .tool-name {
@@ -2198,147 +1089,21 @@ select:focus {
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: 0.1px;
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%  { transform: translateX(-3px) rotate(-4deg); }
-  40%  { transform: translateX(3px) rotate(4deg); }
-  60%  { transform: translateX(-2px) rotate(-2deg); }
-  80%  { transform: translateX(2px) rotate(2deg); }
 }
 
 .tool-target {
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--text-muted);
-.buddy-emoji {
-  font-size: 19px;
-  display: inline-block;
-  transform-origin: center bottom;
-  transition: transform 0.2s var(--ease-out);
-}
-
-.buddy-container.state-thinking .buddy-emoji {
-  animation: think 1.4s infinite var(--ease-in-out);
-}
-
-.buddy-container.state-coding .buddy-emoji {
-  animation: type-code 0.3s infinite alternate var(--ease-out);
-}
-
-.buddy-container.state-tool_calling .buddy-emoji {
-  animation: hammer 0.7s infinite var(--ease-in-out);
-}
-
-@keyframes think {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  25%  { transform: rotate(-12deg) scale(1.08); }
-  75%  { transform: rotate(12deg) scale(1.08); }
-}
-
-@keyframes type-code {
-  from { transform: translateY(0) scaleY(1); }
-  to   { transform: translateY(-1px) scaleY(0.9); }
-}
-
-@keyframes hammer {
-  0%, 100% { transform: rotate(0deg); }
-  35%  { transform: rotate(-15deg) translateY(-1px); }
-  70%  { transform: rotate(15deg) translateY(1px); }
-}
-
-.buddy-tooltip {
-  position: absolute;
-  top: -28px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(10, 10, 20, 0.92);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 9px;
-  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out);
-  transform: translateX(-50%) translateY(4px);
 }
 
 .tool-header-controls {
-.buddy-container:hover .buddy-tooltip,
-.buddy-container.state-thinking .buddy-tooltip,
-.buddy-container.state-coding .buddy-tooltip,
-.buddy-container.state-tool_calling .buddy-tooltip,
-.buddy-container.state-error .buddy-tooltip {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-/* ─── UTILITY ─────────────────────────────────────────────────────────────── */
-.hidden { display: none !important; }
-
-.scrollbar-thin::-webkit-scrollbar { width: 4px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--border-glass);
-  border-radius: 4px;
-}
-
-/* ─── TOKEN & COST DASHBOARD ──────────────────────────────────────────────── */
-.usage-dashboard {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-sm);
-  font-size: 10px;
-  color: var(--text-secondary);
-  margin-top: 6px;
-  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
-  animation: message-in 0.3s var(--ease-spring) forwards;
-}
-
-.usage-stat {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.usage-label {
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-#usage-tokens, #usage-cost {
-  font-family: var(--font-mono);
-  color: var(--color-primary-light);
-  font-weight: 700;
-}
-
-/* ─── AVATAR (legacy compatibility) ───────────────────────────────────────── */
-.avatar-container {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-glass);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(255, 255, 255, 0.025);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  user-select: none;
-  transition: transform 0.25s var(--ease-spring), border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
-  position: relative;
-  overflow: hidden;
   flex-shrink: 0;
 }
 
@@ -2349,34 +1114,16 @@ select:focus {
   border-radius: 10px;
   letter-spacing: 0.2px;
   text-transform: uppercase;
-.avatar-container:hover {
-  transform: scale(1.1);
-  border-color: rgba(99, 102, 241, 0.2);
-  box-shadow: 0 0 16px rgba(99, 102, 241, 0.12);
 }
 
 .tool-card[data-status="success"] .tool-status-badge {
   background: rgba(52, 211, 153, 0.08);
   color: var(--color-success);
-.avatar-emoji {
-  font-size: 16px;
-  display: inline-block;
-  transform-origin: center bottom;
-  transition: transform 0.2s var(--ease-out);
 }
 
 .tool-card[data-status="error"] .tool-status-badge {
   background: rgba(248, 113, 113, 0.08);
   color: var(--color-danger);
-/* ─── SCROLLBAR (global) ──────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: var(--border-glass);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-glass-hover);
 }
 
 .tool-card[data-status="running"] .tool-status-badge {

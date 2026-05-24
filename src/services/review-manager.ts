@@ -199,10 +199,6 @@ export class ReviewManager implements vscode.CodeLensProvider {
     );
   }
 
-  private getDeletedContentText(_lines: string[], _isAtEnd = false): string {
-    return `➖ [deleted ${_lines.length} line${_lines.length !== 1 ? 's' : ''}]`;
-  }
-
   private applyDecorations(editor: vscode.TextEditor) {
     const normPath = this.normalizePath(editor.document.uri.fsPath);
     const review = this._activeReviews.get(normPath);

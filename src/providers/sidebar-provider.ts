@@ -778,15 +778,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     if (!this._view) return;
     const sessions = this._storageService.getSessions();
     const activeSessionId = this._getActiveSessionId() || '';
-    // Enrich sessions with actual message count from per-session stored messages
-    const enrichedSessions: ChatSession[] = sessions.map((s) => {
-      const messages = this._storageService.loadMessages(s.id);
-      return {
-        ...s,
-        messages: [],
-        messageCount: messages.length,
-      } as any;
-    });
     // Use stored messageCount from metadata (faster than loading each session's messages)
     const enrichedSessions: ChatSession[] = sessions.map((s) => ({
       id: s.id,

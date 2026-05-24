@@ -1,3 +1,4 @@
+
 import * as vscode from 'vscode';
 import { ChatMessage, ChatSession } from '../types';
 
@@ -18,13 +19,8 @@ export class StorageService {
   }
 
   /**
-   * Load messages for a specific session from its dedicated key.
-   */
-  loadMessages(sessionId: string): ChatMessage[] {
-=======
-  /**
    * Save session list (metadata only: id, title, timestamp, messageCount).
-   * Messages are striped out before saving — count is derived from stored messages.
+   * Messages are striped out before saving.
    */
   async saveSessions(sessions: ChatSession[]): Promise<void> {
     // Strip message content — only keep count for the session list
@@ -33,16 +29,9 @@ export class StorageService {
       title: s.title,
       timestamp: s.timestamp,
       messages: [] as ChatMessage[],
-      messageCount: s.messageCount || 0,
     }));
     await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
   }
-
-  /**
-   * Load messages for a specific session from its dedicated key.
-   */
-  loadMessages(sessionId: string): ChatMessage[] {
-=======
 
   /**
    * Load messages for a specific session from its dedicated key.
@@ -81,7 +70,7 @@ export class StorageService {
         // Strip images from all messages to avoid bloating workspaceState with base64
         const cleaned = session.messages.map((msg) => ({
           ...msg,
-          images: msg.images ? msg.images.slice(0, 0) : undefined, // keep the array key but empty
+          images: msg.images ? msg.images.slice(0, 0) : undefined,
         }));
         await this._workspaceState.update(`mirror-vs.messages.${session.id}`, cleaned);
       }
@@ -112,7 +101,6 @@ export class StorageService {
 
     // Clean up any stale empty message keys
     if (legacy || legacyPerSession) {
-      // Also remove any old keys that might have been left behind
       this._workspaceState.update('mirror-vs.chatHistory', undefined);
     }
   }
@@ -124,7 +112,6 @@ export class StorageService {
     const sessions = this.getSessions();
     if (sessions.length <= maxSessions) return;
 
-    // Sort by timestamp descending (newest first)
     sessions.sort((a, b) => b.timestamp - a.timestamp);
     const toKeep = sessions.slice(0, maxSessions);
     const toDelete = sessions.slice(maxSessions);
