@@ -1409,15 +1409,15 @@
     return `
       <div class="tool-card running streaming-write-card ${expandedClass}">
         <div class="tool-card-header" style="cursor: pointer;">
-          <div class="tool-icon-wrapper" style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.15);">
+          <div class="tool-icon-wrapper">
             <span class="tool-icon">${iconHtml}</span>
           </div>
           <div class="tool-info">
             <span class="tool-name">${friendlyName}...</span>
-            <span class="tool-target" style="font-family: var(--font-mono); color: var(--text-muted); text-decoration: none;">${escapeHtml(decodedTarget)}</span>
+            <span class="tool-target">${escapeHtml(decodedTarget)}</span>
           </div>
           <div class="tool-header-controls">
-            <span class="tool-status-badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.15);">Writing</span>
+            <span class="tool-status-badge">Writing</span>
             <span class="tool-expand-chevron">
               <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
                 <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
@@ -1425,13 +1425,13 @@
             </span>
           </div>
         </div>
-        <div class="scanning-bar" style="background: linear-gradient(90deg, transparent, #a855f7, transparent);"></div>
+        <div class="scanning-bar"></div>
         <div class="tool-card-body-wrapper">
-          <div class="tool-card-body" style="border-top: 1px solid var(--border-glass);">
-            <div class="code-block-wrapper" style="margin: 8px; border-color: rgba(168, 85, 247, 0.15);">
-              <div class="code-block-header" style="background: rgba(147, 51, 234, 0.05); border-bottom-color: rgba(168, 85, 247, 0.15);">
+          <div class="tool-card-body">
+            <div class="code-block-wrapper">
+              <div class="code-block-header">
                 <span class="code-block-lang">${fileExt}</span>
-                <span class="streaming-label" style="font-size: 9px; opacity: 0.6; color: #c084fc;">Generating...</span>
+                <span class="streaming-label">Generating...</span>
               </div>
               <pre><code>${escapedCode}</code></pre>
             </div>
