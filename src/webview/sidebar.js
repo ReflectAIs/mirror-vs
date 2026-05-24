@@ -501,6 +501,41 @@
     }
   });
 
+
+  // Drag-and-Drop Image Support
+  promptInput.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    promptInput.style.borderColor = '#a855f7';
+    promptInput.style.boxShadow = '0 0 0 2px rgba(168, 85, 247, 0.3)';
+  });
+
+  promptInput.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    promptInput.style.borderColor = '';
+    promptInput.style.boxShadow = '';
+  });
+
+  promptInput.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    promptInput.style.borderColor = '';
+    promptInput.style.boxShadow = '';
+    
+    const files = e.dataTransfer.files;
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].type.indexOf('image') !== -1) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const base64 = event.target.result.split(',')[1];
+          attachImage(base64);
+        };
+        reader.readAsDataURL(files[i]);
+      }
+    }
+  });
+
 function attachImage(base64) {
     attachedImages.push(base64);
     renderImageAttachments();
@@ -2242,7 +2277,7 @@ function attachImage(base64) {
   setAvatarState('idle');
 
 /**
- * Lightweight syntax highlighting for code blocks.
+ * tweight syntax highlighting for code blocks.
  * Applies token-wrapping in real-time after rendering.
  */
 function applySyntaxHighlighting(container) {
@@ -2346,3 +2381,5 @@ function highlightLine(line, lang) {
 }
 
 })();
+
+
