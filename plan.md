@@ -23,14 +23,6 @@
 - **Risk**: Any refactor is blind. No regression detection.
 - **Fix**: Add unit tests for orchestrator, browser-tools, file-tools, api-service. Integration test for end-to-end tool pipeline.
 
-### 2. ✅ Orchestrator Split — Done (v0.0.9)
-- **1382 lines** in `orchestrator.ts` was Single Point of Failure
-- **Split done**:
-  - ✅ `AgentSession` (state mgmt) — 200 lines
-  - ✅ `AgentCompleter` (streaming + telemetry) — 217 lines
-  - ✅ `AgentParser` (tool extraction) — 338 lines
-  - `AgentExecutor` (orchestrator loop) — **remaining refactor** needed to complete the split
-- **Next**: Extract `handleMessageStream()` loop and tool execution dispatch into an `AgentExecutor.ts`
 ### 2. ✅ Orchestrator Split — Complete
 - **1429 lines** → split into **4 focused modules** (1224 total lines):
   - ✅ `AgentSession` (`agent-session.ts`, 200 lines) — state management, git baseline, history
