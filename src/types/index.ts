@@ -1,3 +1,25 @@
+/** Telemetry data for tracking usage statistics */
+export interface TelemetryData {
+  totalSessions: number;
+  totalMessages: number;
+  totalTurns: number;
+  totalTokensInput: number;
+  totalTokensOutput: number;
+  totalCost: number;
+  errorsByProvider: { provider: string; count: number }[];
+  averageLatency: number; // ms
+  topModels: { model: string; count: number }[];
+  sessionHistory: {
+    sessionId: string;
+    title: string;
+    tokensInput: number;
+    tokensOutput: number;
+    cost: number;
+    latency: number;
+    errorCount: number;
+  }[];
+}
+
 export type LLMProvider = 'ollama' | 'deepseek';
 
 export interface ExtensionSettings {
@@ -83,7 +105,16 @@ export type WebviewToExtensionMessage =
   | { type: 'commitGitChanges' }
   | { type: 'getGitDiff'; file: string }
   | { type: 'applyGitDiff'; file: string; action: 'accept' | 'reject' }
-  | { type: 'acceptAllReviews' };
+  | { type: 'acceptAllReviews' }
+  // New: Per-session model override
+  | { type: 'setSessionModel'; sessionId: string; provider: LLMProvider; model: string }
+  // New: Telemetry queries
+  | { type: 'getTelemetry' }
+  | { type: 'clearTelemetry' }
+  // New: User feedback
+  | { type: 'submitFeedback'; rating: number; comment?: string }
+  // New: Language / locale
+  | { type: 'setLocale'; locale: string };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
@@ -116,4 +147,14 @@ export type ExtensionToWebviewMessage =
   | { type: 'gitDiffContent'; file: string; diff: GitFileDiff | null }
   | { type: 'prefillPrompt'; text: string }
   | { type: 'tokenUsage'; usage: { input: number; output: number; total: number; cost: number } }
-  | { type: 'activeReviewsChanged'; count: number };
+  | { type: 'activeReviewsChanged'; count: number }
+  // New: Per-session model info
+  | { type: 'sessionModelChanged'; sessionId: string; provider: LLMProvider; model: string }
+  // New: Telemetry data
+  | { type: 'telemetryData'; data: TelemetryData }
+  // New: Locale info
+  | { type: 'localeChanged'; locale: string }
+  // New: User feedback confirmation
+  | { type: 'feedbackSubmitted'; success: boolean }
+  // New: Provider fallback notification
+  | { type: 'providerFallback'; message: string; newProvider: LLMProvider };

@@ -4,6 +4,9 @@ import { ToolCall } from './types';
 import { executeTool } from './tools/tool-registry';
 import { fetchOllamaModels, streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
 import { CommandService } from '../services/command-service';
+import { RateLimiter } from '../services/rate-limiter';
+import { ProviderFallback } from '../services/provider-fallback';
+import { TelemetryService } from '../services/telemetry-service';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
 
@@ -217,6 +220,11 @@ export function buildSystemPrompt(): string {
 
 export class AgentOrchestrator {
   private _activeAbortController?: AbortController;
+  private _currentSessionId: string = '';
+  private readonly _rateLimiter = RateLimiter.getInstance();
+  private readonly _fallback = ProviderFallback.getInstance();
+  private readonly _telemetry = TelemetryService.getInstance();
+  private _lastLatencyMeasurement = 0;
 
   constructor(
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
@@ -296,21 +304,84 @@ export class AgentOrchestrator {
 
     // Retrieve configurations
     const config = vscode.workspace.getConfiguration('mirror-vs');
-    const provider = config.get<LLMProvider>('defaultProvider', 'ollama');
+    let provider = config.get<LLMProvider>('defaultProvider', 'ollama');
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
-    const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
-    const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
+    let defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
+    let defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
 
-    let apiKey = '';
-    if (provider === 'deepseek') {
-      apiKey = (await this._getSecret('deepseek_api_key')) || '';
-      if (!apiKey) {
+    // Extract session ID from history or generate a placeholder
+    this._currentSessionId = 'session_' + Date.now();
+
+    // Check rate limiter: image budget
+    if (images && images.length > 0) {
+      const imageCheck = this._rateLimiter.checkImageBudget(images.length);
+      if (!imageCheck.allowed) {
         this._postMessage({
           type: 'chatResponseError',
-          error: 'DeepSeek API Key is missing. Please add your key in the settings drawer.',
+          error: imageCheck.reason || 'Too many images attached.',
         });
         return;
       }
+    }
+
+    // Check circuit breaker
+    const circuitCheck = this._rateLimiter.checkCircuitBreaker();
+    if (!circuitCheck.allowed) {
+      this._postMessage({
+        type: 'chatResponseError',
+        error: circuitCheck.reason || 'Circuit breaker active.',
+      });
+      return;
+    }
+
+    // Initialize provider fallback
+    this._fallback.reset(provider);
+
+    // Try to get API key - will do provider fallback if needed
+    let apiKey = '';
+    const tryGetApiKey = async (p: LLMProvider): Promise<string> => {
+      if (p === 'deepseek') {
+        const key = (await this._getSecret('deepseek_api_key')) || '';
+        return key;
+      }
+      return '';
+    };
+
+    apiKey = await tryGetApiKey(provider);
+
+    // Provider fallback: if Ollama is selected but no models available, fallback to DeepSeek if key exists
+    if (provider === 'ollama' && !apiKey) {
+      const deepseekKey = await tryGetApiKey('deepseek');
+      if (deepseekKey) {
+        const fallbackResult = this._fallback.failover();
+        if (fallbackResult.success && fallbackResult.newProvider) {
+          provider = fallbackResult.newProvider;
+          apiKey = deepseekKey;
+          this._postMessage({
+            type: 'providerFallback',
+            message: fallbackResult.message,
+            newProvider: provider,
+          });
+        }
+      }
+    } else if (provider === 'deepseek' && !apiKey) {
+      this._postMessage({
+        type: 'chatResponseError',
+        error: 'DeepSeek API Key is missing. Please add your key in the settings drawer.',
+      });
+      return;
+    }
+
+    // Check rate limiter: session budget for estimated tokens
+    const estimatedInputTokens = RateLimiter.estimateTokens(text || '') + 
+      (images || []).reduce((sum, img) => sum + Math.ceil(img.length / 1000), 0);
+    const sessionCheck = this._rateLimiter.checkSessionBudget(this._currentSessionId, estimatedInputTokens);
+    if (!sessionCheck.allowed) {
+      this._postMessage({
+        type: 'chatResponseError',
+        error: sessionCheck.reason || 'Session token budget exceeded.',
+      });
+      return;
     }
 
     let currentMessages = [...history];
@@ -786,9 +857,87 @@ USER/ENVIRONMENT TOOL RESPONSE:
     signal: AbortSignal,
     completionController?: AbortController,
   ): Promise<string> {
+    const startTime = Date.now();
     return new Promise((resolve, reject) => {
       let fullText = '';
       let isFinished = false;
+      let capturedUsage: { promptTokens: number; completionTokens: number } | undefined;
+
+      const onComplete = (completedText: string, usage?: { promptTokens: number; completionTokens: number }) => {
+        if (isFinished) return;
+        isFinished = true;
+        const cleaned = this.getCleanedToolResponse(completedText);
+        this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
+
+        // Track usage
+        if (usage) {
+          capturedUsage = usage;
+          const inputTokens = usage.promptTokens;
+          const outputTokens = usage.completionTokens;
+          const isDeepSeek = provider === 'deepseek';
+          const inputCost = isDeepSeek ? (inputTokens / 1000000) * 0.14 : 0;
+          const outputCost = isDeepSeek ? (outputTokens / 1000000) * 0.28 : 0;
+          const totalCost = inputCost + outputCost;
+
+          this._postMessage({
+            type: 'tokenUsage',
+            usage: {
+              input: inputTokens,
+              output: outputTokens,
+              total: inputTokens + outputTokens,
+              cost: totalCost,
+            },
+          });
+
+          // Record in rate limiter
+          this._rateLimiter.recordUsage(this._currentSessionId, inputTokens, outputTokens);
+
+          // Record telemetry
+          const latency = Date.now() - startTime;
+          this._lastLatencyMeasurement = latency;
+          this._telemetry.recordCall({
+            sessionId: this._currentSessionId,
+            sessionTitle: 'Active Session',
+            tokensInput: inputTokens,
+            tokensOutput: outputTokens,
+            cost: totalCost,
+            latency,
+            provider,
+            model,
+            error: false,
+            toolCalls: this._parseToolCalls(completedText).length,
+          });
+        }
+
+        resolve(cleaned);
+      };
+
+      const onError = (err: any) => {
+        if (isFinished) return;
+        isFinished = true;
+
+        // Record telemetry with error
+        const latency = Date.now() - startTime;
+        const inputTokens = RateLimiter.estimateTokens(JSON.stringify(messages));
+        const outputTokens = RateLimiter.estimateTokens(fullText);
+        this._telemetry.recordCall({
+          sessionId: this._currentSessionId,
+          sessionTitle: 'Active Session',
+          tokensInput: inputTokens,
+          tokensOutput: outputTokens,
+          cost: 0,
+          latency,
+          provider,
+          model,
+          error: true,
+          errorMessage: err.message || 'Unknown error',
+        });
+
+        // Circuit breaker tracking
+        this._rateLimiter.recordFailure();
+
+        reject(err);
+      };
 
       if (provider === 'ollama') {
         streamOllamaChat(
@@ -802,36 +951,15 @@ USER/ENVIRONMENT TOOL RESPONSE:
             this._postMessage({ type: 'chatResponseChunk', text: chunk });
 
             if (this.hasCompleteToolCall(fullText)) {
-              isFinished = true;
               completionController?.abort();
-              const cleaned = this.getCleanedToolResponse(fullText);
-              this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
-              resolve(cleaned);
+              onComplete(fullText, capturedUsage);
             }
           },
           (completedText, usage) => {
-            if (isFinished) return;
-            isFinished = true;
-            const cleaned = this.getCleanedToolResponse(completedText);
-            this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
-            if (usage) {
-              this._postMessage({
-                type: 'tokenUsage',
-                usage: {
-                  input: usage.promptTokens,
-                  output: usage.completionTokens,
-                  total: usage.promptTokens + usage.completionTokens,
-                  cost: 0,
-                },
-              });
-            }
-            resolve(cleaned);
+            if (usage) capturedUsage = usage;
+            onComplete(completedText, usage);
           },
-          (err) => {
-            if (isFinished) return;
-            isFinished = true;
-            reject(err);
-          },
+          onError,
         );
       } else {
         streamDeepSeekChat(
@@ -845,39 +973,15 @@ USER/ENVIRONMENT TOOL RESPONSE:
             this._postMessage({ type: 'chatResponseChunk', text: chunk });
 
             if (this.hasCompleteToolCall(fullText)) {
-              isFinished = true;
               completionController?.abort();
-              const cleaned = this.getCleanedToolResponse(fullText);
-              this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
-              resolve(cleaned);
+              onComplete(fullText, capturedUsage);
             }
           },
           (completedText, usage) => {
-            if (isFinished) return;
-            isFinished = true;
-            const cleaned = this.getCleanedToolResponse(completedText);
-            this._postMessage({ type: 'chatResponseComplete', fullText: cleaned });
-            if (usage) {
-              const inputCost = (usage.promptTokens / 1000000) * 0.14;
-              const outputCost = (usage.completionTokens / 1000000) * 0.28;
-              const totalCost = inputCost + outputCost;
-              this._postMessage({
-                type: 'tokenUsage',
-                usage: {
-                  input: usage.promptTokens,
-                  output: usage.completionTokens,
-                  total: usage.promptTokens + usage.completionTokens,
-                  cost: totalCost,
-                },
-              });
-            }
-            resolve(cleaned);
+            if (usage) capturedUsage = usage;
+            onComplete(completedText, usage);
           },
-          (err) => {
-            if (isFinished) return;
-            isFinished = true;
-            reject(err);
-          },
+          onError,
         );
       }
     });

@@ -4,6 +4,7 @@ import { executeSearchTool } from './search-tools';
 import { executeBrowserTool } from './browser-tools';
 import { executeTerminalTool } from './terminal-tools';
 import { executeFigmaTool } from './figma-tools';
+import { executeGitTool } from './git-tools';
 
 export async function executeTool(
   tool: ToolCall,
@@ -49,6 +50,17 @@ export async function executeTool(
 
   if (name === 'figma_inspect') {
     return await executeFigmaTool(tool, figmaKey, workspacePath);
+  }
+
+  // New git tools
+  if (name === 'git_status' || name === 'git_diff' || name === 'git_commit' || name === 'git_add') {
+    return await executeGitTool(tool, workspacePath);
+  }
+
+  // New language tools (run in VS Code host context via executeCommand)
+  if (name === 'symbol_search' || name === 'rename_symbol') {
+    const { executeLanguageTool } = require('./language-tools');
+    return await executeLanguageTool(tool);
   }
 
   throw new Error(`Unsupported tool call: ${name}`);
