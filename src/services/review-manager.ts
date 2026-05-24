@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { diffLines } from '../utils/diff';
+import { revertCheckpoint } from '../utils/editor-utils';
 
 export interface ActiveReview {
   filePath: string;
@@ -9,6 +10,7 @@ export interface ActiveReview {
   proposedContent: string;
   tempOriginalPath?: string;
   tempProposedPath?: string;
+  checkpointId?: string;
   addedLineIndices: number[];
   removedLineIndices: number[];
   resolve: (accepted: boolean) => void;
@@ -228,10 +230,36 @@ export class ReviewManager implements vscode.CodeLensProvider {
     editor.setDecorations(this._deletedDecorationType, deletedRanges);
   }
 
-  public async startReview(filePath: string, originalContent: string, proposedContent: string): Promise<boolean> {
+  public async startReview(
+    filePath: string,
+    originalContent: string,
+    proposedContent: string,
+    checkpointId?: string,
+  ): Promise<boolean> {
     const normPath = this.normalizePath(filePath);
+    let original = originalContent;
+    let finalCheckpointId = checkpointId;
+    let previousResolve: ((accepted: boolean) => void) | undefined;
+
     if (this._activeReviews.has(normPath)) {
-      await this.resolveReview(filePath, true); // Auto-accept previous stage if a new review starts
+      const existing = this._activeReviews.get(normPath)!;
+      original = existing.originalContent;
+      if (existing.checkpointId) {
+        finalCheckpointId = existing.checkpointId;
+      }
+      previousResolve = existing.resolve;
+
+      // Clean up previous temp files to avoid clutter
+      try {
+        if (existing.tempOriginalPath && fs.existsSync(existing.tempOriginalPath)) {
+          fs.unlinkSync(existing.tempOriginalPath);
+        }
+        if (existing.tempProposedPath && fs.existsSync(existing.tempProposedPath)) {
+          fs.unlinkSync(existing.tempProposedPath);
+        }
+      } catch (e) {
+        // ignore
+      }
     }
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -247,42 +275,42 @@ export class ReviewManager implements vscode.CodeLensProvider {
       tempOriginalPath = path.join(tempDir, `original_${Date.now()}_${baseName}`);
       tempProposedPath = path.join(tempDir, `proposed_${Date.now()}_${baseName}`);
 
-      fs.writeFileSync(tempOriginalPath, originalContent, 'utf8');
+      fs.writeFileSync(tempOriginalPath, original, 'utf8');
       fs.writeFileSync(tempProposedPath, proposedContent, 'utf8');
     }
 
-    // Compute diff to construct visual review content
-    const diff = diffLines(originalContent, proposedContent);
-    const visualLines: string[] = [];
+    // Compute diff to construct decorations (added lines only)
+    const diff = diffLines(original, proposedContent);
     const addedLineIndices: number[] = [];
     const removedLineIndices: number[] = [];
 
     for (let i = 0; i < diff.length; i++) {
       const item = diff[i];
-      visualLines.push(item.line);
-      if (item.type === 'added') {
-        addedLineIndices.push(visualLines.length - 1);
-      } else if (item.type === 'removed') {
-        removedLineIndices.push(visualLines.length - 1);
+      if (item.type === 'added' && item.proposedLineNum !== undefined) {
+        addedLineIndices.push(item.proposedLineNum);
       }
     }
-    const visualContent = visualLines.join('\n');
 
-    // Write visual content containing inline diff to the actual file
+    // Write clean, valid proposedContent directly to the actual file
     try {
       const encoder = new TextEncoder();
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(visualContent));
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(proposedContent));
     } catch (e) {
       // ignore
+    }
+
+    if (previousResolve) {
+      previousResolve(true);
     }
 
     return new Promise<boolean>((resolve) => {
       this._activeReviews.set(normPath, {
         filePath,
-        originalContent,
+        originalContent: original,
         proposedContent,
         tempOriginalPath,
         tempProposedPath,
+        checkpointId: finalCheckpointId,
         addedLineIndices,
         removedLineIndices,
         resolve,
@@ -292,7 +320,7 @@ export class ReviewManager implements vscode.CodeLensProvider {
       this._onDidChangeActiveReviews.fire();
       this.updateStatusBar();
 
-      // Open the original file in the active editor (now containing the inline diff content)
+      // Open the original file in the active editor (now containing the clean proposed content)
       vscode.workspace.openTextDocument(filePath).then(
         (doc) => {
           vscode.window.showTextDocument(doc, { preview: false }).then((editor) => {
@@ -350,10 +378,25 @@ export class ReviewManager implements vscode.CodeLensProvider {
       }
     }
 
+    const docName = path.basename(filePath);
+
     if (accepted) {
       try {
         const encoder = new TextEncoder();
         await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(review.proposedContent));
+        vscode.window.showInformationMessage(`✅ Changes accepted for ${docName}`);
+      } catch (e) {
+        // ignore
+      }
+    } else {
+      try {
+        if (review.checkpointId) {
+          await revertCheckpoint(review.checkpointId);
+        } else {
+          const encoder = new TextEncoder();
+          await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(review.originalContent));
+          vscode.window.showInformationMessage(`⏪ Changes rejected and rolled back for ${docName}`);
+        }
       } catch (e) {
         // ignore
       }

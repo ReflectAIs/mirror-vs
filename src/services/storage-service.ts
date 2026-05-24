@@ -28,6 +28,7 @@ export class StorageService {
       id: s.id,
       title: s.title,
       timestamp: s.timestamp,
+      messageCount: s.messageCount || 0,
       messages: [] as ChatMessage[],
     }));
     await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);

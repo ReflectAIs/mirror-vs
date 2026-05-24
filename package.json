@@ -163,6 +163,23 @@
         "key": "alt+j",
         "mac": "alt+j",
         "when": "mirror-vs.inReview"
+      },
+      {
+        "command": "mirror-vs.fixSelection",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "mirror-vs.explainSelection",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "mirror-vs.clearChat",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l"
       }
     ],
     "configuration": {

@@ -122,6 +122,8 @@ export type WebviewToExtensionMessage =
   | { type: 'clearTelemetry' }
   // New: User feedback
   | { type: 'submitFeedback'; rating: number; comment?: string }
+  // New: Retry last failed tool call
+  | { type: 'retryLastToolCall'; toolName: string; target: string }
   // New: Language / locale
   | { type: 'setLocale'; locale: string };
 

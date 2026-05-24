@@ -183,6 +183,19 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           await this._orchestrator.handleMessageStream(fullMessageText, data.history, (data as any).images);
           break;
         }
+        case 'retryLastToolCall': {
+          // Re-send the last user message to retry the failed tool call
+          const history = this._getChatHistory();
+          const lastUserMsg = [...history].reverse().find((m) => m.role === 'user');
+          if (lastUserMsg) {
+            // Remove assistant + system messages after the last user message to clean state
+            const lastUserIdx = history.lastIndexOf(lastUserMsg);
+            const cleanHistory = history.slice(0, lastUserIdx + 1);
+            await this._saveChatHistory(cleanHistory);
+            await this._orchestrator.handleMessageStream(lastUserMsg.content, cleanHistory, lastUserMsg.images);
+          }
+          break;
+        }
         case 'cancelStream': {
           this._orchestrator.cancelActiveStream();
           break;
@@ -225,6 +238,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
             await this._saveChatHistory(newHistory);
           }
+          break;
+        }
+        case 'getChatSessions': {
+          this._sendChatSessionsToWebview();
+          break;
+        }
+        case 'getChatHistory': {
+          this._sendChatHistoryToWebview();
           break;
         }
         case 'newSession': {

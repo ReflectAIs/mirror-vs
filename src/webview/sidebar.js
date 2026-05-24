@@ -109,6 +109,8 @@
   // Initialize
   vscode.postMessage({ type: 'getSettings' });
   vscode.postMessage({ type: 'fetchModels' });
+  vscode.postMessage({ type: 'getChatSessions' });
+  vscode.postMessage({ type: 'getChatHistory' });
 
   // Drawer Close Buttons
   document.querySelectorAll('.drawer-close-btn').forEach(btn => {
@@ -729,6 +731,32 @@
         }
         // Insert revert button before the status badge
         controlsContainer.insertBefore(revertBtn, controlsContainer.firstChild);
+      }
+
+      // Retry button for failed tool cards
+      if (status === 'error') {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'tool-revert-btn';
+        retryBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
+            <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+            <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+          </svg>
+          Retry
+        `;
+        retryBtn.style.color = '#f59e0b';
+        retryBtn.style.borderColor = 'rgba(245, 158, 11, 0.25)';
+        retryBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          retryBtn.disabled = true;
+          retryBtn.innerHTML = 'Retrying...';
+          vscode.postMessage({
+            type: 'retryLastToolCall',
+            toolName: toolName,
+            target: target
+          });
+        });
+        controlsContainer.insertBefore(retryBtn, controlsContainer.firstChild);
       }
 
       // Collapsible accordion body wrapper using CSS Grid trick

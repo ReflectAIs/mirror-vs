@@ -37,6 +37,10 @@ export class AgentCompleter {
     let toolCallBuffer = '';
     const startTime = Date.now();
     let totalTokens = 0;
+    // Estimate input tokens from payload
+    const estimateInputTokens = payload.reduce((sum, msg) => {
+      return sum + RateLimiter.estimateTokens(msg.content || '') + (msg.images || []).length * 200;
+    }, 0);
     const isDeepSeek = provider === 'deepseek';
 
     this._postMessage({ type: 'streamStart' });
@@ -84,16 +88,35 @@ export class AgentCompleter {
         const elapsed = Date.now() - startTime;
         this._lastLatencyMeasurement = elapsed;
 
+        // Estimate cost based on provider pricing
+        let cost = 0;
+        if (provider === 'deepseek') {
+          // DeepSeek pricing: $0.14/M input tokens, $0.28/M output tokens
+          cost = (estimateInputTokens / 1000000) * 0.14 + (totalTokens / 1000000) * 0.28;
+        }
+        // Ollama is local (free)
+
         // Telemetry
         this._telemetry.recordCall({
           sessionId: '',
           sessionTitle: '',
-          tokensInput: 0,
+          tokensInput: estimateInputTokens,
           tokensOutput: totalTokens,
-          cost: 0,
+          cost,
           latency: elapsed,
           provider,
           model,
+        });
+
+        // Send token usage to webview
+        this._postMessage({
+          type: 'tokenUsage',
+          usage: {
+            input: estimateInputTokens,
+            output: totalTokens,
+            total: estimateInputTokens + totalTokens,
+            cost,
+          },
         });
 
         resolve(fullResponse);

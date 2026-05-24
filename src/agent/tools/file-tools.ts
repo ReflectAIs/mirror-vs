@@ -64,26 +64,13 @@ async function confirmChangesWithDiff(
   // Create checkpoint first so the user can easily revert if needed
   const checkpointId = await createCheckpoint(originalPath, checkpointAction);
 
-  // Write proposed content to actual file so it shows inline instantly and triggers Git colors
-  const encoder = new TextEncoder();
-  await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(proposedContent));
-
-  // Start the non-blocking background review
-  ReviewManager.getInstance()
-    .startReview(originalPath, originalContent, proposedContent)
-    .then(async (accepted) => {
-      if (!accepted) {
-        if (checkpointId) {
-          await revertCheckpoint(checkpointId);
-        } else {
-          const encoder = new TextEncoder();
-          await vscode.workspace.fs.writeFile(vscode.Uri.file(originalPath), encoder.encode(originalContent));
-        }
-        vscode.window.showInformationMessage(`⏪ Changes rejected and rolled back for ${fileName}`);
-      } else {
-        vscode.window.showInformationMessage(`✅ Changes accepted for ${fileName}`);
-      }
-    });
+  // Start the non-blocking background review, passing checkpoint ID
+  ReviewManager.getInstance().startReview(
+    originalPath,
+    originalContent,
+    proposedContent,
+    checkpointId || undefined,
+  );
 
   return { accepted: true, checkpointId };
 }
@@ -171,10 +158,6 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
 
-      if (ReviewManager.getInstance().hasActiveReview(safePath)) {
-        await ReviewManager.getInstance().resolveReview(safePath, true);
-      }
-
       const { accepted, checkpointId } = await confirmChangesWithDiff(
         safePath,
         proposedContent,
@@ -226,10 +209,6 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const safePath = getSafePath(tool.path);
       if (!fs.existsSync(safePath)) {
         throw new Error(`File does not exist: ${tool.path}`);
-      }
-
-      if (ReviewManager.getInstance().hasActiveReview(safePath)) {
-        await ReviewManager.getInstance().resolveReview(safePath, true);
       }
 
       let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
