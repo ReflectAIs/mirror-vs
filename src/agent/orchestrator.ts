@@ -775,9 +775,14 @@ USER/ENVIRONMENT TOOL RESPONSE:
    * mistakenly treated as real invocations.
    */
   private _stripCodeBlocks(text: string): string {
-    // Match triple-backtick blocks (with or without a language label)
-    return text.replace(/```[\s\S]*?```/g, '');
-  }
+    // Step 1: Remove fenced code blocks (triple-backtick with optional language label)
+    let result = text.replace(/```[\s\S]*?```/g, '');
+    // Step 2: Remove inline code spans (single backtick, non-greedy)
+    result = result.replace(/`[^`\n]*?`/g, '');
+    // Step 3: Remove HTML-escaped tool tags (e.g., &lt;read_file ... /&gt;)
+    result = result.replace(/&lt;\/?[a-z_]+[\s\S]*?\/?&gt;/gi, '');
+    return result;
+  
 
   private isTagFullyClosed(text: string, toolName: string): boolean {
     const openTag = `<${toolName}`;
