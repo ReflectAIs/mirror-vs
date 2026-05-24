@@ -86,6 +86,17 @@ To accomplish these tasks, you have access to a set of special workspace tools t
    IMPORTANT: The SEARCH block must match existing file content exactly.
    HANDLING LARGE/HUGE FILES: If a file is large or huge, do NOT try to edit the whole file or large blocks at once. Only include small, specific SEARCH/REPLACE blocks matching the precise lines you read and intend to modify. Use the line numbers from your partial read_file calls to locate and modify exactly the required sections.
 
+
+5a. RENAME FILE:
+    Rename or move a file within the workspace. The path parameter is the source, content is the destination.
+    Usage:
+    <rename_file path="old/path.ts" content="new/path.ts" />
+
+5b. DELETE FILE:
+    Permanently delete a file. Use with caution — this cannot be undone via git.
+    Usage:
+    <delete_file path="path/to/file.ts" />
+
 5. LIST DIRECTORY:
    List all files and subdirectories directly inside the specified directory path.
    Usage:
@@ -297,10 +308,18 @@ export class AgentOrchestrator {
     }
   }
 
+  // Send avatar state change to the webview for interactive buddy animation
+  private _sendAvatarState(state: 'idle' | 'thinking' | 'coding' | 'tool_calling' | 'error') {
+    this._postMessage({ type: 'avatarState', state });
+  }
+
   public async handleMessageStream(text: string, history: ChatMessage[], images?: string[]) {
     this.cancelActiveStream();
     this._activeAbortController = new AbortController();
     const signal = this._activeAbortController.signal;
+
+    // Signal avatar that we're starting to think
+    this._sendAvatarState('thinking');
 
     // Retrieve configurations
     const config = vscode.workspace.getConfiguration('mirror-vs');
@@ -555,6 +574,9 @@ export class AgentOrchestrator {
         const toolCalls = this._parseToolCalls(assistantResponse);
 
         if (toolCalls.length > 0) {
+          // Set avatar to tool_calling state
+          this._sendAvatarState('tool_calling');
+
           const toolResults: string[] = [];
 
           for (const tool of toolCalls) {
@@ -617,6 +639,7 @@ export class AgentOrchestrator {
               toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Success - ${result}`);
             } catch (err: any) {
               this._sendToolStatusToWebview(tool.name, 'error', target, err.message);
+              this._sendAvatarState('error');
               // IMPORTANT: Push error as a result so the LLM can self-correct in the next turn
               // Do NOT throw — throwing would abort the entire loop and leave the user with a frozen UI
               toolResults.push(
@@ -779,8 +802,10 @@ USER/ENVIRONMENT TOOL RESPONSE:
         }
       }
 
+      this._sendAvatarState('idle');
       this._postMessage({ type: 'loopComplete' });
     } catch (err: any) {
+      this._sendAvatarState('error');
       if (signal.aborted) {
         console.log('Agent stream aborted.');
       } else {

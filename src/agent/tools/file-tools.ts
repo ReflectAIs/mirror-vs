@@ -188,6 +188,39 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       return `File updated and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
     }
 
+    case 'rename_file': {
+      if (!tool.path) throw new Error('Missing "path" attribute for rename_file. Use path for source.');
+      if (!tool.content) throw new Error('Missing "content" attribute for rename_file. Use content for destination path.');
+      const safePath = getSafePath(tool.path);
+      const destPath = getSafePath(tool.content.trim());
+      if (!fs.existsSync(safePath)) {
+        throw new Error(`Source file does not exist: ${tool.path}`);
+      }
+      if (fs.existsSync(destPath)) {
+        throw new Error(`Destination already exists: ${tool.content}`);
+      }
+      const parentDir = path.dirname(destPath);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+      fs.renameSync(safePath, destPath);
+      return `File renamed: ${tool.path} -> ${tool.content}`;
+    }
+
+    case 'delete_file': {
+      if (!tool.path) throw new Error('Missing "path" attribute for delete_file.');
+      const safePathDel = getSafePath(tool.path);
+      if (!fs.existsSync(safePathDel)) {
+        throw new Error(`File does not exist: ${tool.path}`);
+      }
+      const stat = fs.statSync(safePathDel);
+      if (stat.isDirectory()) {
+        throw new Error(`Cannot delete directory with delete_file. Path is a directory: ${tool.path}`);
+      }
+      fs.unlinkSync(safePathDel);
+      return `File deleted: ${tool.path}`;
+    }
+
     case 'patch_file': {
       if (!tool.path) throw new Error('Missing "path" attribute for patch_file.');
       const safePath = getSafePath(tool.path);

@@ -25,6 +25,9 @@ export interface ToolCall {
     | 'git_add'
     | 'symbol_search'
     | 'rename_symbol';
+    | 'rename_symbol'
+    | 'rename_file'
+    | 'delete_file';
   path?: string;
   query?: string;
   content?: string;

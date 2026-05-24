@@ -106,6 +106,13 @@ export type WebviewToExtensionMessage =
   | { type: 'getGitDiff'; file: string }
   | { type: 'applyGitDiff'; file: string; action: 'accept' | 'reject' }
   | { type: 'acceptAllReviews' }
+  | { type: 'cancelStream' }
+  | { type: 'revertHistory'; text: string; role: string; inclusive: boolean; messageIndex?: number }
+  | { type: 'acceptReview' }
+  | { type: 'rejectReview' }
+  | { type: 'diffReview'; file: string }
+  | { type: 'prevChange' }
+  | { type: 'nextChange' }
   // New: Per-session model override
   | { type: 'setSessionModel'; sessionId: string; provider: LLMProvider; model: string }
   // New: Telemetry queries
@@ -158,3 +165,5 @@ export type ExtensionToWebviewMessage =
   | { type: 'feedbackSubmitted'; success: boolean }
   // New: Provider fallback notification
   | { type: 'providerFallback'; message: string; newProvider: LLMProvider };
+  | { type: 'providerFallback'; message: string; newProvider: LLMProvider }
+  | { type: 'avatarState'; state: 'idle' | 'thinking' | 'coding' | 'tool_calling' | 'error' };
