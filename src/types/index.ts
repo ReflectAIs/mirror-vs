@@ -164,6 +164,5 @@ export type ExtensionToWebviewMessage =
   // New: User feedback confirmation
   | { type: 'feedbackSubmitted'; success: boolean }
   // New: Provider fallback notification
-  | { type: 'providerFallback'; message: string; newProvider: LLMProvider };
   | { type: 'providerFallback'; message: string; newProvider: LLMProvider }
   | { type: 'avatarState'; state: 'idle' | 'thinking' | 'coding' | 'tool_calling' | 'error' };

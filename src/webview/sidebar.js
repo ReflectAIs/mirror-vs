@@ -1261,6 +1261,11 @@
         break;
       }
 
+      case 'avatarState': {
+        setAvatarState(message.state);
+        break;
+      }
+
       case 'updateChatHistory': {
         const history = message.history;
         chatHistory = history || [];

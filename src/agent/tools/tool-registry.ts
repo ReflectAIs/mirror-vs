@@ -19,7 +19,6 @@ export async function executeTool(
     name === 'create_file' ||
     name === 'write_file' ||
     name === 'patch_file' ||
-    name === 'list_dir'
     name === 'list_dir' ||
     name === 'rename_file' ||
     name === 'delete_file'
