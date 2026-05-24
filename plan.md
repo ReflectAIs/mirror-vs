@@ -27,6 +27,14 @@
 - **1382 lines** in `orchestrator.ts` violates Single Responsibility Principle
 - Combines: system prompt generation, streaming, tool parsing, tool execution, context compression, error recovery, telemetry
 - **Fix**: Split into: `AgentSession` (state mgmt), `AgentCompleter` (streaming), `AgentParser` (tool extraction), `AgentExecutor` (tool orchestrator)
+### 2. ✅ Orchestrator Split — Done (v0.0.9)
+- **1382 lines** in `orchestrator.ts` was Single Point of Failure
+- **Split done**:
+  - ✅ `AgentSession` (state mgmt) — 200 lines
+  - ✅ `AgentCompleter` (streaming + telemetry) — 217 lines
+  - ✅ `AgentParser` (tool extraction) — 338 lines
+  - `AgentExecutor` (orchestrator loop) — **remaining refactor** needed to complete the split
+- **Next**: Extract `handleMessageStream()` loop and tool execution dispatch into an `AgentExecutor.ts`
 
 ### 3. No Inline Completions (Missing Major Feature)
 - No `InlineCompletionItemProvider` registered in extension.ts
