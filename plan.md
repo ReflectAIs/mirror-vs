@@ -16,7 +16,6 @@
 ## Enhancement Opportunities (Priority Order)
 
 ### ✅ DONE: PREMIUM UI OVERHAUL
-- **Logo integration**: `logo.png` displayed in both header and welcome card
 - **Logo integration**: `logo.png` displayed in both header and welcome card (via `media/logo.png`)
 - **Marketplace icon**: SVG diamond logo at `resources/icon.svg` (set via `package.json` icon field)
 - **Animated gradient header**: Premium glassmorphic header with backdrop blur
