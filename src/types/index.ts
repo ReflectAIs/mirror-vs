@@ -46,6 +46,8 @@ export interface ChatSession {
   timestamp: number;
   /** Messages are NOT stored inline here — they are loaded separately via workspaceState keys */
   messages: ChatMessage[];
+  /** Lightweight count of messages for display in session list (not stored in session list meta) */
+  messageCount?: number;
 }
 
 /** Lightweight session metadata (no messages) used for the sessions list sidebar */

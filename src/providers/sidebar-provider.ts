@@ -462,7 +462,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       }
     });
 
-    await this._ensureDefaultSession();
+    await this._ensureDefaultSession(true);
 
     await this._sendSettingsToWebview();
     this._sendActiveFileContext();
@@ -654,6 +654,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       }
       sessions[sessionIndex].timestamp = Date.now();
     }
+    // Update message count in session metadata
+    if (sessionIndex !== -1) {
+      sessions[sessionIndex].messageCount = history.length;
+    }
     await this._storageService.saveSessions(sessions);
     this._sendChatSessionsToWebview();
 
@@ -675,7 +679,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _ensureDefaultSession(): Promise<void> {
+  private async _ensureDefaultSession(initialLoad: boolean = false): Promise<void> {
     const sessions = this._storageService.getSessions();
     let activeId = this._getActiveSessionId();
 
@@ -685,14 +689,23 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         title: 'New Session',
         timestamp: Date.now(),
         messages: [],
+        messageCount: 0,
       };
       sessions.push(defaultSession);
       activeId = defaultSession.id;
       await this._storageService.saveSessions(sessions);
       await this._saveActiveSessionId(activeId);
+      // Send empty history for the new default session
+      if (initialLoad) {
+        this._sendChatHistoryToWebview();
+      }
     } else if (!activeId || !sessions.find((s) => s.id === activeId)) {
       activeId = sessions[0].id;
       await this._saveActiveSessionId(activeId);
+      // Send history for the existing session we're switching to
+      if (initialLoad) {
+        this._sendChatHistoryToWebview();
+      }
     }
   }
 
@@ -703,6 +716,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       title: 'New Session',
       timestamp: Date.now(),
       messages: [],
+      messageCount: 0,
     };
     sessions.unshift(newSession);
     await this._storageService.saveSessions(sessions);
@@ -719,6 +733,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       await this._saveActiveSessionId(sessionId);
       this._sendChatSessionsToWebview();
       this._sendChatHistoryToWebview();
+    } else {
+      // Session not found in list — could be stale. Re-sync from storage.
+      this._sendChatSessionsToWebview();
+      vscode.window.showWarningMessage(`Session "${sessionId}" not found. Refreshing session list.`);
     }
   }
 
@@ -737,10 +755,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         await this._saveActiveSessionId(filtered[0].id);
       } else {
         await this._saveActiveSessionId('');
-        await this._ensureDefaultSession();
+        await this._ensureDefaultSession(true);
       }
-    } else {
-      await this._ensureDefaultSession();
+    } else if (!activeId || !filtered.find((s) => s.id === activeId)) {
+      // Our active session was deleted but we're on a different session — ensure we have a valid one
+      await this._ensureDefaultSession(true);
     }
 
     this._sendChatSessionsToWebview();
@@ -759,11 +778,26 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     if (!this._view) return;
     const sessions = this._storageService.getSessions();
     const activeSessionId = this._getActiveSessionId() || '';
-    // Send messageCount derived from loaded messages (we don't have the count in meta,
-    // but the webview only needs id/title/timestamp)
+    // Enrich sessions with actual message count from per-session stored messages
+    const enrichedSessions: ChatSession[] = sessions.map((s) => {
+      const messages = this._storageService.loadMessages(s.id);
+      return {
+        ...s,
+        messages: [],
+        messageCount: messages.length,
+      } as any;
+    });
+    // Use stored messageCount from metadata (faster than loading each session's messages)
+    const enrichedSessions: ChatSession[] = sessions.map((s) => ({
+      id: s.id,
+      title: s.title,
+      timestamp: s.timestamp,
+      messages: [],
+      messageCount: (s as any).messageCount || 0,
+    }));
     this._view.webview.postMessage({
       type: 'updateChatSessions',
-      sessions,
+      sessions: enrichedSessions,
       activeSessionId,
     });
   }

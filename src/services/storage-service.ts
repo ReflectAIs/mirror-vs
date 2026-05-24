@@ -18,8 +18,13 @@ export class StorageService {
   }
 
   /**
+   * Load messages for a specific session from its dedicated key.
+   */
+  loadMessages(sessionId: string): ChatMessage[] {
+=======
+  /**
    * Save session list (metadata only: id, title, timestamp, messageCount).
-   * Messages are striped out before saving.
+   * Messages are striped out before saving — count is derived from stored messages.
    */
   async saveSessions(sessions: ChatSession[]): Promise<void> {
     // Strip message content — only keep count for the session list
@@ -28,9 +33,16 @@ export class StorageService {
       title: s.title,
       timestamp: s.timestamp,
       messages: [] as ChatMessage[],
+      messageCount: s.messageCount || 0,
     }));
     await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
   }
+
+  /**
+   * Load messages for a specific session from its dedicated key.
+   */
+  loadMessages(sessionId: string): ChatMessage[] {
+=======
 
   /**
    * Load messages for a specific session from its dedicated key.
