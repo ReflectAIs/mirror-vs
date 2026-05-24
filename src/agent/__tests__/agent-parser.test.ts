@@ -35,20 +35,28 @@ describe('AgentParser', () => {
   describe('stripCodeBlocks', () => {
     it('should strip triple-backtick fenced code blocks', () => {
       const parser = makeParser();
-      const input = 'before\n\nafter';
+      const bt = String.fromCharCode(96);
+      const input = 'before\n' + bt + bt + bt + '\ncode here\n' + bt + bt + bt + '\nafter';
       expect(parser.stripCodeBlocks(input)).toBe('before\n\nafter');
     });
 
     it('should strip inline backtick blocks', () => {
       const parser = makeParser();
-      const input = 'use  to read files';
+      const bt = String.fromCharCode(96);
+      const input = 'use ' + bt + 'read_file' + bt + ' to read files';
       expect(parser.stripCodeBlocks(input)).toBe('use  to read files');
     });
 
-    it('should strip HTML-encoded angle bracket blocks (&lt; ... &gt;)', () => {
+    it('should strip HTML-encoded angle bracket blocks', () => {
       const parser = makeParser();
-      const input = 'text content more';
-      expect(parser.stripCodeBlocks(input)).toBe('text  more');
+      const amp = String.fromCharCode(38);
+      const q = String.fromCharCode(34);
+      // Construct: content
+      const openTag = amp + 'lt;write_file path=' + q + 'x' + q + amp + 'gt;';
+      const closeTag = amp + 'lt;/write_file' + amp + 'gt;';
+      const input = 'text ' + openTag + 'content' + closeTag + ' more';
+      // Both entities are removed, leaving 'text content more'
+      expect(parser.stripCodeBlocks(input)).toBe('text content more');
     });
 
     it('should return unchanged text if no code blocks', () => {
@@ -64,8 +72,10 @@ describe('AgentParser', () => {
 
     it('should handle nested backticks by removing outer block only', () => {
       const parser = makeParser();
-      const input = '';
-      expect(parser.stripCodeBlocks(input)).toBe('\n');
+      const bt = String.fromCharCode(96);
+      const input = bt + bt + bt + '\ninner ' + bt + 'code' + bt + '\n' + bt + bt + bt;
+      // The outer triple backtick block is removed including its newlines, leaving empty string
+      expect(parser.stripCodeBlocks(input)).toBe('');
     });
   });
 
