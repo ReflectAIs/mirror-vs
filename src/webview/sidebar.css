@@ -1147,6 +1147,107 @@ select:focus {
   100% { background-position: 200% 0; }
 }
 
+/* ─── COLLAPSED BY DEFAULT (File Tool Cards) ─────────────────────────────── */
+.tool-card.collapsed-by-default:not(.expanded) {
+  /* No additional structural changes — the .tool-card-body-wrapper already starts at 0fr */
+}
+
+.tool-card.collapsed-by-default:not(.expanded) .tool-card-body-wrapper {
+  grid-template-rows: 0fr;
+}
+
+.tool-card.collapsed-by-default:not(.expanded) .chevron-icon {
+  transform: rotate(0deg);
+}
+
+.tool-expand-hint {
+  display: block;
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-style: italic;
+  margin-top: 1px;
+  letter-spacing: 0.1px;
+  opacity: 0.7;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.tool-card-header:hover .tool-expand-hint {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+.tool-expand-hint.terminal-hint {
+  color: var(--color-info);
+  opacity: 0.6;
+}
+
+.tool-card-header:hover .tool-expand-hint.terminal-hint {
+  color: var(--color-info);
+  opacity: 1;
+}
+
+/* ─── TERMINAL RUNNING STATE ─────────────────────────────────────────────── */
+.tool-card.terminal-running {
+  border-color: rgba(56, 189, 248, 0.15);
+  position: relative;
+}
+
+.tool-card.terminal-running::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    var(--color-info), 
+    #22d3ee, 
+    var(--color-info), 
+    transparent
+  );
+  background-size: 300% 100%;
+  animation: terminal-pulse 1.2s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes terminal-pulse {
+  0%   { background-position: -300% 0; }
+  100% { background-position: 300% 0; }
+}
+
+.tool-card.terminal-running .tool-status-badge {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--color-info);
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ─── TERMINAL OUTPUT (collapsed) ────────────────────────────────────────── */
+.tool-card.collapsed-by-default .tool-details {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: none;
+}
+
+.tool-card.collapsed-by-default.expanded .tool-details {
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* ─── FILE TOOL DISTINCT RUNNING BAR ──────────────────────────────────────── */
+.tool-card:not(.terminal-running).running .scanning-bar {
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  height: 2px;
+}
+
 /* ─── CODE BLOCK WRAPPER IN BUBBLES ──────────────────────────────────────── */
 .code-block-wrapper {
   position: relative;

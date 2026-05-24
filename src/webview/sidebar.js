@@ -565,7 +565,13 @@
 
   function createToolCardDOM(toolName, status, target, result, checkpointId, isReverted = false, code = null, terminalName = null) {
     const card = document.createElement('div');
+    const fileTools = ['write_file', 'create_file', 'patch_file'];
+    const isFileTool = fileTools.includes(toolName);
+    const isRunning = status === 'running';
+    const isComplete = status === 'success' || status === 'error';
+    
     card.className = `tool-card ${status}`;
+    card.setAttribute('data-status', status);
     if (isReverted) {
       card.classList.add('reverted');
     }
@@ -769,6 +775,39 @@
 
       if (code) {
         bindCodeBlockButtons(bodyWrapper);
+      }
+
+      // Collapsed by default for write_file, create_file, patch_file tools
+      // These tools often contain large code/patches that clutter the view
+      if (isFileTool && isComplete && code) {
+        card.classList.add('collapsed-by-default');
+        
+        // Add a subtle "Expand to view" hint badge in the header
+        const hint = document.createElement('span');
+        hint.className = 'tool-expand-hint';
+        hint.textContent = 'Expand to view';
+        const info = header.querySelector('.tool-info');
+        if (info) {
+          info.appendChild(hint);
+        }
+      }
+
+      // For terminal commands: add a "Show Output" collapsed state on completion
+      if (toolName === 'run_command' && isComplete) {
+        card.classList.add('collapsed-by-default');
+        
+        const hint = document.createElement('span');
+        hint.className = 'tool-expand-hint terminal-hint';
+        hint.textContent = 'Click to view output';
+        const info = header.querySelector('.tool-info');
+        if (info) {
+          info.appendChild(hint);
+        }
+      }
+      
+      // Terminal-style progress indicator when running
+      if (toolName === 'run_command' && status === 'running') {
+        card.classList.add('terminal-running');
       }
     }
 

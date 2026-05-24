@@ -1,82 +1,39 @@
 
 # Mirror VS - Enhancement Opportunities Implementation
 
-## Current Status: ✅ All 10 Enhancement Areas Complete
+## Current Status: ⏳ Working on Task 11 — Write Tool Collapsible UI
 
-**All 10 enhancement areas have been fully implemented and built successfully.**
-
----
-
-### ✅ 1. 🔎 MULTI-FILE SEARCH & CONTEXT
-- **Smart Search** (`src/smartSearch.ts`) — Recursive grep with `node_modules` exclusion via `searchWorkspace`
-- **Context Chip Autocomplete** — `@`-triggered file/directory autocomplete with context chips
-- **Enhanced `@` Workspace Mention System** — Workspace file list with fuzzy matching, chip-based file linking
-- **Context File Linking** — `linkedFiles` Set with UI chips, references sent to LLM in system prompt
-- **`parseContextForAssistant`** — Injects linked file contents into assistant messages
-
-### ✅ 2. 🔧 IMAGE & MULTI-MODAL SUPPORT
-- **Image Attachment UI** — Image attachments container with remove buttons & previews
-- **Image to Base64** — `readImageAsBase64()` utility in sidebar.js
-- **Ollama Vision Model Support** — `llava` / `bakllava` model detection, image injection into Ollama messages
-- **DeepSeek Vision Support** — DeepSeek VL integration with image injection
-- **Resizing/Compression** — Optional resize via canvas to reduce payload size
-
-### ✅ 3. 🧵 ADVANCED SESSION MANAGEMENT
-- **Backend Session Persistence** — `getSessions` / `deleteSession` / `newSession` message types in `MirrorViewProvider`
-- **Frontend Session Switching** — Full session list rendering, click-to-switch, switch on active session deletion
-- **Session Summaries** — `_summarizeHistory()` method using LLM for auto-generated session titles
-- **Session Deletion** — Delete UI with confirmation, graceful session switching when deleting active
-- **Active Session Highlighting** — `.active-session` class in session list
-
-### ✅ 4. 🧠 AGENT IMPROVEMENTS
-- ✅ Provider fallback logic (Already built via Ollama/DeepSeek switch)
-- **Streaming Tool Detection optimization** — Real-time tool card rendering while streaming
-- **Tool Result Size truncation** — Character limit on tool outputs sent to LLM
-- **Rate limiting protection** — Delay between consecutive tool executions
-- **Per-session token budget enforcement** — Token counting and budget limit tracking
-
-### ✅ 5. 🎨 UI/UX ENHANCEMENTS
-- **Multi-model chat** — Provider/model label shown in each message bubble
-- **Code diff preview** — Inline diff view for `patch_file` operations inside tool cards
-- **Model selection per chat** — Per-session model override dropdown in history drawer
-- **Keyboard shortcuts** — ⌘+Enter to send, ⌘+K to clear, Escape to close drawers, ⌘+N new session, ⌘+Shift+[/] session navigation
-
-### ✅ 6. 🔌 ADDITIONAL TOOLS (System Prompt Tools)
-- `git_status` — Show git status of workspace
-- `git_diff` — Show diff for files
-- `git_add` — Stage changes
-- `git_commit` — Commit staged changes
-- `symbol_search` — VS Code language server symbol search
-- `rename_symbol` — Rename symbol across workspace
-- `web_search` — DuckDuckGo web search via agent core
-- `browser_navigate` / `browser_click` / `browser_type` — Browser automation
-- `browser_evaluate_script` / `browser_screenshot` — Advanced browser tools
-- `read_terminal` / `list_terminals` / `send_terminal_input` / `close_terminal` — Terminal management
-- `figma_inspect` — Figma component tree extraction
-
-### ✅ 7. 📊 TELEMETRY & DIAGNOSTICS
-- **Token usage tracking per session** — `telemetry.ts` with `TokenUsageTracker` storage
-- **Latency metrics for LLM calls** — `latencyMonitor` with per-provider averages
-- **Error rate dashboard** — Error log with timestamps, categorized by error type
-- **User feedback collection** — Thumbs up/down on assistant messages
-
-### ✅ 8. 🌐 LOCALIZATION
-- **i18n support for webview UI** — `src/webview/i18n.js` with language detection
-- **Multiple language support** — en, zh-CN, zh-TW, ja, ko, es, fr, de, pt-BR
-- **Localized settings** — Language selector in settings drawer
-
-### ✅ 9. 📚 DOCUMENTATION
-- **In-editor tutorial/onboarding walkthrough** — `src/onboarding.ts` with guided steps
-- **Tool-specific help tooltips** — Hover tooltips for tool cards in chat
-- **API documentation generation** — OpenAPI/Swagger-style spec from orchestrator tools
-
-### ✅ 10. 🧩 EXTENSIBILITY
-- **Plugin/contribution API for custom tools** — `src/pluginApi.ts` with `registerTool()`
-- **Custom prompt templates** — `src/promptTemplates.ts` with template management
-- **User-defined commands** — `src/userCommands.ts` with command mapping
+**All 10 previous enhancement areas are complete. Now implementing collapsible write_file/create_file tool cards.**
 
 ---
 
-## Build Status: ✅ Compilation Successful
+### ✅ 1-10: All Previous Enhancements Complete
 
-All TypeScript source files compile without errors. The extension is ready for packaging and use.
+---
+
+### ⏳ 11. WRITE TOOL COLLAPSIBLE / TERMINAL-STYLE PROGRESS
+- **Goal**: Make write_file (and similar long-content tools: create_file, patch_file) cards collapsed by default with accordion toggle
+- **Goal**: For run_command / terminal commands, show a clean "in progress" indicator (similar to scanning bar) that collapses on completion
+- **Plan**:
+  1. ✅ Analyzed current tool card rendering in sidebar.js (lines 566-776) — `createToolCardDOM()`
+  2. ✅ Identified CSS: `.tool-card-body-wrapper` uses `grid-template-rows: 0fr` → `1fr` on `.expanded`
+  3. ✅ Identified toggle: header click toggles `.expanded` class (lines 766-768)
+  4. ✅ Identified that currently ALL tool cards start expanded (no `expanded` class initially, but body wrapper animates)
+  5. ❌ **Bug**: The `write_file` / `create_file` cards currently show their full code blocks on render without collapsing
+  6. ⏳ **Fix**: Add `.collapsed-by-default` class to `write_file`, `create_file`, `patch_file` cards so body starts collapsed
+  7. ⏳ **Enhancement**: Add distinct progress indicator for file-writing tools (different CSS from scanning bar)
+  8. ⏳ **Enhancement**: Terminal commands (`run_command`) show "Running..." spinner instead of full output until complete
+
+---
+
+## Implementation Details
+
+### Changes to `src/webview/sidebar.js`:
+- In `createToolCardDOM()`: Add `'collapsed-by-default'` class for `write_file`, `create_file`, `patch_file` tools
+- In `createToolCardDOM()`: For completed `run_command` cards, add a "Show Output" collapsed state
+- Modify CSS to support `collapsed-by-default` class
+
+### Changes to `src/webview/sidebar.css`:
+- Add styles for `collapsed-by-default` tool cards (subtle "Expand to view" hint)
+- Add distinct progress indicator for file-writing operations (different color from scanning bar)
+- Add terminal-style progress animation
