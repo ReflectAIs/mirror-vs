@@ -7,57 +7,48 @@
 - `.github/workflows/ci.yml` — Added TypeScript checks, linting, tests, build on push/PR across Node 18/20 on Ubuntu/Windows
 - `.vscodeignore` — Updated to include webview source assets and exclude build artifacts
 - Plan & Memory files maintained
+- **ACUTALLY VERIFIED**: `window.addEventListener('message', ...)` handler **already exists and is COMPLETE** — handles all 21 message types including chat responses, tool status, git changes, settings, hosting validation, etc.
 
-## ❌ Remaining Critical Issues
+## ❌ Remaining Issues
 
-### 1. 🔴 Critical: sidebar.js missing `window.addEventListener('message', ...)` handler
-The webview cannot receive ANY messages from the extension. Messages like `chatResponseStart`, `chatResponse`, `chatResponseComplete`, `chatResponseError`, `updateChatHistory`, `toolStatus`, `gitChanges`, `hostValidationResult`, `avatarState`, etc. are all silently dropped. This means:
-- Chat messages never appear in the webview
-- Tool execution results never appear
-- Git changes panel never updates
-- Settings validation feedback never arrives
-- Avatar state changes never apply
-- Token/cost dashboard never updates
+### 1. 🔴 Critical: Syntax highlighting never applied in parseMarkdown
+`parseMarkdown` renders code blocks using `escapeHtml()` (which escapes HTML entities) but never calls `highlightCode()` to apply syntax highlighting colors. The `highlightCode()` function exists at the bottom of sidebar.js but is not called during code block rendering.
 
-**Fix:** Add a message handler that routes each message type to the appropriate handler function.
+**Fix:** In the code block rendering section of `parseMarkdown`, replace:
+```js
+escapedCode = escapeHtml(codeBuffer.trim());
+```
+with:
+```js
+const codeContent = codeBuffer.trim();
+escapedCode = codeLang ? highlightCode(escapeHtml(codeContent), codeLang) : escapeHtml(codeContent);
+```
 
-### 2. 🔴 Critical: Code blocks don't apply syntax highlighting
-The `parseMarkdown` function escapes HTML before rendering, so syntax highlighting never works in code blocks. The `highlightCode` function exists but is never called.
-
-**Fix:** When rendering code blocks in `parseMarkdown`, apply `highlightCode()` to the code content before wrapping in `<pre><code>`.
+### 2. 🟡 Medium: Missing `syntax-highlighter.js` in sidebar.html
+The `syntax-highlighter.js` script is referenced in `esbuild.js` as a dependency to copy, but may not be loaded in `sidebar.html`.
 
 ### 3. 🟡 Medium: No retry UI for failed tool cards
 Tool cards show status but have no retry button when they fail.
 
-**Fix:** Add retry buttons that post `retryTool` messages to the extension.
+### 4. 🟡 Medium: No drag-and-drop image support active (duplicate handlers exist)
+Two sets of drag-and-drop handlers exist in sidebar.js (lines 471 and 506).
 
-### 4. 🟡 Medium: No drag-and-drop image support active
-The drag-and-drop handlers exist but detection is fragile.
-
-**Fix:** Ensure MIME type detection and base64 encoding work correctly for common image types.
-
-### 5. 🟠 Low: Missing usage dashboard update handler
-The `usage-dashboard` HTML exists but sidebar.js has no code to update the token/cost dashboard.
-
-**Fix:** Add updateUsageDashboard handler that reads token/cost from chatResponse messages.
-
-### 6. 🟠 Low: Slash commands not implemented
+### 5. 🟠 Low: Slash commands not implemented
 The `/` key handler shows a commands list but doesn't execute any slash commands.
 
-**Fix:** Wire slash command handlers for `/help`, `/clear`, `/review`, `/figma`, etc.
+### 6. 🟠 Low: Usage dashboard not updating from token/cost messages
+The `tokenUsage` message type exists but dashboard HTML may not have proper update functions wired.
 
 ### 7. 🟠 Low: README needs update for production features
-README doesn't mention drag-and-drop, syntax highlighting, retry buttons, etc.
 
 ### 8. 🟢 Nice-to-have: Add test for sidebar webview message handling
-Cover critical message processing logic.
 
 ## Next Steps
-1. Fix sidebar.js message handler (CRITICAL)
-2. Fix code block syntax highlighting
+1. Fix syntax highlighting in parseMarkdown (CRITICAL)
+2. Check/verify syntax-highlighter.js inclusion in sidebar.html
 3. Add retry buttons to tool cards
-4. Add usage dashboard updates
-5. Add image drag-and-drop polish
-6. Add slash commands
+4. Clean up duplicate drag-and-drop handlers
+5. Add slash commands
+6. Wire usage dashboard updates
 7. Update README
 8. Run full TypeScript/ESLint/tests verification

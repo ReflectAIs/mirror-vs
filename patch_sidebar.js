@@ -17,9 +17,9 @@ const afterPos = insertAfter + marker.length;
 const beforePart = content.substring(0, afterPos);
 const afterPart = content.substring(afterPos);
 
-// Check if we already have a message handler
-if (content.includes("window.addEventListener('message'")) {
-  console.log('Message handler already exists, skipping');
+// Check if we already have a message handler - look for it in sidebar.js content
+if (beforePart.includes("window.addEventListener('message'") || afterPart.includes("window.addEventListener('message'")) {
+  console.log('Message handler already exists in sidebar.js, skipping');
   process.exit(0);
 }
 

@@ -1705,7 +1705,11 @@ function attachImage(base64) {
       if (line.trim().startsWith('```')) {
         if (inCodeBlock) {
           inCodeBlock = false;
-          const escapedCode = escapeHtml(codeBuffer.trim());
+          const codeContent = codeBuffer.trim();
+          let escapedCode = escapeHtml(codeContent);
+          if (codeLang && codeLang !== 'plaintext') {
+            escapedCode = highlightCode(escapedCode, codeLang);
+          }
           html += `
             <div class="code-block-wrapper">
               <div class="code-block-header">
