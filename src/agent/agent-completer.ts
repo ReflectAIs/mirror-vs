@@ -36,7 +36,7 @@ export class AgentCompleter {
 
     return new Promise<string>((resolve, reject) => {
       const onChunk = (chunk: string) => {
-        this._postMessage({ type: 'chatResponse', text: chunk, sessionId: _sessionId });
+        this._postMessage({ type: 'chatResponseChunk', text: chunk, sessionId: _sessionId });
       };
 
       const onComplete = (fullText: string, _usage?: { promptTokens: number; completionTokens: number }) => {
