@@ -46,7 +46,7 @@ export class AgentParser {
       if (char === '"' && !inSq) {
         if (inDq) {
           const remaining = text.substring(i + 1).trim();
-          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9\-]+\s*=/.test(remaining)) {
+          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9-]+\s*=/.test(remaining)) {
             inDq = false;
           }
         } else {
@@ -57,7 +57,7 @@ export class AgentParser {
       if (char === "'" && !inDq) {
         if (inSq) {
           const remaining = text.substring(i + 1).trim();
-          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9\-]+\s*=/.test(remaining)) {
+          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9-]+\s*=/.test(remaining)) {
             inSq = false;
           }
         } else {

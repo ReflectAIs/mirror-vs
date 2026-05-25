@@ -1,13 +1,10 @@
 import { LLMProvider, ChatMessage } from '../types';
 import { streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
-import { RateLimiter } from '../services/rate-limiter';
 import { TelemetryService } from '../services/telemetry-service';
-import { AgentParser } from './agent-parser';
 
 /** Handles LLM streaming completion calls and context summarization */
 export class AgentCompleter {
   private readonly _telemetry = TelemetryService.getInstance();
-  private readonly _parser = new AgentParser();
   private _lastLatencyMeasurement = 0;
 
   constructor(
@@ -38,16 +35,22 @@ export class AgentCompleter {
     const startTime = performance.now();
 
     return new Promise<string>((resolve, reject) => {
-      let fullResponse = '';
-
       const onChunk = (chunk: string) => {
-        fullResponse += chunk;
         this._postMessage({ type: 'chatResponse', text: chunk, sessionId: _sessionId });
       };
 
       const onComplete = (fullText: string, _usage?: { promptTokens: number; completionTokens: number }) => {
         this._lastLatencyMeasurement = performance.now() - startTime;
-        this._telemetry.recordLatency(this._lastLatencyMeasurement);
+        this._telemetry.recordCall({
+          sessionId: _sessionId,
+          sessionTitle: '',
+          tokensInput: _usage?.promptTokens ?? 0,
+          tokensOutput: _usage?.completionTokens ?? 0,
+          cost: 0,
+          latency: this._lastLatencyMeasurement,
+          provider: provider,
+          model: model,
+        });
         resolve(fullText);
       };
 
@@ -55,7 +58,6 @@ export class AgentCompleter {
         reject(err);
       };
 
-      // Wire abort signals: if outer signal aborts, cancel the completion
       if (signal.aborted) {
         reject(new Error('Operation cancelled'));
         return;
@@ -88,7 +90,7 @@ export class AgentCompleter {
   /**
    * Generate a summary of conversation turns to compress context.
    */
-  public async generateSummary(
+  public async summarizeHistory(
     provider: LLMProvider,
     host: string,
     model: string,
