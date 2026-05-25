@@ -5,6 +5,14 @@ import { ReviewManager } from './services/review-manager';
 export function activate(context: vscode.ExtensionContext) {
   console.log('Mirror VS Extension is now active!');
 
+  // Global error handlers to prevent extension host crashes from unhandled rejections
+  process.on('unhandledRejection', (reason: any) => {
+    console.error('[Mirror VS] Unhandled Promise Rejection:', reason instanceof Error ? reason.message : reason);
+  });
+  process.on('uncaughtException', (error: Error) => {
+    console.error('[Mirror VS] Uncaught Exception:', error.message);
+  });
+
   // Register ReviewManager service
   ReviewManager.getInstance().register(context);
 

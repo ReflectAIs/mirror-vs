@@ -271,18 +271,25 @@ export class CommandService {
    * Extracts the directory and sets it as the spawn cwd.
    */
   private resolveCommandAndCwd(command: string, baseCwd: string): { cmd: string; cwd: string } {
+    let normalizedCmd = command;
+
+    // Windows: translate 'mkdir -p' to the correct PowerShell syntax
+    if (process.platform === 'win32') {
+      normalizedCmd = normalizedCmd.replace(/\bmkdir\b(\s+)-p\b/gi, (match, spaces) => `New-Item -Force -ItemType Directory${spaces}`);
+    }
+
     const cdPattern = /^\s*cd\s+(['"]?)([^'"&;|\r\n]+)\1\s*(?:&&|;)?\s*/i;
-    const cdMatch = command.match(cdPattern);
+    const cdMatch = normalizedCmd.match(cdPattern);
 
     if (cdMatch) {
       const dir = cdMatch[2].trim();
       const resolvedCwd = path.resolve(baseCwd, dir);
-      const remainingCmd = command.slice(cdMatch[0].length).trim();
+      const remainingCmd = normalizedCmd.slice(cdMatch[0].length).trim();
       this.logToDebug(`cd prefix extracted: cwd set to "${resolvedCwd}", running: "${remainingCmd}"`);
-      return { cmd: remainingCmd || command, cwd: resolvedCwd };
+      return { cmd: remainingCmd || normalizedCmd, cwd: resolvedCwd };
     }
 
-    return { cmd: command, cwd: baseCwd };
+    return { cmd: normalizedCmd, cwd: baseCwd };
   }
 
   // -----------------------------------------------------------------------
