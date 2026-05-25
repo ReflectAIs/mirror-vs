@@ -96,10 +96,12 @@ export function buildSystemPrompt(): string {
   const folders = vscode.workspace.workspaceFolders;
   if (folders && folders.length > 0) {
     workspaceContext = "\n\n### OPEN WORKSPACE FOLDERS:\n" +
-      folders.map((f, i) => `  ${i}. \`${f.uri.fsPath}\` (name: "${f.name}")`).join("\n");
-    if (folders.length > 1) {
-      workspaceContext += "\n\nAll file-related tools (read_file, create_file, write_file, patch_file, list_dir) operate relative to the **primary** workspace folder (index 0). For other folders, use absolute paths.";
-    }
+      folders.map((f, i) => `  ${i}. \`${f.uri.fsPath}\` (name: "${f.name}")`).join("\n") +
+      "\n\n**Multi-Root Workspace File Rules:**\n" +
+      "  - All file-related tools (read_file, create_file, write_file, patch_file, list_dir) accept **relative** or **absolute** paths.\n" +
+      "  - **Absolute paths** (e.g., `C:\\Users\\me\\project\\file.ts` on Windows or `/home/user/project/file.ts` on Mac/Linux) are allowed and will be resolved against the matching workspace folder.\n" +
+      "  - **Relative paths** (e.g., `src/file.ts`) are resolved against the **primary** workspace folder (index 0).\n" +
+      "  - To create/write files in a non-primary folder, always use the **full absolute path** to that folder.";
   } else {
     workspaceContext = "\n\n### OPEN WORKSPACE FOLDERS:\nNone";
   }

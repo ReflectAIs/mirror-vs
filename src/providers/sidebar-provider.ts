@@ -609,20 +609,37 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private getSafePath(targetPath: string): string {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceFolder) {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
       throw new Error('No workspace folder open.');
     }
-    const resolved = path.resolve(workspaceFolder, targetPath);
 
-    // Normalize both paths for case-insensitive drive letter comparisons on Windows
-    const workspaceFolderLower = workspaceFolder.toLowerCase();
+    // If the target path is already absolute, use it directly (after security check)
+    if (path.isAbsolute(targetPath)) {
+      const resolvedLower = targetPath.toLowerCase();
+      // Security check: absolute path must be under one of the workspace folders
+      for (const f of folders) {
+        const folderLower = f.uri.fsPath.toLowerCase();
+        if (resolvedLower.startsWith(folderLower)) {
+          return targetPath;
+        }
+      }
+      throw new Error('Access denied: Absolute file path is outside of all workspace folders.');
+    }
+
+    // Relative path: resolve against the first workspace folder (primary)
+    const primaryFolder = folders[0].uri.fsPath;
+    const resolved = path.resolve(primaryFolder, targetPath);
     const resolvedLower = resolved.toLowerCase();
 
-    if (!resolvedLower.startsWith(workspaceFolderLower)) {
-      throw new Error('Access denied: File path is outside of workspace.');
+    // Security check: resolved path must be under one of the workspace folders
+    for (const f of folders) {
+      const folderLower = f.uri.fsPath.toLowerCase();
+      if (resolvedLower.startsWith(folderLower)) {
+        return resolved;
+      }
     }
-    return resolved;
+    throw new Error('Access denied: File path resolves outside of all workspace folders.');
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
