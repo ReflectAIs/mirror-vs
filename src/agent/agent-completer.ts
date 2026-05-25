@@ -3,7 +3,6 @@ import { streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
 import { RateLimiter } from '../services/rate-limiter';
 import { TelemetryService } from '../services/telemetry-service';
 import { AgentParser } from './agent-parser';
-import { ToolCall } from './types';
 
 /** Handles LLM streaming completion calls and context summarization */
 export class AgentCompleter {
@@ -12,7 +11,7 @@ export class AgentCompleter {
   private _lastLatencyMeasurement = 0;
 
   constructor(
-    private readonly _postMessage: (msg: any) => void,
+    private readonly _postMessage: (msg: Record<string, unknown>) => void,
   ) {}
 
   public get lastLatency(): number {
@@ -22,134 +21,74 @@ export class AgentCompleter {
   /**
    * Get a completion from the LLM via streaming.
    * Returns the full assistant response text.
+   *
+   * Signature matches orchestrator call:
+   *   getLLMCompletion(provider, host, model, apiKey, messages, signal, sessionId, abortController)
    */
   public async getLLMCompletion(
     provider: LLMProvider,
     host: string,
     model: string,
     apiKey: string,
-    payload: ChatMessage[],
+    messages: ChatMessage[],
     signal: AbortSignal,
     _sessionId: string,
-    _abortController: AbortController,
+    abortController: AbortController,
   ): Promise<string> {
-    let fullResponse = '';
-    let toolCallBuffer = '';
-    const startTime = Date.now();
-    let totalTokens = 0;
-    // Estimate input tokens from payload
-    const estimateInputTokens = payload.reduce((sum, msg) => {
-      return sum + RateLimiter.estimateTokens(msg.content || '') + (msg.images || []).length * 200;
-    }, 0);
-    const isDeepSeek = provider === 'deepseek';
-
-    this._postMessage({ type: 'streamStart' });
+    const startTime = performance.now();
 
     return new Promise<string>((resolve, reject) => {
-      const wrappedOnError = (err: any) => {
-        if (err.name === 'AbortError') {
-          this._postMessage({ type: 'streamEnd' });
-          resolve(fullResponse);
-          return;
-        }
-        this._postMessage({ type: 'streamEnd' });
+      let fullResponse = '';
+
+      const onChunk = (chunk: string) => {
+        fullResponse += chunk;
+        this._postMessage({ type: 'chatResponse', text: chunk, sessionId: _sessionId });
+      };
+
+      const onComplete = (fullText: string, _usage?: { promptTokens: number; completionTokens: number }) => {
+        this._lastLatencyMeasurement = performance.now() - startTime;
+        this._telemetry.recordLatency(this._lastLatencyMeasurement);
+        resolve(fullText);
+      };
+
+      const onError = (err: Error) => {
         reject(err);
       };
 
-      const onChunk = (chunk: string) => {
-        if (signal.aborted) return;
-        toolCallBuffer += chunk;
-        totalTokens += RateLimiter.estimateTokens(chunk);
-        this._postMessage({
-          type: 'chatResponseChunk',
-          text: chunk,
-        });
+      // Wire abort signals: if outer signal aborts, cancel the completion
+      if (signal.aborted) {
+        reject(new Error('Operation cancelled'));
+        return;
+      }
 
-        // Emit tool call status if we detect a tool tag
-        const parsed: ToolCall[] = this._parser.parseToolCalls(toolCallBuffer);
-        if (parsed.length > 0) {
-          for (const tc of parsed) {
-            this._postMessage({
-              type: 'toolStatus',
-              toolName: tc.name,
-              status: 'running',
-              target: tc.path || tc.url || tc.selector || '',
-            });
-          }
-          toolCallBuffer = '';
-        }
-      };
-
-      const wrappedOnComplete = (fullText: string) => {
-        fullResponse = fullText;
-        this._postMessage({ type: 'streamEnd' });
-
-        const elapsed = Date.now() - startTime;
-        this._lastLatencyMeasurement = elapsed;
-
-        // Estimate cost based on provider pricing
-        let cost = 0;
-        if (provider === 'deepseek') {
-          // DeepSeek pricing: $0.14/M input tokens, $0.28/M output tokens
-          cost = (estimateInputTokens / 1000000) * 0.14 + (totalTokens / 1000000) * 0.28;
-        }
-        // Ollama is local (free)
-
-        // Telemetry
-        this._telemetry.recordCall({
-          sessionId: '',
-          sessionTitle: '',
-          tokensInput: estimateInputTokens,
-          tokensOutput: totalTokens,
-          cost,
-          latency: elapsed,
-          provider,
-          model,
-        });
-
-        // Send token usage to webview
-        this._postMessage({
-          type: 'tokenUsage',
-          usage: {
-            input: estimateInputTokens,
-            output: totalTokens,
-            total: estimateInputTokens + totalTokens,
-            cost,
-          },
-        });
-
-        resolve(fullResponse);
-      };
-
-      if (isDeepSeek) {
+      if (provider === 'deepseek') {
         streamDeepSeekChat(
           apiKey,
           model,
-          payload,
-          signal,
+          messages,
+          abortController.signal,
           onChunk,
-          wrappedOnComplete,
-          wrappedOnError,
+          onComplete,
+          onError,
         );
       } else {
         streamOllamaChat(
           host,
           model,
-          payload,
-          signal,
+          messages,
+          abortController.signal,
           onChunk,
-          wrappedOnComplete,
-          wrappedOnError,
+          onComplete,
+          onError,
         );
       }
     });
   }
 
   /**
-   * Summarize a set of chat messages into a compact context.
-   * Used to compress middle turns and stay within context window.
+   * Generate a summary of conversation turns to compress context.
    */
-  public async summarizeHistory(
+  public async generateSummary(
     provider: LLMProvider,
     host: string,
     model: string,
@@ -168,13 +107,7 @@ export class AgentCompleter {
       },
     ];
 
-    const isDeepSeek = provider === 'deepseek';
-    let summaryResponse = '';
     return new Promise<string>((resolve) => {
-      const onChunk = (chunk: string) => {
-        summaryResponse += chunk;
-      };
-
       const onComplete = (fullText: string) => {
         resolve(fullText.trim() || 'Summary generation failed.');
       };
@@ -183,7 +116,11 @@ export class AgentCompleter {
         resolve('Summary generation failed.');
       };
 
-      if (isDeepSeek) {
+      const onChunk = (_chunk: string) => {
+        // Chunks are accumulated into the fullText parameter of onComplete
+      };
+
+      if (provider === 'deepseek') {
         streamDeepSeekChat(
           apiKey,
           model,
