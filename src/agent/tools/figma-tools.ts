@@ -49,6 +49,6 @@ export async function executeFigmaTool(tool: ToolCall, figmaKey?: string, worksp
 
     return `Successfully fetched Figma node ${nodeId}.\n\nTo prevent the AI from becoming overloaded with huge amounts of text, the component tree data has been saved to: ${filePath}\n\nPlease use the \`read_file\` tool or standard file operations to read this file and analyze the design data as needed.`;
   } catch (err: any) {
-    return `Failed to fetch from Figma: ${err.message}`;
+    throw new Error(`Failed to fetch from Figma: ${err.message}`);
   }
 }

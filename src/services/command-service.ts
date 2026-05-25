@@ -246,8 +246,20 @@ export class CommandService {
 
   /** Generate a unique terminal name for a command. */
   private getTerminalName(command: string): string {
-    const shortName = command.length > 30 ? command.substring(0, 30) + '\u2026' : command;
-    return `Mirror: ${shortName}`;
+    // Remove shell redirection, piping, and common special characters
+    let clean = command
+      .replace(/2>&1/g, '')
+      .replace(/&&/g, 'and')
+      .replace(/[;|<>&\r\n]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Limit naming to 60 chars maximum for safety and clean display
+    if (clean.length > 60) {
+      clean = clean.substring(0, 57).trim() + '...';
+    }
+
+    return `Mirror: ${clean}`;
   }
 
   // -----------------------------------------------------------------------
@@ -365,10 +377,23 @@ export class CommandService {
     chars: number = 5000,
   ): { output: string; running: boolean; exitCode: number | null } | null {
     const pty = this.activePtys.get(terminalName);
-    if (!pty) {
-      // Fuzzy match: try to find a terminal whose name contains the search string
+    if (pty) {
+      return {
+        output: pty.getRecentOutput(chars),
+        running: pty.running,
+        exitCode: pty.exitCode,
+      };
+    }
+
+    // Normalized helper for extremely robust fuzzy matching
+    const normalize = (s: string) => s.toLowerCase().replace(/mirror:/i, '').replace(/[^\w]/g, '');
+    const normSearch = normalize(terminalName);
+
+    if (normSearch) {
       for (const [name, p] of this.activePtys) {
-        if (name.includes(terminalName) || terminalName.includes(name)) {
+        const normName = normalize(name);
+        if (normName.includes(normSearch) || normSearch.includes(normName)) {
+          this.logToDebug(`readTerminalOutput: fuzzy matched "${terminalName}" to active PTY "${name}"`);
           return {
             output: p.getRecentOutput(chars),
             running: p.running,
@@ -376,13 +401,8 @@ export class CommandService {
           };
         }
       }
-      return null;
     }
-    return {
-      output: pty.getRecentOutput(chars),
-      running: pty.running,
-      exitCode: pty.exitCode,
-    };
+    return null;
   }
 
   // -----------------------------------------------------------------------
@@ -646,16 +666,21 @@ export class CommandService {
       return true;
     }
 
-    // Fuzzy match across our terminals
-    for (const [name, p] of this.activePtys) {
-      if ((name.includes(terminalName) || terminalName.includes(name)) && p.running) {
-        this.logToDebug(`Sending input to fuzzy-matched pseudoterminal "${name}": "${input}"`);
-        if (input === 'Ctrl+C' || input === 'ctrl+c' || input === '\u0003') {
-          p.handleInput('\u0003');
-        } else {
-          p.handleInput(input + '\n');
+    // Fuzzy match across our terminals using normalization
+    const normalize = (s: string) => s.toLowerCase().replace(/mirror:/i, '').replace(/[^\w]/g, '');
+    const normSearch = normalize(terminalName);
+    if (normSearch) {
+      for (const [name, p] of this.activePtys) {
+        const normName = normalize(name);
+        if ((normName.includes(normSearch) || normSearch.includes(normName)) && p.running) {
+          this.logToDebug(`Sending input to fuzzy-matched pseudoterminal "${name}": "${input}"`);
+          if (input === 'Ctrl+C' || input === 'ctrl+c' || input === '\u0003') {
+            p.handleInput('\u0003');
+          } else {
+            p.handleInput(input + '\n');
+          }
+          return true;
         }
-        return true;
       }
     }
 
@@ -682,13 +707,18 @@ export class CommandService {
     let terminal = this.activeTerminals.get(terminalName);
     let foundName = terminalName;
 
-    // Fuzzy match
+    // Fuzzy match using normalization
     if (!terminal) {
-      for (const [name, t] of this.activeTerminals) {
-        if (name.includes(terminalName) || terminalName.includes(name)) {
-          terminal = t;
-          foundName = name;
-          break;
+      const normalize = (s: string) => s.toLowerCase().replace(/mirror:/i, '').replace(/[^\w]/g, '');
+      const normSearch = normalize(terminalName);
+      if (normSearch) {
+        for (const [name, t] of this.activeTerminals) {
+          const normName = normalize(name);
+          if (normName.includes(normSearch) || normSearch.includes(normName)) {
+            terminal = t;
+            foundName = name;
+            break;
+          }
         }
       }
     }

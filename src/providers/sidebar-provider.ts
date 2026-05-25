@@ -22,14 +22,15 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   private readonly _secretService: SecretService;
   private readonly _storageService: StorageService;
   private readonly _orchestrator: AgentOrchestrator;
+  private readonly _migrationPromise: Promise<void>;
 
   constructor(private readonly _context: vscode.ExtensionContext) {
     this._secretService = new SecretService(_context.secrets);
     this._storageService = new StorageService(_context.workspaceState);
 
-    // Migrate legacy storage to per-session keys (non-blocking, fires in background)
-    this._storageService.migrateFromLegacyIfNeeded().then(() => {
-      this._storageService.trimOldSessions(50);
+    // Migrate legacy storage to per-session keys
+    this._migrationPromise = this._storageService.migrateFromLegacyIfNeeded().then(() => {
+      return this._storageService.trimOldSessions(50);
     });
 
     // Initialize decoupled Agent Orchestrator
@@ -48,6 +49,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken,
   ): Promise<void> {
     this._view = webviewView;
+
+    // Await storage migration completion before resolving view
+    await this._migrationPromise;
 
     webviewView.webview.options = {
       enableScripts: true,

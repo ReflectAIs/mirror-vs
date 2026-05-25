@@ -595,11 +595,11 @@ function attachImage(base64) {
       }
 
       if (command === 'fix') {
-        text = rest ? 'Fix the following code/issue: ' + rest : 'Fix this code:\n\';
+        text = rest ? 'Fix the following code/issue: ' + rest : 'Fix this code:\n';
       } else if (command === 'explain') {
-        text = rest ? 'Explain this: ' + rest : 'Explain this code:\n\';
+        text = rest ? 'Explain this: ' + rest : 'Explain this code:\n';
       } else if (command === 'test') {
-        text = rest ? 'Write tests for: ' + rest : 'Write unit tests for this code:\n\';
+        text = rest ? 'Write tests for: ' + rest : 'Write unit tests for this code:\n';
       }
     }
 
@@ -720,6 +720,30 @@ function attachImage(base64) {
     } else if (toolName === 'figma_inspect') {
       friendlyName = 'Figma Inspect';
       iconHtml = '🎨';
+    } else if (toolName === 'rename_file') {
+      friendlyName = 'Rename File';
+      iconHtml = '🚚';
+    } else if (toolName === 'delete_file') {
+      friendlyName = 'Delete File';
+      iconHtml = '🗑️';
+    } else if (toolName === 'git_status') {
+      friendlyName = 'Git Status';
+      iconHtml = '📊';
+    } else if (toolName === 'git_diff') {
+      friendlyName = 'Git Diff';
+      iconHtml = '📝';
+    } else if (toolName === 'git_add') {
+      friendlyName = 'Git Stage';
+      iconHtml = '➕';
+    } else if (toolName === 'git_commit') {
+      friendlyName = 'Git Commit';
+      iconHtml = '📦';
+    } else if (toolName === 'symbol_search') {
+      friendlyName = 'Symbol Search';
+      iconHtml = '🔎';
+    } else if (toolName === 'rename_symbol') {
+      friendlyName = 'Rename Symbol';
+      iconHtml = '✏️';
     }
 
     const header = document.createElement('div');
@@ -1538,6 +1562,12 @@ function attachImage(base64) {
     } else if (tool === 'patch_file') {
       friendlyName = 'Patching File';
       iconHtml = '✏️';
+    } else if (tool === 'rename_file') {
+      friendlyName = 'Renaming File';
+      iconHtml = '🚚';
+    } else if (tool === 'git_commit') {
+      friendlyName = 'Git Commit';
+      iconHtml = '📦';
     }
     
     const fileExt = decodedTarget.split('.').pop() || 'plaintext';
@@ -1584,72 +1614,65 @@ function attachImage(base64) {
   function parseMarkdown(text) {
     let cleanText = text;
     
-    // Clean block tools: create_file, write_file, patch_file, send_terminal_input
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
+    // Clean block tools: create_file, write_file, patch_file, send_terminal_input, rename_file, git_commit
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
     for (const tool of blockTools) {
-      const openTag = `<${tool}`;
-      
-      let openIndex = cleanText.toLowerCase().indexOf(openTag);
-      while (openIndex !== -1) {
-        const closeRegex = new RegExp(`</${tool}\\s*>`, 'i');
-        const match = closeRegex.exec(cleanText.substring(openIndex));
+      let tagInfo;
+      let startFrom = 0;
+      while ((tagInfo = findUnquotedTagEndEx(cleanText, tool, startFrom)) !== null) {
+        const closeTagPattern = '</' + tool + '\\s*>';
+        const closeRegex = new RegExp(closeTagPattern, 'i');
+        const match = closeRegex.exec(cleanText.substring(tagInfo.end));
         if (match) {
-          const closeIndex = openIndex + match.index;
+          const closeIndex = tagInfo.end + match.index;
           const matchLength = match[0].length;
-          let tagContent = cleanText.substring(openIndex, closeIndex + matchLength);
           
-          const attrsEnd = tagContent.indexOf('>');
-          const attrs = attrsEnd !== -1 ? tagContent.substring(0, attrsEnd) : tagContent;
-          let target = getAttrValue(attrs, 'path')
-            || getAttrValue(attrs, 'query')
-            || getAttrValue(attrs, 'terminal_name')
+          let target = getAttrValue(tagInfo.attrs, 'path')
+            || getAttrValue(tagInfo.attrs, 'query')
+            || getAttrValue(tagInfo.attrs, 'terminal_name')
             || '';
           target = target.trim();
           
           let placeholderToken = `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
-          cleanText = cleanText.substring(0, openIndex) + placeholderToken + cleanText.substring(closeIndex + matchLength);
+          cleanText = cleanText.substring(0, tagInfo.start) + placeholderToken + cleanText.substring(closeIndex + matchLength);
+          startFrom = tagInfo.start + placeholderToken.length;
         } else {
-          let streamingContent = cleanText.substring(openIndex);
-          let firstCloseBracket = streamingContent.indexOf('>');
-          
-          if (firstCloseBracket !== -1) {
-            let actualCode = streamingContent.substring(firstCloseBracket + 1);
-            let pathExt = 'plaintext';
-            const attrs = streamingContent.substring(0, firstCloseBracket);
-            const pathVal = getAttrValue(attrs, 'path');
-            if (pathVal) {
-              pathExt = pathVal.split('.').pop() || 'plaintext';
-            }
-            if (tool === 'create_file' || tool === 'write_file' || tool === 'patch_file') {
-              let placeholderToken = `%%%STREAMING_TOOL_PLACEHOLDER::${tool}::${escapeHtml(pathVal || '')}::${escapeHtml(actualCode)}%%%`;
-              cleanText = cleanText.substring(0, openIndex) + placeholderToken;
-            } else {
-              cleanText = cleanText.substring(0, openIndex) + `\n\`\`\`${pathExt}\n${actualCode}`;
-            }
+          let actualCode = cleanText.substring(tagInfo.end);
+          let pathExt = 'plaintext';
+          const pathVal = getAttrValue(tagInfo.attrs, 'path');
+          if (pathVal) {
+            pathExt = pathVal.split('.').pop() || 'plaintext';
+          }
+          if (tool === 'create_file' || tool === 'write_file' || tool === 'patch_file' || tool === 'rename_file' || tool === 'git_commit') {
+            let placeholderToken = `%%%STREAMING_TOOL_PLACEHOLDER::${tool}::${escapeHtml(pathVal || '')}::${escapeHtml(actualCode)}%%%`;
+            cleanText = cleanText.substring(0, tagInfo.start) + placeholderToken;
           } else {
-            cleanText = cleanText.substring(0, openIndex);
+            cleanText = cleanText.substring(0, tagInfo.start) + `\n\`\`\`${pathExt}\n${actualCode}`;
           }
           break;
         }
-        openIndex = cleanText.toLowerCase().indexOf(openTag);
       }
     }
 
     // Clean self-closing or simple tools
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal'];
+    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals', 'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol'];
     for (const tool of selfClosingTools) {
-      const regex = new RegExp(`<${tool}([\\s\\S]*?)\\/?>`, 'gi');
-      cleanText = cleanText.replace(regex, (match, attrs) => {
-        let target = getAttrValue(attrs, 'path')
-          || getAttrValue(attrs, 'query')
-          || getAttrValue(attrs, 'url')
-          || getAttrValue(attrs, 'selector')
-          || getAttrValue(attrs, 'command')
-          || getAttrValue(attrs, 'terminal_name')
+      let tagInfo;
+      let startFrom = 0;
+      while ((tagInfo = findUnquotedTagEndEx(cleanText, tool, startFrom)) !== null) {
+        let target = getAttrValue(tagInfo.attrs, 'path')
+          || getAttrValue(tagInfo.attrs, 'query')
+          || getAttrValue(tagInfo.attrs, 'url')
+          || getAttrValue(tagInfo.attrs, 'selector')
+          || getAttrValue(tagInfo.attrs, 'command')
+          || getAttrValue(tagInfo.attrs, 'terminal_name')
           || '';
         target = target.trim();
-        return `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
-      });
+        
+        let placeholderToken = `%%%TOOL_PLACEHOLDER::${tool}::${escapeHtml(target)}%%%`;
+        cleanText = cleanText.substring(0, tagInfo.start) + placeholderToken + cleanText.substring(tagInfo.end);
+        startFrom = tagInfo.start + placeholderToken.length;
+      }
     }
     
     // Handle currently streaming incomplete self-closing tags
@@ -1657,12 +1680,7 @@ function attachImage(base64) {
       const openTag = `<${tool}`;
       const openIndex = cleanText.toLowerCase().indexOf(openTag);
       if (openIndex !== -1) {
-        const closeIndex = cleanText.indexOf('>', openIndex);
-        if (closeIndex !== -1) {
-          cleanText = cleanText.substring(0, openIndex) + cleanText.substring(closeIndex + 1);
-        } else {
-          cleanText = cleanText.substring(0, openIndex);
-        }
+        cleanText = cleanText.substring(0, openIndex);
       }
     }
 
@@ -2003,6 +2021,52 @@ function attachImage(base64) {
       .replace(/&quot;/g, '"')
       .replace(/&#039;/g, "'")
       .replace(/&apos;/g, "'");
+  }
+
+  function findUnquotedTagEndEx(text, toolName, startFrom = 0) {
+    const openTag = '<' + toolName;
+    const startIdx = text.toLowerCase().indexOf(openTag, startFrom);
+    if (startIdx === -1) return null;
+
+    const nextChar = text[startIdx + openTag.length];
+    if (nextChar && !/\s|\/|>/.test(nextChar)) {
+      return findUnquotedTagEndEx(text, toolName, startIdx + 1);
+    }
+
+    let inDq = false;
+    let inSq = false;
+    let escaped = false;
+    for (let i = startIdx + openTag.length; i < text.length; i++) {
+      const char = text[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"' && !inSq) {
+        inDq = !inDq;
+        continue;
+      }
+      if (char === "'" && !inDq) {
+        inSq = !inSq;
+        continue;
+      }
+      if (char === '>' && !inDq && !inSq) {
+        const tagText = text.substring(startIdx, i + 1);
+        const isSelfClosing = tagText.trim().endsWith('/>');
+        const attrs = text.substring(openTag.length + startIdx, i - (isSelfClosing ? 1 : 0));
+        return {
+          start: startIdx,
+          end: i + 1,
+          attrs,
+          isSelfClosing,
+        };
+      }
+    }
+    return null;
   }
 
   function getAttrValue(attrs, name) {

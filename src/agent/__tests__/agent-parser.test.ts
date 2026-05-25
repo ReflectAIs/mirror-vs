@@ -325,6 +325,16 @@ describe('AgentParser', () => {
       expect((calls[0] as any).terminal_name).toBe('Term 1');
     });
 
+    it('should parse read_terminal with sanitized long terminal names', () => {
+      const parser = makeParser();
+      const calls = parser.parseToolCalls(
+        selfClosing('read_terminal', 'terminal_name="Mirror: cd temp-login and npm install and npm install tailwindcss ..."')
+      );
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe('read_terminal');
+      expect((calls[0] as any).terminal_name).toBe('Mirror: cd temp-login and npm install and npm install tailwindcss ...');
+    });
+
     it('should return empty array for text with no tool tags', () => {
       const parser = makeParser();
       expect(parser.parseToolCalls('Just some text')).toEqual([]);
@@ -407,6 +417,13 @@ describe('AgentParser', () => {
     it('should return empty string for empty input', () => {
       const parser = makeParser();
       expect(parser.getCleanedToolResponse('')).toBe('');
+    });
+
+    it('should not truncate tags whose attributes contain a > character', () => {
+      const parser = makeParser();
+      const input = '<run_command command="git log 2>&1 | select -first 30" /> extra content';
+      const result = parser.getCleanedToolResponse(input);
+      expect(result).toBe('<run_command command="git log 2>&1 | select -first 30" />');
     });
   });
 

@@ -81,6 +81,7 @@ export class StorageService {
         id: s.id,
         title: s.title,
         timestamp: s.timestamp,
+        messageCount: s.messages ? s.messages.length : 0,
         messages: [] as ChatMessage[],
       }));
       await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
@@ -88,7 +89,7 @@ export class StorageService {
       // Clear legacy key
       await this._workspaceState.update('mirror-vs.chatSessions', undefined);
       console.log('[StorageService] Migration complete.');
-    } else if (legacyPerSession && activeId) {
+    } else if (legacyPerSession && legacyPerSession.length > 0 && activeId) {
       // Migration from single per-workspace chatHistory key to per-session
       console.log('[StorageService] Migrating legacy chatHistory to per-session key...');
       const cleaned = legacyPerSession.map((msg) => ({
@@ -96,12 +97,37 @@ export class StorageService {
         images: msg.images ? msg.images.slice(0, 0) : undefined,
       }));
       await this._workspaceState.update(`mirror-vs.messages.${activeId}`, cleaned);
+
+      // Create lightweight metadata for this migrated active session
+      const sessions = this.getSessions();
+      if (!sessions.find((s) => s.id === activeId)) {
+        const firstUser = legacyPerSession.find((m) => m.role === 'user');
+        let title = 'Chat Session';
+        if (firstUser) {
+          let text = firstUser.content.trim();
+          const contextIndex = text.indexOf('\n\n[Active File Context:');
+          if (contextIndex !== -1) {
+            text = text.substring(0, contextIndex).trim();
+          }
+          title = text.substring(0, 32);
+          if (text.length > 32) title += '...';
+        }
+        sessions.push({
+          id: activeId,
+          title: title || 'Chat Session',
+          timestamp: Date.now(),
+          messageCount: legacyPerSession.length,
+          messages: [] as ChatMessage[],
+        });
+        await this.saveSessions(sessions);
+      }
+
       await this._workspaceState.update('mirror-vs.chatHistory', undefined);
       console.log('[StorageService] Migration complete.');
     }
 
     // Clean up any stale empty message keys
-    if (legacy || legacyPerSession) {
+    if ((legacy && legacy.length > 0) || (legacyPerSession && legacyPerSession.length > 0)) {
       this._workspaceState.update('mirror-vs.chatHistory', undefined);
     }
   }

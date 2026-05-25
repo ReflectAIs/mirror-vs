@@ -208,11 +208,17 @@ export function streamOllamaChat(
 
   if (signal.aborted) {
     req.destroy();
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    onError(abortErr);
     return;
   }
 
   signal.addEventListener('abort', () => {
     req.destroy();
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    onError(abortErr);
   });
 
   req.write(bodyData);
@@ -329,11 +335,17 @@ export function streamDeepSeekChat(
 
   if (signal.aborted) {
     req.destroy();
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    onError(abortErr);
     return;
   }
 
   signal.addEventListener('abort', () => {
     req.destroy();
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    onError(abortErr);
   });
 
   req.write(bodyData);

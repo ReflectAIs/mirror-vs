@@ -16,55 +16,132 @@ export class AgentParser {
     return result;
   }
 
-  private isTagFullyClosed(text: string, toolName: string): boolean {
+  private findUnquotedTagEndEx(
+    text: string,
+    toolName: string,
+    startFrom: number = 0,
+  ): { start: number; end: number; attrs: string; isSelfClosing: boolean } | null {
     const openTag = '\u003C' + toolName;
-    const startIdx = text.toLowerCase().indexOf(openTag);
-    if (startIdx === -1) return false;
+    const startIdx = text.toLowerCase().indexOf(openTag, startFrom);
+    if (startIdx === -1) return null;
+
+    const nextChar = text[startIdx + openTag.length];
+    if (nextChar && !/\s|\/|\u003E/.test(nextChar)) {
+      return this.findUnquotedTagEndEx(text, toolName, startIdx + 1);
+    }
+
     let inDq = false;
     let inSq = false;
     let escaped = false;
     for (let i = startIdx + openTag.length; i < text.length; i++) {
       const char = text[i];
-      if (escaped) { escaped = false; continue; }
-      if (char === '\\') { escaped = true; continue; }
-      if (char === '"' && !inSq) { inDq = !inDq; continue; }
-      if (char === "'" && !inDq) { inSq = !inSq; continue; }
-      if (char === '\u003E' && !inDq && !inSq) { return true; }
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"' && !inSq) {
+        inDq = !inDq;
+        continue;
+      }
+      if (char === "'" && !inDq) {
+        inSq = !inSq;
+        continue;
+      }
+      if (char === '\u003E' && !inDq && !inSq) {
+        const tagText = text.substring(startIdx, i + 1);
+        const isSelfClosing = tagText.trim().endsWith('/\u003E');
+        const attrs = text.substring(openTag.length + startIdx, i - (isSelfClosing ? 1 : 0));
+        return {
+          start: startIdx,
+          end: i + 1,
+          attrs,
+          isSelfClosing,
+        };
+      }
     }
-    return false;
+    return null;
+  }
+
+  private findUnquotedTagEnd(text: string, toolName: string): number {
+    const info = this.findUnquotedTagEndEx(text, toolName);
+    return info ? info.end : -1;
+  }
+
+  private isInsideFencedCodeBlock(text: string, index: number): boolean {
+    let count = 0;
+    let pos = text.indexOf('```');
+    while (pos !== -1 && pos < index) {
+      count++;
+      pos = text.indexOf('```', pos + 3);
+    }
+    return count % 2 === 1;
+  }
+
+  private isInsideInlineCodeBlock(text: string, index: number): boolean {
+    const lineStart = text.lastIndexOf('\n', index) + 1;
+    const lineEnd = text.indexOf('\n', index);
+    const line = text.substring(lineStart, lineEnd === -1 ? text.length : lineEnd);
+    const indexInLine = index - lineStart;
+
+    let count = 0;
+    let pos = line.indexOf('`');
+    while (pos !== -1 && pos < indexInLine) {
+      count++;
+      pos = line.indexOf('`', pos + 1);
+    }
+    return count % 2 === 1;
   }
 
   public hasCompleteToolCall(text: string): boolean {
-    const stripped = this.stripCodeBlocks(text);
     const selfClosingTools = [
       'read_file', 'list_dir', 'grep_search', 'web_search',
       'browser_navigate', 'browser_click', 'browser_type',
       'browser_evaluate_script', 'browser_screenshot',
       'figma_inspect', 'run_command', 'close_terminal',
       'read_terminal', 'list_terminals',
+      'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
     ];
     for (const tool of selfClosingTools) {
-      if (this.isTagFullyClosed(stripped, tool)) return true;
+      let startFrom = 0;
+      let tagInfo;
+      while ((tagInfo = this.findUnquotedTagEndEx(text, tool, startFrom)) !== null) {
+        if (!this.isInsideFencedCodeBlock(text, tagInfo.start) && !this.isInsideInlineCodeBlock(text, tagInfo.start)) {
+          return true;
+        }
+        startFrom = tagInfo.end;
+      }
     }
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
     for (const tool of blockTools) {
-      const closeTag = '\u003C\u002F' + tool + '\\s*\u003E';
-      const regex = new RegExp(closeTag, 'i');
-      if (regex.test(stripped)) return true;
+      let startFrom = 0;
+      let tagInfo;
+      while ((tagInfo = this.findUnquotedTagEndEx(text, tool, startFrom)) !== null) {
+        if (!this.isInsideFencedCodeBlock(text, tagInfo.start) && !this.isInsideInlineCodeBlock(text, tagInfo.start)) {
+          const closeTag = '\u003C\u002F' + tool + '\\s*\u003E';
+          const regex = new RegExp(closeTag, 'i');
+          if (regex.test(text.substring(tagInfo.end))) {
+            return true;
+          }
+        }
+        startFrom = tagInfo.end;
+      }
     }
     return false;
   }
 
   private autoCloseToolTags(text: string): string {
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
     let adjustedText = text;
     for (const tool of blockTools) {
-      const openTag = '\u003C' + tool + '(\\s+[^>]*?)?\u003E';
-      const openRegex = new RegExp(openTag, 'i');
+      const hasOpen = this.findUnquotedTagEndEx(adjustedText, tool) !== null;
       const closeTag = '\u003C\u002F' + tool + '\\s*\u003E';
       const closeRegex = new RegExp(closeTag, 'i');
-      if (openRegex.test(adjustedText) && !closeRegex.test(adjustedText)) {
-        adjustedText = adjustedText.trimEnd() + '\\n\u003C\u002F' + tool + '\u003E';
+      if (hasOpen && !closeRegex.test(adjustedText)) {
+        adjustedText = adjustedText.trimEnd() + '\n\u003C\u002F' + tool + '\u003E';
       }
     }
     return adjustedText;
@@ -72,40 +149,44 @@ export class AgentParser {
 
   public getCleanedToolResponse(text: string): string {
     const closedText = this.autoCloseToolTags(text);
-    const stripped = this.stripCodeBlocks(closedText);
     const selfClosingTools = [
       'read_file', 'list_dir', 'grep_search', 'web_search',
       'browser_navigate', 'browser_click', 'browser_type',
       'browser_evaluate_script', 'browser_screenshot',
       'figma_inspect', 'run_command', 'close_terminal',
       'read_terminal', 'list_terminals',
+      'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
     ];
     let earliestEnd = -1;
     for (const tool of selfClosingTools) {
-      const openTag = '\u003C' + tool + '[^>]*\u003E';
-      const regex = new RegExp(openTag, 'i');
-      const m = regex.exec(stripped);
-      if (m) {
-        const escaped = m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const origM = new RegExp(escaped).exec(closedText);
-        if (origM) {
-          const endIdx = origM.index + origM[0].length;
-          if (earliestEnd === -1 || endIdx < earliestEnd) earliestEnd = endIdx;
+      let startFrom = 0;
+      let tagInfo;
+      while ((tagInfo = this.findUnquotedTagEndEx(closedText, tool, startFrom)) !== null) {
+        if (!this.isInsideFencedCodeBlock(closedText, tagInfo.start) && !this.isInsideInlineCodeBlock(closedText, tagInfo.start)) {
+          if (earliestEnd === -1 || tagInfo.end < earliestEnd) {
+            earliestEnd = tagInfo.end;
+          }
         }
+        startFrom = tagInfo.end;
       }
     }
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
     for (const tool of blockTools) {
-      const closeTag = '\u003C\u002F' + tool + '\\s*\u003E';
-      const regex = new RegExp(closeTag, 'i');
-      const m = regex.exec(stripped);
-      if (m) {
-        const escaped = m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const origM = new RegExp(escaped).exec(closedText);
-        if (origM) {
-          const endIdx = origM.index + origM[0].length;
-          if (earliestEnd === -1 || endIdx < earliestEnd) earliestEnd = endIdx;
+      let startFrom = 0;
+      let tagInfo;
+      while ((tagInfo = this.findUnquotedTagEndEx(closedText, tool, startFrom)) !== null) {
+        if (!this.isInsideFencedCodeBlock(closedText, tagInfo.start) && !this.isInsideInlineCodeBlock(closedText, tagInfo.start)) {
+          const closeTag = '\u003C\u002F' + tool + '\\s*\u003E';
+          const regex = new RegExp(closeTag, 'i');
+          const m = regex.exec(closedText.substring(tagInfo.end));
+          if (m) {
+            const endIdx = tagInfo.end + m.index + m[0].length;
+            if (earliestEnd === -1 || endIdx < earliestEnd) {
+              earliestEnd = endIdx;
+            }
+          }
         }
+        startFrom = tagInfo.end;
       }
     }
     if (earliestEnd !== -1) return closedText.substring(0, earliestEnd);
@@ -123,189 +204,328 @@ export class AgentParser {
   }
 
   public parseToolCalls(rawText: string): ToolCall[] {
-    const text = this.stripCodeBlocks(rawText);
     const candidates: { index: number; tool: ToolCall }[] = [];
-    let match;
+    let tagInfo;
+    let startFrom = 0;
 
     // read_file
-    const readFileTag = '\\u003Cread_file([\\s\\S]*?)\\/?\\u003E';
-    const readFileRegex = new RegExp(readFileTag, 'gi');
-    while ((match = readFileRegex.exec(text)) !== null) {
-      const p = this.attr(match[1], 'path');
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'read_file', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
       if (p) {
-        const sl = this.attr(match[1], 'start_line');
-        const el = this.attr(match[1], 'end_line');
+        const sl = this.attr(tagInfo.attrs, 'start_line');
+        const el = this.attr(tagInfo.attrs, 'end_line');
         const tool: ToolCall = { name: 'read_file', path: p.trim() };
         if (sl) tool.start_line = parseInt(sl, 10);
         if (el) tool.end_line = parseInt(el, 10);
-        candidates.push({ index: match.index, tool });
+        candidates.push({ index: tagInfo.start, tool });
       }
+      startFrom = tagInfo.end;
     }
 
     // figma_inspect
-    const figmaTag = '\\u003Cfigma_inspect([\\s\\S]*?)\\/?\\u003E';
-    const figmaInspectRegex = new RegExp(figmaTag, 'gi');
-    while ((match = figmaInspectRegex.exec(text)) !== null) {
-      const u = this.attr(match[1], 'url');
-      if (u) candidates.push({ index: match.index, tool: { name: 'figma_inspect', url: u } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'figma_inspect', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const u = this.attr(tagInfo.attrs, 'url');
+      if (u) candidates.push({ index: tagInfo.start, tool: { name: 'figma_inspect', url: u } });
+      startFrom = tagInfo.end;
     }
 
     // list_dir
-    const listDirTag = '\\u003Clist_dir([\\s\\S]*?)\\/?\\u003E';
-    const listDirRegex = new RegExp(listDirTag, 'gi');
-    while ((match = listDirRegex.exec(text)) !== null) {
-      const p = this.attr(match[1], 'path');
-      if (p) candidates.push({ index: match.index, tool: { name: 'list_dir', path: p.trim() } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'list_dir', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim() } });
+      startFrom = tagInfo.end;
     }
 
     // grep_search
-    const grepTag = '\\u003Cgrep_search([\\s\\S]*?)\\/?\\u003E';
-    const grepSearchRegex = new RegExp(grepTag, 'gi');
-    while ((match = grepSearchRegex.exec(text)) !== null) {
-      const q = this.attr(match[1], 'query');
-      if (q) candidates.push({ index: match.index, tool: { name: 'grep_search', query: q } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'grep_search', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const q = this.attr(tagInfo.attrs, 'query');
+      if (q) candidates.push({ index: tagInfo.start, tool: { name: 'grep_search', query: q } });
+      startFrom = tagInfo.end;
     }
 
     // web_search
-    const webTag = '\\u003Cweb_search([\\s\\S]*?)\\/?\\u003E';
-    const webSearchRegex = new RegExp(webTag, 'gi');
-    while ((match = webSearchRegex.exec(text)) !== null) {
-      const q = this.attr(match[1], 'query');
-      if (q) candidates.push({ index: match.index, tool: { name: 'web_search', query: q } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'web_search', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const q = this.attr(tagInfo.attrs, 'query');
+      if (q) candidates.push({ index: tagInfo.start, tool: { name: 'web_search', query: q } });
+      startFrom = tagInfo.end;
     }
 
-    // write_file
-    const writeFileTag = '\\u003Cwrite_file([\\s\\S]*?)\\u003E([\\s\\S]*?)\\u003C\\u002Fwrite_file\\s*\\u003E';
-    const writeFileRegex = new RegExp(writeFileTag, 'gi');
-    while ((match = writeFileRegex.exec(text)) !== null) {
-      const p = this.attr(match[1], 'path');
-      if (p) candidates.push({ index: match.index, tool: { name: 'write_file', path: p.trim(), content: match[2] } });
+    // block tools (write_file, create_file, patch_file, rename_file, git_commit)
+    const blockTools = ['write_file', 'create_file', 'patch_file', 'rename_file', 'git_commit'];
+    for (const toolName of blockTools) {
+      startFrom = 0;
+      while ((tagInfo = this.findUnquotedTagEndEx(rawText, toolName, startFrom)) !== null) {
+        if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+          startFrom = tagInfo.end;
+          continue;
+        }
+        const p = this.attr(tagInfo.attrs, 'path');
+        if (p || toolName === 'git_commit') {
+          const closeTagPattern = '\u003C\u002F' + toolName + '\\s*\u003E';
+          const closeTagRegex = new RegExp(closeTagPattern, 'i');
+          const closeMatch = closeTagRegex.exec(rawText.substring(tagInfo.end));
+          if (closeMatch) {
+            const content = rawText.substring(tagInfo.end, tagInfo.end + closeMatch.index);
+            candidates.push({
+              index: tagInfo.start,
+              tool: { name: toolName as any, path: p ? p.trim() : undefined, content },
+            });
+            startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;
+            continue;
+          }
+        }
+        startFrom = tagInfo.end;
+      }
     }
 
-    // create_file
-    const createFileTag = '\\u003Ccreate_file([\\s\\S]*?)\\u003E([\\s\\S]*?)\\u003C\\u002Fcreate_file\\s*\\u003E';
-    const createFileRegex = new RegExp(createFileTag, 'gi');
-    while ((match = createFileRegex.exec(text)) !== null) {
-      const p = this.attr(match[1], 'path');
-      if (p) candidates.push({ index: match.index, tool: { name: 'create_file', path: p.trim(), content: match[2] } });
+    // delete_file
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'delete_file', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'delete_file', path: p.trim() } });
+      startFrom = tagInfo.end;
     }
 
-    // patch_file
-    const patchFileTag = '\\u003Cpatch_file([\\s\\S]*?)\\u003E([\\s\\S]*?)\\u003C\\u002Fpatch_file\\s*\\u003E';
-    const patchFileRegex = new RegExp(patchFileTag, 'gi');
-    while ((match = patchFileRegex.exec(text)) !== null) {
-      const p = this.attr(match[1], 'path');
-      if (p) candidates.push({ index: match.index, tool: { name: 'patch_file', path: p.trim(), content: match[2] } });
+    // git_status
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'git_status', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      candidates.push({ index: tagInfo.start, tool: { name: 'git_status' } });
+      startFrom = tagInfo.end;
+    }
+
+    // git_diff
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'git_diff', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      candidates.push({ index: tagInfo.start, tool: { name: 'git_diff', path: p ? p.trim() : undefined } });
+      startFrom = tagInfo.end;
+    }
+
+    // git_add
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'git_add', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      candidates.push({ index: tagInfo.start, tool: { name: 'git_add', path: p ? p.trim() : undefined } });
+      startFrom = tagInfo.end;
+    }
+
+    // symbol_search
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'symbol_search', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const q = this.attr(tagInfo.attrs, 'query');
+      if (q) candidates.push({ index: tagInfo.start, tool: { name: 'symbol_search', query: q } });
+      startFrom = tagInfo.end;
+    }
+
+    // rename_symbol
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'rename_symbol', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const q = this.attr(tagInfo.attrs, 'query');
+      const p = this.attr(tagInfo.attrs, 'path');
+      if (q && p) candidates.push({ index: tagInfo.start, tool: { name: 'rename_symbol', query: q, path: p.trim() } });
+      startFrom = tagInfo.end;
     }
 
     // browser_navigate
-    const browserNavTag = '\\u003Cbrowser_navigate([\\s\\S]*?)\\/?\\u003E';
-    const browserNavRegex = new RegExp(browserNavTag, 'gi');
-    while ((match = browserNavRegex.exec(text)) !== null) {
-      const u = this.attr(match[1], 'url');
-      if (u) candidates.push({ index: match.index, tool: { name: 'browser_navigate', url: u } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_navigate', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const u = this.attr(tagInfo.attrs, 'url');
+      if (u) candidates.push({ index: tagInfo.start, tool: { name: 'browser_navigate', url: u } });
+      startFrom = tagInfo.end;
     }
 
     // browser_click
-    const browserClickTag = '\\u003Cbrowser_click([\\s\\S]*?)\\/?\\u003E';
-    const browserClickRegex = new RegExp(browserClickTag, 'gi');
-    while ((match = browserClickRegex.exec(text)) !== null) {
-      const s = this.attr(match[1], 'selector');
-      if (s) candidates.push({ index: match.index, tool: { name: 'browser_click', selector: s } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_click', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const s = this.attr(tagInfo.attrs, 'selector');
+      if (s) candidates.push({ index: tagInfo.start, tool: { name: 'browser_click', selector: s } });
+      startFrom = tagInfo.end;
     }
 
     // browser_type
-    const browserTypeTag = '\\u003Cbrowser_type([\\s\\S]*?)\\/?\\u003E';
-    const browserTypeRegex = new RegExp(browserTypeTag, 'gi');
-    while ((match = browserTypeRegex.exec(text)) !== null) {
-      const s = this.attr(match[1], 'selector');
-      const t = this.attr(match[1], 'text');
-      if (s && t) candidates.push({ index: match.index, tool: { name: 'browser_type', selector: s, text: t } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_type', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const s = this.attr(tagInfo.attrs, 'selector');
+      const t = this.attr(tagInfo.attrs, 'text');
+      if (s && t) candidates.push({ index: tagInfo.start, tool: { name: 'browser_type', selector: s, text: t } });
+      startFrom = tagInfo.end;
     }
 
     // browser_evaluate_script
-    const browserEvalTag = '\\u003Cbrowser_evaluate_script([\\s\\S]*?)\\/?\\u003E';
-    const browserEvalRegex = new RegExp(browserEvalTag, 'gi');
-    while ((match = browserEvalRegex.exec(text)) !== null) {
-      const scriptAttr = this.attr(match[1], 'script');
-      if (scriptAttr) candidates.push({ index: match.index, tool: { name: 'browser_evaluate_script', script: scriptAttr } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_evaluate_script', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const scriptAttr = this.attr(tagInfo.attrs, 'script');
+      if (scriptAttr) candidates.push({ index: tagInfo.start, tool: { name: 'browser_evaluate_script', script: scriptAttr } });
+      startFrom = tagInfo.end;
     }
 
     // browser_screenshot
-    const browserScreenshotTag = '\\u003Cbrowser_screenshot[\\s\\S]*?\\/?\\u003E';
-    const browserScreenshotRegex = new RegExp(browserScreenshotTag, 'gi');
-    while ((match = browserScreenshotRegex.exec(text)) !== null) {
-      candidates.push({ index: match.index, tool: { name: 'browser_screenshot' } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_screenshot', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      candidates.push({ index: tagInfo.start, tool: { name: 'browser_screenshot' } });
+      startFrom = tagInfo.end;
     }
 
     // run_command
-    const runCommandTag = '\\u003Crun_command([\\s\\S]*?)\\/?\\u003E';
-    const runCommandRegex = new RegExp(runCommandTag, 'gi');
-    while ((match = runCommandRegex.exec(text)) !== null) {
-      const c = this.attr(match[1], 'command');
-      if (c) candidates.push({ index: match.index, tool: { name: 'run_command', command: c } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'run_command', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const c = this.attr(tagInfo.attrs, 'command');
+      if (c) candidates.push({ index: tagInfo.start, tool: { name: 'run_command', command: c } });
+      startFrom = tagInfo.end;
     }
 
-    // send_terminal_input (block style)
-    const sendTerminalBlockTag = '\\u003Csend_terminal_input([\\s\\S]*?)\\u003E([\\s\\S]*?)\\u003C\\u002Fsend_terminal_input\\s*\\u003E';
-    const sendTerminalInputBlockRegex = new RegExp(sendTerminalBlockTag, 'gi');
-    while ((match = sendTerminalInputBlockRegex.exec(text)) !== null) {
-      const termName = this.attr(match[1], 'terminal_name');
+    // send_terminal_input (both block and self-closing styles)
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'send_terminal_input', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const termName = this.attr(tagInfo.attrs, 'terminal_name');
       if (termName) {
-        candidates.push({
-          index: match.index,
-          tool: { name: 'send_terminal_input', terminal_name: termName.trim(), content: match[2] } as any,
-        });
+        if (tagInfo.isSelfClosing) {
+          const input = this.attr(tagInfo.attrs, 'input');
+          if (input) {
+            candidates.push({
+              index: tagInfo.start,
+              tool: { name: 'send_terminal_input', terminal_name: termName.trim(), content: input } as any,
+            });
+          }
+        } else {
+          const closeTagPattern = '\u003C\u002Fsend_terminal_input\\s*\u003E';
+          const closeTagRegex = new RegExp(closeTagPattern, 'i');
+          const closeMatch = closeTagRegex.exec(rawText.substring(tagInfo.end));
+          if (closeMatch) {
+            const content = rawText.substring(tagInfo.end, tagInfo.end + closeMatch.index);
+            candidates.push({
+              index: tagInfo.start,
+              tool: { name: 'send_terminal_input', terminal_name: termName.trim(), content } as any,
+            });
+            startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;
+            continue;
+          }
+        }
       }
-    }
-
-    // send_terminal_input (self-closing style)
-    const sendTerminalSelfTag = '\\u003Csend_terminal_input([\\s\\S]*?)\\/?\\u003E';
-    const sendTerminalInputSelfRegex = new RegExp(sendTerminalSelfTag, 'gi');
-    while ((match = sendTerminalInputSelfRegex.exec(text)) !== null) {
-      if (match[0].includes('\u003C\\u002Fsend_terminal_input')) continue;
-      const termName = this.attr(match[1], 'terminal_name');
-      const input = this.attr(match[1], 'input');
-      if (termName && input) {
-        candidates.push({
-          index: match.index,
-          tool: { name: 'send_terminal_input', terminal_name: termName.trim(), content: input } as any,
-        });
-      }
+      startFrom = tagInfo.end;
     }
 
     // close_terminal
-    const closeTerminalTag = '\\u003Cclose_terminal([\\s\\S]*?)\\/?\\u003E';
-    const closeTerminalRegex = new RegExp(closeTerminalTag, 'gi');
-    while ((match = closeTerminalRegex.exec(text)) !== null) {
-      const termName = this.attr(match[1], 'terminal_name');
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'close_terminal', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const termName = this.attr(tagInfo.attrs, 'terminal_name');
       if (termName) {
         candidates.push({
-          index: match.index,
+          index: tagInfo.start,
           tool: { name: 'close_terminal', terminal_name: termName.trim() } as any,
         });
       }
+      startFrom = tagInfo.end;
     }
 
     // read_terminal
-    const readTerminalTag = '\\u003Cread_terminal([\\s\\S]*?)\\/?\\u003E';
-    const readTerminalRegex = new RegExp(readTerminalTag, 'gi');
-    while ((match = readTerminalRegex.exec(text)) !== null) {
-      const termName = this.attr(match[1], 'terminal_name');
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'read_terminal', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const termName = this.attr(tagInfo.attrs, 'terminal_name');
       if (termName) {
-        const chars = this.attr(match[1], 'chars');
+        const chars = this.attr(tagInfo.attrs, 'chars');
         candidates.push({
-          index: match.index,
+          index: tagInfo.start,
           tool: { name: 'read_terminal', terminal_name: termName.trim(), chars: chars || undefined } as any,
         });
       }
+      startFrom = tagInfo.end;
     }
 
     // list_terminals
-    const listTerminalsTag = '\\u003Clist_terminals[\\s\\S]*?\\/?\\u003E';
-    const listTerminalsRegex = new RegExp(listTerminalsTag, 'gi');
-    while ((match = listTerminalsRegex.exec(text)) !== null) {
-      candidates.push({ index: match.index, tool: { name: 'list_terminals' } });
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'list_terminals', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      candidates.push({ index: tagInfo.start, tool: { name: 'list_terminals' } });
+      startFrom = tagInfo.end;
     }
 
     if (candidates.length === 0) return [];
