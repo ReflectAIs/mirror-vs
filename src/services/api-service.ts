@@ -142,6 +142,7 @@ export function streamOllamaChat(
     let buffer = '';
 
     res.on('data', (chunk) => {
+      if (streamCompleted) return;
       buffer += chunk.toString();
       const lines = buffer.split('\n');
       buffer = lines.pop() || ''; // Hold the last incomplete line in buffer
@@ -158,6 +159,7 @@ export function streamOllamaChat(
             onChunk(chunkText);
           }
           if (parsed.done) {
+            streamCompleted = true;
             const usage =
               parsed.prompt_eval_count || parsed.eval_count
                 ? {
@@ -175,6 +177,8 @@ export function streamOllamaChat(
     });
 
     res.on('end', () => {
+      if (streamCompleted) return;
+      streamCompleted = true;
       let finalUsage: { promptTokens: number; completionTokens: number } | undefined = undefined;
       // Parse any remaining buffer
       if (buffer.trim()) {
@@ -206,6 +210,15 @@ export function streamOllamaChat(
     onError(err);
   });
 
+  req.on('timeout', () => {
+    req.destroy();
+    const timeoutErr = new Error('Ollama streaming request timed out.');
+    timeoutErr.name = 'TimeoutError';
+    onError(timeoutErr);
+  });
+
+  let streamCompleted = false;
+
   if (signal.aborted) {
     req.destroy();
     const abortErr = new Error('The user aborted a request.');
@@ -215,6 +228,7 @@ export function streamOllamaChat(
   }
 
   signal.addEventListener('abort', () => {
+    if (streamCompleted) return;
     req.destroy();
     const abortErr = new Error('The user aborted a request.');
     abortErr.name = 'AbortError';
@@ -284,6 +298,7 @@ export function streamDeepSeekChat(
     let usage: { promptTokens: number; completionTokens: number } | undefined = undefined;
 
     res.on('data', (chunk) => {
+      if (deepseekCompleted) return;
       buffer += chunk.toString();
       const lines = buffer.split('\n');
       buffer = lines.pop() || ''; // Hold the last incomplete line in buffer
@@ -295,6 +310,7 @@ export function streamDeepSeekChat(
         }
 
         if (cleanLine === 'data: [DONE]') {
+          deepseekCompleted = true;
           onComplete(fullText, usage);
           return;
         }
@@ -322,6 +338,8 @@ export function streamDeepSeekChat(
     });
 
     res.on('end', () => {
+      if (deepseekCompleted) return;
+      deepseekCompleted = true;
       onComplete(fullText, usage);
     });
   });
@@ -333,6 +351,15 @@ export function streamDeepSeekChat(
     onError(err);
   });
 
+  req.on('timeout', () => {
+    req.destroy();
+    const timeoutErr = new Error('DeepSeek streaming request timed out.');
+    timeoutErr.name = 'TimeoutError';
+    onError(timeoutErr);
+  });
+
+  let deepseekCompleted = false;
+
   if (signal.aborted) {
     req.destroy();
     const abortErr = new Error('The user aborted a request.');
@@ -342,6 +369,7 @@ export function streamDeepSeekChat(
   }
 
   signal.addEventListener('abort', () => {
+    if (deepseekCompleted) return;
     req.destroy();
     const abortErr = new Error('The user aborted a request.');
     abortErr.name = 'AbortError';

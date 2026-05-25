@@ -184,17 +184,18 @@ export class AgentOrchestrator {
   }
 
   public async handleMessageStream(text: string, history: ChatMessage[], images?: string[]) {
-    this.cancelActiveStream();
-    this._activeAbortController = new AbortController();
-    const signal = this._activeAbortController.signal;
-    this._sendAvatarState("thinking");
+    try {
+      this.cancelActiveStream();
+      this._activeAbortController = new AbortController();
+      const signal = this._activeAbortController.signal;
+      this._sendAvatarState("thinking");
 
-    const config = vscode.workspace.getConfiguration("mirror-vs");
-    let provider = config.get<string>("defaultProvider", "ollama") as string;
-    const ollamaHost = config.get<string>("ollamaHost", "http://localhost:11434") as string;
-    const defaultOllamaModel = config.get<string>("defaultOllamaModel", "llama3") as string;
-    const defaultDeepSeekModel = config.get<string>("defaultDeepSeekModel", "deepseek-chat") as string;
-    this._session.sessionId = "session_" + Date.now();
+      const config = vscode.workspace.getConfiguration("mirror-vs");
+      let provider = config.get<string>("defaultProvider", "ollama") as string;
+      const ollamaHost = config.get<string>("ollamaHost", "http://localhost:11434") as string;
+      const defaultOllamaModel = config.get<string>("defaultOllamaModel", "llama3") as string;
+      const defaultDeepSeekModel = config.get<string>("defaultDeepSeekModel", "deepseek-chat") as string;
+      this._session.sessionId = "session_" + Date.now();
 
     // Rate limiter: image budget
     if (images && images.length > 0) {
@@ -470,6 +471,15 @@ export class AgentOrchestrator {
       } else {
         this._postMessage({ type: "chatResponseError", error: err.message });
       }
+    } finally {
+      this._activeAbortController = undefined;
+    }
+    } catch (outerErr: any) {
+      this._sendAvatarState("error");
+      console.error("Unhandled error in handleMessageStream:", outerErr);
+      try {
+        this._postMessage({ type: "chatResponseError", error: outerErr.message || "Unknown error" });
+      } catch (_) { /* best effort */ }
     } finally {
       this._activeAbortController = undefined;
     }

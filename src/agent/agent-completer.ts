@@ -35,6 +35,20 @@ export class AgentCompleter {
     const startTime = performance.now();
 
     return new Promise<string>((resolve, reject) => {
+      let settled = false;
+
+      const safeResolve = (val: string) => {
+        if (settled) return;
+        settled = true;
+        resolve(val);
+      };
+
+      const safeReject = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      };
+
       const onChunk = (chunk: string) => {
         this._postMessage({ type: 'chatResponseChunk', text: chunk, sessionId: _sessionId });
       };
@@ -51,15 +65,15 @@ export class AgentCompleter {
           provider: provider,
           model: model,
         });
-        resolve(fullText);
+        safeResolve(fullText);
       };
 
       const onError = (err: Error) => {
-        reject(err);
+        safeReject(err);
       };
 
       if (signal.aborted) {
-        reject(new Error('Operation cancelled'));
+        safeReject(new Error('Operation cancelled'));
         return;
       }
 
