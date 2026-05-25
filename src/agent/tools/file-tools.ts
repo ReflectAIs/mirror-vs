@@ -262,12 +262,47 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
 
 function parsePatchBlocks(content: string): { search: string; replace: string }[] {
   const blocks: { search: string; replace: string }[] = [];
-  const regex = /<<<<<<< SEARCH[\r\n]+([\s\S]*?)[\r\n]+=======[\r\n]+([\s\S]*?)[\r\n]+>>>>>>> REPLACE/gi;
+  
+  // 1. Try standard conflict style first
+  const gitRegex = /<<<<<<< SEARCH[\r\n]+([\s\S]*?)[\r\n]+=======[\r\n]+([\s\S]*?)[\r\n]+>>>>>>> REPLACE/gi;
   let match;
-  while ((match = regex.exec(content)) !== null) {
+  while ((match = gitRegex.exec(content)) !== null) {
     const search = match[1].replace(/\r\n/g, '\n');
     const replace = match[2].replace(/\r\n/g, '\n');
     blocks.push({ search, replace });
   }
+  
+  if (blocks.length > 0) {
+    return blocks;
+  }
+
+  // 2. Fallback to flexible sequential label parser (handles "SEARCH:" / "REPLACE:" etc.)
+  const normalized = content.replace(/\r\n/g, '\n');
+  const parts = normalized.split(/SEARCH:?/i);
+  
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    const replaceIndex = part.search(/REPLACE:?/i);
+    if (replaceIndex !== -1) {
+      let search = part.substring(0, replaceIndex);
+      // Clean leading/trailing spaces and newlines
+      search = search.replace(/^\n/, '').replace(/\n$/, '').trim();
+      
+      let replace = part.substring(replaceIndex);
+      // Strip the REPLACE: marker
+      const markerMatch = replace.match(/REPLACE:?/i);
+      if (markerMatch) {
+        replace = replace.substring(markerMatch[0].length);
+      }
+      // Strip any trailing git conflict replacement markers if present
+      replace = replace.replace(/>>>>>>>\s*REPLACE/i, '');
+      replace = replace.replace(/^\n/, '').replace(/\n$/, '').trim();
+      
+      if (search !== undefined && replace !== undefined) {
+        blocks.push({ search, replace });
+      }
+    }
+  }
+  
   return blocks;
 }

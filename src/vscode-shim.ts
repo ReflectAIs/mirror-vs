@@ -8,13 +8,29 @@ export const workspace = {
     get: <T>(_key: string, defaultValue?: T) => defaultValue as T,
     update: () => Promise.resolve(),
   }),
+  openTextDocument: () => Promise.resolve({
+    uri: { fsPath: '/mock/workspace/file.ts' },
+    lineCount: 0,
+    lineAt: () => ({ range: {} }),
+  }),
+};
+
+const mockTextEditor = {
+  document: {
+    uri: { fsPath: '/mock/workspace/file.ts' },
+    lineCount: 0,
+    lineAt: () => ({ range: {} }),
+  },
+  selection: { active: { line: 0 } },
+  revealRange: () => {},
+  setDecorations: () => {},
 };
 
 export const window = {
   showInformationMessage: () => Promise.resolve(undefined),
   showErrorMessage: () => Promise.resolve(undefined),
-  showTextDocument: () => Promise.resolve({}),
-  activeTextEditor: null,
+  showTextDocument: () => Promise.resolve(mockTextEditor),
+  activeTextEditor: mockTextEditor,
   visibleTextEditors: [],
   createTerminal: () => ({
     show: () => {},
@@ -34,6 +50,10 @@ export const window = {
   createTextEditorDecorationType: () => ({
     dispose: () => {},
   }),
+  tabGroups: {
+    all: [],
+    close: () => Promise.resolve(),
+  },
 };
 
 export const commands = {

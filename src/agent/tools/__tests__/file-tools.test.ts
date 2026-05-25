@@ -130,6 +130,30 @@ describe('executeFileTool', () => {
         cleanupTempDir(tmpDir);
       }
     });
+
+    it('should successfully parse and apply label-style SEARCH: / REPLACE: patches', async () => {
+      const tmpDir = createTempDir();
+      try {
+        const filePath = path.join(tmpDir, 'test.txt');
+        fs.writeFileSync(filePath, 'hello world\nthis is a test\nend', 'utf8');
+
+        const localGetSafe = (p: string) => path.join(tmpDir, p);
+        const tool = {
+          name: 'patch_file' as const,
+          path: 'test.txt',
+          content: 'SEARCH:\nthis is a test\nREPLACE:\nthis is a patched test',
+        };
+        const result = await executeFileTool(tool, localGetSafe);
+        expect(result).toContain('File patched: test.txt');
+
+        const { ReviewManager } = await import('../../../services/review-manager.js');
+        const rm = ReviewManager.getInstance();
+        const proposed = rm.getProposedContent(filePath);
+        expect(proposed).toBe('hello world\nthis is a patched test\nend');
+      } finally {
+        cleanupTempDir(tmpDir);
+      }
+    });
   });
 
   describe('unsupported tool', () => {
