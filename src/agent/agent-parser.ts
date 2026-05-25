@@ -80,11 +80,6 @@ export class AgentParser {
     return null;
   }
 
-  private findUnquotedTagEnd(text: string, toolName: string): number {
-    const info = this.findUnquotedTagEndEx(text, toolName);
-    return info ? info.end : -1;
-  }
-
   private isInsideFencedCodeBlock(text: string, index: number): boolean {
     let count = 0;
     let pos = text.indexOf('```');
@@ -304,7 +299,14 @@ export class AgentParser {
           const closeTagRegex = new RegExp(closeTagPattern, 'i');
           const closeMatch = closeTagRegex.exec(rawText.substring(tagInfo.end));
           if (closeMatch) {
-            const content = rawText.substring(tagInfo.end, tagInfo.end + closeMatch.index);
+            let content = rawText.substring(tagInfo.end, tagInfo.end + closeMatch.index);
+            // Strip any CDATA wrapper if present (sometimes added by XML-aware LLMs)
+            const cdataStart = '<![CDATA[';
+            const cdataEnd = ']]>';
+            if (content.trim().startsWith(cdataStart) && content.trim().endsWith(cdataEnd)) {
+              const trimmed = content.trim();
+              content = trimmed.substring(cdataStart.length, trimmed.length - cdataEnd.length);
+            }
             candidates.push({
               index: tagInfo.start,
               tool: { name: toolName as any, path: p ? p.trim() : undefined, content },

@@ -1,12 +1,14 @@
-import * as puppeteer from 'puppeteer-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
+type PuppeteerBrowser = any;
+type PuppeteerPage = any;
+
 export class BrowserService {
   private static instance: BrowserService;
-  private browser: puppeteer.Browser | null = null;
-  private page: puppeteer.Page | null = null;
+  private browser: PuppeteerBrowser | null = null;
+  private page: PuppeteerPage | null = null;
 
   private constructor() {}
 
@@ -52,10 +54,12 @@ export class BrowserService {
     throw new Error('Could not find Google Chrome installation. Please ensure Chrome is installed.');
   }
 
-  public async getPage(): Promise<puppeteer.Page> {
+  public async getPage(): Promise<PuppeteerPage> {
     try {
       if (!this.browser) {
         const executablePath = await this.getChromePath();
+        // Use dynamic import for ESM-only puppeteer-core
+        const puppeteer = await import('puppeteer-core');
         this.browser = await puppeteer.launch({
           executablePath,
           headless: false,

@@ -1638,6 +1638,15 @@ function attachImage(base64) {
           startFrom = tagInfo.start + placeholderToken.length;
         } else {
           let actualCode = cleanText.substring(tagInfo.end);
+          // Strip CDATA wrapping if present
+          const cdataStart = '<![CDATA[';
+          const trimmed = actualCode.trim();
+          if (trimmed.startsWith(cdataStart)) {
+            actualCode = trimmed.substring(cdataStart.length);
+            if (actualCode.endsWith(']]>')) {
+              actualCode = actualCode.substring(0, actualCode.length - 3);
+            }
+          }
           let pathExt = 'plaintext';
           const pathVal = getAttrValue(tagInfo.attrs, 'path');
           if (pathVal) {

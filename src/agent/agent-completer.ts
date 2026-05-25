@@ -169,9 +169,10 @@ export class AgentCompleter {
     ];
 
     const isDeepSeek = provider === 'deepseek';
+    let summaryResponse = '';
     return new Promise<string>((resolve) => {
       const onChunk = (chunk: string) => {
-        fullResponse += chunk;
+        summaryResponse += chunk;
       };
 
       const onComplete = (fullText: string) => {

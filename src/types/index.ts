@@ -125,7 +125,10 @@ export type WebviewToExtensionMessage =
   // New: Retry last failed tool call
   | { type: 'retryLastToolCall'; toolName: string; target: string }
   // New: Language / locale
-  | { type: 'setLocale'; locale: string };
+  | { type: 'setLocale'; locale: string }
+  // Session management queries from webview
+  | { type: 'getChatSessions' }
+  | { type: 'getChatHistory' };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =

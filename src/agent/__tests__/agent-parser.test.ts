@@ -1,18 +1,13 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { AgentParser } from '../agent-parser';
 
 function makeParser() {
   return new AgentParser();
 }
 
-/**
- * Helper: build tool tags without template literals to avoid XML parser ambiguity.
- * Using char codes: 60=<, 62=>, 47=/, 34="
- */
 const TAG_OPEN = String.fromCharCode(60);
 const TAG_CLOSE = String.fromCharCode(62);
 const TAG_SLASH = String.fromCharCode(47);
-const Q = String.fromCharCode(34);
 
 function selfClosing(name: string, attrs: string = ''): string {
   return TAG_OPEN + name + (attrs ? ' ' + attrs : '') + ' ' + TAG_SLASH + TAG_CLOSE;
@@ -26,12 +21,7 @@ function blockClose(name: string): string {
   return TAG_OPEN + TAG_SLASH + name + TAG_CLOSE;
 }
 
-function tag(name: string, attrs: string = ''): string {
-  return TAG_OPEN + name + (attrs ? ' ' + attrs : '') + TAG_CLOSE;
-}
-
 describe('AgentParser', () => {
-  // ── stripCodeBlocks ──────────────────────────────────────────────────
   describe('stripCodeBlocks', () => {
     it('should strip triple-backtick fenced code blocks', () => {
       const parser = makeParser();
@@ -51,11 +41,9 @@ describe('AgentParser', () => {
       const parser = makeParser();
       const amp = String.fromCharCode(38);
       const q = String.fromCharCode(34);
-      // Construct: content
       const openTag = amp + 'lt;write_file path=' + q + 'x' + q + amp + 'gt;';
       const closeTag = amp + 'lt;/write_file' + amp + 'gt;';
       const input = 'text ' + openTag + 'content' + closeTag + ' more';
-      // Both entities are removed, leaving 'text content more'
       expect(parser.stripCodeBlocks(input)).toBe('text content more');
     });
 
@@ -74,12 +62,10 @@ describe('AgentParser', () => {
       const parser = makeParser();
       const bt = String.fromCharCode(96);
       const input = bt + bt + bt + '\ninner ' + bt + 'code' + bt + '\n' + bt + bt + bt;
-      // The outer triple backtick block is removed including its newlines, leaving empty string
       expect(parser.stripCodeBlocks(input)).toBe('');
     });
   });
 
-  // ── hasCompleteToolCall ─────────────────────────────────────────────
   describe('hasCompleteToolCall', () => {
     it('should detect self-closing read_file', () => {
       const parser = makeParser();
@@ -147,7 +133,6 @@ describe('AgentParser', () => {
     });
   });
 
-  // ── parseToolCalls ──────────────────────────────────────────────────
   describe('parseToolCalls', () => {
     it('should parse read_file with path', () => {
       const parser = makeParser();
@@ -291,6 +276,16 @@ describe('AgentParser', () => {
       expect(calls[0]).toEqual({ name: 'figma_inspect', url: 'https://figma.com/file/test' });
     });
 
+    it('should parse write_file and strip CDATA wrapper if present', () => {
+      const parser = makeParser();
+      const input = blockOpen('write_file', 'path="src/index.ts"') + '<![CDATA[console.log("hello");]]>' + blockClose('write_file');
+      const calls = parser.parseToolCalls(input);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe('write_file');
+      expect(calls[0].path).toBe('src/index.ts');
+      expect((calls[0] as any).content).toBe('console.log("hello");');
+    });
+
     it('should parse send_terminal_input (block style)', () => {
       const parser = makeParser();
       const input = blockOpen('send_terminal_input', 'terminal_name="Term 1"') + 'Ctrl+C' + blockClose('send_terminal_input');
@@ -337,7 +332,6 @@ describe('AgentParser', () => {
 
     it('should parse run_command with nested unescaped quotes and redirections correctly', () => {
       const parser = makeParser();
-      // Test cases identical to the actual cut-off examples reported by the user
       const inputDouble = '<run_command command="powershell -Command \'npm run compile 2>&1 | ForEach-Object { $_ -replace \\"^D:.*?error \\", \\"\\" }\'" />';
       const callsDouble = parser.parseToolCalls(inputDouble);
       expect(callsDouble).toHaveLength(1);
@@ -377,7 +371,6 @@ describe('AgentParser', () => {
     });
   });
 
-  // ── getCleanedToolResponse ──────────────────────────────────────────
   describe('getCleanedToolResponse', () => {
     it('should auto-close unclosed block tags (write_file)', () => {
       const parser = makeParser();
@@ -443,7 +436,6 @@ describe('AgentParser', () => {
     });
   });
 
-  // ── formatToolStatus ────────────────────────────────────────────────
   describe('formatToolStatus', () => {
     it('should format a running status correctly', () => {
       const parser = makeParser();

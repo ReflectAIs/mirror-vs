@@ -48,7 +48,7 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
 async function confirmChangesWithDiff(
   originalPath: string,
   proposedContent: string,
-  fileName: string,
+  _fileName: string,
   checkpointAction: 'create' | 'replace',
 ): Promise<{ accepted: boolean; checkpointId: string | null }> {
   // Ensure parent directory exists before writing
