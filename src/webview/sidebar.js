@@ -1649,6 +1649,24 @@ function attachImage(base64) {
         startFrom = tagInfo.start + placeholderToken.length;
       }
     }
+
+    // Catch-all: strip any remaining self-closing XML tags (unknown tool names like <ls_dir ... />)
+    // This prevents the UI from showing raw XML if the model hallucinates a wrong tool name.
+    {
+      let startFrom = 0;
+      const unknownTagRegex = /<([a-z_][a-z0-9_]*)([^>]*?)\s*\/\s*>/gi;
+      let tagInfo;
+      while ((tagInfo = unknownTagRegex.exec(cleanText)) !== null) {
+        const fullTag = tagInfo[0];
+        // Skip known HTML-like self-closing tags
+        const skipTags = ['br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr'];
+        if (skipTags.indexOf(tagInfo[1].toLowerCase()) !== -1) continue;
+        // Skip if it looks like a math/technical expression like < something >
+        if (tagInfo[1].length > 30) continue;
+        cleanText = cleanText.replace(fullTag, '');
+        unknownTagRegex.lastIndex = 0;
+      }
+    }
     
     // Handle currently streaming incomplete self-closing tags
     for (const tool of selfClosingTools) {

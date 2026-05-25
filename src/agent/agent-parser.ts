@@ -260,6 +260,18 @@ export class AgentParser {
       startFrom = tagInfo.end;
     }
 
+    // ls_dir alias (models sometimes hallucinate this instead of list_dir)
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'ls_dir', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim() } });
+      startFrom = tagInfo.end;
+    }
+
     // grep_search
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'grep_search', startFrom)) !== null) {
