@@ -1673,7 +1673,8 @@ function attachImage(base64) {
       const openTag = `<${tool}`;
       const openIndex = cleanText.toLowerCase().indexOf(openTag);
       if (openIndex !== -1) {
-        cleanText = cleanText.substring(0, openIndex);
+        // Only strip the incomplete tag itself, not everything before it
+        cleanText = cleanText.substring(0, openIndex) + cleanText.substring(openIndex + openTag.length);
       }
     }
 
