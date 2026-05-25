@@ -42,8 +42,8 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
 
   if (!tool.query) throw new Error('Missing "query" attribute for grep_search.');
 
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!workspaceFolder) throw new Error('No workspace folder open.');
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) throw new Error('No workspace folder open.');
 
   const query = tool.query.toLowerCase();
   const results: string[] = [];
@@ -69,7 +69,15 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
             const lines = content.split('\n');
             lines.forEach((line, idx) => {
               if (line.toLowerCase().includes(query)) {
-                const relPath = path.relative(workspaceFolder, fullPath);
+                // Find which workspace folder this file belongs to for a clean relative path
+                let relPath = fullPath;
+                for (const wf of workspaceFolders) {
+                  const prefix = wf.uri.fsPath + '/';
+                  if (fullPath.startsWith(prefix)) {
+                    relPath = fullPath.slice(prefix.length);
+                    break;
+                  }
+                }
                 results.push(`${relPath}:${idx + 1}: ${line.trim()}`);
               }
             });
@@ -81,6 +89,8 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
     }
   };
 
-  search(workspaceFolder);
+  for (const wf of workspaceFolders) {
+    search(wf.uri.fsPath);
+  }
   return results.slice(0, 40).join('\n') || 'No matches found.';
 }

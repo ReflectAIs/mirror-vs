@@ -422,11 +422,12 @@ export class CommandService {
    * after port probing; short commands wait for exit and return output.
    */
   public async executeCommand(commandString: string): Promise<string> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceFolder) {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
       throw new Error('No workspace folder is currently open.');
     }
 
+    const workspaceFolder = folders[0].uri.fsPath;
     const { cmd, cwd } = this.resolveCommandAndCwd(commandString, workspaceFolder);
     this.logToDebug(`Executing command: "${cmd}" (cwd: "${cwd}")`);
 

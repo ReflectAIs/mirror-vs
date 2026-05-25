@@ -23,16 +23,18 @@ function isSensitiveCommand(command: string): boolean {
     return true;
   }
 
-  // 3. Out-of-workspace absolute path check
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceFolder) {
-    const workspaceFolderLower = workspaceFolder.toLowerCase();
+  // 3. Out-of-workspace absolute path check — check against all workspace folders
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    // Collect all allowed path prefixes (lowercase)
+    const allowedPrefixes = workspaceFolders.map(wf => wf.uri.fsPath.toLowerCase());
 
     // Match Windows drive-letter paths (e.g. C:\path or D:/path)
     const winAbsMatch = command.match(/\b([a-zA-Z]:[\\/][^"'\s]*)/);
     if (winAbsMatch) {
       const absPath = winAbsMatch[1].toLowerCase();
-      if (!absPath.startsWith(workspaceFolderLower)) {
+      const isAllowed = allowedPrefixes.some(prefix => absPath.startsWith(prefix));
+      if (!isAllowed) {
         return true;
       }
     }
@@ -41,8 +43,12 @@ function isSensitiveCommand(command: string): boolean {
     const unixAbsMatch = command.match(/\b(\/[a-zA-Z0-9_\-./]+)/);
     if (unixAbsMatch) {
       const absPath = unixAbsMatch[1].toLowerCase();
-      const workspaceUnix = workspaceFolderLower.replace(/\\/g, '/');
-      if (!absPath.startsWith(workspaceUnix) && absPath !== '/' && absPath.split('/').length > 2) {
+      const absUnix = absPath.replace(/\\/g, '/');
+      const isAllowed = allowedPrefixes.some(prefix => {
+        const prefixUnix = prefix.replace(/\\/g, '/');
+        return absUnix.startsWith(prefixUnix);
+      });
+      if (!isAllowed && absPath !== '/' && absPath.split('/').length > 2) {
         return true;
       }
     }

@@ -34,6 +34,16 @@ export async function executeLanguageTool(
         return `No symbols found matching "${query}".`;
       }
 
+      function makeRelative(absPath: string): string {
+        for (const wf of workspaceFolders) {
+          const prefix = wf.uri.fsPath + '/';
+          if (absPath.startsWith(prefix)) {
+            return absPath.slice(prefix.length);
+          }
+        }
+        return absPath;
+      }
+
       let output = `Found ${results.length} symbol(s) matching "${query}":\n\n`;
       results.slice(0, 25).forEach((sym, idx) => {
         const kind = sym.kind === vscode.SymbolKind.Function ? '⚡ Function' :
@@ -45,9 +55,7 @@ export async function executeLanguageTool(
           '📄 Symbol';
         const filePath = sym.location.uri.fsPath;
         const line = sym.location.range.start.line + 1;
-        const relativePath = workspaceFolders[0]
-          ? filePath.replace(workspaceFolders[0].uri.fsPath + '/', '')
-          : filePath;
+        const relativePath = makeRelative(filePath);
         output += `${idx + 1}. ${kind}: ${sym.name}\n`;
         output += `   📁 ${relativePath}:${line}\n`;
         if (sym.containerName) {
