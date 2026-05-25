@@ -44,11 +44,25 @@ export class AgentParser {
         continue;
       }
       if (char === '"' && !inSq) {
-        inDq = !inDq;
+        if (inDq) {
+          const remaining = text.substring(i + 1).trim();
+          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9\-]+\s*=/.test(remaining)) {
+            inDq = false;
+          }
+        } else {
+          inDq = true;
+        }
         continue;
       }
       if (char === "'" && !inDq) {
-        inSq = !inSq;
+        if (inSq) {
+          const remaining = text.substring(i + 1).trim();
+          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9\-]+\s*=/.test(remaining)) {
+            inSq = false;
+          }
+        } else {
+          inSq = true;
+        }
         continue;
       }
       if (char === '\u003E' && !inDq && !inSq) {

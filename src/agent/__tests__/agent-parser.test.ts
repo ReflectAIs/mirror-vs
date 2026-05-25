@@ -335,6 +335,22 @@ describe('AgentParser', () => {
       expect((calls[0] as any).terminal_name).toBe('Mirror: cd temp-login and npm install and npm install tailwindcss ...');
     });
 
+    it('should parse run_command with nested unescaped quotes and redirections correctly', () => {
+      const parser = makeParser();
+      // Test cases identical to the actual cut-off examples reported by the user
+      const inputDouble = '<run_command command="powershell -Command \'npm run compile 2>&1 | ForEach-Object { $_ -replace \\"^D:.*?error \\", \\"\\" }\'" />';
+      const callsDouble = parser.parseToolCalls(inputDouble);
+      expect(callsDouble).toHaveLength(1);
+      expect(callsDouble[0].name).toBe('run_command');
+      expect((callsDouble[0] as any).command).toBe(`powershell -Command 'npm run compile 2>&1 | ForEach-Object { $_ -replace "^D:.*?error ", "" }'`);
+
+      const inputSingle = '<run_command command=\'powershell -Command "$null; Write-Output \\"---$\\"; dir *.config.* 2> $null; Write-Output \\"---$\\"; dir *.js 2> $null"\' />';
+      const callsSingle = parser.parseToolCalls(inputSingle);
+      expect(callsSingle).toHaveLength(1);
+      expect(callsSingle[0].name).toBe('run_command');
+      expect((callsSingle[0] as any).command).toBe(`powershell -Command "$null; Write-Output \\"---$\\"; dir *.config.* 2> $null; Write-Output \\"---$\\"; dir *.js 2> $null"`);
+    });
+
     it('should return empty array for text with no tool tags', () => {
       const parser = makeParser();
       expect(parser.parseToolCalls('Just some text')).toEqual([]);

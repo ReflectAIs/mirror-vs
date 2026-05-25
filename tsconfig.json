@@ -21,8 +21,11 @@
     "emitDecoratorMetadata": true,
     "rootDir": "src"
   },
+  "include": ["src/**/*.ts"],
   "exclude": [
     "node_modules",
-    ".vscode-test"
+    ".vscode-test",
+    "vitest.config.ts",
+    "build-check.mjs"
   ]
 }
