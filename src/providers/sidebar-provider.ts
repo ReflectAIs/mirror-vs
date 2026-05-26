@@ -812,13 +812,33 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _getActiveSessionId(): string | undefined {
-    return this._context.workspaceState.get<string>('mirror-vs.activeSessionId');
+    const id = this._context.workspaceState.get<string>('mirror-vs.activeSessionId');
+    if (id) return id;
+    // Fall back to file backup for cross-workspace compatibility
+    return this._storageService.getActiveSessionIdFromFile();
   }
 
   private async _saveActiveSessionId(id: string): Promise<void> {
     await this._context.workspaceState.update('mirror-vs.activeSessionId', id);
+    // Also persist to file backup
+    this._storageService.persistActiveSessionId(id);
   }
 
+  private _getActiveSessionId(): string | undefined {
+    const id = this._context.workspaceState.get<string>('mirror-vs.activeSessionId');
+    if (id) return id;
+    return this._storageService.getActiveSessionIdFromFile();
+  }
+
+  private async _saveActiveSessionId(id: string): Promise<void> {
+    await this._context.workspaceState.update('mirror-vs.activeSessionId', id);
+    this._storageService.persistActiveSessionId(id);
+  }
+
+  private _sendChatSessionsToWebview(): void {
+  private _sendChatSessionsToWebview(): void {
+  private _sendChatSessionsToWebview(): void {
+  private _sendChatSessionsToWebview(): void {
   private _sendChatSessionsToWebview(): void {
     if (!this._view) return;
     const sessions = this._storageService.getSessions();

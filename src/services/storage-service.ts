@@ -15,7 +15,11 @@ export class StorageService {
    * Get session list (lightweight — no messages included).
    */
   getSessions(): ChatSession[] {
-    return this._workspaceState.get<ChatSession[]>('mirror-vs.sessions.meta', []);
+    const state = this._workspaceState.get<ChatSession[]>('mirror-vs.sessions.meta', []);
+    if (state.length > 0) return state;
+    // Fall back to file backup if workspaceState is empty
+    const fileData = this._readFileBackup();
+    return fileData?.sessions || [];
   }
 
   /**
@@ -32,13 +36,23 @@ export class StorageService {
       messages: [] as ChatMessage[],
     }));
     await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
+    // Also write file backup for cross-workspace persistence
+    const messages: Record<string, ChatMessage[]> = {};
+    for (const session of sessions) {
+      messages[session.id] = this.loadMessages(session.id);
+    }
+    this._writeFileBackup({ sessions: metaOnly, messages });
   }
 
   /**
    * Load messages for a specific session from its dedicated key.
    */
   loadMessages(sessionId: string): ChatMessage[] {
-    return this._workspaceState.get<ChatMessage[]>(`mirror-vs.messages.${sessionId}`, []);
+    const state = this._workspaceState.get<ChatMessage[]>(`mirror-vs.messages.${sessionId}`, []);
+    if (state.length > 0) return state;
+    // Fall back to file backup
+    const fileData = this._readFileBackup();
+    return fileData?.messages?.[sessionId] || [];
   }
 
   /**
@@ -46,6 +60,17 @@ export class StorageService {
    */
   async saveMessages(sessionId: string, messages: ChatMessage[]): Promise<void> {
     await this._workspaceState.update(`mirror-vs.messages.${sessionId}`, messages);
+    // Also write file backup
+    const sessions = this.getSessions();
+    const allMessages: Record<string, ChatMessage[]> = {};
+    for (const session of sessions) {
+      if (session.id === sessionId) {
+        allMessages[session.id] = messages;
+      } else {
+        allMessages[session.id] = this.loadMessages(session.id);
+      }
+    }
+    this._writeFileBackup({ sessions, messages: allMessages });
   }
 
   /**
@@ -53,6 +78,12 @@ export class StorageService {
    */
   async deleteMessages(sessionId: string): Promise<void> {
     await this._workspaceState.update(`mirror-vs.messages.${sessionId}`, undefined);
+    // Update file backup
+    const fileData = this._readFileBackup();
+    if (fileData && fileData.messages) {
+      delete fileData.messages[sessionId];
+      this._writeFileBackup(fileData);
+    }
   }
 
   /**
@@ -67,6 +98,8 @@ export class StorageService {
     if (legacy && legacy.length > 0) {
       console.log('[StorageService] Migrating legacy chatSessions to per-session keys...');
 
+      const allMessages: Record<string, ChatMessage[]> = {};
+
       for (const session of legacy) {
         // Strip images from all messages to avoid bloating workspaceState with base64
         const cleaned = session.messages.map((msg) => ({
@@ -74,6 +107,7 @@ export class StorageService {
           images: msg.images ? msg.images.slice(0, 0) : undefined,
         }));
         await this._workspaceState.update(`mirror-vs.messages.${session.id}`, cleaned);
+        allMessages[session.id] = cleaned;
       }
 
       // Save light metadata (no messages)
@@ -85,6 +119,9 @@ export class StorageService {
         messages: [] as ChatMessage[],
       }));
       await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
+
+      // Write file backup with all migrated data
+      this._writeFileBackup({ sessions: metaOnly, messages: allMessages });
 
       // Clear legacy key
       await this._workspaceState.update('mirror-vs.chatSessions', undefined);
@@ -121,6 +158,13 @@ export class StorageService {
         });
         await this.saveSessions(sessions);
       }
+
+      // Write file backup
+      const allMessages: Record<string, ChatMessage[]> = { [activeId]: cleaned };
+      this._writeFileBackup({ sessions, messages: allMessages });
+
+      // Persist active session ID
+      this.persistActiveSessionId(activeId);
 
       await this._workspaceState.update('mirror-vs.chatHistory', undefined);
       console.log('[StorageService] Migration complete.');
