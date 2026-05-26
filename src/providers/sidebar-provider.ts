@@ -407,11 +407,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           try {
             if (data.action === 'accept') {
               // Stage the file (accept changes)
-              execSync(`git add "${data.file}"`, { cwd: wsFolderApply, encoding: 'utf8' });
+              execFileSync('git', ['add', '--', data.file], { cwd: wsFolderApply, encoding: 'utf8', shell: false });
               vscode.window.showInformationMessage(`✅ Changes accepted for ${data.file}`);
             } else if (data.action === 'reject') {
               // Restore the file (reject changes)
-              execSync(`git checkout -- "${data.file}"`, { cwd: wsFolderApply, encoding: 'utf8' });
+              execFileSync('git', ['checkout', '--', data.file], { cwd: wsFolderApply, encoding: 'utf8', shell: false });
               vscode.window.showInformationMessage(`⏪ Changes rejected for ${data.file}`);
             }
 

@@ -14,6 +14,14 @@ export async function executeTool(
 ): Promise<string> {
   const name = tool.name;
 
+  // Built-in wait tool that doesn't need any service
+  if (name === 'wait') {
+    const ms = tool.ms !== undefined ? tool.ms : (tool.seconds !== undefined ? tool.seconds * 1000 : 3000);
+    const duration = Math.max(100, Math.min(60000, ms));
+    await new Promise(resolve => setTimeout(resolve, duration));
+    return `Waited for ${duration}ms as requested.`;
+  }
+
   if (
     name === 'read_file' ||
     name === 'create_file' ||
@@ -54,14 +62,14 @@ export async function executeTool(
     return await executeFigmaTool(tool, figmaKey, workspacePath);
   }
 
-  // New git tools
+  // Git tools
   if (name === 'git_status' || name === 'git_diff' || name === 'git_commit' || name === 'git_add') {
     return await executeGitTool(tool, workspacePath);
   }
 
-  // New language tools (run in VS Code host context via executeCommand)
+  // Language tools (run in VS Code host context via executeCommand)
   if (name === 'symbol_search' || name === 'rename_symbol') {
-    const { executeLanguageTool } = await import('./language-tools.js');
+    const { executeLanguageTool } = await import('./language-tools');
     return await executeLanguageTool(tool);
   }
 

@@ -26,7 +26,8 @@ export interface ToolCall {
     | 'symbol_search'
     | 'rename_symbol'
     | 'rename_file'
-    | 'delete_file';
+    | 'delete_file'
+    | 'wait';
   path?: string;
   query?: string;
   content?: string;
@@ -39,6 +40,8 @@ export interface ToolCall {
   end_line?: number;
   chars?: string;
   script?: string;
+  ms?: number;
+  seconds?: number;
 }
 
 export type ToolStatus = 'running' | 'success' | 'error';

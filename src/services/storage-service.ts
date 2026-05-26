@@ -270,24 +270,24 @@ export class StorageService {
       if (!workspaceFolders || workspaceFolders.length === 0) return null;
       const workspacePath = workspaceFolders[0].uri.fsPath;
       const workspaceHash = this._simpleHash(workspacePath);
-      // Use the extension's context-based path for backup storage
-      const ext = vscode.extensions.getExtension('DipeshMajithia.mirror-vs');
-      if (ext && ext.extensionUri) {
-        const globalStorageDir = path.join(ext.extensionUri.fsPath, '.mirror-vs-backup');
-        if (!fs.existsSync(globalStorageDir)) {
-          fs.mkdirSync(globalStorageDir, { recursive: true });
-        }
-        return path.join(globalStorageDir, `workspace_${workspaceHash}.json`);
+      // Store backup inside the workspace's .mirror-vs directory
+      const backupDir = path.join(workspacePath, '.mirror-vs', 'backup');
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
       }
-      // Fallback to OS temp directory
-      const tempDir = path.join(os.tmpdir(), 'mirror-vs-backup');
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-      return path.join(tempDir, `workspace_${workspaceHash}.json`);
+      return path.join(backupDir, `storage_${workspaceHash}.json`);
     } catch (e) {
       console.warn('[StorageService] Failed to get backup file path:', e);
-      return null;
+      // Ultimate fallback to OS temp directory
+      try {
+        const tempDir = path.join(os.tmpdir(), 'mirror-vs-backup');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        return path.join(tempDir, 'storage_fallback.json');
+      } catch {
+        return null;
+      }
     }
   }
 

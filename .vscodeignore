@@ -22,9 +22,16 @@ src/extension.ts
 
 # But include webview static assets and media
 !media/logo.png
-!src/webview/sidebar.html
-!src/webview/sidebar.css
-!src/webview/sidebar.js
+
+# Exclude loose source files in src root
+src/*.ts
+src/*.mjs
+src/*.md
+src/scripts/**
+src/webview/**
+
+# Exclude design docs and dev-only assets
+*.design.md
 
 # Exclude duplicate root-level files
 logo.png
@@ -32,3 +39,13 @@ memory.md
 plan.md
 vitest.config.ts
 .mirror-vs/**
+.mirror-vs-backup/**
+public/**
+check_syntax.js
+test_regex.js
+build-check.mjs
+vision.md
+.git-changes.design.md
+src/scripts/**
+*.ts.map
+*.d.ts

@@ -65,13 +65,18 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 9. BROWSER CLICK: Usage: browser_click selector="#my-button" />
 10. BROWSER TYPE: Usage: browser_type selector="#search-input" text="hello world" />
 11. BROWSER EVALUATE SCRIPT: Usage: browser_evaluate_script script="..." />
-12. BROWSER SCREENSHOT: Usage: browser_screenshot />
-13. RUN COMMAND: Usage: run_command command="npm install" />
-14. SEND TERMINAL INPUT: Usage: send_terminal_input terminal_name="...">Ctrl+C/send_terminal_input>
-15. CLOSE TERMINAL: Usage: close_terminal terminal_name="..." />
-16. READ TERMINAL: Usage: read_terminal terminal_name="..." />
-17. LIST TERMINALS: Usage: list_terminals />
-18. FIGMA INSPECT: Usage: figma_inspect url="..." />
+12. WAIT: Usage: wait ms="3000" />
+    Use wait to pause execution for a specified number of milliseconds before continuing.
+    Always wait 3-4 seconds before taking screenshots of web pages so they fully render.
+13. BROWSER SCREENSHOT: Usage: browser_screenshot />
+    There is an automatic 3-second delay before capture for page rendering.
+    Always use browser_navigate first, then wait 3-4 seconds, then screenshot.
+14. RUN COMMAND: Usage: run_command command="npm install" />
+15. SEND TERMINAL INPUT: Usage: send_terminal_input terminal_name="...">Ctrl+C/send_terminal_input>
+16. CLOSE TERMINAL: Usage: close_terminal terminal_name="..." />
+17. READ TERMINAL: Usage: read_terminal terminal_name="..." />
+18. LIST TERMINALS: Usage: list_terminals />
+19. FIGMA INSPECT: Usage: figma_inspect url="..." />
 `;
 
 function getShellEnvDescription(): string {
