@@ -479,6 +479,7 @@ export class AgentOrchestrator {
         }
       }
       this._sendAvatarState("idle");
+      this._postMessage({ type: "updateChatHistory", history: currentMessages });
       this._postMessage({ type: "loopComplete" });
     } catch (err: any) {
       this._sendAvatarState("error");
