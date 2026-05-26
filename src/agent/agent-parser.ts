@@ -512,6 +512,24 @@ export class AgentParser {
       startFrom = tagInfo.end;
     }
 
+    // wait
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'wait', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const ms = this.attr(tagInfo.attrs, 'ms');
+      const seconds = this.attr(tagInfo.attrs, 'seconds');
+      if (ms || seconds) {
+        const tool: ToolCall = { name: 'wait' };
+        if (ms) tool.ms = parseInt(ms, 10);
+        if (seconds) tool.seconds = parseInt(seconds, 10);
+        candidates.push({ index: tagInfo.start, tool } as any);
+      }
+      startFrom = tagInfo.end;
+    }
+
     // close_terminal
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'close_terminal', startFrom)) !== null) {
