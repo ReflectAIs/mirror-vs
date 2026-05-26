@@ -1,4 +1,3 @@
-
 /**
  * Language server integration tools for Mirror VS.
  * Provides symbol_search and rename_symbol as built-in tools.
@@ -6,6 +5,22 @@
 
 import { ToolCall } from '../types';
 import * as vscode from 'vscode';
+
+/**
+ * Make a file path relative to the workspace root.
+ * Defined at module scope to avoid no-inner-declarations error.
+ */
+function makeRelative(absPath: string): string {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders) return absPath;
+  for (const wf of workspaceFolders) {
+    const prefix = wf.uri.fsPath + '/';
+    if (absPath.startsWith(prefix)) {
+      return absPath.slice(prefix.length);
+    }
+  }
+  return absPath;
+}
 
 /**
  * Execute a language tool call (runs in VS Code extension host context)
@@ -32,16 +47,6 @@ export async function executeLanguageTool(
 
       if (!results || results.length === 0) {
         return `No symbols found matching "${query}".`;
-      }
-
-      function makeRelative(absPath: string): string {
-        for (const wf of workspaceFolders) {
-          const prefix = wf.uri.fsPath + '/';
-          if (absPath.startsWith(prefix)) {
-            return absPath.slice(prefix.length);
-          }
-        }
-        return absPath;
       }
 
       let output = `Found ${results.length} symbol(s) matching "${query}":\n\n`;
