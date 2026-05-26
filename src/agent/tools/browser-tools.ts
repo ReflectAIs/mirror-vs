@@ -69,7 +69,19 @@ Post-eval Visible Text (preview): ${summary.contentText || '(empty)'}`;
           if (!fs.existsSync(mirrorDir)) {
             fs.mkdirSync(mirrorDir, { recursive: true });
           }
-          const fileName = `screenshot_${Date.now()}.png`;
+          // Use user-supplied name if provided, otherwise use timestamp
+          let fileName: string;
+          if (tool.text && tool.text.trim()) {
+            // Sanitize name: replace non-alphanumeric chars (except . - _) with underscore
+            const safeName = tool.text.trim()
+              .replace(/[^a-zA-Z0-9._-]/g, '_')
+              .replace(/_+/g, '_')
+              .replace(/^_|_$/g, '')
+              .toLowerCase();
+            fileName = safeName.endsWith('.png') ? safeName : `${safeName}.png`;
+          } else {
+            fileName = `screenshot_${Date.now()}.png`;
+          }
           const filePath = path.join(mirrorDir, fileName);
           fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
           fileSavedMsg = `Saved screenshot to .mirror-vs/screenshots/${fileName}\n`;

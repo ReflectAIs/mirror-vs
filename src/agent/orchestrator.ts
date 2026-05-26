@@ -68,9 +68,16 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 12. WAIT: Usage: wait ms="3000" />
     Use wait to pause execution for a specified number of milliseconds before continuing.
     Always wait 3-4 seconds before taking screenshots of web pages so they fully render.
-13. BROWSER SCREENSHOT: Usage: browser_screenshot />
-    There is an automatic 3-second delay before capture for page rendering.
-    Always use browser_navigate first, then wait 3-4 seconds, then screenshot.
+ 13. BROWSER SCREENSHOT: Usage: browser_screenshot name="descriptive-name" />
+     There is an automatic 3-second delay before capture for page rendering.
+     Always use browser_navigate first, then wait 3-4 seconds, then screenshot.
+     CRITICAL: You MUST always provide a descriptive 'name' attribute so the screenshot file
+     has a meaningful name (e.g., login_page.png, manufacturer_dashboard.png, rfq_marketplace_listing.png).
+     Never leave a screenshot with a generic timestamp filename.
+     Examples:
+       <browser_screenshot name="manufacturer_dashboard" />
+       <browser_screenshot name="rfq_marketplace_filtered.png" />
+       <browser_screenshot name="login-page-error" />
 14. RUN COMMAND: Usage: run_command command="npm install" />
 15. SEND TERMINAL INPUT: Usage: send_terminal_input terminal_name="...">Ctrl+C/send_terminal_input>
 16. CLOSE TERMINAL: Usage: close_terminal terminal_name="..." />
