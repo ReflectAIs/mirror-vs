@@ -5,7 +5,7 @@
  */
 
 import { ToolCall } from '../types';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -56,15 +56,15 @@ export async function executeGitTool(
 
   // Ensure we're in a git repo
   try {
-    execSync('git rev-parse --is-inside-work-tree', { cwd: ws, encoding: 'utf8', stdio: 'pipe' });
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: ws, encoding: 'utf8', stdio: 'pipe' });
   } catch {
     return 'Error: Not a git repository. Please initialize a git repo first with `git init`.';
   }
 
   switch (tool.name) {
     case 'git_status': {
-      const status = execSync('git status --porcelain', { cwd: ws, encoding: 'utf8' });
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: ws, encoding: 'utf8' }).trim();
+      const status = execFileSync('git', ['status', '--porcelain'], { cwd: ws, encoding: 'utf8' });
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ws, encoding: 'utf8' }).trim();
       const lines = status.trim() ? status.split('\n').filter(Boolean) : [];
 
       if (lines.length === 0) {
@@ -102,7 +102,7 @@ export async function executeGitTool(
       const filePath = tool.path;
       if (!filePath) {
         // Full diff
-        const diff = execSync('git diff --unified=5', { cwd: ws, encoding: 'utf8' });
+        const diff = execFileSync('git', ['diff', '--unified=5'], { cwd: ws, encoding: 'utf8' });
         if (!diff.trim()) {
           return 'Git Diff: No unstaged changes detected.';
         }
@@ -131,10 +131,10 @@ export async function executeGitTool(
       }
 
       try {
-        const diff = execSync(`git diff --unified=5 "${filePath}"`, { cwd: ws, encoding: 'utf8' });
+        const diff = execFileSync('git', ['diff', '--unified=5', '--', filePath], { cwd: ws, encoding: 'utf8' });
         if (!diff.trim()) {
           // Try staged diff
-          const stagedDiff = execSync(`git diff --cached --unified=5 "${filePath}"`, { cwd: ws, encoding: 'utf8' });
+          const stagedDiff = execFileSync('git', ['diff', '--cached', '--unified=5', '--', filePath], { cwd: ws, encoding: 'utf8' });
           if (!stagedDiff.trim()) {
             return `Git Diff for ${filePath}: No changes detected (check if file is tracked).`;
           }
@@ -176,7 +176,7 @@ export async function executeGitTool(
       const filePath = tool.path;
       if (!filePath) {
         // Add all
-        execSync('git add -A', { cwd: ws, encoding: 'utf8' });
+        execFileSync('git', ['add', '-A'], { cwd: ws, encoding: 'utf8' });
         return '✅ All changes staged for commit.';
       }
 
@@ -188,7 +188,7 @@ export async function executeGitTool(
         return `Error: File not found: ${filePath}`;
       }
 
-      execSync(`git add "${filePath}"`, { cwd: ws, encoding: 'utf8' });
+      execFileSync('git', ['add', '--', filePath], { cwd: ws, encoding: 'utf8' });
       return `✅ Staged: ${filePath}`;
     }
 
@@ -198,14 +198,14 @@ export async function executeGitTool(
 
       if (addAll) {
         try {
-          execSync('git add -A', { cwd: ws, encoding: 'utf8' });
+          execFileSync('git', ['add', '-A'], { cwd: ws, encoding: 'utf8' });
         } catch {
           // Continue even if add fails
         }
       }
 
       try {
-        execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: ws, encoding: 'utf8' });
+        execFileSync('git', ['commit', '-m', message], { cwd: ws, encoding: 'utf8' });
         return `✅ Commit created: "${message}"`;
       } catch (e: any) {
         if (e.message && e.message.includes('nothing to commit')) {
