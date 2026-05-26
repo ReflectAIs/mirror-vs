@@ -1,5 +1,8 @@
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { ChatMessage, ChatSession } from '../types';
 
 /**
@@ -192,5 +195,112 @@ export class StorageService {
     }
 
     await this.saveSessions(toKeep);
+  }
+
+  // =============================================================
+  // MISSING METHODS ADDED BACK
+  // =============================================================
+
+  /**
+   * Get the active session ID from a file-based persistence layer.
+   * Returns undefined if no active session is stored.
+   */
+  getActiveSessionIdFromFile(): string | undefined {
+    // Check if there's a globalState-based active session ID
+    // This is stored in the workspaceState as 'mirror-vs.activeSessionId'
+    return this._workspaceState.get<string>('mirror-vs.activeSessionId');
+  }
+
+  /**
+   * Persist the active session ID to both workspaceState and file backup.
+   */
+  persistActiveSessionId(id: string): void {
+    // The active session ID is stored via the sidebar provider directly
+    // This method ensures the file backup also has a reference
+    const fileData = this._readFileBackup();
+    if (fileData) {
+      fileData.activeSessionId = id;
+      this._writeFileBackup(fileData);
+    }
+  }
+
+  /**
+   * Read the backup file from disk (global storage path).
+   * Returns null if the file doesn't exist or is corrupted.
+   */
+  private _readFileBackup(): { sessions: ChatSession[]; messages: Record<string, ChatMessage[]>; activeSessionId?: string } | null {
+    try {
+      // Use a global storage path for the backup file
+      const backupPath = this._getBackupFilePath();
+      if (!backupPath || !fs.existsSync(backupPath)) {
+        return null;
+      }
+      const raw = fs.readFileSync(backupPath, 'utf8');
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('[StorageService] Failed to read file backup:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Write the backup file to disk (global storage path).
+   */
+  private _writeFileBackup(data: { sessions: ChatSession[]; messages: Record<string, ChatMessage[]>; activeSessionId?: string }): void {
+    try {
+      const backupPath = this._getBackupFilePath();
+      if (!backupPath) return;
+      const dir = path.dirname(backupPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      console.warn('[StorageService] Failed to write file backup:', e);
+    }
+  }
+
+  /**
+   * Derive the backup file path from the extension's global storage directory.
+   * Uses a hash of the workspace folder path to create a unique file per workspace.
+   */
+  private _getBackupFilePath(): string | null {
+    try {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) return null;
+      const workspacePath = workspaceFolders[0].uri.fsPath;
+      const workspaceHash = this._simpleHash(workspacePath);
+      // Use the extension's context-based path for backup storage
+      const ext = vscode.extensions.getExtension('DipeshMajithia.mirror-vs');
+      if (ext && ext.extensionUri) {
+        const globalStorageDir = path.join(ext.extensionUri.fsPath, '.mirror-vs-backup');
+        if (!fs.existsSync(globalStorageDir)) {
+          fs.mkdirSync(globalStorageDir, { recursive: true });
+        }
+        return path.join(globalStorageDir, `workspace_${workspaceHash}.json`);
+      }
+      // Fallback to OS temp directory
+      const tempDir = path.join(os.tmpdir(), 'mirror-vs-backup');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      return path.join(tempDir, `workspace_${workspaceHash}.json`);
+    } catch (e) {
+      console.warn('[StorageService] Failed to get backup file path:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Simple string hash function for generating unique workspace identifiers.
+   */
+  private _simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(16);
   }
 }
