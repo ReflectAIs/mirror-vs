@@ -73,5 +73,18 @@ export async function executeTool(
     return await executeLanguageTool(tool);
   }
 
+  // Code analysis tools
+  if (
+    name === 'analyze_project' ||
+    name === 'analyze_dependencies' ||
+    name === 'analyze_complexity' ||
+    name === 'analyze_coverage' ||
+    name === 'analyze_dead_code' ||
+    name === 'analyze_impact'
+  ) {
+    const { executeCodeAnalysisTool } = await import('./code-analysis-tools');
+    return await executeCodeAnalysisTool(tool);
+  }
+
   throw new Error(`Unsupported tool call: ${name}`);
 }

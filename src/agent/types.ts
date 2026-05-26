@@ -25,9 +25,16 @@ export interface ToolCall {
     | 'git_add'
     | 'symbol_search'
     | 'rename_symbol'
-    | 'rename_file'
-    | 'delete_file'
-    | 'wait';
+  | 'rename_file'
+  | 'delete_file'
+  | 'wait'
+  // Code analysis tools:
+  | 'analyze_project'
+  | 'analyze_dependencies'
+  | 'analyze_complexity'
+  | 'analyze_coverage'
+  | 'analyze_dead_code'
+  | 'analyze_impact';
   path?: string;
   query?: string;
   content?: string;

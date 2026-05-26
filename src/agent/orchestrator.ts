@@ -64,36 +64,49 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 9. BROWSER CLICK: Usage: browser_click selector="#my-button" />
 10. BROWSER TYPE: Usage: browser_type selector="#search-input" text="hello world" />
 11. BROWSER EVALUATE SCRIPT: Usage: browser_evaluate_script script="..." />
- 12. WAIT: Usage: wait ms="3000" />
-    Use wait to pause execution for a specified number of milliseconds before continuing.
- 13. BROWSER SCREENSHOT: Usage: browser_screenshot />
-     There is an automatic 3-second delay before capture for page rendering.
-     The screenshot is saved as .mirror-vs/screenshots/screenshot_TIMESTAMP.png and the
-     image content is sent to the vision model so you can see the page visually.
+ 12. CODEBASE ANALYSIS:
+     Usage: analyze_project />
+     Provides a comprehensive project overview (files, lines, framework, package manager, top files).
+     Usage: analyze_dependencies />
+     Analyzes the import dependency graph, finds circular dependencies, and identifies core modules.
+     Usage: analyze_complexity />
+     Measures cyclomatic complexity of all functions, highlights hotspots (complexity > 10 or lines > 50).
+     Usage: analyze_coverage />
+     Maps test files to source files and identifies untested source files by name convention.
+     Usage: analyze_dead_code />
+     Scans all exports and detects potentially unused code by checking import references.
+     Usage: analyze_impact path="src/components/Button.tsx" />
+     Shows what a file imports and what depends on it, with risk assessment.
+ 13. WAIT: Usage: wait ms="3000" />
+     Use wait to pause execution for a specified number of milliseconds before continuing.
+ 14. BROWSER SCREENSHOT: Usage: browser_screenshot />
+      There is an automatic 3-second delay before capture for page rendering.
+      The screenshot is saved as .mirror-vs/screenshots/screenshot_TIMESTAMP.png and the
+      image content is sent to the vision model so you can see the page visually.
 
-     **SCREENSHOT WORKFLOW (ONE AT A TIME):**
-       1. Navigate: browser_navigate url="PAGE_URL" />
-       2. Wait: wait ms="3000" />
-       3. Screenshot: browser_screenshot />
-       4. Vision result shows you the page. RENAME the file descriptively:
-          run_command command="Rename-Item '.mirror-vs/screenshots/screenshot_TIMESTAMP.png' 'manufacturer_login_page.png'" />
-       5. Immediately UPDATE your report.md:
-          patch_file path=".mirror-vs/screenshots/report.md">[SEARCH/REPLACE content]/patch_file>
-       6. REPEAT steps 1-5 for each page. NEVER batch screenshots.
+      **SCREENSHOT WORKFLOW (ONE AT A TIME):**
+        1. Navigate: browser_navigate url="PAGE_URL" />
+        2. Wait: wait ms="3000" />
+        3. Screenshot: browser_screenshot />
+        4. Vision result shows you the page. RENAME the file descriptively:
+           run_command command="Rename-Item '.mirror-vs/screenshots/screenshot_TIMESTAMP.png' 'manufacturer_login_page.png'" />
+        5. Immediately UPDATE your report.md:
+           patch_file path=".mirror-vs/screenshots/report.md">[SEARCH/REPLACE content]/patch_file>
+        6. REPEAT steps 1-5 for each page. NEVER batch screenshots.
 
-     **CLEANUP RULE**: Before starting a new documentation task, run:
-       run_command command="Remove-Item '.mirror-vs/screenshots/*.png' -Force" />
-     to delete old screenshots so you start fresh.
+      **CLEANUP RULE**: Before starting a new documentation task, run:
+        run_command command="Remove-Item '.mirror-vs/screenshots/*.png' -Force" />
+      to delete old screenshots so you start fresh.
 
-     If restarting a partially-failed task, first run:
-       list_dir path=".mirror-vs/screenshots" />
-     to see existing screenshots, then reference them directly in report.md.
-14. RUN COMMAND: Usage: run_command command="npm install" />
-15. SEND TERMINAL INPUT: Usage: send_terminal_input terminal_name="...">Ctrl+C/send_terminal_input>
-16. CLOSE TERMINAL: Usage: close_terminal terminal_name="..." />
-17. READ TERMINAL: Usage: read_terminal terminal_name="..." />
-18. LIST TERMINALS: Usage: list_terminals />
-19. FIGMA INSPECT: Usage: figma_inspect url="..." />
+      If restarting a partially-failed task, first run:
+        list_dir path=".mirror-vs/screenshots" />
+      to see existing screenshots, then reference them directly in report.md.
+ 15. RUN COMMAND: Usage: run_command command="npm install" />
+ 16. SEND TERMINAL INPUT: Usage: send_terminal_input terminal_name="...">Ctrl+C/send_terminal_input>
+ 17. CLOSE TERMINAL: Usage: close_terminal terminal_name="..." />
+ 18. READ TERMINAL: Usage: read_terminal terminal_name="..." />
+ 19. LIST TERMINALS: Usage: list_terminals />
+ 20. FIGMA INSPECT: Usage: figma_inspect url="..." />
 `;
 
 function getShellEnvDescription(): string {
