@@ -106,8 +106,9 @@ export async function executeLanguageTool(
 
         await vscode.workspace.applyEdit(edits);
         return `✅ Renamed "${currentSymbol}" → "${newName}" across ${edits.size} file(s).`;
-      } catch (e: any) {
-        return `Error renaming symbol: ${e.message}`;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return `Error renaming symbol: ${message}`;
       }
     }
 

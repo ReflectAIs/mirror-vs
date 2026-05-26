@@ -9,11 +9,28 @@ import { execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
-function parseUnifiedDiff(diffOutput: string): any {
+interface DiffLine {
+  type: 'add' | 'del' | 'ctx';
+  content: string;
+}
+
+interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: DiffLine[];
+}
+
+interface ParsedDiff {
+  hunks: DiffHunk[];
+}
+
+function parseUnifiedDiff(diffOutput: string): ParsedDiff | null {
   if (!diffOutput.trim()) return null;
 
-  const hunks: any[] = [];
-  let currentHunk: any = null;
+  const hunks: DiffHunk[] = [];
+  let currentHunk: DiffHunk | null = null;
 
   diffOutput.split('\n').forEach((line) => {
     if (line.startsWith('@@ ')) {
@@ -111,9 +128,9 @@ export async function executeGitTool(
           return 'Git Diff: No changes to display (files may be staged or untracked).';
         }
         let result = 'Git Diff (all unstaged changes):\n\n';
-        parsed.hunks.forEach((hunk: any) => {
+        parsed.hunks.forEach((hunk: DiffHunk) => {
           result += `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n`;
-          hunk.lines.forEach((line: any) => {
+          hunk.lines.forEach((line: DiffLine) => {
             const prefix = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' ';
             result += `${prefix}${line.content}\n`;
           });
@@ -143,9 +160,9 @@ export async function executeGitTool(
             return `Git Diff for ${filePath}: File exists but diff format could not be parsed.`;
           }
           let result = `Git Diff for ${filePath} (staged):\n\n`;
-          parsed.hunks.forEach((hunk: any) => {
+          parsed.hunks.forEach((hunk: DiffHunk) => {
             result += `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n`;
-            hunk.lines.forEach((line: any) => {
+            hunk.lines.forEach((line: DiffLine) => {
               const prefix = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' ';
               result += `${prefix}${line.content}\n`;
             });
@@ -159,16 +176,17 @@ export async function executeGitTool(
         }
 
         let result = `Git Diff for ${filePath}:\n\n`;
-        parsed.hunks.forEach((hunk: any) => {
+        parsed.hunks.forEach((hunk: DiffHunk) => {
           result += `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n`;
-          hunk.lines.forEach((line: any) => {
+          hunk.lines.forEach((line: DiffLine) => {
             const prefix = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' ';
             result += `${prefix}${line.content}\n`;
           });
         });
         return result;
-      } catch (e: any) {
-        return `Error getting git diff for ${filePath}: ${e.message}`;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return `Error getting git diff for ${filePath}: ${message}`;
       }
     }
 
@@ -207,11 +225,12 @@ export async function executeGitTool(
       try {
         execFileSync('git', ['commit', '-m', message], { cwd: ws, encoding: 'utf8' });
         return `✅ Commit created: "${message}"`;
-      } catch (e: any) {
-        if (e.message && e.message.includes('nothing to commit')) {
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (message.includes('nothing to commit')) {
           return 'ℹ️ Nothing to commit - working tree clean.';
         }
-        return `Error creating commit: ${e.message}`;
+        return `Error creating commit: ${message}`;
       }
     }
 

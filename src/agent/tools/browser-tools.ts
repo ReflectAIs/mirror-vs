@@ -74,8 +74,9 @@ Post-eval Visible Text (preview): ${summary.contentText || '(empty)'}`;
           const filePath = path.join(mirrorDir, savedFileName);
           fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
           fileSavedMsg = `Saved screenshot to .mirror-vs/screenshots/${savedFileName}\n`;
-        } catch (err: any) {
-          fileSavedMsg = `Failed to save screenshot to .mirror-vs/screenshots: ${err.message}\n`;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          fileSavedMsg = `Failed to save screenshot to .mirror-vs/screenshots: ${message}\n`;
         }
       }
 

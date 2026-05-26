@@ -100,7 +100,7 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
 
   // ---- send_terminal_input ----
   if (tool.name === 'send_terminal_input') {
-    const termName = (tool as any).terminal_name || '';
+    const termName = (tool as ToolCall).terminal_name || '';
     const input = tool.content || '';
 
     if (!termName) {
@@ -130,7 +130,7 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
 
   // ---- close_terminal ----
   if (tool.name === 'close_terminal') {
-    const termName = (tool as any).terminal_name || '';
+    const termName = (tool as ToolCall).terminal_name || '';
 
     if (!termName) {
       throw new Error('Missing "terminal_name" attribute for close_terminal.');
@@ -151,7 +151,7 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
 
   // ---- read_terminal ----
   if (tool.name === 'read_terminal') {
-    const termName = (tool as any).terminal_name || '';
+    const termName = (tool as ToolCall).terminal_name || '';
 
     if (!termName) {
       throw new Error(
@@ -160,7 +160,7 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
     }
 
     // Parse optional chars/lines parameter
-    const chars = parseInt((tool as any).chars || '5000', 10) || 5000;
+    const chars = parseInt((tool as ToolCall).chars || '5000', 10) || 5000;
 
     const result = service.readTerminalOutput(termName, chars);
     if (!result) {

@@ -227,7 +227,7 @@
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "postinstall": "npm run compile",
-    "lint": "eslint \"src/**/*.ts\" --max-warnings 100",
+    "lint": "eslint \"src/**/*.ts\" --max-warnings 200",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",

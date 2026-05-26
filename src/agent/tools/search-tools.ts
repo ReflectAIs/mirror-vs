@@ -31,8 +31,9 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
           .map((r) => `URL: ${r.url}\nSnippet: ${r.snippet}\n`)
           .join('---\n') || 'No web search results found.'
       );
-    } catch (e: any) {
-      return `Web search failed: ${e.message}`;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return `Web search failed: ${message}`;
     }
   }
 

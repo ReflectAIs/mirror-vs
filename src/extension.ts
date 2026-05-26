@@ -6,7 +6,7 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('Mirror VS Extension is now active!');
 
   // Global error handlers to prevent extension host crashes from unhandled rejections
-  process.on('unhandledRejection', (reason: any) => {
+  process.on('unhandledRejection', (reason: unknown) => {
     console.error('[Mirror VS] Unhandled Promise Rejection:', reason instanceof Error ? reason.message : reason);
   });
   process.on('uncaughtException', (error: Error) => {

@@ -16,7 +16,7 @@ export class AgentSession {
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
     private readonly _getChatHistory: () => ChatMessage[],
     private readonly _saveChatHistory: (history: ChatMessage[]) => Promise<void>,
-    private readonly _postMessage: (msg: any) => void,
+    private readonly _postMessage: (msg: Record<string, unknown>) => void,
     private readonly _getSafePath: (targetPath: string) => string,
   ) {}
 
@@ -189,8 +189,9 @@ USER/ENVIRONMENT TOOL RESPONSE:
       }
 
       fs.appendFileSync(logFilePath, logEntry, 'utf8');
-    } catch (e: any) {
-      console.warn('Failed to write to turns.log:', e.message);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn('Failed to write to turns.log:', message);
     }
   }
 }
