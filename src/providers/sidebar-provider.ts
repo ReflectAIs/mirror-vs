@@ -843,39 +843,50 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private _sendWorkspaceFileTimer: ReturnType<typeof setTimeout> | undefined;
+  private _sendWorkspaceFileAbort: AbortController | undefined;
+
   private async _sendWorkspaceFiles() {
     if (!this._view) return;
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceFolder) return;
 
-    const files: string[] = [];
-    const traverse = (dir: string) => {
-      const list = fs.readdirSync(dir);
-      for (const item of list) {
-        if (
-          ['node_modules', 'dist', 'out', '.git', '.mirror-vs', '.new_file_placeholder_'].some((ignored) =>
-            item.includes(ignored),
-          )
-        )
-          continue;
-        const fullPath = path.join(dir, item);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          traverse(fullPath);
-        } else if (stat.isFile()) {
-          files.push(path.relative(workspaceFolder, fullPath));
-        }
-      }
-    };
+    // Cancel any previous pending scan
+    if (this._sendWorkspaceFileTimer) {
+      clearTimeout(this._sendWorkspaceFileTimer);
+    }
+    if (this._sendWorkspaceFileAbort) {
+      this._sendWorkspaceFileAbort.abort();
+    }
 
+    // Use VS Code's findFiles which respects .gitignore & is async
     try {
-      traverse(workspaceFolder);
+      this._sendWorkspaceFileAbort = new AbortController();
+      const token = this._sendWorkspaceFileAbort;
+
+      const results = await vscode.workspace.findFiles(
+        '{**/*}',               // Include everything
+        '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/.new_file_placeholder_/**}',  // Exclude heavy dirs
+        20000,                   // Hard limit to prevent memory blowup
+      );
+
+      if (token.signal.aborted) return;
+
+      const files: string[] = results
+        .filter(uri => {
+          const name = path.basename(uri.fsPath);
+          // Additional skip for file patterns (though .gitignore handles most)
+          return !name.startsWith('.');
+        })
+        .map(uri => path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, uri.fsPath))
+        .slice(0, 10000); // Safety cap
+
       this._view.webview.postMessage({
         type: 'workspaceFiles',
         files,
       });
     } catch (e) {
       console.warn('Workspace files fetch failed:', e);
+      // Fallback: send empty list gracefully
+      this._view?.webview.postMessage({ type: 'workspaceFiles', files: [] });
     }
   }
 
