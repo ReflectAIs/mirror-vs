@@ -355,8 +355,8 @@ export class AgentOrchestrator {
         await this._saveChatHistory(currentMessages);
         this._postMessage({ type: "updateChatHistory", history: currentMessages });
         this._postMessage({ type: "chatResponseComplete", fullText: "Context optimized." });
-      } catch (e: any) {
-        console.warn("Failed to summarize history:", e.message);
+      } catch (e: unknown) {
+        console.warn("Failed to summarize history:", e instanceof Error ? e.message : String(e));
       }
     }
 
@@ -402,14 +402,15 @@ export class AgentOrchestrator {
             this._session.sessionId,
             completionController,
           );
-        } catch (apiErr: any) {
+        } catch (apiErr: unknown) {
           signal.removeEventListener("abort", mainAbortListener);
+          const apiErrMsg = apiErr instanceof Error ? apiErr.message : String(apiErr);
           const fb = this._fallback.failover();
           if (fb.success && fb.newProvider) {
             const nextKey = await tryGetApiKey(fb.newProvider);
             this._postMessage({
               type: "providerFallback",
-              message: (apiErr.message || "API error") + " " + fb.message,
+              message: apiErrMsg + " " + fb.message,
               newProvider: fb.newProvider,
             });
             provider = fb.newProvider;
@@ -462,10 +463,11 @@ export class AgentOrchestrator {
               }
               this._sendToolStatusToWebview(tool.name, "success", target, displayResult, checkpointId, tool.content, terminalName);
               toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Success - " + result);
-            } catch (err: any) {
-              this._sendToolStatusToWebview(tool.name, "error", target, err.message);
+            } catch (err: unknown) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              this._sendToolStatusToWebview(tool.name, "error", target, errMsg);
               this._sendAvatarState("error");
-              toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Error - " + err.message + ". Please correct your approach and try again.");
+              toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Error - " + errMsg + ". Please correct your approach and try again.");
             }
             if (signal.aborted) {
               continueLoop = false;
@@ -518,21 +520,21 @@ export class AgentOrchestrator {
       this._sendAvatarState("idle");
       this._postMessage({ type: "updateChatHistory", history: currentMessages });
       this._postMessage({ type: "loopComplete" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       this._sendAvatarState("error");
       if (signal.aborted) {
         console.log("Agent stream aborted.");
       } else {
-        this._postMessage({ type: "chatResponseError", error: err.message });
+        this._postMessage({ type: "chatResponseError", error: err instanceof Error ? err.message : String(err) });
       }
     } finally {
       this._activeAbortController = undefined;
     }
-    } catch (outerErr: any) {
+    } catch (outerErr: unknown) {
       this._sendAvatarState("error");
       console.error("Unhandled error in handleMessageStream:", outerErr);
       try {
-        this._postMessage({ type: "chatResponseError", error: outerErr.message || "Unknown error" });
+        this._postMessage({ type: "chatResponseError", error: outerErr instanceof Error ? outerErr.message : "Unknown error" });
       } catch (_) { /* best effort */ }
     } finally {
       this._activeAbortController = undefined;

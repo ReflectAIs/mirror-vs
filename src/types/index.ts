@@ -78,8 +78,16 @@ export interface GitFileDiff {
 }
 
 // Messages sent from Webview -> Extension Host
+export interface SendMessageData {
+  text: string;
+  history: ChatMessage[];
+  linkedFiles?: string[];
+  images?: string[];
+  terminalName?: string;
+}
+
 export type WebviewToExtensionMessage =
-  | { type: 'sendMessage'; text: string; history: ChatMessage[] }
+  | { type: 'sendMessage'; text: string; history: ChatMessage[]; linkedFiles?: string[]; images?: string[] }
   | { type: 'getSettings' }
   | {
       type: 'saveSettings';

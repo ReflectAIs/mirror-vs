@@ -53,6 +53,17 @@ export interface ToolCall {
 
 export type ToolStatus = 'running' | 'success' | 'error';
 
+export interface ToolStatusMessage {
+  type: 'toolStatus';
+  toolName: string;
+  status: ToolStatus;
+  target: string;
+  result?: string;
+  checkpointId?: string;
+  code?: string;
+  terminalName?: string;
+}
+
 export interface ToolExecutionContext {
   getSafePath(targetPath: string): string;
   createCheckpoint(filePath: string, type: 'replace' | 'create'): Promise<string>;

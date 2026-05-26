@@ -1,4 +1,4 @@
-import { ToolCall } from './types';
+import { ToolCall, ToolStatusMessage } from './types';
 
 /**
  * Parses tool calls from raw LLM response text.
@@ -535,10 +535,8 @@ export class AgentParser {
       }
       const termName = this.attr(tagInfo.attrs, 'terminal_name');
       if (termName) {
-        candidates.push({
-          index: tagInfo.start,
-          tool: { name: 'close_terminal', terminal_name: termName.trim() } as any,
-        });
+        const tool: ToolCall = { name: 'close_terminal', terminal_name: termName.trim() };
+        candidates.push({ index: tagInfo.start, tool });
       }
       startFrom = tagInfo.end;
     }
@@ -553,10 +551,9 @@ export class AgentParser {
       const termName = this.attr(tagInfo.attrs, 'terminal_name');
       if (termName) {
         const chars = this.attr(tagInfo.attrs, 'chars');
-        candidates.push({
-          index: tagInfo.start,
-          tool: { name: 'read_terminal', terminal_name: termName.trim(), chars: chars || undefined } as any,
-        });
+        const tool: ToolCall = { name: 'read_terminal', terminal_name: termName.trim() };
+        if (chars) tool.chars = chars;
+        candidates.push({ index: tagInfo.start, tool });
       }
       startFrom = tagInfo.end;
     }
@@ -585,7 +582,7 @@ export class AgentParser {
     checkpointId?: string,
     code?: string,
     terminalName?: string,
-  ): any {
+  ): ToolStatusMessage {
     return {
       type: 'toolStatus',
       toolName,

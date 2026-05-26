@@ -147,11 +147,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           let fullMessageText = data.text;
 
           // Process and append selected context files from user autocomplete selections
-          if ((data as any).linkedFiles && (data as any).linkedFiles.length > 0) {
+          if (data.linkedFiles && data.linkedFiles.length > 0) {
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (workspaceFolder) {
               let linkedContent = '\n\n[Additional Workspace Files Context]:\n';
-              for (const relPath of (data as any).linkedFiles) {
+              for (const relPath of data.linkedFiles) {
                 const safePath = path.resolve(workspaceFolder, relPath);
                 if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
                   try {
@@ -184,7 +184,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const contextPrompt = getActiveFileContext();
           fullMessageText += contextPrompt;
 
-          await this._orchestrator.handleMessageStream(fullMessageText, data.history, (data as any).images);
+          await this._orchestrator.handleMessageStream(fullMessageText, data.history, data.images);
           break;
         }
         case 'retryLastToolCall': {
