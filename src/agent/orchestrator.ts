@@ -8,7 +8,6 @@ import { AgentSession } from "./agent-session";
 import { AgentParser } from "./agent-parser";
 import { AgentCompleter } from "./agent-completer";
 import * as fs from "fs";
-import { execFileSync } from "child_process";
 
 const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
 

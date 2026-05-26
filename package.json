@@ -198,7 +198,7 @@
         "mirror-vs.defaultDeepSeekModel": {
           "type": "string",
           "default": "deepseek-chat",
-          "description": "The DeepSeek model to use (e.g., deepseek-chat, deepseek-coder)."
+          "description": "The DeepSeek model to use (e.g., deepseek-chat, deepseek-coder, deepseek-reasoner)."
         },
         "mirror-vs.defaultProvider": {
           "type": "string",
