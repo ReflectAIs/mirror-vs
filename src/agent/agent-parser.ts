@@ -323,7 +323,7 @@ export class AgentParser {
             }
             candidates.push({
               index: tagInfo.start,
-              tool: { name: toolName as any, path: p ? p.trim() : undefined, content },
+              tool: { name: toolName as ToolCall['name'], path: p ? p.trim() : undefined, content },
             });
             startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;
             continue;
@@ -489,10 +489,8 @@ export class AgentParser {
         if (tagInfo.isSelfClosing) {
           const input = this.attr(tagInfo.attrs, 'input');
           if (input) {
-            candidates.push({
-              index: tagInfo.start,
-              tool: { name: 'send_terminal_input', terminal_name: termName.trim(), content: input } as any,
-            });
+            const tool: ToolCall = { name: 'send_terminal_input', terminal_name: termName.trim(), content: input };
+            candidates.push({ index: tagInfo.start, tool });
           }
         } else {
           const closeTagPattern = '\u003C\u002Fsend_terminal_input\\s*\u003E';
@@ -500,10 +498,8 @@ export class AgentParser {
           const closeMatch = closeTagRegex.exec(rawText.substring(tagInfo.end));
           if (closeMatch) {
             const content = rawText.substring(tagInfo.end, tagInfo.end + closeMatch.index);
-            candidates.push({
-              index: tagInfo.start,
-              tool: { name: 'send_terminal_input', terminal_name: termName.trim(), content } as any,
-            });
+            const tool: ToolCall = { name: 'send_terminal_input', terminal_name: termName.trim(), content };
+            candidates.push({ index: tagInfo.start, tool });
             startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;
             continue;
           }
@@ -525,7 +521,7 @@ export class AgentParser {
         const tool: ToolCall = { name: 'wait' };
         if (ms) tool.ms = parseInt(ms, 10);
         if (seconds) tool.seconds = parseInt(seconds, 10);
-        candidates.push({ index: tagInfo.start, tool } as any);
+        candidates.push({ index: tagInfo.start, tool });
       }
       startFrom = tagInfo.end;
     }
