@@ -40,7 +40,7 @@ export class AgentSession {
     return this._getSafePath(p);
   }
 
-  public postMessage(msg: any): void {
+  public postMessage(msg: Record<string, unknown>): void {
     this._postMessage(msg);
   }
 
