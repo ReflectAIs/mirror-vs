@@ -69,7 +69,7 @@ export async function executeTool(
 
   // Language tools (run in VS Code host context via executeCommand)
   if (name === 'symbol_search' || name === 'rename_symbol') {
-    const { executeLanguageTool } = await import('./language-tools');
+    const { executeLanguageTool } = await import('./language-tools.js');
     return await executeLanguageTool(tool);
   }
 
@@ -82,7 +82,7 @@ export async function executeTool(
     name === 'analyze_dead_code' ||
     name === 'analyze_impact'
   ) {
-    const { executeCodeAnalysisTool } = await import('./code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('./code-analysis-tools.js');
     return await executeCodeAnalysisTool(tool);
   }
 

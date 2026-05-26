@@ -26,6 +26,7 @@
     "node_modules",
     ".vscode-test",
     "vitest.config.ts",
-    "build-check.mjs"
+    "build-check.mjs",
+    "**/__tests__/**"
   ]
 }

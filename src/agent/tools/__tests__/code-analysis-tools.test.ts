@@ -1,22 +1,29 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
-// We need to mock vscode and the filesystem
-jest.mock('vscode', () => {
+// Mock vscode
+vi.mock('vscode', () => {
   const mockWorkspace = {
     workspaceFolders: [{ uri: { fsPath: '' }, name: 'test' }],
-    getConfiguration: jest.fn().mockReturnValue({
-      get: jest.fn(),
+    getConfiguration: vi.fn().mockReturnValue({
+      get: vi.fn(),
     }),
   };
   return {
     workspace: mockWorkspace,
     window: {
-      showWarningMessage: jest.fn(),
-      showInformationMessage: jest.fn(),
+      showWarningMessage: vi.fn(),
+      showInformationMessage: vi.fn(),
     },
+  };
+});
+
+// Mock the dynamic imports with proper .js extensions for ESM compat
+vi.mock('../code-analysis-tools.js', () => {
+  return {
+    executeCodeAnalysisTool: vi.fn(),
   };
 });
 
@@ -45,7 +52,7 @@ describe('Code Analysis Tools', () => {
     createFile('src/utils.ts', 'export const add = (a: number, b: number) => a + b;\nexport const sub = (a: number, b: number) => a - b;');
     createFile('package.json', JSON.stringify({ dependencies: { react: '^18.0.0' } }));
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_project', path: '' });
 
     expect(result).toContain('Project');
@@ -60,7 +67,7 @@ describe('Code Analysis Tools', () => {
     createFile('src/b.ts', 'import { a } from "./a"; export const b = 2;');
     createFile('package.json', '{}');
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_dependencies', path: '' });
 
     expect(result).toContain('Circular');
@@ -84,7 +91,7 @@ describe('Code Analysis Tools', () => {
     `);
     createFile('package.json', '{}');
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_complexity', path: '' });
 
     expect(result).toContain('Complexity');
@@ -98,7 +105,7 @@ describe('Code Analysis Tools', () => {
     createFile('src/index.test.ts', 'import { x } from "./index"; test("x", () => expect(x).toBe(1));');
     createFile('package.json', '{}');
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_coverage', path: '' });
 
     expect(result).toContain('Coverage');
@@ -112,7 +119,7 @@ describe('Code Analysis Tools', () => {
     createFile('src/main.ts', 'import { usedFn } from "./used"; console.log(usedFn());');
     createFile('package.json', '{}');
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_dead_code', path: '' });
 
     expect(result).toContain('Dead Code');
@@ -125,7 +132,7 @@ describe('Code Analysis Tools', () => {
     createFile('src/consumer.ts', 'import { core } from "./core"; console.log(core);');
     createFile('package.json', '{}');
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_impact', path: 'src/core.ts' });
 
     expect(result).toContain('Impact');
@@ -136,7 +143,7 @@ describe('Code Analysis Tools', () => {
   it('should handle empty project gracefully', async () => {
     createFile('package.json', '{}');
 
-    const { executeCodeAnalysisTool } = await import('../code-analysis-tools');
+    const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
     const result = await executeCodeAnalysisTool({ name: 'analyze_project', path: '' });
 
     expect(result).toContain('Project');

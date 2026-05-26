@@ -1,7 +1,7 @@
 
 import * as vscode from 'vscode';
 import { LLMProvider, ChatMessage } from '../types';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import { buildSystemPrompt } from './orchestrator';
 
@@ -52,24 +52,21 @@ export class AgentSession {
    * Ensures the workspace has a git repo with a clean baseline commit so that
    * every agent file write shows up as a coloured diff gutter (yellow/green/red) in VS Code.
    */
+  private _gitExec(args: string[], workspaceFolder: string): string {
+    try { return execFileSync('git', args, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' }); }
+    catch { return ''; }
+  }
+
   public async ensureGitBaseline(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceFolder) {
       return;
     }
 
-    const run = (cmd: string) => {
-      try {
-        return execSync(cmd, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' });
-      } catch {
-        return '';
-      }
-    };
-
     // 1. Init git if not already a repo
-    const isRepo = run('git rev-parse --is-inside-work-tree').trim() === 'true';
+    const isRepo = this._gitExec(['rev-parse', '--is-inside-work-tree'], workspaceFolder).trim() === 'true';
     if (!isRepo) {
-      run('git init');
+      this._gitExec(['init'], workspaceFolder);
     }
 
     // 2. Ensure .gitignore has noise exclusions
@@ -85,21 +82,21 @@ export class AgentSession {
     if (missingPatterns.length > 0) {
       const newContent = gitignoreContent.trimEnd() + '\n' + missingPatterns.join('\n') + '\n';
       fs.writeFileSync(gitignorePath, newContent, 'utf8');
-      run('git add .gitignore');
+      this._gitExec(['add', '.gitignore'], workspaceFolder);
     }
 
     // 3. Check if there are any tracked modified files already — commit them as baseline
-    const dirty = run('git status --porcelain').trim();
+    const dirty = this._gitExec(['status', '--porcelain'], workspaceFolder).trim();
     if (dirty) {
-      run('git add -A');
+      this._gitExec(['add', '-A'], workspaceFolder);
       // Only commit tracked files — untracked files (new) will remain unstaged so they show green in VS Code
-      run('git commit -m "Mirror VS: baseline snapshot before agent task"');
+      this._gitExec(['commit', '-m', 'Mirror VS: baseline snapshot before agent task'], workspaceFolder);
     } else {
       // Ensure at least one commit exists (needed for diff gutters to work)
-      const hasCommit = run('git log --oneline -1').trim();
+      const hasCommit = this._gitExec(['log', '--oneline', '-1'], workspaceFolder).trim();
       if (!hasCommit) {
-        run('git add -A');
-        run('git commit -m "Mirror VS: initial baseline"');
+        this._gitExec(['add', '-A'], workspaceFolder);
+        this._gitExec(['commit', '-m', 'Mirror VS: initial baseline'], workspaceFolder);
       }
     }
   }

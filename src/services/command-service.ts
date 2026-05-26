@@ -275,7 +275,7 @@ export class CommandService {
 
     // Windows: translate 'mkdir -p' to the correct PowerShell syntax
     if (process.platform === 'win32') {
-      normalizedCmd = normalizedCmd.replace(/\bmkdir\b(\s+)-p\b/gi, (match, spaces) => `New-Item -Force -ItemType Directory${spaces}`);
+      normalizedCmd = normalizedCmd.replace(/\bmkdir\b(\s+)-p\b/gi, (_, spaces) => `New-Item -Force -ItemType Directory${spaces}`);
     }
 
     const cdPattern = /^\s*cd\s+(['"]?)([^'"&;|\r\n]+)\1\s*(?:&&|;)?\s*/i;

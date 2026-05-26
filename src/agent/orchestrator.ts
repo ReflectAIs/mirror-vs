@@ -7,6 +7,7 @@ import { ProviderFallback } from "../services/provider-fallback";
 import { AgentSession } from "./agent-session";
 import { AgentParser } from "./agent-parser";
 import { AgentCompleter } from "./agent-completer";
+import { execFileSync } from "child_process";
 import * as fs from "fs";
 
 const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
@@ -178,15 +179,16 @@ export class AgentOrchestrator {
     }
   }
 
+  private _gitExec(args: string[], workspaceFolder: string): string {
+    try { return execFileSync("git", args, { cwd: workspaceFolder, encoding: "utf8", stdio: "pipe" }); }
+    catch { return ""; }
+  }
+
   private async _ensureGitBaseline(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceFolder) return;
-    const run = (cmd: string) => {
-      try { return execSync(cmd, { cwd: workspaceFolder, encoding: "utf8", stdio: "pipe" }); }
-      catch { return ""; }
-    };
-    const isRepo = run("git rev-parse --is-inside-work-tree").trim() === "true";
-    if (!isRepo) run("git init");
+    const isRepo = this._gitExec(["rev-parse", "--is-inside-work-tree"], workspaceFolder).trim() === "true";
+    if (!isRepo) this._gitExec(["init"], workspaceFolder);
     const gitignorePath = workspaceFolder + "/.gitignore";
     let gitignoreContent = "";
     try { gitignoreContent = fs.readFileSync(gitignorePath, "utf8"); } catch { /* ignore */ }
@@ -194,17 +196,17 @@ export class AgentOrchestrator {
     const missing = patterns.filter(p => !gitignoreContent.includes(p));
     if (missing.length > 0) {
       fs.writeFileSync(gitignorePath, gitignoreContent.trimEnd() + "\n" + missing.join("\n") + "\n", "utf8");
-      run("git add .gitignore");
+      this._gitExec(["add", ".gitignore"], workspaceFolder);
     }
-    const dirty = run("git status --porcelain").trim();
+    const dirty = this._gitExec(["status", "--porcelain"], workspaceFolder).trim();
     if (dirty) {
-      run("git add -A");
-      run("git commit -m \"Mirror VS: baseline snapshot before agent task\"");
+      this._gitExec(["add", "-A"], workspaceFolder);
+      this._gitExec(["commit", "-m", "Mirror VS: baseline snapshot before agent task"], workspaceFolder);
     } else {
-      const hasCommit = run("git log --oneline -1").trim();
+      const hasCommit = this._gitExec(["log", "--oneline", "-1"], workspaceFolder).trim();
       if (!hasCommit) {
-        run("git add -A");
-        run("git commit -m \"Mirror VS: initial baseline\"");
+        this._gitExec(["add", "-A"], workspaceFolder);
+        this._gitExec(["commit", "-m", "Mirror VS: initial baseline"], workspaceFolder);
       }
     }
   }

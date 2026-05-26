@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync, execFileSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { SecretService } from '../services/secret-service';
 import { StorageService } from '../services/storage-service';
 import {
@@ -301,7 +301,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsFolder) break;
           try {
-            const gitStatus = execSync('git status --porcelain', { cwd: wsFolder, encoding: 'utf8' });
+            const gitStatus = execFileSync('git', ['status', '--porcelain'], { cwd: wsFolder, encoding: 'utf8' });
             const changes: { file: string; status: string }[] = [];
             gitStatus
               .split('\n')
@@ -351,7 +351,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsFolderDiff = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsFolderDiff || !data.file) break;
           try {
-            const diffOutput = execSync(`git diff --unified=10 "${data.file}"`, {
+            const diffOutput = execFileSync('git', ['diff', '--unified=10', '--', data.file], {
               cwd: wsFolderDiff,
               encoding: 'utf8',
             });
@@ -430,8 +430,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           const wsF = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!wsF) break;
           try {
-            execSync('git add -A', { cwd: wsF, encoding: 'utf8' });
-            execSync('git commit -m "Mirror VS: agent changes committed"', { cwd: wsF, encoding: 'utf8' });
+            execFileSync('git', ['add', '-A'], { cwd: wsF, encoding: 'utf8' });
+            execFileSync('git', ['commit', '-m', 'Mirror VS: agent changes committed'], { cwd: wsF, encoding: 'utf8' });
             vscode.window.showInformationMessage('✅ All changes committed.');
             // Refresh git status
             this._view?.webview.postMessage({ type: 'gitChanges', changes: [] });
@@ -504,7 +504,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!wsFolder) return;
     try {
-      const gitStatus = execSync('git status --porcelain', { cwd: wsFolder, encoding: 'utf8' });
+      const gitStatus = execFileSync('git', ['status', '--porcelain'], { cwd: wsFolder, encoding: 'utf8' });
       const changes: { file: string; status: string }[] = [];
       gitStatus
         .split('\n')
