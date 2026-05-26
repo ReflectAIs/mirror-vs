@@ -107,7 +107,7 @@ Customize Mirror VS's behavior inside your VS Code `settings.json` or through th
 | `mirror-vs.defaultProvider` | `string` | `"ollama"` | Active LLM Provider (`"ollama"` or `"deepseek"`). |
 | `mirror-vs.ollamaHost` | `string` | `"http://localhost:11434"` | Base URL of your running Ollama server. |
 | `mirror-vs.defaultOllamaModel` | `string` | `"llama3"` | Default local Ollama model. |
-| `mirror-vs.defaultDeepSeekModel` | `string` | `"deepseek-chat"` | Default DeepSeek API model. |
+| `mirror-vs.defaultDeepSeekModel` | `string` | `"deepseek-chat"` | Default DeepSeek API model (`deepseek-chat`, `deepseek-coder`, `deepseek-reasoner`, `deepseek-v4-flash`, `deepseek-v4-pro`). |
 | `mirror-vs.maxTurnsBeforeSummarize` | `number` | `16` | Max turn count before conversation context is compressed. |
 | `mirror-vs.turnsToRetain` | `number` | `6` | Number of recent turns to retain as active context after compression. |
 
