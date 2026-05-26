@@ -113,6 +113,7 @@ export class AgentParser {
       'figma_inspect', 'run_command', 'close_terminal',
       'read_terminal', 'list_terminals',
       'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
+      'wait',
     ];
     for (const tool of selfClosingTools) {
       let startFrom = 0;
@@ -165,6 +166,7 @@ export class AgentParser {
       'figma_inspect', 'run_command', 'close_terminal',
       'read_terminal', 'list_terminals',
       'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
+      'wait',
     ];
     let earliestEnd = -1;
     for (const tool of selfClosingTools) {
