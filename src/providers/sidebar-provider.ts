@@ -487,6 +487,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       }
     });
 
+    // Ensure migration is complete before reading sessions/history
+    await this._migrationPromise;
+
     await this._ensureDefaultSession(true);
 
     await this._sendSettingsToWebview();
