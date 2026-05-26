@@ -244,6 +244,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
+        case 'requestWorkspaceFiles': {
+          await this._sendWorkspaceFiles();
+          break;
+        }
         case 'getChatSessions': {
           this._sendChatSessionsToWebview();
           break;
@@ -497,7 +501,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     this._sendActiveReviewsCount();
     this._sendChatSessionsToWebview();
     this._sendChatHistoryToWebview();
-    this._sendWorkspaceFiles();
+    // Do NOT eagerly send workspace files — they are fetched on-demand
+    // when user types '@' in the prompt input. This avoids crashes on large repos.
   }
 
   public refreshGitStatus(): void {
@@ -843,45 +848,76 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private _sendWorkspaceFileTimer: ReturnType<typeof setTimeout> | undefined;
-  private _sendWorkspaceFileAbort: AbortController | undefined;
+  private _sendWorkspaceFileTokenSource: vscode.CancellationTokenSource | undefined;
+
+  // Restricted glob — only top-level and 1-level nested files in key source dirs.
+  // Avoids deep recursive enumeration that crashes on large repos.
+  private static readonly _WORKSPACE_GLOB_PATTERNS = [
+    // Top-level source files only
+    '*.{ts,tsx,js,jsx,json,html,css,scss,py,rb,go,rs,md,yaml,yml,toml,sh,bash}',
+    // Common src/ directory (1 level deep max)
+    'src/*.{ts,tsx,js,jsx,json,html,css,scss,py,rb,go,rs,md,yaml,yml}',
+    // Some projects use lib/, app/, server/ — shallow only
+    'lib/*.{ts,tsx,js,jsx,json}',
+    'app/*.{ts,tsx,js,jsx,json,html,css,scss}',
+    'server/*.{ts,tsx,js,jsx,json}',
+    'components/*.{ts,tsx,js,jsx,vue,svelte}',
+    'pages/*.{ts,tsx,js,jsx}',
+    'utils/*.{ts,tsx,js,jsx}',
+    'helpers/*.{ts,tsx,js,jsx}',
+    'config/*.{ts,tsx,js,jsx,json,yaml,yml}',
+    'routes/*.{ts,tsx,js,jsx}',
+    'middleware/*.{ts,tsx,js,jsx}',
+    'models/*.{ts,tsx,js,jsx,py,go}',
+    'controllers/*.{ts,tsx,js,jsx,py,go}',
+    'api/*.{ts,tsx,js,jsx,py}',
+    'scripts/*.{ts,tsx,js,jsx,py,sh,bash}',
+  ];
 
   private async _sendWorkspaceFiles() {
     if (!this._view) return;
 
     // Cancel any previous pending scan
-    if (this._sendWorkspaceFileTimer) {
-      clearTimeout(this._sendWorkspaceFileTimer);
-    }
-    if (this._sendWorkspaceFileAbort) {
-      this._sendWorkspaceFileAbort.abort();
+    if (this._sendWorkspaceFileTokenSource) {
+      this._sendWorkspaceFileTokenSource.cancel();
+      this._sendWorkspaceFileTokenSource.dispose();
     }
 
-    // Use VS Code's findFiles which respects .gitignore & is async
     try {
-      this._sendWorkspaceFileAbort = new AbortController();
-      const token = this._sendWorkspaceFileAbort;
+      this._sendWorkspaceFileTokenSource = new vscode.CancellationTokenSource();
+      const token = this._sendWorkspaceFileTokenSource.token;
 
-      const results = await vscode.workspace.findFiles(
-        '{**/*}',               // Include everything
-        '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/.new_file_placeholder_/**}',  // Exclude heavy dirs
-        20000,                   // Hard limit to prevent memory blowup
+      // Run multiple parallel restricted glob queries instead of one huge one.
+      // Each pattern only matches shallow files in specific directories.
+      // Use AbortController-style cancellation via the token.
+      const allResults = await Promise.all(
+        MirrorVsSidebarProvider._WORKSPACE_GLOB_PATTERNS.map(pattern =>
+          vscode.workspace.findFiles(pattern, undefined, 50, token),
+        ),
       );
 
-      if (token.signal.aborted) return;
+      if (token.isCancellationRequested) return;
 
-      const files: string[] = results
-        .filter(uri => {
-          const name = path.basename(uri.fsPath);
-          // Additional skip for file patterns (though .gitignore handles most)
-          return !name.startsWith('.');
-        })
-        .map(uri => path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, uri.fsPath))
-        .slice(0, 10000); // Safety cap
+      // Deduplicate and flatten results
+      const seen = new Set<string>();
+      const files: string[] = [];
+      for (const results of allResults) {
+        for (const uri of results) {
+          const relPath = path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, uri.fsPath);
+          if (!seen.has(relPath)) {
+            seen.add(relPath);
+            files.push(relPath);
+          }
+        }
+      }
+
+      // Hard cap what we send
+      files.sort();
+      const cappedFiles = files.slice(0, 300);
 
       this._view.webview.postMessage({
         type: 'workspaceFiles',
-        files,
+        files: cappedFiles,
       });
     } catch (e) {
       console.warn('Workspace files fetch failed:', e);
