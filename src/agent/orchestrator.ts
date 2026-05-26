@@ -67,24 +67,28 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 11. BROWSER EVALUATE SCRIPT: Usage: browser_evaluate_script script="..." />
  12. WAIT: Usage: wait ms="3000" />
     Use wait to pause execution for a specified number of milliseconds before continuing.
- 13. BROWSER SCREENSHOT: Usage: browser_screenshot name="descriptive_name" />
+ 13. BROWSER SCREENSHOT: Usage: browser_screenshot />
      There is an automatic 3-second delay before capture for page rendering.
-     Always provide a **descriptive `name`** so the file is saved directly as `.mirror-vs/screenshots/descriptive_name.png`.
-     NEVER use generic names like "screenshot". Use names that identify the page content,
-     e.g., `manufacturer_login_page`, `dashboard_overview`, `settings_panel`.
-     The screenshot is also sent to the vision model so you can see its content.
-     When building a **documentation report**, follow this workflow:
-       1. Navigate to page: `<browser_navigate url="http://localhost:3000/page" />`
-       2. Wait for render: `<wait ms="3000" />`
-       3. Screenshot with meaningful name: `<browser_screenshot name="manufacturer_login_page" />`
-       4. The vision result shows you the page content. Use it to **UPDATE** (patch_file) your
-          `.mirror-vs/screenshots/report.md` document immediately, adding the screenshot reference:
-          ```markdown
-          ![Manufacturer Login Page](manufacturer_login_page.png)
-          ```
-       5. Repeat for each page. The document is built incrementally — ONE screenshot at a time.
-     If the task fails midway and you restart, use `list_dir path=".mirror-vs/screenshots"` first
-     to see existing screenshots. Reuse them instead of re-capturing. Reference them directly in report.md.
+     The screenshot is saved as .mirror-vs/screenshots/screenshot_TIMESTAMP.png and the
+     image content is sent to the vision model so you can see the page visually.
+
+     **SCREENSHOT WORKFLOW (ONE AT A TIME):**
+       1. Navigate: browser_navigate url="PAGE_URL" />
+       2. Wait: wait ms="3000" />
+       3. Screenshot: browser_screenshot />
+       4. Vision result shows you the page. RENAME the file descriptively:
+          run_command command="Rename-Item '.mirror-vs/screenshots/screenshot_TIMESTAMP.png' 'manufacturer_login_page.png'" />
+       5. Immediately UPDATE your report.md:
+          patch_file path=".mirror-vs/screenshots/report.md">[SEARCH/REPLACE content]/patch_file>
+       6. REPEAT steps 1-5 for each page. NEVER batch screenshots.
+
+     **CLEANUP RULE**: Before starting a new documentation task, run:
+       run_command command="Remove-Item '.mirror-vs/screenshots/*.png' -Force" />
+     to delete old screenshots so you start fresh.
+
+     If restarting a partially-failed task, first run:
+       list_dir path=".mirror-vs/screenshots" />
+     to see existing screenshots, then reference them directly in report.md.
 14. RUN COMMAND: Usage: run_command command="npm install" />
 15. SEND TERMINAL INPUT: Usage: send_terminal_input terminal_name="...">Ctrl+C/send_terminal_input>
 16. CLOSE TERMINAL: Usage: close_terminal terminal_name="..." />

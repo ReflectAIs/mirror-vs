@@ -206,19 +206,11 @@ describe('AgentParser', () => {
       expect(calls[0].command).toContain('node');
     });
 
-    it('should parse browser_screenshot without name', () => {
+    it('should parse browser_screenshot', () => {
       const parser = makeParser();
       const calls = parser.parseToolCalls(selfClosing('browser_screenshot'));
       expect(calls).toHaveLength(1);
       expect(calls[0]).toEqual({ name: 'browser_screenshot' });
-    });
-
-    it('should parse browser_screenshot with name attribute', () => {
-      const parser = makeParser();
-      const calls = parser.parseToolCalls(selfClosing('browser_screenshot', 'name="manufacturer_login_page"'));
-      expect(calls).toHaveLength(1);
-      expect(calls[0].name).toBe('browser_screenshot');
-      expect(calls[0].screenshot_name).toBe('manufacturer_login_page');
     });
 
     it('should parse list_terminals', () => {

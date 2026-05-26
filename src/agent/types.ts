@@ -42,7 +42,6 @@ export interface ToolCall {
   script?: string;
   ms?: number;
   seconds?: number;
-  screenshot_name?: string;
 }
 
 export type ToolStatus = 'running' | 'success' | 'error';
