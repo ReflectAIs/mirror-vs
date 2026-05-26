@@ -198,7 +198,14 @@
         "mirror-vs.defaultDeepSeekModel": {
           "type": "string",
           "default": "deepseek-chat",
-          "description": "The DeepSeek model to use (e.g., deepseek-chat, deepseek-coder, deepseek-reasoner)."
+          "enum": [
+            "deepseek-chat",
+            "deepseek-coder",
+            "deepseek-reasoner",
+            "deepseek-v4-flash",
+            "deepseek-v4-pro"
+          ],
+          "description": "The DeepSeek model to use."
         },
         "mirror-vs.defaultProvider": {
           "type": "string",
