@@ -461,7 +461,10 @@ export class AgentParser {
         startFrom = tagInfo.end;
         continue;
       }
-      candidates.push({ index: tagInfo.start, tool: { name: 'browser_screenshot' } });
+      const name = this.attr(tagInfo.attrs, 'name');
+      const tool: ToolCall = { name: 'browser_screenshot' };
+      if (name) tool.screenshot_name = name.trim();
+      candidates.push({ index: tagInfo.start, tool });
       startFrom = tagInfo.end;
     }
 

@@ -60,19 +60,28 @@ Post-eval Visible Text (preview): ${summary.contentText || '(empty)'}`;
       // Capture real base64 screenshot for display in chat + vision models
       const base64 = await browserService.screenshot();
 
-      // Store screenshot to the .mirror-vs/screenshots folder in the workspace root
+      // Store screenshot with a descriptive name, or auto-generated if no name given
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       let fileSavedMsg = '';
+      let savedFileName = '';
       if (workspaceFolder) {
         try {
           const mirrorDir = path.join(workspaceFolder, '.mirror-vs', 'screenshots');
           if (!fs.existsSync(mirrorDir)) {
             fs.mkdirSync(mirrorDir, { recursive: true });
           }
-          const fileName = `screenshot_${Date.now()}.png`;
-          const filePath = path.join(mirrorDir, fileName);
+          // Use the provided name or fall back to timestamp
+          if (tool.screenshot_name) {
+            // Sanitize name — replace spaces/special chars with underscores, ensure .png
+            let baseName = tool.screenshot_name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+            if (!baseName.endsWith('.png')) baseName += '.png';
+            savedFileName = baseName;
+          } else {
+            savedFileName = `screenshot_${Date.now()}.png`;
+          }
+          const filePath = path.join(mirrorDir, savedFileName);
           fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
-          fileSavedMsg = `Saved screenshot to .mirror-vs/screenshots/${fileName}\n`;
+          fileSavedMsg = `Saved screenshot to .mirror-vs/screenshots/${savedFileName}\n`;
         } catch (err: any) {
           fileSavedMsg = `Failed to save screenshot to .mirror-vs/screenshots: ${err.message}\n`;
         }
