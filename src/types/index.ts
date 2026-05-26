@@ -128,7 +128,9 @@ export type WebviewToExtensionMessage =
   | { type: 'setLocale'; locale: string }
   // Session management queries from webview
   | { type: 'getChatSessions' }
-  | { type: 'getChatHistory' };
+  | { type: 'getChatHistory' }
+  // Workspace file requests (on-demand)
+  | { type: 'requestWorkspaceFiles' };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
