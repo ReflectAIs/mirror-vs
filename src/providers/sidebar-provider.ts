@@ -285,7 +285,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           if (!data.command) break;
           const svc = CommandService.getInstance();
           const termName =
-            (data as any).terminalName ||
+            data.terminalName ||
             `Mirror: ${data.command.length > 30 ? data.command.substring(0, 30) + '…' : data.command}`;
           const revealed = svc.revealTerminal(termName);
           if (!revealed) {
@@ -839,7 +839,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       title: s.title,
       timestamp: s.timestamp,
       messages: [],
-      messageCount: (s as any).messageCount || 0,
+      messageCount: s.messageCount || 0,
     }));
     this._view.webview.postMessage({
       type: 'updateChatSessions',
