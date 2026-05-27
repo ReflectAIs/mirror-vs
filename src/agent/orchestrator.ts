@@ -117,6 +117,35 @@ function getShellEnvDescription(): string {
   return "This is a macOS/Linux machine running bash/zsh.";
 }
 
+function hasActionPlanningIntent(text: string): boolean {
+  const lower = text.toLowerCase();
+  const patterns = [
+    /\bi'll start by\b/,
+    /\bi will start by\b/,
+    /\blet's start by\b/,
+    /\blet me start by\b/,
+    /\bfirst, i will\b/,
+    /\bfirst, let's\b/,
+    /\bfirst, let me\b/,
+    /\bfirst, i need to\b/,
+    /\bi will need to\b/,
+    /\bi'll need to\b/,
+    /\bi need to\b/,
+    /\bi'm going to\b/,
+    /\bi will analyze\b/,
+    /\bi'll analyze\b/,
+    /\bi will search\b/,
+    /\bi'll search\b/,
+    /\bi will read\b/,
+    /\bi'll read\b/,
+    /\bi will run\b/,
+    /\bi'll run\b/,
+    /\bi will check\b/,
+    /\bi'll check\b/
+  ];
+  return patterns.some(p => p.test(lower));
+}
+
 export function buildSystemPrompt(): string {
   const service = CommandService.getInstance();
   const terminals = service.getActiveTerminals();
@@ -512,6 +541,13 @@ export class AgentOrchestrator {
             consecutiveMalformedCount++;
             const errorMsg = "[Tool Parsing Error]: Your tool call was malformed or incomplete (attempt " + consecutiveMalformedCount + "/" + maxMalformedRetries + "). Please retry with correct XML syntax.";
             currentMessages.push({ role: "system", content: errorMsg });
+            await this._saveChatHistory(currentMessages);
+            continueLoop = true;
+          } else if (loopCount === 1 && hasActionPlanningIntent(assistantResponse)) {
+            // Conversational nudge: if the model gave a conversational greeting in its very first turn without calling any tools,
+            // but explicitly indicated that it plans to perform actions, we nudge it to execute a tool to keep the autonomous flow alive.
+            const nudgeMsg = "[System Notice]: You did not invoke any tool tags in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please output a valid tool tag now to continue autonomously.";
+            currentMessages.push({ role: "system", content: nudgeMsg });
             await this._saveChatHistory(currentMessages);
             continueLoop = true;
           }
