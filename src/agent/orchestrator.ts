@@ -310,56 +310,6 @@ export class AgentOrchestrator {
       await this._saveChatHistory(currentMessages);
     }
 
-    // Context optimization guardrail
-    const maxTurns = config.get("maxTurnsBeforeSummarize", 16);
-    const turnsToRetain = config.get("turnsToRetain", 6);
-    const activeMessages = currentMessages.filter((msg, idx) => {
-      if (idx === 0) return false;
-      if (msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]")) return false;
-      return !msg.summarized;
-    });
-
-    if (activeMessages.length > maxTurns) {
-      try {
-        const toSummarize = activeMessages.slice(0, activeMessages.length - turnsToRetain);
-        const existingSummaries = currentMessages.filter(
-          (msg) => msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]"),
-        );
-        this._postMessage({ type: "chatResponseStart" });
-        this._postMessage({
-          type: "chatResponseChunk",
-          text: "Compressing middle turns to optimize speed...",
-        });
-        const summary = await this._completer.summarizeHistory(
-          provider as LLMProvider,
-          ollamaHost,
-          provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
-          apiKey,
-          [...existingSummaries, ...toSummarize],
-        );
-        const summaryMsg: ChatMessage = { role: "system", content: "[CONSOLIDATED CONTEXT SUMMARY]\n" + summary };
-        const cleaned = currentMessages.filter(
-          (msg) => !(msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]")),
-        );
-        toSummarize.forEach((msg) => {
-          const found = cleaned.find((m) => m === msg);
-          if (found) {
-            found.summarized = true;
-            if (found.content.length > 2000) {
-              found.content = found.content.substring(0, 1000) + " [CONTENT REMOVED AFTER CONTEXT CONSOLIDATION] " + found.content.substring(found.content.length - 1000);
-            }
-            if (found.images) found.images = [];
-          }
-        });
-        currentMessages = [cleaned[0], summaryMsg, ...cleaned.slice(1)];
-        await this._saveChatHistory(currentMessages);
-        this._postMessage({ type: "updateChatHistory", history: currentMessages });
-        this._postMessage({ type: "chatResponseComplete", fullText: "Context optimized." });
-      } catch (e: unknown) {
-        console.warn("Failed to summarize history:", e instanceof Error ? e.message : String(e));
-      }
-    }
-
     await this._ensureGitBaseline();
 
     let loopCount = 0;
@@ -371,6 +321,56 @@ export class AgentOrchestrator {
     try {
       while (continueLoop && loopCount < maxLoops) {
         loopCount++;
+
+        // Context optimization guardrail (moved inside loop to fix context inflation loophole)
+        const maxTurns = config.get("maxTurnsBeforeSummarize", 16);
+        const turnsToRetain = config.get("turnsToRetain", 6);
+        const activeMessages = currentMessages.filter((msg, idx) => {
+          if (idx === 0) return false;
+          if (msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]")) return false;
+          return !msg.summarized;
+        });
+
+        if (activeMessages.length > maxTurns) {
+          try {
+            const toSummarize = activeMessages.slice(0, activeMessages.length - turnsToRetain);
+            const existingSummaries = currentMessages.filter(
+              (msg) => msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]"),
+            );
+            this._postMessage({ type: "chatResponseStart" });
+            this._postMessage({
+              type: "chatResponseChunk",
+              text: "Compressing middle turns to optimize speed...",
+            });
+            const summary = await this._completer.summarizeHistory(
+              provider as LLMProvider,
+              ollamaHost,
+              provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
+              apiKey,
+              [...existingSummaries, ...toSummarize],
+            );
+            const summaryMsg: ChatMessage = { role: "system", content: "[CONSOLIDATED CONTEXT SUMMARY]\n" + summary };
+            const cleaned = currentMessages.filter(
+              (msg) => !(msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]")),
+            );
+            toSummarize.forEach((msg) => {
+              const found = cleaned.find((m) => m === msg);
+              if (found) {
+                found.summarized = true;
+                if (found.content.length > 2000) {
+                  found.content = found.content.substring(0, 1000) + " [CONTENT REMOVED AFTER CONTEXT CONSOLIDATION] " + found.content.substring(found.content.length - 1000);
+                }
+                if (found.images) found.images = [];
+              }
+            });
+            currentMessages = [cleaned[0], summaryMsg, ...cleaned.slice(1)];
+            await this._saveChatHistory(currentMessages);
+            this._postMessage({ type: "updateChatHistory", history: currentMessages });
+            this._postMessage({ type: "chatResponseComplete", fullText: "Context optimized." });
+          } catch (e: unknown) {
+            console.warn("Failed to summarize history:", e instanceof Error ? e.message : String(e));
+          }
+        }
         continueLoop = false;
 
         const payload: ChatMessage[] = [
@@ -456,9 +456,9 @@ export class AgentOrchestrator {
               if (tool.name === "browser_screenshot") {
                 const match = result.match(/\(Image successfully captured and sent to vision model\)/);
                 if (match) displayResult = result.replace(match[0], "(Image captured)");
-              } else if (result.length > 35000) {
-                const keep = 17500;
-                const truncated = result.length - 35000;
+              } else if (result.length > 15000) {
+                const keep = 7500;
+                const truncated = result.length - 15000;
                 displayResult = result.substring(0, keep) + " [TRUNCATED " + truncated + " CHARS] " + result.substring(result.length - keep);
               }
               this._sendToolStatusToWebview(tool.name, "success", target, displayResult, checkpointId, tool.content, terminalName);
@@ -483,12 +483,12 @@ export class AgentOrchestrator {
               this._postMessage({ type: "screenshotCapture", base64: match[1] });
               return res.replace(match[0], "(Image successfully captured and sent to vision model)");
             }
-            if (res.length > 35000) {
+            if (res.length > 15000) {
               const prefixMatch = res.match(/^\[Tool Result for \w+ on "[^"]*"\]: (Success|Error) - /);
               const prefix = prefixMatch ? prefixMatch[0] : "";
               const content = prefix ? res.substring(prefix.length) : res;
-              const keep = 17500;
-              const truncated = content.length - 35000;
+              const keep = 7500;
+              const truncated = content.length - 15000;
               return prefix + content.substring(0, keep) + " [TRUNCATED " + truncated + " CHARS] " + content.substring(content.length - keep);
             }
             return res;

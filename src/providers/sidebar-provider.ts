@@ -651,7 +651,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
-    const htmlPath = vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.html');
+    const htmlPath = vscode.Uri.joinPath(this._context.extensionUri, 'dist', 'webview', 'sidebar.html');
 
     let htmlContent = '';
     try {
@@ -661,9 +661,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     const cssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.css'),
+      vscode.Uri.joinPath(this._context.extensionUri, 'dist', 'webview', 'sidebar.css'),
     );
-    const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'src', 'webview', 'sidebar.js'));
+    const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'dist', 'webview', 'sidebar.js'));
     const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, 'media', 'logo.png'));
     const cspSource = webview.cspSource;
 
