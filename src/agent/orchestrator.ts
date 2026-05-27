@@ -511,10 +511,10 @@ export class AgentOrchestrator {
           const images: string[] = [];
           const cleanedToolResults = toolResults.map((res) => {
             const match = res.match(/\(Base64 data hidden from output but sent to vision model: (.*)\)/);
-            if (hasScreenshot) {
-              images.push("captured");
-              this._postMessage({ type: "screenshotCapture", base64: "captured" });
-              return res.replace(/\(Image successfully captured and sent to vision model\)/g, "(Image captured)");
+            if (match) {
+              images.push(match[1]);
+              this._postMessage({ type: "screenshotCapture", base64: match[1] });
+              return res.replace(match[0], "(Image successfully captured and sent to vision model)");
             }
             if (res.length > 15000) {
               const prefixMatch = res.match(/^\[Tool Result for \w+ on "[^"]*"\]: (Success|Error) - /);
