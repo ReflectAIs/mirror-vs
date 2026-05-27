@@ -349,6 +349,10 @@ export class AgentOrchestrator {
 
     try {
       while (continueLoop && loopCount < maxLoops) {
+        if (signal.aborted) {
+          continueLoop = false;
+          break;
+        }
         loopCount++;
 
         // Context optimization guardrail (moved inside loop to fix context inflation loophole)
@@ -557,10 +561,13 @@ export class AgentOrchestrator {
       this._postMessage({ type: "updateChatHistory", history: currentMessages });
       this._postMessage({ type: "loopComplete" });
     } catch (err: unknown) {
-      this._sendAvatarState("error");
       if (signal.aborted) {
         console.log("Agent stream aborted.");
+        this._sendAvatarState("idle");
+        this._postMessage({ type: "updateChatHistory", history: currentMessages });
+        this._postMessage({ type: "loopComplete" });
       } else {
+        this._sendAvatarState("error");
         this._postMessage({ type: "chatResponseError", error: err instanceof Error ? err.message : String(err) });
       }
     } finally {

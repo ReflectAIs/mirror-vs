@@ -285,9 +285,9 @@ export async function applyCodeToActiveEditor(code: string, mode: 'insert' | 're
       }
       fs.writeFileSync(absolutePath, code, 'utf8');
 
-      // Open the newly created file in the editor
+      // Open the newly created file in the editor with preserveFocus: true to prevent focus hijacking
       const newDoc = await vscode.workspace.openTextDocument(absolutePath);
-      await vscode.window.showTextDocument(newDoc, { preview: false });
+      await vscode.window.showTextDocument(newDoc, { preview: false, preserveFocus: true });
 
       if (checkpointId) {
         vscode.window

@@ -180,10 +180,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
           }
 
-          // Append active file context if any before sending
-          const contextPrompt = getActiveFileContext();
-          fullMessageText += contextPrompt;
-
+          // Do NOT automatically append the entire open file's context.
+          // This prevents prompt pollution and saves massive amount of tokens.
           await this._orchestrator.handleMessageStream(fullMessageText, data.history, data.images);
           break;
         }

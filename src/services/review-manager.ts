@@ -320,10 +320,10 @@ export class ReviewManager implements vscode.CodeLensProvider {
       this._onDidChangeActiveReviews.fire();
       this.updateStatusBar();
 
-      // Open the original file in the active editor (now containing the clean proposed content)
+      // Open the original file in the active editor with preserveFocus: true to prevent focus hijacking
       vscode.workspace.openTextDocument(filePath).then(
         (doc) => {
-          vscode.window.showTextDocument(doc, { preview: false }).then((editor) => {
+          vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
             this.applyDecorations(editor);
           });
         },
