@@ -80,7 +80,8 @@ export async function executeTool(
     name === 'analyze_complexity' ||
     name === 'analyze_coverage' ||
     name === 'analyze_dead_code' ||
-    name === 'analyze_impact'
+    name === 'analyze_impact' ||
+    name === 'graphify'
   ) {
     const { executeCodeAnalysisTool } = await import('./code-analysis-tools.js');
     return await executeCodeAnalysisTool(tool);

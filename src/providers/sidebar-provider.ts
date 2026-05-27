@@ -534,14 +534,37 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private _resetAgentPlanAndMemory(): void {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return;
+    const primaryFolder = folders[0].uri.fsPath;
+    const planPath = path.join(primaryFolder, '.mirror-vs', 'plan.md');
+    
+    // Archive plan.md if it exists instead of deleting it to be safe
+    if (fs.existsSync(planPath)) {
+      try {
+        const archiveDir = path.join(primaryFolder, '.mirror-vs', 'archive');
+        if (!fs.existsSync(archiveDir)) {
+          fs.mkdirSync(archiveDir, { recursive: true });
+        }
+        const archivePlanPath = path.join(archiveDir, `plan_archived_${Date.now()}.md`);
+        fs.renameSync(planPath, archivePlanPath);
+        console.log(`[Session Reset] Archived plan.md to ${archivePlanPath}`);
+      } catch (e) {
+        try { fs.unlinkSync(planPath); } catch (_) { /* ignore */ }
+      }
+    }
+  }
+
   public async clearActiveChat() {
     this._orchestrator.cancelActiveStream();
+    this._resetAgentPlanAndMemory();
     await this._saveChatHistory([]);
     this._view?.webview.postMessage({
       type: 'updateChatHistory',
       history: [],
     });
-    vscode.window.showInformationMessage('Chat session cleared.');
+    vscode.window.showInformationMessage('Chat session cleared and agent checklist reset.');
   }
 
   private async _sendSettingsToWebview() {
@@ -769,6 +792,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     sessions.unshift(newSession);
     await this._storageService.saveSessions(sessions);
     await this._saveActiveSessionId(newSession.id);
+    this._resetAgentPlanAndMemory();
 
     this._sendChatSessionsToWebview();
     this._sendChatHistoryToWebview();

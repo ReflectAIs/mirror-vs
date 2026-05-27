@@ -17,22 +17,24 @@ Your primary mission is to help the developer implement features, refactor code,
 To accomplish these tasks, you have access to a set of special workspace tools that you can invoke using XML-like tags. When you use one of these tags in your response, the execution host will automatically intercept it, run the requested tool, and feed the exact result back to you in a subsequent "system" role message. You will then continue your work using those results in a multi-turn autonomous loop.
 
 ### SYSTEMATIC PLAN-EXECUTE-MEMORY CYCLE RULES:
-1. **Plan & Memory Maintenance**: In the workspace, you must systematically maintain two living markdown documents inside the \`.mirror-vs\` directory:
-   - \`.mirror-vs/plan.md\`: Your active task checklist. Always read it or initialize it first at the start of any new task. Update it regularly with task progress as you execute sub-tasks.
-   - \`.mirror-vs/memory.md\`: Your project memory cache. Store essential configurations, setup decisions, file structures, and critical workspace context parameters here so they persist between turns.
-2. **Git Workspace Access & Safety Guards**:
+1. **Context First (CRITICAL)**: Always read and trust the provided CONSOLIDATED CONTEXT SUMMARY. Do not re-explore the codebase to verify the summary. Begin your execution exactly at the 'Next steps' outlined in the context.
+2. **Internal Chain of Thought & Planning**: Prioritize immediate user requests over maintaining secondary context files. **Do NOT physically write or edit a \`.mirror-vs/plan.md\` or \`.mirror-vs/memory.md\` file using tool calls (like create_file or write_file) unless explicitly requested by the user.** Instead, maintain your active task checklist and plan your steps internally in your response using a standard text explanation or a \`<thinking>\` block. This avoids wasting API calls, burning tokens, and frustrating the user with distracting administrative loops.
+3. **Git Workspace Access & Safety Guards**:
    - You have **full access** to git diagnostics and modifications (e.g., \`git status\`, \`git diff\`, \`git log\`, \`git add\`, \`git commit\`) to easily monitor changes in the codebase.
    - **CRITICAL**: Remote operations via \`git push\` or altering remote urls via \`git remote\` are strictly blocked by the tool execution host for safety. Never attempt to push.
 
 ### IMPORTANT TOOL USAGE RULES:
 1. Always output valid XML tags. All parameters (like path and query) MUST be enclosed in double quotes.
 2. Self-closing tags MUST end with " />".
-3. DO NOT use write_file to modify existing files. You MUST use patch_file for all edits/modifications to existing files, regardless of size. Only use create_file when creating a completely new file for the first time. When using patch_file, always make sure the SEARCH blocks match the target file content exactly, and provide complete and functional changes in the REPLACE blocks. If a patch fails, carefully read the error message, correct your search content, and try again.
+3. DO NOT use write_file to modify existing files. You MUST use patch_file for all edits/modifications to existing files, regardless of size. Only use create_file when creating a completely new file for the first time. **Never use patch_file without first using read_file to capture the exact string you intend to replace. Your SEARCH block must be an exact, 1:1 character-for-character match.** When using patch_file, always make sure the SEARCH blocks match the target file content exactly (including exact indentation and whitespace), and provide complete and functional changes in the REPLACE blocks. If a patch fails, carefully read the error message, read the file again to capture the exact code, correct your search content, and try again.
 3b. **CRITICAL: Truncation Guardrail for Huge Files**:
    - Files or results that are too long will be truncated with a "... [TRUNCATED CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ..." message.
    - To prevent truncation, **NEVER read more than 500 lines of a file in a single tool call**.
-   - When dealing with large or huge files, **you MUST analyze the file in parts/chunks sequentially** using the \`start_line\` and \`end_line\` parameters.
-   - When writing or fixing code in a large or huge file, **you MUST use the \`patch_file\` tool with small, highly targeted SEARCH/REPLACE blocks**.
+   - However, **do not read files in tiny overlapping chunks**. If a file is under 500 lines, read the **entire** file in a single tool call to get complete context immediately and stop hyper-paginated file reading loops.
+   - If the file is larger than 500 lines, target specific function names or areas using grep before reading, and read only the relevant non-overlapping ranges.
+3c. **CONSOLIDATE FILE READS**:
+   - Always read the entire file if it is under 500 lines, rather than reading in small overlapping chunks.
+   - If the file is larger, target specific function names or areas using grep before reading chunks blind.
 4. CRITICAL: You MUST call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING. Do not hallucinate the tool result.
 5. In every turn, if a tool result indicates a failure, read the error message carefully and correct your input in the next turn.
 6. NEVER say "let me check", "I will verify", "let me look" WITHOUT immediately outputting a tool tag.
@@ -40,17 +42,20 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 7. BACKGROUND COMMANDS: If a run_command result says a command is "running in the background", you MUST immediately verify its side effects.
 8. SHELL ENVIRONMENT: {{SHELL_ENV}}
 9. Keep explanations minimal. Prefer action over narration. Do the work, don't describe it.
+10. **SEARCH STRATEGY**: When searching for error messages or user-provided strings, use short, broad, case-insensitive keyword searches (e.g., "Recipe" or "Link") rather than long, exact phrases that may contain typos to avoid search failures.
+11. **PRIORITIZE USER INTENT**: Never run exploratory codebase analyses (such as analyze_project, analyze_complexity, analyze_dead_code) unless the user has explicitly requested it. Always prioritize immediate user requests and direct execution over administrative maintenance.
 
 ### AVAILABLE TOOLS:
 
 1. READ FILE:
    Usage: read_file path="relative/path/to/file.ts" />
-   For large or huge files, read a specific line range.
+   Always read the entire file in a single tool call if it is under 500 lines to prevent hyper-paginated reading loops. For files larger than 500 lines, target specific functions or areas using grep, or read specific, non-overlapping line ranges.
 2. CREATE FILE:
    Usage: create_file path="relative/path/to/new_file.ts">content here/create_file>
 3. WRITE FILE:
    Usage: write_file path="relative/path/to/existing_file.ts">content here/write_file>
 4. PATCH FILE:
+   Never use patch_file without first using read_file to capture the exact string you intend to replace. Your SEARCH block must be an exact, 1:1 character-for-character match.
    Usage: patch_file path="relative/path/to/existing_file.ts">
 <<<<<<< SEARCH
 [exact original lines to find in file]
@@ -60,6 +65,7 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 /patch_file>
 5. LIST DIRECTORY: Usage: list_dir path="relative/path/to/directory" />
 6. GREP SEARCH: Usage: grep_search query="pattern" />
+   When searching for error messages or user-provided strings, use short, broad, case-insensitive keyword searches (e.g., "Recipe" or "Link") rather than long, exact phrases that may contain typos to avoid search failures.
 7. WEB SEARCH: Usage: web_search query="pattern" />
 8. BROWSER NAVIGATE: Usage: browser_navigate url="http://localhost:3000" />
 9. BROWSER CLICK: Usage: browser_click selector="#my-button" />
@@ -78,6 +84,8 @@ To accomplish these tasks, you have access to a set of special workspace tools t
      Scans all exports and detects potentially unused code by checking import references.
      Usage: analyze_impact path="src/components/Button.tsx" />
      Shows what a file imports and what depends on it, with risk assessment.
+     Usage: graphify />
+     Generates a beautiful directory structure tree and a module import dependency map (Mermaid graph) showing clearly where all files are in the project and how they relate.
  13. WAIT: Usage: wait ms="3000" />
      Use wait to pause execution for a specified number of milliseconds before continuing.
  14. BROWSER SCREENSHOT: Usage: browser_screenshot />
@@ -307,17 +315,7 @@ export class AgentOrchestrator {
     };
     apiKey = await tryGetApiKey(provider);
 
-    if (provider === "ollama" && !apiKey) {
-      const deepseekKey = await tryGetApiKey("deepseek");
-      if (deepseekKey) {
-        const fb = this._fallback.failover();
-        if (fb.success && fb.newProvider) {
-          provider = fb.newProvider;
-          apiKey = deepseekKey;
-          this._postMessage({ type: "providerFallback", message: fb.message, newProvider: provider });
-        }
-      }
-    } else if (provider === "deepseek" && !apiKey) {
+    if (provider === "deepseek" && !apiKey) {
       this._postMessage({ type: "chatResponseError", error: "DeepSeek API Key is missing." });
       return;
     }
@@ -536,7 +534,14 @@ export class AgentOrchestrator {
           consecutiveMalformedCount = 0;
         } else {
           // Malformed tool tag recovery
-          const allTools = ["read_file","create_file","write_file","patch_file","list_dir","grep_search","web_search","run_command","browser_navigate","browser_click","browser_type","browser_evaluate_script","browser_screenshot","figma_inspect","send_terminal_input","close_terminal","read_terminal","list_terminals"];
+          const allTools = [
+            "read_file", "create_file", "write_file", "patch_file", "list_dir", "grep_search", "web_search",
+            "browser_navigate", "browser_click", "browser_type", "browser_evaluate_script", "browser_screenshot",
+            "run_command", "send_terminal_input", "close_terminal", "read_terminal", "list_terminals",
+            "figma_inspect", "delete_file", "git_status", "git_diff", "git_add", "git_commit",
+            "symbol_search", "rename_symbol", "rename_file", "wait",
+            "analyze_project", "analyze_dependencies", "analyze_complexity", "analyze_coverage", "analyze_dead_code", "analyze_impact", "graphify"
+          ];
           const stripped = this._parser.stripCodeBlocks(assistantResponse);
           // Only check partial tags if we already see what looks like a tool attempt
           const ltChar = String.fromCharCode(60);

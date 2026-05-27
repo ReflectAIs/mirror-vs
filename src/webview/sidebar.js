@@ -47,6 +47,7 @@
   let chatHistory = [];
   let currentStreamingBubble = null;
   let currentStreamingText = '';
+  let currentStreamingReasoningText = '';
   let activeProvider = 'ollama';
   let isSending = false;
   let savedDefaultOllamaModel = 'llama3';
@@ -190,8 +191,30 @@
   providerOllamaBtn.addEventListener('click', () => {
     selectProvider('ollama');
     vscode.postMessage({ type: 'fetchModels' });
+    saveProviderSettings('ollama');
   });
-  providerDeepseekBtn.addEventListener('click', () => selectProvider('deepseek'));
+  providerDeepseekBtn.addEventListener('click', () => {
+    selectProvider('deepseek');
+    saveProviderSettings('deepseek');
+  });
+
+  function saveProviderSettings(provider) {
+    const ollamaHost = ollamaHostInput.value.trim();
+    const defaultOllamaModel = ollamaModelSelect.value;
+    const defaultDeepSeekModel = deepseekModelSelect.value;
+    const maxTurns = parseInt(maxTurnsInput.value.trim(), 10) || 16;
+    const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
+
+    vscode.postMessage({
+      type: 'saveSettings',
+      provider,
+      ollamaHost,
+      defaultOllamaModel,
+      defaultDeepSeekModel,
+      maxTurnsBeforeSummarize: maxTurns,
+      turnsToRetain: turnsToRetain
+    });
+  }
 
   function selectProvider(provider) {
     activeProvider = provider;
@@ -342,6 +365,10 @@
       if (/\s/.test(query)) {
         closeAutocomplete();
         return;
+      }
+      
+      if (workspaceFiles.length === 0) {
+        vscode.postMessage({ type: 'requestWorkspaceFiles' });
       }
       
       autocompleteQuery = query;
@@ -529,6 +556,40 @@ function attachImage(base64) {
     });
   }
 
+  function clearAllActiveAnimations() {
+    // 1. Clear any running tool cards
+    const runningCards = document.querySelectorAll('.tool-card.running');
+    runningCards.forEach(card => {
+      const toolName = card.getAttribute('data-tool') || 'tool';
+      const target = card.getAttribute('data-target') || '';
+      const parent = card.parentNode;
+      if (parent) {
+        const updatedCard = createToolCardDOM(toolName, 'error', target, 'Interrupted/Stopped', null, false, null, null);
+        parent.replaceChild(updatedCard, card);
+      }
+    });
+    currentToolCardElement = null;
+
+    // 2. Remove typing indicator / think animations
+    const typingIndicators = document.querySelectorAll('.typing-indicator');
+    typingIndicators.forEach(indicator => {
+      const parent = indicator.parentNode;
+      if (parent) {
+        parent.removeChild(indicator);
+      }
+    });
+
+    // 3. Clear any streaming code blocks / write cards
+    const streamingWriteCards = document.querySelectorAll('.tool-card.streaming-write-card');
+    streamingWriteCards.forEach(card => {
+      card.classList.remove('running');
+      const badge = card.querySelector('.tool-status-badge');
+      if (badge) badge.textContent = 'Interrupted';
+      const scanBar = card.querySelector('.scanning-bar');
+      if (scanBar) scanBar.parentNode.removeChild(scanBar);
+    });
+  }
+
   // Stop button handler
   stopBtn.addEventListener('click', () => {
     vscode.postMessage({ type: 'cancelStream' });
@@ -538,6 +599,7 @@ function attachImage(base64) {
     stopBtn.classList.add('hidden');
     sendBtn.classList.remove('hidden');
     setAvatarState('idle');
+    clearAllActiveAnimations();
   });
 
   // 7. Core Message Submission with Slash Command Support
@@ -606,6 +668,7 @@ function attachImage(base64) {
     assistantBubble.appendChild(typingIndicator);
     currentStreamingBubble = assistantBubble;
     currentStreamingText = '';
+    currentStreamingReasoningText = '';
 
     scrollChatToBottom(true);
 
@@ -629,6 +692,8 @@ function attachImage(base64) {
   function createToolCardDOM(toolName, status, target, result, checkpointId, isReverted = false, code = null, terminalName = null) {
     const card = document.createElement('div');
     card.className = `tool-card ${status}`;
+    card.setAttribute('data-tool', toolName);
+    card.setAttribute('data-target', target || '');
     if (isReverted) {
       card.classList.add('reverted');
     }
@@ -1149,6 +1214,11 @@ function attachImage(base64) {
 
       case 'workspaceFiles': {
         workspaceFiles = message.files || [];
+        const textBeforeCursor = promptInput.value.substring(0, promptInput.selectionStart);
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+        if (atIndex !== -1 && (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1]))) {
+          handleAutocompleteSearch();
+        }
         break;
       }
 
@@ -1170,6 +1240,7 @@ function attachImage(base64) {
           assistantBubble.appendChild(typingIndicator);
           currentStreamingBubble = assistantBubble;
           currentStreamingText = '';
+          currentStreamingReasoningText = '';
         }
         break;
       }
@@ -1178,15 +1249,40 @@ function attachImage(base64) {
         if (!currentStreamingBubble) {
           return;
         }
-        setAvatarState('coding');
 
         const loader = currentStreamingBubble.querySelector('.typing-indicator');
         if (loader) {
           currentStreamingBubble.removeChild(loader);
         }
 
-        currentStreamingText += message.text;
-        const html = parseMarkdown(currentStreamingText);
+        if (message.reasoningText) {
+          currentStreamingReasoningText += message.reasoningText;
+          setAvatarState('thinking');
+        } else {
+          setAvatarState('coding');
+        }
+
+        if (message.text) {
+          currentStreamingText += message.text;
+        }
+
+        let html = '';
+        if (currentStreamingReasoningText) {
+          html += `
+            <details class="thought-container" open>
+              <summary class="thought-header">
+                <span class="thought-chevron">▶</span>
+                <span class="thought-icon">🧠</span>
+                <span class="thought-title">Thought Process</span>
+              </summary>
+              <div class="thought-body">${parseMarkdown(currentStreamingReasoningText)}</div>
+            </details>
+          `;
+        }
+
+        if (currentStreamingText) {
+          html += parseMarkdown(currentStreamingText);
+        }
 
         const existingCard = currentStreamingBubble.querySelector('.streaming-write-card');
         if (existingCard) {
@@ -1239,11 +1335,28 @@ function attachImage(base64) {
 
         currentStreamingText = message.fullText;
         extractToolContents(currentStreamingText);
-        currentStreamingBubble.innerHTML = parseMarkdown(currentStreamingText);
+
+        let html = '';
+        if (currentStreamingReasoningText) {
+          html += `
+            <details class="thought-container">
+              <summary class="thought-header">
+                <span class="thought-chevron">▶</span>
+                <span class="thought-icon">🧠</span>
+                <span class="thought-title">Thought Process</span>
+              </summary>
+              <div class="thought-body">${parseMarkdown(currentStreamingReasoningText)}</div>
+            </details>
+          `;
+        }
+        html += parseMarkdown(currentStreamingText);
+
+        currentStreamingBubble.innerHTML = html;
         bindCodeBlockButtons(currentStreamingBubble);
 
         currentStreamingBubble = null;
         currentStreamingText = '';
+        currentStreamingReasoningText = '';
         scrollChatToBottom();
         break;
       }
@@ -1276,9 +1389,11 @@ function attachImage(base64) {
         promptInput.focus();
         currentStreamingBubble = null;
         currentStreamingText = '';
+        currentStreamingReasoningText = '';
         setAvatarState('idle');
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
+        clearAllActiveAnimations();
         scrollChatToBottom();
         break;
       }
@@ -1304,6 +1419,7 @@ function attachImage(base64) {
         currentStreamingBubble = null;
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
+        clearAllActiveAnimations();
         scrollChatToBottom();
         break;
       }
@@ -1630,7 +1746,12 @@ function attachImage(base64) {
     }
 
     // Clean self-closing or simple tools
-    const selfClosingTools = ['read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals', 'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol'];
+    const selfClosingTools = [
+      'read_file', 'list_dir', 'grep_search', 'browser_navigate', 'browser_click', 'browser_type', 'browser_screenshot',
+      'run_command', 'close_terminal', 'read_terminal', 'list_terminals', 'delete_file', 'git_status', 'git_diff', 'git_add',
+      'symbol_search', 'rename_symbol', 'wait',
+      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify'
+    ];
     for (const tool of selfClosingTools) {
       let tagInfo;
       let startFrom = 0;

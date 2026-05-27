@@ -142,7 +142,7 @@ export type WebviewToExtensionMessage =
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
-  | { type: 'chatResponseChunk'; text: string }
+  | { type: 'chatResponseChunk'; text: string; reasoningText?: string }
   | { type: 'chatResponseComplete'; fullText: string }
   | { type: 'chatResponseError'; error: string }
   | { type: 'chatResponseStart' }

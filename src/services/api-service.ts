@@ -250,6 +250,7 @@ export function streamDeepSeekChat(
   onChunk: (text: string) => void,
   onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
   onError: (err: any) => void,
+  onReasoningChunk?: (text: string) => void,
 ): void {
   const urlStr = 'https://api.deepseek.com/chat/completions';
   const parsedUrl = new URL(urlStr);
@@ -320,6 +321,10 @@ export function streamDeepSeekChat(
           try {
             const parsed = JSON.parse(jsonStr);
             const chunkText = parsed.choices?.[0]?.delta?.content || '';
+            const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning_content || '';
+            if (reasoningChunk && onReasoningChunk) {
+              onReasoningChunk(reasoningChunk);
+            }
             if (chunkText) {
               fullText += chunkText;
               onChunk(chunkText);

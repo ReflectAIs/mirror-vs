@@ -49,49 +49,62 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   const query = tool.query.toLowerCase();
   const results: string[] = [];
 
-  const search = (dir: string) => {
-    const list = fs.readdirSync(dir);
-    for (const item of list) {
-      if (['node_modules', 'dist', 'out', '.git', '.mirror-vs'].includes(item)) continue;
-      const fullPath = path.join(dir, item);
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        search(fullPath);
-      } else if (stat.isFile()) {
-        try {
-          let content = '';
-          const proposed = ReviewManager.getInstance().getProposedContent(fullPath);
-          if (proposed !== undefined) {
-            content = proposed;
-          } else {
-            content = fs.readFileSync(fullPath, 'utf8');
-          }
-          if (content.toLowerCase().includes(query)) {
-            const lines = content.split('\n');
-            lines.forEach((line, idx) => {
-              if (line.toLowerCase().includes(query)) {
-                // Find which workspace folder this file belongs to for a clean relative path
-                let relPath = fullPath;
-                for (const wf of workspaceFolders) {
-                  const prefix = wf.uri.fsPath + '/';
-                  if (fullPath.startsWith(prefix)) {
-                    relPath = fullPath.slice(prefix.length);
-                    break;
-                  }
-                }
-                results.push(`${relPath}:${idx + 1}: ${line.trim()}`);
-              }
-            });
-          }
-        } catch (e) {
-          // Ignore binary/read errors
+  // Use vscode.workspace.findFiles for highly optimized workspace scanning
+  const files = await vscode.workspace.findFiles(
+    '**/*',
+    '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/bin/**,**/obj/**,**/*.png,**/*.jpg,**/*.jpeg,**/*.gif,**/*.ico,**/*.svg,**/*.pdf,**/*.zip,**/*.exe,**/*.dll}'
+  );
+
+  const uris = [...files];
+  const concurrency = 50;
+  const worker = async () => {
+    while (uris.length > 0) {
+      const uri = uris.pop();
+      if (!uri) break;
+      const fullPath = uri.fsPath;
+      
+      const ext = path.extname(fullPath).toLowerCase();
+      if (['.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.o', '.obj'].includes(ext)) {
+        continue;
+      }
+
+      try {
+        let content = '';
+        const proposed = ReviewManager.getInstance().getProposedContent(fullPath);
+        if (proposed !== undefined) {
+          content = proposed;
+        } else {
+          const stat = await fs.promises.stat(fullPath);
+          if (stat.size > 1024 * 1024) continue; // Skip files larger than 1MB
+          content = await fs.promises.readFile(fullPath, 'utf8');
         }
+
+        if (content.toLowerCase().includes(query)) {
+          const lines = content.split('\n');
+          lines.forEach((line, idx) => {
+            if (line.toLowerCase().includes(query)) {
+              let relPath = fullPath;
+              for (const wf of workspaceFolders) {
+                const prefix = wf.uri.fsPath + path.sep;
+                if (fullPath.startsWith(prefix)) {
+                  relPath = fullPath.slice(prefix.length);
+                  break;
+                }
+              }
+              relPath = relPath.replace(/\\/g, '/');
+              results.push(`${relPath}:${idx + 1}: ${line.trim()}`);
+            }
+          });
+        }
+      } catch (e) {
+        // Ignore read/stat errors
       }
     }
   };
 
-  for (const wf of workspaceFolders) {
-    search(wf.uri.fsPath);
-  }
+  const workers = Array.from({ length: concurrency }, () => worker());
+  await Promise.all(workers);
+
   return results.slice(0, 40).join('\n') || 'No matches found.';
 }
+

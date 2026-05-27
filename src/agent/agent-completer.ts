@@ -53,6 +53,10 @@ export class AgentCompleter {
         this._postMessage({ type: 'chatResponseChunk', text: chunk, sessionId: _sessionId });
       };
 
+      const onReasoningChunk = (reasoningChunk: string) => {
+        this._postMessage({ type: 'chatResponseChunk', text: '', reasoningText: reasoningChunk, sessionId: _sessionId });
+      };
+
       const onComplete = (fullText: string, _usage?: { promptTokens: number; completionTokens: number }) => {
         this._lastLatencyMeasurement = performance.now() - startTime;
         this._telemetry.recordCall({
@@ -86,6 +90,7 @@ export class AgentCompleter {
           onChunk,
           onComplete,
           onError,
+          onReasoningChunk,
         );
       } else {
         streamOllamaChat(

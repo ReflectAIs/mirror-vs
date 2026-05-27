@@ -34,7 +34,8 @@ export interface ToolCall {
   | 'analyze_complexity'
   | 'analyze_coverage'
   | 'analyze_dead_code'
-  | 'analyze_impact';
+  | 'analyze_impact'
+  | 'graphify';
   path?: string;
   query?: string;
   content?: string;

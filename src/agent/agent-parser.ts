@@ -114,6 +114,7 @@ export class AgentParser {
       'read_terminal', 'list_terminals',
       'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
       'wait',
+      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify',
     ];
     for (const tool of selfClosingTools) {
       let startFrom = 0;
@@ -167,6 +168,7 @@ export class AgentParser {
       'read_terminal', 'list_terminals',
       'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
       'wait',
+      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify',
     ];
     let earliestEnd = -1;
     for (const tool of selfClosingTools) {
@@ -566,6 +568,39 @@ export class AgentParser {
         continue;
       }
       candidates.push({ index: tagInfo.start, tool: { name: 'list_terminals' } });
+      startFrom = tagInfo.end;
+    }
+
+    // codebase analysis tools
+    const codeAnalysisTools = [
+      'analyze_project',
+      'analyze_dependencies',
+      'analyze_complexity',
+      'analyze_coverage',
+      'analyze_dead_code',
+      'graphify',
+    ];
+    for (const toolName of codeAnalysisTools) {
+      startFrom = 0;
+      while ((tagInfo = this.findUnquotedTagEndEx(rawText, toolName, startFrom)) !== null) {
+        if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+          startFrom = tagInfo.end;
+          continue;
+        }
+        candidates.push({ index: tagInfo.start, tool: { name: toolName as ToolCall['name'] } });
+        startFrom = tagInfo.end;
+      }
+    }
+
+    // analyze_impact
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'analyze_impact', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      candidates.push({ index: tagInfo.start, tool: { name: 'analyze_impact', path: p ? p.trim() : undefined } });
       startFrom = tagInfo.end;
     }
 

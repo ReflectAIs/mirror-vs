@@ -276,6 +276,24 @@ describe('AgentParser', () => {
       expect(calls[0]).toEqual({ name: 'figma_inspect', url: 'https://figma.com/file/test' });
     });
 
+    it('should parse analyze_project and other code analysis tools', () => {
+      const parser = makeParser();
+      const analyzeProjectCalls = parser.parseToolCalls(selfClosing('analyze_project'));
+      expect(analyzeProjectCalls).toHaveLength(1);
+      expect(analyzeProjectCalls[0]).toEqual({ name: 'analyze_project' });
+
+      const graphifyCalls = parser.parseToolCalls(selfClosing('graphify'));
+      expect(graphifyCalls).toHaveLength(1);
+      expect(graphifyCalls[0]).toEqual({ name: 'graphify' });
+    });
+
+    it('should parse analyze_impact with path', () => {
+      const parser = makeParser();
+      const calls = parser.parseToolCalls(selfClosing('analyze_impact', 'path="src/index.ts"'));
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toEqual({ name: 'analyze_impact', path: 'src/index.ts' });
+    });
+
     it('should parse write_file and strip CDATA wrapper if present', () => {
       const parser = makeParser();
       const input = blockOpen('write_file', 'path="src/index.ts"') + '<![CDATA[console.log("hello");]]>' + blockClose('write_file');

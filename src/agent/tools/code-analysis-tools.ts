@@ -441,6 +441,110 @@ function impact(root: string, target: string): string {
   return lines.join('\n');
 }
 
+function graphify(root: string): string {
+  const all = collectSrc(root);
+  
+  // 1. Build directory tree
+  const treeNodes = new Map<string, string[]>();
+  const addPathToTree = (relPath: string) => {
+    const parts = relPath.split('/');
+    for (let i = 0; i < parts.length - 1; i++) {
+      const parent = parts.slice(0, i + 1).join('/');
+      const child = parts.slice(0, i + 2).join('/');
+      if (!treeNodes.has(parent)) treeNodes.set(parent, []);
+      const children = treeNodes.get(parent)!;
+      if (!children.includes(child)) children.push(child);
+    }
+  };
+
+  const relFiles = all.map(f => path.relative(root, f).replace(/\\/g, '/'));
+  
+  const roots = new Set<string>();
+  for (const f of relFiles) {
+    addPathToTree(f);
+    const firstPart = f.split('/')[0];
+    roots.add(firstPart);
+  }
+
+  const printTree = (node: string, prefix: string = '', isLast: boolean = true): string => {
+    const name = path.basename(node);
+    let output = prefix + (isLast ? '└── ' : '├── ') + name + '\n';
+    const newPrefix = prefix + (isLast ? '    ' : '│   ');
+    const children = treeNodes.get(node) || [];
+    const subDirs = children;
+    const leafFiles = relFiles.filter(f => {
+      const dir = path.dirname(f);
+      return (dir === node && !subDirs.some(sd => sd === f)) || (node === f && !treeNodes.has(f));
+    });
+
+    const allChildren = [
+      ...subDirs.map(sd => ({ path: sd, isDir: true })),
+      ...leafFiles.map(lf => ({ path: lf, isDir: false }))
+    ].sort((a, b) => a.path.localeCompare(b.path));
+
+    allChildren.forEach((child, idx) => {
+      const last = idx === allChildren.length - 1;
+      if (child.isDir) {
+        output += printTree(child.path, newPrefix, last);
+      } else {
+        output += newPrefix + (last ? '└── ' : '├── ') + path.basename(child.path) + '\n';
+      }
+    });
+    return output;
+  };
+
+  let treeOutput = '📂 **Project Structure Tree:**\n```\n';
+  const rootList = Array.from(roots).sort();
+  rootList.forEach((r, idx) => {
+    const last = idx === rootList.length - 1;
+    if (treeNodes.has(r) || relFiles.includes(r)) {
+      if (treeNodes.has(r)) {
+        treeOutput += printTree(r, '', last);
+      } else {
+        treeOutput += (last ? '└── ' : '├── ') + r + '\n';
+      }
+    }
+  });
+  treeOutput += '```\n\n';
+
+  // 2. Build Dependency graph
+  const impMap = new Map<string, string[]>();
+  for (const f of all) {
+    const rel = path.relative(root, f).replace(/\\/g, '/');
+    const deps: string[] = [];
+    for (const e of parseImports(f)) {
+      const r = resolve(f, e.to, root);
+      if (r) deps.push(path.relative(root, r).replace(/\\/g, '/'));
+    }
+    if (deps.length > 0) impMap.set(rel, deps);
+  }
+
+  let depOutput = '🔗 **Module Dependency Graph (Mermaid):**\n```mermaid\ngraph TD\n';
+  const connections: string[] = [];
+  const nodeIds = new Map<string, string>();
+  let idCounter = 0;
+  const getNodeId = (filePath: string) => {
+    if (!nodeIds.has(filePath)) {
+      idCounter++;
+      nodeIds.set(filePath, `N${idCounter}`);
+    }
+    return nodeIds.get(filePath)!;
+  };
+
+  for (const [file, deps] of impMap.entries()) {
+    const fromId = getNodeId(file);
+    depOutput += `  ${fromId}["${file}"]\n`;
+    for (const d of deps) {
+      const toId = getNodeId(d);
+      depOutput += `  ${toId}["${d}"]\n`;
+      connections.push(`  ${fromId} --> ${toId}`);
+    }
+  }
+  depOutput += connections.join('\n') + '\n```\n';
+
+  return treeOutput + depOutput;
+}
+
 // ── Main Export ──
 export async function executeCodeAnalysisTool(tool: ToolCall): Promise<string> {
   const start = Date.now();
@@ -465,6 +569,9 @@ export async function executeCodeAnalysisTool(tool: ToolCall): Promise<string> {
     case 'analyze_impact':
       if (!tool.path) throw new Error('Missing "path" for analyze_impact.');
       result = impact(root, tool.path);
+      break;
+    case 'graphify':
+      result = graphify(root);
       break;
     default:
       throw new Error(`Unknown code analysis tool: ${tool.name}`);
