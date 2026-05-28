@@ -12,6 +12,14 @@ import * as fs from "fs";
 
 const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
 
+********************************************************************************
+CRITICAL: LANGUAGE CONSTRAINT
+- You MUST communicate, think, and respond in the same language as the user's message.
+- If the user writes or speaks to you in English, you MUST respond in English. Do not randomly shift or drift to Chinese (中文) or any other language.
+- If the user writes or speaks to you in another language, you should respond in that matching language.
+- Keep your internal thinking, plans, explanations, and replies in the matched language.
+********************************************************************************
+
 Your primary mission is to help the developer implement features, refactor code, find bugs, and manage files automatically with minimum friction.
 
 To accomplish these tasks, you have access to a set of special workspace tools that you can invoke using XML-like tags. When you use one of these tags in your response, the execution host will automatically intercept it, run the requested tool, and feed the exact result back to you in a subsequent "system" role message. You will then continue your work using those results in a multi-turn autonomous loop.
@@ -44,6 +52,8 @@ To accomplish these tasks, you have access to a set of special workspace tools t
 9. Keep explanations minimal. Prefer action over narration. Do the work, don't describe it.
 10. **SEARCH STRATEGY**: When searching for error messages or user-provided strings, use short, broad, case-insensitive keyword searches (e.g., "Recipe" or "Link") rather than long, exact phrases that may contain typos to avoid search failures.
 11. **PRIORITIZE USER INTENT**: Never run exploratory codebase analyses (such as analyze_project, analyze_complexity, analyze_dead_code) unless the user has explicitly requested it. Always prioritize immediate user requests and direct execution over administrative maintenance.
+12. **LANGUAGE CONSTRAINT (CRITICAL)**: You MUST communicate and write all responses, thoughts, plans, and explanations in the same language as the user's message. For example, if the user interacts in English, you must respond strictly in English and never randomly shift to Chinese or any other language. If the user interacts in another language, you must respond in that matching language.
+
 
 ### AVAILABLE TOOLS:
 
@@ -235,16 +245,12 @@ export class AgentOrchestrator {
       fs.writeFileSync(gitignorePath, gitignoreContent.trimEnd() + "\n" + missing.join("\n") + "\n", "utf8");
       this._gitExec(["add", ".gitignore"], workspaceFolder);
     }
-    const dirty = this._gitExec(["status", "--porcelain"], workspaceFolder).trim();
-    if (dirty) {
-      this._gitExec(["add", "-A"], workspaceFolder);
-      this._gitExec(["commit", "-m", "Mirror VS: baseline snapshot before agent task"], workspaceFolder);
-    } else {
-      const hasCommit = this._gitExec(["log", "--oneline", "-1"], workspaceFolder).trim();
-      if (!hasCommit) {
-        this._gitExec(["add", "-A"], workspaceFolder);
-        this._gitExec(["commit", "-m", "Mirror VS: initial baseline"], workspaceFolder);
-      }
+    
+    // Ensure at least one commit exists in the repo so that standard git commands function properly,
+    // but NEVER automatically stage or commit the developer's dirty workspace changes.
+    const hasCommit = this._gitExec(["log", "--oneline", "-1"], workspaceFolder).trim();
+    if (!hasCommit) {
+      this._gitExec(["commit", "--allow-empty", "-m", "Mirror VS: initial empty baseline"], workspaceFolder);
     }
   }
 

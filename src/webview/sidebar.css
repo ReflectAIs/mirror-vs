@@ -935,26 +935,25 @@ select:focus {
 }
 
 .message-bubble {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--text-primary);
   word-wrap: break-word;
   overflow-wrap: break-word;
-  transition: border-color 0.2s var(--ease-out);
 }
 
 .user .message-bubble {
-  background: rgba(99, 102, 241, 0.04);
-  border-color: rgba(99, 102, 241, 0.12);
+  background: transparent;
+  border: none;
 }
 
 .system .message-bubble {
-  background: rgba(168, 85, 247, 0.03);
-  border-color: rgba(168, 85, 247, 0.08);
+  background: transparent;
+  border: none;
 }
 
 .message-bubble p { margin-bottom: 8px; }
@@ -2488,4 +2487,39 @@ select:focus {
 
 .thought-body li {
   margin: 4px 0;
+}
+
+/* ─── SLOW PULSING MASCOT/MODEL THINKING FLASH ───────────────────────────── */
+@keyframes slow-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.thinking-flash {
+  animation: slow-pulse 2.2s infinite ease-in-out;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--color-primary-light);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: var(--radius-md);
+  background: rgba(168, 85, 247, 0.04);
+  margin: 8px 0 12px 0;
+  user-select: none;
+  width: fit-content;
+}
+
+.thinking-flash .thought-icon {
+  font-size: 12px;
+}
+
+.thinking-flash .thought-title {
+  font-family: inherit;
 }

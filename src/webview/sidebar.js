@@ -1267,16 +1267,12 @@ function attachImage(base64) {
         }
 
         let html = '';
-        if (currentStreamingReasoningText) {
+        if (currentStreamingReasoningText && !currentStreamingText) {
           html += `
-            <details class="thought-container" open>
-              <summary class="thought-header">
-                <span class="thought-chevron">▶</span>
-                <span class="thought-icon">🧠</span>
-                <span class="thought-title">Thought Process</span>
-              </summary>
-              <div class="thought-body">${parseMarkdown(currentStreamingReasoningText)}</div>
-            </details>
+            <div class="thinking-flash">
+              <span class="thought-icon">🧠</span>
+              <span class="thought-title">Thinking...</span>
+            </div>
           `;
         }
 
@@ -1337,18 +1333,6 @@ function attachImage(base64) {
         extractToolContents(currentStreamingText);
 
         let html = '';
-        if (currentStreamingReasoningText) {
-          html += `
-            <details class="thought-container">
-              <summary class="thought-header">
-                <span class="thought-chevron">▶</span>
-                <span class="thought-icon">🧠</span>
-                <span class="thought-title">Thought Process</span>
-              </summary>
-              <div class="thought-body">${parseMarkdown(currentStreamingReasoningText)}</div>
-            </details>
-          `;
-        }
         html += parseMarkdown(currentStreamingText);
 
         currentStreamingBubble.innerHTML = html;

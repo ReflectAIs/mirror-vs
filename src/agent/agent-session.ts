@@ -85,19 +85,11 @@ export class AgentSession {
       this._gitExec(['add', '.gitignore'], workspaceFolder);
     }
 
-    // 3. Check if there are any tracked modified files already — commit them as baseline
-    const dirty = this._gitExec(['status', '--porcelain'], workspaceFolder).trim();
-    if (dirty) {
-      this._gitExec(['add', '-A'], workspaceFolder);
-      // Only commit tracked files — untracked files (new) will remain unstaged so they show green in VS Code
-      this._gitExec(['commit', '-m', 'Mirror VS: baseline snapshot before agent task'], workspaceFolder);
-    } else {
-      // Ensure at least one commit exists (needed for diff gutters to work)
-      const hasCommit = this._gitExec(['log', '--oneline', '-1'], workspaceFolder).trim();
-      if (!hasCommit) {
-        this._gitExec(['add', '-A'], workspaceFolder);
-        this._gitExec(['commit', '-m', 'Mirror VS: initial baseline'], workspaceFolder);
-      }
+    // 3. Ensure at least one commit exists in the repo so that standard git commands function properly,
+    // but NEVER automatically stage or commit the developer's dirty workspace changes.
+    const hasCommit = this._gitExec(['log', '--oneline', '-1'], workspaceFolder).trim();
+    if (!hasCommit) {
+      this._gitExec(['commit', '--allow-empty', '-m', 'Mirror VS: initial empty baseline'], workspaceFolder);
     }
   }
 
