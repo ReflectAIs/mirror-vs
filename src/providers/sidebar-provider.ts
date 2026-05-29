@@ -23,6 +23,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   private readonly _storageService: StorageService;
   private readonly _orchestrator: AgentOrchestrator;
   private readonly _migrationPromise: Promise<void>;
+  private readonly _unstrippedHistoryCache = new Map<string, ChatMessage[]>();
 
   constructor(private readonly _context: vscode.ExtensionContext) {
     this._secretService = new SecretService(_context.secrets);
@@ -699,12 +700,18 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   private _getChatHistory(): ChatMessage[] {
     const activeId = this._getActiveSessionId();
     if (!activeId) return [];
+    if (this._unstrippedHistoryCache.has(activeId)) {
+      return this._unstrippedHistoryCache.get(activeId)!;
+    }
     return this._storageService.loadMessages(activeId);
   }
 
   private async _saveChatHistory(history: ChatMessage[]): Promise<void> {
     const activeId = this._getActiveSessionId();
     if (!activeId) return;
+
+    // Cache unstripped history in-memory to preserve base64 images for active session
+    this._unstrippedHistoryCache.set(activeId, history);
 
     // Update session metadata
     const sessions = this._storageService.getSessions();
@@ -738,7 +745,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       images: msg.images ? msg.images.map(() => '[IMAGE STRIPPED]') : undefined,
     }));
     await this._storageService.saveMessages(activeId, stripped);
-    this._sendChatHistoryToWebview();
+    
+    // Send the original history with base64 images to the webview to preserve rendering and LLM context in-memory
+    if (this._view) {
+      this._view.webview.postMessage({
+        type: 'updateChatHistory',
+        history,
+      });
+    }
   }
 
   private _sendChatHistoryToWebview(): void {
