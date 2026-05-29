@@ -2174,7 +2174,7 @@ select:focus {
   border-radius: 4px;
 }
 
-/* ─── BUDDY AVATAR ────────────────────────────────────────────────────────── */
+/* ─── BUDDY AVATAR (GORGEOUS CYBERNETIC MASCOT ORB) ────────────────────────── */
 .buddy-container {
   position: absolute;
   right: 14px;
@@ -2185,57 +2185,101 @@ select:focus {
   align-items: center;
   cursor: pointer;
   user-select: none;
-  transition: transform 0.35s var(--ease-out);
+  perspective: 1000px;
+  transition: transform 0.4s var(--ease-spring);
 }
 
-.buddy-container:hover { transform: scale(1.12); }
+.buddy-container:hover {
+  transform: translateY(-4px) scale(1.15) rotate(2deg);
+}
+
+.buddy-container:active {
+  transform: translateY(1px) scale(0.95);
+}
 
 .buddy-glow {
   position: absolute;
-  inset: -4px;
+  inset: -6px;
   border-radius: 50%;
   background: conic-gradient(
     from 0deg,
     transparent,
-    rgba(99, 102, 241, 0.25),
+    rgba(99, 102, 241, 0.4),
     transparent,
-    rgba(168, 85, 247, 0.25),
+    rgba(168, 85, 247, 0.4),
     transparent
   );
-  animation: spin 3s linear infinite;
-  opacity: 0;
-  transition: opacity 0.3s var(--ease-out);
+  filter: blur(2px);
+  animation: spin 4s linear infinite;
+  opacity: 0.45;
+  transition: all 0.4s var(--ease-out);
 }
 
-.buddy-container:hover .buddy-glow { opacity: 1; }
+.buddy-container:hover .buddy-glow {
+  opacity: 1;
+  inset: -8px;
+  filter: blur(4px) drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
+  animation-duration: 2s;
+}
 
 .buddy-container.state-thinking .buddy-glow {
   opacity: 1;
-  animation: spin 1.4s linear infinite;
+  inset: -8px;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(99, 102, 241, 0.6),
+    transparent,
+    rgba(6, 182, 212, 0.6),
+    transparent
+  );
+  animation: spin 1.2s linear infinite;
+  filter: blur(4px) drop-shadow(0 0 12px rgba(6, 182, 212, 0.5));
 }
 
 .buddy-container.state-coding .buddy-glow {
   opacity: 1;
+  inset: -8px;
   background: conic-gradient(
     from 0deg,
     transparent,
-    rgba(52, 211, 153, 0.25),
+    rgba(16, 185, 129, 0.6),
     transparent,
-    rgba(34, 197, 94, 0.25),
+    rgba(34, 197, 94, 0.6),
     transparent
   );
+  animation: spin 0.8s linear infinite;
+  filter: blur(4px) drop-shadow(0 0 12px rgba(34, 197, 94, 0.5));
+}
+
+.buddy-container.state-tool_calling .buddy-glow {
+  opacity: 1;
+  inset: -8px;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(168, 85, 247, 0.6),
+    transparent,
+    rgba(217, 70, 239, 0.6),
+    transparent
+  );
+  animation: spin 1.5s linear infinite;
+  filter: blur(4px) drop-shadow(0 0 12px rgba(217, 70, 239, 0.5));
 }
 
 .buddy-container.state-error .buddy-glow {
   opacity: 1;
+  inset: -8px;
   background: conic-gradient(
     from 0deg,
     transparent,
-    rgba(248, 113, 113, 0.35),
+    rgba(239, 68, 68, 0.7),
     transparent,
-    rgba(239, 68, 68, 0.35),
+    rgba(244, 63, 94, 0.7),
     transparent
   );
+  animation: spin 0.5s linear infinite;
+  filter: blur(3px) drop-shadow(0 0 14px rgba(239, 68, 68, 0.6));
 }
 
 @keyframes spin {
@@ -2244,60 +2288,92 @@ select:focus {
 }
 
 .buddy-avatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px) saturate(1.8);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.25),
-    inset 0 2px 4px rgba(255, 255, 255, 0.03);
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    inset 0 2px 4px rgba(255, 255, 255, 0.05),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s var(--ease-out);
+  transition: all 0.4s var(--ease-spring);
+  animation: buddy-breath 4s ease-in-out infinite;
+}
+
+@keyframes buddy-breath {
+  0%, 100% {
+    transform: translateY(0);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+  }
+  50% {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.08);
+  }
 }
 
 .buddy-container.state-thinking .buddy-avatar {
-  border-color: rgba(129, 140, 248, 0.3);
-  box-shadow: 0 0活着20px rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(6, 182, 212, 0.05));
+  animation: buddy-pulse-thinking 1.5s infinite ease-in-out;
 }
 
 .buddy-container.state-coding .buddy-avatar {
-  border-color: rgba(52, 211, 153, 0.3);
-  box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+  border-color: rgba(52, 211, 153, 0.5);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(34, 197, 94, 0.05));
+  animation: buddy-pulse-coding 0.8s infinite alternate ease-in-out;
 }
 
 .buddy-container.state-tool_calling .buddy-avatar {
-  border-color: rgba(168, 85, 247, 0.3);
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.5);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(217, 70, 239, 0.05));
+  animation: buddy-pulse-tool 1.2s infinite ease-in-out;
 }
 
 .buddy-container.state-error .buddy-avatar {
-  border-color: rgba(248, 113, 113, 0.4);
-  box-shadow: 0 0 20px rgba(248, 113, 113, 0.3);
-  animation: shake 0.45s var(--ease-out);
+  border-color: rgba(239, 68, 68, 0.6);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(244, 63, 94, 0.05));
+  animation: shake 0.4s var(--ease-out) infinite;
+}
+
+@keyframes buddy-pulse-thinking {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes buddy-pulse-coding {
+  from { transform: translateY(0) scaleY(1); }
+  to   { transform: translateY(-2px) scaleY(0.95); }
+}
+
+@keyframes buddy-pulse-tool {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(8deg) scale(1.04); }
 }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  20%  { transform: translateX(-3px) rotate(-4deg); }
-  40%  { transform: translateX(3px) rotate(4deg); }
-  60%  { transform: translateX(-2px) rotate(-2deg); }
-  80%  { transform: translateX(2px) rotate(2deg); }
+  25%  { transform: translateX(-2px) rotate(-3deg); }
+  75%  { transform: translateX(2px) rotate(3deg); }
 }
 
 .buddy-emoji {
-  font-size: 19px;
+  font-size: 21px;
   display: inline-block;
   transform-origin: center bottom;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
   transition: transform 0.2s var(--ease-out);
 }
 
 .buddy-container.state-thinking .buddy-emoji {
-  animation: think 1.4s infinite var(--ease-in-out);
+  animation: think 1.6s infinite var(--ease-in-out);
 }
 
 .buddy-container.state-coding .buddy-emoji {
@@ -2309,39 +2385,57 @@ select:focus {
 }
 
 @keyframes think {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  25%  { transform: rotate(-12deg) scale(1.08); }
-  75%  { transform: rotate(12deg) scale(1.08); }
+  0%, 100% { transform: rotate(0deg) scale(1) translateY(0); }
+  25%  { transform: rotate(-10deg) scale(1.1) translateY(-1px); }
+  75%  { transform: rotate(10deg) scale(1.1) translateY(-1px); }
 }
 
 @keyframes type-code {
-  from { transform: translateY(0) scaleY(1); }
-  to   { transform: translateY(-1px) scaleY(0.9); }
+  from { transform: translateY(0) scale(1); }
+  to   { transform: translateY(-2px) scale(0.95) rotate(-2deg); }
 }
 
 @keyframes hammer {
-  0%, 100% { transform: rotate(0deg); }
-  35%  { transform: rotate(-15deg) translateY(-1px); }
-  70%  { transform: rotate(15deg) translateY(1px); }
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  35%  { transform: rotate(-20deg) translateY(-2px); }
+  70%  { transform: rotate(20deg) translateY(1px); }
 }
 
 .buddy-tooltip {
   position: absolute;
-  top: -28px;
+  bottom: 52px;
   left: 50%;
-  transform: translateX(-50%);
-  background: rgba(10, 10, 20, 0.92);
-  backdrop-filter: blur(8px);
+  transform: translateX(-50%) translateY(6px);
+  background: rgba(8, 8, 16, 0.94);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 9px;
-  color: var(--text-secondary);
-  white-space: nowrap;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.65),
+    0 4px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  white-space: pre-wrap;
+  max-width: 190px;
+  text-align: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out);
-  transform: translateX(-50%) translateY(4px);
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-spring);
+  line-height: 1.4;
+}
+
+.buddy-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(8, 8, 16, 0.94) transparent transparent transparent;
 }
 
 .buddy-container:hover .buddy-tooltip,

@@ -476,20 +476,51 @@
     autocompleteDropdown.classList.add('hidden');
   }
 
-  // Paste Event Listener for Images
-  promptInput.addEventListener('paste', (e) => {
-    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        const reader = new FileReader();
-        reader.onload = function(event) {
-          const base64 = event.target.result.split(',')[1];
-          attachImage(base64);
-        };
-        reader.readAsDataURL(file);
-        e.preventDefault(); // Stop default pasting of image as raw text
+  // Global Window-level Paste Event Listener for Images
+  window.addEventListener('paste', (e) => {
+    const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+    if (!clipboardData) return;
+
+    let imageAttached = false;
+
+    // 1. Check files array first (handles files copied/pasted from file explorer)
+    const files = clipboardData.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type && files[i].type.indexOf('image') !== -1) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            const base64 = event.target.result.split(',')[1];
+            attachImage(base64);
+          };
+          reader.readAsDataURL(files[i]);
+          imageAttached = true;
+        }
       }
+    }
+
+    // 2. Fall back to items list (handles snipped screenshots and raw clipboard prints)
+    const items = clipboardData.items;
+    if (items && !imageAttached) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+              const base64 = event.target.result.split(',')[1];
+              attachImage(base64);
+            };
+            reader.readAsDataURL(file);
+            imageAttached = true;
+          }
+        }
+      }
+    }
+
+    if (imageAttached) {
+      e.preventDefault();
+      promptInput.focus();
     }
   });
 
@@ -679,6 +710,8 @@ function attachImage(base64) {
       linkedFiles: selectedFiles,
       images: attachedImages
     });
+
+
 
     linkedFiles.clear();
     renderChips();
@@ -2428,17 +2461,43 @@ function attachImage(base64) {
     }, 8000);
   }
 
-  // Hook up winking/reactions on click
+  // Hook up premium interactive winking, 3D rotations, and dev jokes/quotes on click
+  const CLICK_EASTER_EGGS = [
+    "Why do programmers wear glasses?\nBecause they can't C#! 🤓",
+    "There are 10 types of people:\nthose who understand binary, and those who don't. 🔢",
+    "A SQL query walks into a bar,\nwalks up to two tables and asks:\n'Can I join you?' 📊",
+    "How many programmers does it take to change a light bulb?\nNone, it's a hardware problem! 💡",
+    "['hip', 'hip']\n(hip hip array!) 🎁",
+    "No place like localhost\n(127.0.0.1) 🏠",
+    "To understand recursion, you must first understand recursion. 🔄",
+    "Why did the programmer quit his job?\nBecause he didn't get arrays. 💸",
+    "Hardware: The parts of a computer system that you can kick. 🖥️",
+    "An optimist says the glass is half full.\nA pessimist says it's half empty.\nA programmer says the glass is twice as large as necessary. 🥛",
+    "\"Talk is cheap. Show me the code.\"\n— Linus Torvalds 🐧",
+    "\"First, solve the problem. Then, write the code.\"\n— John Johnson 🧩",
+    "\"Clean code always looks like it was written by someone who cares.\"\n— Michael Feathers ✨",
+    "\"Coding is the closest thing we have to magic!\" 🔮",
+    "\"Simplicity is the ultimate sophistication.\"\n— Leonardo da Vinci 🎨",
+    "\"Before software can be reusable it first has to be usable.\"\n— Ralph Johnson ⚙️",
+    "Hey! You clicked me! Let's build something awesome today! 🚀",
+    "My circuits are fully charged and ready to write some clean code! ⚡",
+    "Need a code audit, a debug session, or a coffee break? I've got your back! ☕"
+  ];
+
   if (buddyContainer) {
     buddyContainer.addEventListener('click', () => {
       const current = avatarState;
       
-      buddyContainer.style.transform = 'scale(1.3) rotate(360deg)';
-      buddyContainer.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      // Dynamic 3D rotation, bounce and pulse scale
+      buddyContainer.style.transform = 'translateY(-10px) scale(1.3) rotate(360deg)';
+      buddyContainer.style.transition = 'transform 0.7s cubic-bezier(0.34, 1.6, 0.64, 1)';
       
       const clicks = EMOJIS.click;
       buddyEmoji.textContent = clicks[Math.floor(Math.random() * clicks.length)];
-      buddyTooltip.textContent = '👋 Hey there!';
+      
+      // Select a random fun developer quote or joke
+      const randomEgg = CLICK_EASTER_EGGS[Math.floor(Math.random() * CLICK_EASTER_EGGS.length)];
+      buddyTooltip.textContent = randomEgg;
       buddyTooltip.style.opacity = '1';
       buddyTooltip.style.transform = 'translateX(-50%) translateY(0)';
       
@@ -2450,7 +2509,7 @@ function attachImage(base64) {
         if (avatarState !== 'error') {
           setAvatarState(current);
         }
-      }, 1000);
+      }, 3500); // Allow developer time to read the joke/quote
     });
   }
 
