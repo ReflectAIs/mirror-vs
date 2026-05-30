@@ -26,7 +26,7 @@
   const deepseekModelSelect = document.getElementById('deepseek-model-select');
   
   const saveSettingsBtn = document.getElementById('save-settings-btn');
-  const maxTurnsInput = document.getElementById('max-turns-input');
+  const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
   
   const chatMessages = document.getElementById('chat-messages');
@@ -202,7 +202,7 @@
     const ollamaHost = ollamaHostInput.value.trim();
     const defaultOllamaModel = ollamaModelSelect.value;
     const defaultDeepSeekModel = deepseekModelSelect.value;
-    const maxTurns = parseInt(maxTurnsInput.value.trim(), 10) || 16;
+    const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
     vscode.postMessage({
@@ -211,7 +211,7 @@
       ollamaHost,
       defaultOllamaModel,
       defaultDeepSeekModel,
-      maxTurnsBeforeSummarize: maxTurns,
+      contextBudgetPercent: contextBudget,
       turnsToRetain: turnsToRetain
     });
   }
@@ -268,7 +268,7 @@
     const defaultDeepSeekModel = deepseekModelSelect.value;
     const deepSeekKey = deepseekKeyInput.value.trim();
     const figmaKey = document.getElementById('figma-key').value.trim();
-    const maxTurns = parseInt(maxTurnsInput.value.trim(), 10) || 16;
+    const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
     vscode.postMessage({
@@ -279,7 +279,7 @@
       defaultDeepSeekModel,
       deepSeekKey: deepSeekKey || undefined, // only send key if typed
       figmaKey: figmaKey || undefined, // only send key if typed
-      maxTurnsBeforeSummarize: maxTurns,
+      contextBudgetPercent: contextBudget,
       turnsToRetain: turnsToRetain
     });
 
@@ -1181,8 +1181,8 @@ function attachImage(base64) {
 
         deepseekModelSelect.value = s.defaultDeepSeekModel;
 
-        if (s.maxTurnsBeforeSummarize !== undefined) {
-          maxTurnsInput.value = s.maxTurnsBeforeSummarize;
+        if (s.contextBudgetPercent !== undefined) {
+          contextBudgetInput.value = s.contextBudgetPercent;
         }
         if (s.turnsToRetain !== undefined) {
           turnsToRetainInput.value = s.turnsToRetain;

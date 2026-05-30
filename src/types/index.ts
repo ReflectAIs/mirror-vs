@@ -29,7 +29,7 @@ export interface ExtensionSettings {
   defaultDeepSeekModel: string;
   hasDeepSeekKey: boolean; // Tells the webview if a key is stored without exposing the key itself
   hasFigmaKey: boolean; // Tells the webview if a Figma PAT is stored
-  maxTurnsBeforeSummarize: number;
+  contextBudgetPercent: number;
   turnsToRetain: number;
 }
 
@@ -97,7 +97,7 @@ export type WebviewToExtensionMessage =
       defaultDeepSeekModel: string;
       deepSeekKey?: string;
       figmaKey?: string;
-      maxTurnsBeforeSummarize?: number;
+      contextBudgetPercent?: number;
       turnsToRetain?: number;
     }
   | { type: 'fetchModels' }

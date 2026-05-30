@@ -92,10 +92,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           await config.update('defaultOllamaModel', data.defaultOllamaModel, vscode.ConfigurationTarget.Global);
           await config.update('defaultDeepSeekModel', data.defaultDeepSeekModel, vscode.ConfigurationTarget.Global);
 
-          if (data.maxTurnsBeforeSummarize !== undefined) {
+          if (data.contextBudgetPercent !== undefined) {
             await config.update(
-              'maxTurnsBeforeSummarize',
-              data.maxTurnsBeforeSummarize,
+              'contextBudgetPercent',
+              data.contextBudgetPercent,
               vscode.ConfigurationTarget.Global,
             );
           }
@@ -576,7 +576,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
     const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
-    const maxTurnsBeforeSummarize = config.get<number>('maxTurnsBeforeSummarize', 16);
+    const contextBudgetPercent = config.get<number>('contextBudgetPercent', 75);
     const turnsToRetain = config.get<number>('turnsToRetain', 6);
 
     const hasDeepSeekKey = await this._secretService.hasSecret('deepseek_api_key');
@@ -589,7 +589,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       defaultDeepSeekModel,
       hasDeepSeekKey,
       hasFigmaKey,
-      maxTurnsBeforeSummarize,
+      contextBudgetPercent,
       turnsToRetain,
     };
 

@@ -10,6 +10,41 @@ import { AgentCompleter } from "./agent-completer";
 import { execFileSync } from "child_process";
 import * as fs from "fs";
 
+/** Model context window sizes in tokens. Used for token-budget-based summarization. */
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  "deepseek-chat": 64000,
+  "deepseek-reasoner": 64000,
+  "deepseek-v4-flash": 1000000,
+  "deepseek-v4-pro": 1000000,
+  "llama3": 8192,
+  "llama3.1": 131072,
+  "llama3.2": 131072,
+  "qwen2.5-coder:32b": 131072,
+  "qwen2.5-coder:14b": 131072,
+  "qwen2.5-coder:7b": 32768,
+  "codestral": 32768,
+  "mistral": 32768,
+  "gemma2": 8192,
+  "phi3": 4096,
+};
+
+function getModelContextWindow(model: string): number {
+  const normalized = model.toLowerCase();
+  if (normalized.includes("deepseek-v4")) return 1000000;
+  if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model];
+  const baseModel = model.split(":")[0];
+  if (MODEL_CONTEXT_WINDOWS[baseModel]) return MODEL_CONTEXT_WINDOWS[baseModel];
+  return 32000; // Conservative default
+}
+
+function estimateTokenCount(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function estimatePayloadTokens(messages: { content: string }[]): number {
+  return messages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
+}
+
 const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
@@ -46,7 +81,7 @@ These are hard rules to keep your work focused and prevent wasted effort:
 ### 🛠️ TOOL USAGE RULES
 - Output valid XML tags. Parameters must be in double quotes. Self-closing tags must end with \`/>\`.
 - Call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING.
-- **File Reading Efficiency**: Avoid "keyholing" (reading files in tiny 20-line chunks). Read larger blocks (200-500 lines) or the entire file to get context quickly and save turns. If a file is extremely long or risks being truncated, do not attempt to read the entire file in one go. Instead, target your inspection by either: (a) using \`grep_search\` with specific keywords to find the relevant sections first, or (b) reading the file in logical, sequential parts using the \`start_line\` and \`end_line\` parameters of \`read_file\`.
+- **File Reading Efficiency**: Avoid "keyholing" (reading files in tiny 20-line chunks). Read larger blocks (500-800 lines) or the entire file to get context quickly and save turns. If a file is extremely long or risks being truncated, do not attempt to read the entire file in one go. Instead, target your inspection by either: (a) using \`grep_search\` with specific keywords to find the relevant sections first, or (b) reading the file in logical, sequential parts using the \`start_line\` and \`end_line\` parameters of \`read_file\`.
 - **Patching Files Safely**: To edit existing files, use \`patch_file\`. To ensure your \`SEARCH\` block is a 1:1 exact character-for-character match with the current file state (including whitespace and indentation), you should verify you have the exact file contents in context. You do NOT need to re-read a file using \`read_file\` right before patching if you already have its recent, exact contents in your conversation history/context window and it has not been modified. Only call \`read_file\` if you lack the exact content, or if a previous patch attempt failed.
 - **Handling Long New Files**: When creating a very long or complex new file, avoid writing the entire content in one huge \`create_file\` block (which is prone to model truncation or syntax errors). Instead, create a skeleton or basic scaffold first using \`create_file\`, and then build/populate the rest in logical parts incrementally using \`patch_file\` tags.
 
@@ -54,8 +89,8 @@ These are hard rules to keep your work focused and prevent wasted effort:
 
 1. READ FILE:
    <read_file path="relative/path/to/file.ts" />
-   For extremely long files, you can read specific line ranges:
-   <read_file path="relative/path/to/file.ts" start_line="1" end_line="300" />
+   For extremely long files, you can read specific line ranges (up to 800 lines per turn):
+   <read_file path="relative/path/to/file.ts" start_line="1" end_line="800" />
 2. CREATE FILE (Only for completely new files):
    <create_file path="relative/path/to/new_file.ts">content here</create_file>
 3. WRITE FILE (Overwrites whole file):
@@ -329,30 +364,48 @@ export class AgentOrchestrator {
         }
         loopCount++;
 
-        // Context optimization guardrail (moved inside loop to fix context inflation loophole)
-        const maxTurns = config.get("maxTurnsBeforeSummarize", 16);
+        // Context optimization guardrail: token-budget-based summarization
+        const currentModel = provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel;
+        const contextWindow = getModelContextWindow(currentModel);
+        const budgetPercent = config.get("contextBudgetPercent", 75) as number;
+        const summarizeThreshold = contextWindow * (budgetPercent / 100);
+        const targetBudget = contextWindow * (Math.max(budgetPercent - 20, 10) / 100);
         const turnsToRetain = config.get("turnsToRetain", 6);
+
+        const systemPromptTokens = estimateTokenCount(buildSystemPrompt());
         const activeMessages = currentMessages.filter((msg, idx) => {
           if (idx === 0) return false;
           if (msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]")) return false;
           return !msg.summarized;
         });
+        const activeTokens = systemPromptTokens + activeMessages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
 
-        if (activeMessages.length > maxTurns) {
+        if (activeTokens > summarizeThreshold) {
           try {
-            const toSummarize = activeMessages.slice(0, activeMessages.length - turnsToRetain);
+            // Remove oldest messages until under target budget
+            let tokensToRemove = activeTokens - targetBudget;
+            let summarizeCount = 0;
+            let removedTokens = 0;
+            for (let i = 0; i < activeMessages.length - turnsToRetain; i++) {
+              removedTokens += estimateTokenCount(activeMessages[i].content);
+              summarizeCount = i + 1;
+              if (removedTokens >= tokensToRemove) break;
+            }
+            if (summarizeCount === 0) summarizeCount = Math.max(1, activeMessages.length - turnsToRetain);
+
+            const toSummarize = activeMessages.slice(0, summarizeCount);
             const existingSummaries = currentMessages.filter(
               (msg) => msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]"),
             );
             this._postMessage({ type: "chatResponseStart" });
             this._postMessage({
               type: "chatResponseChunk",
-              text: "Compressing middle turns to optimize speed...",
+              text: `Compressing context (~${Math.round(activeTokens / 1000)}K tokens → target ~${Math.round(targetBudget / 1000)}K, model window: ${Math.round(contextWindow / 1000)}K)...`,
             });
             const summary = await this._completer.summarizeHistory(
               provider as LLMProvider,
               ollamaHost,
-              provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
+              currentModel,
               apiKey,
               [...existingSummaries, ...toSummarize],
             );
@@ -364,9 +417,7 @@ export class AgentOrchestrator {
               const found = cleaned.find((m) => m === msg);
               if (found) {
                 found.summarized = true;
-                if (found.content.length > 2000) {
-                  found.content = found.content.substring(0, 1000) + " [CONTENT REMOVED AFTER CONTEXT CONSOLIDATION] " + found.content.substring(found.content.length - 1000);
-                }
+                found.content = `[Summarized: ${found.role} message, ${found.content.length} chars original]`;
                 if (found.images) found.images = [];
               }
             });
@@ -390,6 +441,11 @@ export class AgentOrchestrator {
               images: msg.images,
             })),
         ];
+
+        // Payload diagnostics
+        const payloadTokens = estimatePayloadTokens(payload);
+        const utilization = Math.round(payloadTokens / contextWindow * 100);
+        console.log(`[Context] Payload: ${payload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, utilization: ${utilization}%)`);
 
         this._postMessage({ type: "chatResponseStart" });
 
@@ -501,6 +557,23 @@ export class AgentOrchestrator {
             if (signal.aborted) {
               continueLoop = false;
               break;
+            }
+          }
+
+          // Staleness eviction: compress old read_file results for files that were just modified
+          const modifiedPaths = toolCalls
+            .filter(t => t.name === "patch_file" || t.name === "write_file" || t.name === "create_file")
+            .map(t => t.path)
+            .filter(Boolean);
+          if (modifiedPaths.length > 0) {
+            for (const msg of currentMessages) {
+              if (msg.role !== "system" || msg.summarized) continue;
+              for (const modPath of modifiedPaths) {
+                if (modPath && msg.content.includes(`[Tool Result for read_file on "${modPath}"]`)) {
+                  const originalLen = msg.content.length;
+                  msg.content = `[Tool Result for read_file on "${modPath}"]: File was read (${originalLen} chars) and subsequently modified. Content evicted from context.`;
+                }
+              }
             }
           }
 

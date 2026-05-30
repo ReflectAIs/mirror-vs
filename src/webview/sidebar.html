@@ -123,14 +123,14 @@
           <div class="form-divider"></div>
           <div class="form-section-label">Context Settings</div>
           <div class="form-group">
-            <label for="max-turns-input">Max Active Turns</label>
-            <input type="number" id="max-turns-input" min="2" max="100" value="16">
-            <span class="field-hint">Trigger compaction when history exceeds this limit</span>
+            <label for="context-budget-input">Context Budget (%)</label>
+            <input type="number" id="context-budget-input" min="20" max="95" value="75">
+            <span class="field-hint">Summarize when token usage exceeds this % of model's context window</span>
           </div>
           <div class="form-group">
             <label for="turns-to-retain-input">Turns to Retain</label>
             <input type="number" id="turns-to-retain-input" min="1" max="50" value="6">
-            <span class="field-hint">Number of recent messages to keep unsummarized</span>
+            <span class="field-hint">Minimum recent messages to keep unsummarized</span>
           </div>
           <div class="drawer-footer">
             <button id="save-settings-btn" class="btn btn-primary">Save Configuration</button>

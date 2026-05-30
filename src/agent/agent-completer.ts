@@ -119,12 +119,33 @@ export class AgentCompleter {
     const summaryPrompt: ChatMessage[] = [
       {
         role: 'system',
-        content: `You are a summarization assistant. Compress the following conversation turns into a single short paragraph that preserves all key information: decisions made, files changed, errors encountered, and next steps. Do NOT include any tool calls or XML tags in your summary. Keep it under 200 words.`,
+        content: `You are a context compression assistant for an AI coding agent. Summarize the following conversation turns into a structured summary using EXACTLY this format:
+
+## Files Modified
+- [list each file path and what was changed, one per line]
+
+## Files Read (still relevant)
+- [list files the agent may need to reference again]
+
+## Decisions Made
+- [key decisions, variable names, patterns chosen]
+
+## Current State
+- [pending errors, next steps, active branch, build status]
+
+## Key Code Snippets
+- [any critical code patterns, function signatures, or variable names the agent will need]
+
+Rules:
+- Preserve EXACT file paths and variable/function names — never paraphrase them.
+- Do NOT include any XML tool tags.
+- Keep under 500 words.
+- If previous summaries are included, merge them into one cohesive summary.`,
       },
       ...messages,
       {
         role: 'user',
-        content: 'Please provide a concise summary of the above conversation turns.',
+        content: 'Provide the structured summary now.',
       },
     ];
 

@@ -110,10 +110,10 @@ export class AgentSession {
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
     const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
-    const maxTurns = config.get<number>('maxTurnsBeforeSummarize', 16);
+    const contextBudgetPercent = config.get<number>('contextBudgetPercent', 75);
     const turnsToRetain = config.get<number>('turnsToRetain', 6);
 
-    return { provider, ollamaHost, defaultOllamaModel, defaultDeepSeekModel, maxTurns, turnsToRetain };
+    return { provider, ollamaHost, defaultOllamaModel, defaultDeepSeekModel, contextBudgetPercent, turnsToRetain };
   }
 
   /** Try to get API key for a provider */

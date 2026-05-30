@@ -2,49 +2,39 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug SST",
-      "type": "node",
+      "name": "Run Extension",
+      "type": "extensionHost",
       "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["dev", "--increase-timeout"],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      // sourceMapRenames helps with the loading spinner when debugging and viewing local variables
-      "sourceMapRenames": false,
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      }
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "preLaunchTask": "npm: watch",
+      "console": "integratedTerminal"
     },
     {
-      "name": "Debug Tests - Unit",
+      "name": "Debug Tests",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["bind", "yarn", "\"jest\"", "\"--watch\"", "\"--config\"", "\"./jest.unit.config.cjs\"", "\"${input:scopeTestsFileName}\""],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      },
-    },
-    {
-      "name": "Debug Tests - E2E",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["bind", "yarn", "\"vitest\"", "\"--config\"", "\"./vitest.e2e.config.ts\"", "\"${input:scopeTestsFileName}\""],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      },
-    },
+      "autoAttachChildProcesses": true,
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": [
+        "run",
+        "${input:scopeTestsFileName}"
+      ],
+      "smartStep": true,
+      "console": "integratedTerminal"
+    }
   ],
   "inputs": [
     {
       "id": "scopeTestsFileName",
       "type": "promptString",
-      "description": "Partial file name to scope test debugging to. ex. arena. Leave blank to run all tests.",
+      "description": "Partial file name to scope test debugging to. Leave blank to run all tests."
     }
   ]
 }
+
