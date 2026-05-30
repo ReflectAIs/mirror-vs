@@ -56,23 +56,26 @@ describe('executeFileTool', () => {
 
     it('should return proposed content if file is in active review', async () => {
       const tmpDir = createTempDir();
+      const { ReviewManager } = await import('../../../services/review-manager.js');
+      const rm = ReviewManager.getInstance();
+      let spy: any;
       try {
         const filePath = 'review.txt';
         const absolutePath = path.join(tmpDir, filePath);
         fs.writeFileSync(absolutePath, 'original disk content', 'utf8');
 
-        const { ReviewManager } = await import('../../../services/review-manager.js');
-        const rm = ReviewManager.getInstance();
-        const spy = vi.spyOn(rm, 'getProposedContent').mockReturnValue('mock proposed clean content');
+        spy = vi.spyOn(rm, 'getProposedContent').mockReturnValue('mock proposed clean content');
 
         const localGetSafe = (p: string) => path.join(tmpDir, p);
         const tool = { name: 'read_file' as const, path: filePath };
         const result = await executeFileTool(tool, localGetSafe);
-
-        expect(result).toBe('mock proposed clean content');
+        
+        expect(result).toBe(
+          '[File: review.txt — showing lines 1-1 of 1 total]\n1: mock proposed clean content'
+        );
         expect(spy).toHaveBeenCalledWith(absolutePath);
-        spy.mockRestore();
       } finally {
+        if (spy) spy.mockRestore();
         cleanupTempDir(tmpDir);
       }
     });

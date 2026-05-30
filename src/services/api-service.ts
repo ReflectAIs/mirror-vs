@@ -255,9 +255,14 @@ export function streamDeepSeekChat(
   const urlStr = 'https://api.deepseek.com/chat/completions';
   const parsedUrl = new URL(urlStr);
 
+  const sanitizedMessages = messages.map(msg => ({
+    ...msg,
+    content: typeof msg.content === 'string' ? msg.content.toWellFormed() : msg.content
+  }));
+
   const bodyData = JSON.stringify({
     model,
-    messages,
+    messages: sanitizedMessages,
     stream: true,
     stream_options: {
       include_usage: true,

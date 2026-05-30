@@ -640,15 +640,6 @@ export class CommandService {
     const { code, output } = result;
     this.logToDebug(`Command in terminal "${terminalName}" exited with code ${code}`);
 
-    // Clean up the terminal UI to prevent VS Code PTY slot exhaustion (which causes exit code 9 / 255)
-    setTimeout(() => {
-      try {
-        terminal.dispose();
-      } catch (e) {
-        // ignore
-      }
-    }, 2000);
-
     if (code === 0 || code === null) {
       return output.trim() || 'Command completed with no output.';
     } else {
