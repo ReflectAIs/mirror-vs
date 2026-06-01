@@ -257,7 +257,9 @@ export function streamDeepSeekChat(
 
   const sanitizedMessages = messages.map(msg => ({
     ...msg,
-    content: typeof msg.content === 'string' ? msg.content.toWellFormed() : msg.content
+    content: typeof msg.content === 'string'
+      ? (typeof (msg.content as any).toWellFormed === 'function' ? (msg.content as any).toWellFormed() : msg.content)
+      : msg.content
   }));
 
   const bodyData = JSON.stringify({

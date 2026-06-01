@@ -115,6 +115,7 @@ export class AgentParser {
       'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
       'wait',
       'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify',
+      'get_diagnostics',
     ];
     for (const tool of selfClosingTools) {
       let startFrom = 0;
@@ -169,6 +170,7 @@ export class AgentParser {
       'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
       'wait',
       'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify',
+      'get_diagnostics',
     ];
     let earliestEnd = -1;
     for (const tool of selfClosingTools) {
@@ -216,7 +218,7 @@ export class AgentParser {
     return null;
   }
 
-  public parseToolCalls(rawText: string): ToolCall[] {
+  public parseToolCalls(rawText: string, allowParallelReadOnly: boolean = false): ToolCall[] {
     const candidates: { index: number; tool: ToolCall }[] = [];
     let tagInfo;
     let startFrom = 0;
@@ -260,7 +262,8 @@ export class AgentParser {
         continue;
       }
       const p = this.attr(tagInfo.attrs, 'path');
-      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim() } });
+      const d = this.attr(tagInfo.attrs, 'depth');
+      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim(), depth: d ? parseInt(d, 10) : undefined } });
       startFrom = tagInfo.end;
     }
 
@@ -272,7 +275,8 @@ export class AgentParser {
         continue;
       }
       const p = this.attr(tagInfo.attrs, 'path');
-      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim() } });
+      const d = this.attr(tagInfo.attrs, 'depth');
+      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim(), depth: d ? parseInt(d, 10) : undefined } });
       startFrom = tagInfo.end;
     }
 
@@ -284,7 +288,8 @@ export class AgentParser {
         continue;
       }
       const q = this.attr(tagInfo.attrs, 'query');
-      if (q) candidates.push({ index: tagInfo.start, tool: { name: 'grep_search', query: q } });
+      const p = this.attr(tagInfo.attrs, 'path');
+      if (q) candidates.push({ index: tagInfo.start, tool: { name: 'grep_search', query: q, path: p ? p.trim() : undefined } });
       startFrom = tagInfo.end;
     }
 
@@ -604,9 +609,46 @@ export class AgentParser {
       startFrom = tagInfo.end;
     }
 
+    // get_diagnostics
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'get_diagnostics', startFrom)) !== null) {
+      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const p = this.attr(tagInfo.attrs, 'path');
+      candidates.push({ index: tagInfo.start, tool: { name: 'get_diagnostics', path: p ? p.trim() : undefined } });
+      startFrom = tagInfo.end;
+    }
+
     if (candidates.length === 0) return [];
     candidates.sort((a, b) => a.index - b.index);
-    return [candidates[0].tool];
+
+    const readOnlyTools = [
+      'read_file', 'list_dir', 'grep_search', 'symbol_search',
+      'web_search', 'get_diagnostics', 'git_status', 'git_diff'
+    ];
+    const firstTool = candidates[0].tool;
+
+    if (allowParallelReadOnly && readOnlyTools.includes(firstTool.name)) {
+      const batch = candidates
+        .filter(c => readOnlyTools.includes(c.tool.name))
+        .map(c => c.tool);
+      
+      // Deduplicate identical tool calls
+      const seen = new Set<string>();
+      const uniqueBatch: ToolCall[] = [];
+      for (const t of batch) {
+        const key = JSON.stringify(t);
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueBatch.push(t);
+        }
+      }
+      return uniqueBatch.slice(0, 5); // Max 5 parallel reads
+    }
+
+    return [firstTool];
   }
 
   public formatToolStatus(

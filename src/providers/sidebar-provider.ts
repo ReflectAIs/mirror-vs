@@ -886,28 +886,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
   private _sendWorkspaceFileTokenSource: vscode.CancellationTokenSource | undefined;
 
-  // Restricted glob — only top-level and 1-level nested files in key source dirs.
-  // Avoids deep recursive enumeration that crashes on large repos.
+  // Recursive glob patterns to find files at any directory depth.
+  // VS Code's findFiles automatically ignores standard system folders like node_modules via user settings.
   private static readonly _WORKSPACE_GLOB_PATTERNS = [
-    // Top-level source files only
-    '*.{ts,tsx,js,jsx,json,html,css,scss,py,rb,go,rs,md,yaml,yml,toml,sh,bash}',
-    // Common src/ directory (1 level deep max)
-    'src/*.{ts,tsx,js,jsx,json,html,css,scss,py,rb,go,rs,md,yaml,yml}',
-    // Some projects use lib/, app/, server/ — shallow only
-    'lib/*.{ts,tsx,js,jsx,json}',
-    'app/*.{ts,tsx,js,jsx,json,html,css,scss}',
-    'server/*.{ts,tsx,js,jsx,json}',
-    'components/*.{ts,tsx,js,jsx,vue,svelte}',
-    'pages/*.{ts,tsx,js,jsx}',
-    'utils/*.{ts,tsx,js,jsx}',
-    'helpers/*.{ts,tsx,js,jsx}',
-    'config/*.{ts,tsx,js,jsx,json,yaml,yml}',
-    'routes/*.{ts,tsx,js,jsx}',
-    'middleware/*.{ts,tsx,js,jsx}',
-    'models/*.{ts,tsx,js,jsx,py,go}',
-    'controllers/*.{ts,tsx,js,jsx,py,go}',
-    'api/*.{ts,tsx,js,jsx,py}',
-    'scripts/*.{ts,tsx,js,jsx,py,sh,bash}',
+    '**/*.{ts,tsx,js,jsx,json,html,css,scss,py,rb,go,rs,md,yaml,yml,toml,sh,bash}',
   ];
 
   private async _sendWorkspaceFiles() {
@@ -923,12 +905,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       this._sendWorkspaceFileTokenSource = new vscode.CancellationTokenSource();
       const token = this._sendWorkspaceFileTokenSource.token;
 
-      // Run multiple parallel restricted glob queries instead of one huge one.
-      // Each pattern only matches shallow files in specific directories.
+      // Run parallel recursive glob queries.
       // Use AbortController-style cancellation via the token.
       const allResults = await Promise.all(
         MirrorVsSidebarProvider._WORKSPACE_GLOB_PATTERNS.map(pattern =>
-          vscode.workspace.findFiles(pattern, undefined, 50, token),
+          vscode.workspace.findFiles(pattern, undefined, 3000, token),
         ),
       );
 
@@ -947,9 +928,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         }
       }
 
-      // Hard cap what we send
+      // Cap at 3000 files to support extremely large codebases seamlessly
       files.sort();
-      const cappedFiles = files.slice(0, 300);
+      const cappedFiles = files.slice(0, 3000);
 
       this._view.webview.postMessage({
         type: 'workspaceFiles',

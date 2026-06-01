@@ -1,8 +1,6 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { ToolCall } from '../types';
-import { ReviewManager } from '../../services/review-manager';
 
 export async function executeSearchTool(tool: ToolCall): Promise<string> {
   if (tool.name === 'web_search') {
@@ -37,6 +35,10 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
     }
   }
 
+  if (tool.name === 'get_diagnostics') {
+    return getDiagnostics(tool);
+  }
+
   if (tool.name !== 'grep_search') {
     throw new Error(`Invalid search tool: ${tool.name}`);
   }
@@ -46,13 +48,97 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) throw new Error('No workspace folder open.');
 
-  const query = tool.query.toLowerCase();
+  const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+  // Build scope: if a path is provided, restrict search to that directory/file
+  let includePattern: vscode.GlobPattern | undefined;
+  if (tool.path) {
+    const scopePath = tool.path.replace(/\\/g, '/');
+    // If it looks like a directory path (no extension or ends with /), glob it recursively
+    if (scopePath.endsWith('/') || !path.extname(scopePath)) {
+      includePattern = new vscode.RelativePattern(workspaceFolders[0], `${scopePath}/**`);
+    } else {
+      includePattern = new vscode.RelativePattern(workspaceFolders[0], scopePath);
+    }
+  }
+
+  const results: { file: string; line: number; text: string }[] = [];
+
+  try {
+    // Use VS Code's native text search API — delegates to ripgrep internally
+    await (vscode.workspace as any).findTextInFiles(
+      { pattern: tool.query, isRegExp: false, isCaseSensitive: false },
+      {
+        include: includePattern,
+        exclude: '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/bin/**,**/obj/**,**/build/**,**/.next/**,**/coverage/**}',
+        maxResults: 80,
+        previewOptions: { matchLines: 1, charsPerLine: 250 },
+      },
+      (result: any) => {
+        const relPath = path.relative(workspaceRoot, result.uri.fsPath).replace(/\\/g, '/');
+        if (result.preview && result.ranges && result.ranges.length > 0) {
+          const range = Array.isArray(result.ranges) ? result.ranges[0] : result.ranges;
+          const lineNum = 'start' in range ? (range as vscode.Range).start.line + 1 : 1;
+          const previewText = typeof result.preview.text === 'string' ? result.preview.text.trim() : '';
+          results.push({ file: relPath, line: lineNum, text: previewText });
+        }
+      },
+    );
+  } catch (e) {
+    // Fallback: if findTextInFiles fails (e.g., unsupported VS Code version),
+    // use the simpler findFiles + manual scan approach
+    return await fallbackGrepSearch(tool.query, workspaceFolders, includePattern);
+  }
+
+  if (results.length === 0) {
+    return 'No matches found.';
+  }
+
+  // Group results by file for compact output
+  const grouped = new Map<string, { line: number; text: string }[]>();
+  for (const r of results) {
+    if (!grouped.has(r.file)) grouped.set(r.file, []);
+    grouped.get(r.file)!.push({ line: r.line, text: r.text });
+  }
+
+  const lines: string[] = [];
+  let totalShown = 0;
+  for (const [file, matches] of grouped) {
+    if (totalShown >= 50) break;
+    lines.push(`📄 ${file}`);
+    for (const m of matches.slice(0, 5)) {
+      lines.push(`  L${m.line}: ${m.text}`);
+      totalShown++;
+      if (totalShown >= 50) break;
+    }
+    if (matches.length > 5) {
+      lines.push(`  ... and ${matches.length - 5} more matches in this file`);
+    }
+  }
+
+  if (results.length > totalShown) {
+    lines.push(`\n(${results.length - totalShown} more results not shown)`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Fallback grep implementation using findFiles + manual file reading.
+ * Used only if vscode.workspace.findTextInFiles is unavailable.
+ */
+async function fallbackGrepSearch(
+  query: string,
+  workspaceFolders: readonly vscode.WorkspaceFolder[],
+  includePattern?: vscode.GlobPattern,
+): Promise<string> {
+  const fs = await import('fs');
+  const lowerQuery = query.toLowerCase();
   const results: string[] = [];
 
-  // Use vscode.workspace.findFiles for highly optimized workspace scanning
   const files = await vscode.workspace.findFiles(
-    '**/*',
-    '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/bin/**,**/obj/**,**/*.png,**/*.jpg,**/*.jpeg,**/*.gif,**/*.ico,**/*.svg,**/*.pdf,**/*.zip,**/*.exe,**/*.dll}'
+    includePattern || '**/*',
+    '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/bin/**,**/obj/**,**/*.png,**/*.jpg,**/*.jpeg,**/*.gif,**/*.ico,**/*.svg,**/*.pdf,**/*.zip,**/*.exe,**/*.dll}',
   );
 
   const uris = [...files];
@@ -62,27 +148,21 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
       const uri = uris.pop();
       if (!uri) break;
       const fullPath = uri.fsPath;
-      
+
       const ext = path.extname(fullPath).toLowerCase();
       if (['.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.o', '.obj'].includes(ext)) {
         continue;
       }
 
       try {
-        let content = '';
-        const proposed = ReviewManager.getInstance().getProposedContent(fullPath);
-        if (proposed !== undefined) {
-          content = proposed;
-        } else {
-          const stat = await fs.promises.stat(fullPath);
-          if (stat.size > 1024 * 1024) continue; // Skip files larger than 1MB
-          content = await fs.promises.readFile(fullPath, 'utf8');
-        }
+        const stat = await fs.promises.stat(fullPath);
+        if (stat.size > 1024 * 1024) continue;
+        const content = await fs.promises.readFile(fullPath, 'utf8');
 
-        if (content.toLowerCase().includes(query)) {
+        if (content.toLowerCase().includes(lowerQuery)) {
           const lines = content.split('\n');
           lines.forEach((line, idx) => {
-            if (line.toLowerCase().includes(query)) {
+            if (line.toLowerCase().includes(lowerQuery)) {
               let relPath = fullPath;
               for (const wf of workspaceFolders) {
                 const prefix = wf.uri.fsPath + path.sep;
@@ -96,7 +176,7 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
             }
           });
         }
-      } catch (e) {
+      } catch {
         // Ignore read/stat errors
       }
     }
@@ -105,6 +185,97 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   const workers = Array.from({ length: concurrency }, () => worker());
   await Promise.all(workers);
 
-  return results.slice(0, 40).join('\n') || 'No matches found.';
+  return results.slice(0, 50).join('\n') || 'No matches found.';
 }
 
+/**
+ * Get VS Code diagnostics (errors, warnings) for the workspace.
+ * Gives the model instant access to all known issues.
+ */
+function getDiagnostics(tool: ToolCall): string {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) return 'No workspace folder open.';
+
+  const workspaceRoot = workspaceFolders[0].uri.fsPath;
+  const allDiagnostics = vscode.languages.getDiagnostics();
+
+  // Filter by path if provided
+  const scopePath = tool.path;
+
+  const entries: { file: string; line: number; severity: string; message: string; source: string }[] = [];
+
+  for (const [uri, diags] of allDiagnostics) {
+    const relPath = path.relative(workspaceRoot, uri.fsPath).replace(/\\/g, '/');
+
+    // Skip files outside the workspace
+    if (relPath.startsWith('..')) continue;
+    // Skip node_modules, dist, etc.
+    if (relPath.startsWith('node_modules/') || relPath.startsWith('dist/') || relPath.startsWith('.git/')) continue;
+
+    // Apply path scope filter if provided
+    if (scopePath && !relPath.startsWith(scopePath.replace(/\\/g, '/'))) continue;
+
+    for (const d of diags) {
+      const severity = d.severity === vscode.DiagnosticSeverity.Error ? 'Error'
+        : d.severity === vscode.DiagnosticSeverity.Warning ? 'Warning'
+        : d.severity === vscode.DiagnosticSeverity.Information ? 'Info'
+        : 'Hint';
+
+      // Only include errors and warnings by default
+      if (d.severity > vscode.DiagnosticSeverity.Warning) continue;
+
+      entries.push({
+        file: relPath,
+        line: d.range.start.line + 1,
+        severity,
+        message: d.message,
+        source: d.source || '',
+      });
+    }
+  }
+
+  if (entries.length === 0) {
+    return scopePath
+      ? `✅ No errors or warnings found in "${scopePath}".`
+      : '✅ No errors or warnings found in the workspace.';
+  }
+
+  // Sort: errors first, then warnings, then by file
+  entries.sort((a, b) => {
+    if (a.severity !== b.severity) return a.severity === 'Error' ? -1 : 1;
+    return a.file.localeCompare(b.file) || a.line - b.line;
+  });
+
+  const lines: string[] = [];
+  const errorCount = entries.filter(e => e.severity === 'Error').length;
+  const warningCount = entries.filter(e => e.severity === 'Warning').length;
+  lines.push(`Found ${errorCount} error(s) and ${warningCount} warning(s):`);
+  lines.push('');
+
+  // Group by file
+  const grouped = new Map<string, typeof entries>();
+  for (const e of entries) {
+    if (!grouped.has(e.file)) grouped.set(e.file, []);
+    grouped.get(e.file)!.push(e);
+  }
+
+  let totalShown = 0;
+  for (const [file, fileEntries] of grouped) {
+    if (totalShown >= 60) {
+      lines.push(`\n... and more diagnostics in ${grouped.size - lines.length} additional files`);
+      break;
+    }
+    lines.push(`📄 ${file}`);
+    for (const e of fileEntries.slice(0, 10)) {
+      const icon = e.severity === 'Error' ? '🔴' : '🟡';
+      const src = e.source ? ` [${e.source}]` : '';
+      lines.push(`  ${icon} L${e.line}: ${e.message}${src}`);
+      totalShown++;
+    }
+    if (fileEntries.length > 10) {
+      lines.push(`  ... and ${fileEntries.length - 10} more in this file`);
+    }
+  }
+
+  return lines.join('\n');
+}

@@ -9,13 +9,14 @@ import { AgentParser } from "./agent-parser";
 import { AgentCompleter } from "./agent-completer";
 import { execFileSync } from "child_process";
 import * as fs from "fs";
+import * as path from "path";
 
 /** Model context window sizes in tokens. Used for token-budget-based summarization. */
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "deepseek-chat": 64000,
   "deepseek-reasoner": 64000,
-  "deepseek-v4-flash": 1000000,
-  "deepseek-v4-pro": 1000000,
+  "deepseek-v4-flash": 128000, // Capped at 64K for cost-effectiveness
+  "deepseek-v4-pro": 128000,   // Capped at 64K for cost-effectiveness
   "llama3": 8192,
   "llama3.1": 131072,
   "llama3.2": 131072,
@@ -30,7 +31,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 
 function getModelContextWindow(model: string): number {
   const normalized = model.toLowerCase();
-  if (normalized.includes("deepseek-v4")) return 1000000;
+  if (normalized.includes("deepseek")) return 64000; // Safe cap for cost-control
   if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model];
   const baseModel = model.split(":")[0];
   if (MODEL_CONTEXT_WINDOWS[baseModel]) return MODEL_CONTEXT_WINDOWS[baseModel];
@@ -78,6 +79,13 @@ These are hard rules to keep your work focused and prevent wasted effort:
 10. **Feature Addition Control**: Avoid adding major features or expanding scope unless explicitly requested. Prioritize doing exactly what is asked.
 11. **Root Cause Discipline**: Before modifying code to fix a bug, identify the most likely root cause and collect evidence. Do not apply speculative or guess-based fixes.
 
+### 🐛 EVIDENCE-DRIVEN DEBUGGING DISCIPLINE (HARD RULES)
+1. **No Guess-and-Patch Loops (Hypothesis Churn)**: Never propose patches based on blind speculation. A debugging process must be strictly evidence-driven: Observe Symptom → Identify Producer Component → Inspect Source Files → Form One Hypothesis → Prove Hypothesis → Patch → Re-test.
+2. **Contradiction Invalidation**: If a patch fails to resolve the issue or produces new symptoms, immediately invalidate your previous hypothesis. Do NOT stack defensive layers (like adding locks, refs, timing guards, or extra state checks) on top of a failed theory. Re-evaluate from first principles.
+3. **Strict Source Ownership**: Never explain, guess, or make claims about the behavior of a listener, callback, event handler, service, hook, or component unless you have actually called \`read_file\` or \`grep_search\` and inspected its source code directly. Hallucinated reasoning is completely unacceptable.
+4. **Single Active Theory**: You are allowed exactly one active root-cause theory at a time. Do not list multiple unrelated possibilities and guess. Prove or disprove one theory before moving to another.
+5. **Evidence Before Complexity**: Do not add extra complexity (timing guards, refs, locks, generation IDs, counters) unless you have collected concrete evidence (e.g. via logs or diagnostic tools) that proves that specific event sequence is actually occurring. Keep fixes minimal, targeted, and clean.
+
 ### 🛠️ TOOL USAGE RULES
 - Output valid XML tags. Parameters must be in double quotes. Self-closing tags must end with \`/>\`.
 - Call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING.
@@ -98,19 +106,24 @@ These are hard rules to keep your work focused and prevent wasted effort:
 4. PATCH FILE (For modifying existing files):
    <patch_file path="relative/path/to/existing_file.ts">
 <<<<<<< SEARCH
-[exact original lines to find in file]
+[exact original lines]
 =======
 [new replacement lines]
 >>>>>>> REPLACE
 </patch_file>
 5. LIST DIRECTORY: <list_dir path="relative/path/to/directory" />
-6. GREP SEARCH: <grep_search query="pattern" />
+6. GREP SEARCH (full workspace): <grep_search query="pattern" />
+   GREP SEARCH (scoped to directory): <grep_search query="pattern" path="src/screens" />
+   **Best practice**: Always scope with \`path\` when you know the relevant area. This is dramatically faster on large codebases.
 7. WEB SEARCH: <web_search query="pattern" />
-8. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
-9. BROWSER CLICK: <browser_click selector="#my-button" />
-10. BROWSER TYPE: <browser_type selector="#search-input" text="hello world" />
-11. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />
-12. CODEBASE ANALYSIS:
+8. GET DIAGNOSTICS (all errors/warnings): <get_diagnostics />
+   GET DIAGNOSTICS (scoped): <get_diagnostics path="src/screens" />
+   Returns all VS Code errors and warnings with exact file:line locations. Use this FIRST when debugging issues.
+9. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
+10. BROWSER CLICK: <browser_click selector="#my-button" />
+11. BROWSER TYPE: <browser_type selector="#search-input" text="hello world" />
+12. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />
+13. CODEBASE ANALYSIS:
     <analyze_project /> (Project overview)
     <analyze_dependencies /> (Import graph)
     <analyze_complexity /> (Cyclomatic complexity)
@@ -118,16 +131,14 @@ These are hard rules to keep your work focused and prevent wasted effort:
     <analyze_dead_code /> (Unused exports)
     <analyze_impact path="src/file.ts" /> (Dependency impact)
     <graphify /> (Mermaid structure graph)
-13. WAIT: <wait ms="3000" />
-14. BROWSER SCREENSHOT: <browser_screenshot />
-    Workflow: Navigate -> Wait 3s -> Screenshot -> Rename file via run_command -> Update report via patch_file. Do one page at a time. Clean old screenshots first using run_command.
-15. RUN COMMAND: <run_command command="npm install" />
-    Note: Remote git operations (push) are blocked by the host.
-16. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
-17. CLOSE TERMINAL: <close_terminal terminal_name="..." />
-18. READ TERMINAL: <read_terminal terminal_name="..." />
-19. LIST TERMINALS: <list_terminals />
-20. FIGMA INSPECT: <figma_inspect url="..." />
+14. WAIT: <wait ms="3000" />
+15. BROWSER SCREENSHOT: <browser_screenshot />
+16. RUN COMMAND: <run_command command="npm install" />
+17. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
+18. CLOSE TERMINAL: <close_terminal terminal_name="..." />
+19. READ TERMINAL: <read_terminal terminal_name="..." />
+20. LIST TERMINALS: <list_terminals />
+21. FIGMA INSPECT: <figma_inspect url="..." />
 
 ENVIRONMENT: {{SHELL_ENV}}
 `;
@@ -349,9 +360,28 @@ export class AgentOrchestrator {
 
     await this._ensureGitBaseline();
 
+    // Auto-inject lightweight project map if this is the first turn and history doesn't already have it
+    const hasProjectMap = currentMessages.some(msg => msg.role === "system" && msg.content.includes("[PROJECT STRUCTURE]"));
+    const folders = vscode.workspace.workspaceFolders;
+    if (!hasProjectMap && folders && folders.length > 0) {
+      try {
+        const workspaceRoot = folders[0].uri.fsPath;
+        const projectMap = await this._generateLightweightProjectMap(workspaceRoot);
+        const mapMsg: ChatMessage = {
+          role: "system",
+          content: `[PROJECT STRUCTURE]\nHere is a lightweight structure of the workspace to help you orient yourself:\n\n\`\`\`\n${projectMap}\n\`\`\``
+        };
+        currentMessages.unshift(mapMsg);
+        await this._saveChatHistory(currentMessages);
+      } catch (e) {
+        console.warn("Failed to generate project map:", e);
+      }
+    }
+
     let loopCount = 0;
     const maxLoops = 50;
     let continueLoop = true;
+    let lastEvictionLoopCount = -1; // Track which loop iteration last performed eviction
     let consecutiveMalformedCount = 0;
     const maxMalformedRetries = 3;
     let sequentialExploratorySteps = 0;
@@ -454,36 +484,63 @@ export class AgentOrchestrator {
         signal.addEventListener("abort", mainAbortListener);
 
         let assistantResponse = "";
-        try {
-          assistantResponse = await this._completer.getLLMCompletion(
-            provider as LLMProvider,
-            ollamaHost,
-            provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
-            apiKey,
-            payload,
-            completionController.signal,
-            this._session.sessionId,
-            completionController,
-          );
-        } catch (apiErr: unknown) {
-          signal.removeEventListener("abort", mainAbortListener);
-          const apiErrMsg = apiErr instanceof Error ? apiErr.message : String(apiErr);
-          const fb = this._fallback.failover();
-          if (fb.success && fb.newProvider) {
-            const nextKey = await tryGetApiKey(fb.newProvider);
-            this._postMessage({
-              type: "providerFallback",
-              message: apiErrMsg + " " + fb.message,
-              newProvider: fb.newProvider,
-            });
-            provider = fb.newProvider;
-            apiKey = nextKey;
-            loopCount--;
-            continueLoop = true;
-            continue;
-          } else {
-            throw apiErr;
+        let completionRetries = 0;
+        const maxCompletionRetries = 2;
+        
+        while (completionRetries <= maxCompletionRetries) {
+          try {
+            assistantResponse = await this._completer.getLLMCompletion(
+              provider as LLMProvider,
+              ollamaHost,
+              provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel,
+              apiKey,
+              payload,
+              completionController.signal,
+              this._session.sessionId,
+              completionController,
+            );
+            
+            // If response is not empty, we are good
+            if (assistantResponse && assistantResponse.trim() !== "") {
+              break;
+            }
+            
+            completionRetries++;
+            if (completionRetries <= maxCompletionRetries) {
+              console.warn(`[Orchestrator] Empty completion received. Retrying (attempt ${completionRetries}/${maxCompletionRetries})...`);
+              this._postMessage({
+                type: "chatResponseChunk",
+                text: `\n*(Empty response received; retrying attempt ${completionRetries}/${maxCompletionRetries}...)*\n`
+              });
+            } else {
+              // If we exhausted retries and it's still empty, return a friendly fallback
+              assistantResponse = "I'm sorry, I encountered a temporary issue generating a response. Please try sending your message again or check your model connection.";
+            }
+          } catch (apiErr: unknown) {
+            signal.removeEventListener("abort", mainAbortListener);
+            const apiErrMsg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+            const fb = this._fallback.failover();
+            if (fb.success && fb.newProvider) {
+              const nextKey = await tryGetApiKey(fb.newProvider);
+              this._postMessage({
+                type: "providerFallback",
+                message: apiErrMsg + " " + fb.message,
+                newProvider: fb.newProvider,
+              });
+              provider = fb.newProvider;
+              apiKey = nextKey;
+              loopCount--;
+              continueLoop = true;
+              break;
+            } else {
+              throw apiErr;
+            }
           }
+        }
+        
+        // If we switched provider during error catch, continue loop
+        if (continueLoop && loopCount < maxLoops && assistantResponse === "") {
+          continue;
         }
 
         signal.removeEventListener("abort", mainAbortListener);
@@ -491,7 +548,7 @@ export class AgentOrchestrator {
         currentMessages.push({ role: "assistant", content: assistantResponse });
         await this._saveChatHistory(currentMessages);
 
-        const toolCalls = this._parser.parseToolCalls(assistantResponse);
+        const toolCalls = this._parser.parseToolCalls(assistantResponse, true);
 
         if (toolCalls.length > 0) {
           const hasModifyingTool = toolCalls.some(tool => 
@@ -518,63 +575,126 @@ export class AgentOrchestrator {
 
           this._sendAvatarState("tool_calling");
           const toolResults: string[] = [];
-          for (const tool of toolCalls) {
-            if (signal.aborted) {
-              continueLoop = false;
-              break;
-            }
-            const target = tool.path || tool.query || tool.url || tool.selector || tool.command || "";
-            this._sendToolStatusToWebview(tool.name, "running", target);
-            try {
-              const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-              const figmaKey = (await this._getSecret("figma_api_key")) || "";
-              const result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
-              let checkpointId: string | undefined;
-              const cpMatch = result.match(/Revert ID: (\w+)/);
-              if (cpMatch) checkpointId = cpMatch[1];
-              let terminalName: string | undefined;
-              if (tool.name === "run_command") {
-                const tnMatch = result.match(/VS Code terminal "([^"]+)"/);
-                if (tnMatch) terminalName = tnMatch[1];
+
+          const readOnlyTools = [
+            'read_file', 'list_dir', 'grep_search', 'symbol_search',
+            'web_search', 'get_diagnostics', 'git_status', 'git_diff'
+          ];
+          const isAllReadOnly = toolCalls.every(t => readOnlyTools.includes(t.name));
+
+          if (isAllReadOnly) {
+            // Parallel execution for read-only tools
+            const promises = toolCalls.map(async (tool) => {
+              if (signal.aborted) return;
+              const target = tool.path || tool.query || tool.url || tool.selector || tool.command || "";
+              this._sendToolStatusToWebview(tool.name, "running", target);
+              try {
+                const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                const figmaKey = (await this._getSecret("figma_api_key")) || "";
+                const result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+                
+                let displayResult = result;
+                // Scale truncation threshold with model context window
+                const currentModel = provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel;
+                const contextWindow = getModelContextWindow(currentModel);
+                const truncateThreshold = Math.min(60000, Math.max(15000, contextWindow / 20));
+                
+                if (result.length > truncateThreshold) {
+                  const keep = Math.floor(truncateThreshold / 2);
+                  const truncated = result.length - truncateThreshold;
+                  displayResult = result.substring(0, keep) + " [TRUNCATED " + truncated + " CHARS] " + result.substring(result.length - keep);
+                }
+                
+                this._sendToolStatusToWebview(tool.name, "success", target, displayResult, undefined, tool.content, undefined);
+                return "[Tool Result for " + tool.name + " on \"" + target + "\"]: Success - " + result;
+              } catch (err: unknown) {
+                const errMsg = err instanceof Error ? err.message : String(err);
+                this._sendToolStatusToWebview(tool.name, "error", target, errMsg);
+                this._sendAvatarState("error");
+                return "[Tool Result for " + tool.name + " on \"" + target + "\"]: Error - " + errMsg + ". Please correct your approach and try again.";
               }
-              let displayResult = result;
-              if (tool.name === "browser_screenshot") {
-                const match = result.match(/\(Image successfully captured and sent to vision model\)/);
-                if (match) displayResult = result.replace(match[0], "(Image captured)");
-              } else if (result.length > 15000) {
-                const keep = 7500;
-                const truncated = result.length - 15000;
-                displayResult = result.substring(0, keep) + " [TRUNCATED " + truncated + " CHARS] " + result.substring(result.length - keep);
-              }
-              this._sendToolStatusToWebview(tool.name, "success", target, displayResult, checkpointId, tool.content, terminalName);
-              toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Success - " + result);
-            } catch (err: unknown) {
-              const errMsg = err instanceof Error ? err.message : String(err);
-              this._sendToolStatusToWebview(tool.name, "error", target, errMsg);
-              this._sendAvatarState("error");
-              toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Error - " + errMsg + ". Please correct your approach and try again.");
+            });
+            
+            const resolvedResults = await Promise.all(promises);
+            for (const r of resolvedResults) {
+              if (r) toolResults.push(r);
             }
-            if (signal.aborted) {
-              continueLoop = false;
-              break;
+          } else {
+            // Sequential execution for mixed or modifying tools
+            for (const tool of toolCalls) {
+              if (signal.aborted) {
+                continueLoop = false;
+                break;
+              }
+              const target = tool.path || tool.query || tool.url || tool.selector || tool.command || "";
+              this._sendToolStatusToWebview(tool.name, "running", target);
+              try {
+                const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                const figmaKey = (await this._getSecret("figma_api_key")) || "";
+                const result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+                let checkpointId: string | undefined;
+                const cpMatch = result.match(/Revert ID: (\w+)/);
+                if (cpMatch) checkpointId = cpMatch[1];
+                let terminalName: string | undefined;
+                if (tool.name === "run_command") {
+                  const tnMatch = result.match(/VS Code terminal "([^"]+)"/);
+                  if (tnMatch) terminalName = tnMatch[1];
+                }
+                let displayResult = result;
+                if (tool.name === "browser_screenshot") {
+                  const match = result.match(/\(Image successfully captured and sent to vision model\)/);
+                  if (match) displayResult = result.replace(match[0], "(Image captured)");
+                } else {
+                  // Scale truncation threshold with model context window
+                  const currentModel = provider === "ollama" ? defaultOllamaModel : defaultDeepSeekModel;
+                  const contextWindow = getModelContextWindow(currentModel);
+                  const truncateThreshold = Math.min(60000, Math.max(15000, contextWindow / 20));
+                  
+                  if (result.length > truncateThreshold) {
+                    const keep = Math.floor(truncateThreshold / 2);
+                    const truncated = result.length - truncateThreshold;
+                    displayResult = result.substring(0, keep) + " [TRUNCATED " + truncated + " CHARS] " + result.substring(result.length - keep);
+                  }
+                }
+                this._sendToolStatusToWebview(tool.name, "success", target, displayResult, checkpointId, tool.content, terminalName);
+                toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Success - " + result);
+              } catch (err: unknown) {
+                const errMsg = err instanceof Error ? err.message : String(err);
+                this._sendToolStatusToWebview(tool.name, "error", target, errMsg);
+                this._sendAvatarState("error");
+                toolResults.push("[Tool Result for " + tool.name + " on \"" + target + "\"]: Error - " + errMsg + ". Please correct your approach and try again.");
+              }
+              if (signal.aborted) {
+                continueLoop = false;
+                break;
+              }
             }
           }
 
-          // Staleness eviction: compress old read_file results for files that were just modified
+          // Staleness eviction: compress old read_file results for files that were just modified.
+          // IMPORTANT: Only evict messages that existed BEFORE this loop iteration.
+          // This prevents the bug where a fresh re-read after a patch gets immediately evicted
+          // by the next patch, creating an infinite loop where the model can never see file contents.
           const modifiedPaths = toolCalls
             .filter(t => t.name === "patch_file" || t.name === "write_file" || t.name === "create_file")
             .map(t => t.path)
             .filter(Boolean);
           if (modifiedPaths.length > 0) {
-            for (const msg of currentMessages) {
+            // Count messages that existed before this tool result was added
+            const messageCountBeforeThisTurn = currentMessages.length;
+            for (let mi = 0; mi < messageCountBeforeThisTurn; mi++) {
+              const msg = currentMessages[mi];
               if (msg.role !== "system" || msg.summarized) continue;
+              // Skip messages already evicted
+              if (msg.content.includes("Content evicted from context.")) continue;
               for (const modPath of modifiedPaths) {
-                if (modPath && msg.content.includes(`[Tool Result for read_file on "${modPath}"]`)) {
+                if (modPath && msg.content.includes(`[Tool Result for read_file on "${modPath}"]`) && msg.content.includes("Success -")) {
                   const originalLen = msg.content.length;
-                  msg.content = `[Tool Result for read_file on "${modPath}"]: File was read (${originalLen} chars) and subsequently modified. Content evicted from context.`;
+                  msg.content = `[Tool Result for read_file on "${modPath}"]: File was read (${originalLen} chars) and subsequently modified — re-read the file to see current contents.`;
                 }
               }
             }
+            lastEvictionLoopCount = loopCount;
           }
 
           const images: string[] = [];
@@ -585,12 +705,14 @@ export class AgentOrchestrator {
               this._postMessage({ type: "screenshotCapture", base64: match[1] });
               return res.replace(match[0], "(Image successfully captured and sent to vision model)");
             }
-            if (res.length > 15000) {
+            // Scale truncation threshold with model context window
+            const truncateThreshold = Math.min(60000, Math.max(15000, contextWindow / 20));
+            if (res.length > truncateThreshold) {
               const prefixMatch = res.match(/^\[Tool Result for \w+ on "[^"]*"\]: (Success|Error) - /);
               const prefix = prefixMatch ? prefixMatch[0] : "";
               const content = prefix ? res.substring(prefix.length) : res;
-              const keep = 7500;
-              const truncated = content.length - 15000;
+              const keep = Math.floor(truncateThreshold / 2);
+              const truncated = content.length - truncateThreshold;
               return prefix + content.substring(0, keep) + " [TRUNCATED " + truncated + " CHARS] " + content.substring(content.length - keep);
             }
             return res;
@@ -661,6 +783,100 @@ export class AgentOrchestrator {
       } catch (_) { /* best effort */ }
     } finally {
       this._activeAbortController = undefined;
+    }
+  }
+
+  private async _generateLightweightProjectMap(workspaceRoot: string): Promise<string> {
+    const shouldSkipDir = (name: string): boolean => {
+      return [
+        "node_modules", "dist", "out", ".git", ".mirror-vs", "build",
+        ".next", ".nuxt", "coverage", ".nyc_output", "__pycache__",
+        ".venv", "venv", "env", "target", "bin", "obj", ".vscode"
+      ].includes(name);
+    };
+
+    const countFiles = (dir: string): number => {
+      let count = 0;
+      try {
+        const entries = fs.readdirSync(dir);
+        for (const e of entries) {
+          if (shouldSkipDir(e)) continue;
+          const fp = path.join(dir, e);
+          try {
+            const s = fs.statSync(fp);
+            if (s.isDirectory()) {
+              count += countFiles(fp);
+            } else if (s.isFile()) {
+              count++;
+            }
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+      return count;
+    };
+
+    const buildTree = (dir: string, depth: number, prefix: string): string[] => {
+      if (depth > 2) return [];
+      const lines: string[] = [];
+      try {
+        const entries = fs.readdirSync(dir);
+        const dirs: string[] = [];
+        const files: string[] = [];
+
+        for (const e of entries) {
+          if (shouldSkipDir(e)) continue;
+          const fp = path.join(dir, e);
+          try {
+            const s = fs.statSync(fp);
+            if (s.isDirectory()) {
+              dirs.push(e);
+            } else if (s.isFile()) {
+              files.push(e);
+            }
+          } catch { /* skip */ }
+        }
+
+        dirs.sort();
+        files.sort();
+
+        const allItems = [
+          ...dirs.map(d => ({ name: d, isDir: true })),
+          ...files.map(f => ({ name: f, isDir: false }))
+        ];
+
+        const maxItemsToDisplay = 15;
+        const displayItems = allItems.slice(0, maxItemsToDisplay);
+
+        for (let i = 0; i < displayItems.length; i++) {
+          const item = displayItems[i];
+          const isLast = i === displayItems.length - 1 && displayItems.length === allItems.length;
+          const marker = isLast ? "└── " : "├── ";
+          const childPrefix = prefix + (isLast ? "    " : "│   ");
+
+          if (item.isDir) {
+            const fullPath = path.join(dir, item.name);
+            const numFiles = countFiles(fullPath);
+            lines.push(`${prefix}${marker}${item.name}/ (${numFiles} files)`);
+            if (depth < 2) {
+              lines.push(...buildTree(fullPath, depth + 1, childPrefix));
+            }
+          } else {
+            lines.push(`${prefix}${marker}${item.name}`);
+          }
+        }
+        if (allItems.length > maxItemsToDisplay) {
+          lines.push(`${prefix}└── ... and ${allItems.length - maxItemsToDisplay} more items`);
+        }
+      } catch { /* skip */ }
+      return lines;
+    };
+
+    try {
+      const rootFilesCount = countFiles(workspaceRoot);
+      const treeLines = buildTree(workspaceRoot, 0, "");
+      return `Root: ${path.basename(workspaceRoot)} (${rootFilesCount} files total)\n` + treeLines.join("\n");
+    } catch (e) {
+      return `Error generating map: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 }

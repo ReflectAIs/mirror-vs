@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.0.15",
+  "version": "0.0.14",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -136,20 +136,9 @@
         "mac": "alt+enter"
       },
       {
-        "command": "mirror-vs.rejectReview",
-        "key": "shift+alt+backspace",
-        "mac": "shift+alt+backspace"
-      },
-      {
         "command": "mirror-vs.acceptReview",
         "key": "ctrl+enter",
         "mac": "ctrl+enter",
-        "when": "mirror-vs.inReview"
-      },
-      {
-        "command": "mirror-vs.rejectReview",
-        "key": "ctrl+backspace",
-        "mac": "ctrl+backspace",
         "when": "mirror-vs.inReview"
       },
       {

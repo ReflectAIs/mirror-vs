@@ -118,15 +118,68 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (!stat.isDirectory()) {
         throw new Error(`Not a directory: ${tool.path}`);
       }
-      const entries = fs.readdirSync(safePath);
-      return (
-        entries
-          .map((e) => {
-            const isDir = fs.statSync(path.join(safePath, e)).isDirectory();
-            return `${e}${isDir ? '/' : ''}`;
-          })
-          .join('\n') || '[Directory is empty]'
-      );
+
+      const depth = tool.depth !== undefined ? Math.max(1, Math.min(5, tool.depth)) : 1;
+
+      if (depth === 1) {
+        const entries = fs.readdirSync(safePath);
+        return (
+          entries
+            .map((e) => {
+              const isDir = fs.statSync(path.join(safePath, e)).isDirectory();
+              return `${e}${isDir ? '/' : ''}`;
+            })
+            .join('\n') || '[Directory is empty]'
+        );
+      } else {
+        // Recursive listing
+        const buildLocalTree = (dir: string, currentDepth: number, prefix: string): string[] => {
+          if (currentDepth > depth) return [];
+          const lines: string[] = [];
+          try {
+            const entries = fs.readdirSync(dir);
+            const dirs: string[] = [];
+            const files: string[] = [];
+
+            for (const e of entries) {
+              // Ignore standard skip items to keep output clean and fast
+              if (['node_modules', 'dist', 'out', '.git', '.mirror-vs', 'build', '.next', '.vscode'].includes(e)) continue;
+              const fp = path.join(dir, e);
+              try {
+                const s = fs.statSync(fp);
+                if (s.isDirectory()) dirs.push(e);
+                else if (s.isFile()) files.push(e);
+              } catch { /* skip */ }
+            }
+
+            dirs.sort();
+            files.sort();
+
+            const allItems = [
+              ...dirs.map(d => ({ name: d, isDir: true })),
+              ...files.map(f => ({ name: f, isDir: false }))
+            ];
+
+            for (let i = 0; i < allItems.length; i++) {
+              const item = allItems[i];
+              const isLast = i === allItems.length - 1;
+              const marker = isLast ? "└── " : "├── ";
+              const childPrefix = prefix + (isLast ? "    " : "│   ");
+
+              if (item.isDir) {
+                lines.push(`${prefix}${marker}${item.name}/`);
+                lines.push(...buildLocalTree(path.join(dir, item.name), currentDepth + 1, childPrefix));
+              } else {
+                lines.push(`${prefix}${marker}${item.name}`);
+              }
+            }
+          } catch { /* skip */ }
+          return lines;
+        };
+
+        const treeLines = buildLocalTree(safePath, 1, "");
+        return treeLines.join('\n') || '[Directory is empty]';
+      }
     }
 
     case 'create_file': {
@@ -194,8 +247,17 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (stat.isDirectory()) {
         throw new Error(`Cannot delete directory with delete_file. Path is a directory: ${tool.path}`);
       }
-      fs.unlinkSync(safePathDel);
-      return `File deleted: ${tool.path}`;
+
+      const { accepted, checkpointId } = await confirmChangesWithDiff(
+        safePathDel,
+        '',
+        path.basename(tool.path),
+        'replace',
+      );
+      if (!accepted) {
+        throw new Error('User rejected file deletion.');
+      }
+      return `File deletion proposed and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
     }
 
     case 'patch_file': {

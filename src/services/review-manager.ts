@@ -279,15 +279,21 @@ export class ReviewManager implements vscode.CodeLensProvider {
       fs.writeFileSync(tempProposedPath, proposedContent, 'utf8');
     }
 
-    // Compute diff to construct decorations (added lines only)
+    // Compute diff to construct decorations
     const diff = diffLines(original, proposedContent);
     const addedLineIndices: number[] = [];
     const removedLineIndices: number[] = [];
 
+    let currentProposedLine = 0;
     for (let i = 0; i < diff.length; i++) {
       const item = diff[i];
-      if (item.type === 'added' && item.proposedLineNum !== undefined) {
+      if (item.type === 'common' && item.proposedLineNum !== undefined) {
+        currentProposedLine = item.proposedLineNum;
+      } else if (item.type === 'added' && item.proposedLineNum !== undefined) {
         addedLineIndices.push(item.proposedLineNum);
+        currentProposedLine = item.proposedLineNum;
+      } else if (item.type === 'removed') {
+        removedLineIndices.push(currentProposedLine);
       }
     }
 
@@ -382,9 +388,16 @@ export class ReviewManager implements vscode.CodeLensProvider {
 
     if (accepted) {
       try {
-        const encoder = new TextEncoder();
-        await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(review.proposedContent));
-        vscode.window.showInformationMessage(`✅ Changes accepted for ${docName}`);
+        if (review.proposedContent === '') {
+          if (fs.existsSync(review.filePath)) {
+            fs.unlinkSync(review.filePath);
+          }
+          vscode.window.showInformationMessage(`✅ File deleted: ${docName}`);
+        } else {
+          const encoder = new TextEncoder();
+          await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(review.proposedContent));
+          vscode.window.showInformationMessage(`✅ Changes accepted for ${docName}`);
+        }
       } catch (e) {
         // ignore
       }

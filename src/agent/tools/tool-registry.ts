@@ -34,7 +34,7 @@ export async function executeTool(
     return await executeFileTool(tool, getSafePath);
   }
 
-  if (name === 'grep_search' || name === 'web_search') {
+  if (name === 'grep_search' || name === 'web_search' || name === 'get_diagnostics') {
     return await executeSearchTool(tool);
   }
 
