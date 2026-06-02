@@ -22,16 +22,16 @@
   --bg-glass-hover: rgba(255, 255, 255, 0.04);
   --bg-glass-active: rgba(255, 255, 255, 0.06);
 
-  /* Primary gradient — refined indigo-to-violet signature glow */
-  --gradient-primary: linear-gradient(135deg, #5f5dec, #9f3fed);
-  --gradient-primary-hover: linear-gradient(135deg, #4b48db, #8c2ada);
+  /* Primary gradient — refined cybernetic blue-to-cyan signature glow */
+  --gradient-primary: linear-gradient(135deg, #2563eb, #38bdf8);
+  --gradient-primary-hover: linear-gradient(135deg, #1d4ed8, #0ea5e9);
   --gradient-header: linear-gradient(180deg, rgba(7, 7, 11, 0.95) 0%, rgba(7, 7, 11, 0.8) 100%);
-  --gradient-glow: linear-gradient(90deg, rgba(95, 93, 236, 0.25), rgba(159, 63, 237, 0.25));
+  --gradient-glow: linear-gradient(90deg, rgba(37, 99, 235, 0.25), rgba(56, 189, 248, 0.25));
 
   /* Functional colors */
-  --color-primary: #6366f1;
-  --color-primary-light: #a855f7;
-  --color-accent: #d946ef;
+  --color-primary: #2563eb;
+  --color-primary-light: #38bdf8;
+  --color-accent: #06b6d4;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
@@ -45,7 +45,7 @@
   /* Borders — ultra-thin clean borders */
   --border-glass: rgba(255, 255, 255, 0.05);
   --border-glass-hover: rgba(255, 255, 255, 0.09);
-  --border-glow: rgba(99, 102, 241, 0.15);
+  --border-glow: rgba(37, 99, 235, 0.15);
 
   /* Border radii */
   --radius-xs: 4px;
@@ -87,8 +87,8 @@ body {
   height: 100vh;
   position: relative;
   background:
-    radial-gradient(ellipse 70% 55% at 50% -8%, rgba(99, 102, 241, 0.05), transparent),
-    radial-gradient(ellipse 50% 45% at 85% 100%, rgba(168, 85, 247, 0.03), transparent),
+    radial-gradient(ellipse 70% 55% at 50% -8%, rgba(37, 99, 235, 0.05), transparent),
+    radial-gradient(ellipse 50% 45% at 85% 100%, rgba(56, 189, 248, 0.03), transparent),
     var(--bg-deep);
 }
 

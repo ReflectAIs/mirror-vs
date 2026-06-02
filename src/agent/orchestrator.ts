@@ -31,8 +31,8 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 
 function getModelContextWindow(model: string): number {
   const normalized = model.toLowerCase();
-  if (normalized.includes("deepseek")) return 64000; // Safe cap for cost-control
   if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model];
+  if (normalized.includes("deepseek")) return 128000; // Safe cap for cost-control for V4 models
   const baseModel = model.split(":")[0];
   if (MODEL_CONTEXT_WINDOWS[baseModel]) return MODEL_CONTEXT_WINDOWS[baseModel];
   return 32000; // Conservative default
@@ -46,102 +46,32 @@ function estimatePayloadTokens(messages: { content: string }[]): number {
   return messages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
 }
 
-const AGENT_SYSTEM_PROMPT_TEMPLATE = `You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+import { getBaseAgentRole } from "./prompts/baseAgentRole";
+import { getWorkspaceContext } from "./prompts/workspaceContext";
+import { getToolSpecifications } from "./prompts/toolSpecifications";
 
-********************************************************************************
-CRITICAL: LANGUAGE CONSTRAINT
-You MUST communicate, think, and respond in the same language as the user's message, default is english. If the user writes in English, reply in English. If they write in Chinese, reply in Chinese. Keep your internal thinking, plans, explanations, and replies in the matched language.
-********************************************************************************
+export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = false): string {
+  const service = CommandService.getInstance();
+  const terminals = service.getActiveTerminals();
+  let terminalContext = "";
+  if (terminals.length > 0) {
+    terminalContext = "\n\n### ACTIVE RUNNING TERMINALS:\n" + terminals.map(t => "- \"" + t.name + "\" " + (t.running ? "RUNNING" : "EXITED")).join("\n");
+  } else {
+    terminalContext = "\n\n### ACTIVE RUNNING TERMINALS:\nNone";
+  }
 
-Your primary mission is to help the developer implement features, refactor code, find bugs, and manage files autonomously with minimum friction. You have access to workspace tools invoked via XML tags. The host will execute the tool and return the results.
+  const isSubsequent = loopCount > 1;
+  const baseRole = getBaseAgentRole();
+  const workspaceContext = getWorkspaceContext();
+  const toolSpecs = getToolSpecifications(isSubsequent);
 
-### 🧠 CORE BEHAVIORS & WORKFLOW
-1. **Context First**: Always base your actions on the provided CONSOLIDATED CONTEXT SUMMARY. Begin your execution exactly at the 'Next steps' outlined in the context without re-verifying what is already known.
-2. **Internal Planning**: Prioritize immediate execution. Do NOT physically write or edit \`.mirror-vs/plan.md\` or \`.mirror-vs/memory.md\` files using tool calls unless explicitly asked.
-3. **Action-Biased Exploration (The Soft Boundary)**: Always start your work at the exact file that needs changing (e.g., the target frontend component). If you have the data you need, make the change immediately. However, if you discover you are missing a crucial variable, endpoint, or logic, you are encouraged to explore upstream files (like backend controllers or models) to find it. 
-4. **Purposeful Investigation**: When exploring the codebase, be targeted. Once you find the missing context, stop investigating and immediately execute the fix. Avoid using heavy, project-wide exploratory tools (like \`analyze_project\` or \`analyze_complexity\`) unless you are completely lost or the user explicitly requests an audit.
-5. **Search Strategy**: When searching for text, errors, or variables using \`grep_search\`, use short, broad, case-insensitive keywords (e.g., "Recipe" instead of "No Recipe Link Found") to avoid failing on exact-string typos.
-6. **Autonomous Execution**: Do not ask for permission to read, create, or edit files, or to run safe commands. Just do it. The ONLY exception is \`delete_file\`—you must ask the user for approval before deleting any file.
-7. **Background Tasks**: If a \`run_command\` result indicates a process is "running in the background," immediately verify its side effects (e.g., check if a port opened or a file was generated).
-8. **Vision Capabilities**: If the user pastes an image or a screenshot is captured, it is automatically attached to your context payload. If your underlying model supports vision/multimodality (like Ollama's vision models), you can fully analyze and describe the image to solve UI/UX, styling, or layout alignment issues.
+  let planStatusContext = "";
+  if (hasPlan) {
+    planStatusContext = "\n\n### 📋 APPROVED PLAN DETECTED:\nAn implementation plan has already been proposed and approved by the user for this session. Do NOT write or output a new <implementation_plan> block. Proceed directly to executing the tool calls (e.g. read_file, patch_file, etc.) to accomplish the plan steps now!";
+  }
 
-### 🎯 EXECUTION DISCIPLINE
-These are hard rules to keep your work focused and prevent wasted effort:
-1. **User Intent is Source of Truth**: The user's most recent message defines what success looks like. If the user changes direction or their latest request conflicts with previous plans, features, or assumptions, immediately abandon the outdated plan and discard obsolete goals. Do not continue implementing previously discussed features that are no longer part of the current path.
-2. **Completion Gate (MANDATORY)**: After EVERY read_file or grep_search call, ask yourself: "Can I write the patch right now with the information I have?" If YES → write the patch immediately in your next turn. If NO → identify the ONE specific piece of missing information and read ONLY that. Do not re-read files you have already seen. Do not re-verify information already in your context.
-3. **Investigation Budget**: You have a maximum of 4 read/search operations per task before you MUST either (a) write a patch, or (b) explain to the user exactly what specific information is still missing and why. Exceeding this budget without producing a code change is a failure. If the task is trivial (e.g., hide a UI element, rename a variable), your budget is 2.
-4. **Patch-First Workflow**: The correct sequence is always: Read → Patch → Verify. NOT: Read → Read → Read → Read → Patch. Once you understand the change needed, commit to the patch. You can always fix a failed patch faster than you can achieve perfect certainty through more reading.
-5. **Never Re-Read Known Content**: If file contents are already in your conversation history or context summary, use them directly. Do NOT call read_file on the same file or line range you have already read in this session. The only exception is if a patch_file failed and you need the exact current state after a modification.
-6. **Failure Recovery (Patch Failed)**: When a patch_file fails with "SEARCH block not found": (a) read ONLY the exact section of the file that contains the block you tried to match, (b) copy the exact lines, (c) retry the patch with the corrected SEARCH block. Do NOT restart investigation from scratch. Do NOT re-read the entire file. Do NOT re-read other files.
-7. **Verify Before Done**: A task is not complete until: (a) the requested user workflow succeeds, (b) errors are reproduced and fully resolved, and (c) the exact feature requested is demonstrated or verified.
-8. **Small, Verifiable Steps**: Prefer making one focused change and confirming it works over rewriting large sections at once. If a task involves multiple files, patch and verify incrementally.
-9. **On Failure, Simplify**: If a test fails or a patch doesn't apply, resist the urge to add more code or widen the scope. Step back, re-read the error, and try a simpler approach.
-10. **Feature Addition Control**: Avoid adding major features or expanding scope unless explicitly requested. Prioritize doing exactly what is asked.
-11. **Root Cause Discipline**: Before modifying code to fix a bug, identify the most likely root cause and collect evidence. Do not apply speculative or guess-based fixes.
-
-### 🐛 EVIDENCE-DRIVEN DEBUGGING DISCIPLINE (HARD RULES)
-1. **No Guess-and-Patch Loops (Hypothesis Churn)**: Never propose patches based on blind speculation. A debugging process must be strictly evidence-driven: Observe Symptom → Identify Producer Component → Inspect Source Files → Form One Hypothesis → Prove Hypothesis → Patch → Re-test.
-2. **Contradiction Invalidation**: If a patch fails to resolve the issue or produces new symptoms, immediately invalidate your previous hypothesis. Do NOT stack defensive layers (like adding locks, refs, timing guards, or extra state checks) on top of a failed theory. Re-evaluate from first principles.
-3. **Strict Source Ownership**: Never explain, guess, or make claims about the behavior of a listener, callback, event handler, service, hook, or component unless you have actually called \`read_file\` or \`grep_search\` and inspected its source code directly. Hallucinated reasoning is completely unacceptable.
-4. **Single Active Theory**: You are allowed exactly one active root-cause theory at a time. Do not list multiple unrelated possibilities and guess. Prove or disprove one theory before moving to another.
-5. **Evidence Before Complexity**: Do not add extra complexity (timing guards, refs, locks, generation IDs, counters) unless you have collected concrete evidence (e.g. via logs or diagnostic tools) that proves that specific event sequence is actually occurring. Keep fixes minimal, targeted, and clean.
-
-### 🛠️ TOOL USAGE RULES
-- Output valid XML tags. Parameters must be in double quotes. Self-closing tags must end with \`/>\`.
-- Call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING.
-- **File Reading Efficiency**: Avoid "keyholing" (reading files in tiny 20-line chunks). Read larger blocks (500-800 lines) or the entire file to get context quickly and save turns. If a file is extremely long or risks being truncated, do not attempt to read the entire file in one go. Instead, target your inspection by either: (a) using \`grep_search\` with specific keywords to find the relevant sections first, or (b) reading the file in logical, sequential parts using the \`start_line\` and \`end_line\` parameters of \`read_file\`.
-- **Patching Files Safely**: To edit existing files, use \`patch_file\`. To ensure your \`SEARCH\` block is a 1:1 exact character-for-character match with the current file state (including whitespace and indentation), you should verify you have the exact file contents in context. You do NOT need to re-read a file using \`read_file\` right before patching if you already have its recent, exact contents in your conversation history/context window and it has not been modified. Only call \`read_file\` if you lack the exact content, or if a previous patch attempt failed.
-- **Handling Long New Files**: When creating a very long or complex new file, avoid writing the entire content in one huge \`create_file\` block (which is prone to model truncation or syntax errors). Instead, create a skeleton or basic scaffold first using \`create_file\`, and then build/populate the rest in logical parts incrementally using \`patch_file\` tags.
-
-### 🧰 AVAILABLE TOOLS
-
-1. READ FILE:
-   <read_file path="relative/path/to/file.ts" />
-   For extremely long files, you can read specific line ranges (up to 800 lines per turn):
-   <read_file path="relative/path/to/file.ts" start_line="1" end_line="800" />
-2. CREATE FILE (Only for completely new files):
-   <create_file path="relative/path/to/new_file.ts">content here</create_file>
-3. WRITE FILE (Overwrites whole file):
-   <write_file path="relative/path/to/existing_file.ts">content here</write_file>
-4. PATCH FILE (For modifying existing files):
-   <patch_file path="relative/path/to/existing_file.ts">
-<<<<<<< SEARCH
-[exact original lines]
-=======
-[new replacement lines]
->>>>>>> REPLACE
-</patch_file>
-5. LIST DIRECTORY: <list_dir path="relative/path/to/directory" />
-6. GREP SEARCH (full workspace): <grep_search query="pattern" />
-   GREP SEARCH (scoped to directory): <grep_search query="pattern" path="src/screens" />
-   **Best practice**: Always scope with \`path\` when you know the relevant area. This is dramatically faster on large codebases.
-7. WEB SEARCH: <web_search query="pattern" />
-8. GET DIAGNOSTICS (all errors/warnings): <get_diagnostics />
-   GET DIAGNOSTICS (scoped): <get_diagnostics path="src/screens" />
-   Returns all VS Code errors and warnings with exact file:line locations. Use this FIRST when debugging issues.
-9. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
-10. BROWSER CLICK: <browser_click selector="#my-button" />
-11. BROWSER TYPE: <browser_type selector="#search-input" text="hello world" />
-12. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />
-13. CODEBASE ANALYSIS:
-    <analyze_project /> (Project overview)
-    <analyze_dependencies /> (Import graph)
-    <analyze_complexity /> (Cyclomatic complexity)
-    <analyze_coverage /> (Test coverage)
-    <analyze_dead_code /> (Unused exports)
-    <analyze_impact path="src/file.ts" /> (Dependency impact)
-    <graphify /> (Mermaid structure graph)
-14. WAIT: <wait ms="3000" />
-15. BROWSER SCREENSHOT: <browser_screenshot />
-16. RUN COMMAND: <run_command command="npm install" />
-17. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
-18. CLOSE TERMINAL: <close_terminal terminal_name="..." />
-19. READ TERMINAL: <read_terminal terminal_name="..." />
-20. LIST TERMINALS: <list_terminals />
-21. FIGMA INSPECT: <figma_inspect url="..." />
-
-ENVIRONMENT: {{SHELL_ENV}}
-`;
+  return `${baseRole}${planStatusContext}\n\n${toolSpecs}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}`;
+}
 
 function getShellEnvDescription(): string {
   if (process.platform === "win32") {
@@ -179,32 +109,44 @@ function hasActionPlanningIntent(text: string): boolean {
   return patterns.some(p => p.test(lower));
 }
 
-export function buildSystemPrompt(): string {
-  const service = CommandService.getInstance();
-  const terminals = service.getActiveTerminals();
-  let terminalContext = "";
-  if (terminals.length > 0) {
-    terminalContext = "\n\n### ACTIVE RUNNING TERMINALS:\n" + terminals.map(t => "- \"" + t.name + "\" " + (t.running ? "RUNNING" : "EXITED")).join("\n");
-  } else {
-    terminalContext = "\n\n### ACTIVE RUNNING TERMINALS:\nNone";
-  }
+function hasDeclaredPlan(history: ChatMessage[], currentResponse: string): boolean {
+  const planTagRegex = /<implementation_plan>([\s\S]*?)<\/implementation_plan>/i;
+  if (planTagRegex.test(currentResponse)) return true;
+  return history.some(msg => msg.role === 'assistant' && planTagRegex.test(msg.content));
+}
 
-  // List all workspace folders so the model has full multi-root awareness
-  let workspaceContext = "";
-  const folders = vscode.workspace.workspaceFolders;
-  if (folders && folders.length > 0) {
-    workspaceContext = "\n\n### OPEN WORKSPACE FOLDERS:\n" +
-      folders.map((f, i) => `  ${i}. \`${f.uri.fsPath}\` (name: "${f.name}")`).join("\n") +
-      "\n\n**Multi-Root Workspace File Rules:**\n" +
-      "  - All file-related tools (read_file, create_file, write_file, patch_file, list_dir) accept **relative** or **absolute** paths.\n" +
-      "  - **Absolute paths** (e.g., `C:\\Users\\me\\project\\file.ts` on Windows or `/home/user/project/file.ts` on Mac/Linux) are allowed and will be resolved against the matching workspace folder.\n" +
-      "  - **Relative paths** (e.g., `src/file.ts`) are resolved against the **primary** workspace folder (index 0).\n" +
-      "  - To create/write files in a non-primary folder, always use the **full absolute path** to that folder.";
-  } else {
-    workspaceContext = "\n\n### OPEN WORKSPACE FOLDERS:\nNone";
-  }
+function getDiagnosticsForFile(filePath: string): string {
+  try {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return "";
 
-  return AGENT_SYSTEM_PROMPT_TEMPLATE.replace("{{SHELL_ENV}}", getShellEnvDescription()) + terminalContext + workspaceContext;
+    const workspaceRoot = folders[0].uri.fsPath;
+    const allDiagnostics = vscode.languages.getDiagnostics();
+    const relativeTarget = path.isAbsolute(filePath)
+      ? path.relative(workspaceRoot, filePath).replace(/\\/g, '/')
+      : filePath.replace(/\\/g, '/');
+
+    const fileDiags: string[] = [];
+
+    for (const [uri, diags] of allDiagnostics) {
+      const relPath = path.relative(workspaceRoot, uri.fsPath).replace(/\\/g, '/');
+      if (relPath !== relativeTarget) continue;
+
+      for (const d of diags) {
+        if (d.severity > vscode.DiagnosticSeverity.Warning) continue;
+        const severity = d.severity === vscode.DiagnosticSeverity.Error ? 'Error' : 'Warning';
+        fileDiags.push(`- Line ${d.range.start.line + 1}: [${severity}] ${d.message} (${d.source || 'linter'})`);
+      }
+    }
+
+    if (fileDiags.length === 0) {
+      return `\n[Grounding Observation]: VS Code reports 0 errors and 0 warnings in this file. build is clean!`;
+    }
+
+    return `\n[Grounding Warning - Code issues detected after patch]:\n${fileDiags.join('\n')}\n*Please fix these compiler/syntax errors in your next turn!*`;
+  } catch (e) {
+    return "";
+  }
 }
 
 export class AgentOrchestrator {
@@ -305,7 +247,7 @@ export class AgentOrchestrator {
       let provider = config.get<string>("defaultProvider", "ollama") as string;
       const ollamaHost = config.get<string>("ollamaHost", "http://localhost:11434") as string;
       const defaultOllamaModel = config.get<string>("defaultOllamaModel", "llama3") as string;
-      const defaultDeepSeekModel = config.get<string>("defaultDeepSeekModel", "deepseek-chat") as string;
+      const defaultDeepSeekModel = config.get<string>("defaultDeepSeekModel", "deepseek-v4-pro") as string;
       this._session.sessionId = "session_" + Date.now();
 
     // Rate limiter: image budget
@@ -386,6 +328,79 @@ export class AgentOrchestrator {
     const maxMalformedRetries = 3;
     let sequentialExploratorySteps = 0;
 
+    // Agent Control Loop Guard State Tracking (Eradicates Execution Paralysis)
+    let agentMode: "DISCOVERY" | "IMPLEMENTATION" | "VALIDATION" = "DISCOVERY";
+    let searchCount = 0;
+    const maxSearchBudget = 10;
+    const readHistory = new Set<string>();
+    const lastSearches: string[] = [];
+    let hasCommittedToPatch = false;
+
+    const validateControlLoopGuard = (tool: any): { allowed: boolean; reason?: string } => {
+      const target = tool.path || tool.query || tool.url || tool.selector || tool.command || "";
+      const isSearchOrRead = [
+        "read_file", "grep_search", "symbol_search", "list_dir", "web_search", "git_status", "git_diff"
+      ].includes(tool.name);
+
+      if (isSearchOrRead) {
+        // 1. Commitment Lock (Search is blocked, but single-time read_file is permitted to check imports/signatures)
+        if (hasCommittedToPatch && tool.name !== "read_file") {
+          return {
+            allowed: false,
+            reason: `[System Intervention - Commitment Locked]: You declared that you are ready to patch. In this state, exploratory search/exploratory tools like '${tool.name}' are BLOCKED. You are permitted to use 'read_file' once per file path if you need to verify parameter signatures, imports, or mutations, but you must proceed to implementation.`
+          };
+        }
+
+        // 2. Search Budget
+        if (searchCount >= maxSearchBudget) {
+          return {
+            allowed: false,
+            reason: `[System Intervention - Search Budget Exhausted]: You have exceeded your maximum allowed discovery budget of ${maxSearchBudget} search/read steps in this session. You are BLOCKED from performing further searches or reads. You MUST either immediately output the patch (patch_file/write_file) or stop and explain what is missing.`
+          };
+        }
+
+        // 3. "No Re-Read" Rule
+        if (tool.name === "read_file") {
+          const startLine = tool.start_line || 1;
+          const endLine = tool.end_line || 1000;
+          const readKey = `${tool.path}:${startLine}-${endLine}`;
+          if (readHistory.has(readKey)) {
+            return {
+              allowed: false,
+              reason: `[System Intervention - No Re-Read]: You have already read the file section "${tool.path}" (lines ${startLine}-${endLine}) in this session. Re-reading identical content is BLOCKED to prevent wasted tokens and action loops. Please proceed to write the patch or explain using your existing knowledge.`
+            };
+          }
+          readHistory.add(readKey);
+        }
+
+        // 4. Convergence Detector
+        searchCount++;
+        const searchKey = `${tool.name}:${target}`;
+        lastSearches.push(searchKey);
+        if (lastSearches.length > 5) lastSearches.shift();
+
+        if (lastSearches.length >= 3 && lastSearches.every(s => s === searchKey)) {
+          return {
+            allowed: false,
+            reason: `[System Intervention - Convergence Detector]: You have performed the identical search or read step "${searchKey}" three times consecutively without making progress. You have CONVERGED. You are BLOCKED from further redundant actions. You MUST proceed to execute the patch now.`
+          };
+        }
+      }
+
+      // Clear read history if modifying a file
+      if (tool.name === "patch_file" || tool.name === "write_file" || tool.name === "create_file") {
+        if (tool.path) {
+          for (const key of Array.from(readHistory.keys())) {
+            if (key.startsWith(tool.path + ":")) {
+              readHistory.delete(key);
+            }
+          }
+        }
+      }
+
+      return { allowed: true };
+    };
+
     try {
       while (continueLoop && loopCount < maxLoops) {
         if (signal.aborted) {
@@ -402,7 +417,7 @@ export class AgentOrchestrator {
         const targetBudget = contextWindow * (Math.max(budgetPercent - 20, 10) / 100);
         const turnsToRetain = config.get("turnsToRetain", 6);
 
-        const systemPromptTokens = estimateTokenCount(buildSystemPrompt());
+        const systemPromptTokens = estimateTokenCount(buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, "")));
         const activeMessages = currentMessages.filter((msg, idx) => {
           if (idx === 0) return false;
           if (msg.role === "system" && msg.content.includes("[CONSOLIDATED CONTEXT SUMMARY]")) return false;
@@ -462,7 +477,7 @@ export class AgentOrchestrator {
         continueLoop = false;
 
         const payload: ChatMessage[] = [
-          { role: "system", content: buildSystemPrompt() },
+          { role: "system", content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, "")) },
           ...currentMessages
             .filter((msg) => !msg.summarized)
             .map((msg) => ({
@@ -548,6 +563,25 @@ export class AgentOrchestrator {
         currentMessages.push({ role: "assistant", content: assistantResponse });
         await this._saveChatHistory(currentMessages);
 
+        // Commitment Detection: check if the model says it has enough context or is ready to patch
+        const lowerResponse = assistantResponse.toLowerCase();
+        const commitmentPatterns = [
+          "i will now apply the patch",
+          "i will now modify",
+          "i'll write the patch",
+          "i will write the patch",
+          "i have enough context",
+          "i will now implement",
+          "applying the patch",
+          "applying patch",
+          "i'm ready to patch",
+          "i am ready to patch"
+        ];
+        if (commitmentPatterns.some(p => lowerResponse.includes(p))) {
+          hasCommittedToPatch = true;
+          agentMode = "IMPLEMENTATION";
+        }
+
         const toolCalls = this._parser.parseToolCalls(assistantResponse, true);
 
         if (toolCalls.length > 0) {
@@ -580,13 +614,19 @@ export class AgentOrchestrator {
             'read_file', 'list_dir', 'grep_search', 'symbol_search',
             'web_search', 'get_diagnostics', 'git_status', 'git_diff'
           ];
-          const isAllReadOnly = toolCalls.every(t => readOnlyTools.includes(t.name));
-
-          if (isAllReadOnly) {
+          const isAllReadOnly = toolCalls.every(t => readOnlyTools.includes(t.name));          if (isAllReadOnly) {
             // Parallel execution for read-only tools
             const promises = toolCalls.map(async (tool) => {
               if (signal.aborted) return;
               const target = tool.path || tool.query || tool.url || tool.selector || tool.command || "";
+
+              const guard = validateControlLoopGuard(tool);
+              if (!guard.allowed) {
+                this._sendToolStatusToWebview(tool.name, "error", target, guard.reason);
+                this._sendAvatarState("error");
+                return "[Tool Result for " + tool.name + " on \"" + target + "\"]: Error - " + guard.reason;
+              }
+
               this._sendToolStatusToWebview(tool.name, "running", target);
               try {
                 const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -627,11 +667,46 @@ export class AgentOrchestrator {
                 break;
               }
               const target = tool.path || tool.query || tool.url || tool.selector || tool.command || "";
+
+              const guard = validateControlLoopGuard(tool);
+              if (!guard.allowed) {
+                this._sendToolStatusToWebview(tool.name, "error", target, guard.reason);
+                this._sendAvatarState("error");
+                toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${guard.reason}`);
+                continue;
+              }
+
+              // Plan-First Mode Validation
+              const isModifying = [
+                "create_file", "write_file", "patch_file", "delete_file", "rename_file", 
+                "run_command", "send_terminal_input", "browser_click", "browser_type", 
+                "browser_evaluate_script", "git_add", "git_commit", "rename_symbol"
+              ].includes(tool.name);
+              const planFirstEnabled = vscode.workspace.getConfiguration("mirror-vs").get<boolean>("planFirst", true);
+
+              if (isModifying && planFirstEnabled && !hasDeclaredPlan(currentMessages, assistantResponse)) {
+                const rejectMsg = `[System Intervention - Plan Required]: You attempted to execute the modifying tool '${tool.name}' without first proposing an implementation plan. In Plan-First Mode, you MUST output a structured <implementation_plan>...</implementation_plan> block detailing the files to modify, the changes, and the verification strategy BEFORE executing any modification. Please write the plan first.`;
+                this._sendToolStatusToWebview(tool.name, "error", target, rejectMsg);
+                this._sendAvatarState("error");
+                toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${rejectMsg}`);
+                continue;
+              }
+
               this._sendToolStatusToWebview(tool.name, "running", target);
               try {
                 const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                 const figmaKey = (await this._getSecret("figma_api_key")) || "";
-                const result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+                let result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+
+                // Grounding Verification Hook
+                if (tool.name === "create_file" || tool.name === "write_file" || tool.name === "patch_file") {
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  if (tool.path) {
+                    const diagnosticsFeed = getDiagnosticsForFile(tool.path);
+                    result += diagnosticsFeed;
+                  }
+                }
+
                 let checkpointId: string | undefined;
                 const cpMatch = result.match(/Revert ID: (\w+)/);
                 if (cpMatch) checkpointId = cpMatch[1];

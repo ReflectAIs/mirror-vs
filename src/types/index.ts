@@ -31,6 +31,8 @@ export interface ExtensionSettings {
   hasFigmaKey: boolean; // Tells the webview if a Figma PAT is stored
   contextBudgetPercent: number;
   turnsToRetain: number;
+  deepSeekThinking?: boolean;
+  deepSeekThinkingLevel?: 'high' | 'max';
 }
 
 export interface ChatMessage {
@@ -99,6 +101,8 @@ export type WebviewToExtensionMessage =
       figmaKey?: string;
       contextBudgetPercent?: number;
       turnsToRetain?: number;
+      deepSeekThinking?: boolean;
+      deepSeekThinkingLevel?: 'high' | 'max';
     }
   | { type: 'fetchModels' }
   | { type: 'validateHost'; host: string }

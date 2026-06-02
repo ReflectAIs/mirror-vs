@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.0.14",
+  "version": "0.1.0",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -186,7 +186,7 @@
         },
         "mirror-vs.defaultDeepSeekModel": {
           "type": "string",
-          "default": "deepseek-chat",
+          "default": "deepseek-v4-pro",
           "enum": [
             "deepseek-chat",
             "deepseek-coder",
@@ -214,6 +214,22 @@
           "type": "integer",
           "default": 6,
           "description": "Number of recent turns to retain as active conversation context after compression."
+        },
+        "mirror-vs.planFirst": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enforce Plan-First Execution Mode. The agent must declare an <implementation_plan> before executing file modifications."
+        },
+        "mirror-vs.deepSeekThinking": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable DeepSeek V4 Thinking Mode."
+        },
+        "mirror-vs.deepSeekThinkingLevel": {
+          "type": "string",
+          "enum": ["high", "max"],
+          "default": "high",
+          "description": "DeepSeek V4 Thinking Effort Level."
         }
       }
     }

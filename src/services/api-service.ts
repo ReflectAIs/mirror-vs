@@ -1,6 +1,7 @@
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import * as vscode from 'vscode';
 
 interface OllamaTag {
   name: string;
@@ -262,14 +263,27 @@ export function streamDeepSeekChat(
       : msg.content
   }));
 
-  const bodyData = JSON.stringify({
+  const config = vscode.workspace.getConfiguration('mirror-vs');
+  const thinkingEnabled = config.get<boolean>('deepSeekThinking', true);
+  const thinkingLevel = config.get<string>('deepSeekThinkingLevel', 'high');
+
+  const payload: any = {
     model,
     messages: sanitizedMessages,
     stream: true,
     stream_options: {
       include_usage: true,
-    },
-  });
+    }
+  };
+
+  if (thinkingEnabled) {
+    payload.reasoning_effort = thinkingLevel;
+    payload.thinking = {
+      type: "enabled"
+    };
+  }
+
+  const bodyData = JSON.stringify(payload);
 
   const requestOptions: https.RequestOptions = {
     hostname: parsedUrl.hostname,

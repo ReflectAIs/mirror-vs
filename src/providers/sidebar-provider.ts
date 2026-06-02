@@ -6,7 +6,6 @@ import { SecretService } from '../services/secret-service';
 import { StorageService } from '../services/storage-service';
 import {
   getActiveFileName,
-  getActiveFileContext,
   applyCodeToActiveEditor,
   revertCheckpoint,
 } from '../utils/editor-utils';
@@ -91,6 +90,13 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
           await config.update('ollamaHost', data.ollamaHost, vscode.ConfigurationTarget.Global);
           await config.update('defaultOllamaModel', data.defaultOllamaModel, vscode.ConfigurationTarget.Global);
           await config.update('defaultDeepSeekModel', data.defaultDeepSeekModel, vscode.ConfigurationTarget.Global);
+
+          if (data.deepSeekThinking !== undefined) {
+            await config.update('deepSeekThinking', data.deepSeekThinking, vscode.ConfigurationTarget.Global);
+          }
+          if (data.deepSeekThinkingLevel !== undefined) {
+            await config.update('deepSeekThinkingLevel', data.deepSeekThinkingLevel, vscode.ConfigurationTarget.Global);
+          }
 
           if (data.contextBudgetPercent !== undefined) {
             await config.update(
@@ -575,9 +581,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const provider = config.get<LLMProvider>('defaultProvider', 'ollama');
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
-    const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
+    const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-v4-pro');
     const contextBudgetPercent = config.get<number>('contextBudgetPercent', 75);
     const turnsToRetain = config.get<number>('turnsToRetain', 6);
+    const deepSeekThinking = config.get<boolean>('deepSeekThinking', true);
+    const deepSeekThinkingLevel = config.get<'high' | 'max'>('deepSeekThinkingLevel', 'high');
 
     const hasDeepSeekKey = await this._secretService.hasSecret('deepseek_api_key');
     const hasFigmaKey = await this._secretService.hasSecret('figma_api_key');
@@ -591,6 +599,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       hasFigmaKey,
       contextBudgetPercent,
       turnsToRetain,
+      deepSeekThinking,
+      deepSeekThinkingLevel,
     };
 
     this._view.webview.postMessage({

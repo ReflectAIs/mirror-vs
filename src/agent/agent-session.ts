@@ -109,7 +109,7 @@ export class AgentSession {
     const provider = config.get<LLMProvider>('defaultProvider', 'ollama');
     const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434');
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
-    const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-chat');
+    const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-v4-pro');
     const contextBudgetPercent = config.get<number>('contextBudgetPercent', 75);
     const turnsToRetain = config.get<number>('turnsToRetain', 6);
 

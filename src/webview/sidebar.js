@@ -29,6 +29,14 @@
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
   
+  const quickProviderSelect = document.getElementById('quick-provider-select');
+  const quickModelSelect = document.getElementById('quick-model-select');
+  const quickThinkingToggle = document.getElementById('thinking-toggle');
+  const quickThinkingLevelSelect = document.getElementById('thinking-level-select');
+  const settingsThinkingToggle = document.getElementById('settings-thinking-toggle');
+  const settingsThinkingLevelSelect = document.getElementById('settings-thinking-level-select');
+  const thinkingQuickControls = document.getElementById('thinking-quick-controls');
+  
   const chatMessages = document.getElementById('chat-messages');
   const welcomeCard = document.getElementById('welcome-card');
   
@@ -223,11 +231,45 @@
       providerDeepseekBtn.classList.remove('active');
       ollamaPanel.classList.remove('hidden');
       deepseekPanel.classList.add('hidden');
+      if (thinkingQuickControls) {
+        thinkingQuickControls.style.opacity = '0.5';
+        thinkingQuickControls.style.pointerEvents = 'none';
+      }
     } else {
       providerOllamaBtn.classList.remove('active');
       providerDeepseekBtn.classList.add('active');
       ollamaPanel.classList.add('hidden');
       deepseekPanel.classList.remove('hidden');
+      if (thinkingQuickControls) {
+        thinkingQuickControls.style.opacity = '1';
+        thinkingQuickControls.style.pointerEvents = 'auto';
+      }
+    }
+    if (quickProviderSelect) {
+      quickProviderSelect.value = provider;
+    }
+    syncQuickModelSelect();
+  }
+
+  function syncQuickModelSelect() {
+    if (!quickProviderSelect || !quickModelSelect) return;
+    quickModelSelect.innerHTML = '';
+    if (activeProvider === 'ollama') {
+      Array.from(ollamaModelSelect.options).forEach(opt => {
+        const newOpt = document.createElement('option');
+        newOpt.value = opt.value;
+        newOpt.textContent = opt.textContent;
+        quickModelSelect.appendChild(newOpt);
+      });
+      quickModelSelect.value = ollamaModelSelect.value;
+    } else {
+      Array.from(deepseekModelSelect.options).forEach(opt => {
+        const newOpt = document.createElement('option');
+        newOpt.value = opt.value;
+        newOpt.textContent = opt.textContent;
+        quickModelSelect.appendChild(newOpt);
+      });
+      quickModelSelect.value = deepseekModelSelect.value;
     }
   }
 
@@ -271,6 +313,9 @@
     const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
+    const deepSeekThinking = settingsThinkingToggle.checked;
+    const deepSeekThinkingLevel = settingsThinkingLevelSelect.value;
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -280,11 +325,58 @@
       deepSeekKey: deepSeekKey || undefined, // only send key if typed
       figmaKey: figmaKey || undefined, // only send key if typed
       contextBudgetPercent: contextBudget,
-      turnsToRetain: turnsToRetain
+      turnsToRetain: turnsToRetain,
+      deepSeekThinking,
+      deepSeekThinkingLevel
     });
 
     settingsDrawer.classList.add('collapsed');
   });
+
+  // 5x. Bind event listeners for quick input settings controls
+  if (quickProviderSelect) {
+    quickProviderSelect.addEventListener('change', (e) => {
+      selectProvider(e.target.value);
+      saveSettingsBtn.click();
+    });
+  }
+
+  if (quickModelSelect) {
+    quickModelSelect.addEventListener('change', (e) => {
+      if (activeProvider === 'ollama') {
+        ollamaModelSelect.value = e.target.value;
+      } else {
+        deepseekModelSelect.value = e.target.value;
+      }
+      saveSettingsBtn.click();
+    });
+  }
+
+  if (quickThinkingToggle) {
+    quickThinkingToggle.addEventListener('change', (e) => {
+      settingsThinkingToggle.checked = e.target.checked;
+      saveSettingsBtn.click();
+    });
+  }
+
+  if (quickThinkingLevelSelect) {
+    quickThinkingLevelSelect.addEventListener('change', (e) => {
+      settingsThinkingLevelSelect.value = e.target.value;
+      saveSettingsBtn.click();
+    });
+  }
+
+  if (settingsThinkingToggle) {
+    settingsThinkingToggle.addEventListener('change', (e) => {
+      quickThinkingToggle.checked = e.target.checked;
+    });
+  }
+
+  if (settingsThinkingLevelSelect) {
+    settingsThinkingLevelSelect.addEventListener('change', (e) => {
+      quickThinkingLevelSelect.value = e.target.value;
+    });
+  }
 
   // 5b. Ollama Host Live Validation on Type (Debounced)
   ollamaHostInput.addEventListener('input', () => {
@@ -1181,6 +1273,15 @@ function attachImage(base64) {
 
         deepseekModelSelect.value = s.defaultDeepSeekModel;
 
+        if (s.deepSeekThinking !== undefined) {
+          settingsThinkingToggle.checked = s.deepSeekThinking;
+          quickThinkingToggle.checked = s.deepSeekThinking;
+        }
+        if (s.deepSeekThinkingLevel !== undefined) {
+          settingsThinkingLevelSelect.value = s.deepSeekThinkingLevel;
+          quickThinkingLevelSelect.value = s.deepSeekThinkingLevel;
+        }
+
         if (s.contextBudgetPercent !== undefined) {
           contextBudgetInput.value = s.contextBudgetPercent;
         }
@@ -1191,6 +1292,8 @@ function attachImage(base64) {
         if (ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`)) {
           ollamaModelSelect.value = s.defaultOllamaModel;
         }
+
+        syncQuickModelSelect();
 
         // Trigger connection validation check
         vscode.postMessage({ type: 'validateHost', host: s.ollamaHost });
@@ -1300,12 +1403,17 @@ function attachImage(base64) {
         }
 
         let html = '';
-        if (currentStreamingReasoningText && !currentStreamingText) {
+        if (currentStreamingReasoningText) {
+          const escapedReasoning = escapeHtml(currentStreamingReasoningText).replace(/\n/g, '<br/>');
           html += `
-            <div class="thinking-flash">
-              <span class="thought-icon">🧠</span>
-              <span class="thought-title">Thinking...</span>
-            </div>
+            <details class="thought-process-container" open style="margin-bottom: 12px; border-left: 2px solid rgba(168, 85, 247, 0.4); padding-left: 10px; background: rgba(168, 85, 247, 0.03); border-radius: 0 6px 6px 0;">
+              <summary style="cursor: pointer; font-size: 11px; color: #a855f7; font-weight: 600; user-select: none; outline: none; margin-bottom: 6px;">
+                🧠 View Chain-of-Thought
+              </summary>
+              <div class="thought-process-content" style="font-size: 11px; line-height: 1.5; color: rgba(255, 255, 255, 0.65); font-style: italic; font-family: var(--vscode-editor-font-family, monospace);">
+                ${escapedReasoning}
+              </div>
+            </details>
           `;
         }
 
@@ -1338,15 +1446,22 @@ function attachImage(base64) {
                 existingLang.textContent = newLang.textContent;
               }
               
+              const existingLabel = existingCard.querySelector('.streaming-label');
+              const newLabel = newCard.querySelector('.streaming-label');
+              if (existingLabel && newLabel && existingLabel.textContent !== newLabel.textContent) {
+                existingLabel.textContent = newLabel.textContent;
+              }
+
               bindCodeBlockButtons(existingCard);
               scrollChatToBottom();
               break;
             }
           }
+        } else {
+          currentStreamingBubble.innerHTML = html;
+          bindCodeBlockButtons(currentStreamingBubble);
         }
-
-        currentStreamingBubble.innerHTML = html;
-        bindCodeBlockButtons(currentStreamingBubble);
+        
         scrollChatToBottom();
         break;
       }
@@ -1363,9 +1478,23 @@ function attachImage(base64) {
         }
 
         currentStreamingText = message.fullText;
+        currentStreamingReasoningText = message.reasoningText || currentStreamingReasoningText;
         extractToolContents(currentStreamingText);
 
         let html = '';
+        if (currentStreamingReasoningText) {
+          const escapedReasoning = escapeHtml(currentStreamingReasoningText).replace(/\n/g, '<br/>');
+          html += `
+            <details class="thought-process-container" style="margin-bottom: 12px; border-left: 2px solid rgba(168, 85, 247, 0.4); padding-left: 10px; background: rgba(168, 85, 247, 0.03); border-radius: 0 6px 6px 0;">
+              <summary style="cursor: pointer; font-size: 11px; color: #a855f7; font-weight: 600; user-select: none; outline: none; margin-bottom: 6px;">
+                🧠 View Chain-of-Thought
+              </summary>
+              <div class="thought-process-content" style="font-size: 11px; line-height: 1.5; color: rgba(255, 255, 255, 0.65); font-style: italic; font-family: var(--vscode-editor-font-family, monospace);">
+                ${escapedReasoning}
+              </div>
+            </details>
+          `;
+        }
         html += parseMarkdown(currentStreamingText);
 
         currentStreamingBubble.innerHTML = html;
@@ -1711,7 +1840,27 @@ function attachImage(base64) {
 
   // 9. Markdown Parser Implementation
   function parseMarkdown(text) {
+    if (!text) return '';
     let cleanText = text;
+
+    // Intercept and wrap <implementation_plan> block in a gorgeous card, avoiding recursive infinite loops
+    let hasPlan = false;
+    let planContent = '';
+    const planRegex = /<implementation_plan>([\s\S]*?)<\/implementation_plan>/gi;
+    cleanText = cleanText.replace(planRegex, (match, inner) => {
+      hasPlan = true;
+      planContent = inner.trim();
+      return `%%%PLAN_PLACEHOLDER%%%`;
+    });
+
+    // Also handle incomplete streaming tag
+    let streamingPlan = false;
+    if (cleanText.includes('<implementation_plan>') && !cleanText.includes('</implementation_plan>')) {
+      const openIdx = cleanText.indexOf('<implementation_plan>');
+      planContent = cleanText.substring(openIdx + '<implementation_plan>'.length).trim();
+      cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_PLAN_PLACEHOLDER%%%`;
+      streamingPlan = true;
+    }
     
     // Clean block tools: create_file, write_file, patch_file, send_terminal_input, rename_file, git_commit
     const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
@@ -1829,9 +1978,13 @@ function attachImage(base64) {
         if (inCodeBlock) {
           inCodeBlock = false;
           const codeContent = codeBuffer.trim();
-          let escapedCode = escapeHtml(codeContent);
+          let escapedCode;
+          let isHighlighted = false;
           if (codeLang && codeLang !== 'plaintext') {
-            escapedCode = highlightCode(escapedCode, codeLang);
+            escapedCode = highlightCode(codeContent, codeLang);
+            isHighlighted = true;
+          } else {
+            escapedCode = escapeHtml(codeContent);
           }
           html += `
             <div class="code-block-wrapper">
@@ -1841,7 +1994,7 @@ function attachImage(base64) {
                   <button class="code-action-btn copy-btn">Copy</button>
                 </div>
               </div>
-              <pre><code class="language-${codeLang}">${escapedCode}</code></pre>
+              <pre><code class="language-${codeLang}"${isHighlighted ? ' data-highlighted="true"' : ''}>${escapedCode}</code></pre>
             </div>
           `;
           codeBuffer = '';
@@ -1899,7 +2052,7 @@ function attachImage(base64) {
         <div class="code-block-wrapper">
           <div class="code-block-header">
             <span class="code-block-lang">${codeLang}</span>
-            <span class="streaming-label" style="font-size: 9px; opacity: 0.5; color: #a855f7;">Generating...</span>
+            <span class="streaming-label" style="font-size: 9px; opacity: 0.5; color: #38bdf8;">Generating...</span>
           </div>
           <pre><code>${escapedCode}</code></pre>
         </div>
@@ -1911,6 +2064,43 @@ function attachImage(base64) {
 
     html = html.replace(/<p>%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%<\/p>/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
     html = html.replace(/%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
+
+    // Replace planning cards placeholders
+    if (hasPlan) {
+      const innerHtml = parseMarkdown(planContent);
+      const cardHtml = `
+        <div class="implementation-plan-card" style="background: rgba(14, 165, 233, 0.04); border: 1.5px solid rgba(14, 165, 233, 0.15); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+          <div class="plan-card-glow" style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(14, 165, 233, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 1;"></div>
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #38bdf8; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.7px; z-index: 2; position: relative; border-bottom: 1px solid rgba(14, 165, 233, 0.2); padding-bottom: 6px;">
+            <span>📋</span>
+            <span>Proposed Implementation Plan</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.9); line-height: 1.6; z-index: 2; position: relative;" class="plan-inner-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      html = html.replace('%%%PLAN_PLACEHOLDER%%%', cardHtml);
+    }
+
+    if (streamingPlan) {
+      const innerHtml = parseMarkdown(planContent);
+      const cardHtml = `
+        <div class="implementation-plan-card streaming" style="background: rgba(14, 165, 233, 0.02); border: 1.2px dashed rgba(14, 165, 233, 0.25); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative; overflow: hidden; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(14, 165, 233, 0.15); padding-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #38bdf8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;">
+              <span>📋</span>
+              <span>Drafting Plan...</span>
+            </div>
+            <span class="streaming-label" style="font-size: 9px; opacity: 0.6; color: #38bdf8; font-weight: 600; animation: pulse 1.5s infinite alternate;">Generating...</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.65); line-height: 1.6;" class="plan-inner-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      html = html.replace('%%%STREAMING_PLAN_PLACEHOLDER%%%', cardHtml);
+    }
 
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
   }
@@ -2380,22 +2570,66 @@ function attachImage(base64) {
     }
   });
 
-  // Buddy Avatar - Interactive Entertaining Mascot
+  // Buddy Avatar - Interactive Entertaining Cute Vector Mascot Expressor
   const buddyContainer = document.getElementById('buddy-container');
-  const buddyEmoji = document.getElementById('buddy-emoji');
+  const buddyEyes = document.getElementById('buddy-eyes');
   const buddyTooltip = document.getElementById('buddy-tooltip');
 
   let avatarState = 'idle';
   let idleInterval = null;
   let errorResetTimeout = null;
 
-  const EMOJIS = {
-    idle: ['🤖', '🤖', '🤖', '👾', '🤖', '😉', '🥱', '🤓', '🤪'],
-    thinking: ['🤔', '💭', '🧠', '🧐'],
-    coding: ['💻', '⌨️', '🚀', '👨‍💻', '👩‍💻'],
-    tool_calling: ['🛠️', '⚙️', '🔨', '🔧'],
-    error: ['💥', '❌', '😱', '🤕', '😭'],
-    click: ['😮', '🥰', '🤪', '😎', '🎉']
+  // Multi-expression dynamic SVG definitions
+  const FACES = {
+    idle: [
+      `<!-- cute open eyes -->
+       <circle cx="7" cy="11" r="2.2" />
+       <circle cx="17" cy="11" r="2.2" />
+       <path d="M9 15 Q12 17 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`,
+      `<!-- cute blink -->
+       <path d="M5 11 L9 11 M15 11 L19 11" stroke-width="1.8" stroke-linecap="round" />
+       <path d="M9 15 Q12 17 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`,
+      `<!-- cute wink -->
+       <circle cx="7" cy="11" r="2.2" />
+       <path d="M15 11 Q17 9 19 11" stroke-width="1.8" stroke-linecap="round" fill="none" />
+       <path d="M9 15 Q12 16.5 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+    ],
+    thinking: [
+      `<!-- eyes looking up/curious -->
+       <ellipse cx="7" cy="9.5" rx="2.2" ry="1.5" />
+       <ellipse cx="17" cy="9" rx="1.8" ry="2.2" />
+       <path d="M10 15 L14 14.5" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+    ],
+    coding: [
+      `<!-- dynamic matrix squint coding eyes -->
+       <path d="M5 11 L9 11 M15 11 L19 11" stroke-width="2" stroke-linecap="round" />
+       <path d="M10 15 Q12 16 14 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+    ],
+    tool_calling: [
+      `<!-- focus scanning gear eyes -->
+       <circle cx="7" cy="11" r="2.2" stroke-width="1.5" stroke-dasharray="2,1" fill="none" />
+       <circle cx="17" cy="11" r="2.2" stroke-width="1.5" stroke-dasharray="2,1" fill="none" />
+       <circle cx="12" cy="15" r="1.2" />`
+    ],
+    error: [
+      `<!-- shocked / error crossed eyes -->
+       <path d="M6 9.5 L9 12.5 M9 9.5 L6 12.5 M15 9.5 L18 12.5 M18 9.5 L15 12.5" stroke-width="1.8" stroke-linecap="round" />
+       <path d="M9 16 Q12 13.5 15 16" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+    ],
+    click: [
+      `<!-- happy star/wink heart eyes -->
+       <path d="M5 10 Q7 8 9 10 M15 10 Q17 8 19 10" stroke-width="1.8" stroke-linecap="round" fill="none" />
+       <path d="M9 14.5 Q12 17.5 15 14.5 Z" />`
+    ]
+  };
+
+  const FACE_COLORS = {
+    idle: '#38bdf8',
+    thinking: '#0ea5e9',
+    coding: '#10b981',
+    tool_calling: '#06b6d4',
+    error: '#ef4444',
+    click: '#f43f5e'
   };
 
   function setAvatarState(state) {
@@ -2414,8 +2648,23 @@ function attachImage(base64) {
       errorResetTimeout = null;
     }
 
-    const list = EMOJIS[state] || EMOJIS.idle;
-    buddyEmoji.textContent = list[Math.floor(Math.random() * list.length)];
+    // Render the beautiful SVG path
+    if (buddyEyes) {
+      const list = FACES[state] || FACES.idle;
+      const selectedFace = list[Math.floor(Math.random() * list.length)];
+      buddyEyes.innerHTML = selectedFace;
+      
+      // Update color stroke and fills matching state
+      const color = FACE_COLORS[state] || FACE_COLORS.idle;
+      buddyEyes.setAttribute('fill', color);
+      // Make sure the strokes in the face also use the matching state color
+      const paths = buddyEyes.querySelectorAll('path');
+      paths.forEach(p => {
+        if (p.getAttribute('stroke') !== 'none') {
+          p.setAttribute('stroke', color);
+        }
+      });
+    }
 
     // Update tooltip text
     const tooltips = {
@@ -2443,9 +2692,24 @@ function attachImage(base64) {
     idleInterval = setInterval(() => {
       if (avatarState === 'idle') {
         const chance = Math.random();
+        
+        // Idle animation / blink / wink change
+        if (buddyEyes) {
+          const list = FACES.idle;
+          const selectedFace = list[Math.floor(Math.random() * list.length)];
+          buddyEyes.innerHTML = selectedFace;
+          
+          const color = FACE_COLORS.idle;
+          buddyEyes.setAttribute('fill', color);
+          const paths = buddyEyes.querySelectorAll('path');
+          paths.forEach(p => {
+            if (p.getAttribute('stroke') !== 'none') {
+              p.setAttribute('stroke', color);
+            }
+          });
+        }
+
         if (chance < 0.35) {
-          const list = EMOJIS.idle;
-          buddyEmoji.textContent = list[Math.floor(Math.random() * list.length)];
           // Random tooltip messages to entertain
           const messages = [
             'Ready to help!',
@@ -2458,7 +2722,7 @@ function attachImage(base64) {
           buddyTooltip.textContent = messages[Math.floor(Math.random() * messages.length)];
         }
       }
-    }, 8000);
+    }, 6000);
   }
 
   // Hook up premium interactive winking, 3D rotations, and dev jokes/quotes on click
@@ -2478,7 +2742,7 @@ function attachImage(base64) {
     "\"Clean code always looks like it was written by someone who cares.\"\n— Michael Feathers ✨",
     "\"Coding is the closest thing we have to magic!\" 🔮",
     "\"Simplicity is the ultimate sophistication.\"\n— Leonardo da Vinci 🎨",
-    "\"Before software can be reusable it first has to be usable.\"\n— Ralph Johnson ⚙️",
+    "\"Before software can be reusable it first has to be reusable.\"\n— Ralph Johnson ⚙️",
     "Hey! You clicked me! Let's build something awesome today! 🚀",
     "My circuits are fully charged and ready to write some clean code! ⚡",
     "Need a code audit, a debug session, or a coffee break? I've got your back! ☕"
@@ -2492,8 +2756,18 @@ function attachImage(base64) {
       buddyContainer.style.transform = 'translateY(-10px) scale(1.3) rotate(360deg)';
       buddyContainer.style.transition = 'transform 0.7s cubic-bezier(0.34, 1.6, 0.64, 1)';
       
-      const clicks = EMOJIS.click;
-      buddyEmoji.textContent = clicks[Math.floor(Math.random() * clicks.length)];
+      // Set happy winking face
+      if (buddyEyes) {
+        buddyEyes.innerHTML = FACES.click[0];
+        const color = FACE_COLORS.click;
+        buddyEyes.setAttribute('fill', color);
+        const paths = buddyEyes.querySelectorAll('path');
+        paths.forEach(p => {
+          if (p.getAttribute('stroke') !== 'none') {
+            p.setAttribute('stroke', color);
+          }
+        });
+      }
       
       // Select a random fun developer quote or joke
       const randomEgg = CLICK_EASTER_EGGS[Math.floor(Math.random() * CLICK_EASTER_EGGS.length)];
