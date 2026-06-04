@@ -9,6 +9,21 @@ import { CommandService } from '../../services/command-service';
  */
 function isSensitiveCommand(command: string): boolean {
   const cmdLower = command.toLowerCase();
+  let cmdTrimmed = cmdLower.trim();
+  // Strip leading and trailing quotes (single/double) if they wrap the entire command
+  if ((cmdTrimmed.startsWith('"') && cmdTrimmed.endsWith('"')) || (cmdTrimmed.startsWith("'") && cmdTrimmed.endsWith("'"))) {
+    cmdTrimmed = cmdTrimmed.slice(1, -1).trim();
+  }
+
+  // Exempt safe grep, sed, and read-only file viewer commands (get-content, gc, cat, type) from sensitive checks
+  const isSafeGrep = /^\s*grep\b/i.test(cmdTrimmed);
+  const isSafeSed = /^\s*sed\b/i.test(cmdTrimmed) && !/\b-i\b/i.test(cmdTrimmed) && !/--in-place/i.test(cmdTrimmed);
+  const hasWriteRedirect = /[>|]\s*(out-file|set-content|sc|tee|add-content|ac)\b/i.test(cmdTrimmed) || />/g.test(cmdTrimmed);
+  const isSafeRead = /^\s*(get-content|gc|cat|type)\b/i.test(cmdTrimmed) && !hasWriteRedirect;
+
+  if (isSafeGrep || isSafeSed || isSafeRead) {
+    return false;
+  }
 
   // 1. Destructive check (rm, rmdir, del, rd, erase, remove-item)
   const destructivePatterns = [/\brm\b/i, /\brmdir\b/i, /\bdel\b/i, /\brd\b/i, /\berase\b/i, /\bremove-item\b/i];

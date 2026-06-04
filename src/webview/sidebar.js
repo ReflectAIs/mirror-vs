@@ -441,6 +441,20 @@
     });
   }
 
+  // Implementation Plan approval button handler
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.approve-plan-btn');
+    if (btn) {
+      const container = btn.parentNode;
+      if (container) {
+        container.innerHTML = `<span style="font-size: 11px; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 4px;">Approved &amp; Executing ⚡</span>`;
+      }
+      
+      promptInput.value = "Approved. Proceed with the implementation plan.";
+      submitMessage();
+    }
+  });
+
   // 6b. Autocomplete Logic
   function handleAutocompleteSearch() {
     const text = promptInput.value;
@@ -1230,7 +1244,19 @@ function attachImage(base64) {
     if (text) {
       const textContainer = document.createElement('div');
       textContainer.className = 'bubble-text-container';
-      textContainer.innerHTML = parseMarkdown(text);
+      
+      let isApproved = false;
+      if (role === 'assistant' && msgIndex !== -1) {
+        for (let idx = msgIndex + 1; idx < chatHistory.length; idx++) {
+          const nextMsg = chatHistory[idx];
+          if (nextMsg.role === 'user' && nextMsg.content.includes("Approved. Proceed with the implementation plan.")) {
+            isApproved = true;
+            break;
+          }
+        }
+      }
+
+      textContainer.innerHTML = parseMarkdown(text, isApproved);
       bindCodeBlockButtons(textContainer);
       applySyntaxHighlighting(textContainer);
       bubble.appendChild(textContainer);
@@ -1839,7 +1865,7 @@ function attachImage(base64) {
   }
 
   // 9. Markdown Parser Implementation
-  function parseMarkdown(text) {
+  function parseMarkdown(text, isPlanApproved = false) {
     if (!text) return '';
     let cleanText = text;
 
@@ -2067,7 +2093,14 @@ function attachImage(base64) {
 
     // Replace planning cards placeholders
     if (hasPlan) {
-      const innerHtml = parseMarkdown(planContent);
+      const innerHtml = parseMarkdown(planContent, isPlanApproved);
+      const approveBtnHtml = isPlanApproved ? `
+        <span style="font-size: 11px; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 4px;">Approved &amp; Executing ⚡</span>
+      ` : `
+        <button class="approve-plan-btn" style="background: linear-gradient(135deg, #2563eb, #38bdf8); border: none; border-radius: var(--radius-sm, 6px); color: #fff; font-family: var(--font-system); font-size: 11px; font-weight: 600; padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25); transition: transform 0.2s var(--ease-out);">
+          <span>✅</span> Approve &amp; Execute
+        </button>
+      `;
       const cardHtml = `
         <div class="implementation-plan-card" style="background: rgba(14, 165, 233, 0.04); border: 1.5px solid rgba(14, 165, 233, 0.15); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
           <div class="plan-card-glow" style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(14, 165, 233, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 1;"></div>
@@ -2077,6 +2110,9 @@ function attachImage(base64) {
           </div>
           <div style="font-size: 11px; color: rgba(255,255,255,0.9); line-height: 1.6; z-index: 2; position: relative;" class="plan-inner-content">
             ${innerHtml}
+          </div>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; z-index: 2; position: relative;">
+            ${approveBtnHtml}
           </div>
         </div>
       `;

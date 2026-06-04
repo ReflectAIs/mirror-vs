@@ -256,12 +256,15 @@ export function streamDeepSeekChat(
   const urlStr = 'https://api.deepseek.com/chat/completions';
   const parsedUrl = new URL(urlStr);
 
-  const sanitizedMessages = messages.map(msg => ({
-    ...msg,
-    content: typeof msg.content === 'string'
-      ? (typeof (msg.content as any).toWellFormed === 'function' ? (msg.content as any).toWellFormed() : msg.content)
-      : msg.content
-  }));
+  const sanitizedMessages = messages.map(msg => {
+    const { images, ...rest } = msg;
+    return {
+      ...rest,
+      content: typeof rest.content === 'string'
+        ? (typeof (rest.content as any).toWellFormed === 'function' ? (rest.content as any).toWellFormed() : rest.content)
+        : rest.content
+    };
+  });
 
   const config = vscode.workspace.getConfiguration('mirror-vs');
   const thinkingEnabled = config.get<boolean>('deepSeekThinking', true);
