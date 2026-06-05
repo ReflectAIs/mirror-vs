@@ -303,13 +303,6 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               await this.clearActiveChat();
               break;
             }
-            case 'editMessage': {
-              const { history, msgIndex, text } = data;
-              this._orchestrator.cancelActiveStream();
-              await this._saveChatHistory(history);
-              this._sendChatHistoryToWebview();
-              break;
-            }
             case 'revertHistory': {
               const { text, role, inclusive, messageIndex } = data;
               const history = this._getChatHistory();

@@ -1692,8 +1692,8 @@ function attachImage(base64) {
     return card;
   }
 
-  function placeCardInPlaceholder(card, toolName, target) {
-    const placeholders = document.querySelectorAll('.tool-card-placeholder');
+  function placeCardInPlaceholder(card, toolName, target, container = chatMessages) {
+    const placeholders = container.querySelectorAll('.tool-card-placeholder');
     let placed = false;
     const cleanTarget = unescapeHtml(target).trim();
     for (let i = 0; i < placeholders.length; i++) {
@@ -1706,11 +1706,11 @@ function attachImage(base64) {
       }
     }
     if (!placed) {
-      chatMessages.appendChild(card);
+      container.appendChild(card);
     }
   }
 
-  function appendToolCardFromHistory(text) {
+  function appendToolCardFromHistory(text, container = chatMessages) {
     const results = text.split('\n\n');
     results.forEach(res => {
       const match = res.match(/\[Tool Result for (\w+) on "([\s\S]*?)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
@@ -1734,16 +1734,16 @@ function attachImage(base64) {
         
         const code = parsedToolContents.get(target);
         const card = createToolCardDOM(toolName, status, target, details, checkpointId, isReverted, code);
-        placeCardInPlaceholder(card, toolName, target);
+        placeCardInPlaceholder(card, toolName, target, container);
       }
     });
   }
 
   // Helper: Append a message bubble to DOM
-  function appendMessageBubble(role, text, images) {
+  function appendMessageBubble(role, text, images, container = chatMessages) {
     if (role === 'system') {
       if (text.startsWith('[Tool Result')) {
-        appendToolCardFromHistory(text);
+        appendToolCardFromHistory(text, container);
         return null;
       }
       if (text.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
@@ -1770,7 +1770,7 @@ function attachImage(base64) {
         });
         
         msgElement.appendChild(banner);
-        chatMessages.appendChild(msgElement);
+        container.appendChild(msgElement);
         return banner;
       }
       return null;
@@ -1861,7 +1861,7 @@ function attachImage(base64) {
     }
     
     msgElement.appendChild(bubble);
-    chatMessages.appendChild(msgElement);
+    container.appendChild(msgElement);
     if (role === 'user') {
       updateStickyUserMessage();
     }
@@ -3259,77 +3259,7 @@ function attachImage(base64) {
   // ==========================================================================
   let renderedLimit = 15;
 
-  function createMessageElement(role, text, images) {
-    const bubble = document.createElement('div');
-    bubble.className = `message ${role}`;
-    if (role === 'assistant') {
-      bubble.dataset.isAssistant = 'true';
-    }
 
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar';
-    if (role === 'user') {
-      avatar.textContent = '';
-      avatar.title = 'You';
-    } else {
-      avatar.textContent = '🤖';
-      avatar.title = 'Assistant';
-    }
-    bubble.appendChild(avatar);
-
-    const content = document.createElement('div');
-    content.className = 'content';
-    if (text) {
-      content.innerHTML = parseMarkdown(text);
-    }
-    bubble.appendChild(content);
-
-    // Handle images if present
-    if (images && images.length > 0) {
-      images.forEach(img => {
-        const imgEl = document.createElement('img');
-        imgEl.src = 'data:image/png;base64,' + img;
-        imgEl.style.cssText = 'max-width: 100%; border-radius: 6px; margin-top: 6px;';
-        content.appendChild(imgEl);
-      });
-    }
-
-    // Add action buttons for user messages (edit only)
-    if (role === 'user') {
-      const actions = document.createElement('div');
-      actions.className = 'message-actions';
-      
-      const editBtn = document.createElement('button');
-      editBtn.className = 'message-action-btn';
-      editBtn.innerHTML = '✏️ Edit';
-      editBtn.title = 'Edit & revert chat to this point';
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        try {
-          const bubbles = chatMessages.querySelectorAll('.message.user');
-          const idx = Array.from(bubbles).indexOf(bubble);
-          if (idx >= 0) {
-            enableEditMode(idx);
-          } else {
-            showToast('Could not find message index', 'error');
-          }
-        } catch (err) {
-          showToast('Edit error: ' + err.message, 'error');
-        }
-      });
-      actions.appendChild(editBtn);
-
-      bubble.appendChild(actions);
-    }
-
-    return bubble;
-  }
-
-  function appendMessageBubble(role, text, images) {
-    const bubble = createMessageElement(role, text, images);
-    chatMessages.appendChild(bubble);
-    return bubble;
-  }
 
   function renderVisibleHistory(preserveScroll = false) {
     isRebuildingDOM = true;
@@ -3385,8 +3315,7 @@ function attachImage(base64) {
     // Append visible messages
     const visibleSlice = chatHistory.slice(startIdx);
     visibleSlice.forEach((msg) => {
-      const bubble = createMessageElement(msg.role, msg.content, msg.images);
-      fragment.appendChild(bubble);
+      appendMessageBubble(msg.role, msg.content, msg.images, fragment);
     });
 
     // Atomic swap: replace all children in one paint cycle
@@ -3412,35 +3341,6 @@ function attachImage(base64) {
 
     // Update sticky user message status
     updateStickyUserMessage();
-  }
-
-  function enableEditMode(msgIndex) {
-    const bubbles = chatMessages.querySelectorAll('.message.user');
-    if (msgIndex >= bubbles.length) return;
-    const bubble = bubbles[msgIndex];
-    const contentDiv = bubble.querySelector('.content');
-    if (!contentDiv) return;
-    
-    // Get the text content
-    const originalText = contentDiv.textContent || '';
-    
-    // Truncate chat history to BEFORE this message (remove it entirely)
-    chatHistory = chatHistory.slice(0, msgIndex);
-    
-    // Put the message text in the input box
-    if (promptInput) {
-      promptInput.value = originalText;
-      promptInput.focus();
-      const len = originalText.length;
-      promptInput.selectionStart = promptInput.selectionEnd = len;
-      autoGrowTextarea();
-    }
-    
-    // Re-render chat to show truncated history (message will be gone)
-    renderVisibleHistory(true);
-    
-    // Notify extension to update history
-    vscode.postMessage({ type: 'editMessage', history: chatHistory, msgIndex, text: originalText });
   }
 
   function loadMoreHistory() {
