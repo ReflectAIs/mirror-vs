@@ -152,6 +152,7 @@ export type WebviewToExtensionMessage =
   | { type: 'getActiveReviews' }
   | { type: 'getCheckpoints' }
   | { type: 'getPromptTemplates' }
+  | { type: 'createPromptTemplate' }
   | { type: 'exportTelemetryJson' }
   | { type: 'exportTelemetryCsv' }
   // New: Per-session model override

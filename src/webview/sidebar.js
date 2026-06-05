@@ -89,53 +89,35 @@
   const templatesMenuBtn = document.getElementById('templates-menu-btn');
   let promptTemplates = [];
 
-  const stickyLastMsg = document.getElementById('sticky-last-msg');
-  const stickyLastMsgText = document.getElementById('sticky-last-msg-text');
-
-  // Stored text for the sticky bar — updated on each message send / history load
-  let _stickyText = '';
-
-  function setStickyLastMessage(text) {
-    if (!stickyLastMsgText) return;
-    if (!text) {
-      _stickyText = '';
-      if (stickyLastMsg) stickyLastMsg.classList.add('hidden');
-      return;
-    }
-    // Strip context/file reference suffixes for display
-    _stickyText = text
-      .replace(/\n\n_Slash command expanded to:.*$/s, '')
-      .replace(/\n\n_Referenced Context:.*$/s, '')
-      .trim();
-    stickyLastMsgText.textContent = _stickyText;
-    // Don't show yet — updateStickyVisibility() will decide when to reveal
-    updateStickyVisibility();
-  }
-
   // Scroll container is <main class="chat-container">
   const chatScrollContainer = document.querySelector('.chat-container');
 
-  function updateStickyVisibility() {
-    if (!stickyLastMsg || !chatScrollContainer) return;
-    if (!_stickyText) {
-      stickyLastMsg.classList.add('hidden');
-      return;
-    }
-    // Find the last user message bubble in the DOM
+  function updateStickyUserMessage() {
     const userBubbles = chatMessages ? chatMessages.querySelectorAll('.message.user') : [];
-    if (userBubbles.length === 0) {
-      stickyLastMsg.classList.add('hidden');
-      return;
+    userBubbles.forEach(bubble => {
+      bubble.classList.remove('sticky-user-message', 'is-stuck');
+    });
+    if (userBubbles.length > 0) {
+      const lastBubble = userBubbles[userBubbles.length - 1];
+      lastBubble.classList.add('sticky-user-message');
     }
+    updateStickyVisibility();
+  }
+
+  function updateStickyVisibility() {
+    if (!chatScrollContainer) return;
+    const userBubbles = chatMessages ? chatMessages.querySelectorAll('.message.user') : [];
+    if (userBubbles.length === 0) return;
     const lastBubble = userBubbles[userBubbles.length - 1];
-    const containerTop = chatScrollContainer.getBoundingClientRect().top;
-    const bubbleBottom = lastBubble.getBoundingClientRect().bottom;
-    // Show sticky bar only once the bubble's bottom edge has scrolled above the container top
-    if (bubbleBottom < containerTop + 4) {
-      stickyLastMsgText.textContent = _stickyText;
-      stickyLastMsg.classList.remove('hidden');
+    
+    const containerRect = chatScrollContainer.getBoundingClientRect();
+    const bubbleRect = lastBubble.getBoundingClientRect();
+    
+    // Add is-stuck class if the message top edge crosses the top boundary of the chat container
+    if (bubbleRect.top <= containerRect.top + 2) {
+      lastBubble.classList.add('is-stuck');
     } else {
-      stickyLastMsg.classList.add('hidden');
+      lastBubble.classList.remove('is-stuck');
     }
   }
 
@@ -350,6 +332,7 @@
   vscode.postMessage({ type: 'fetchModels' });
   vscode.postMessage({ type: 'getChatSessions' });
   vscode.postMessage({ type: 'getChatHistory' });
+  vscode.postMessage({ type: 'getActiveReviews' });
 
   // Drawer Close Buttons
   document.querySelectorAll('.drawer-close-btn').forEach(btn => {
@@ -1392,7 +1375,6 @@ function attachImage(base64) {
     }
     appendMessageBubble('user', userDisplayMessage, attachedImages);
     scrollChatToBottom(true);
-    setStickyLastMessage(userDisplayMessage);
 
     const assistantBubble = appendMessageBubble('assistant', '');
     const typingIndicator = document.createElement('div');
@@ -1831,6 +1813,7 @@ function attachImage(base64) {
           promptInput.style.height = (promptInput.scrollHeight) + 'px';
           promptInput.focus();
         }
+        isEditingHistory = true;
         // Use index-based revert for reliability
         vscode.postMessage({ type: 'revertHistory', text, role: 'user', inclusive: false, messageIndex: msgIndex });
       });
@@ -1879,6 +1862,9 @@ function attachImage(base64) {
     
     msgElement.appendChild(bubble);
     chatMessages.appendChild(msgElement);
+    if (role === 'user') {
+      updateStickyUserMessage();
+    }
     return bubble;
   }
 
@@ -2381,7 +2367,8 @@ function attachImage(base64) {
         parsedToolContents.clear();
         currentStreamingBubble = null;
         
-        renderVisibleHistory();
+        renderVisibleHistory(isEditingHistory);
+        isEditingHistory = false;
         break;
       }
 
@@ -3164,13 +3151,19 @@ function attachImage(base64) {
   }
 
   let userIsAtBottom = true;
+  let isRebuildingDOM = false;
+  let isEditingHistory = false;
 
   function scrollChatToBottom(force = false) {
+    const container = chatScrollContainer || chatMessages;
     if (force || userIsAtBottom) {
       setTimeout(() => {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        container.scrollTop = container.scrollHeight;
         userIsAtBottom = true;
+        isRebuildingDOM = false;
       }, 50);
+    } else {
+      isRebuildingDOM = false;
     }
   }
 
@@ -3266,13 +3259,89 @@ function attachImage(base64) {
   // ==========================================================================
   let renderedLimit = 15;
 
-  function renderVisibleHistory(preserveScroll = false) {
-    const oldScrollHeight = chatMessages.scrollHeight;
-    const oldScrollTop = chatMessages.scrollTop;
+  function createMessageElement(role, text, images) {
+    const bubble = document.createElement('div');
+    bubble.className = `message ${role}`;
+    if (role === 'assistant') {
+      bubble.dataset.isAssistant = 'true';
+    }
 
-    chatMessages.innerHTML = '';
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    if (role === 'user') {
+      avatar.textContent = '';
+      avatar.title = 'You';
+    } else {
+      avatar.textContent = '🤖';
+      avatar.title = 'Assistant';
+    }
+    bubble.appendChild(avatar);
+
+    const content = document.createElement('div');
+    content.className = 'content';
+    if (text) {
+      content.innerHTML = parseMarkdown(text);
+    }
+    bubble.appendChild(content);
+
+    // Handle images if present
+    if (images && images.length > 0) {
+      images.forEach(img => {
+        const imgEl = document.createElement('img');
+        imgEl.src = 'data:image/png;base64,' + img;
+        imgEl.style.cssText = 'max-width: 100%; border-radius: 6px; margin-top: 6px;';
+        content.appendChild(imgEl);
+      });
+    }
+
+    // Add action buttons for user messages (edit only)
+    if (role === 'user') {
+      const actions = document.createElement('div');
+      actions.className = 'message-actions';
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'message-action-btn';
+      editBtn.innerHTML = '✏️ Edit';
+      editBtn.title = 'Edit & revert chat to this point';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try {
+          const bubbles = chatMessages.querySelectorAll('.message.user');
+          const idx = Array.from(bubbles).indexOf(bubble);
+          if (idx >= 0) {
+            enableEditMode(idx);
+          } else {
+            showToast('Could not find message index', 'error');
+          }
+        } catch (err) {
+          showToast('Edit error: ' + err.message, 'error');
+        }
+      });
+      actions.appendChild(editBtn);
+
+      bubble.appendChild(actions);
+    }
+
+    return bubble;
+  }
+
+  function appendMessageBubble(role, text, images) {
+    const bubble = createMessageElement(role, text, images);
+    chatMessages.appendChild(bubble);
+    return bubble;
+  }
+
+  function renderVisibleHistory(preserveScroll = false) {
+    isRebuildingDOM = true;
+    const container = chatScrollContainer || chatMessages;
+    const oldScrollHeight = container.scrollHeight;
+    const oldScrollTop = container.scrollTop;
+
+    // Hide the container during rebuild to prevent flash/scroll jump from empty state
+    container.style.visibility = 'hidden';
     
     if (chatHistory.length === 0) {
+      chatMessages.innerHTML = '';
       if (welcomeCard) {
         welcomeCard.style.display = 'block';
         chatMessages.appendChild(welcomeCard);
@@ -3286,7 +3355,9 @@ function attachImage(base64) {
         costEl.textContent = '$0.0000';
         dash.classList.add('hidden');
       }
-      setStickyLastMessage(null);
+      updateStickyUserMessage();
+      container.style.visibility = '';
+      isRebuildingDOM = false;
       return;
     }
 
@@ -3297,6 +3368,9 @@ function attachImage(base64) {
     const totalMessages = chatHistory.length;
     const startIdx = Math.max(0, totalMessages - renderedLimit);
     
+    // Build new content in a document fragment to avoid flash of empty container
+    const fragment = document.createDocumentFragment();
+    
     // Prepend the load more trigger if we have older logs
     if (startIdx > 0) {
       const loadTrigger = document.createElement('div');
@@ -3305,29 +3379,63 @@ function attachImage(base64) {
       loadTrigger.addEventListener('click', () => {
         loadMoreHistory();
       });
-      chatMessages.appendChild(loadTrigger);
+      fragment.appendChild(loadTrigger);
     }
 
     // Append visible messages
     const visibleSlice = chatHistory.slice(startIdx);
     visibleSlice.forEach((msg) => {
-      appendMessageBubble(msg.role, msg.content, msg.images);
+      const bubble = createMessageElement(msg.role, msg.content, msg.images);
+      fragment.appendChild(bubble);
     });
+
+    // Atomic swap: replace all children in one paint cycle
+    chatMessages.replaceChildren(fragment);
+
+    // Restore visibility now that all content is loaded
+    container.style.visibility = '';
 
     if (preserveScroll) {
       // Maintain scroll position perfectly so there are no sudden jumps
-      chatMessages.scrollTop = chatMessages.scrollHeight - oldScrollHeight + oldScrollTop;
+      container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
+      setTimeout(() => {
+        isRebuildingDOM = false;
+      }, 80);
     } else {
-      scrollChatToBottom();
+      scrollChatToBottom(true);
     }
 
-    // Restore sticky last user message from history
-    const lastUserMsg = [...chatHistory].reverse().find(m => m.role === 'user');
-    if (lastUserMsg) {
-      setStickyLastMessage(lastUserMsg.content);
-    } else {
-      setStickyLastMessage(null);
+    // Update sticky user message status
+    updateStickyUserMessage();
+  }
+
+  function enableEditMode(msgIndex) {
+    const bubbles = chatMessages.querySelectorAll('.message.user');
+    if (msgIndex >= bubbles.length) return;
+    const bubble = bubbles[msgIndex];
+    const contentDiv = bubble.querySelector('.content');
+    if (!contentDiv) return;
+    
+    // Get the text content
+    const originalText = contentDiv.textContent || '';
+    
+    // Truncate chat history to BEFORE this message (remove it entirely)
+    chatHistory = chatHistory.slice(0, msgIndex);
+    
+    // Put the message text in the input box
+    if (promptInput) {
+      promptInput.value = originalText;
+      promptInput.focus();
+      const len = originalText.length;
+      promptInput.selectionStart = promptInput.selectionEnd = len;
+      autoGrowTextarea();
     }
+    
+    // Re-render chat to show truncated history (message will be gone)
+    renderVisibleHistory(true);
+    
+    // Notify extension to update history
+    vscode.postMessage({ type: 'editMessage', history: chatHistory, msgIndex, text: originalText });
   }
 
   function loadMoreHistory() {
@@ -3338,22 +3446,22 @@ function attachImage(base64) {
   }
 
   // Scroll pagination trigger + sticky bar visibility
-  chatMessages.addEventListener('scroll', () => {
-    const threshold = 15;
-    const isAtBottom = (chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight) <= threshold;
-    userIsAtBottom = isAtBottom;
-
-    if (chatMessages.scrollTop <= 10) {
-      const totalMessages = chatHistory.length;
-      if (totalMessages > renderedLimit) {
-        loadMoreHistory();
-      }
-    }
-  });
-
-  // The actual scroll container for sticky is the <main class="chat-container">
   if (chatScrollContainer) {
-    chatScrollContainer.addEventListener('scroll', updateStickyVisibility, { passive: true });
+    chatScrollContainer.addEventListener('scroll', () => {
+      if (isRebuildingDOM) return;
+      const threshold = 15;
+      const isAtBottom = (chatScrollContainer.scrollHeight - chatScrollContainer.scrollTop - chatScrollContainer.clientHeight) <= threshold;
+      userIsAtBottom = isAtBottom;
+
+      if (chatScrollContainer.scrollTop <= 10) {
+        const totalMessages = chatHistory.length;
+        if (totalMessages > renderedLimit) {
+          loadMoreHistory();
+        }
+      }
+
+      updateStickyVisibility();
+    }, { passive: true });
   }
 
   // Buddy Avatar - Interactive Entertaining Cute Vector Mascot Expressor

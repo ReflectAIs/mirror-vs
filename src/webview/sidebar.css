@@ -777,54 +777,6 @@ select:focus {
   min-height: 100%;
 }
 
-/* ─── STICKY LAST USER MESSAGE ─────────────────────────────────────────────── */
-.sticky-last-msg {
-  position: sticky;
-  top: 0;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px 5px;
-  background: rgba(10, 10, 18, 0.92);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.14);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  margin-bottom: 4px;
-  overflow: hidden;
-  /* Transition for smooth show/hide */
-  transition: opacity 0.18s ease, max-height 0.18s ease;
-  max-height: 36px;
-  opacity: 1;
-}
-
-.sticky-last-msg.hidden {
-  display: none;
-}
-
-.sticky-last-msg-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: rgba(99, 102, 241, 0.65);
-  flex-shrink: 0;
-  padding: 1px 5px;
-  background: rgba(99, 102, 241, 0.09);
-  border-radius: 3px;
-}
-
-.sticky-last-msg-text {
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  line-height: 1.4;
-  opacity: 0.8;
-}
-
 
 
 /* ─── WELCOME CARD ────────────────────────────────────────────────────────── */
@@ -981,6 +933,22 @@ select:focus {
   padding: 12px 12px 10px 12px;
   border: 1px dashed rgba(99, 102, 241, 0.12);
   margin: 6px 4px;
+}
+
+.message.user.sticky-user-message {
+  position: sticky;
+  top: -12px;
+  z-index: 10;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, border-style 0.2s ease;
+}
+
+.message.user.sticky-user-message.is-stuck {
+  background: rgba(15, 15, 25, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99, 102, 241, 0.35) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-md);
 }
 
 @keyframes message-in {
@@ -1494,29 +1462,35 @@ select:focus {
 }
 
 .accept-all-btn {
-  background: rgba(52, 211, 153, 0.06);
-  border: 1px solid rgba(52, 211, 153, 0.18);
-  color: var(--color-success);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 4px;
+  position: absolute;
+  bottom: calc(100% - 2px); /* Floats exactly above the top of the input-panel */
+  right: 14px;
+  z-index: 100;
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  color: #10b981 !important;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: var(--transition-normal);
+  transition: all 0.2s var(--ease-out);
   white-space: nowrap;
 }
 
 .accept-all-btn:hover {
-  background: rgba(52, 211, 153, 0.14);
-  border-color: rgba(52, 211, 153, 0.35);
-  box-shadow: 0 2px 10px rgba(52, 211, 153, 0.15);
-  color: #fff;
+  background: rgba(16, 185, 129, 0.28) !important;
+  border-color: rgba(16, 185, 129, 0.6) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
 }
 
-.accept-all-btn:active { transform: scale(0.96); }
+.accept-all-btn:active { transform: translateY(0) scale(0.97); }
 .accept-all-btn.hidden { display: none !important; }
 
 /* ─── INPUT PANEL ─────────────────────────────────────────────────────────── */
@@ -2478,6 +2452,7 @@ select:focus {
 }
 
 .buddy-tooltip {
+  display: none !important;
   position: absolute;
   bottom: 52px;
   left: 50%;
@@ -3112,6 +3087,7 @@ select:focus {
   padding: 10px 12px 12px;
   background: transparent;
   box-shadow: none;
+  position: relative;
 }
 
 .input-card {

@@ -395,12 +395,6 @@
 
     <!-- ===== CHAT AREA ===== -->
     <main class="chat-container">
-      <!-- Sticky last user message — sticks to top when scrolling up -->
-      <div id="sticky-last-msg" class="sticky-last-msg hidden">
-        <span class="sticky-last-msg-label">You</span>
-        <span id="sticky-last-msg-text" class="sticky-last-msg-text"></span>
-      </div>
-
       <div id="chat-messages" class="messages-list">
         <!-- Welcome Screen -->
         <div class="welcome-card" id="welcome-card">
@@ -449,6 +443,7 @@
     </main>
 
     <div class="input-panel">
+      <button id="accept-all-btn" class="accept-all-btn hidden" title="Accept All Active Reviews">✨ Accept All</button>
       <div class="input-card">
         <!-- Card Header: Active File Context Bar (Kept in DOM but hidden via CSS) -->
         <div id="context-bar" class="context-bar">
@@ -460,7 +455,6 @@
             <button id="gen-tests-btn" class="context-action-btn hidden" title="Generate Unit Tests for active file">🧪 Test</button>
             <button id="gen-docs-btn" class="context-action-btn hidden" title="Generate JSDoc/TSDoc for active file">📝 Doc</button>
             <button id="open-multi-diff-btn" class="context-action-btn hidden" title="Open Multi-File Diff Review Drawer">🔍 Review</button>
-            <button id="accept-all-btn" class="accept-all-btn hidden" title="Accept All Active Reviews">✨ Accept All</button>
           </div>
         </div>
 
