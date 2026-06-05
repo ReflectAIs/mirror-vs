@@ -1210,7 +1210,8 @@
     linkedFiles.add(filePath);
     renderChips();
     
-    // Replace the '@query' segment in promptInput with inline location reference
+    // Just remove the '@query' segment — the chip above the input is the visual indicator.
+    // No raw [File: ...] injection into the textarea. The model receives the path via linkedFiles.
     const text = promptInput.value;
     const cursorPos = promptInput.selectionStart;
     const textBeforeCursor = text.substring(0, cursorPos);
@@ -1218,9 +1219,8 @@
     
     if (atIndex !== -1) {
       const textAfterCursor = text.substring(cursorPos);
-      const fileRef = `[File: ${filePath}] `;
-      promptInput.value = text.substring(0, atIndex) + fileRef + textAfterCursor;
-      const newCursorPos = atIndex + fileRef.length;
+      promptInput.value = text.substring(0, atIndex) + textAfterCursor;
+      const newCursorPos = atIndex;
       promptInput.selectionStart = newCursorPos;
       promptInput.selectionEnd = newCursorPos;
     }
@@ -1754,19 +1754,22 @@ function attachImage(base64) {
       const body = document.createElement('div');
       body.className = 'tool-card-body';
 
-      const details = document.createElement('div');
-      details.className = 'tool-details';
-      const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
-      details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
-      body.appendChild(details);
-
-      if (code) {
-        const fileExt = target.split('.').pop() || 'plaintext';
+      const detailsContainer = document.createElement('div');
+      detailsContainer.className = 'tool-details-container';
+      
+      // For read_file: show the full file content that the model read
+      if (toolName === 'read_file' && code) {
+        const header = document.createElement('div');
+        header.className = 'tool-details-header';
+        header.innerHTML = '📖 <span>File Content Read by Model</span>';
+        detailsContainer.appendChild(header);
+        
+        const fileExt = target.split('.').pop() || 'txt';
         const escapedCode = escapeHtml(code.trim());
-        const codeWrapper = document.createElement('div');
-        codeWrapper.className = 'code-block-wrapper';
-        codeWrapper.style.marginTop = '8px';
-        codeWrapper.innerHTML = `
+        const codeBlock = document.createElement('div');
+        codeBlock.className = 'code-block-wrapper';
+        codeBlock.style.marginTop = '4px';
+        codeBlock.innerHTML = `
           <div class="code-block-header">
             <span class="code-block-lang">${fileExt}</span>
             <div class="code-block-actions">
@@ -1775,9 +1778,84 @@ function attachImage(base64) {
           </div>
           <pre><code class="language-${fileExt}">${escapedCode}</code></pre>
         `;
-        body.appendChild(codeWrapper);
+        detailsContainer.appendChild(codeBlock);
+        bindCodeBlockButtons(codeBlock);
       }
-
+      
+      // For grep_search: show search matches
+      if (toolName === 'grep_search' && result) {
+        const header = document.createElement('div');
+        header.className = 'tool-details-header';
+        header.innerHTML = '🔍 <span>Search Results</span>';
+        detailsContainer.appendChild(header);
+        
+        const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
+        const pre = document.createElement('pre');
+        pre.className = 'tool-result-pre';
+        pre.textContent = cleanResult;
+        detailsContainer.appendChild(pre);
+      }
+      
+      // For patch_file: show the diff in a highlighted code block
+      if (toolName === 'patch_file' && result) {
+        const header = document.createElement('div');
+        header.className = 'tool-details-header';
+        header.innerHTML = '✏️ <span>Patch Applied</span>';
+        detailsContainer.appendChild(header);
+        
+        const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
+        const pre = document.createElement('pre');
+        pre.className = 'tool-result-pre diff-display';
+        pre.textContent = cleanResult;
+        detailsContainer.appendChild(pre);
+      }
+      
+      // For write_file / create_file: show what was written
+      if ((toolName === 'write_file' || toolName === 'create_file') && code) {
+        const header = document.createElement('div');
+        header.className = 'tool-details-header';
+        header.innerHTML = (toolName === 'create_file' ? '🆕' : '💾') + ' <span>File Content Written</span>';
+        detailsContainer.appendChild(header);
+        
+        const fileExt = target.split('.').pop() || 'txt';
+        const escapedCode = escapeHtml(code.trim());
+        const codeBlock = document.createElement('div');
+        codeBlock.className = 'code-block-wrapper';
+        codeBlock.style.marginTop = '4px';
+        codeBlock.innerHTML = `
+          <div class="code-block-header">
+            <span class="code-block-lang">${fileExt}</span>
+            <div class="code-block-actions">
+              <button class="code-action-btn copy-btn">Copy</button>
+            </div>
+          </div>
+          <pre><code class="language-${fileExt}">${escapedCode}</code></pre>
+        `;
+        detailsContainer.appendChild(codeBlock);
+        bindCodeBlockButtons(codeBlock);
+      }
+      
+      // Default: show summary for other tools
+      if (toolName !== 'read_file' && toolName !== 'grep_search' && toolName !== 'patch_file' && toolName !== 'write_file' && toolName !== 'create_file') {
+        const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
+        const details = document.createElement('div');
+        details.className = 'tool-details';
+        details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
+        detailsContainer.appendChild(details);
+      }
+      
+      // If there's a result for tools that also have code, show additional result text
+      if ((toolName === 'read_file' || toolName === 'write_file' || toolName === 'create_file') && result) {
+        const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
+        if (cleanResult && cleanResult !== 'Operation succeeded') {
+          const extraInfo = document.createElement('div');
+          extraInfo.className = 'tool-details-extra';
+          extraInfo.textContent = cleanResult;
+          detailsContainer.appendChild(extraInfo);
+        }
+      }
+      
+      body.appendChild(detailsContainer);
       bodyWrapper.appendChild(body);
       card.appendChild(bodyWrapper);
 
@@ -1786,10 +1864,6 @@ function attachImage(base64) {
       header.addEventListener('click', () => {
         card.classList.toggle('expanded');
       });
-
-      if (code) {
-        bindCodeBlockButtons(bodyWrapper);
-      }
     }
 
     return card;

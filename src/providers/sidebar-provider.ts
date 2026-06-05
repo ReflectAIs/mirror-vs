@@ -237,44 +237,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               break;
             }
             case 'sendMessage': {
+              // Linked files are sent as inline path tags only — the model can
+              // call read_file itself if it needs the content. Pre-reading file
+              // contents wastes tokens and pollutes context.
               let fullMessageText = data.text;
 
-              // Process and append selected context files from user autocomplete selections
-              if (data.linkedFiles && data.linkedFiles.length > 0) {
-                const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                if (workspaceFolder) {
-                  let linkedContent = '\n\n[Additional Workspace Files Context]:\n';
-                  for (const relPath of data.linkedFiles) {
-                    const safePath = path.resolve(workspaceFolder, relPath);
-                    if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
-                      try {
-                        let content = '';
-                        const proposed = ReviewManager.getInstance().getProposedContent(safePath);
-                        if (proposed !== undefined) {
-                          content = proposed;
-                        } else {
-                          content = fs.readFileSync(safePath, 'utf8');
-                        }
-                        if (content.length > 25000) {
-                          const keepLength = 12500;
-                          const truncatedCount = content.length - 25000;
-                          content =
-                            content.substring(0, keepLength) +
-                            `\n\n... [TRUNCATED ${truncatedCount} CHARACTERS TO PREVENT CONTEXT HANGS / API LIMITS] ...\n\n` +
-                            content.substring(content.length - keepLength);
-                        }
-                        linkedContent += `\n--- File: ${relPath} ---\n${content}\n`;
-                      } catch (e) {
-                        console.warn(`Could not load context file: ${relPath}`, e);
-                      }
-                    }
-                  }
-                  fullMessageText += linkedContent;
-                }
-              }
-
-              // Do NOT automatically append the entire open file's context.
-              // This prevents prompt pollution and saves massive amount of tokens.
               await this._orchestrator.handleMessageStream(fullMessageText, data.history, data.images);
               break;
             }
