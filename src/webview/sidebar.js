@@ -47,12 +47,133 @@
   const promptInput = document.getElementById('prompt-input');
   const sendBtn = document.getElementById('send-btn');
 
+  // Advanced Agent Feature Elements
+  const providerCustomBtn = document.getElementById('provider-custom-btn');
+  const customPanel = document.getElementById('custom-panel');
+  const customEndpointUrlInput = document.getElementById('custom-endpoint-url');
+  const customEndpointModelInput = document.getElementById('custom-endpoint-model');
+  const customEndpointKeyInput = document.getElementById('custom-endpoint-key');
+  const toggleCustomKeyVisibilityBtn = document.getElementById('toggle-custom-key-visibility');
+
+  const settingsCustomProviderSelect = document.getElementById('settings-custom-provider-select');
+  const deleteCustomProviderBtn = document.getElementById('delete-custom-provider-btn');
+  const customEndpointNameInput = document.getElementById('custom-endpoint-name');
+  const saveCustomProviderBtn = document.getElementById('save-custom-provider-btn');
+  const newCustomProviderBtn = document.getElementById('new-custom-provider-btn');
+  const customApiEditorTitle = document.getElementById('custom-api-editor-title');
+
+  let customApisList = [];
+  let customApiKeysData = {};
+  let configuredCustomApiKeys = {};
+
+  const toggleCheckpointBtn = document.getElementById('toggle-checkpoint-btn');
+  const checkpointsDrawer = document.getElementById('checkpoints-drawer');
+  const checkpointsList = document.getElementById('checkpoints-list');
+
+  const openMultiDiffBtn = document.getElementById('open-multi-diff-btn');
+  const multiDiffDrawer = document.getElementById('multi-diff-drawer');
+  const multiDiffContainer = document.getElementById('multi-diff-container');
+  const multiDiffAcceptAll = document.getElementById('multi-diff-accept-all');
+  const multiDiffRejectAll = document.getElementById('multi-diff-reject-all');
+  
+  const genTestsBtn = document.getElementById('gen-tests-btn');
+  const genDocsBtn = document.getElementById('gen-docs-btn');
+
+  const exportTelemetryJsonBtn = document.getElementById('export-telemetry-json-btn');
+  const exportTelemetryCsvBtn = document.getElementById('export-telemetry-csv-btn');
+
+  const templatesPopup = document.getElementById('templates-popup');
+  const templatesPopupList = document.getElementById('templates-popup-list');
+  const popupCreateTemplateBtn = document.getElementById('popup-create-template-btn');
+  const templatesSearchInput = document.getElementById('templates-search-input');
+  const templatesMenuBtn = document.getElementById('templates-menu-btn');
+  let promptTemplates = [];
+
+  const stickyLastMsg = document.getElementById('sticky-last-msg');
+  const stickyLastMsgText = document.getElementById('sticky-last-msg-text');
+
+  // Stored text for the sticky bar — updated on each message send / history load
+  let _stickyText = '';
+
+  function setStickyLastMessage(text) {
+    if (!stickyLastMsgText) return;
+    if (!text) {
+      _stickyText = '';
+      if (stickyLastMsg) stickyLastMsg.classList.add('hidden');
+      return;
+    }
+    // Strip context/file reference suffixes for display
+    _stickyText = text
+      .replace(/\n\n_Slash command expanded to:.*$/s, '')
+      .replace(/\n\n_Referenced Context:.*$/s, '')
+      .trim();
+    stickyLastMsgText.textContent = _stickyText;
+    // Don't show yet — updateStickyVisibility() will decide when to reveal
+    updateStickyVisibility();
+  }
+
+  // Scroll container is <main class="chat-container">
+  const chatScrollContainer = document.querySelector('.chat-container');
+
+  function updateStickyVisibility() {
+    if (!stickyLastMsg || !chatScrollContainer) return;
+    if (!_stickyText) {
+      stickyLastMsg.classList.add('hidden');
+      return;
+    }
+    // Find the last user message bubble in the DOM
+    const userBubbles = chatMessages ? chatMessages.querySelectorAll('.message.user') : [];
+    if (userBubbles.length === 0) {
+      stickyLastMsg.classList.add('hidden');
+      return;
+    }
+    const lastBubble = userBubbles[userBubbles.length - 1];
+    const containerTop = chatScrollContainer.getBoundingClientRect().top;
+    const bubbleBottom = lastBubble.getBoundingClientRect().bottom;
+    // Show sticky bar only once the bubble's bottom edge has scrolled above the container top
+    if (bubbleBottom < containerTop + 4) {
+      stickyLastMsgText.textContent = _stickyText;
+      stickyLastMsg.classList.remove('hidden');
+    } else {
+      stickyLastMsg.classList.add('hidden');
+    }
+  }
+
+  let activeFilePath = '';
+
+  // ── Inline toast notification (VS Code webview has no alert/confirm) ──
+  function showToast(msg, type = 'success') {
+    const toast = document.createElement('div');
+    const color = type === 'error' ? '#ef4444' : type === 'warn' ? '#f59e0b' : '#10b981';
+    toast.style.cssText = `
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: rgba(12,12,20,0.97); color: ${color};
+      border: 1px solid ${color}40; border-radius: 8px;
+      padding: 8px 16px; font-size: 11.5px; font-weight: 600;
+      z-index: 9999; pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      animation: toast-in 0.2s ease forwards;
+    `;
+    if (!document.getElementById('toast-style')) {
+      const s = document.createElement('style');
+      s.id = 'toast-style';
+      s.textContent = '@keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+      document.head.appendChild(s);
+    }
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2800);
+  }
+
   // Autocomplete & Context Chips Elements
   const contextChipsContainer = document.getElementById('context-chips-container');
   const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
 
   // Application State
   let chatHistory = [];
+  let allSessions = [];
+  let searchMatchedIds = null;
+  let searchQuery = '';
   let currentStreamingBubble = null;
   let currentStreamingText = '';
   let currentStreamingReasoningText = '';
@@ -64,7 +185,116 @@
 
   const stopBtn = document.getElementById('stop-btn');
   const imageAttachmentsContainer = document.getElementById('image-attachments-container');
+  const exportMdBtn = document.getElementById('export-md-btn');
+  const exportJsonBtn = document.getElementById('export-json-btn');
+  const gitPrDescBtn = document.getElementById('git-pr-desc-btn');
+  const gitCommitMsgBtn = document.getElementById('git-commit-msg-btn');
 
+  if (exportMdBtn) {
+    exportMdBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'exportChatMarkdown' });
+    });
+  }
+  if (exportJsonBtn) {
+    exportJsonBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'exportChatSession' });
+    });
+  }
+  if (gitPrDescBtn) {
+    gitPrDescBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'generatePRDescription' });
+      const gitDrawer = document.getElementById('git-drawer');
+      if (gitDrawer) gitDrawer.classList.add('collapsed');
+    });
+  }
+  if (gitCommitMsgBtn) {
+    gitCommitMsgBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'generateCommitMessage' });
+      const gitDrawer = document.getElementById('git-drawer');
+      if (gitDrawer) gitDrawer.classList.add('collapsed');
+    });
+  }
+
+  const sessionSearchInput = document.getElementById('session-search-input');
+  if (sessionSearchInput) {
+    sessionSearchInput.addEventListener('input', () => {
+      const query = sessionSearchInput.value.toLowerCase().trim();
+      searchQuery = query;
+      if (query) {
+        vscode.postMessage({ type: 'searchSessions', query });
+      } else {
+        searchMatchedIds = null;
+        renderChatSessions();
+      }
+    });
+  }
+  const voiceInputBtn = document.getElementById('voice-input-btn');
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let isRecording = false;
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      isRecording = true;
+      voiceInputBtn.style.color = '#ef4444';
+      voiceInputBtn.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+      voiceInputBtn.title = 'Recording... Click to stop';
+    };
+
+    recognition.onend = () => {
+      isRecording = false;
+      voiceInputBtn.style.color = '';
+      voiceInputBtn.style.backgroundColor = '';
+      voiceInputBtn.title = 'Voice Input (Speech-to-Text)';
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      if (promptInput) {
+        const start = promptInput.selectionStart;
+        const end = promptInput.selectionEnd;
+        const oldVal = promptInput.value;
+        promptInput.value = oldVal.substring(0, start) + transcript + oldVal.substring(end);
+        promptInput.focus();
+        promptInput.selectionStart = promptInput.selectionEnd = start + transcript.length;
+        if (typeof autoGrowTextarea === 'function') {
+          autoGrowTextarea();
+        } else {
+          promptInput.style.height = '0px';
+          promptInput.style.height = (promptInput.scrollHeight) + 'px';
+        }
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      isRecording = false;
+      voiceInputBtn.style.color = '';
+      voiceInputBtn.style.backgroundColor = '';
+    };
+  }
+
+  if (voiceInputBtn) {
+    voiceInputBtn.addEventListener('click', () => {
+      if (!SpeechRecognition) {
+        vscode.postMessage({
+          type: 'showWarning',
+          text: 'Voice input (Speech Recognition) is not supported in this environment. Please ensure microphone access is enabled.'
+        });
+        return;
+      }
+      if (isRecording) {
+        recognition.stop();
+      } else {
+        recognition.start();
+      }
+    });
+  }
   // Attached Images State
   let attachedImages = [];
 
@@ -146,9 +376,14 @@
   }
 
   function closeAllDrawers() {
+    if (!settingsDrawer.classList.contains('collapsed')) {
+      saveSettingsBtn.click();
+    }
     settingsDrawer.classList.add('collapsed');
     historyDrawer.classList.add('collapsed');
     gitDrawer.classList.add('collapsed');
+    if (checkpointsDrawer) checkpointsDrawer.classList.add('collapsed');
+    if (multiDiffDrawer) multiDiffDrawer.classList.add('collapsed');
   }
 
   toggleGitBtn.addEventListener('click', () => {
@@ -188,11 +423,34 @@
     }
   });
 
+  // Checkpoints Drawer Toggle
+  if (toggleCheckpointBtn && checkpointsDrawer) {
+    toggleCheckpointBtn.addEventListener('click', () => {
+      const isOpening = checkpointsDrawer.classList.contains('collapsed');
+      closeAllDrawers();
+      if (isOpening) {
+        checkpointsDrawer.classList.remove('collapsed');
+        vscode.postMessage({ type: 'getCheckpoints' });
+      }
+    });
+  }
+
+  // Multi-Diff Drawer Toggle
+  if (openMultiDiffBtn && multiDiffDrawer) {
+    openMultiDiffBtn.addEventListener('click', () => {
+      const isOpening = multiDiffDrawer.classList.contains('collapsed');
+      closeAllDrawers();
+      if (isOpening) {
+        multiDiffDrawer.classList.remove('collapsed');
+        vscode.postMessage({ type: 'getActiveReviews' });
+      }
+    });
+  }
+
   // 1c. New Chat Session Action
   newChatBtn.addEventListener('click', () => {
+    closeAllDrawers();
     vscode.postMessage({ type: 'newSession' });
-    historyDrawer.classList.add('collapsed');
-    settingsDrawer.classList.add('collapsed');
   });
 
   // 2. Provider Switch Tabs
@@ -205,6 +463,16 @@
     selectProvider('deepseek');
     saveProviderSettings('deepseek');
   });
+  if (providerCustomBtn) {
+    providerCustomBtn.addEventListener('click', () => {
+      selectProvider('custom');
+      saveProviderSettings('custom');
+    });
+  }
+
+  let defaultCustomUrl = 'https://api.openai.com/v1';
+  let defaultCustomModel = 'gpt-4o';
+  let defaultCustomHasKey = false;
 
   function saveProviderSettings(provider) {
     const ollamaHost = ollamaHostInput.value.trim();
@@ -213,6 +481,27 @@
     const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
+    const customEndpointUrl = customEndpointUrlInput ? customEndpointUrlInput.value.trim() : '';
+    const customEndpointModel = customEndpointModelInput ? customEndpointModelInput.value.trim() : '';
+    let customEndpointKey = customEndpointKeyInput ? customEndpointKeyInput.value.trim() : '';
+    if (customEndpointKey === '••••••••') {
+      customEndpointKey = undefined;
+    }
+
+    const activeCustomId = settingsCustomProviderSelect ? settingsCustomProviderSelect.value : 'custom';
+    if (activeCustomId === 'custom') {
+      if (customEndpointKey !== undefined) {
+        customApiKeysData['custom'] = customEndpointKey;
+      }
+    } else {
+      if (customEndpointKey !== undefined) {
+        customApiKeysData[activeCustomId] = customEndpointKey;
+      }
+    }
+
+    const agentMode = document.getElementById('agent-mode-select') ? document.getElementById('agent-mode-select').value : 'normal';
+    const customSystemPrompt = document.getElementById('custom-system-prompt') ? document.getElementById('custom-system-prompt').value : '';
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -220,31 +509,52 @@
       defaultOllamaModel,
       defaultDeepSeekModel,
       contextBudgetPercent: contextBudget,
-      turnsToRetain: turnsToRetain
+      turnsToRetain: turnsToRetain,
+      customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
+      customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
+      customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
+      customEndpointKey: activeCustomId === 'custom' ? customEndpointKey : undefined,
+      agentMode,
+      customSystemPrompt,
+      customApis: customApisList,
+      customApiKeys: customApiKeysData,
     });
   }
 
   function selectProvider(provider) {
     activeProvider = provider;
+    
+    providerOllamaBtn.classList.remove('active');
+    providerDeepseekBtn.classList.remove('active');
+    if (providerCustomBtn) providerCustomBtn.classList.remove('active');
+    
+    ollamaPanel.classList.add('hidden');
+    deepseekPanel.classList.add('hidden');
+    if (customPanel) customPanel.classList.add('hidden');
+
     if (provider === 'ollama') {
       providerOllamaBtn.classList.add('active');
-      providerDeepseekBtn.classList.remove('active');
       ollamaPanel.classList.remove('hidden');
-      deepseekPanel.classList.add('hidden');
       if (thinkingQuickControls) {
         thinkingQuickControls.style.opacity = '0.5';
         thinkingQuickControls.style.pointerEvents = 'none';
       }
-    } else {
-      providerOllamaBtn.classList.remove('active');
+    } else if (provider === 'deepseek') {
       providerDeepseekBtn.classList.add('active');
-      ollamaPanel.classList.add('hidden');
       deepseekPanel.classList.remove('hidden');
       if (thinkingQuickControls) {
         thinkingQuickControls.style.opacity = '1';
         thinkingQuickControls.style.pointerEvents = 'auto';
       }
+    } else {
+      if (providerCustomBtn) providerCustomBtn.classList.add('active');
+      if (customPanel) customPanel.classList.remove('hidden');
+      if (thinkingQuickControls) {
+        thinkingQuickControls.style.opacity = '0.5';
+        thinkingQuickControls.style.pointerEvents = 'none';
+      }
     }
+    
     if (quickProviderSelect) {
       quickProviderSelect.value = provider;
     }
@@ -262,7 +572,7 @@
         quickModelSelect.appendChild(newOpt);
       });
       quickModelSelect.value = ollamaModelSelect.value;
-    } else {
+    } else if (activeProvider === 'deepseek') {
       Array.from(deepseekModelSelect.options).forEach(opt => {
         const newOpt = document.createElement('option');
         newOpt.value = opt.value;
@@ -270,6 +580,30 @@
         quickModelSelect.appendChild(newOpt);
       });
       quickModelSelect.value = deepseekModelSelect.value;
+    } else if (activeProvider === 'custom' || (typeof activeProvider === 'string' && activeProvider.startsWith('custom_'))) {
+      const activeCustom = customApisList.find(api => api.id === activeProvider);
+      if (activeCustom && activeCustom.models && activeCustom.models.length > 0) {
+        activeCustom.models.forEach(model => {
+          const newOpt = document.createElement('option');
+          newOpt.value = model;
+          newOpt.textContent = model;
+          quickModelSelect.appendChild(newOpt);
+        });
+        const savedModel = customEndpointModelInput ? customEndpointModelInput.value : '';
+        if (activeCustom.models.includes(savedModel)) {
+          quickModelSelect.value = savedModel;
+        } else {
+          quickModelSelect.value = activeCustom.models[0];
+          if (customEndpointModelInput) customEndpointModelInput.value = activeCustom.models[0];
+        }
+      } else {
+        const newOpt = document.createElement('option');
+        const val = customEndpointModelInput ? (customEndpointModelInput.value || 'custom') : 'custom';
+        newOpt.value = val;
+        newOpt.textContent = val;
+        quickModelSelect.appendChild(newOpt);
+        quickModelSelect.value = val;
+      }
     }
   }
 
@@ -286,15 +620,29 @@
 
   const toggleFigmaKeyVisibilityBtn = document.getElementById('toggle-figma-key-visibility');
   const figmaKeyInput = document.getElementById('figma-key');
-  toggleFigmaKeyVisibilityBtn.addEventListener('click', () => {
-    if (figmaKeyInput.type === 'password') {
-      figmaKeyInput.type = 'text';
-      toggleFigmaKeyVisibilityBtn.textContent = 'Hide';
-    } else {
-      figmaKeyInput.type = 'password';
-      toggleFigmaKeyVisibilityBtn.textContent = 'Show';
-    }
-  });
+  if (toggleFigmaKeyVisibilityBtn && figmaKeyInput) {
+    toggleFigmaKeyVisibilityBtn.addEventListener('click', () => {
+      if (figmaKeyInput.type === 'password') {
+        figmaKeyInput.type = 'text';
+        toggleFigmaKeyVisibilityBtn.textContent = 'Hide';
+      } else {
+        figmaKeyInput.type = 'password';
+        toggleFigmaKeyVisibilityBtn.textContent = 'Show';
+      }
+    });
+  }
+
+  if (toggleCustomKeyVisibilityBtn && customEndpointKeyInput) {
+    toggleCustomKeyVisibilityBtn.addEventListener('click', () => {
+      if (customEndpointKeyInput.type === 'password') {
+        customEndpointKeyInput.type = 'text';
+        toggleCustomKeyVisibilityBtn.textContent = 'Hide';
+      } else {
+        customEndpointKeyInput.type = 'password';
+        toggleCustomKeyVisibilityBtn.textContent = 'Show';
+      }
+    });
+  }
 
   // 4. Refresh Models button
   refreshModelsBtn.addEventListener('click', () => {
@@ -308,13 +656,36 @@
     const ollamaHost = ollamaHostInput.value.trim();
     const defaultOllamaModel = ollamaModelSelect.value;
     const defaultDeepSeekModel = deepseekModelSelect.value;
-    const deepSeekKey = deepseekKeyInput.value.trim();
-    const figmaKey = document.getElementById('figma-key').value.trim();
+    let deepSeekKey = deepseekKeyInput.value.trim();
+    if (deepSeekKey === '••••••••') {
+      deepSeekKey = undefined;
+    }
+    const figmaKey = figmaKeyInput ? figmaKeyInput.value.trim() : '';
     const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
     const deepSeekThinking = settingsThinkingToggle.checked;
     const deepSeekThinkingLevel = settingsThinkingLevelSelect.value;
+
+    const activeCustomId = settingsCustomProviderSelect ? settingsCustomProviderSelect.value : 'custom';
+    const customEndpointUrl = customEndpointUrlInput ? customEndpointUrlInput.value.trim() : defaultCustomUrl;
+    const customEndpointModel = customEndpointModelInput ? customEndpointModelInput.value.trim() : defaultCustomModel;
+    let customEndpointKey = customEndpointKeyInput ? customEndpointKeyInput.value.trim() : '';
+    if (customEndpointKey === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022') {
+      customEndpointKey = undefined;
+    }
+    if (activeCustomId === 'custom') {
+      if (customEndpointKey !== undefined) {
+        customApiKeysData['custom'] = customEndpointKey;
+      }
+    } else {
+      if (customEndpointKey !== undefined) {
+        customApiKeysData[activeCustomId] = customEndpointKey;
+      }
+    }
+
+    const agentMode = document.getElementById('agent-mode-select') ? document.getElementById('agent-mode-select').value : 'normal';
+    const customSystemPrompt = document.getElementById('custom-system-prompt') ? document.getElementById('custom-system-prompt').value : '';
 
     vscode.postMessage({
       type: 'saveSettings',
@@ -322,12 +693,20 @@
       ollamaHost,
       defaultOllamaModel,
       defaultDeepSeekModel,
-      deepSeekKey: deepSeekKey || undefined, // only send key if typed
+      deepSeekKey: deepSeekKey !== undefined ? deepSeekKey : undefined,
       figmaKey: figmaKey || undefined, // only send key if typed
       contextBudgetPercent: contextBudget,
       turnsToRetain: turnsToRetain,
       deepSeekThinking,
-      deepSeekThinkingLevel
+      deepSeekThinkingLevel,
+      customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
+      customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
+      customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
+      customEndpointKey: activeCustomId === 'custom' ? customEndpointKey : undefined,
+      agentMode,
+      customSystemPrompt,
+      customApis: customApisList,
+      customApiKeys: customApiKeysData,
     });
 
     settingsDrawer.classList.add('collapsed');
@@ -345,10 +724,204 @@
     quickModelSelect.addEventListener('change', (e) => {
       if (activeProvider === 'ollama') {
         ollamaModelSelect.value = e.target.value;
-      } else {
+      } else if (activeProvider === 'deepseek') {
         deepseekModelSelect.value = e.target.value;
+      } else {
+        if (customEndpointModelInput) customEndpointModelInput.value = e.target.value;
       }
       saveSettingsBtn.click();
+    });
+  }
+
+  function updateCustomProvidersUI(selectedProvider) {
+    if (!settingsCustomProviderSelect || !quickProviderSelect) return;
+    
+    settingsCustomProviderSelect.innerHTML = '<option value="custom">Default Custom API</option>';
+    customApisList.forEach(api => {
+      const opt = document.createElement('option');
+      opt.value = api.id;
+      opt.textContent = api.name;
+      settingsCustomProviderSelect.appendChild(opt);
+    });
+
+    quickProviderSelect.innerHTML = `
+      <option value="ollama">Ollama</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="custom">Default Custom API</option>
+    `;
+    customApisList.forEach(api => {
+      const opt = document.createElement('option');
+      opt.value = api.id;
+      opt.textContent = api.name;
+      quickProviderSelect.appendChild(opt);
+    });
+
+    const isCustomId = selectedProvider === 'custom' || (typeof selectedProvider === 'string' && selectedProvider.startsWith('custom_'));
+    if (isCustomId) {
+      settingsCustomProviderSelect.value = selectedProvider;
+    } else {
+      settingsCustomProviderSelect.value = 'custom';
+    }
+    quickProviderSelect.value = selectedProvider;
+
+    fillCustomApiEditorFields(settingsCustomProviderSelect.value);
+  }
+
+  function fillCustomApiEditorFields(providerId) {
+    if (providerId === 'custom') {
+      if (customApiEditorTitle) customApiEditorTitle.textContent = 'Configure Default Connection';
+      if (customEndpointNameInput) {
+        customEndpointNameInput.value = 'Default Custom API';
+        customEndpointNameInput.disabled = true;
+      }
+      if (customEndpointUrlInput) customEndpointUrlInput.value = defaultCustomUrl;
+      if (customEndpointModelInput) customEndpointModelInput.value = defaultCustomModel;
+      if (customEndpointKeyInput) {
+        if (customApiKeysData['custom']) {
+          customEndpointKeyInput.value = customApiKeysData['custom'];
+          customEndpointKeyInput.placeholder = 'Key configured (unsaved)';
+        } else {
+          customEndpointKeyInput.placeholder = defaultCustomHasKey ? 'Key is configured' : 'Key...';
+          customEndpointKeyInput.value = defaultCustomHasKey ? '••••••••' : '';
+        }
+      }
+    } else {
+      const api = customApisList.find(a => a.id === providerId);
+      if (api) {
+        if (customApiEditorTitle) customApiEditorTitle.textContent = 'Configure Connection';
+        if (customEndpointNameInput) {
+          customEndpointNameInput.value = api.name;
+          customEndpointNameInput.disabled = false;
+        }
+        if (customEndpointUrlInput) customEndpointUrlInput.value = api.url;
+        if (customEndpointModelInput) customEndpointModelInput.value = api.models.join(', ');
+        
+        const hasKey = configuredCustomApiKeys[api.id] || customApiKeysData[api.id];
+        if (customEndpointKeyInput) {
+          if (customApiKeysData[api.id]) {
+            customEndpointKeyInput.value = customApiKeysData[api.id];
+            customEndpointKeyInput.placeholder = 'Key configured (unsaved)';
+          } else {
+            customEndpointKeyInput.placeholder = hasKey ? 'Key is configured' : 'Key...';
+            customEndpointKeyInput.value = hasKey ? '••••••••' : '';
+          }
+        }
+      }
+    }
+  }
+
+  if (settingsCustomProviderSelect) {
+    settingsCustomProviderSelect.addEventListener('change', (e) => {
+      fillCustomApiEditorFields(e.target.value);
+    });
+  }
+
+  if (newCustomProviderBtn) {
+    newCustomProviderBtn.addEventListener('click', () => {
+      if (customApiEditorTitle) customApiEditorTitle.textContent = 'Create New Connection';
+      if (settingsCustomProviderSelect) settingsCustomProviderSelect.value = 'custom';
+      if (customEndpointNameInput) {
+        customEndpointNameInput.value = '';
+        customEndpointNameInput.disabled = false;
+        customEndpointNameInput.focus();
+      }
+      if (customEndpointUrlInput) customEndpointUrlInput.value = '';
+      if (customEndpointModelInput) customEndpointModelInput.value = '';
+      if (customEndpointKeyInput) {
+        customEndpointKeyInput.value = '';
+        customEndpointKeyInput.placeholder = 'Key...';
+      }
+    });
+  }
+
+  if (saveCustomProviderBtn) {
+    saveCustomProviderBtn.addEventListener('click', () => {
+      const name = customEndpointNameInput ? customEndpointNameInput.value.trim() : '';
+      const url = customEndpointUrlInput ? customEndpointUrlInput.value.trim() : '';
+      const modelsStr = customEndpointModelInput ? customEndpointModelInput.value.trim() : '';
+      let key = customEndpointKeyInput ? customEndpointKeyInput.value.trim() : '';
+
+      if (!name || !url) {
+        showToast('Please specify connection name and endpoint URL.', 'error');
+        return;
+      }
+
+      const models = modelsStr.split(',').map(m => m.trim()).filter(m => m.length > 0);
+      if (models.length === 0) {
+        showToast('Please specify at least one model name.', 'error');
+        return;
+      }
+
+      const activeId = settingsCustomProviderSelect ? settingsCustomProviderSelect.value : 'custom';
+      let targetId = activeId;
+      
+      if (activeId === 'custom') {
+        if (customApiEditorTitle && customApiEditorTitle.textContent === 'Configure Default Connection') {
+          defaultCustomUrl = url;
+          defaultCustomModel = models[0];
+          if (key && key !== '••••••••') {
+            customApiKeysData['custom'] = key;
+            defaultCustomHasKey = true;
+          }
+          saveProviderSettings(activeProvider);
+          showToast('Default Custom API settings saved!');
+          return;
+        } else {
+          targetId = 'custom_' + Date.now();
+          const newApi = { id: targetId, name, url, models };
+          customApisList.push(newApi);
+        }
+      } else {
+        const api = customApisList.find(a => a.id === activeId);
+        if (api) {
+          api.name = name;
+          api.url = url;
+          api.models = models;
+        }
+      }
+
+      if (key && key !== '••••••••') {
+        customApiKeysData[targetId] = key;
+      } else if (key === '') {
+        customApiKeysData[targetId] = '';
+      }
+
+      updateCustomProvidersUI(targetId);
+      selectProvider(targetId);
+      saveProviderSettings(targetId);
+      showToast('Custom connection saved!');
+    });
+  }
+
+  if (deleteCustomProviderBtn) {
+    deleteCustomProviderBtn.addEventListener('click', () => {
+      const activeId = settingsCustomProviderSelect ? settingsCustomProviderSelect.value : 'custom';
+      if (activeId === 'custom') {
+        // Reset default custom API
+        defaultCustomUrl = 'https://api.openai.com/v1';
+        defaultCustomModel = 'gpt-4o';
+        defaultCustomHasKey = false;
+        customApiKeysData['custom'] = '';
+
+        if (customEndpointUrlInput) customEndpointUrlInput.value = defaultCustomUrl;
+        if (customEndpointModelInput) customEndpointModelInput.value = defaultCustomModel;
+        if (customEndpointKeyInput) {
+          customEndpointKeyInput.value = '';
+          customEndpointKeyInput.placeholder = 'Key...';
+        }
+        saveProviderSettings('custom');
+        showToast('Default Custom API configuration cleared.');
+        return;
+      }
+
+      // Delete a named custom connection
+      customApisList = customApisList.filter(a => a.id !== activeId);
+      customApiKeysData[activeId] = '';
+
+      updateCustomProvidersUI('custom');
+      selectProvider('custom');
+      saveProviderSettings('custom');
+      showToast('Custom connection deleted.');
     });
   }
 
@@ -378,6 +951,26 @@
     });
   }
 
+  // Bind Enter key to save settings on input fields
+  [
+    ollamaHostInput,
+    deepseekKeyInput,
+    contextBudgetInput,
+    turnsToRetainInput,
+    customEndpointUrlInput,
+    customEndpointModelInput,
+    customEndpointKeyInput,
+    figmaKeyInput
+  ].forEach(input => {
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          saveSettingsBtn.click();
+        }
+      });
+    }
+  });
+
   // 5b. Ollama Host Live Validation on Type (Debounced)
   ollamaHostInput.addEventListener('input', () => {
     if (validationTimeout) {
@@ -401,7 +994,7 @@
   });
 
   function autoGrowTextarea() {
-    promptInput.style.height = 'auto';
+    promptInput.style.height = '0px';
     promptInput.style.height = promptInput.scrollHeight + 'px';
   }
 
@@ -535,7 +1128,7 @@
     linkedFiles.add(filePath);
     renderChips();
     
-    // Replace the '@query' segment in promptInput with clean text
+    // Replace the '@query' segment in promptInput with inline location reference
     const text = promptInput.value;
     const cursorPos = promptInput.selectionStart;
     const textBeforeCursor = text.substring(0, cursorPos);
@@ -543,9 +1136,11 @@
     
     if (atIndex !== -1) {
       const textAfterCursor = text.substring(cursorPos);
-      promptInput.value = text.substring(0, atIndex) + textAfterCursor;
-      promptInput.selectionStart = atIndex;
-      promptInput.selectionEnd = atIndex;
+      const fileRef = `[File: ${filePath}] `;
+      promptInput.value = text.substring(0, atIndex) + fileRef + textAfterCursor;
+      const newCursorPos = atIndex + fileRef.length;
+      promptInput.selectionStart = newCursorPos;
+      promptInput.selectionEnd = newCursorPos;
     }
     
     closeAutocomplete();
@@ -797,6 +1392,7 @@ function attachImage(base64) {
     }
     appendMessageBubble('user', userDisplayMessage, attachedImages);
     scrollChatToBottom(true);
+    setStickyLastMessage(userDisplayMessage);
 
     const assistantBubble = appendMessageBubble('assistant', '');
     const typingIndicator = document.createElement('div');
@@ -966,6 +1562,25 @@ function attachImage(base64) {
       const scanning = document.createElement('div');
       scanning.className = 'scanning-bar';
       card.appendChild(scanning);
+
+      if (toolName === 'run_command') {
+        const consoleStream = document.createElement('pre');
+        consoleStream.className = 'terminal-console-stream';
+        consoleStream.style.maxHeight = '150px';
+        consoleStream.style.overflowY = 'auto';
+        consoleStream.style.margin = '8px';
+        consoleStream.style.padding = '6px';
+        consoleStream.style.background = 'rgba(0, 0, 0, 0.4)';
+        consoleStream.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+        consoleStream.style.borderRadius = '4px';
+        consoleStream.style.fontFamily = 'var(--font-mono)';
+        consoleStream.style.fontSize = '10px';
+        consoleStream.style.color = '#38bdf8';
+        consoleStream.style.whiteSpace = 'pre-wrap';
+        consoleStream.style.wordBreak = 'break-all';
+        consoleStream.innerHTML = '<code></code>';
+        card.appendChild(consoleStream);
+      }
     } else {
       const controlsContainer = header.querySelector('.tool-header-controls');
 
@@ -1212,7 +1827,7 @@ function attachImage(base64) {
           if (activeIndex !== -1) rawText = rawText.substring(0, activeIndex);
           
           promptInput.value = rawText.trim();
-          promptInput.style.height = 'auto';
+          promptInput.style.height = '0px';
           promptInput.style.height = (promptInput.scrollHeight) + 'px';
           promptInput.focus();
         }
@@ -1276,25 +1891,33 @@ function attachImage(base64) {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;
         
-        selectProvider(s.provider);
         ollamaHostInput.value = s.ollamaHost;
         
         // Handle deepseek key display helper
         if (s.hasDeepSeekKey) {
           deepseekKeyStatus.textContent = 'Key is configured (Securely stored)';
           deepseekKeyStatus.style.color = '#22c55e';
+          deepseekKeyInput.value = '••••••••';
         } else {
           deepseekKeyStatus.textContent = 'Key is not configured';
           deepseekKeyStatus.style.color = '#ef4444';
+          deepseekKeyInput.value = '';
         }
 
         const figmaKeyStatus = document.getElementById('figma-key-status');
+        if (s.figmaKeyInput) {
+          figmaKeyInput.value = s.figmaKeyInput;
+        }
         if (s.hasFigmaKey) {
-          figmaKeyStatus.textContent = 'Token is configured (Securely stored)';
-          figmaKeyStatus.style.color = '#22c55e';
+          if (figmaKeyStatus) {
+            figmaKeyStatus.textContent = 'Token is configured (Securely stored)';
+            figmaKeyStatus.style.color = '#22c55e';
+          }
         } else {
-          figmaKeyStatus.textContent = 'Token is not configured';
-          figmaKeyStatus.style.color = '#ef4444';
+          if (figmaKeyStatus) {
+            figmaKeyStatus.textContent = 'Token is not configured';
+            figmaKeyStatus.style.color = '#ef4444';
+          }
         }
 
         deepseekModelSelect.value = s.defaultDeepSeekModel;
@@ -1317,6 +1940,35 @@ function attachImage(base64) {
 
         if (ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`)) {
           ollamaModelSelect.value = s.defaultOllamaModel;
+        }
+
+        if (s.customEndpointUrl !== undefined) {
+          defaultCustomUrl = s.customEndpointUrl;
+        }
+        if (s.customEndpointModel !== undefined) {
+          defaultCustomModel = s.customEndpointModel;
+        }
+        if (s.hasCustomEndpointKey !== undefined) {
+          defaultCustomHasKey = s.hasCustomEndpointKey;
+        }
+
+        if (s.customApis !== undefined) {
+          customApisList = s.customApis;
+        }
+        if (s.configuredCustomApiKeys !== undefined) {
+          configuredCustomApiKeys = s.configuredCustomApiKeys;
+        }
+
+        updateCustomProvidersUI(s.provider);
+        selectProvider(s.provider);
+
+        if (s.agentMode !== undefined) {
+          const agentModeSelect = document.getElementById('agent-mode-select');
+          if (agentModeSelect) agentModeSelect.value = s.agentMode;
+        }
+        if (s.customSystemPrompt !== undefined) {
+          const customPromptArea = document.getElementById('custom-system-prompt');
+          if (customPromptArea) customPromptArea.value = s.customSystemPrompt;
         }
 
         syncQuickModelSelect();
@@ -1562,7 +2214,13 @@ function attachImage(base64) {
         currentStreamingBubble = null;
         currentStreamingText = '';
         currentStreamingReasoningText = '';
-        setAvatarState('idle');
+        setAvatarState('celebrate');
+        triggerParticleExplosion();
+        setTimeout(() => {
+          if (avatarState === 'celebrate') {
+            setAvatarState('idle');
+          }
+        }, 4000);
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
         clearAllActiveAnimations();
@@ -1619,12 +2277,17 @@ function attachImage(base64) {
 
       case 'activeFileChanged': {
         const file = message.fileName;
+        activeFilePath = message.filePath || '';
         if (file) {
           contextDot.classList.remove('offline');
           contextFileName.textContent = `Context: ${file}`;
+          if (genTestsBtn) genTestsBtn.classList.remove('hidden');
+          if (genDocsBtn) genDocsBtn.classList.remove('hidden');
         } else {
           contextDot.classList.add('offline');
           contextFileName.textContent = 'No active file open';
+          if (genTestsBtn) genTestsBtn.classList.add('hidden');
+          if (genDocsBtn) genDocsBtn.classList.add('hidden');
         }
         break;
       }
@@ -1635,8 +2298,44 @@ function attachImage(base64) {
           if (count > 0) {
             acceptAllBtn.textContent = `✨ Accept All (${count})`;
             acceptAllBtn.classList.remove('hidden');
+            if (openMultiDiffBtn) openMultiDiffBtn.classList.remove('hidden');
           } else {
             acceptAllBtn.classList.add('hidden');
+            if (openMultiDiffBtn) openMultiDiffBtn.classList.add('hidden');
+            if (multiDiffDrawer) multiDiffDrawer.classList.add('collapsed');
+          }
+        }
+        break;
+      }
+
+      case 'promptTemplatesList': {
+        promptTemplates = message.templates || [];
+        renderTemplatesList();
+        break;
+      }
+
+      case 'activeReviewsList': {
+        renderMultiDiffList(message.reviews);
+        break;
+      }
+
+      case 'checkpointsList': {
+        renderCheckpoints(message.checkpoints);
+        break;
+      }
+
+      case 'terminalStream': {
+        const { terminalName, data } = message;
+        const activeTerminalCard = document.querySelector('.tool-card.running[data-tool="run_command"]');
+        if (activeTerminalCard) {
+          const consoleStream = activeTerminalCard.querySelector('.terminal-console-stream code');
+          if (consoleStream) {
+            const cleanData = escapeHtml(data);
+            consoleStream.innerHTML += cleanData;
+            const pre = activeTerminalCard.querySelector('.terminal-console-stream');
+            if (pre) {
+              pre.scrollTop = pre.scrollHeight;
+            }
           }
         }
         break;
@@ -1654,9 +2353,16 @@ function attachImage(base64) {
         const dash = document.getElementById('usage-dashboard');
         const tokensEl = document.getElementById('usage-tokens');
         const costEl = document.getElementById('usage-cost');
+        const progressBar = document.getElementById('token-progress-bar');
         if (dash && tokensEl && costEl) {
           tokensEl.textContent = total.toLocaleString();
           costEl.textContent = `$${cost.toFixed(4)}`;
+          if (progressBar) {
+            const maxTokens = activeProvider === 'deepseek' ? 64000 : 16384;
+            const pct = Math.min(100, (total / maxTokens) * 100);
+            progressBar.style.width = pct + '%';
+            progressBar.title = `Context utilization: ${pct.toFixed(1)}%`;
+          }
           dash.classList.remove('hidden');
         }
         break;
@@ -1680,68 +2386,16 @@ function attachImage(base64) {
       }
 
       case 'updateChatSessions': {
-        const sessions = message.sessions || [];
+        allSessions = message.sessions || [];
         activeSessionId = message.activeSessionId;
-        
-        sessionsList.innerHTML = '';
-        if (sessions.length > 0) {
-          sessions.forEach((session) => {
-            const item = document.createElement('div');
-            item.className = `session-item${session.id === activeSessionId ? ' active' : ''}`;
-            item.setAttribute('data-id', session.id);
-            
-            const details = document.createElement('div');
-            details.className = 'session-details';
-            
-            const title = document.createElement('span');
-            title.className = 'session-title';
-            title.textContent = session.title || 'New Session';
-            
-            const metaRow = document.createElement('div');
-            metaRow.className = 'session-meta-row';
-            
-            const time = document.createElement('span');
-            time.className = 'session-time';
-            time.textContent = formatRelativeTime(session.timestamp);
-            
-            const count = document.createElement('span');
-            count.className = 'session-msg-count';
-            const msgCount = session.messageCount || 0;
-            count.textContent = msgCount > 0 ? `${msgCount} msg${msgCount !== 1 ? 's' : ''}` : 'empty';
-            
-            metaRow.appendChild(time);
-            metaRow.appendChild(count);
-            
-            details.appendChild(title);
-            details.appendChild(metaRow);
-            item.appendChild(details);
-            
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'session-delete-btn';
-            deleteBtn.title = 'Delete Session';
-            deleteBtn.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-              </svg>
-            `;
-            
-            deleteBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              vscode.postMessage({ type: 'deleteSession', sessionId: session.id });
-            });
-            
-            item.appendChild(deleteBtn);
-            
-            item.addEventListener('click', () => {
-              vscode.postMessage({ type: 'selectSession', sessionId: session.id });
-              historyDrawer.classList.add('collapsed');
-            });
-            
-            sessionsList.appendChild(item);
-          });
-        } else {
-          sessionsList.innerHTML = '<div class="no-sessions">No previous sessions</div>';
+        renderChatSessions();
+        break;
+      }
+      
+      case 'searchSessionsResult': {
+        if (message.query === searchQuery) {
+          searchMatchedIds = message.matchingIds;
+          renderChatSessions();
         }
         break;
       }
@@ -2471,7 +3125,7 @@ function attachImage(base64) {
         const codeElement = wrapper.querySelector('pre code');
         const textToCopy = codeElement.innerText;
 
-        navigator.clipboard.writeText(textToCopy).then(() => {
+        const onSuccess = () => {
           const oldText = btn.textContent;
           btn.textContent = 'Copied!';
           btn.style.color = '#22c55e';
@@ -2479,7 +3133,17 @@ function attachImage(base64) {
             btn.textContent = oldText;
             btn.style.color = '';
           }, 1500);
-        });
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textToCopy).then(onSuccess, () => {
+            vscode.postMessage({ type: 'copyToClipboard', text: textToCopy });
+            onSuccess();
+          });
+        } else {
+          vscode.postMessage({ type: 'copyToClipboard', text: textToCopy });
+          onSuccess();
+        }
       });
     });
 
@@ -2525,6 +3189,78 @@ function attachImage(base64) {
     return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  function renderChatSessions() {
+    sessionsList.innerHTML = '';
+    
+    const filtered = allSessions.filter(s => {
+      if (!searchQuery) return true;
+      if (searchMatchedIds) {
+        return searchMatchedIds.includes(s.id);
+      }
+      return (s.title && s.title.toLowerCase().includes(searchQuery)) || s.id.toLowerCase().includes(searchQuery);
+    });
+    
+    if (filtered.length > 0) {
+      filtered.forEach((session) => {
+        const item = document.createElement('div');
+        item.className = `session-item${session.id === activeSessionId ? ' active' : ''}`;
+        item.setAttribute('data-id', session.id);
+        
+        const details = document.createElement('div');
+        details.className = 'session-details';
+        
+        const title = document.createElement('span');
+        title.className = 'session-title';
+        title.textContent = session.title || 'New Session';
+        
+        const metaRow = document.createElement('div');
+        metaRow.className = 'session-meta-row';
+        
+        const time = document.createElement('span');
+        time.className = 'session-time';
+        time.textContent = formatRelativeTime(session.timestamp);
+        
+        const count = document.createElement('span');
+        count.className = 'session-msg-count';
+        const msgCount = session.messageCount || 0;
+        count.textContent = msgCount > 0 ? `${msgCount} msg${msgCount !== 1 ? 's' : ''}` : 'empty';
+        
+        metaRow.appendChild(time);
+        metaRow.appendChild(count);
+        
+        details.appendChild(title);
+        details.appendChild(metaRow);
+        item.appendChild(details);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'session-delete-btn';
+        deleteBtn.title = 'Delete Session';
+        deleteBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+          </svg>
+        `;
+        
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({ type: 'deleteSession', sessionId: session.id });
+        });
+        
+        item.appendChild(deleteBtn);
+        
+        item.addEventListener('click', () => {
+          vscode.postMessage({ type: 'selectSession', sessionId: session.id });
+          historyDrawer.classList.add('collapsed');
+        });
+        
+        sessionsList.appendChild(item);
+      });
+    } else {
+      sessionsList.innerHTML = '<div class="no-sessions">No sessions found</div>';
+    }
+  }
+
   // ==========================================================================
   // Infinite Scroll & Avatar State Manager Implementations
   // ==========================================================================
@@ -2550,6 +3286,7 @@ function attachImage(base64) {
         costEl.textContent = '$0.0000';
         dash.classList.add('hidden');
       }
+      setStickyLastMessage(null);
       return;
     }
 
@@ -2583,6 +3320,14 @@ function attachImage(base64) {
     } else {
       scrollChatToBottom();
     }
+
+    // Restore sticky last user message from history
+    const lastUserMsg = [...chatHistory].reverse().find(m => m.role === 'user');
+    if (lastUserMsg) {
+      setStickyLastMessage(lastUserMsg.content);
+    } else {
+      setStickyLastMessage(null);
+    }
   }
 
   function loadMoreHistory() {
@@ -2592,7 +3337,7 @@ function attachImage(base64) {
     }
   }
 
-  // Scroll pagination trigger
+  // Scroll pagination trigger + sticky bar visibility
   chatMessages.addEventListener('scroll', () => {
     const threshold = 15;
     const isAtBottom = (chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight) <= threshold;
@@ -2605,6 +3350,11 @@ function attachImage(base64) {
       }
     }
   });
+
+  // The actual scroll container for sticky is the <main class="chat-container">
+  if (chatScrollContainer) {
+    chatScrollContainer.addEventListener('scroll', updateStickyVisibility, { passive: true });
+  }
 
   // Buddy Avatar - Interactive Entertaining Cute Vector Mascot Expressor
   const buddyContainer = document.getElementById('buddy-container');
@@ -2648,14 +3398,21 @@ function attachImage(base64) {
        <circle cx="12" cy="15" r="1.2" />`
     ],
     error: [
-      `<!-- shocked / error crossed eyes -->
-       <path d="M6 9.5 L9 12.5 M9 9.5 L6 12.5 M15 9.5 L18 12.5 M18 9.5 L15 12.5" stroke-width="1.8" stroke-linecap="round" />
-       <path d="M9 16 Q12 13.5 15 16" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- cute dizzy sad/worried look -->
+       <ellipse cx="7" cy="11.5" rx="1.8" ry="1.2" />
+       <ellipse cx="17" cy="11.5" rx="1.8" ry="1.2" />
+       <path d="M6 8.5 Q7.5 10 9 8.5 M15 8.5 Q16.5 10 18 8.5" stroke-width="1.2" stroke-linecap="round" fill="none" />
+       <path d="M10 16 Q12 14.5 14 16" stroke-width="1.5" stroke-linecap="round" fill="none" />`
     ],
     click: [
       `<!-- happy star/wink heart eyes -->
        <path d="M5 10 Q7 8 9 10 M15 10 Q17 8 19 10" stroke-width="1.8" stroke-linecap="round" fill="none" />
        <path d="M9 14.5 Q12 17.5 15 14.5 Z" />`
+    ],
+    celebrate: [
+      `<!-- extremely happy starry/celebration eyes with wide smile -->
+       <path d="M3 11 L6 8 L9 11 M15 11 L18 8 L21 11" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M8 15 Q12 19 16 15 Z" />`
     ]
   };
 
@@ -2664,8 +3421,9 @@ function attachImage(base64) {
     thinking: '#0ea5e9',
     coding: '#10b981',
     tool_calling: '#06b6d4',
-    error: '#ef4444',
-    click: '#f43f5e'
+    error: '#f472b6', // Playful pink instead of dark red
+    click: '#fbbf24', // Warm playful amber
+    celebrate: '#10b981'
   };
 
   function setAvatarState(state) {
@@ -2759,6 +3517,56 @@ function attachImage(base64) {
         }
       }
     }, 6000);
+  }
+
+  function triggerParticleExplosion() {
+    const canvas = document.getElementById('buddy-particles');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = 128;
+    canvas.height = 128;
+    
+    const particles = [];
+    const colors = ['#38bdf8', '#a855f7', '#10b981', '#f43f5e', '#fbbf24'];
+    
+    for (let i = 0; i < 40; i++) {
+      particles.push({
+        x: 64,
+        y: 64,
+        angle: Math.random() * Math.PI * 2,
+        speed: 1 + Math.random() * 3,
+        radius: 2 + Math.random() * 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1,
+        decay: 0.015 + Math.random() * 0.02
+      });
+    }
+    
+    function animate() {
+      ctx.clearRect(0, 0, 128, 128);
+      let alive = false;
+      
+      particles.forEach(p => {
+        if (p.alpha > 0) {
+          p.x += Math.cos(p.angle) * p.speed;
+          p.y += Math.sin(p.angle) * p.speed + 0.1;
+          p.alpha -= p.decay;
+          
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.alpha;
+          ctx.fill();
+          
+          alive = true;
+        }
+      });
+      
+      if (alive) {
+        requestAnimationFrame(animate);
+      }
+    }
+    animate();
   }
 
   // Hook up premium interactive winking, 3D rotations, and dev jokes/quotes on click
@@ -2929,6 +3737,338 @@ function highlightLine(line, lang) {
   
   return escaped || '&nbsp;';
 }
+
+  // ==========================================================================
+  // Checkpoint, Diff, Templates & Telemetry Integration
+  // ==========================================================================
+
+  // Request templates list on init
+  vscode.postMessage({ type: 'getPromptTemplates' });
+
+  // Bind Telemetry Export Actions
+  if (exportTelemetryJsonBtn) {
+    exportTelemetryJsonBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'exportTelemetryJson' });
+    });
+  }
+  if (exportTelemetryCsvBtn) {
+    exportTelemetryCsvBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'exportTelemetryCsv' });
+    });
+  }
+
+  function renderTemplatesList() {
+    if (!templatesPopupList) return;
+    templatesPopupList.innerHTML = '';
+    
+    const query = templatesSearchInput ? templatesSearchInput.value.toLowerCase().trim() : '';
+    const filtered = promptTemplates.filter(t => 
+      t.name.toLowerCase().includes(query) || 
+      (t.content && t.content.toLowerCase().includes(query))
+    );
+
+    if (filtered.length === 0) {
+      templatesPopupList.innerHTML = `<div class="templates-popup-empty">${query ? 'No matching templates found.' : 'No templates yet. Click + New to create one!'}</div>`;
+      return;
+    }
+
+    filtered.forEach((t) => {
+      const item = document.createElement('div');
+      item.className = 'templates-popup-item';
+      
+      let preview = t.content || '';
+      preview = preview
+        .replace(/^#+\s+/gm, '') // Remove markdown headers
+        .replace(/\r?\n/g, ' ') // Replace newlines with spaces
+        .trim();
+      if (preview.length > 55) {
+        preview = preview.substring(0, 55) + '...';
+      }
+
+      item.innerHTML = `
+        <div class="templates-popup-item-name">${t.name}</div>
+        <div class="templates-popup-item-preview">${preview || 'Empty template'}</div>
+      `;
+      item.title = `Click to load template: ${t.name}`;
+      item.addEventListener('click', () => {
+        promptInput.value = t.content;
+        promptInput.focus();
+        autoGrowTextarea();
+        if (templatesPopup) templatesPopup.classList.add('hidden');
+      });
+      templatesPopupList.appendChild(item);
+    });
+  }
+
+  if (templatesSearchInput) {
+    templatesSearchInput.addEventListener('input', () => {
+      renderTemplatesList();
+    });
+    templatesSearchInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  // Bind Prompt Library Custom Popup
+  if (templatesMenuBtn && templatesPopup) {
+    templatesMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = templatesPopup.classList.contains('hidden');
+      templatesPopup.classList.toggle('hidden');
+      if (isHidden) {
+        if (templatesSearchInput) {
+          templatesSearchInput.value = '';
+          templatesSearchInput.focus();
+        }
+        renderTemplatesList();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!templatesMenuBtn.contains(e.target) && !templatesPopup.contains(e.target)) {
+        templatesPopup.classList.add('hidden');
+      }
+    });
+  }
+
+  if (popupCreateTemplateBtn) {
+    popupCreateTemplateBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'createPromptTemplate' });
+      if (templatesPopup) templatesPopup.classList.add('hidden');
+    });
+  }
+
+  // Bind settings create template button
+  const settingsCreateTemplateBtn = document.getElementById('settings-create-template-btn');
+  if (settingsCreateTemplateBtn) {
+    settingsCreateTemplateBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'createPromptTemplate' });
+    });
+  }
+
+  // Bind Active File Context Quick Actions
+  if (genTestsBtn) {
+    genTestsBtn.addEventListener('click', () => {
+      if (!activeFilePath) return;
+      linkedFiles.add(activeFilePath);
+      renderChips();
+      promptInput.value = `/test Write comprehensive unit tests for this file.`;
+      submitMessage();
+    });
+  }
+
+  if (genDocsBtn) {
+    genDocsBtn.addEventListener('click', () => {
+      if (!activeFilePath) return;
+      linkedFiles.add(activeFilePath);
+      renderChips();
+      promptInput.value = `Generate JSdoc/TSdoc/docstrings documentation for functions and classes in this file.`;
+      submitMessage();
+    });
+  }
+
+  // Bind Multi-Diff Global Actions
+  if (multiDiffAcceptAll) {
+    multiDiffAcceptAll.addEventListener('click', () => {
+      vscode.postMessage({ type: 'acceptAllReviews' });
+      if (multiDiffDrawer) multiDiffDrawer.classList.add('collapsed');
+    });
+  }
+  if (multiDiffRejectAll) {
+    multiDiffRejectAll.addEventListener('click', () => {
+      vscode.postMessage({ type: 'rejectAllReviews' });
+      if (multiDiffDrawer) multiDiffDrawer.classList.add('collapsed');
+    });
+  }
+
+  function renderCheckpoints(checkpoints) {
+    if (!checkpointsList) return;
+    checkpointsList.innerHTML = '';
+    
+    if (!checkpoints || checkpoints.length === 0) {
+      checkpointsList.innerHTML = `<div class="no-checkpoints" style="padding: 12px; font-size: 10.5px; color: var(--text-muted); text-align: center;">No checkpoints recorded yet.</div>`;
+      return;
+    }
+    
+    const sorted = [...checkpoints].reverse();
+    sorted.forEach((cp) => {
+      const item = document.createElement('div');
+      item.className = 'checkpoint-item';
+      
+      const header = document.createElement('div');
+      header.className = 'checkpoint-item-header';
+      
+      const typeBadge = document.createElement('span');
+      typeBadge.className = `checkpoint-type-badge ${cp.type || 'replace'}`;
+      typeBadge.textContent = cp.type || 'replace';
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'checkpoint-time';
+      timeSpan.textContent = formatRelativeTime(cp.timestamp);
+      
+      header.appendChild(typeBadge);
+      header.appendChild(timeSpan);
+      
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'checkpoint-file';
+      const fileBasename = cp.filePath.split(/[/\\]/).pop() || cp.filePath;
+      fileDiv.textContent = fileBasename;
+      fileDiv.title = cp.filePath;
+      
+      const revertBtn = document.createElement('button');
+      revertBtn.className = 'btn btn-secondary checkpoint-revert-action';
+      revertBtn.style.padding = '3px 8px';
+      revertBtn.style.fontSize = '9px';
+      revertBtn.style.height = '20px';
+      revertBtn.style.lineHeight = '1';
+      revertBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 3px;">
+          <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+          <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+        </svg> Revert
+      `;
+      
+      revertBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        revertBtn.disabled = true;
+        revertBtn.textContent = 'Reverting...';
+        vscode.postMessage({ type: 'revertCheckpoint', checkpointId: cp.id });
+      });
+      
+      item.appendChild(header);
+      item.appendChild(fileDiv);
+      item.appendChild(revertBtn);
+      
+      checkpointsList.appendChild(item);
+    });
+  }
+
+  function renderMultiDiffList(reviews) {
+    if (!multiDiffContainer) return;
+    multiDiffContainer.innerHTML = '';
+    
+    if (!reviews || reviews.length === 0) {
+      multiDiffContainer.innerHTML = `
+        <div class="no-changes" style="padding: 16px; font-size: 10.5px; color: var(--text-muted); text-align: center;">
+          No changes to review.
+        </div>
+      `;
+      return;
+    }
+    
+    reviews.forEach((review) => {
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'multi-diff-file';
+      
+      const header = document.createElement('div');
+      header.className = 'multi-diff-file-header';
+      
+      const filenameSpan = document.createElement('span');
+      filenameSpan.textContent = review.filePath;
+      filenameSpan.title = review.absolutePath;
+      
+      const actions = document.createElement('div');
+      actions.className = 'multi-diff-file-actions';
+      
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className = 'multi-diff-file-btn accept';
+      acceptBtn.textContent = 'Accept';
+      acceptBtn.addEventListener('click', () => {
+        acceptBtn.disabled = true;
+        acceptBtn.textContent = '⏳';
+        vscode.postMessage({ type: 'acceptReview', filePath: review.absolutePath });
+      });
+      
+      const rejectBtn = document.createElement('button');
+      rejectBtn.className = 'multi-diff-file-btn reject';
+      rejectBtn.textContent = 'Reject';
+      rejectBtn.addEventListener('click', () => {
+        rejectBtn.disabled = true;
+        rejectBtn.textContent = '⏳';
+        vscode.postMessage({ type: 'rejectReview', filePath: review.absolutePath });
+      });
+      
+      actions.appendChild(acceptBtn);
+      actions.appendChild(rejectBtn);
+      
+      header.appendChild(filenameSpan);
+      header.appendChild(actions);
+      fileDiv.appendChild(header);
+      
+      const hunksContainer = document.createElement('div');
+      hunksContainer.className = 'inline-diff-hunks';
+      hunksContainer.style.borderTop = '1px solid var(--border-glass)';
+      
+      if (!review.hunks || review.hunks.length === 0) {
+        hunksContainer.innerHTML = `
+          <div style="padding: 8px; font-size: 10px; color: var(--text-muted); text-align: center;">
+            No hunks available (file might be empty)
+          </div>
+        `;
+      } else {
+        review.hunks.forEach((hunk) => {
+          const hunkDiv = document.createElement('div');
+          hunkDiv.className = 'diff-hunk';
+          hunkDiv.style.borderBottom = '1px solid var(--border-glass)';
+          
+          const hunkHeader = document.createElement('div');
+          hunkHeader.className = 'diff-hunk-header';
+          hunkHeader.style.padding = '3px 8px';
+          hunkHeader.style.fontSize = '9px';
+          hunkHeader.style.fontFamily = 'var(--font-mono)';
+          hunkHeader.style.background = 'rgba(255,255,255,0.02)';
+          hunkHeader.style.color = 'var(--text-muted)';
+          hunkHeader.textContent = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`;
+          hunkDiv.appendChild(hunkHeader);
+          
+          hunk.lines.forEach((line) => {
+            let prefix = ' ';
+            let bgColor = 'transparent';
+            let textColor = 'var(--text-secondary)';
+            
+            if (line.type === 'add') {
+              prefix = '+';
+              bgColor = 'rgba(52, 211, 153, 0.06)';
+              textColor = '#34d399';
+            } else if (line.type === 'del') {
+              prefix = '-';
+              bgColor = 'rgba(248, 113, 113, 0.06)';
+              textColor = '#f87171';
+            }
+            
+            const lineDiv = document.createElement('div');
+            lineDiv.style.padding = '1px 8px';
+            lineDiv.style.fontSize = '10px';
+            lineDiv.style.fontFamily = 'var(--font-mono)';
+            lineDiv.style.background = bgColor;
+            lineDiv.style.color = textColor;
+            lineDiv.style.whiteSpace = 'pre-wrap';
+            lineDiv.style.wordBreak = 'break-all';
+            lineDiv.style.lineHeight = '1.5';
+            lineDiv.style.borderBottom = '1px solid rgba(255,255,255,0.02)';
+            
+            const prefixSpan = document.createElement('span');
+            prefixSpan.style.opacity = '0.3';
+            prefixSpan.style.marginRight = '8px';
+            prefixSpan.style.userSelect = 'none';
+            prefixSpan.textContent = prefix;
+            
+            const contentSpan = document.createElement('span');
+            contentSpan.textContent = line.content || ' ';
+            
+            lineDiv.appendChild(prefixSpan);
+            lineDiv.appendChild(contentSpan);
+            hunkDiv.appendChild(lineDiv);
+          });
+          
+          hunksContainer.appendChild(hunkDiv);
+        });
+      }
+      
+      fileDiv.appendChild(hunksContainer);
+      multiDiffContainer.appendChild(fileDiv);
+    });
+  }
 
 })();
 

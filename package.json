@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -198,12 +198,13 @@
         },
         "mirror-vs.defaultProvider": {
           "type": "string",
-          "enum": [
-            "ollama",
-            "deepseek"
-          ],
           "default": "ollama",
           "description": "The default active LLM provider when launching the assistant."
+        },
+        "mirror-vs.contextBudgetPercent": {
+          "type": "integer",
+          "default": 75,
+          "description": "Context window budget utilization percentage."
         },
         "mirror-vs.maxTurnsBeforeSummarize": {
           "type": "integer",
@@ -230,6 +231,50 @@
           "enum": ["high", "max"],
           "default": "high",
           "description": "DeepSeek V4 Thinking Effort Level."
+        },
+        "mirror-vs.customSystemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "A custom instructions prefix prepended to the agent's system prompt (e.g. 'Prefer functional components')."
+        },
+        "mirror-vs.agentMode": {
+          "type": "string",
+          "enum": ["normal", "refactor", "debug"],
+          "default": "normal",
+          "description": "Select the active agent mode. Normal is for general tasks, Refactor focuses on restructuring, Debug attaches to debugger."
+        },
+        "mirror-vs.customEndpointEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable custom OpenAI-compatible API endpoint provider."
+        },
+        "mirror-vs.customEndpointUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Base URL of the OpenAI-compatible endpoint (e.g. Together, Groq, vLLM, Azure)."
+        },
+        "mirror-vs.customEndpointModel": {
+          "type": "string",
+          "default": "gpt-4o",
+          "description": "Default model name for the custom endpoint."
+        },
+        "mirror-vs.customApis": {
+          "type": "array",
+          "default": [],
+          "description": "List of configured custom OpenAI-compatible API providers.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "models": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["id", "name", "url", "models"]
+          }
         }
       }
     }

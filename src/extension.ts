@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { MirrorVsSidebarProvider } from './providers/sidebar-provider';
 import { ReviewManager } from './services/review-manager';
+import { TelemetryService } from './services/telemetry-service';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Mirror VS Extension is now active!');
@@ -15,6 +16,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register ReviewManager service
   ReviewManager.getInstance().register(context);
+
+  // Initialize TelemetryService
+  TelemetryService.getInstance().initialize(context);
 
   const provider = new MirrorVsSidebarProvider(context);
 

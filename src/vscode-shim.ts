@@ -8,11 +8,12 @@ export const workspace = {
     get: <T>(_key: string, defaultValue?: T) => defaultValue as T,
     update: () => Promise.resolve(),
   }),
-  openTextDocument: () => Promise.resolve({
-    uri: { fsPath: '/mock/workspace/file.ts' },
-    lineCount: 0,
-    lineAt: () => ({ range: {} }),
-  }),
+  openTextDocument: () =>
+    Promise.resolve({
+      uri: { fsPath: '/mock/workspace/file.ts' },
+      lineCount: 0,
+      lineAt: () => ({ range: {} }),
+    }),
 };
 
 const mockTextEditor = {

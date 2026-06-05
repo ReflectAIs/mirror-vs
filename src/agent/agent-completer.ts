@@ -1,5 +1,5 @@
 import { LLMProvider, ChatMessage } from '../types';
-import { streamOllamaChat, streamDeepSeekChat } from '../services/api-service';
+import { streamOllamaChat, streamDeepSeekChat, streamCustomOpenAIChat } from '../services/api-service';
 import { TelemetryService } from '../services/telemetry-service';
 
 /** Handles LLM streaming completion calls and context summarization */
@@ -7,9 +7,7 @@ export class AgentCompleter {
   private readonly _telemetry = TelemetryService.getInstance();
   private _lastLatencyMeasurement = 0;
 
-  constructor(
-    private readonly _postMessage: (msg: Record<string, unknown>) => void,
-  ) {}
+  constructor(private readonly _postMessage: (msg: Record<string, unknown>) => void) {}
 
   public get lastLatency(): number {
     return this._lastLatencyMeasurement;
@@ -54,21 +52,45 @@ export class AgentCompleter {
       };
 
       const onReasoningChunk = (reasoningChunk: string) => {
-        this._postMessage({ type: 'chatResponseChunk', text: '', reasoningText: reasoningChunk, sessionId: _sessionId });
+        this._postMessage({
+          type: 'chatResponseChunk',
+          text: '',
+          reasoningText: reasoningChunk,
+          sessionId: _sessionId,
+        });
       };
 
       const onComplete = (fullText: string, _usage?: { promptTokens: number; completionTokens: number }) => {
         this._lastLatencyMeasurement = performance.now() - startTime;
+        const inputTokens = _usage?.promptTokens ?? 0;
+        const outputTokens = _usage?.completionTokens ?? 0;
+        const totalTokens = inputTokens + outputTokens;
+
+        const rateInput = provider === 'deepseek' ? 0.00014 / 1000 : 0.0;
+        const rateOutput = provider === 'deepseek' ? 0.00028 / 1000 : 0.0;
+        const cost = inputTokens * rateInput + outputTokens * rateOutput;
+
         this._telemetry.recordCall({
           sessionId: _sessionId,
           sessionTitle: '',
-          tokensInput: _usage?.promptTokens ?? 0,
-          tokensOutput: _usage?.completionTokens ?? 0,
-          cost: 0,
+          tokensInput: inputTokens,
+          tokensOutput: outputTokens,
+          cost: cost,
           latency: this._lastLatencyMeasurement,
           provider: provider,
           model: model,
         });
+
+        this._postMessage({
+          type: 'tokenUsage',
+          usage: {
+            input: inputTokens,
+            output: outputTokens,
+            total: totalTokens,
+            cost: cost,
+          },
+        });
+
         safeResolve(fullText);
       };
 
@@ -92,16 +114,10 @@ export class AgentCompleter {
           onError,
           onReasoningChunk,
         );
+      } else if (provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_'))) {
+        streamCustomOpenAIChat(host, apiKey, model, messages, abortController.signal, onChunk, onComplete, onError);
       } else {
-        streamOllamaChat(
-          host,
-          model,
-          messages,
-          abortController.signal,
-          onChunk,
-          onComplete,
-          onError,
-        );
+        streamOllamaChat(host, model, messages, abortController.signal, onChunk, onComplete, onError);
       }
     });
   }
@@ -163,7 +179,10 @@ Rules:
       };
 
       if (provider === 'deepseek') {
-        streamDeepSeekChat(
+        streamDeepSeekChat(apiKey, model, summaryPrompt, new AbortController().signal, onChunk, onComplete, onError);
+      } else if (provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_'))) {
+        streamCustomOpenAIChat(
+          host,
           apiKey,
           model,
           summaryPrompt,
@@ -173,15 +192,7 @@ Rules:
           onError,
         );
       } else {
-        streamOllamaChat(
-          host,
-          model,
-          summaryPrompt,
-          new AbortController().signal,
-          onChunk,
-          onComplete,
-          onError,
-        );
+        streamOllamaChat(host, model, summaryPrompt, new AbortController().signal, onChunk, onComplete, onError);
       }
     });
   }

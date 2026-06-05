@@ -42,7 +42,10 @@ describe('Code Analysis Tools', () => {
 
   it('should analyze project overview', async () => {
     createFile('src/index.ts', 'export const greet = (name: string) => `Hello ${name}`;');
-    createFile('src/utils.ts', 'export const add = (a: number, b: number) => a + b;\nexport const sub = (a: number, b: number) => a - b;');
+    createFile(
+      'src/utils.ts',
+      'export const add = (a: number, b: number) => a + b;\nexport const sub = (a: number, b: number) => a - b;',
+    );
     createFile('package.json', JSON.stringify({ dependencies: { react: '^18.0.0' } }));
 
     const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');
@@ -69,7 +72,9 @@ describe('Code Analysis Tools', () => {
   });
 
   it('should analyze complexity', async () => {
-    createFile('src/complex.ts', `
+    createFile(
+      'src/complex.ts',
+      `
       export function simple() { return 1; }
       export function complex(x: number) {
         if (x > 0) {
@@ -95,7 +100,8 @@ describe('Code Analysis Tools', () => {
         }
         return x;
       }
-    `);
+    `,
+    );
     createFile('package.json', '{}');
 
     const { executeCodeAnalysisTool } = await import('../code-analysis-tools.js');

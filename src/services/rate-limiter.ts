@@ -1,4 +1,3 @@
-
 /**
  * Rate limiter and token budget enforcement for Mirror VS.
  * Prevents runaway API costs by limiting tokens per session and per turn.

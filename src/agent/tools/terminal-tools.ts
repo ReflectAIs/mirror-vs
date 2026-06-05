@@ -11,14 +11,18 @@ function isSensitiveCommand(command: string): boolean {
   const cmdLower = command.toLowerCase();
   let cmdTrimmed = cmdLower.trim();
   // Strip leading and trailing quotes (single/double) if they wrap the entire command
-  if ((cmdTrimmed.startsWith('"') && cmdTrimmed.endsWith('"')) || (cmdTrimmed.startsWith("'") && cmdTrimmed.endsWith("'"))) {
+  if (
+    (cmdTrimmed.startsWith('"') && cmdTrimmed.endsWith('"')) ||
+    (cmdTrimmed.startsWith("'") && cmdTrimmed.endsWith("'"))
+  ) {
     cmdTrimmed = cmdTrimmed.slice(1, -1).trim();
   }
 
   // Exempt safe grep, sed, and read-only file viewer commands (get-content, gc, cat, type) from sensitive checks
   const isSafeGrep = /^\s*grep\b/i.test(cmdTrimmed);
   const isSafeSed = /^\s*sed\b/i.test(cmdTrimmed) && !/\b-i\b/i.test(cmdTrimmed) && !/--in-place/i.test(cmdTrimmed);
-  const hasWriteRedirect = /[>|]\s*(out-file|set-content|sc|tee|add-content|ac)\b/i.test(cmdTrimmed) || />/g.test(cmdTrimmed);
+  const hasWriteRedirect =
+    /[>|]\s*(out-file|set-content|sc|tee|add-content|ac)\b/i.test(cmdTrimmed) || />/g.test(cmdTrimmed);
   const isSafeRead = /^\s*(get-content|gc|cat|type)\b/i.test(cmdTrimmed) && !hasWriteRedirect;
 
   if (isSafeGrep || isSafeSed || isSafeRead) {
@@ -42,13 +46,13 @@ function isSensitiveCommand(command: string): boolean {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (workspaceFolders && workspaceFolders.length > 0) {
     // Collect all allowed path prefixes (lowercase)
-    const allowedPrefixes = workspaceFolders.map(wf => wf.uri.fsPath.toLowerCase());
+    const allowedPrefixes = workspaceFolders.map((wf) => wf.uri.fsPath.toLowerCase());
 
     // Match Windows drive-letter paths (e.g. C:\path or D:/path)
     const winAbsMatch = command.match(/\b([a-zA-Z]:[\\/][^"'\s]*)/);
     if (winAbsMatch) {
       const absPath = winAbsMatch[1].toLowerCase();
-      const isAllowed = allowedPrefixes.some(prefix => absPath.startsWith(prefix));
+      const isAllowed = allowedPrefixes.some((prefix) => absPath.startsWith(prefix));
       if (!isAllowed) {
         return true;
       }
@@ -59,7 +63,7 @@ function isSensitiveCommand(command: string): boolean {
     if (unixAbsMatch) {
       const absPath = unixAbsMatch[1].toLowerCase();
       const absUnix = absPath.replace(/\\/g, '/');
-      const isAllowed = allowedPrefixes.some(prefix => {
+      const isAllowed = allowedPrefixes.some((prefix) => {
         const prefixUnix = prefix.replace(/\\/g, '/');
         return absUnix.startsWith(prefixUnix);
       });

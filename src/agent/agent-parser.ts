@@ -46,7 +46,13 @@ export class AgentParser {
       if (char === '"' && !inSq) {
         if (inDq) {
           const remaining = text.substring(i + 1).trim();
-          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9-]+\s*=/.test(remaining)) {
+          if (
+            remaining === '' ||
+            remaining.startsWith('/>') ||
+            remaining.startsWith('>') ||
+            remaining.startsWith('\u003E') ||
+            /^[a-zA-Z_0-9-]+\s*=/.test(remaining)
+          ) {
             inDq = false;
           }
         } else {
@@ -57,7 +63,13 @@ export class AgentParser {
       if (char === "'" && !inDq) {
         if (inSq) {
           const remaining = text.substring(i + 1).trim();
-          if (remaining === '' || remaining.startsWith('/>') || remaining.startsWith('>') || remaining.startsWith('\u003E') || /^[a-zA-Z_0-9-]+\s*=/.test(remaining)) {
+          if (
+            remaining === '' ||
+            remaining.startsWith('/>') ||
+            remaining.startsWith('>') ||
+            remaining.startsWith('\u003E') ||
+            /^[a-zA-Z_0-9-]+\s*=/.test(remaining)
+          ) {
             inSq = false;
           }
         } else {
@@ -107,14 +119,34 @@ export class AgentParser {
 
   public hasCompleteToolCall(text: string): boolean {
     const selfClosingTools = [
-      'read_file', 'list_dir', 'grep_search', 'web_search',
-      'browser_navigate', 'browser_click', 'browser_type',
-      'browser_evaluate_script', 'browser_screenshot',
-      'figma_inspect', 'run_command', 'close_terminal',
-      'read_terminal', 'list_terminals',
-      'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
+      'read_file',
+      'list_dir',
+      'grep_search',
+      'web_search',
+      'browser_navigate',
+      'browser_click',
+      'browser_type',
+      'browser_evaluate_script',
+      'browser_screenshot',
+      'figma_inspect',
+      'run_command',
+      'close_terminal',
+      'read_terminal',
+      'list_terminals',
+      'delete_file',
+      'git_status',
+      'git_diff',
+      'git_add',
+      'symbol_search',
+      'rename_symbol',
       'wait',
-      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify',
+      'analyze_project',
+      'analyze_dependencies',
+      'analyze_complexity',
+      'analyze_coverage',
+      'analyze_dead_code',
+      'analyze_impact',
+      'graphify',
       'get_diagnostics',
     ];
     for (const tool of selfClosingTools) {
@@ -162,14 +194,34 @@ export class AgentParser {
   public getCleanedToolResponse(text: string): string {
     const closedText = this.autoCloseToolTags(text);
     const selfClosingTools = [
-      'read_file', 'list_dir', 'grep_search', 'web_search',
-      'browser_navigate', 'browser_click', 'browser_type',
-      'browser_evaluate_script', 'browser_screenshot',
-      'figma_inspect', 'run_command', 'close_terminal',
-      'read_terminal', 'list_terminals',
-      'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
+      'read_file',
+      'list_dir',
+      'grep_search',
+      'web_search',
+      'browser_navigate',
+      'browser_click',
+      'browser_type',
+      'browser_evaluate_script',
+      'browser_screenshot',
+      'figma_inspect',
+      'run_command',
+      'close_terminal',
+      'read_terminal',
+      'list_terminals',
+      'delete_file',
+      'git_status',
+      'git_diff',
+      'git_add',
+      'symbol_search',
+      'rename_symbol',
       'wait',
-      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify',
+      'analyze_project',
+      'analyze_dependencies',
+      'analyze_complexity',
+      'analyze_coverage',
+      'analyze_dead_code',
+      'analyze_impact',
+      'graphify',
       'get_diagnostics',
     ];
     let earliestEnd = -1;
@@ -177,7 +229,10 @@ export class AgentParser {
       let startFrom = 0;
       let tagInfo;
       while ((tagInfo = this.findUnquotedTagEndEx(closedText, tool, startFrom)) !== null) {
-        if (!this.isInsideFencedCodeBlock(closedText, tagInfo.start) && !this.isInsideInlineCodeBlock(closedText, tagInfo.start)) {
+        if (
+          !this.isInsideFencedCodeBlock(closedText, tagInfo.start) &&
+          !this.isInsideInlineCodeBlock(closedText, tagInfo.start)
+        ) {
           if (earliestEnd === -1 || tagInfo.end < earliestEnd) {
             earliestEnd = tagInfo.end;
           }
@@ -190,7 +245,10 @@ export class AgentParser {
       let startFrom = 0;
       let tagInfo;
       while ((tagInfo = this.findUnquotedTagEndEx(closedText, tool, startFrom)) !== null) {
-        if (!this.isInsideFencedCodeBlock(closedText, tagInfo.start) && !this.isInsideInlineCodeBlock(closedText, tagInfo.start)) {
+        if (
+          !this.isInsideFencedCodeBlock(closedText, tagInfo.start) &&
+          !this.isInsideInlineCodeBlock(closedText, tagInfo.start)
+        ) {
           const closeTag = '\u003C\u002F' + tool + '\\s*\u003E';
           const regex = new RegExp(closeTag, 'i');
           const m = regex.exec(closedText.substring(tagInfo.end));
@@ -226,7 +284,10 @@ export class AgentParser {
     // read_file
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'read_file', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -245,7 +306,10 @@ export class AgentParser {
     // figma_inspect
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'figma_inspect', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -257,46 +321,70 @@ export class AgentParser {
     // list_dir
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'list_dir', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
       const p = this.attr(tagInfo.attrs, 'path');
       const d = this.attr(tagInfo.attrs, 'depth');
-      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim(), depth: d ? parseInt(d, 10) : undefined } });
+      if (p)
+        candidates.push({
+          index: tagInfo.start,
+          tool: { name: 'list_dir', path: p.trim(), depth: d ? parseInt(d, 10) : undefined },
+        });
       startFrom = tagInfo.end;
     }
 
     // ls_dir alias (models sometimes hallucinate this instead of list_dir)
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'ls_dir', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
       const p = this.attr(tagInfo.attrs, 'path');
       const d = this.attr(tagInfo.attrs, 'depth');
-      if (p) candidates.push({ index: tagInfo.start, tool: { name: 'list_dir', path: p.trim(), depth: d ? parseInt(d, 10) : undefined } });
+      if (p)
+        candidates.push({
+          index: tagInfo.start,
+          tool: { name: 'list_dir', path: p.trim(), depth: d ? parseInt(d, 10) : undefined },
+        });
       startFrom = tagInfo.end;
     }
 
     // grep_search
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'grep_search', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
       const q = this.attr(tagInfo.attrs, 'query');
       const p = this.attr(tagInfo.attrs, 'path');
-      if (q) candidates.push({ index: tagInfo.start, tool: { name: 'grep_search', query: q, path: p ? p.trim() : undefined } });
+      if (q)
+        candidates.push({
+          index: tagInfo.start,
+          tool: { name: 'grep_search', query: q, path: p ? p.trim() : undefined },
+        });
       startFrom = tagInfo.end;
     }
 
     // web_search
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'web_search', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -310,7 +398,10 @@ export class AgentParser {
     for (const toolName of blockTools) {
       startFrom = 0;
       while ((tagInfo = this.findUnquotedTagEndEx(rawText, toolName, startFrom)) !== null) {
-        if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        if (
+          this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+          this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+        ) {
           startFrom = tagInfo.end;
           continue;
         }
@@ -343,7 +434,10 @@ export class AgentParser {
     // delete_file
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'delete_file', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -355,7 +449,10 @@ export class AgentParser {
     // git_status
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'git_status', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -366,7 +463,10 @@ export class AgentParser {
     // git_diff
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'git_diff', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -378,7 +478,10 @@ export class AgentParser {
     // git_add
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'git_add', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -390,7 +493,10 @@ export class AgentParser {
     // symbol_search
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'symbol_search', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -402,7 +508,10 @@ export class AgentParser {
     // rename_symbol
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'rename_symbol', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -415,7 +524,10 @@ export class AgentParser {
     // browser_navigate
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_navigate', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -427,7 +539,10 @@ export class AgentParser {
     // browser_click
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_click', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -439,7 +554,10 @@ export class AgentParser {
     // browser_type
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_type', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -452,19 +570,26 @@ export class AgentParser {
     // browser_evaluate_script
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_evaluate_script', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
       const scriptAttr = this.attr(tagInfo.attrs, 'script');
-      if (scriptAttr) candidates.push({ index: tagInfo.start, tool: { name: 'browser_evaluate_script', script: scriptAttr } });
+      if (scriptAttr)
+        candidates.push({ index: tagInfo.start, tool: { name: 'browser_evaluate_script', script: scriptAttr } });
       startFrom = tagInfo.end;
     }
 
     // browser_screenshot
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'browser_screenshot', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -475,7 +600,10 @@ export class AgentParser {
     // run_command
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'run_command', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -487,7 +615,10 @@ export class AgentParser {
     // send_terminal_input (both block and self-closing styles)
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'send_terminal_input', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -518,7 +649,10 @@ export class AgentParser {
     // wait
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'wait', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -536,7 +670,10 @@ export class AgentParser {
     // close_terminal
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'close_terminal', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -551,7 +688,10 @@ export class AgentParser {
     // read_terminal
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'read_terminal', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -568,7 +708,10 @@ export class AgentParser {
     // list_terminals
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'list_terminals', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -588,7 +731,10 @@ export class AgentParser {
     for (const toolName of codeAnalysisTools) {
       startFrom = 0;
       while ((tagInfo = this.findUnquotedTagEndEx(rawText, toolName, startFrom)) !== null) {
-        if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+        if (
+          this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+          this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+        ) {
           startFrom = tagInfo.end;
           continue;
         }
@@ -600,7 +746,10 @@ export class AgentParser {
     // analyze_impact
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'analyze_impact', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -612,7 +761,10 @@ export class AgentParser {
     // get_diagnostics
     startFrom = 0;
     while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'get_diagnostics', startFrom)) !== null) {
-      if (this.isInsideFencedCodeBlock(rawText, tagInfo.start) || this.isInsideInlineCodeBlock(rawText, tagInfo.start)) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
         startFrom = tagInfo.end;
         continue;
       }
@@ -625,16 +777,20 @@ export class AgentParser {
     candidates.sort((a, b) => a.index - b.index);
 
     const readOnlyTools = [
-      'read_file', 'list_dir', 'grep_search', 'symbol_search',
-      'web_search', 'get_diagnostics', 'git_status', 'git_diff'
+      'read_file',
+      'list_dir',
+      'grep_search',
+      'symbol_search',
+      'web_search',
+      'get_diagnostics',
+      'git_status',
+      'git_diff',
     ];
     const firstTool = candidates[0].tool;
 
     if (allowParallelReadOnly && readOnlyTools.includes(firstTool.name)) {
-      const batch = candidates
-        .filter(c => readOnlyTools.includes(c.tool.name))
-        .map(c => c.tool);
-      
+      const batch = candidates.filter((c) => readOnlyTools.includes(c.tool.name)).map((c) => c.tool);
+
       // Deduplicate identical tool calls
       const seen = new Set<string>();
       const uniqueBatch: ToolCall[] = [];

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { ToolCall } from '../types';
 import { createCheckpoint } from '../../utils/editor-utils';
 import { ReviewManager } from '../../services/review-manager';
@@ -64,12 +65,7 @@ async function confirmChangesWithDiff(
   const checkpointId = await createCheckpoint(originalPath, checkpointAction);
 
   // Start the non-blocking background review, passing checkpoint ID
-  ReviewManager.getInstance().startReview(
-    originalPath,
-    originalContent,
-    proposedContent,
-    checkpointId || undefined,
-  );
+  ReviewManager.getInstance().startReview(originalPath, originalContent, proposedContent, checkpointId || undefined);
 
   return { accepted: true, checkpointId };
 }
@@ -143,28 +139,31 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
 
             for (const e of entries) {
               // Ignore standard skip items to keep output clean and fast
-              if (['node_modules', 'dist', 'out', '.git', '.mirror-vs', 'build', '.next', '.vscode'].includes(e)) continue;
+              if (['node_modules', 'dist', 'out', '.git', '.mirror-vs', 'build', '.next', '.vscode'].includes(e))
+                continue;
               const fp = path.join(dir, e);
               try {
                 const s = fs.statSync(fp);
                 if (s.isDirectory()) dirs.push(e);
                 else if (s.isFile()) files.push(e);
-              } catch { /* skip */ }
+              } catch {
+                /* skip */
+              }
             }
 
             dirs.sort();
             files.sort();
 
             const allItems = [
-              ...dirs.map(d => ({ name: d, isDir: true })),
-              ...files.map(f => ({ name: f, isDir: false }))
+              ...dirs.map((d) => ({ name: d, isDir: true })),
+              ...files.map((f) => ({ name: f, isDir: false })),
             ];
 
             for (let i = 0; i < allItems.length; i++) {
               const item = allItems[i];
               const isLast = i === allItems.length - 1;
-              const marker = isLast ? "└── " : "├── ";
-              const childPrefix = prefix + (isLast ? "    " : "│   ");
+              const marker = isLast ? '└── ' : '├── ';
+              const childPrefix = prefix + (isLast ? '    ' : '│   ');
 
               if (item.isDir) {
                 lines.push(`${prefix}${marker}${item.name}/`);
@@ -173,11 +172,13 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
                 lines.push(`${prefix}${marker}${item.name}`);
               }
             }
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
           return lines;
         };
 
-        const treeLines = buildLocalTree(safePath, 1, "");
+        const treeLines = buildLocalTree(safePath, 1, '');
         return treeLines.join('\n') || '[Directory is empty]';
       }
     }
@@ -220,7 +221,8 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
 
     case 'rename_file': {
       if (!tool.path) throw new Error('Missing "path" attribute for rename_file. Use path for source.');
-      if (!tool.content) throw new Error('Missing "content" attribute for rename_file. Use content for destination path.');
+      if (!tool.content)
+        throw new Error('Missing "content" attribute for rename_file. Use content for destination path.');
       const safePath = getSafePath(tool.path);
       const destPath = getSafePath(tool.content.trim());
       if (!fs.existsSync(safePath)) {
@@ -312,6 +314,51 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       return `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;
     }
 
+    case 'update_agent_memory': {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceFolder) {
+        return 'Error: No workspace folder open. Agent memory cannot be updated.';
+      }
+      const key = tool.key || tool.query || '';
+      const value = tool.value || tool.path || tool.content || '';
+      if (!key || !value) {
+        return 'Error: Missing "key" or "value" parameters for update_agent_memory. Usage: <update_agent_memory key="preferences" value="use functional components" />';
+      }
+
+      const memoryDir = path.join(workspaceFolder, '.mirror-vs');
+      if (!fs.existsSync(memoryDir)) {
+        fs.mkdirSync(memoryDir, { recursive: true });
+      }
+
+      const memoryPath = path.join(memoryDir, 'memory.json');
+      let memory: Record<string, any> = {};
+
+      try {
+        if (fs.existsSync(memoryPath)) {
+          memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      if (!memory[key]) {
+        memory[key] = [];
+      }
+
+      if (Array.isArray(memory[key])) {
+        if (!memory[key].includes(value)) {
+          memory[key].push(value);
+        }
+      } else if (typeof memory[key] === 'object') {
+        memory[key][`item_${Date.now()}`] = value;
+      } else {
+        memory[key] = value;
+      }
+
+      fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2), 'utf8');
+      return `✅ Successfully updated agent memory for key "${key}" with: "${value}"`;
+    }
+
     default:
       throw new Error(`Invalid file tool: ${tool.name}`);
   }
@@ -319,7 +366,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
 
 function parsePatchBlocks(content: string): { search: string; replace: string }[] {
   const blocks: { search: string; replace: string }[] = [];
-  
+
   // 1. Try standard conflict style first
   const gitRegex = /<<<<<<< SEARCH[\r\n]+([\s\S]*?)[\r\n]+=======[\r\n]+([\s\S]*?)[\r\n]+>>>>>>> REPLACE/gi;
   let match;
@@ -328,7 +375,7 @@ function parsePatchBlocks(content: string): { search: string; replace: string }[
     const replace = match[2].replace(/\r\n/g, '\n');
     blocks.push({ search, replace });
   }
-  
+
   if (blocks.length > 0) {
     return blocks;
   }
@@ -336,7 +383,7 @@ function parsePatchBlocks(content: string): { search: string; replace: string }[
   // 2. Fallback to flexible sequential label parser (handles "SEARCH:" / "REPLACE:" etc.)
   const normalized = content.replace(/\r\n/g, '\n');
   const parts = normalized.split(/SEARCH:?/i);
-  
+
   for (let i = 1; i < parts.length; i++) {
     const part = parts[i];
     const replaceIndex = part.search(/REPLACE:?/i);
@@ -344,7 +391,7 @@ function parsePatchBlocks(content: string): { search: string; replace: string }[
       let search = part.substring(0, replaceIndex);
       // Clean leading/trailing spaces and newlines
       search = search.replace(/^\n/, '').replace(/\n$/, '').trim();
-      
+
       let replace = part.substring(replaceIndex);
       // Strip the REPLACE: marker
       const markerMatch = replace.match(/REPLACE:?/i);
@@ -354,12 +401,12 @@ function parsePatchBlocks(content: string): { search: string; replace: string }[
       // Strip any trailing git conflict replacement markers if present
       replace = replace.replace(/>>>>>>>\s*REPLACE/i, '');
       replace = replace.replace(/^\n/, '').replace(/\n$/, '').trim();
-      
+
       if (search !== undefined && replace !== undefined) {
         blocks.push({ search, replace });
       }
     }
   }
-  
+
   return blocks;
 }

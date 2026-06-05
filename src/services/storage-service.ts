@@ -1,4 +1,3 @@
-
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -94,88 +93,98 @@ export class StorageService {
    * Call once on extension activation if the old key exists.
    */
   async migrateFromLegacyIfNeeded(): Promise<void> {
-    const legacy = this._workspaceState.get<ChatSession[]>('mirror-vs.chatSessions') || [];
-    const legacyPerSession = this._workspaceState.get<ChatMessage[]>('mirror-vs.chatHistory') || [];
-    const activeId = this._workspaceState.get<string>('mirror-vs.activeSessionId');
+    try {
+      const legacy = this._workspaceState.get<ChatSession[]>('mirror-vs.chatSessions');
+      const legacyPerSession = this._workspaceState.get<ChatMessage[]>('mirror-vs.chatHistory');
+      const activeId = this._workspaceState.get<string>('mirror-vs.activeSessionId');
 
-    if (legacy && legacy.length > 0) {
-      console.log('[StorageService] Migrating legacy chatSessions to per-session keys...');
+      if (Array.isArray(legacy) && legacy.length > 0) {
+        console.log('[StorageService] Migrating legacy chatSessions to per-session keys...');
 
-      const allMessages: Record<string, ChatMessage[]> = {};
+        const allMessages: Record<string, ChatMessage[]> = {};
 
-      for (const session of legacy) {
-        // Strip images from all messages to avoid bloating workspaceState with base64
-        const cleaned = session.messages.map((msg) => ({
+        for (const session of legacy) {
+          if (!session || !session.id) continue;
+          // Strip images from all messages to avoid bloating workspaceState with base64
+          const cleaned = Array.isArray(session.messages)
+            ? session.messages.map((msg) => ({
+                ...msg,
+                images: msg.images ? msg.images.slice(0, 0) : undefined,
+              }))
+            : [];
+          await this._workspaceState.update(`mirror-vs.messages.${session.id}`, cleaned);
+          allMessages[session.id] = cleaned;
+        }
+
+        // Save light metadata (no messages)
+        const metaOnly = legacy.map((s) => ({
+          id: s.id,
+          title: s.title || 'Chat Session',
+          timestamp: s.timestamp || Date.now(),
+          messageCount: s.messages ? s.messages.length : 0,
+          messages: [] as ChatMessage[],
+        }));
+        await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
+
+        // Write file backup with all migrated data
+        this._writeFileBackup({ sessions: metaOnly, messages: allMessages });
+
+        // Clear legacy key
+        await this._workspaceState.update('mirror-vs.chatSessions', undefined);
+        console.log('[StorageService] Migration complete.');
+      } else if (Array.isArray(legacyPerSession) && legacyPerSession.length > 0 && activeId) {
+        // Migration from single per-workspace chatHistory key to per-session
+        console.log('[StorageService] Migrating legacy chatHistory to per-session key...');
+        const cleaned = legacyPerSession.map((msg) => ({
           ...msg,
           images: msg.images ? msg.images.slice(0, 0) : undefined,
         }));
-        await this._workspaceState.update(`mirror-vs.messages.${session.id}`, cleaned);
-        allMessages[session.id] = cleaned;
-      }
+        await this._workspaceState.update(`mirror-vs.messages.${activeId}`, cleaned);
 
-      // Save light metadata (no messages)
-      const metaOnly = legacy.map((s) => ({
-        id: s.id,
-        title: s.title,
-        timestamp: s.timestamp,
-        messageCount: s.messages ? s.messages.length : 0,
-        messages: [] as ChatMessage[],
-      }));
-      await this._workspaceState.update('mirror-vs.sessions.meta', metaOnly);
-
-      // Write file backup with all migrated data
-      this._writeFileBackup({ sessions: metaOnly, messages: allMessages });
-
-      // Clear legacy key
-      await this._workspaceState.update('mirror-vs.chatSessions', undefined);
-      console.log('[StorageService] Migration complete.');
-    } else if (legacyPerSession && legacyPerSession.length > 0 && activeId) {
-      // Migration from single per-workspace chatHistory key to per-session
-      console.log('[StorageService] Migrating legacy chatHistory to per-session key...');
-      const cleaned = legacyPerSession.map((msg) => ({
-        ...msg,
-        images: msg.images ? msg.images.slice(0, 0) : undefined,
-      }));
-      await this._workspaceState.update(`mirror-vs.messages.${activeId}`, cleaned);
-
-      // Create lightweight metadata for this migrated active session
-      const sessions = this.getSessions();
-      if (!sessions.find((s) => s.id === activeId)) {
-        const firstUser = legacyPerSession.find((m) => m.role === 'user');
-        let title = 'Chat Session';
-        if (firstUser) {
-          let text = firstUser.content.trim();
-          const contextIndex = text.indexOf('\n\n[Active File Context:');
-          if (contextIndex !== -1) {
-            text = text.substring(0, contextIndex).trim();
+        // Create lightweight metadata for this migrated active session
+        const sessions = this.getSessions();
+        if (!sessions.find((s) => s.id === activeId)) {
+          const firstUser = legacyPerSession.find((m) => m.role === 'user');
+          let title = 'Chat Session';
+          if (firstUser) {
+            let text = firstUser.content.trim();
+            const contextIndex = text.indexOf('\n\n[Active File Context:');
+            if (contextIndex !== -1) {
+              text = text.substring(0, contextIndex).trim();
+            }
+            title = text.substring(0, 32);
+            if (text.length > 32) title += '...';
           }
-          title = text.substring(0, 32);
-          if (text.length > 32) title += '...';
+          sessions.push({
+            id: activeId,
+            title: title || 'Chat Session',
+            timestamp: Date.now(),
+            messageCount: legacyPerSession.length,
+            messages: [] as ChatMessage[],
+          });
+          await this.saveSessions(sessions);
         }
-        sessions.push({
-          id: activeId,
-          title: title || 'Chat Session',
-          timestamp: Date.now(),
-          messageCount: legacyPerSession.length,
-          messages: [] as ChatMessage[],
-        });
-        await this.saveSessions(sessions);
+
+        // Write file backup
+        const allMessages: Record<string, ChatMessage[]> = { [activeId]: cleaned };
+        this._writeFileBackup({ sessions, messages: allMessages });
+
+        // Persist active session ID
+        this.persistActiveSessionId(activeId);
+
+        await this._workspaceState.update('mirror-vs.chatHistory', undefined);
+        console.log('[StorageService] Migration complete.');
       }
 
-      // Write file backup
-      const allMessages: Record<string, ChatMessage[]> = { [activeId]: cleaned };
-      this._writeFileBackup({ sessions, messages: allMessages });
-
-      // Persist active session ID
-      this.persistActiveSessionId(activeId);
-
-      await this._workspaceState.update('mirror-vs.chatHistory', undefined);
-      console.log('[StorageService] Migration complete.');
-    }
-
-    // Clean up any stale empty message keys
-    if ((legacy && legacy.length > 0) || (legacyPerSession && legacyPerSession.length > 0)) {
-      this._workspaceState.update('mirror-vs.chatHistory', undefined);
+      // Clean up any stale empty message keys
+      if (
+        (Array.isArray(legacy) && legacy.length > 0) ||
+        (Array.isArray(legacyPerSession) && legacyPerSession.length > 0)
+      ) {
+        this._workspaceState.update('mirror-vs.chatHistory', undefined);
+      }
+    } catch (err) {
+      console.error('[StorageService] Legacy migration failed:', err);
     }
   }
 
@@ -228,7 +237,11 @@ export class StorageService {
    * Read the backup file from disk (global storage path).
    * Returns null if the file doesn't exist or is corrupted.
    */
-  private _readFileBackup(): { sessions: ChatSession[]; messages: Record<string, ChatMessage[]>; activeSessionId?: string } | null {
+  private _readFileBackup(): {
+    sessions: ChatSession[];
+    messages: Record<string, ChatMessage[]>;
+    activeSessionId?: string;
+  } | null {
     try {
       // Use a global storage path for the backup file
       const backupPath = this._getBackupFilePath();
@@ -246,7 +259,11 @@ export class StorageService {
   /**
    * Write the backup file to disk (global storage path).
    */
-  private _writeFileBackup(data: { sessions: ChatSession[]; messages: Record<string, ChatMessage[]>; activeSessionId?: string }): void {
+  private _writeFileBackup(data: {
+    sessions: ChatSession[];
+    messages: Record<string, ChatMessage[]>;
+    activeSessionId?: string;
+  }): void {
     try {
       const backupPath = this._getBackupFilePath();
       if (!backupPath) return;
@@ -298,7 +315,7 @@ export class StorageService {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(16);

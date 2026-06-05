@@ -1,4 +1,3 @@
-
 /**
  * Simple i18n / localization service for Mirror VS webview.
  * Supports multiple languages with dictionary-based translations.
@@ -14,7 +13,7 @@ const EN: Record<string, string> = {
   'welcome.instant': 'One-click apply with smart checkpoints',
   'welcome.dual': 'Seamlessly switch between Ollama & DeepSeek',
   'welcome.hint': 'Open a file and start typing below ⬇️',
-  'input.placeholder': 'Ask to modify code... Type \'@\' to link files',
+  'input.placeholder': "Ask to modify code... Type '@' to link files",
   'settings.title': '⚙️ Configuration',
   'settings.provider': 'AI Provider',
   'settings.ollama.host': 'Ollama API Host',
@@ -63,7 +62,7 @@ const ES: Record<string, string> = {
   'welcome.instant': 'Aplicación con un clic y puntos de control',
   'welcome.dual': 'Cambia entre Ollama y DeepSeek sin problemas',
   'welcome.hint': 'Abre un archivo y empieza a escribir abajo ⬇️',
-  'input.placeholder': 'Pide modificar código... Escribe \'@\' para enlazar archivos',
+  'input.placeholder': "Pide modificar código... Escribe '@' para enlazar archivos",
   'settings.title': '⚙️ Configuración',
   'settings.provider': 'Proveedor IA',
   'settings.ollama.host': 'Host de API Ollama',
@@ -112,7 +111,7 @@ const HI: Record<string, string> = {
   'welcome.instant': 'स्मार्ट चेकपॉइंट्स के साथ एक-क्लिक लागू करें',
   'welcome.dual': 'Ollama और DeepSeek के बीच आसानी से स्विच करें',
   'welcome.hint': 'एक फ़ाइल खोलें और नीचे टाइप करना शुरू करें ⬇️',
-  'input.placeholder': 'कोड संशोधित करने के लिए पूछें... फ़ाइलें लिंक करने के लिए \'@\' टाइप करें',
+  'input.placeholder': "कोड संशोधित करने के लिए पूछें... फ़ाइलें लिंक करने के लिए '@' टाइप करें",
   'settings.title': '⚙️ कॉन्फ़िगरेशन',
   'settings.provider': 'AI प्रदाता',
   'settings.ollama.host': 'Ollama API होस्ट',

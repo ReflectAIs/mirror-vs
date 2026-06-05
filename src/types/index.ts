@@ -20,7 +20,14 @@ export interface TelemetryData {
   }[];
 }
 
-export type LLMProvider = 'ollama' | 'deepseek';
+export interface CustomApi {
+  id: string;
+  name: string;
+  url: string;
+  models: string[];
+}
+
+export type LLMProvider = 'ollama' | 'deepseek' | 'custom' | string;
 
 export interface ExtensionSettings {
   provider: LLMProvider;
@@ -33,6 +40,12 @@ export interface ExtensionSettings {
   turnsToRetain: number;
   deepSeekThinking?: boolean;
   deepSeekThinkingLevel?: 'high' | 'max';
+  customEndpointEnabled?: boolean;
+  customEndpointUrl?: string;
+  customEndpointModel?: string;
+  hasCustomEndpointKey?: boolean;
+  customApis?: CustomApi[];
+  configuredCustomApiKeys?: Record<string, boolean>;
 }
 
 export interface ChatMessage {
@@ -103,6 +116,14 @@ export type WebviewToExtensionMessage =
       turnsToRetain?: number;
       deepSeekThinking?: boolean;
       deepSeekThinkingLevel?: 'high' | 'max';
+      customEndpointEnabled?: boolean;
+      customEndpointUrl?: string;
+      customEndpointModel?: string;
+      customEndpointKey?: string;
+      agentMode?: string;
+      customSystemPrompt?: string;
+      customApis?: CustomApi[];
+      customApiKeys?: Record<string, string>;
     }
   | { type: 'fetchModels' }
   | { type: 'validateHost'; host: string }
@@ -122,11 +143,17 @@ export type WebviewToExtensionMessage =
   | { type: 'acceptAllReviews' }
   | { type: 'cancelStream' }
   | { type: 'revertHistory'; text: string; role: string; inclusive: boolean; messageIndex?: number }
-  | { type: 'acceptReview' }
-  | { type: 'rejectReview' }
+  | { type: 'acceptReview'; filePath?: string }
+  | { type: 'rejectReview'; filePath?: string }
   | { type: 'diffReview'; file: string }
   | { type: 'prevChange' }
   | { type: 'nextChange' }
+  | { type: 'rejectAllReviews' }
+  | { type: 'getActiveReviews' }
+  | { type: 'getCheckpoints' }
+  | { type: 'getPromptTemplates' }
+  | { type: 'exportTelemetryJson' }
+  | { type: 'exportTelemetryCsv' }
   // New: Per-session model override
   | { type: 'setSessionModel'; sessionId: string; provider: LLMProvider; model: string }
   // New: Telemetry queries
@@ -142,7 +169,15 @@ export type WebviewToExtensionMessage =
   | { type: 'getChatSessions' }
   | { type: 'getChatHistory' }
   // Workspace file requests (on-demand)
-  | { type: 'requestWorkspaceFiles' };
+  | { type: 'requestWorkspaceFiles' }
+  // Phase 1 Quick Wins message types
+  | { type: 'copyToClipboard'; text: string }
+  | { type: 'exportChatMarkdown' }
+  | { type: 'exportChatSession' }
+  | { type: 'generatePRDescription' }
+  | { type: 'generateCommitMessage' }
+  | { type: 'searchSessions'; query: string }
+  | { type: 'showWarning'; text: string };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =
@@ -172,6 +207,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'screenshotCapture'; base64: string }
   | { type: 'gitChanges'; changes: { file: string; status: string }[] }
   | { type: 'cancelStream' }
+  | { type: 'searchSessionsResult'; matchingIds: string[]; query: string }
   | { type: 'gitDiffContent'; file: string; diff: GitFileDiff | null }
   | { type: 'prefillPrompt'; text: string }
   | { type: 'tokenUsage'; usage: { input: number; output: number; total: number; cost: number } }

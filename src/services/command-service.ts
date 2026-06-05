@@ -45,6 +45,7 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
   constructor(
     private readonly command: string,
     private readonly cwd: string,
+    private readonly terminalName: string,
   ) {
     this.exitPromise = new Promise((resolve) => {
       this._resolveExit = resolve;
@@ -92,12 +93,14 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
       const str = data.toString();
       this.appendOutput(str);
       this.writeEmitter.fire(str.replace(/\r?\n/g, '\r\n'));
+      CommandService.emitStreamData(this.terminalName, str);
     });
 
     this.process.stderr?.on('data', (data: Buffer) => {
       const str = data.toString();
       this.appendOutput(str);
       this.writeEmitter.fire(str.replace(/\r?\n/g, '\r\n'));
+      CommandService.emitStreamData(this.terminalName, str);
     });
 
     this.process.on('close', (code) => {
@@ -165,6 +168,13 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
 
 export class CommandService {
   private static instance: CommandService;
+
+  private static readonly _onDidStreamData = new vscode.EventEmitter<{ name: string; data: string }>();
+  public static readonly onDidStreamData = CommandService._onDidStreamData.event;
+
+  public static emitStreamData(name: string, data: string) {
+    CommandService._onDidStreamData.fire({ name, data });
+  }
 
   /** Terminal reference by name. */
   private activeTerminals: Map<string, vscode.Terminal> = new Map();
@@ -275,7 +285,10 @@ export class CommandService {
 
     // Windows: translate 'mkdir -p' to the correct PowerShell syntax
     if (process.platform === 'win32') {
-      normalizedCmd = normalizedCmd.replace(/\bmkdir\b(\s+)-p\b/gi, (_, spaces) => `New-Item -Force -ItemType Directory${spaces}`);
+      normalizedCmd = normalizedCmd.replace(
+        /\bmkdir\b(\s+)-p\b/gi,
+        (_, spaces) => `New-Item -Force -ItemType Directory${spaces}`,
+      );
     }
 
     const cdPattern = /^\s*cd\s+(['"]?)([^'"&;|\r\n]+)\1\s*(?:&&|;)?\s*/i;
@@ -393,7 +406,11 @@ export class CommandService {
     }
 
     // Normalized helper for extremely robust fuzzy matching
-    const normalize = (s: string) => s.toLowerCase().replace(/mirror:/i, '').replace(/[^\w]/g, '');
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/mirror:/i, '')
+        .replace(/[^\w]/g, '');
     const normSearch = normalize(terminalName);
 
     if (normSearch) {
@@ -472,7 +489,7 @@ export class CommandService {
     }
 
     // Create pseudoterminal + visible terminal
-    const pty = new MirrorPseudoterminal(cmd, cwd);
+    const pty = new MirrorPseudoterminal(cmd, cwd, terminalName);
     terminal = vscode.window.createTerminal({ name: terminalName, pty });
     this.activeTerminals.set(terminalName, terminal);
     this.activePtys.set(terminalName, pty);
@@ -516,7 +533,7 @@ export class CommandService {
     const terminalName = this.getTerminalName(originalCommand || cmd);
 
     // Create pseudoterminal + visible terminal
-    const pty = new MirrorPseudoterminal(cmd, cwd);
+    const pty = new MirrorPseudoterminal(cmd, cwd, terminalName);
     const terminal = vscode.window.createTerminal({ name: terminalName, pty });
     this.activeTerminals.set(terminalName, terminal);
     this.activePtys.set(terminalName, pty);
@@ -666,7 +683,11 @@ export class CommandService {
     }
 
     // Fuzzy match across our terminals using normalization
-    const normalize = (s: string) => s.toLowerCase().replace(/mirror:/i, '').replace(/[^\w]/g, '');
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/mirror:/i, '')
+        .replace(/[^\w]/g, '');
     const normSearch = normalize(terminalName);
     if (normSearch) {
       for (const [name, p] of this.activePtys) {
@@ -708,7 +729,11 @@ export class CommandService {
 
     // Fuzzy match using normalization
     if (!terminal) {
-      const normalize = (s: string) => s.toLowerCase().replace(/mirror:/i, '').replace(/[^\w]/g, '');
+      const normalize = (s: string) =>
+        s
+          .toLowerCase()
+          .replace(/mirror:/i, '')
+          .replace(/[^\w]/g, '');
       const normSearch = normalize(terminalName);
       if (normSearch) {
         for (const [name, t] of this.activeTerminals) {

@@ -28,33 +28,29 @@ describe('executeFigmaTool', () => {
   });
 
   it('should throw if tool name is not figma_inspect', async () => {
-    await expect(executeFigmaTool({ name: 'read_file' } as any)).rejects.toThrow(
-      'Unsupported Figma tool: read_file'
-    );
+    await expect(executeFigmaTool({ name: 'read_file' } as any)).rejects.toThrow('Unsupported Figma tool: read_file');
   });
 
   it('should throw if figmaKey is missing', async () => {
     await expect(
-      executeFigmaTool({ name: 'figma_inspect', url: 'https://figma.com/file/ABC' }, undefined, mockWorkspace)
-    ).rejects.toThrow(
-      'Figma Personal Access Token is not configured'
-    );
+      executeFigmaTool({ name: 'figma_inspect', url: 'https://figma.com/file/ABC' }, undefined, mockWorkspace),
+    ).rejects.toThrow('Figma Personal Access Token is not configured');
   });
 
   it('should throw if workspacePath is missing', async () => {
     await expect(
-      executeFigmaTool({ name: 'figma_inspect', url: 'https://figma.com/file/ABC' }, mockFigmaKey, undefined)
-    ).rejects.toThrow(
-      'No workspace folder is open'
-    );
+      executeFigmaTool({ name: 'figma_inspect', url: 'https://figma.com/file/ABC' }, mockFigmaKey, undefined),
+    ).rejects.toThrow('No workspace folder is open');
   });
 
   it('should throw if Figma URL is invalid', async () => {
     await expect(
-      executeFigmaTool({ name: 'figma_inspect', url: 'https://figma.com/file/invalid-url' }, mockFigmaKey, mockWorkspace)
-    ).rejects.toThrow(
-      'Invalid Figma URL provided'
-    );
+      executeFigmaTool(
+        { name: 'figma_inspect', url: 'https://figma.com/file/invalid-url' },
+        mockFigmaKey,
+        mockWorkspace,
+      ),
+    ).rejects.toThrow('Invalid Figma URL provided');
   });
 
   it('should correctly throw the error if fetching simplified node fails', async () => {
@@ -62,13 +58,11 @@ describe('executeFigmaTool', () => {
     const tool = { name: 'figma_inspect' as const, url: figmaUrl };
 
     mockGetSimplifiedNode.mockRejectedValue(
-      new Error('Figma API Error: 429 - {"status":429,"err":"Rate limit exceeded"}')
+      new Error('Figma API Error: 429 - {"status":429,"err":"Rate limit exceeded"}'),
     );
 
-    await expect(
-      executeFigmaTool(tool, mockFigmaKey, mockWorkspace)
-    ).rejects.toThrow(
-      'Failed to fetch from Figma: Figma API Error: 429 - {"status":429,"err":"Rate limit exceeded"}'
+    await expect(executeFigmaTool(tool, mockFigmaKey, mockWorkspace)).rejects.toThrow(
+      'Failed to fetch from Figma: Figma API Error: 429 - {"status":429,"err":"Rate limit exceeded"}',
     );
   });
 

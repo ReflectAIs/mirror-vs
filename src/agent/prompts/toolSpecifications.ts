@@ -10,12 +10,14 @@ Available tools:
 - patch_file: <patch_file path="...">\n<<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE\n</patch_file>
 - list_dir: <list_dir path="..." />
 - grep_search: <grep_search query="..." [path="..."] />
+- semantic_search: <semantic_search query="..." />
 - web_search: <web_search query="..." />
 - get_diagnostics: <get_diagnostics [path="..."] />
 - browser_navigate / browser_click / browser_type / browser_screenshot / browser_evaluate_script
 - run_command: <run_command command="..." />
 - list_terminals / read_terminal / send_terminal_input / close_terminal
 - figma_inspect: <figma_inspect url="..." />
+- update_agent_memory: <update_agent_memory key="..." value="..." />
 
 CRITICAL subsequent turn rule:
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
@@ -53,14 +55,16 @@ CRITICAL subsequent turn rule:
 6. GREP SEARCH (full workspace): <grep_search query="pattern" />
    GREP SEARCH (scoped to directory): <grep_search query="pattern" path="src/screens" />
    **Best practice**: Always scope with \`path\` when you know the relevant area.
-7. WEB SEARCH: <web_search query="pattern" />
-8. GET DIAGNOSTICS (all errors/warnings): <get_diagnostics />
+7. SEMANTIC SEARCH (RAG): <semantic_search query="concept or keywords" />
+   Use this to search the workspace semantically for related context or code concepts.
+8. WEB SEARCH: <web_search query="pattern" />
+9. GET DIAGNOSTICS (all errors/warnings): <get_diagnostics />
    GET DIAGNOSTICS (scoped): <get_diagnostics path="src/screens" />
-9. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
-10. BROWSER CLICK: <browser_click selector="#my-button" />
-11. BROWSER TYPE: <browser_type selector="#search-input" text="hello world" />
-12. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />
-13. CODEBASE ANALYSIS:
+10. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
+11. BROWSER CLICK: <browser_click selector="#my-button" />
+12. BROWSER TYPE: <browser_type selector="#search-input" text="hello world" />
+13. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />
+14. CODEBASE ANALYSIS:
     <analyze_project /> (Overview)
     <analyze_dependencies /> (Import graph)
     <analyze_complexity /> (Complexity)
@@ -68,13 +72,22 @@ CRITICAL subsequent turn rule:
     <analyze_dead_code /> (Unused exports)
     <analyze_impact path="src/file.ts" /> (Impact analysis)
     <graphify /> (Mermaid structure graph)
-14. WAIT: <wait ms="3000" />
-15. BROWSER SCREENSHOT: <browser_screenshot />
-16. RUN COMMAND: <run_command command="npm install" />
-17. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
-18. CLOSE TERMINAL: <close_terminal terminal_name="..." />
-19. READ TERMINAL: <read_terminal terminal_name="..." />
-20. LIST TERMINALS: <list_terminals />
-21. FIGMA INSPECT: <figma_inspect url="..." />
+15. WAIT: <wait ms="3000" />
+16. BROWSER SCREENSHOT: <browser_screenshot />
+17. RUN COMMAND: <run_command command="npm install" />
+18. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
+19. CLOSE TERMINAL: <close_terminal terminal_name="..." />
+20. READ TERMINAL: <read_terminal terminal_name="..." />
+21. LIST TERMINALS: <list_terminals />
+22. FIGMA INSPECT: <figma_inspect url="..." />
+23. UPDATE AGENT MEMORY:
+    <update_agent_memory key="preferences" value="Always use functional React components." />
+    Saves developer preferences, key architectural decisions, or code patterns in the local workspace.
+24. DEBUGGER CONTROLS (Only in Debug Mode):
+    - debug_get_sessions: <debug_get_sessions /> (lists active debugging sessions)
+    - debug_get_breakpoints: <debug_get_breakpoints /> (lists active breakpoints)
+    - debug_add_breakpoint: <debug_add_breakpoint path="relative/file.ts" line="25" /> (adds breakpoint)
+    - debug_remove_breakpoint: <debug_remove_breakpoint breakpoint_id="..." /> (removes breakpoint)
+    - debug_inspect_variables: <debug_inspect_variables /> (dumps active threads, callstack, scopes, and variables)
 `;
 }

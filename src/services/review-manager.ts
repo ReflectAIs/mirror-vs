@@ -54,6 +54,10 @@ export class ReviewManager implements vscode.CodeLensProvider {
     return this._activeReviews.size;
   }
 
+  public getActiveReviews(): Map<string, ActiveReview> {
+    return this._activeReviews;
+  }
+
   public static getInstance(): ReviewManager {
     if (!this._instance) {
       this._instance = new ReviewManager();

@@ -296,7 +296,8 @@ describe('AgentParser', () => {
 
     it('should parse write_file and strip CDATA wrapper if present', () => {
       const parser = makeParser();
-      const input = blockOpen('write_file', 'path="src/index.ts"') + '<![CDATA[console.log("hello");]]>' + blockClose('write_file');
+      const input =
+        blockOpen('write_file', 'path="src/index.ts"') + '<![CDATA[console.log("hello");]]>' + blockClose('write_file');
       const calls = parser.parseToolCalls(input);
       expect(calls).toHaveLength(1);
       expect(calls[0].name).toBe('write_file');
@@ -306,7 +307,8 @@ describe('AgentParser', () => {
 
     it('should parse send_terminal_input (block style)', () => {
       const parser = makeParser();
-      const input = blockOpen('send_terminal_input', 'terminal_name="Term 1"') + 'Ctrl+C' + blockClose('send_terminal_input');
+      const input =
+        blockOpen('send_terminal_input', 'terminal_name="Term 1"') + 'Ctrl+C' + blockClose('send_terminal_input');
       const calls = parser.parseToolCalls(input);
       expect(calls).toHaveLength(1);
       expect(calls[0].name).toBe('send_terminal_input');
@@ -341,26 +343,37 @@ describe('AgentParser', () => {
     it('should parse read_terminal with sanitized long terminal names', () => {
       const parser = makeParser();
       const calls = parser.parseToolCalls(
-        selfClosing('read_terminal', 'terminal_name="Mirror: cd temp-login and npm install and npm install tailwindcss ..."')
+        selfClosing(
+          'read_terminal',
+          'terminal_name="Mirror: cd temp-login and npm install and npm install tailwindcss ..."',
+        ),
       );
       expect(calls).toHaveLength(1);
       expect(calls[0].name).toBe('read_terminal');
-      expect((calls[0] as any).terminal_name).toBe('Mirror: cd temp-login and npm install and npm install tailwindcss ...');
+      expect((calls[0] as any).terminal_name).toBe(
+        'Mirror: cd temp-login and npm install and npm install tailwindcss ...',
+      );
     });
 
     it('should parse run_command with nested unescaped quotes and redirections correctly', () => {
       const parser = makeParser();
-      const inputDouble = '<run_command command="powershell -Command \'npm run compile 2>&1 | ForEach-Object { $_ -replace \\"^D:.*?error \\", \\"\\" }\'" />';
+      const inputDouble =
+        '<run_command command="powershell -Command \'npm run compile 2>&1 | ForEach-Object { $_ -replace \\"^D:.*?error \\", \\"\\" }\'" />';
       const callsDouble = parser.parseToolCalls(inputDouble);
       expect(callsDouble).toHaveLength(1);
       expect(callsDouble[0].name).toBe('run_command');
-      expect((callsDouble[0] as any).command).toBe(`powershell -Command 'npm run compile 2>&1 | ForEach-Object { $_ -replace "^D:.*?error ", "" }'`);
+      expect((callsDouble[0] as any).command).toBe(
+        `powershell -Command 'npm run compile 2>&1 | ForEach-Object { $_ -replace "^D:.*?error ", "" }'`,
+      );
 
-      const inputSingle = '<run_command command=\'powershell -Command "$null; Write-Output \\"---$\\"; dir *.config.* 2> $null; Write-Output \\"---$\\"; dir *.js 2> $null"\' />';
+      const inputSingle =
+        '<run_command command=\'powershell -Command "$null; Write-Output \\"---$\\"; dir *.config.* 2> $null; Write-Output \\"---$\\"; dir *.js 2> $null"\' />';
       const callsSingle = parser.parseToolCalls(inputSingle);
       expect(callsSingle).toHaveLength(1);
       expect(callsSingle[0].name).toBe('run_command');
-      expect((callsSingle[0] as any).command).toBe(`powershell -Command "$null; Write-Output \\"---$\\"; dir *.config.* 2> $null; Write-Output \\"---$\\"; dir *.js 2> $null"`);
+      expect((callsSingle[0] as any).command).toBe(
+        `powershell -Command "$null; Write-Output \\"---$\\"; dir *.config.* 2> $null; Write-Output \\"---$\\"; dir *.js 2> $null"`,
+      );
     });
 
     it('should return empty array for text with no tool tags', () => {
@@ -421,7 +434,12 @@ describe('AgentParser', () => {
 
     it('should strip content after a block tool call', () => {
       const parser = makeParser();
-      const input = blockOpen('write_file', 'path="a.ts"') + 'content' + blockClose('write_file') + ' extra stuff ' + selfClosing('read_file', 'path="b.ts"');
+      const input =
+        blockOpen('write_file', 'path="a.ts"') +
+        'content' +
+        blockClose('write_file') +
+        ' extra stuff ' +
+        selfClosing('read_file', 'path="b.ts"');
       const result = parser.getCleanedToolResponse(input);
       expect(result).not.toContain('b.ts');
       expect(result).not.toContain('extra stuff');
@@ -487,13 +505,28 @@ describe('AgentParser', () => {
 
     it('should format with terminalName for send_terminal_input', () => {
       const parser = makeParser();
-      const result = parser.formatToolStatus('send_terminal_input', 'running', 'Term 1', undefined, undefined, undefined, 'Term 1');
+      const result = parser.formatToolStatus(
+        'send_terminal_input',
+        'running',
+        'Term 1',
+        undefined,
+        undefined,
+        undefined,
+        'Term 1',
+      );
       expect(result.terminalName).toBe('Term 1');
     });
 
     it('should format with code for patch_file', () => {
       const parser = makeParser();
-      const result = parser.formatToolStatus('patch_file', 'running', 'test.ts', undefined, undefined, 'SEARCH/REPLACE block');
+      const result = parser.formatToolStatus(
+        'patch_file',
+        'running',
+        'test.ts',
+        undefined,
+        undefined,
+        'SEARCH/REPLACE block',
+      );
       expect(result.code).toBe('SEARCH/REPLACE block');
     });
   });

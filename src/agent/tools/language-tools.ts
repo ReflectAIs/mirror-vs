@@ -25,9 +25,7 @@ function makeRelative(absPath: string): string {
 /**
  * Execute a language tool call (runs in VS Code extension host context)
  */
-export async function executeLanguageTool(
-  tool: ToolCall,
-): Promise<string> {
+export async function executeLanguageTool(tool: ToolCall): Promise<string> {
   switch (tool.name) {
     case 'symbol_search': {
       const query = tool.query || tool.path || '';
@@ -51,13 +49,20 @@ export async function executeLanguageTool(
 
       let output = `Found ${results.length} symbol(s) matching "${query}":\n\n`;
       results.slice(0, 25).forEach((sym, idx) => {
-        const kind = sym.kind === vscode.SymbolKind.Function ? '⚡ Function' :
-          sym.kind === vscode.SymbolKind.Class ? '🏛️ Class' :
-          sym.kind === vscode.SymbolKind.Method ? '🔧 Method' :
-          sym.kind === vscode.SymbolKind.Variable ? '📦 Variable' :
-          sym.kind === vscode.SymbolKind.Interface ? '📐 Interface' :
-          sym.kind === vscode.SymbolKind.Module ? '📦 Module' :
-          '📄 Symbol';
+        const kind =
+          sym.kind === vscode.SymbolKind.Function
+            ? '⚡ Function'
+            : sym.kind === vscode.SymbolKind.Class
+              ? '🏛️ Class'
+              : sym.kind === vscode.SymbolKind.Method
+                ? '🔧 Method'
+                : sym.kind === vscode.SymbolKind.Variable
+                  ? '📦 Variable'
+                  : sym.kind === vscode.SymbolKind.Interface
+                    ? '📐 Interface'
+                    : sym.kind === vscode.SymbolKind.Module
+                      ? '📦 Module'
+                      : '📄 Symbol';
         const filePath = sym.location.uri.fsPath;
         const line = sym.location.range.start.line + 1;
         const relativePath = makeRelative(filePath);

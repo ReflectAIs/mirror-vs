@@ -1,4 +1,3 @@
-
 import * as vscode from 'vscode';
 import { LLMProvider, ChatMessage } from '../types';
 import { execFileSync } from 'child_process';
@@ -53,8 +52,11 @@ export class AgentSession {
    * every agent file write shows up as a coloured diff gutter (yellow/green/red) in VS Code.
    */
   private _gitExec(args: string[], workspaceFolder: string): string {
-    try { return execFileSync('git', args, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' }); }
-    catch { return ''; }
+    try {
+      return execFileSync('git', args, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' });
+    } catch {
+      return '';
+    }
   }
 
   public async ensureGitBaseline(): Promise<void> {
@@ -122,11 +124,24 @@ export class AgentSession {
       const key = (await this._getSecret('deepseek_api_key')) || '';
       return key;
     }
+    if (provider === 'custom') {
+      const key = (await this._getSecret('custom_endpoint_api_key')) || '';
+      return key;
+    }
+    if (typeof provider === 'string' && provider.startsWith('custom_')) {
+      const key = (await this._getSecret(`custom_api_key_${provider}`)) || '';
+      return key;
+    }
     return '';
   }
 
   /** Write tool execution turn to turns.log */
-  public logTurn(assistantResponse: string, combinedToolResult: string, isMalformed?: boolean, errorMsg?: string): void {
+  public logTurn(
+    assistantResponse: string,
+    combinedToolResult: string,
+    isMalformed?: boolean,
+    errorMsg?: string,
+  ): void {
     try {
       const logFilePath = this._getSafePath('turns.log');
       const timestamp = new Date().toISOString();

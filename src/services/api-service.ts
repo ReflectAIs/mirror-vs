@@ -256,13 +256,16 @@ export function streamDeepSeekChat(
   const urlStr = 'https://api.deepseek.com/chat/completions';
   const parsedUrl = new URL(urlStr);
 
-  const sanitizedMessages = messages.map(msg => {
+  const sanitizedMessages = messages.map((msg) => {
     const { images, ...rest } = msg;
     return {
       ...rest,
-      content: typeof rest.content === 'string'
-        ? (typeof (rest.content as any).toWellFormed === 'function' ? (rest.content as any).toWellFormed() : rest.content)
-        : rest.content
+      content:
+        typeof rest.content === 'string'
+          ? typeof (rest.content as any).toWellFormed === 'function'
+            ? (rest.content as any).toWellFormed()
+            : rest.content
+          : rest.content,
     };
   });
 
@@ -276,13 +279,13 @@ export function streamDeepSeekChat(
     stream: true,
     stream_options: {
       include_usage: true,
-    }
+    },
   };
 
   if (thinkingEnabled) {
     payload.reasoning_effort = thinkingLevel;
     payload.thinking = {
-      type: "enabled"
+      type: 'enabled',
     };
   }
 
@@ -399,6 +402,171 @@ export function streamDeepSeekChat(
 
   signal.addEventListener('abort', () => {
     if (deepseekCompleted) return;
+    req.destroy();
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    onError(abortErr);
+  });
+
+  req.write(bodyData);
+  req.end();
+}
+
+/**
+ * Streams a chat completion response from a custom OpenAI-compatible endpoint.
+ */
+export function streamCustomOpenAIChat(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  messages: { role: string; content: string; images?: string[] }[],
+  signal: AbortSignal,
+  onChunk: (text: string) => void,
+  onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
+  onError: (err: any) => void,
+): void {
+  let urlStr = baseUrl.replace(/\/$/, '');
+  if (!urlStr.includes('/chat/completions')) {
+    urlStr += '/chat/completions';
+  }
+  const parsedUrl = new URL(urlStr);
+  const isHttps = parsedUrl.protocol === 'https:';
+  const requestModule = isHttps ? https : http;
+
+  const sanitizedMessages = messages.map((msg) => {
+    const { images, ...rest } = msg;
+    return {
+      ...rest,
+      content:
+        typeof rest.content === 'string'
+          ? typeof (rest.content as any).toWellFormed === 'function'
+            ? (rest.content as any).toWellFormed()
+            : rest.content
+          : rest.content,
+    };
+  });
+
+  const payload = {
+    model,
+    messages: sanitizedMessages,
+    stream: true,
+  };
+
+  const bodyData = JSON.stringify(payload);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(bodyData).toString(),
+  };
+
+  if (apiKey && apiKey.trim() !== '') {
+    headers['Authorization'] = `Bearer ${apiKey.trim()}`;
+  }
+
+  const requestOptions: http.RequestOptions | https.RequestOptions = {
+    hostname: parsedUrl.hostname,
+    port: parsedUrl.port || (isHttps ? 443 : 80),
+    path: parsedUrl.pathname + parsedUrl.search,
+    method: 'POST',
+    timeout: 60000,
+    headers,
+  };
+
+  const req = requestModule.request(requestOptions, (res) => {
+    if (res.statusCode !== 200) {
+      let errBody = '';
+      res.on('data', (chunk) => (errBody += chunk));
+      res.on('end', () => {
+        let parsedErr = errBody;
+        try {
+          const jsonErr = JSON.parse(errBody);
+          parsedErr = jsonErr.error?.message || errBody;
+        } catch (e) {
+          // ignore
+        }
+        onError(new Error(`Custom API error: HTTP ${res.statusCode} - ${parsedErr}`));
+      });
+      return;
+    }
+
+    let fullText = '';
+    let buffer = '';
+    let usage: { promptTokens: number; completionTokens: number } | undefined = undefined;
+
+    res.on('data', (chunk) => {
+      if (completed) return;
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (!cleanLine) {
+          continue;
+        }
+
+        if (cleanLine === 'data: [DONE]') {
+          completed = true;
+          onComplete(fullText, usage);
+          return;
+        }
+
+        if (cleanLine.startsWith('data:')) {
+          const jsonStr = cleanLine.substring(5).trim();
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const chunkText = parsed.choices?.[0]?.delta?.content || '';
+            if (chunkText) {
+              fullText += chunkText;
+              onChunk(chunkText);
+            }
+            if (parsed.usage) {
+              usage = {
+                promptTokens: parsed.usage.prompt_tokens,
+                completionTokens: parsed.usage.completion_tokens,
+              };
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    });
+
+    res.on('end', () => {
+      if (completed) return;
+      completed = true;
+      onComplete(fullText, usage);
+    });
+  });
+
+  req.on('error', (err) => {
+    if (signal.aborted) {
+      return;
+    }
+    onError(err);
+  });
+
+  req.on('timeout', () => {
+    req.destroy();
+    const timeoutErr = new Error('Custom API streaming request timed out.');
+    timeoutErr.name = 'TimeoutError';
+    onError(timeoutErr);
+  });
+
+  let completed = false;
+
+  if (signal.aborted) {
+    req.destroy();
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    onError(abortErr);
+    return;
+  }
+
+  signal.addEventListener('abort', () => {
+    if (completed) return;
+    completed = true;
     req.destroy();
     const abortErr = new Error('The user aborted a request.');
     abortErr.name = 'AbortError';

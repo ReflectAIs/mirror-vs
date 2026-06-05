@@ -1,4 +1,3 @@
-
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -56,7 +55,7 @@ Post-eval Visible Text (preview): ${summary.contentText || '(empty)'}`;
 
     case 'browser_screenshot': {
       // Wait a moment for the page to fully render before capturing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       // Capture real base64 screenshot for display in chat + vision models
       const base64 = await browserService.screenshot();
 

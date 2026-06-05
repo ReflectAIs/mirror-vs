@@ -1,9 +1,9 @@
-
 /**
  * Telemetry and diagnostics service for Mirror VS.
  * Tracks token usage, latency, errors, and model usage across sessions.
  */
 
+import * as vscode from 'vscode';
 import { TelemetryData } from '../types';
 
 interface TelemetryEntry {
@@ -25,12 +25,38 @@ export class TelemetryService {
   private static instance: TelemetryService;
   private entries: TelemetryEntry[] = [];
   private maxEntries = 1000;
+  private _context?: vscode.ExtensionContext;
 
   static getInstance(): TelemetryService {
     if (!TelemetryService.instance) {
       TelemetryService.instance = new TelemetryService();
     }
     return TelemetryService.instance;
+  }
+
+  /**
+   * Initialize telemetry data from VS Code globalState storage
+   */
+  initialize(context: vscode.ExtensionContext): void {
+    this._context = context;
+    try {
+      const saved = context.globalState.get<TelemetryEntry[]>('telemetry_entries');
+      if (saved && Array.isArray(saved)) {
+        this.entries = saved;
+      }
+    } catch (e) {
+      console.error('Failed to load telemetry entries:', e);
+    }
+  }
+
+  private saveEntries(): void {
+    if (this._context) {
+      try {
+        this._context.globalState.update('telemetry_entries', this.entries);
+      } catch (e) {
+        console.error('Failed to save telemetry entries:', e);
+      }
+    }
   }
 
   /**
@@ -68,15 +94,14 @@ export class TelemetryService {
     if (this.entries.length > this.maxEntries) {
       this.entries = this.entries.slice(this.entries.length - this.maxEntries);
     }
+    this.saveEntries();
   }
 
   /**
    * Get aggregated telemetry data
    */
   getTelemetryData(sessionId?: string): TelemetryData {
-    const filtered = sessionId
-      ? this.entries.filter((e) => e.sessionId === sessionId)
-      : this.entries;
+    const filtered = sessionId ? this.entries.filter((e) => e.sessionId === sessionId) : this.entries;
 
     const totalTokensInput = filtered.reduce((sum, e) => sum + e.tokensInput, 0);
     const totalTokensOutput = filtered.reduce((sum, e) => sum + e.tokensOutput, 0);
@@ -85,9 +110,11 @@ export class TelemetryService {
 
     // Errors by provider
     const errorsByProviderMap = new Map<string, number>();
-    filtered.filter((e) => e.error).forEach((e) => {
-      errorsByProviderMap.set(e.provider, (errorsByProviderMap.get(e.provider) || 0) + 1);
-    });
+    filtered
+      .filter((e) => e.error)
+      .forEach((e) => {
+        errorsByProviderMap.set(e.provider, (errorsByProviderMap.get(e.provider) || 0) + 1);
+      });
 
     // Top models
     const modelCountMap = new Map<string, number>();
@@ -96,15 +123,18 @@ export class TelemetryService {
     });
 
     // Session history aggregation
-    const sessionMap = new Map<string, {
-      sessionId: string;
-      title: string;
-      tokensInput: number;
-      tokensOutput: number;
-      cost: number;
-      latency: number;
-      errorCount: number;
-    }>();
+    const sessionMap = new Map<
+      string,
+      {
+        sessionId: string;
+        title: string;
+        tokensInput: number;
+        tokensOutput: number;
+        cost: number;
+        latency: number;
+        errorCount: number;
+      }
+    >();
 
     this.entries.forEach((e) => {
       const existing = sessionMap.get(e.sessionId);
@@ -154,6 +184,7 @@ export class TelemetryService {
    */
   clearAll(): void {
     this.entries = [];
+    this.saveEntries();
   }
 
   /**

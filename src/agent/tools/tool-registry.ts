@@ -16,9 +16,9 @@ export async function executeTool(
 
   // Built-in wait tool that doesn't need any service
   if (name === 'wait') {
-    const ms = tool.ms !== undefined ? tool.ms : (tool.seconds !== undefined ? tool.seconds * 1000 : 3000);
+    const ms = tool.ms !== undefined ? tool.ms : tool.seconds !== undefined ? tool.seconds * 1000 : 3000;
     const duration = Math.max(100, Math.min(60000, ms));
-    await new Promise(resolve => setTimeout(resolve, duration));
+    await new Promise((resolve) => setTimeout(resolve, duration));
     return `Waited for ${duration}ms as requested.`;
   }
 
@@ -29,12 +29,13 @@ export async function executeTool(
     name === 'patch_file' ||
     name === 'list_dir' ||
     name === 'rename_file' ||
-    name === 'delete_file'
+    name === 'delete_file' ||
+    name === 'update_agent_memory'
   ) {
     return await executeFileTool(tool, getSafePath);
   }
 
-  if (name === 'grep_search' || name === 'web_search' || name === 'get_diagnostics') {
+  if (name === 'grep_search' || name === 'semantic_search' || name === 'web_search' || name === 'get_diagnostics') {
     return await executeSearchTool(tool);
   }
 
@@ -85,6 +86,18 @@ export async function executeTool(
   ) {
     const { executeCodeAnalysisTool } = await import('./code-analysis-tools.js');
     return await executeCodeAnalysisTool(tool);
+  }
+
+  // Debugger tools
+  if (
+    name === 'debug_get_sessions' ||
+    name === 'debug_get_breakpoints' ||
+    name === 'debug_add_breakpoint' ||
+    name === 'debug_remove_breakpoint' ||
+    name === 'debug_inspect_variables'
+  ) {
+    const { executeDebugTool } = await import('./debug-tools.js');
+    return await executeDebugTool(tool);
   }
 
   throw new Error(`Unsupported tool call: ${name}`);

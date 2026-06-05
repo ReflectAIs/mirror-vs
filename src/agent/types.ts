@@ -25,18 +25,26 @@ export interface ToolCall {
     | 'git_add'
     | 'symbol_search'
     | 'rename_symbol'
-  | 'rename_file'
-  | 'delete_file'
-  | 'wait'
-  // Code analysis tools:
-  | 'analyze_project'
-  | 'analyze_dependencies'
-  | 'analyze_complexity'
-  | 'analyze_coverage'
-  | 'analyze_dead_code'
-  | 'analyze_impact'
-  | 'graphify'
-  | 'get_diagnostics';
+    | 'rename_file'
+    | 'delete_file'
+    | 'wait'
+    // Code analysis tools:
+    | 'analyze_project'
+    | 'analyze_dependencies'
+    | 'analyze_complexity'
+    | 'analyze_coverage'
+    | 'analyze_dead_code'
+    | 'analyze_impact'
+    | 'graphify'
+    | 'get_diagnostics'
+    // Advanced features tools:
+    | 'semantic_search'
+    | 'update_agent_memory'
+    | 'debug_get_sessions'
+    | 'debug_get_breakpoints'
+    | 'debug_add_breakpoint'
+    | 'debug_remove_breakpoint'
+    | 'debug_inspect_variables';
   path?: string;
   depth?: number;
   query?: string;
@@ -52,6 +60,9 @@ export interface ToolCall {
   script?: string;
   ms?: number;
   seconds?: number;
+  key?: string;
+  value?: string;
+  id?: string;
 }
 
 export type ToolStatus = 'running' | 'success' | 'error';

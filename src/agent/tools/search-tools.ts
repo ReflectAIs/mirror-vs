@@ -3,6 +3,30 @@ import * as vscode from 'vscode';
 import { ToolCall } from '../types';
 
 export async function executeSearchTool(tool: ToolCall): Promise<string> {
+  if (tool.name === 'semantic_search') {
+    const query = tool.query || tool.content || '';
+    if (!query) throw new Error('Missing "query" attribute for semantic_search.');
+
+    const { LocalRagService } = await import('../../services/local-rag-service.js');
+    const rag = LocalRagService.getInstance();
+    const results = rag.search(query, 5);
+
+    if (results.length === 0) {
+      console.log(`[RAG] No semantic results. Falling back to grep search for query: ${query}`);
+      return await executeSearchTool({
+        id: tool.id,
+        name: 'grep_search',
+        query: query,
+      });
+    }
+
+    return results
+      .map((r: any) => {
+        return `📄 File: ${r.filePath} (Lines ${r.startLine}-${r.endLine})\n\`\`\`\n${r.content}\n\`\`\``;
+      })
+      .join('\n\n---\n\n');
+  }
+
   if (tool.name === 'web_search') {
     if (!tool.query) throw new Error('Missing "query" attribute for web_search.');
     const query = encodeURIComponent(tool.query);
@@ -70,7 +94,8 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
       { pattern: tool.query, isRegExp: false, isCaseSensitive: false },
       {
         include: includePattern,
-        exclude: '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/bin/**,**/obj/**,**/build/**,**/.next/**,**/coverage/**}',
+        exclude:
+          '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**,**/bin/**,**/obj/**,**/build/**,**/.next/**,**/coverage/**}',
         maxResults: 80,
         previewOptions: { matchLines: 1, charsPerLine: 250 },
       },
@@ -150,7 +175,28 @@ async function fallbackGrepSearch(
       const fullPath = uri.fsPath;
 
       const ext = path.extname(fullPath).toLowerCase();
-      if (['.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.o', '.obj'].includes(ext)) {
+      if (
+        [
+          '.png',
+          '.jpg',
+          '.jpeg',
+          '.gif',
+          '.ico',
+          '.svg',
+          '.woff',
+          '.woff2',
+          '.ttf',
+          '.eot',
+          '.pdf',
+          '.zip',
+          '.tar',
+          '.gz',
+          '.exe',
+          '.dll',
+          '.o',
+          '.obj',
+        ].includes(ext)
+      ) {
         continue;
       }
 
@@ -216,10 +262,14 @@ function getDiagnostics(tool: ToolCall): string {
     if (scopePath && !relPath.startsWith(scopePath.replace(/\\/g, '/'))) continue;
 
     for (const d of diags) {
-      const severity = d.severity === vscode.DiagnosticSeverity.Error ? 'Error'
-        : d.severity === vscode.DiagnosticSeverity.Warning ? 'Warning'
-        : d.severity === vscode.DiagnosticSeverity.Information ? 'Info'
-        : 'Hint';
+      const severity =
+        d.severity === vscode.DiagnosticSeverity.Error
+          ? 'Error'
+          : d.severity === vscode.DiagnosticSeverity.Warning
+            ? 'Warning'
+            : d.severity === vscode.DiagnosticSeverity.Information
+              ? 'Info'
+              : 'Hint';
 
       // Only include errors and warnings by default
       if (d.severity > vscode.DiagnosticSeverity.Warning) continue;
@@ -247,8 +297,8 @@ function getDiagnostics(tool: ToolCall): string {
   });
 
   const lines: string[] = [];
-  const errorCount = entries.filter(e => e.severity === 'Error').length;
-  const warningCount = entries.filter(e => e.severity === 'Warning').length;
+  const errorCount = entries.filter((e) => e.severity === 'Error').length;
+  const warningCount = entries.filter((e) => e.severity === 'Warning').length;
   lines.push(`Found ${errorCount} error(s) and ${warningCount} warning(s):`);
   lines.push('');
 

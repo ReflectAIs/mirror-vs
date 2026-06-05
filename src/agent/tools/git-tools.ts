@@ -1,4 +1,3 @@
-
 /**
  * Git tools for the Mirror VS agent.
  * Provides git_commit, git_status, git_diff, git_add as built-in tools.
@@ -61,10 +60,7 @@ function parseUnifiedDiff(diffOutput: string): ParsedDiff | null {
 /**
  * Execute a git tool call
  */
-export async function executeGitTool(
-  tool: ToolCall,
-  workspacePath?: string,
-): Promise<string> {
+export async function executeGitTool(tool: ToolCall, workspacePath?: string): Promise<string> {
   const ws = workspacePath || process.cwd();
 
   if (!workspacePath) {
@@ -105,10 +101,15 @@ export async function executeGitTool(
         }
         const statusChar = stagedStatus || unstagedStatus || '?';
         const statusLabel =
-          statusChar === 'A' ? '✅ Added' :
-          statusChar === 'M' ? '📝 Modified' :
-          statusChar === 'D' ? '🗑️ Deleted' :
-          statusChar === '?' ? '❓ Untracked' : statusChar;
+          statusChar === 'A'
+            ? '✅ Added'
+            : statusChar === 'M'
+              ? '📝 Modified'
+              : statusChar === 'D'
+                ? '🗑️ Deleted'
+                : statusChar === '?'
+                  ? '❓ Untracked'
+                  : statusChar;
         result += `  ${statusLabel}: ${file}\n`;
       });
 
@@ -151,7 +152,10 @@ export async function executeGitTool(
         const diff = execFileSync('git', ['diff', '--unified=5', '--', filePath], { cwd: ws, encoding: 'utf8' });
         if (!diff.trim()) {
           // Try staged diff
-          const stagedDiff = execFileSync('git', ['diff', '--cached', '--unified=5', '--', filePath], { cwd: ws, encoding: 'utf8' });
+          const stagedDiff = execFileSync('git', ['diff', '--cached', '--unified=5', '--', filePath], {
+            cwd: ws,
+            encoding: 'utf8',
+          });
           if (!stagedDiff.trim()) {
             return `Git Diff for ${filePath}: No changes detected (check if file is tracked).`;
           }

@@ -6,14 +6,70 @@ import { ToolCall } from '../types';
 // ── Helpers ──
 function isSourceFile(name: string): boolean {
   const ext = path.extname(name).toLowerCase();
-  return ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.py', '.go', '.rs', '.java', '.rb', '.php'].includes(ext);
+  return [
+    '.ts',
+    '.tsx',
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.mts',
+    '.cts',
+    '.vue',
+    '.svelte',
+    '.py',
+    '.go',
+    '.rs',
+    '.java',
+    '.rb',
+    '.php',
+  ].includes(ext);
 }
 function isBinary(name: string): boolean {
   const ext = path.extname(name).toLowerCase();
-  return ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.o', '.obj'].includes(ext);
+  return [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.ico',
+    '.svg',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.eot',
+    '.pdf',
+    '.zip',
+    '.tar',
+    '.gz',
+    '.exe',
+    '.dll',
+    '.o',
+    '.obj',
+  ].includes(ext);
 }
 function shouldSkip(name: string): boolean {
-  return ['node_modules', 'dist', 'out', '.git', '.mirror-vs', 'build', '.next', '.nuxt', 'coverage', '.nyc_output', '__pycache__', '.venv', 'venv', 'env', 'target', 'bin', 'obj', '.husky', '.vscode'].includes(name);
+  return [
+    'node_modules',
+    'dist',
+    'out',
+    '.git',
+    '.mirror-vs',
+    'build',
+    '.next',
+    '.nuxt',
+    'coverage',
+    '.nyc_output',
+    '__pycache__',
+    '.venv',
+    'venv',
+    'env',
+    'target',
+    'bin',
+    'obj',
+    '.husky',
+    '.vscode',
+  ].includes(name);
 }
 function getRoot(): string {
   const f = vscode.workspace.workspaceFolders;
@@ -22,7 +78,13 @@ function getRoot(): string {
 }
 function isTest(path_: string): boolean {
   const n = path.basename(path_).toLowerCase();
-  return n.includes('.test.') || n.includes('.spec.') || n.includes('_test.') || n.endsWith('.test.ts') || n.endsWith('.spec.ts');
+  return (
+    n.includes('.test.') ||
+    n.includes('.spec.') ||
+    n.includes('_test.') ||
+    n.endsWith('.test.ts') ||
+    n.endsWith('.spec.ts')
+  );
 }
 function collectSrc(root: string): string[] {
   const r: string[] = [];
@@ -43,7 +105,12 @@ function collectSrc(root: string): string[] {
 function analyzeOverview(root: string): string {
   const files: { path: string; lines: number; size: number }[] = [];
   const lines: string[] = [];
-  let totalFiles = 0, totalDirs = 0, srcFiles = 0, testFiles = 0, totalLOC = 0, totalBytes = 0;
+  let totalFiles = 0,
+    totalDirs = 0,
+    srcFiles = 0,
+    testFiles = 0,
+    totalLOC = 0,
+    totalBytes = 0;
   const walk = (dir: string, depth: number) => {
     if (depth > 6) return;
     for (const e of fs.readdirSync(dir)) {
@@ -65,7 +132,9 @@ function analyzeOverview(root: string): string {
             const lc = c.split('\n').length;
             totalLOC += lc;
             files.push({ path: fp, lines: lc, size: s.size });
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
       }
     }
@@ -89,7 +158,9 @@ function analyzeOverview(root: string): string {
     else if (deps['@angular/core']) fw = 'Angular';
     else if (deps['svelte']) fw = 'Svelte';
     else if (deps['express']) fw = 'Express.js';
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   lines.push(`📦 **Project: ${path.basename(root)}**`);
   lines.push('');
   lines.push('**Stats:**');
@@ -125,10 +196,12 @@ const categories: { name: string; pattern: RegExp; emoji: string }[] = [
   { name: 'Middleware', pattern: /\/(middleware|plugins)\//i, emoji: '🔗' },
 ];
 function classifyFile(fp: string): string {
-  for (const c of categories) { if (c.pattern.test(fp)) return `${c.emoji} ${c.name}`; }
+  for (const c of categories) {
+    if (c.pattern.test(fp)) return `${c.emoji} ${c.name}`;
+  }
   const e = path.extname(fp).toLowerCase();
-  if (['.ts','.tsx'].includes(e)) return '📝 TypeScript';
-  if (['.js','.jsx'].includes(e)) return '📝 JavaScript';
+  if (['.ts', '.tsx'].includes(e)) return '📝 TypeScript';
+  if (['.js', '.jsx'].includes(e)) return '📝 JavaScript';
   if (e === '.json') return '📋 JSON';
   if (e === '.md') return '📖 Docs';
   return '📁 Other';
@@ -142,7 +215,11 @@ function classify(root: string): string {
     if (!map.has(cat)) map.set(cat, { count: 0, loc: 0, files: [] });
     const e = map.get(cat)!;
     e.count++;
-    try { e.loc += fs.readFileSync(f, 'utf8').split('\n').length; } catch { /* */ }
+    try {
+      e.loc += fs.readFileSync(f, 'utf8').split('\n').length;
+    } catch {
+      /* */
+    }
     if (e.files.length < 6) e.files.push(rel);
   }
   const lines: string[] = ['**📂 Project Structure by Category**', ''];
@@ -156,7 +233,11 @@ function classify(root: string): string {
 }
 
 // ── Analyzer 3: Dependency & Circular Deps ──
-interface Edge { from: string; to: string; line: number; }
+interface Edge {
+  from: string;
+  to: string;
+  line: number;
+}
 function parseImports(fp: string): Edge[] {
   const r: Edge[] = [];
   try {
@@ -165,9 +246,12 @@ function parseImports(fp: string): Edge[] {
     let m: RegExpExecArray | null;
     while ((m = re.exec(c)) !== null) {
       const imp = m[1] || m[2];
-      if (imp.startsWith('.') || imp.startsWith('/')) r.push({ from: fp, to: imp, line: c.substring(0, m.index).split('\n').length });
+      if (imp.startsWith('.') || imp.startsWith('/'))
+        r.push({ from: fp, to: imp, line: c.substring(0, m.index).split('\n').length });
     }
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   return r;
 }
 function resolve(importer: string, imp: string, root: string): string | null {
@@ -175,7 +259,7 @@ function resolve(importer: string, imp: string, root: string): string | null {
   const res = imp.startsWith('/') ? path.join(root, imp) : path.resolve(dir, imp);
   if (fs.existsSync(res)) {
     if (fs.statSync(res).isDirectory()) {
-      for (const ext of ['.ts','.tsx','.js','.jsx','.mjs','.mts','.cts','.json']) {
+      for (const ext of ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cts', '.json']) {
         const idx = path.join(res, `index${ext}`);
         if (fs.existsSync(idx)) return idx;
       }
@@ -183,7 +267,7 @@ function resolve(importer: string, imp: string, root: string): string | null {
     }
     return res;
   }
-  for (const ext of ['.ts','.tsx','.js','.jsx','.mjs','.mts','.cts','.vue','.json']) {
+  for (const ext of ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cts', '.vue', '.json']) {
     const we = `${res}${ext}`;
     if (fs.existsSync(we)) return we;
   }
@@ -197,20 +281,31 @@ function findCycles(root: string): string[][] {
     const deps: string[] = [];
     for (const e of parseImports(f)) {
       const r = resolve(f, e.to, root);
-      if (r) { const tr = path.relative(root, r).replace(/\\/g, '/'); if (tr !== rel) deps.push(tr); }
+      if (r) {
+        const tr = path.relative(root, r).replace(/\\/g, '/');
+        if (tr !== rel) deps.push(tr);
+      }
     }
     adj.set(rel, deps);
   }
   const cycles: string[][] = [];
-  const visited = new Set<string>(), rec = new Set<string>(), stk: string[] = [];
+  const visited = new Set<string>(),
+    rec = new Set<string>(),
+    stk: string[] = [];
   const dfs = (n: string) => {
-    visited.add(n); rec.add(n); stk.push(n);
+    visited.add(n);
+    rec.add(n);
+    stk.push(n);
     for (const nb of adj.get(n) || []) {
       if (!adj.has(nb)) continue;
       if (!visited.has(nb)) dfs(nb);
-      else if (rec.has(nb)) { const s = stk.indexOf(nb); cycles.push([...stk.slice(s), nb]); }
+      else if (rec.has(nb)) {
+        const s = stk.indexOf(nb);
+        cycles.push([...stk.slice(s), nb]);
+      }
     }
-    stk.pop(); rec.delete(n);
+    stk.pop();
+    rec.delete(n);
   };
   for (const n of adj.keys()) if (!visited.has(n)) dfs(n);
   return cycles;
@@ -222,18 +317,30 @@ function depsAnalysis(root: string): string {
   for (const f of all) {
     const rel = path.relative(root, f).replace(/\\/g, '/');
     const deps: string[] = [];
-    for (const e of parseImports(f)) { const r = resolve(f, e.to, root); if (r) deps.push(path.relative(root, r).replace(/\\/g, '/')); }
+    for (const e of parseImports(f)) {
+      const r = resolve(f, e.to, root);
+      if (r) deps.push(path.relative(root, r).replace(/\\/g, '/'));
+    }
     impMap.set(rel, deps);
   }
   const count = new Map<string, number>();
   for (const [, deps] of impMap) for (const d of deps) count.set(d, (count.get(d) || 0) + 1);
   lines.push('**Most Imported:**');
-  for (const [f, c] of Array.from(count.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20)) lines.push(`- \`${f}\` — ${c}x`);
+  for (const [f, c] of Array.from(count.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20))
+    lines.push(`- \`${f}\` — ${c}x`);
   lines.push('');
   const rev = new Map<string, string[]>();
-  for (const [f, deps] of impMap) for (const d of deps) { if (!rev.has(d)) rev.set(d, []); rev.get(d)!.push(f); }
+  for (const [f, deps] of impMap)
+    for (const d of deps) {
+      if (!rev.has(d)) rev.set(d, []);
+      rev.get(d)!.push(f);
+    }
   lines.push('**Core Modules (most dependents):**');
-  for (const [f, deps] of Array.from(rev.entries()).sort((a, b) => b[1].length - a[1].length).slice(0, 15)) {
+  for (const [f, deps] of Array.from(rev.entries())
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 15)) {
     lines.push(`- \`${f}\` — ${deps.length} dependent${deps.length > 1 ? 's' : ''}`);
   }
   lines.push('');
@@ -241,58 +348,108 @@ function depsAnalysis(root: string): string {
   if (cycles.length) {
     lines.push(`**⚠️ ${cycles.length} Circular Dependenc${cycles.length > 1 ? 'ies' : 'y'}**`);
     for (let i = 0; i < Math.min(10, cycles.length); i++) {
-      lines.push(`  Cycle ${i+1}: ${cycles[i].join(' → ')}`);
+      lines.push(`  Cycle ${i + 1}: ${cycles[i].join(' → ')}`);
     }
     if (cycles.length > 10) lines.push(`  ... and ${cycles.length - 10} more`);
   } else lines.push('✅ No circular dependencies.');
   lines.push('');
   lines.push('**Entry Points (no local imports):**');
   let ec = 0;
-  for (const [f, deps] of impMap) { if (!deps.length) { lines.push(`- \`${f}\``); ec++; if (ec >= 10) break; } }
+  for (const [f, deps] of impMap) {
+    if (!deps.length) {
+      lines.push(`- \`${f}\``);
+      ec++;
+      if (ec >= 10) break;
+    }
+  }
   return lines.join('\n');
 }
 
 // ── Analyzer 4: Complexity Analysis ──
-interface FuncMetric { name: string; line: number; lines: number; complexity: number; depth: number; }
+interface FuncMetric {
+  name: string;
+  line: number;
+  lines: number;
+  complexity: number;
+  depth: number;
+}
 function calcComplexity(code: string): number {
   let c = 1;
-  for (const pat of [/\bif\b/g, /\belse if\b/g, /\bfor\b/g, /\bwhile\b/g, /\bcase\b/g, /\bcatch\b/g, /\b&&\b/g, /\b\|\|\b/g]) {
+  for (const pat of [
+    /\bif\b/g,
+    /\belse if\b/g,
+    /\bfor\b/g,
+    /\bwhile\b/g,
+    /\bcase\b/g,
+    /\bcatch\b/g,
+    /\b&&\b/g,
+    /\b\|\|\b/g,
+  ]) {
     const m = code.match(pat);
     if (m) c += m.length;
   }
   return c;
 }
 function getDepth(code: string): number {
-  let max = 0, cur = 0;
-  for (const ch of code) { if (ch === '{' || ch === '(') { cur++; max = Math.max(max, cur); } else if (ch === '}' || ch === ')') { cur = Math.max(0, cur - 1); } }
+  let max = 0,
+    cur = 0;
+  for (const ch of code) {
+    if (ch === '{' || ch === '(') {
+      cur++;
+      max = Math.max(max, cur);
+    } else if (ch === '}' || ch === ')') {
+      cur = Math.max(0, cur - 1);
+    }
+  }
   return max;
 }
 function extractFuncs(fp: string): FuncMetric[] {
   const r: FuncMetric[] = [];
   try {
     const c = fs.readFileSync(fp, 'utf8');
-    const re = /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?(?:function\s+\*?\s*(\w+)|const\s+(\w+)\s*=\s*(?:async\s*)?(?:function|\(|=>)|let\s+(\w+)\s*=\s*(?:async\s*)?(?:function|\(|=>)|(\w+)\s*\([^)]*\)\s*\{)/g;
+    const re =
+      /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?(?:function\s+\*?\s*(\w+)|const\s+(\w+)\s*=\s*(?:async\s*)?(?:function|\(|=>)|let\s+(\w+)\s*=\s*(?:async\s*)?(?:function|\(|=>)|(\w+)\s*\([^)]*\)\s*\{)/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(c)) !== null) {
       const name = m[1] || m[2] || m[3] || m[4] || 'anon';
       const startLine = c.substring(0, m.index).split('\n').length;
-      let braces = 0, pos = m.index + m[0].length;
-      while (pos < c.length && c[pos] !== '{') { if (c[pos] === '(') braces++; if (c[pos] === ')') braces--; pos++; }
+      let braces = 0,
+        pos = m.index + m[0].length;
+      while (pos < c.length && c[pos] !== '{') {
+        if (c[pos] === '(') braces++;
+        if (c[pos] === ')') braces--;
+        pos++;
+      }
       if (pos < c.length && c[pos] === '{') {
-        pos++; braces = 1; const bodyStart = pos;
-        while (pos < c.length && braces > 0) { if (c[pos] === '{') braces++; if (c[pos] === '}') braces--; pos++; }
+        pos++;
+        braces = 1;
+        const bodyStart = pos;
+        while (pos < c.length && braces > 0) {
+          if (c[pos] === '{') braces++;
+          if (c[pos] === '}') braces--;
+          pos++;
+        }
         const body = c.substring(bodyStart, pos - 1);
         const endLine = c.substring(0, pos).split('\n').length;
-        r.push({ name, line: startLine, lines: endLine - startLine + 1, complexity: calcComplexity(body), depth: getDepth(body) });
+        r.push({
+          name,
+          line: startLine,
+          lines: endLine - startLine + 1,
+          complexity: calcComplexity(body),
+          depth: getDepth(body),
+        });
       }
     }
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   return r;
 }
 function complexity(root: string): string {
   const lines: string[] = ['**📊 Complexity Analysis**', ''];
   const all: { file: string; funcs: FuncMetric[] }[] = [];
-  let totalC = 0, totalF = 0;
+  let totalC = 0,
+    totalF = 0;
   for (const f of collectSrc(root)) {
     const funcs = extractFuncs(f);
     if (funcs.length) {
@@ -306,25 +463,33 @@ function complexity(root: string): string {
   lines.push(`- Average complexity: ${totalF ? (totalC / totalF).toFixed(2) : 'N/A'}`);
   lines.push('');
   const hotspots: { file: string; fn: FuncMetric }[] = [];
-  for (const { file, funcs } of all) for (const fn of funcs) if (fn.complexity > 10 || fn.lines > 50) hotspots.push({ file, fn });
+  for (const { file, funcs } of all)
+    for (const fn of funcs) if (fn.complexity > 10 || fn.lines > 50) hotspots.push({ file, fn });
   hotspots.sort((a, b) => b.fn.complexity - a.fn.complexity);
   if (hotspots.length) {
     lines.push('**⚠️ Complexity Hotspots (complexity > 10 or lines > 50):**');
     for (const { file, fn } of hotspots.slice(0, 30)) {
       const w: string[] = [];
-      if (fn.complexity > 20) w.push('🔴 HIGH'); else if (fn.complexity > 10) w.push('🟡 MED');
-      if (fn.lines > 100) w.push('XL'); else if (fn.lines > 50) w.push('LONG');
-      lines.push(`- \`${file}:${fn.line}\` **${fn.name}** — cc:${fn.complexity}, ${fn.lines}ln, depth:${fn.depth} ${w.join(',')}`);
+      if (fn.complexity > 20) w.push('🔴 HIGH');
+      else if (fn.complexity > 10) w.push('🟡 MED');
+      if (fn.lines > 100) w.push('XL');
+      else if (fn.lines > 50) w.push('LONG');
+      lines.push(
+        `- \`${file}:${fn.line}\` **${fn.name}** — cc:${fn.complexity}, ${fn.lines}ln, depth:${fn.depth} ${w.join(',')}`,
+      );
     }
     lines.push('');
   } else lines.push('✅ No complexity hotspots.');
   lines.push('**Most Complex Files:**');
-  const fileComplexity = all.map(({ file, funcs }) => ({
-    file,
-    avg: funcs.reduce((s, f) => s + f.complexity, 0) / funcs.length,
-    max: Math.max(...funcs.map(f => f.complexity)),
-    cnt: funcs.length,
-  })).sort((a, b) => b.avg - a.avg).slice(0, 15);
+  const fileComplexity = all
+    .map(({ file, funcs }) => ({
+      file,
+      avg: funcs.reduce((s, f) => s + f.complexity, 0) / funcs.length,
+      max: Math.max(...funcs.map((f) => f.complexity)),
+      cnt: funcs.length,
+    }))
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 15);
   for (const fc of fileComplexity) {
     lines.push(`- \`${fc.file}\` — avg: ${fc.avg.toFixed(1)}, max: ${fc.max}, ${fc.cnt} funcs`);
   }
@@ -334,21 +499,39 @@ function complexity(root: string): string {
 // ── Analyzer 5: Test Coverage ──
 function coverage(root: string): string {
   const all = collectSrc(root);
-  const src = all.filter(f => !isTest(f));
-  const tst = all.filter(f => isTest(f));
-  const lines: string[] = ['**🧪 Test Coverage**', '', `- Source: ${src.length}`, `- Tests: ${tst.length}`, `- Ratio: ${src.length ? ((tst.length / src.length) * 100).toFixed(1) : 'N/A'}%`, ''];
+  const src = all.filter((f) => !isTest(f));
+  const tst = all.filter((f) => isTest(f));
+  const lines: string[] = [
+    '**🧪 Test Coverage**',
+    '',
+    `- Source: ${src.length}`,
+    `- Tests: ${tst.length}`,
+    `- Ratio: ${src.length ? ((tst.length / src.length) * 100).toFixed(1) : 'N/A'}%`,
+    '',
+  ];
   const tested = new Set<string>();
   for (const s of src) {
     const base = path.basename(s, path.extname(s));
-    if (tst.some(t => { const tb = path.basename(t, path.extname(t)); return tb.includes(base) || base.includes(tb.replace(/\.(test|spec|_test)$/, '')); })) tested.add(s);
+    if (
+      tst.some((t) => {
+        const tb = path.basename(t, path.extname(t));
+        return tb.includes(base) || base.includes(tb.replace(/\.(test|spec|_test)$/, ''));
+      })
+    )
+      tested.add(s);
   }
-  const untested = src.filter(f => !tested.has(f));
+  const untested = src.filter((f) => !tested.has(f));
   lines.push(`- Tested: ${tested.size} (${src.length ? ((tested.size / src.length) * 100).toFixed(1) : 'N/A'}%)`);
-  lines.push(`- Untested: ${untested.length} (${src.length ? ((untested.length / src.length) * 100).toFixed(1) : 'N/A'}%)`);
+  lines.push(
+    `- Untested: ${untested.length} (${src.length ? ((untested.length / src.length) * 100).toFixed(1) : 'N/A'}%)`,
+  );
   lines.push('');
   if (untested.length) {
     lines.push('**Missing Tests:**');
-    for (const f of untested.map(f => ({ path: path.relative(root, f), size: fs.statSync(f).size })).sort((a, b) => b.size - a.size).slice(0, 30)) {
+    for (const f of untested
+      .map((f) => ({ path: path.relative(root, f), size: fs.statSync(f).size }))
+      .sort((a, b) => b.size - a.size)
+      .slice(0, 30)) {
       lines.push(`- \`${f.path}\` (${(f.size / 1024).toFixed(1)} KB)`);
     }
   }
@@ -357,16 +540,17 @@ function coverage(root: string): string {
 
 // ── Analyzer 6: Dead Code Detection ──
 function deadCode(root: string): string {
-  const src = collectSrc(root).filter(f => !isTest(f));
+  const src = collectSrc(root).filter((f) => !isTest(f));
   const exports: { file: string; name: string; line: number; type: string }[] = [];
   for (const f of src) {
     try {
       const c = fs.readFileSync(f, 'utf8');
-      if (!['.ts','.tsx','.js','.jsx','.mjs','.mts'].includes(path.extname(f))) continue;
-      const re = /export\s+(?:default\s+)?(?:function\s+(\w+)|const\s+(\w+)|let\s+(\w+)|var\s+(\w+)|class\s+(\w+)|interface\s+(\w+)|type\s+(\w+))/g;
+      if (!['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts'].includes(path.extname(f))) continue;
+      const re =
+        /export\s+(?:default\s+)?(?:function\s+(\w+)|const\s+(\w+)|let\s+(\w+)|var\s+(\w+)|class\s+(\w+)|interface\s+(\w+)|type\s+(\w+))/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(c)) !== null) {
-        const name = m[1]||m[2]||m[3]||m[4]||m[5]||m[6]||m[7];
+        const name = m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7];
         if (!name) continue;
         let type = 'var';
         if (m[0].includes('function')) type = 'fn';
@@ -375,7 +559,9 @@ function deadCode(root: string): string {
         else if (m[0].includes('type')) type = 'type';
         exports.push({ file: f, name, line: c.substring(0, m.index).split('\n').length, type });
       }
-    } catch { /* */ }
+    } catch {
+      /* */
+    }
   }
   const unused: typeof exports = [];
   for (const exp of exports) {
@@ -387,17 +573,29 @@ function deadCode(root: string): string {
         const pat = new RegExp(`\\b${exp.name}\\b`);
         for (const line of c.split('\n')) {
           const lo = line.toLowerCase();
-          if ((lo.includes('import') || lo.includes('require') || lo.includes('from')) && pat.test(line)) { used = true; break; }
+          if ((lo.includes('import') || lo.includes('require') || lo.includes('from')) && pat.test(line)) {
+            used = true;
+            break;
+          }
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
       if (used) break;
     }
     if (!used) unused.push(exp);
   }
-  const lines: string[] = ['**🔍 Dead Code Analysis**', '', `- Exports: ${exports.length}`, `- Unused: ${unused.length}`, ''];
+  const lines: string[] = [
+    '**🔍 Dead Code Analysis**',
+    '',
+    `- Exports: ${exports.length}`,
+    `- Unused: ${unused.length}`,
+    '',
+  ];
   if (unused.length) {
     lines.push('**Unused Exports:**');
-    for (const u of unused.slice(0, 40)) lines.push(`- \`${path.relative(root, u.file).replace(/\\/g, '/')}:${u.line}\` **${u.name}** (${u.type})`);
+    for (const u of unused.slice(0, 40))
+      lines.push(`- \`${path.relative(root, u.file).replace(/\\/g, '/')}:${u.line}\` **${u.name}** (${u.type})`);
     if (unused.length > 40) lines.push(`  ... and ${unused.length - 40} more`);
     lines.push('');
     lines.push('⚠️ Best-effort — dynamic imports may not be detected.');
@@ -421,15 +619,23 @@ function impact(root: string, target: string): string {
   const deps: { file: string; line: number }[] = [];
   for (const f of collectSrc(root)) {
     if (f === abs) continue;
-    for (const imp of parseImports(f)) { const r = resolve(f, imp.to, root); if (r === abs) deps.push({ file: f, line: imp.line }); }
+    for (const imp of parseImports(f)) {
+      const r = resolve(f, imp.to, root);
+      if (r === abs) deps.push({ file: f, line: imp.line });
+    }
   }
   lines.push(`**Dependents (${deps.length}):**`);
   if (deps.length) {
     const byDir = new Map<string, number>();
-    for (const d of deps) { const dir = path.dirname(path.relative(root, d.file)); byDir.set(dir, (byDir.get(dir) || 0) + 1); }
-    for (const [dir, c] of Array.from(byDir.entries()).sort((a, b) => b[1] - a[1])) lines.push(`  - \`${dir}/\` — ${c} file${c > 1 ? 's' : ''}`);
+    for (const d of deps) {
+      const dir = path.dirname(path.relative(root, d.file));
+      byDir.set(dir, (byDir.get(dir) || 0) + 1);
+    }
+    for (const [dir, c] of Array.from(byDir.entries()).sort((a, b) => b[1] - a[1]))
+      lines.push(`  - \`${dir}/\` — ${c} file${c > 1 ? 's' : ''}`);
     lines.push('');
-    for (const d of deps.slice(0, 25)) lines.push(`  - \`${path.relative(root, d.file).replace(/\\/g, '/')}\` (line ${d.line})`);
+    for (const d of deps.slice(0, 25))
+      lines.push(`  - \`${path.relative(root, d.file).replace(/\\/g, '/')}\` (line ${d.line})`);
     if (deps.length > 25) lines.push(`  ... and ${deps.length - 25} more`);
   } else lines.push('  No dependents.');
   lines.push('');
@@ -443,7 +649,7 @@ function impact(root: string, target: string): string {
 
 function graphify(root: string): string {
   const all = collectSrc(root);
-  
+
   // 1. Build directory tree
   const treeNodes = new Map<string, string[]>();
   const addPathToTree = (relPath: string) => {
@@ -457,8 +663,8 @@ function graphify(root: string): string {
     }
   };
 
-  const relFiles = all.map(f => path.relative(root, f).replace(/\\/g, '/'));
-  
+  const relFiles = all.map((f) => path.relative(root, f).replace(/\\/g, '/'));
+
   const roots = new Set<string>();
   for (const f of relFiles) {
     addPathToTree(f);
@@ -472,14 +678,14 @@ function graphify(root: string): string {
     const newPrefix = prefix + (isLast ? '    ' : '│   ');
     const children = treeNodes.get(node) || [];
     const subDirs = children;
-    const leafFiles = relFiles.filter(f => {
+    const leafFiles = relFiles.filter((f) => {
       const dir = path.dirname(f);
-      return (dir === node && !subDirs.some(sd => sd === f)) || (node === f && !treeNodes.has(f));
+      return (dir === node && !subDirs.some((sd) => sd === f)) || (node === f && !treeNodes.has(f));
     });
 
     const allChildren = [
-      ...subDirs.map(sd => ({ path: sd, isDir: true })),
-      ...leafFiles.map(lf => ({ path: lf, isDir: false }))
+      ...subDirs.map((sd) => ({ path: sd, isDir: true })),
+      ...leafFiles.map((lf) => ({ path: lf, isDir: false })),
     ].sort((a, b) => a.path.localeCompare(b.path));
 
     allChildren.forEach((child, idx) => {

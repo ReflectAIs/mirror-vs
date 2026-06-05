@@ -69,10 +69,8 @@ describe('executeFileTool', () => {
         const localGetSafe = (p: string) => path.join(tmpDir, p);
         const tool = { name: 'read_file' as const, path: filePath };
         const result = await executeFileTool(tool, localGetSafe);
-        
-        expect(result).toBe(
-          '[File: review.txt — showing lines 1-1 of 1 total]\n1: mock proposed clean content'
-        );
+
+        expect(result).toBe('[File: review.txt — showing lines 1-1 of 1 total]\n1: mock proposed clean content');
         expect(spy).toHaveBeenCalledWith(absolutePath);
       } finally {
         if (spy) spy.mockRestore();
