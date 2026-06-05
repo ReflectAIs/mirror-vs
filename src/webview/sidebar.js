@@ -3396,8 +3396,13 @@ function attachImage(base64) {
     container.style.visibility = '';
 
     if (preserveScroll) {
-      // Maintain scroll position perfectly so there are no sudden jumps
-      container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
+      // If user was at the top, stay at the top after loading older messages
+      if (oldScrollTop <= 5) {
+        container.scrollTop = 0;
+      } else {
+        // Maintain relative scroll position so content doesn't jump
+        container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
+      }
       setTimeout(() => {
         isRebuildingDOM = false;
       }, 80);
@@ -3445,21 +3450,12 @@ function attachImage(base64) {
     }
   }
 
-  // Scroll pagination trigger + sticky bar visibility
+  // Sticky bar visibility only (no auto-load on scroll)
   if (chatScrollContainer) {
     chatScrollContainer.addEventListener('scroll', () => {
       if (isRebuildingDOM) return;
       const threshold = 15;
-      const isAtBottom = (chatScrollContainer.scrollHeight - chatScrollContainer.scrollTop - chatScrollContainer.clientHeight) <= threshold;
-      userIsAtBottom = isAtBottom;
-
-      if (chatScrollContainer.scrollTop <= 10) {
-        const totalMessages = chatHistory.length;
-        if (totalMessages > renderedLimit) {
-          loadMoreHistory();
-        }
-      }
-
+      userIsAtBottom = (chatScrollContainer.scrollHeight - chatScrollContainer.scrollTop - chatScrollContainer.clientHeight) <= threshold;
       updateStickyVisibility();
     }, { passive: true });
   }
