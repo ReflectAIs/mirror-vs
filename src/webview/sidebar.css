@@ -3272,6 +3272,62 @@ select:focus {
   transform: none;
 }
 
+/* Queue chips - stacked above the prompt input */
+.queue-chips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 2px;
+  margin-bottom: 4px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+.queue-chips-container.hidden {
+  display: none !important;
+}
+.queue-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.08));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, rgba(255, 200, 0, 0.3));
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--vscode-inputValidation-warningForeground, #d4a72c);
+  animation: fadeInUp 0.2s ease;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.queue-chip-num {
+  font-weight: 600;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.queue-chip-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-chip-remove {
+  background: none;
+  border: none;
+  color: var(--vscode-inputValidation-warningForeground, #d4a72c);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.queue-chip-remove:hover {
+  opacity: 1;
+}
+
 .stop-btn-circle {
   background: linear-gradient(135deg, #ef4444, #dc2626);
   color: #fff;

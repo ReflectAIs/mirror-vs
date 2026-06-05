@@ -161,6 +161,105 @@
   let currentStreamingReasoningText = '';
   let activeProvider = 'ollama';
   let isSending = false;
+  let messageQueue = [];  // Array of { text, images, selectedFiles, userDisplayMessage, rawText }
+  
+  function renderQueueChips() {
+    const container = document.getElementById('queue-chips-container');
+    if (!container) return;
+    
+    if (messageQueue.length === 0) {
+      container.innerHTML = '';
+      container.classList.add('hidden');
+      return;
+    }
+    
+    container.classList.remove('hidden');
+    container.innerHTML = '';
+    
+    messageQueue.forEach((item, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'queue-chip';
+      
+      const numSpan = document.createElement('span');
+      numSpan.className = 'queue-chip-num';
+      numSpan.textContent = '#' + (idx + 1);
+      
+      const textSpan = document.createElement('span');
+      textSpan.className = 'queue-chip-text';
+      const displayText = item.userDisplayMessage || item.text;
+      textSpan.textContent = displayText.length > 40 ? displayText.substring(0, 37) + '...' : displayText;
+      textSpan.title = displayText;
+      
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'queue-chip-remove';
+      removeBtn.innerHTML = '✕';
+      removeBtn.title = 'Remove queued message';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        messageQueue.splice(idx, 1);
+        renderQueueChips();
+        if (messageQueue.length === 0) {
+          container.classList.add('hidden');
+        }
+      });
+      
+      chip.appendChild(numSpan);
+      chip.appendChild(textSpan);
+      chip.appendChild(removeBtn);
+      container.appendChild(chip);
+    });
+  }
+  
+  function processNextInQueue() {
+    if (messageQueue.length === 0) return;
+    if (isSending) return;
+    
+    const next = messageQueue.shift();
+    renderQueueChips();
+    
+    // Actually send the message
+    executeSend(next.text, next.images, next.selectedFiles, next.userDisplayMessage, next.rawText);
+  }
+  
+  function clearQueue() {
+    messageQueue = [];
+    renderQueueChips();
+    showToast('Queued messages cleared', 'success');
+  }
+
+  // Actual send execution - separated so it can be called from both submitMessage and processNextInQueue
+  function executeSend(text, imagesOpt, selectedFilesOpt, userDisplayMessage) {
+    const images = imagesOpt || [];
+    const selectedFiles = selectedFilesOpt || [];
+    
+    // Build user display message
+    let displayMsg = userDisplayMessage || text;
+    if (selectedFiles.length > 0) {
+      displayMsg += '\n\n_Referenced Context: ' + selectedFiles.map(function(f) { return ''; }).join(', ') + '_';
+    }
+    appendMessageBubble('user', displayMsg, images);
+    scrollChatToBottom(true);
+
+    const assistantBubble = appendMessageBubble('assistant', '');
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'typing-indicator';
+    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+    assistantBubble.appendChild(typingIndicator);
+    currentStreamingBubble = assistantBubble;
+    currentStreamingText = '';
+    currentStreamingReasoningText = '';
+
+    scrollChatToBottom(true);
+
+    vscode.postMessage({
+      type: 'sendMessage',
+      text: text,
+      history: chatHistory,
+      linkedFiles: selectedFiles,
+      images: images
+    });
+  }
+
   let savedDefaultOllamaModel = 'llama3';
   let activeSessionId = null;
   let gitChanges = [];
@@ -1311,6 +1410,7 @@ function attachImage(base64) {
     isSending = false;
     promptInput.disabled = false;
     sendBtn.disabled = false;
+    clearQueue();
     stopBtn.classList.add('hidden');
     sendBtn.classList.remove('hidden');
     setAvatarState('idle');
@@ -1347,7 +1447,35 @@ function attachImage(base64) {
     }
 
     if (!text && linkedFiles.size === 0 && attachedImages.length === 0) return;
-    if (isSending) return;
+    
+    // If already sending, queue the message instead of discarding
+    if (isSending) {
+      messageQueue.push({
+        text: text,
+        images: [...attachedImages],
+        selectedFiles: Array.from(linkedFiles),
+        userDisplayMessage: isSlashCommand ? rawText : text,
+        rawText: rawText
+      });
+      renderQueueChips();
+      showToast('Message queued (' + messageQueue.length + ' pending)', 'info');
+      
+      // Show queued user bubble so user sees it was accepted
+      let displayText = isSlashCommand ? rawText : text;
+      appendMessageBubble('system', '⏳ <em>Queued for sending...</em>');
+      scrollChatToBottom(true);
+      
+      // Also add to chatHistory as a real user message so it's preserved
+      chatHistory.push({ role: 'user', content: text });
+      vscode.postMessage({
+        type: 'saveHistory',
+        history: chatHistory
+      });
+      
+      promptInput.value = '';
+      promptInput.style.height = 'auto';
+      return;
+    }
 
     // Hide welcome card if present
     if (welcomeCard) {
@@ -1357,7 +1485,6 @@ function attachImage(base64) {
     isSending = true;
     promptInput.value = '';
     promptInput.style.height = 'auto';
-    promptInput.disabled = true;
     sendBtn.disabled = true;
 
     // Toggle stop button
@@ -1370,32 +1497,8 @@ function attachImage(base64) {
     if (isSlashCommand) {
       userDisplayMessage += '\n\n_Slash command expanded to: ' + text.substring(0, 120) + (text.length > 120 ? '...' : '') + '_';
     }
-    if (selectedFiles.length > 0) {
-      userDisplayMessage += '\n\n_Referenced Context: ' + selectedFiles.map(function(f) { return ''; }).join(', ') + '_';
-    }
-    appendMessageBubble('user', userDisplayMessage, attachedImages);
-    scrollChatToBottom(true);
 
-    const assistantBubble = appendMessageBubble('assistant', '');
-    const typingIndicator = document.createElement('div');
-    typingIndicator.className = 'typing-indicator';
-    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
-    assistantBubble.appendChild(typingIndicator);
-    currentStreamingBubble = assistantBubble;
-    currentStreamingText = '';
-    currentStreamingReasoningText = '';
-
-    scrollChatToBottom(true);
-
-    vscode.postMessage({
-      type: 'sendMessage',
-      text: text,
-      history: chatHistory,
-      linkedFiles: selectedFiles,
-      images: attachedImages
-    });
-
-
+    executeSend(text, attachedImages, selectedFiles, userDisplayMessage);
 
     linkedFiles.clear();
     renderChips();
@@ -2023,7 +2126,6 @@ function attachImage(base64) {
       }
 
       case 'chatResponseStart': {
-        promptInput.disabled = true;
         sendBtn.disabled = true;
         isSending = true;
         isStreamingCardExpanded = false;
@@ -2192,10 +2294,11 @@ function attachImage(base64) {
         break;
       }
 
-      case 'loopComplete': {
-        isSending = false;
-        promptInput.disabled = false;
-        sendBtn.disabled = false;
+        case 'loopComplete': {
+          isSending = false;
+          promptInput.disabled = false;
+          sendBtn.disabled = false;
+          processNextInQueue();
         promptInput.focus();
         currentStreamingBubble = null;
         currentStreamingText = '';
@@ -2232,6 +2335,7 @@ function attachImage(base64) {
         isSending = false;
         promptInput.disabled = false;
         sendBtn.disabled = false;
+        processNextInQueue();
         currentStreamingBubble = null;
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
