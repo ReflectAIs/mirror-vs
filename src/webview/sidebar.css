@@ -2142,6 +2142,17 @@ select:focus {
 }
 
 /* ─── HISTORY LOADING TRIGGER ────────────────────────────────────────────── */
+/* Last user message sticky - stays visible even when older messages load */
+.message.user:last-of-type {
+  position: sticky;
+  bottom: 0;
+  background: var(--vscode-editorWidget-background, #252526);
+  z-index: 5;
+  border-top: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
 .history-loading-trigger {
   width: 100%;
   display: flex;
