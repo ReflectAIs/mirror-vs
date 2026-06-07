@@ -2146,7 +2146,7 @@ select:focus {
 /* The JS adds .sticky-user-message to the last user message */
 .message.user.sticky-user-message {
   position: sticky !important;
-  top: 0 !important;
+  top: -12px !important;
   background: var(--vscode-editorWidget-background, rgba(12,12,20,0.98)) !important;
   z-index: 10;
   border-bottom: 1.5px solid rgba(99, 102, 241, 0.25);
