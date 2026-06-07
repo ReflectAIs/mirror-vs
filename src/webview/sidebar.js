@@ -93,32 +93,86 @@
   const chatScrollContainer = document.querySelector('.chat-container');
 
   function updateStickyUserMessage() {
-    const userBubbles = chatMessages ? chatMessages.querySelectorAll('.message.user') : [];
+    if (!chatMessages) return;
+    
+    // First: reset all user bubbles (remove sticky from non-targets)
+    const userBubbles = chatMessages.querySelectorAll('.message.user');
     userBubbles.forEach(bubble => {
       bubble.classList.remove('sticky-user-message', 'is-stuck');
+      // Clear inline sticky styles
+      bubble.style.position = '';
+      bubble.style.top = '';
+      bubble.style.bottom = '';
+      bubble.style.zIndex = '';
+      bubble.style.background = '';
+      bubble.style.borderBottom = '';
+      bubble.style.paddingBottom = '';
+      bubble.style.boxShadow = '';
     });
+    
+    // Apply sticky to the LAST user message
     if (userBubbles.length > 0) {
       const lastBubble = userBubbles[userBubbles.length - 1];
       lastBubble.classList.add('sticky-user-message');
+      
+      // Apply sticky via inline styles (guaranteed to work regardless of CSS specificity)
+      lastBubble.style.position = 'sticky';
+      lastBubble.style.top = '-12px';
+      lastBubble.style.bottom = '';
+      lastBubble.style.zIndex = '10';
     }
+    
     updateStickyVisibility();
+    updatePinnedUserMessage();
   }
 
   function updateStickyVisibility() {
-    if (!chatScrollContainer) return;
-    const userBubbles = chatMessages ? chatMessages.querySelectorAll('.message.user') : [];
+    if (!chatScrollContainer || !chatMessages) return;
+    const userBubbles = chatMessages.querySelectorAll('.message.user.sticky-user-message');
     if (userBubbles.length === 0) return;
     const lastBubble = userBubbles[userBubbles.length - 1];
     
+    // Detect if scrolled past the top (stuck at top)
+    const rect = lastBubble.getBoundingClientRect();
     const containerRect = chatScrollContainer.getBoundingClientRect();
-    const bubbleRect = lastBubble.getBoundingClientRect();
+    const isStuck = rect.top <= containerRect.top + 5;
     
-    // Add is-stuck class if the message top edge crosses the top boundary of the chat container
-    if (bubbleRect.top <= containerRect.top + 2) {
+    if (isStuck) {
       lastBubble.classList.add('is-stuck');
+      lastBubble.style.background = 'var(--vscode-editorWidget-background, rgba(12,12,20,0.98))';
+      lastBubble.style.borderBottom = '1.5px solid rgba(99, 102, 241, 0.25)';
+      lastBubble.style.paddingBottom = '8px';
+      lastBubble.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.12), 0 1px 0 rgba(99, 102, 241, 0.2)';
     } else {
       lastBubble.classList.remove('is-stuck');
+      lastBubble.style.background = '';
+      lastBubble.style.borderBottom = '';
+      lastBubble.style.paddingBottom = '';
+      lastBubble.style.boxShadow = '';
     }
+  }
+
+  function updatePinnedUserMessage() {
+    const pinBar = document.getElementById('pinned-user-msg-bar');
+    if (pinBar) {
+      pinBar.classList.add('hidden');
+    }
+  }
+
+
+
+
+  // Contenteditable keyboard handler: Enter sends, Shift+Enter newline
+  if (promptInput) {
+    promptInput.addEventListener('keydown', function contenteditableKeydown(e) {
+      if (!e.shiftKey && e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        if (typeof triggerSend === 'function') {
+          triggerSend();
+        }
+        return;
+      }
+    });
   }
 
   let activeFilePath = '';
@@ -229,14 +283,30 @@
 
   // Actual send execution - separated so it can be called from both submitMessage and processNextInQueue
   function executeSend(text, imagesOpt, selectedFilesOpt, userDisplayMessage) {
-    const images = imagesOpt || [];
-    const selectedFiles = selectedFilesOpt || [];
-    
-    // Build user display message
-    let displayMsg = userDisplayMessage || text;
-    if (selectedFiles.length > 0) {
-      displayMsg += '\n\n_Referenced Context: ' + selectedFiles.map(function(f) { return ''; }).join(', ') + '_';
+  // Read from contenteditable if no text provided
+  if (!text && promptInput) {
+    // Walk the DOM, converting .inline-file-tag spans to [full/path] markers
+    var parts = [];
+    var childNodes = promptInput.childNodes;
+    for (var i = 0; i < childNodes.length; i++) {
+      var node = childNodes[i];
+      if (node.nodeType === Node.TEXT_NODE) {
+        parts.push(node.textContent);
+      } else if (node.classList && node.classList.contains('inline-file-tag')) {
+        var path = node.dataset.path || node.textContent.replace('@', '');
+        parts.push('[' + path + ']');
+      } else {
+        parts.push(node.textContent || ' ');
+      }
     }
+    text = parts.join('');
+    promptInput.innerHTML = '';
+    autoGrowTextarea();
+  }
+    const images = imagesOpt || [];
+    
+    // Build user display message — text already contains [filepath] markers inline from autocomplete
+    let displayMsg = userDisplayMessage || text;
     appendMessageBubble('user', displayMsg, images);
     scrollChatToBottom(true);
 
@@ -255,7 +325,6 @@
       type: 'sendMessage',
       text: text,
       history: chatHistory,
-      linkedFiles: selectedFiles,
       images: images
     });
   }
@@ -286,6 +355,7 @@
       vscode.postMessage({ type: 'generatePRDescription' });
       const gitDrawer = document.getElementById('git-drawer');
       if (gitDrawer) gitDrawer.classList.add('collapsed');
+
     });
   }
   if (gitCommitMsgBtn) {
@@ -337,17 +407,25 @@
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       if (promptInput) {
-        const start = promptInput.selectionStart;
-        const end = promptInput.selectionEnd;
-        const oldVal = promptInput.value;
-        promptInput.value = oldVal.substring(0, start) + transcript + oldVal.substring(end);
         promptInput.focus();
-        promptInput.selectionStart = promptInput.selectionEnd = start + transcript.length;
+        const sel = window.getSelection();
+        if (sel.rangeCount) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const textNode = document.createTextNode(transcript);
+          range.insertNode(textNode);
+          
+          // Position cursor after the inserted text
+          const newRange = document.createRange();
+          newRange.setStartAfter(textNode);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        } else {
+          promptInput.appendChild(document.createTextNode(transcript));
+        }
         if (typeof autoGrowTextarea === 'function') {
           autoGrowTextarea();
-        } else {
-          promptInput.style.height = '0px';
-          promptInput.style.height = (promptInput.scrollHeight) + 'px';
         }
       }
     };
@@ -381,7 +459,6 @@
 
   // New features state
   let workspaceFiles = [];
-  let linkedFiles = new Set();
   let autocompleteQuery = '';
   let autocompleteActiveIndex = 0;
   let isAutocompleteOpen = false;
@@ -1076,8 +1153,7 @@
   });
 
   function autoGrowTextarea() {
-    promptInput.style.height = '0px';
-    promptInput.style.height = promptInput.scrollHeight + 'px';
+    promptInput.style.height = '';
   }
 
   promptInput.addEventListener('keydown', (e) => {
@@ -1125,15 +1201,22 @@
         container.innerHTML = `<span style="font-size: 11px; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 4px;">Approved &amp; Executing ⚡</span>`;
       }
       
-      promptInput.value = "Approved. Proceed with the implementation plan.";
+      promptInput.innerHTML = "Approved. Proceed with the implementation plan.";
       submitMessage();
     }
   });
 
   // 6b. Autocomplete Logic
   function handleAutocompleteSearch() {
-    const text = promptInput.value;
-    const cursorPos = promptInput.selectionStart;
+    const sel = window.getSelection();
+    let text = promptInput.textContent || promptInput.innerText || '';
+    let cursorPos = 0;
+    if (sel && sel.rangeCount && promptInput.contains(sel.anchorNode)) {
+      const preRange = document.createRange();
+      preRange.selectNodeContents(promptInput);
+      preRange.setEnd(sel.anchorNode, sel.anchorOffset);
+      cursorPos = preRange.toString().length;
+    }
     
     // Find if we are typing a file path reference starting with '@'
     const textBeforeCursor = text.substring(0, cursorPos);
@@ -1207,22 +1290,65 @@
   }
 
   function selectAutocompleteItem(filePath) {
-    linkedFiles.add(filePath);
-    renderChips();
+    // Insert a styled file tag into the contenteditable div
+    const sel = window.getSelection();
+    if (!sel.rangeCount) { promptInput.focus(); return; }
+    const range = sel.getRangeAt(0);
     
-    // Just remove the '@query' segment — the chip above the input is the visual indicator.
-    // No raw [File: ...] injection into the textarea. The model receives the path via linkedFiles.
-    const text = promptInput.value;
-    const cursorPos = promptInput.selectionStart;
-    const textBeforeCursor = text.substring(0, cursorPos);
-    const atIndex = textBeforeCursor.lastIndexOf('@');
+    // Find and remove the @query text by scanning backward
+    const walker = document.createTreeWalker(range.startContainer, NodeFilter.SHOW_TEXT, null, false);
+    walker.currentNode = range.startContainer;
+    let node = walker.previousNode();
+    let atNode = range.startContainer;
+    let atOffset = range.startOffset;
     
-    if (atIndex !== -1) {
-      const textAfterCursor = text.substring(cursorPos);
-      promptInput.value = text.substring(0, atIndex) + textAfterCursor;
-      const newCursorPos = atIndex;
-      promptInput.selectionStart = newCursorPos;
-      promptInput.selectionEnd = newCursorPos;
+    // Walk backward to find the '@' character
+    let found = false;
+    if (atNode.nodeType === Node.TEXT_NODE && atNode.textContent) {
+      const text = atNode.textContent;
+      const idx = text.lastIndexOf('@', atOffset);
+      if (idx !== -1) {
+        // Replace '@query' text with file tag
+        atNode.textContent = text.substring(0, idx) + text.substring(atOffset);
+        const tagSpan = document.createElement('span');
+        tagSpan.className = 'inline-file-tag';
+        tagSpan.contentEditable = 'false';
+        const fileName = filePath.split('/').pop() || filePath;
+        tagSpan.textContent = '@' + fileName;
+        tagSpan.dataset.path = filePath;
+        tagSpan.title = filePath;
+        
+        // Insert tag at the position where @ was
+        const tagRange = document.createRange();
+        tagRange.setStart(atNode, idx);
+        tagRange.collapse(true);
+        tagRange.insertNode(tagSpan);
+        
+        // Move cursor after the tag
+        const newRange = document.createRange();
+        newRange.setStartAfter(tagSpan);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        found = true;
+      }
+    }
+    
+    if (!found) {
+      // Fallback: just insert [filepath] text directly
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'inline-file-tag';
+      tagSpan.contentEditable = 'false';
+      const fileName = filePath.split('/').pop() || filePath;
+      tagSpan.textContent = '@' + fileName;
+      tagSpan.dataset.path = filePath;
+      tagSpan.title = filePath;
+      range.insertNode(tagSpan);
+      const newRange = document.createRange();
+      newRange.setStartAfter(tagSpan);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
     }
     
     closeAutocomplete();
@@ -1230,29 +1356,6 @@
     autoGrowTextarea();
   }
 
-  function renderChips() {
-    contextChipsContainer.innerHTML = '';
-    linkedFiles.forEach((file) => {
-      const chip = document.createElement('div');
-      chip.className = 'context-chip';
-      
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = file.split('/').pop() || file;
-      nameSpan.title = file;
-      
-      const removeBtn = document.createElement('span');
-      removeBtn.className = 'context-chip-remove';
-      removeBtn.innerHTML = '&#x2715;';
-      removeBtn.addEventListener('click', () => {
-        linkedFiles.delete(file);
-        renderChips();
-      });
-      
-      chip.appendChild(nameSpan);
-      chip.appendChild(removeBtn);
-      contextChipsContainer.appendChild(chip);
-    });
-  }
 
   function closeAutocomplete() {
     isAutocompleteOpen = false;
@@ -1384,6 +1487,7 @@ function attachImage(base64) {
     });
     currentToolCardElement = null;
 
+
     // 2. Remove typing indicator / think animations
     const typingIndicators = document.querySelectorAll('.typing-indicator');
     typingIndicators.forEach(indicator => {
@@ -1408,7 +1512,7 @@ function attachImage(base64) {
   stopBtn.addEventListener('click', () => {
     vscode.postMessage({ type: 'cancelStream' });
     isSending = false;
-    promptInput.disabled = false;
+    promptInput.contentEditable = 'true';
     sendBtn.disabled = false;
     clearQueue();
     stopBtn.classList.add('hidden');
@@ -1417,9 +1521,27 @@ function attachImage(base64) {
     clearAllActiveAnimations();
   });
 
+  function getPromptInputValue() {
+    if (!promptInput) return '';
+    const parts = [];
+    const childNodes = promptInput.childNodes;
+    for (let i = 0; i < childNodes.length; i++) {
+      const node = childNodes[i];
+      if (node.nodeType === Node.TEXT_NODE) {
+        parts.push(node.textContent);
+      } else if (node.classList && node.classList.contains('inline-file-tag')) {
+        const path = node.dataset.path || node.textContent.replace('@', '');
+        parts.push('[' + path + ']');
+      } else {
+        parts.push(node.textContent || ' ');
+      }
+    }
+    return parts.join('');
+  }
+
   // 7. Core Message Submission with Slash Command Support
   function submitMessage() {
-    const rawText = promptInput.value.trim();
+    const rawText = getPromptInputValue().trim();
 
     // Slash command handling
     let text = rawText;
@@ -1446,14 +1568,13 @@ function attachImage(base64) {
       }
     }
 
-    if (!text && linkedFiles.size === 0 && attachedImages.length === 0) return;
+    if (!text && attachedImages.length === 0) return;
     
     // If already sending, queue the message instead of discarding
     if (isSending) {
       messageQueue.push({
         text: text,
         images: [...attachedImages],
-        selectedFiles: Array.from(linkedFiles),
         userDisplayMessage: isSlashCommand ? rawText : text,
         rawText: rawText
       });
@@ -1472,8 +1593,7 @@ function attachImage(base64) {
         history: chatHistory
       });
       
-      promptInput.value = '';
-      promptInput.style.height = 'auto';
+      promptInput.innerHTML = '';
       return;
     }
 
@@ -1483,25 +1603,22 @@ function attachImage(base64) {
     }
 
     isSending = true;
-    promptInput.value = '';
-    promptInput.style.height = 'auto';
+    promptInput.innerHTML = '';
     sendBtn.disabled = true;
 
     // Toggle stop button
     sendBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
 
-    const selectedFiles = Array.from(linkedFiles);
     
     let userDisplayMessage = isSlashCommand ? rawText : text;
     if (isSlashCommand) {
       userDisplayMessage += '\n\n_Slash command expanded to: ' + text.substring(0, 120) + (text.length > 120 ? '...' : '') + '_';
     }
 
-    executeSend(text, attachedImages, selectedFiles, userDisplayMessage);
+    executeSend(text, attachedImages, undefined, userDisplayMessage);
 
-    linkedFiles.clear();
-    renderChips();
+    
     attachedImages = [];
     renderImageAttachments();
   }
@@ -1524,6 +1641,7 @@ function attachImage(base64) {
       card.setAttribute('data-checkpoint-id', checkpointId);
     }
     
+
     let friendlyName = toolName;
     let iconHtml = '🔧';
     if (toolName === 'read_file') {
@@ -1904,6 +2022,7 @@ function attachImage(base64) {
           isReverted = true;
         } else {
           const cpMatch = details.match(/Revert ID: (\w+)/);
+
           if (cpMatch) {
             checkpointId = cpMatch[1];
           }
@@ -1985,10 +2104,14 @@ function attachImage(base64) {
           const activeIndex = rawText.indexOf('\n\n[Active File Context - ');
           if (activeIndex !== -1) rawText = rawText.substring(0, activeIndex);
           
-          promptInput.value = rawText.trim();
-          promptInput.style.height = '0px';
-          promptInput.style.height = (promptInput.scrollHeight) + 'px';
+          promptInput.textContent = rawText.trim();
           promptInput.focus();
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(promptInput);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
         }
         isEditingHistory = true;
         // Use index-based revert for reliability
@@ -2038,10 +2161,9 @@ function attachImage(base64) {
     }
     
     msgElement.appendChild(bubble);
+    
     container.appendChild(msgElement);
-    if (role === 'user') {
-      updateStickyUserMessage();
-    }
+    
     return bubble;
   }
 
@@ -2191,7 +2313,16 @@ function attachImage(base64) {
 
       case 'workspaceFiles': {
         workspaceFiles = message.files || [];
-        const textBeforeCursor = promptInput.value.substring(0, promptInput.selectionStart);
+        const sel = window.getSelection();
+        let text = promptInput.textContent || promptInput.innerText || '';
+        let cursorPos = 0;
+        if (sel && sel.rangeCount && promptInput.contains(sel.anchorNode)) {
+          const preRange = document.createRange();
+          preRange.selectNodeContents(promptInput);
+          preRange.setEnd(sel.anchorNode, sel.anchorOffset);
+          cursorPos = preRange.toString().length;
+        }
+        const textBeforeCursor = text.substring(0, cursorPos);
         const atIndex = textBeforeCursor.lastIndexOf('@');
         if (atIndex !== -1 && (atIndex === 0 || /\s/.test(textBeforeCursor[atIndex - 1]))) {
           handleAutocompleteSearch();
@@ -2309,6 +2440,7 @@ function attachImage(base64) {
       case 'chatResponseComplete': {
         setAvatarState('idle');
         if (!currentStreamingBubble) {
+          updateStickyUserMessage();
           return;
         }
 
@@ -2343,6 +2475,7 @@ function attachImage(base64) {
         currentStreamingBubble = null;
         currentStreamingText = '';
         currentStreamingReasoningText = '';
+        updateStickyUserMessage();
         scrollChatToBottom();
         break;
       }
@@ -2370,7 +2503,7 @@ function attachImage(base64) {
 
         case 'loopComplete': {
           isSending = false;
-          promptInput.disabled = false;
+          promptInput.contentEditable = 'true';
           sendBtn.disabled = false;
           processNextInQueue();
         promptInput.focus();
@@ -2387,6 +2520,7 @@ function attachImage(base64) {
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
         clearAllActiveAnimations();
+        updateStickyUserMessage();
         scrollChatToBottom();
         break;
       }
@@ -2407,7 +2541,7 @@ function attachImage(base64) {
         }
 
         isSending = false;
-        promptInput.disabled = false;
+        promptInput.contentEditable = 'true';
         sendBtn.disabled = false;
         processNextInQueue();
         currentStreamingBubble = null;
@@ -2423,6 +2557,7 @@ function attachImage(base64) {
         selectProvider(newProvider);
         
         const msgElement = document.createElement('div');
+
         msgElement.className = 'message system-context';
         msgElement.innerHTML = `
           <div class="system-context-banner" style="background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
@@ -2506,9 +2641,14 @@ function attachImage(base64) {
       }
 
       case 'prefillPrompt': {
-        promptInput.value = message.text;
+        promptInput.textContent = message.text;
         promptInput.focus();
-        autoGrowTextarea();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(promptInput);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
         break;
       }
 
@@ -2546,6 +2686,7 @@ function attachImage(base64) {
         currentStreamingBubble = null;
         
         renderVisibleHistory(isEditingHistory);
+        updateStickyUserMessage();
         isEditingHistory = false;
         break;
       }
@@ -2959,6 +3100,7 @@ function attachImage(base64) {
 
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
   }
+
 
   function renderGitChanges(changes) {
     gitChanges = changes || [];
@@ -3973,9 +4115,14 @@ function highlightLine(line, lang) {
       `;
       item.title = `Click to load template: ${t.name}`;
       item.addEventListener('click', () => {
-        promptInput.value = t.content;
+        promptInput.textContent = t.content;
         promptInput.focus();
-        autoGrowTextarea();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(promptInput);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
         if (templatesPopup) templatesPopup.classList.add('hidden');
       });
       templatesPopupList.appendChild(item);
@@ -4032,9 +4179,8 @@ function highlightLine(line, lang) {
   if (genTestsBtn) {
     genTestsBtn.addEventListener('click', () => {
       if (!activeFilePath) return;
-      linkedFiles.add(activeFilePath);
-      renderChips();
-      promptInput.value = `/test Write comprehensive unit tests for this file.`;
+      
+      promptInput.textContent = `/test Write comprehensive unit tests for this file.`;
       submitMessage();
     });
   }
@@ -4042,9 +4188,8 @@ function highlightLine(line, lang) {
   if (genDocsBtn) {
     genDocsBtn.addEventListener('click', () => {
       if (!activeFilePath) return;
-      linkedFiles.add(activeFilePath);
-      renderChips();
-      promptInput.value = `Generate JSdoc/TSdoc/docstrings documentation for functions and classes in this file.`;
+      
+      promptInput.textContent = `Generate JSdoc/TSdoc/docstrings documentation for functions and classes in this file.`;
       submitMessage();
     });
   }
@@ -4253,5 +4398,7 @@ function highlightLine(line, lang) {
   }
 
 })();
+
+
 
 

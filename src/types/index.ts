@@ -96,13 +96,12 @@ export interface GitFileDiff {
 export interface SendMessageData {
   text: string;
   history: ChatMessage[];
-  linkedFiles?: string[];
   images?: string[];
   terminalName?: string;
 }
 
 export type WebviewToExtensionMessage =
-  | { type: 'sendMessage'; text: string; history: ChatMessage[]; linkedFiles?: string[]; images?: string[] }
+  | { type: 'sendMessage'; text: string; history: ChatMessage[]; images?: string[] }
   | { type: 'getSettings' }
   | {
       type: 'saveSettings';

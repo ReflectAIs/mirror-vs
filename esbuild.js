@@ -12,8 +12,30 @@ if (!fs.existsSync(webviewDistDir)) {
   fs.mkdirSync(webviewDistDir, { recursive: true });
 }
 
+// Concatenate sidebar parts into a single sidebar.js
+function concatSidebarParts() {
+  const partsDir = path.join(__dirname, 'src', 'webview', 'sidebar');
+  const parts = ['01-core.js', '02-ui-renderers.js', '03-submit-send.js', '04-tool-cards.js', '05-message-handlers.js', '06-markdown.js', '07-sessions-diffs.js'];
+  let combined = '';
+  for (const part of parts) {
+    const partPath = path.join(partsDir, part);
+    if (fs.existsSync(partPath)) {
+      combined += fs.readFileSync(partPath, 'utf-8') + '\n';
+    } else {
+      console.warn(`Warning: sidebar part not found: ${part}`);
+    }
+  }
+  // Write the concatenated file to src/webview/sidebar.js
+  const outputPath = path.join(__dirname, 'src', 'webview', 'sidebar.js');
+  fs.writeFileSync(outputPath, combined, 'utf-8');
+  console.log('Sidebar parts concatenated into sidebar.js');
+}
+
 // Copy webview assets to dist
 function copyWebviewAssets() {
+  // First concatenate sidebar parts
+  concatSidebarParts();
+  
   const webviewSrcDir = path.join(__dirname, 'src', 'webview');
   const filesToCopy = ['sidebar.html', 'sidebar.js', 'sidebar.css', 'syntax-highlighter.js'];
   for (const file of filesToCopy) {

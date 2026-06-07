@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { LLMProvider, ChatMessage } from '../types';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
-import { buildSystemPrompt } from './orchestrator';
+import { buildSystemPrompt } from './orchestrator-prompt';
 
 /**
  * Manages agent session state, history, git baseline, avatar state,

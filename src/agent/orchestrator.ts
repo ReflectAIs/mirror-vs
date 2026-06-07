@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { ChatMessage, LLMProvider } from '../types';
 import { executeTool } from './tools/tool-registry';
-import { CommandService } from '../services/command-service';
 import { RateLimiter } from '../services/rate-limiter';
 import { ProviderFallback } from '../services/provider-fallback';
 import { AgentSession } from './agent-session';
@@ -10,203 +9,8 @@ import { AgentCompleter } from './agent-completer';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-
-/** Model context window sizes in tokens. Used for token-budget-based summarization. */
-const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-  'deepseek-chat': 64000,
-  'deepseek-reasoner': 64000,
-  'deepseek-v4-flash': 128000, // Capped at 64K for cost-effectiveness
-  'deepseek-v4-pro': 128000, // Capped at 64K for cost-effectiveness
-  llama3: 8192,
-  'llama3.1': 131072,
-  'llama3.2': 131072,
-  'qwen2.5-coder:32b': 131072,
-  'qwen2.5-coder:14b': 131072,
-  'qwen2.5-coder:7b': 32768,
-  codestral: 32768,
-  mistral: 32768,
-  gemma2: 8192,
-  phi3: 4096,
-};
-
-function getModelContextWindow(model: string): number {
-  const normalized = model.toLowerCase();
-  if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model];
-  if (normalized.includes('deepseek')) return 128000; // Safe cap for cost-control for V4 models
-  const baseModel = model.split(':')[0];
-  if (MODEL_CONTEXT_WINDOWS[baseModel]) return MODEL_CONTEXT_WINDOWS[baseModel];
-  return 32000; // Conservative default
-}
-
-function estimateTokenCount(text: string): number {
-  return Math.ceil(text.length / 4);
-}
-
-function estimatePayloadTokens(messages: { content: string }[]): number {
-  return messages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
-}
-
-import { getBaseAgentRole } from './prompts/baseAgentRole';
-import { getWorkspaceContext } from './prompts/workspaceContext';
-import { getToolSpecifications } from './prompts/toolSpecifications';
-
-export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = false): string {
-  const service = CommandService.getInstance();
-  const terminals = service.getActiveTerminals();
-  let terminalContext = '';
-  if (terminals.length > 0) {
-    terminalContext =
-      '\n\n### ACTIVE RUNNING TERMINALS:\n' +
-      terminals.map((t) => '- "' + t.name + '" ' + (t.running ? 'RUNNING' : 'EXITED')).join('\n');
-  } else {
-    terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\nNone';
-  }
-
-  const isSubsequent = loopCount > 1;
-  const baseRole = getBaseAgentRole();
-  const workspaceContext = getWorkspaceContext();
-  const toolSpecs = getToolSpecifications(isSubsequent);
-
-  let planStatusContext = '';
-  if (hasPlan) {
-    planStatusContext =
-      '\n\n### 📋 APPROVED PLAN DETECTED:\nAn implementation plan has already been proposed and approved by the user for this session. Do NOT write or output a new <implementation_plan> block. Proceed directly to executing the tool calls (e.g. read_file, patch_file, etc.) to accomplish the plan steps now!';
-  }
-
-  const config = vscode.workspace.getConfiguration('mirror-vs');
-
-  // 1. Custom Prompt Prefix
-  const customPrefix = config.get<string>('customSystemPrompt', '').trim();
-  let customPrefixSection = '';
-  if (customPrefix) {
-    customPrefixSection = `### CUSTOM USER INSTRUCTIONS:\n${customPrefix}\n\n`;
-  }
-
-  // 2. Workspace Rules (.mirror-vs/rules.md)
-  let rulesSection = '';
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceFolder) {
-    const rulesPath = path.join(workspaceFolder, '.mirror-vs', 'rules.md');
-    if (fs.existsSync(rulesPath)) {
-      try {
-        const rulesContent = fs.readFileSync(rulesPath, 'utf8').trim();
-        if (rulesContent) {
-          rulesSection = `\n\n### WORKSPACE RULES (MANDATORY):\n${rulesContent}`;
-        }
-      } catch (e) {
-        console.warn('Failed to read workspace rules.md', e);
-      }
-    }
-  }
-
-  // 3. Agent Memory (.mirror-vs/memory.json)
-  let memorySection = '';
-  if (workspaceFolder) {
-    const memoryPath = path.join(workspaceFolder, '.mirror-vs', 'memory.json');
-    if (fs.existsSync(memoryPath)) {
-      try {
-        const memoryContent = fs.readFileSync(memoryPath, 'utf8').trim();
-        if (memoryContent) {
-          try {
-            const parsed = JSON.parse(memoryContent);
-            memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${JSON.stringify(parsed, null, 2)}`;
-          } catch {
-            memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${memoryContent}`;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to read memory.json', e);
-      }
-    }
-  }
-
-  // 4. Specialized Agent Mode Instructions
-  let modeSection = '';
-  const activeMode = config.get<string>('agentMode', 'normal');
-  if (activeMode === 'refactor') {
-    modeSection = `\n\n### SPECIALIZED AGENT MODE: REFACTOR MODE\nYou are currently operating in REFACTOR MODE. Your primary focus is performing high-quality, large-scale codebase refactorings. Identify structural patterns, extract modular components, migrate APIs, and explain your changes clearly.`;
-  } else if (activeMode === 'debug') {
-    modeSection = `\n\n### SPECIALIZED AGENT MODE: DEBUG MODE\nYou are currently operating in DEBUG MODE. You are attached to the VS Code debugger to trace errors, read logs, and inspect runtime code states. Use debug tools (debug_get_sessions, debug_get_breakpoints, debug_inspect_variables) to identify bugs and resolve them.`;
-  }
-
-  return `${customPrefixSection}${baseRole}${planStatusContext}${modeSection}\n\n${toolSpecs}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${memorySection}`;
-}
-
-function getShellEnvDescription(): string {
-  if (process.platform === 'win32') {
-    return 'This is a WINDOWS machine running PowerShell.';
-  }
-  return 'This is a macOS/Linux machine running bash/zsh.';
-}
-
-function hasActionPlanningIntent(text: string): boolean {
-  const lower = text.toLowerCase();
-  const patterns = [
-    /\bi'll start by\b/,
-    /\bi will start by\b/,
-    /\blet's start by\b/,
-    /\blet me start by\b/,
-    /\bfirst, i will\b/,
-    /\bfirst, let's\b/,
-    /\bfirst, let me\b/,
-    /\bfirst, i need to\b/,
-    /\bi will need to\b/,
-    /\bi'll need to\b/,
-    /\bi need to\b/,
-    /\bi'm going to\b/,
-    /\bi will analyze\b/,
-    /\bi'll analyze\b/,
-    /\bi will search\b/,
-    /\bi'll search\b/,
-    /\bi will read\b/,
-    /\bi'll read\b/,
-    /\bi will run\b/,
-    /\bi'll run\b/,
-    /\bi will check\b/,
-    /\bi'll check\b/,
-  ];
-  return patterns.some((p) => p.test(lower));
-}
-
-function hasDeclaredPlan(history: ChatMessage[], currentResponse: string): boolean {
-  const planTagRegex = /<implementation_plan>([\s\S]*?)<\/implementation_plan>/i;
-  if (planTagRegex.test(currentResponse)) return true;
-  return history.some((msg) => msg.role === 'assistant' && planTagRegex.test(msg.content));
-}
-
-function getDiagnosticsForFile(filePath: string): string {
-  try {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) return '';
-
-    const workspaceRoot = folders[0].uri.fsPath;
-    const allDiagnostics = vscode.languages.getDiagnostics();
-    const relativeTarget = path.isAbsolute(filePath)
-      ? path.relative(workspaceRoot, filePath).replace(/\\/g, '/')
-      : filePath.replace(/\\/g, '/');
-
-    const fileDiags: string[] = [];
-
-    for (const [uri, diags] of allDiagnostics) {
-      const relPath = path.relative(workspaceRoot, uri.fsPath).replace(/\\/g, '/');
-      if (relPath !== relativeTarget) continue;
-
-      for (const d of diags) {
-        if (d.severity > vscode.DiagnosticSeverity.Warning) continue;
-        const severity = d.severity === vscode.DiagnosticSeverity.Error ? 'Error' : 'Warning';
-        fileDiags.push(`- Line ${d.range.start.line + 1}: [${severity}] ${d.message} (${d.source || 'linter'})`);
-      }
-    }
-
-    if (fileDiags.length === 0) {
-      return `\n[Grounding Observation]: VS Code reports 0 errors and 0 warnings in this file. build is clean!`;
-    }
-
-    return `\n[Grounding Warning - Code issues detected after patch]:\n${fileDiags.join('\n')}\n*Please fix these compiler/syntax errors in your next turn!*`;
-  } catch (e) {
-    return '';
-  }
-}
+import { getModelContextWindow, estimateTokenCount, estimatePayloadTokens } from './orchestrator-config';
+import { buildSystemPrompt, hasDeclaredPlan, hasActionPlanningIntent, getDiagnosticsForFile } from './orchestrator-prompt';
 
 export class AgentOrchestrator {
   private _activeAbortController: AbortController | undefined;
@@ -583,15 +387,24 @@ export class AgentOrchestrator {
           }
           continueLoop = false;
 
+          const resolvedPayloadPromises = currentMessages
+            .filter((msg) => !msg.summarized)
+            .map(async (msg) => {
+              let content = msg.content;
+              if (msg.role === 'user' && content) {
+                content = await this._resolveFileRefs(content);
+              }
+              return {
+                role: (msg.role === 'system' ? 'user' : msg.role) as 'user' | 'assistant' | 'system',
+                content: content,
+                images: msg.images,
+              };
+            });
+          const resolvedPayload = await Promise.all(resolvedPayloadPromises);
+
           const payload: ChatMessage[] = [
             { role: 'system', content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, '')) },
-            ...currentMessages
-              .filter((msg) => !msg.summarized)
-              .map((msg) => ({
-                role: (msg.role === 'system' ? 'user' : msg.role) as 'user' | 'assistant' | 'system',
-                content: msg.content,
-                images: msg.images,
-              })),
+            ...resolvedPayload,
           ];
 
           // Payload diagnostics
@@ -814,32 +627,6 @@ export class AgentOrchestrator {
                   this._sendToolStatusToWebview(tool.name, 'error', target, guard.reason);
                   this._sendAvatarState('error');
                   toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${guard.reason}`);
-                  continue;
-                }
-
-                // Plan-First Mode Validation
-                const isModifying = [
-                  'create_file',
-                  'write_file',
-                  'patch_file',
-                  'delete_file',
-                  'rename_file',
-                  'run_command',
-                  'send_terminal_input',
-                  'browser_click',
-                  'browser_type',
-                  'browser_evaluate_script',
-                  'git_add',
-                  'git_commit',
-                  'rename_symbol',
-                ].includes(tool.name);
-                const planFirstEnabled = vscode.workspace.getConfiguration('mirror-vs').get<boolean>('planFirst', true);
-
-                if (isModifying && planFirstEnabled && !hasDeclaredPlan(currentMessages, assistantResponse)) {
-                  const rejectMsg = `[System Intervention - Plan Required]: You attempted to execute the modifying tool '${tool.name}' without first proposing an implementation plan. In Plan-First Mode, you MUST output a structured <implementation_plan>...</implementation_plan> block detailing the files to modify, the changes, and the verification strategy BEFORE executing any modification. Please write the plan first.`;
-                  this._sendToolStatusToWebview(tool.name, 'error', target, rejectMsg);
-                  this._sendAvatarState('error');
-                  toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${rejectMsg}`);
                   continue;
                 }
 
@@ -1085,6 +872,26 @@ export class AgentOrchestrator {
     }
   }
 
+  /**
+   * Resolves inline [filepath] markers in user text by reading file contents.
+   * Replaces [path/to/file.ts] with a formatted code block.
+   */
+  private async _resolveFileRefs(text: string): Promise<string> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    return text.replace(/\[([^\[\]]+?)\]/g, (match: string, filePath: string) => {
+      try {
+        const trimmed = filePath.trim();
+        const fullPath = path.join(workspaceRoot, trimmed);
+        if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+          const content = fs.readFileSync(fullPath, 'utf-8');
+          const ext = path.extname(trimmed).slice(1) || 'txt';
+          return `\n\`\`\`${ext}:${trimmed}\n${content}\n\`\`\``;
+        }
+      } catch {}
+      return match;
+    });
+  }
+
   private async _generateLightweightProjectMap(workspaceRoot: string): Promise<string> {
     const shouldSkipDir = (name: string): boolean => {
       return [
@@ -1202,3 +1009,4 @@ export class AgentOrchestrator {
     }
   }
 }
+

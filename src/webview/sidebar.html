@@ -442,6 +442,13 @@
       </div>
     </main>
 
+    <!-- Pinned User Message Bar (appears when scrolled above last user message) -->
+    <div id="pinned-user-msg-bar" class="pinned-user-msg-bar hidden">
+      <span class="pinned-label">⬆️ Last Message</span>
+      <span class="pinned-text"></span>
+      <button class="pinned-scroll-btn">▼ Scroll to bottom</button>
+    </div>
+
     <div class="input-panel">
       <button id="accept-all-btn" class="accept-all-btn hidden" title="Accept All Active Reviews">✨ Accept All</button>
       <div class="input-card">
@@ -468,8 +475,8 @@
         <!-- Queue chips - shows queued messages above input -->
         <div id="queue-chips-container" class="queue-chips-container hidden"></div>
 
-        <!-- Sleek prompt input textarea (no nested border container) -->
-        <textarea id="prompt-input" placeholder="Ask to modify code... Type '@' to link files" rows="1"></textarea>
+        <!-- Sleek prompt input contenteditable div (renders inline file tags) -->
+        <div id="prompt-input" class="prompt-editable" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Ask to modify code... Type '@' to link files"></div>
         
         <!-- Streamlined Input Toolbar Row -->
         <div class="input-toolbar">
