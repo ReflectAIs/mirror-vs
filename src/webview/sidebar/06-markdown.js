@@ -272,6 +272,24 @@
     if (!text) return '';
     let cleanText = text;
 
+    // Intercept and wrap <architecture_routing> block in a gorgeous card, avoiding recursive infinite loops
+    let hasRouting = false;
+    let routingContent = '';
+    const routingRegex = /<architecture_routing>([\s\S]*?)<\/architecture_routing>/gi;
+    cleanText = cleanText.replace(routingRegex, (match, inner) => {
+      hasRouting = true;
+      routingContent = inner.trim();
+      return `%%%ROUTING_PLACEHOLDER%%%`;
+    });
+
+    let streamingRouting = false;
+    if (cleanText.includes('<architecture_routing>') && !cleanText.includes('</architecture_routing>')) {
+      const openIdx = cleanText.indexOf('<architecture_routing>');
+      routingContent = cleanText.substring(openIdx + '<architecture_routing>'.length).trim();
+      cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_ROUTING_PLACEHOLDER%%%`;
+      streamingRouting = true;
+    }
+
     // Intercept and wrap <implementation_plan> block in a gorgeous card, avoiding recursive infinite loops
     let hasPlan = false;
     let planContent = '';
@@ -364,6 +382,9 @@
         cleanText = cleanText.substring(0, tagInfo.start) + placeholderToken + cleanText.substring(tagInfo.end);
         startFrom = tagInfo.start + placeholderToken.length;
       }
+      // Strip any closing tag for this self-closing tool
+      const closeTagPattern = new RegExp(`</${tool}\\s*>`, 'gi');
+      cleanText = cleanText.replace(closeTagPattern, '');
     }
 
     // Catch-all: strip any remaining self-closing XML tags (unknown tool names like <ls_dir ... />)
@@ -494,6 +515,43 @@
     html = html.replace(/<p>%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%<\/p>/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
     html = html.replace(/%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
 
+    // Replace architecture routing placeholders
+    if (hasRouting) {
+      const formattedRouting = formatRoutingContent(routingContent);
+      const cardHtml = `
+        <div class="architecture-routing-card" style="background: rgba(168, 85, 247, 0.04); border: 1.5px solid rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #a855f7; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.7px; border-bottom: 1px solid rgba(168, 85, 247, 0.25); padding-bottom: 6px;">
+            <span>🌐</span>
+            <span>Architecture Scope Routing Lock</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.95); line-height: 1.6; font-family: var(--font-system);">
+            ${formattedRouting}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%ROUTING_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%ROUTING_PLACEHOLDER%%%', cardHtml);
+    }
+
+    if (streamingRouting) {
+      const formattedRouting = formatRoutingContent(routingContent);
+      const cardHtml = `
+        <div class="architecture-routing-card streaming" style="background: rgba(168, 85, 247, 0.02); border: 1.2px dashed rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(168, 85, 247, 0.15); padding-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #a855f7; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;">
+              <span>🌐</span>
+              <span>Locking Search Scope...</span>
+            </div>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.6; font-family: var(--font-system);">
+            ${formattedRouting}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%STREAMING_ROUTING_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%STREAMING_ROUTING_PLACEHOLDER%%%', cardHtml);
+    }
+
     // Replace planning cards placeholders
     if (hasPlan) {
       const innerHtml = parseMarkdown(planContent, isPlanApproved);
@@ -519,6 +577,7 @@
           </div>
         </div>
       `;
+      html = html.replace('<p>%%%PLAN_PLACEHOLDER%%%</p>', cardHtml);
       html = html.replace('%%%PLAN_PLACEHOLDER%%%', cardHtml);
     }
 
@@ -538,6 +597,7 @@
           </div>
         </div>
       `;
+      html = html.replace('<p>%%%STREAMING_PLAN_PLACEHOLDER%%%</p>', cardHtml);
       html = html.replace('%%%STREAMING_PLAN_PLACEHOLDER%%%', cardHtml);
     }
 
@@ -551,5 +611,36 @@
       return '<span class="history-file-tag" data-file-path="' + escapedPath + '" title="' + escapedPath + ' (click to open)">&#128196; ' + escapedFileName + '</span>';
     });
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
+  }
+
+  function formatRoutingContent(raw) {
+    const lines = raw.split('\n');
+    let html = '';
+    for (const line of lines) {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join(':').trim();
+        
+        let labelColor = '#a855f7';
+        let valStyle = '';
+        if (key === 'SEARCH_SCOPE_ALLOWED') {
+          labelColor = '#10b981';
+          valStyle = 'background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.2); font-family: monospace; font-size: 10px;';
+        } else if (key === 'SEARCH_SCOPE_BLOCKED') {
+          labelColor = '#ef4444';
+          valStyle = 'background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); font-family: monospace; font-size: 10px;';
+        } else if (key === 'FEATURE_OWNER') {
+          labelColor = '#38bdf8';
+          valStyle = 'font-weight: bold; color: #38bdf8;';
+        } else if (key === 'JUSTIFICATION') {
+          labelColor = '#eab308';
+          valStyle = 'font-style: italic; color: rgba(255,255,255,0.8);';
+        }
+        
+        html += `<div style="margin-bottom: 6px;"><span style="color: ${labelColor}; font-weight: 600; font-size: 10px; text-transform: uppercase;">${escapeHtml(key)}:</span> <span style="${valStyle}">${escapeHtml(val)}</span></div>`;
+      }
+    }
+    return html;
   }
 

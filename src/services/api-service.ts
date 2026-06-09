@@ -287,6 +287,10 @@ export function streamDeepSeekChat(
     payload.thinking = {
       type: 'enabled',
     };
+  } else {
+    payload.thinking = {
+      type: 'disabled',
+    };
   }
 
   const bodyData = JSON.stringify(payload);
@@ -349,7 +353,7 @@ export function streamDeepSeekChat(
             const parsed = JSON.parse(jsonStr);
             const chunkText = parsed.choices?.[0]?.delta?.content || '';
             const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning_content || '';
-            if (reasoningChunk && onReasoningChunk) {
+            if (reasoningChunk && onReasoningChunk && thinkingEnabled) {
               onReasoningChunk(reasoningChunk);
             }
             if (chunkText) {

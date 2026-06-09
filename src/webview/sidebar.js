@@ -26,12 +26,24 @@
   const deepseekModelSelect = document.getElementById('deepseek-model-select');
   
   const saveSettingsBtn = document.getElementById('save-settings-btn');
+  const figmaKeyInput = document.getElementById('figma-key');
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
+  
+  const planFirstToggle = document.getElementById('settings-plan-first-toggle');
+  const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');
+  const aiReviewToggle = document.getElementById('settings-ai-review-toggle');
+  const multiFileToggle = document.getElementById('settings-multi-file-toggle');
+  const maxTurnsSummarizeInput = document.getElementById('max-turns-summarize-input');
+  const maxToolOutputInput = document.getElementById('max-tool-output-input');
+  const embeddingModelInput = document.getElementById('embedding-model-input');
   
   const quickProviderSelect = document.getElementById('quick-provider-select');
   const quickModelSelect = document.getElementById('quick-model-select');
   const quickThinkingToggle = document.getElementById('thinking-toggle');
+  
+  // Autonomous Mode toggle element
+  let autonomousToggleEl = document.getElementById('settings-autonomous-toggle');
   const quickThinkingLevelSelect = document.getElementById('thinking-level-select');
   const settingsThinkingToggle = document.getElementById('settings-thinking-toggle');
   const settingsThinkingLevelSelect = document.getElementById('settings-thinking-level-select');
@@ -350,6 +362,15 @@
       vscode.postMessage({ type: 'exportChatSession' });
     });
   }
+  // Initialize autonomous mode toggle
+  const autoToggle = document.getElementById('settings-autonomous-toggle');
+  if (autoToggle) {
+    vscode.postMessage({ type: 'getSetting', key: 'autonomousMode' });
+    autoToggle.addEventListener('change', function() {
+      vscode.postMessage({ type: 'saveSetting', key: 'autonomousMode', value: this.checked ? true : false });
+    });
+  }
+
   if (gitPrDescBtn) {
     gitPrDescBtn.addEventListener('click', () => {
       vscode.postMessage({ type: 'generatePRDescription' });
@@ -513,12 +534,6 @@
     }
   }
 
-  // Initialize
-  vscode.postMessage({ type: 'getSettings' });
-  vscode.postMessage({ type: 'fetchModels' });
-  vscode.postMessage({ type: 'getChatSessions' });
-  vscode.postMessage({ type: 'getChatHistory' });
-  vscode.postMessage({ type: 'getActiveReviews' });
 
   // Drawer Close Buttons
   document.querySelectorAll('.drawer-close-btn').forEach(btn => {
@@ -644,11 +659,11 @@
   let defaultCustomHasKey = false;
 
   function saveProviderSettings(provider) {
-    const ollamaHost = ollamaHostInput.value.trim();
-    const defaultOllamaModel = ollamaModelSelect.value;
-    const defaultDeepSeekModel = deepseekModelSelect.value;
-    const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
-    const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
+    const ollamaHost = ollamaHostInput ? ollamaHostInput.value.trim() : 'http://localhost:11434';
+    const defaultOllamaModel = ollamaModelSelect ? ollamaModelSelect.value : 'llama3';
+    const defaultDeepSeekModel = deepseekModelSelect ? deepseekModelSelect.value : 'deepseek-v4-pro';
+    const contextBudget = (contextBudgetInput && contextBudgetInput.value) ? parseInt(contextBudgetInput.value.trim(), 10) : 75;
+    const turnsToRetain = (turnsToRetainInput && turnsToRetainInput.value) ? parseInt(turnsToRetainInput.value.trim(), 10) : 6;
 
     const customEndpointUrl = customEndpointUrlInput ? customEndpointUrlInput.value.trim() : '';
     const customEndpointModel = customEndpointModelInput ? customEndpointModelInput.value.trim() : '';
@@ -670,6 +685,18 @@
 
     const agentMode = document.getElementById('agent-mode-select') ? document.getElementById('agent-mode-select').value : 'normal';
     const customSystemPrompt = document.getElementById('custom-system-prompt') ? document.getElementById('custom-system-prompt').value : '';
+    const deepSeekThinking = settingsThinkingToggle ? settingsThinkingToggle.checked : true;
+    const deepSeekThinkingLevel = settingsThinkingLevelSelect ? settingsThinkingLevelSelect.value : 'high';
+    const autoToggle = document.getElementById('settings-autonomous-toggle');
+    const autonomousMode = autoToggle ? autoToggle.checked : false;
+
+    const planFirst = planFirstToggle ? planFirstToggle.checked : true;
+    const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
+    const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
+    const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
     vscode.postMessage({
       type: 'saveSettings',
@@ -679,6 +706,16 @@
       defaultDeepSeekModel,
       contextBudgetPercent: contextBudget,
       turnsToRetain: turnsToRetain,
+      deepSeekThinking,
+      deepSeekThinkingLevel,
+      autonomousMode,
+      planFirst,
+      enableTruncationGuardrail: truncationGuard,
+      aiReviewEnabled,
+      multiFileRefactorEnabled: multiFileRefactor,
+      maxTurnsBeforeSummarize,
+      maxToolOutputLength,
+      embeddingModel,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
@@ -788,7 +825,6 @@
   });
 
   const toggleFigmaKeyVisibilityBtn = document.getElementById('toggle-figma-key-visibility');
-  const figmaKeyInput = document.getElementById('figma-key');
   if (toggleFigmaKeyVisibilityBtn && figmaKeyInput) {
     toggleFigmaKeyVisibilityBtn.addEventListener('click', () => {
       if (figmaKeyInput.type === 'password') {
@@ -829,7 +865,10 @@
     if (deepSeekKey === '••••••••') {
       deepSeekKey = undefined;
     }
-    const figmaKey = figmaKeyInput ? figmaKeyInput.value.trim() : '';
+    let figmaKey = figmaKeyInput ? figmaKeyInput.value.trim() : '';
+    if (figmaKey === '••••••••') {
+      figmaKey = undefined;
+    }
     const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
@@ -856,6 +895,17 @@
     const agentMode = document.getElementById('agent-mode-select') ? document.getElementById('agent-mode-select').value : 'normal';
     const customSystemPrompt = document.getElementById('custom-system-prompt') ? document.getElementById('custom-system-prompt').value : '';
 
+    const autoToggle = document.getElementById('settings-autonomous-toggle');
+    const autonomousMode = autoToggle ? autoToggle.checked : false;
+
+    const planFirst = planFirstToggle ? planFirstToggle.checked : true;
+    const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
+    const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
+    const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -868,6 +918,14 @@
       turnsToRetain: turnsToRetain,
       deepSeekThinking,
       deepSeekThinkingLevel,
+      autonomousMode,
+      planFirst,
+      enableTruncationGuardrail: truncationGuard,
+      aiReviewEnabled,
+      multiFileRefactorEnabled: multiFileRefactor,
+      maxTurnsBeforeSummarize,
+      maxToolOutputLength,
+      embeddingModel,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
@@ -2184,60 +2242,79 @@ function attachImage(base64) {
   window.addEventListener('message', (event) => {
     const message = event.data;
 
+    // Autonomous mode setting sync from VS Code
+    if (message.type === 'settingValue' && message.key === 'autonomousMode') {
+      const toggle = document.getElementById('settings-autonomous-toggle');
+      if (toggle) toggle.checked = message.value === true;
+      return;
+    }
+
     switch (message.type) {
       case 'updateSettings': {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;
         
-        ollamaHostInput.value = s.ollamaHost;
+        if (ollamaHostInput) {
+          ollamaHostInput.value = s.ollamaHost;
+        }
         
         // Handle deepseek key display helper
-        if (s.hasDeepSeekKey) {
-          deepseekKeyStatus.textContent = 'Key is configured (Securely stored)';
-          deepseekKeyStatus.style.color = '#22c55e';
-          deepseekKeyInput.value = '••••••••';
-        } else {
-          deepseekKeyStatus.textContent = 'Key is not configured';
-          deepseekKeyStatus.style.color = '#ef4444';
-          deepseekKeyInput.value = '';
+        if (deepseekKeyStatus && deepseekKeyInput) {
+          if (s.hasDeepSeekKey) {
+            deepseekKeyStatus.textContent = 'Key is configured (Securely stored)';
+            deepseekKeyStatus.style.color = '#22c55e';
+            deepseekKeyInput.value = '••••••••';
+          } else {
+            deepseekKeyStatus.textContent = 'Key is not configured';
+            deepseekKeyStatus.style.color = '#ef4444';
+            deepseekKeyInput.value = '';
+          }
         }
 
         const figmaKeyStatus = document.getElementById('figma-key-status');
-        if (s.figmaKeyInput) {
-          figmaKeyInput.value = s.figmaKeyInput;
-        }
         if (s.hasFigmaKey) {
           if (figmaKeyStatus) {
             figmaKeyStatus.textContent = 'Token is configured (Securely stored)';
             figmaKeyStatus.style.color = '#22c55e';
+          }
+          if (figmaKeyInput) {
+            figmaKeyInput.value = '••••••••';
           }
         } else {
           if (figmaKeyStatus) {
             figmaKeyStatus.textContent = 'Token is not configured';
             figmaKeyStatus.style.color = '#ef4444';
           }
+          if (figmaKeyInput) {
+            figmaKeyInput.value = '';
+          }
         }
 
-        deepseekModelSelect.value = s.defaultDeepSeekModel;
+        if (deepseekModelSelect) {
+          deepseekModelSelect.value = s.defaultDeepSeekModel;
+        }
 
         if (s.deepSeekThinking !== undefined) {
-          settingsThinkingToggle.checked = s.deepSeekThinking;
-          quickThinkingToggle.checked = s.deepSeekThinking;
+          if (settingsThinkingToggle) settingsThinkingToggle.checked = s.deepSeekThinking;
+          if (quickThinkingToggle) quickThinkingToggle.checked = s.deepSeekThinking;
         }
         if (s.deepSeekThinkingLevel !== undefined) {
-          settingsThinkingLevelSelect.value = s.deepSeekThinkingLevel;
-          quickThinkingLevelSelect.value = s.deepSeekThinkingLevel;
+          if (settingsThinkingLevelSelect) settingsThinkingLevelSelect.value = s.deepSeekThinkingLevel;
+          if (quickThinkingLevelSelect) quickThinkingLevelSelect.value = s.deepSeekThinkingLevel;
         }
 
-        if (s.contextBudgetPercent !== undefined) {
+        if (s.contextBudgetPercent !== undefined && contextBudgetInput) {
           contextBudgetInput.value = s.contextBudgetPercent;
         }
-        if (s.turnsToRetain !== undefined) {
+        if (s.turnsToRetain !== undefined && turnsToRetainInput) {
           turnsToRetainInput.value = s.turnsToRetain;
         }
 
-        if (ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`)) {
-          ollamaModelSelect.value = s.defaultOllamaModel;
+        if (ollamaModelSelect && s.defaultOllamaModel) {
+          const opt = ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`);
+          if (opt) {
+            ollamaModelSelect.value = s.defaultOllamaModel;
+          }
         }
 
         if (s.customEndpointUrl !== undefined) {
@@ -2248,6 +2325,9 @@ function attachImage(base64) {
         }
         if (s.hasCustomEndpointKey !== undefined) {
           defaultCustomHasKey = s.hasCustomEndpointKey;
+          if (customEndpointKeyInput) {
+            customEndpointKeyInput.value = defaultCustomHasKey ? '••••••••' : '';
+          }
         }
 
         if (s.customApis !== undefined) {
@@ -2268,11 +2348,39 @@ function attachImage(base64) {
           const customPromptArea = document.getElementById('custom-system-prompt');
           if (customPromptArea) customPromptArea.value = s.customSystemPrompt;
         }
+        if (s.autonomousMode !== undefined) {
+          const autoToggle = document.getElementById('settings-autonomous-toggle');
+          if (autoToggle) autoToggle.checked = s.autonomousMode;
+        }
+
+        if (s.planFirst !== undefined && planFirstToggle) {
+          planFirstToggle.checked = s.planFirst;
+        }
+        if (s.enableTruncationGuardrail !== undefined && truncationGuardToggle) {
+          truncationGuardToggle.checked = s.enableTruncationGuardrail;
+        }
+        if (s.aiReviewEnabled !== undefined && aiReviewToggle) {
+          aiReviewToggle.checked = s.aiReviewEnabled;
+        }
+        if (s.multiFileRefactorEnabled !== undefined && multiFileToggle) {
+          multiFileToggle.checked = s.multiFileRefactorEnabled;
+        }
+        if (s.maxTurnsBeforeSummarize !== undefined && maxTurnsSummarizeInput) {
+          maxTurnsSummarizeInput.value = s.maxTurnsBeforeSummarize;
+        }
+        if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
+          maxToolOutputInput.value = s.maxToolOutputLength;
+        }
+        if (s.embeddingModel !== undefined && embeddingModelInput) {
+          embeddingModelInput.value = s.embeddingModel;
+        }
 
         syncQuickModelSelect();
 
         // Trigger connection validation check
-        vscode.postMessage({ type: 'validateHost', host: s.ollamaHost });
+        if (s.ollamaHost) {
+          vscode.postMessage({ type: 'validateHost', host: s.ollamaHost });
+        }
         break;
       }
 
@@ -2845,6 +2953,24 @@ function attachImage(base64) {
     if (!text) return '';
     let cleanText = text;
 
+    // Intercept and wrap <architecture_routing> block in a gorgeous card, avoiding recursive infinite loops
+    let hasRouting = false;
+    let routingContent = '';
+    const routingRegex = /<architecture_routing>([\s\S]*?)<\/architecture_routing>/gi;
+    cleanText = cleanText.replace(routingRegex, (match, inner) => {
+      hasRouting = true;
+      routingContent = inner.trim();
+      return `%%%ROUTING_PLACEHOLDER%%%`;
+    });
+
+    let streamingRouting = false;
+    if (cleanText.includes('<architecture_routing>') && !cleanText.includes('</architecture_routing>')) {
+      const openIdx = cleanText.indexOf('<architecture_routing>');
+      routingContent = cleanText.substring(openIdx + '<architecture_routing>'.length).trim();
+      cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_ROUTING_PLACEHOLDER%%%`;
+      streamingRouting = true;
+    }
+
     // Intercept and wrap <implementation_plan> block in a gorgeous card, avoiding recursive infinite loops
     let hasPlan = false;
     let planContent = '';
@@ -2937,6 +3063,9 @@ function attachImage(base64) {
         cleanText = cleanText.substring(0, tagInfo.start) + placeholderToken + cleanText.substring(tagInfo.end);
         startFrom = tagInfo.start + placeholderToken.length;
       }
+      // Strip any closing tag for this self-closing tool
+      const closeTagPattern = new RegExp(`</${tool}\\s*>`, 'gi');
+      cleanText = cleanText.replace(closeTagPattern, '');
     }
 
     // Catch-all: strip any remaining self-closing XML tags (unknown tool names like <ls_dir ... />)
@@ -3067,6 +3196,43 @@ function attachImage(base64) {
     html = html.replace(/<p>%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%<\/p>/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
     html = html.replace(/%%%TOOL_PLACEHOLDER::(.+?)::(.*?)%%%/g, '<div class="tool-card-placeholder" data-tool="$1" data-target="$2"></div>');
 
+    // Replace architecture routing placeholders
+    if (hasRouting) {
+      const formattedRouting = formatRoutingContent(routingContent);
+      const cardHtml = `
+        <div class="architecture-routing-card" style="background: rgba(168, 85, 247, 0.04); border: 1.5px solid rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #a855f7; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.7px; border-bottom: 1px solid rgba(168, 85, 247, 0.25); padding-bottom: 6px;">
+            <span>🌐</span>
+            <span>Architecture Scope Routing Lock</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.95); line-height: 1.6; font-family: var(--font-system);">
+            ${formattedRouting}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%ROUTING_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%ROUTING_PLACEHOLDER%%%', cardHtml);
+    }
+
+    if (streamingRouting) {
+      const formattedRouting = formatRoutingContent(routingContent);
+      const cardHtml = `
+        <div class="architecture-routing-card streaming" style="background: rgba(168, 85, 247, 0.02); border: 1.2px dashed rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(168, 85, 247, 0.15); padding-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #a855f7; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;">
+              <span>🌐</span>
+              <span>Locking Search Scope...</span>
+            </div>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.6; font-family: var(--font-system);">
+            ${formattedRouting}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%STREAMING_ROUTING_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%STREAMING_ROUTING_PLACEHOLDER%%%', cardHtml);
+    }
+
     // Replace planning cards placeholders
     if (hasPlan) {
       const innerHtml = parseMarkdown(planContent, isPlanApproved);
@@ -3092,6 +3258,7 @@ function attachImage(base64) {
           </div>
         </div>
       `;
+      html = html.replace('<p>%%%PLAN_PLACEHOLDER%%%</p>', cardHtml);
       html = html.replace('%%%PLAN_PLACEHOLDER%%%', cardHtml);
     }
 
@@ -3111,6 +3278,7 @@ function attachImage(base64) {
           </div>
         </div>
       `;
+      html = html.replace('<p>%%%STREAMING_PLAN_PLACEHOLDER%%%</p>', cardHtml);
       html = html.replace('%%%STREAMING_PLAN_PLACEHOLDER%%%', cardHtml);
     }
 
@@ -3124,6 +3292,37 @@ function attachImage(base64) {
       return '<span class="history-file-tag" data-file-path="' + escapedPath + '" title="' + escapedPath + ' (click to open)">&#128196; ' + escapedFileName + '</span>';
     });
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
+  }
+
+  function formatRoutingContent(raw) {
+    const lines = raw.split('\n');
+    let html = '';
+    for (const line of lines) {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join(':').trim();
+        
+        let labelColor = '#a855f7';
+        let valStyle = '';
+        if (key === 'SEARCH_SCOPE_ALLOWED') {
+          labelColor = '#10b981';
+          valStyle = 'background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.2); font-family: monospace; font-size: 10px;';
+        } else if (key === 'SEARCH_SCOPE_BLOCKED') {
+          labelColor = '#ef4444';
+          valStyle = 'background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); font-family: monospace; font-size: 10px;';
+        } else if (key === 'FEATURE_OWNER') {
+          labelColor = '#38bdf8';
+          valStyle = 'font-weight: bold; color: #38bdf8;';
+        } else if (key === 'JUSTIFICATION') {
+          labelColor = '#eab308';
+          valStyle = 'font-style: italic; color: rgba(255,255,255,0.8);';
+        }
+        
+        html += `<div style="margin-bottom: 6px;"><span style="color: ${labelColor}; font-weight: 600; font-size: 10px; text-transform: uppercase;">${escapeHtml(key)}:</span> <span style="${valStyle}">${escapeHtml(val)}</span></div>`;
+      }
+    }
+    return html;
   }
 
 
@@ -4421,6 +4620,13 @@ function highlightLine(line, lang) {
       multiDiffContainer.appendChild(fileDiv);
     });
   }
+
+  // Initialize after all message handlers and UI renderers are fully set up
+  vscode.postMessage({ type: 'getSettings' });
+  vscode.postMessage({ type: 'fetchModels' });
+  vscode.postMessage({ type: 'getChatSessions' });
+  vscode.postMessage({ type: 'getChatHistory' });
+  vscode.postMessage({ type: 'getActiveReviews' });
 
 })();
 

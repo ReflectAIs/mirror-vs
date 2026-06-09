@@ -46,6 +46,7 @@ export interface ExtensionSettings {
   hasCustomEndpointKey?: boolean;
   customApis?: CustomApi[];
   configuredCustomApiKeys?: Record<string, boolean>;
+  autonomousMode?: boolean;
 }
 
 export interface ChatMessage {

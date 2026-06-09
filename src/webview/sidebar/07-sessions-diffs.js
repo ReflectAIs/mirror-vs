@@ -1293,6 +1293,13 @@ function highlightLine(line, lang) {
     });
   }
 
+  // Initialize after all message handlers and UI renderers are fully set up
+  vscode.postMessage({ type: 'getSettings' });
+  vscode.postMessage({ type: 'fetchModels' });
+  vscode.postMessage({ type: 'getChatSessions' });
+  vscode.postMessage({ type: 'getChatHistory' });
+  vscode.postMessage({ type: 'getActiveReviews' });
+
 })();
 
 

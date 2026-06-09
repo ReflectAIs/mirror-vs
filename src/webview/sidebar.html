@@ -265,6 +265,41 @@
             </div>
           </div>
 
+          <!-- Agent Behavior & Safety Settings Card -->
+          <div class="settings-card">
+            <div class="settings-card-title">Agent Behavior & Safety Settings</div>
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="settings-plan-first-toggle" checked />
+              <label for="settings-plan-first-toggle">Plan-First Execution Mode</label>
+            </div>
+            <div class="form-group checkbox-group" style="margin-top: 6px;">
+              <input type="checkbox" id="settings-truncation-guard-toggle" checked />
+              <label for="settings-truncation-guard-toggle">Enable Truncation Guardrail</label>
+            </div>
+            <div class="form-group checkbox-group" style="margin-top: 6px;">
+              <input type="checkbox" id="settings-ai-review-toggle" />
+              <label for="settings-ai-review-toggle">Enable Post-Save AI Review</label>
+            </div>
+            <div class="form-group checkbox-group" style="margin-top: 6px;">
+              <input type="checkbox" id="settings-multi-file-toggle" checked />
+              <label for="settings-multi-file-toggle">Enable Multi-File Refactor</label>
+            </div>
+            <div class="settings-grid limit-grid" style="margin-top: 8px;">
+              <div class="form-group">
+                <label for="max-turns-summarize-input">Max Turns Before Summarize</label>
+                <input type="number" id="max-turns-summarize-input" min="2" max="100" value="16" />
+              </div>
+              <div class="form-group">
+                <label for="max-tool-output-input">Max Tool Output Length</label>
+                <input type="number" id="max-tool-output-input" min="1000" max="100000" value="20000" />
+              </div>
+            </div>
+            <div class="form-group" style="margin-top: 8px;">
+              <label for="embedding-model-input">Ollama Embedding Model</label>
+              <input type="text" id="embedding-model-input" placeholder="nomic-embed-text" value="nomic-embed-text" />
+            </div>
+          </div>
+
           <!-- Prompt Library Card -->
           <div class="settings-card">
             <div class="settings-card-title">Prompt Library Templates</div>
@@ -272,6 +307,19 @@
             <button type="button" id="settings-create-template-btn" class="btn btn-secondary" style="margin-top: 6px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;">
               ➕ Create Prompt Template
             </button>
+          </div>
+
+          <!-- Autonomous Mode Card -->
+          <div class="settings-card">
+            <div class="settings-card-title">🤖 Autonomous Mode</div>
+            <div class="form-group checkbox-group" style="margin-top: 6px;">
+              <input type="checkbox" id="settings-autonomous-toggle" />
+              <label for="settings-autonomous-toggle">Auto-accept file changes after 10s countdown</label>
+            </div>
+            <p class="settings-info-text" style="margin-top: 4px;">
+              When enabled, file changes proposed by the agent will be automatically accepted after a 10-second countdown instead of waiting for manual approval. 
+              Disable this if you want to review every change before it is applied.
+            </p>
           </div>
 
           <!-- Telemetry & Analytics Card -->

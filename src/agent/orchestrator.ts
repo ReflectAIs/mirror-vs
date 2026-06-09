@@ -9,9 +9,18 @@ import { AgentCompleter } from './agent-completer';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { getModelContextWindow, estimateTokenCount, estimatePayloadTokens } from './orchestrator-config';
 import { buildSystemPrompt, hasDeclaredPlan, hasActionPlanningIntent, getDiagnosticsForFile } from './orchestrator-prompt';
 import { AgentMemoryService } from '../services/agent-memory-service';
+
+export enum AgentState {
+  DISCOVERY = 'DISCOVERY',
+  IMPLEMENTATION = 'IMPLEMENTATION',
+  VERIFICATION = 'VERIFICATION',
+  BLOCKED = 'BLOCKED',
+  NEEDS_EVIDENCE = 'NEEDS_EVIDENCE'
+}
 
 export class AgentOrchestrator {
   private _activeAbortController: AbortController | undefined;
@@ -105,6 +114,49 @@ export class AgentOrchestrator {
       this._activeAbortController = new AbortController();
       const signal = this._activeAbortController.signal;
       this._sendAvatarState('thinking');
+
+      // Ambiguous Business Term Detector
+      const detectAmbiguousBusinessTerms = (input: string): string[] => {
+        const terms = ['successful', 'active', 'verified', 'qualified', 'enrolled', 'completed', 'approved'];
+        const found: string[] = [];
+        const normalized = input.toLowerCase();
+        for (const term of terms) {
+          const regex = new RegExp(`\\b${term}\\b`, 'i');
+          if (regex.test(normalized)) {
+            found.push(term);
+          }
+        }
+        return found;
+      };
+
+      const ambiguousTerms = detectAmbiguousBusinessTerms(text || '');
+      if (ambiguousTerms.length > 0) {
+        const hasAskedAlready = history.some(
+          (msg) =>
+            msg.role === 'assistant' &&
+            ambiguousTerms.every((term) => msg.content.toLowerCase().includes(term.toLowerCase())),
+        );
+        if (!hasAskedAlready) {
+          const clarificationPrompt = `I noticed your request contains the term(s): "${ambiguousTerms.join(', ')}". Before I begin exploring the codebase or proposing changes, could you please clarify what "${ambiguousTerms.join(', ')}" specifically means in this business context?`;
+          
+          let currentMessages = [...history];
+          if (text || (images && images.length > 0)) {
+            const userMsg: ChatMessage = { role: 'user', content: text || '[Image provided]' };
+            if (images && images.length > 0) userMsg.images = images;
+            currentMessages.push(userMsg);
+          }
+          currentMessages.push({ role: 'assistant', content: clarificationPrompt });
+          await this._saveChatHistory(currentMessages);
+          
+          this._postMessage({ type: 'chatResponseStart' });
+          this._postMessage({ type: 'chatResponseChunk', text: clarificationPrompt });
+          this._postMessage({ type: 'chatResponseComplete', fullText: clarificationPrompt });
+          this._postMessage({ type: 'updateChatHistory', history: currentMessages });
+          this._postMessage({ type: 'loopComplete' });
+          this._sendAvatarState('idle');
+          return;
+        }
+      }
 
       const config = vscode.workspace.getConfiguration('mirror-vs');
       let provider = config.get<string>('defaultProvider', 'ollama') as string;
@@ -207,15 +259,53 @@ export class AgentOrchestrator {
       let sequentialExploratorySteps = 0;
 
       // Agent Control Loop Guard State Tracking (Eradicates Execution Paralysis)
-      // let agentMode: "DISCOVERY" | "IMPLEMENTATION" | "VALIDATION" = "DISCOVERY";
       const activeMode = config.get<string>('agentMode', 'normal');
       let searchCount = 0;
-      const maxSearchBudget = activeMode === 'debug' ? 30 : 10;
-      const readHistory = new Set<string>();
+      const maxSearchBudget = activeMode === 'debug' ? 15 : 6;
+      const readRangesTracker = new Map<string, { hash: string; ranges: Set<string> }>();
+      const verifiedFiles = new Set<string>();
       const lastSearches: string[] = [];
       let hasCommittedToPatch = false;
+      let agentState = AgentState.DISCOVERY;
+
+      // Architecture Constraint & Scope Lock State
+      let featureOwner = '';
+      let allowedScopes: string[] = [];
+      let blockedScopes: string[] = [];
+
+      // Initialize routing from history if it exists
+      for (const msg of currentMessages) {
+        if (msg.role === 'assistant') {
+          const routingMatch = msg.content.match(/<architecture_routing>([\s\S]*?)<\/architecture_routing>/i);
+          if (routingMatch) {
+            const blockContent = routingMatch[1];
+            const lines = blockContent.split('\n');
+            for (const line of lines) {
+              const parts = line.split(':');
+              if (parts.length >= 2) {
+                const key = parts[0].trim().toUpperCase();
+                const value = parts.slice(1).join(':').trim();
+                if (key === 'FEATURE_OWNER') {
+                  featureOwner = value;
+                } else if (key === 'SEARCH_SCOPE_ALLOWED') {
+                  allowedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                } else if (key === 'SEARCH_SCOPE_BLOCKED') {
+                  blockedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                }
+              }
+            }
+          }
+        }
+      }
 
       const validateControlLoopGuard = (tool: any): { allowed: boolean; reason?: string } => {
+        if (agentState === AgentState.NEEDS_EVIDENCE) {
+          return {
+            allowed: false,
+            reason: `[System Intervention - NEEDS_EVIDENCE]: You are currently in the NEEDS_EVIDENCE state. You cannot perform code searches, file reads, or patches because you lack the actual JavaScript stack trace or crash logs. You MUST stop invoking tools and ask the user directly for the missing diagnostic information (e.g., Logcat, RedBox, or Crashlytics error logs).`
+          };
+        }
+
         const target = tool.path || tool.query || tool.url || tool.selector || tool.command || '';
         const isSearchOrRead = [
           'read_file',
@@ -228,11 +318,19 @@ export class AgentOrchestrator {
         ].includes(tool.name);
 
         if (isSearchOrRead) {
-          // 1. Commitment Lock (Search is blocked, but single-time read_file is permitted to check imports/signatures)
-          if (hasCommittedToPatch && tool.name !== 'read_file' && activeMode !== 'debug') {
+          // 0. Completion Enforcement After Direct Error Localization
+          if (isErrorDirectlyLocalized(currentMessages, verifiedFiles)) {
             return {
               allowed: false,
-              reason: `[System Intervention - Commitment Locked]: You declared that you are ready to patch. In this state, exploratory search/exploratory tools like '${tool.name}' are BLOCKED. You are permitted to use 'read_file' once per file path if you need to verify parameter signatures, imports, or mutations, but you must proceed to implementation.`,
+              reason: `[System Intervention - Completion Enforcement]: The compilation/runtime error in the failing file has already been inspected and localized. You have the unresolved reference, missing import/dependency, or failing path in your context. Additional searches, greps, or exploratory actions are BLOCKED. You must immediately transition to patching the file (patch_file/write_file) or verifying the fix.`
+            };
+          }
+
+          // 1. Commitment Lock
+          if (hasCommittedToPatch && activeMode !== 'debug') {
+            return {
+              allowed: false,
+              reason: `[System Intervention - Commitment Locked]: You declared that you are ready to patch or have identified the changes. In this state, exploratory search/reading is BLOCKED. You must proceed immediately to implementation (using write_file or patch_file).`,
             };
           }
 
@@ -248,14 +346,31 @@ export class AgentOrchestrator {
           if (tool.name === 'read_file' && activeMode !== 'debug') {
             const startLine = tool.start_line || 1;
             const endLine = tool.end_line || 1000;
-            const readKey = `${tool.path}:${startLine}-${endLine}`;
-            if (readHistory.has(readKey)) {
+            const rangeKey = `${startLine}-${endLine}`;
+            const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+            const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+            
+            let currentHash = '';
+            try {
+              if (fullPath && fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                const content = fs.readFileSync(fullPath);
+                currentHash = crypto.createHash('sha256').update(content).digest('hex');
+              }
+            } catch {}
+
+            let tracker = readRangesTracker.get(fullPath);
+            if (!tracker || tracker.hash !== currentHash) {
+              tracker = { hash: currentHash, ranges: new Set<string>() };
+              readRangesTracker.set(fullPath, tracker);
+            }
+
+            if (tracker.ranges.has(rangeKey)) {
               return {
                 allowed: false,
-                reason: `[System Intervention - No Re-Read]: You have already read the file section "${tool.path}" (lines ${startLine}-${endLine}) in this session. Re-reading identical content is BLOCKED to prevent wasted tokens and action loops. Please proceed to write the patch or explain using your existing knowledge.`,
+                reason: `[System Intervention - No Re-Read]: You have already read the file section "${tool.path}" (lines ${startLine}-${endLine}) with the current hash. Re-reading identical content is BLOCKED. Please proceed to write the patch or explain using your existing knowledge.`,
               };
             }
-            readHistory.add(readKey);
+            tracker.ranges.add(rangeKey);
           }
 
           // 4. Convergence Detector
@@ -267,22 +382,58 @@ export class AgentOrchestrator {
           if (lastSearches.length >= 3 && lastSearches.every((s) => s === searchKey)) {
             return {
               allowed: false,
-              reason: `[System Intervention - Convergence Detector]: You have performed the identical search or read step "${searchKey}" three times consecutively without making progress. You have CONVERGED. You are BLOCKED from further redundant actions. You MUST proceed to execute the patch now.`,
+              reason: `[System Intervention - Convergence Detector]: You have performed the identical search or read step "${searchKey}" three times consecutively. You are BLOCKED from further redundant actions. You MUST proceed to execute the patch now.`,
             };
+          }
+        }
+
+        // 5. Workspace Grounding Check
+        if (tool.name === 'patch_file') {
+          const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+          const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+          if (fullPath && !verifiedFiles.has(fullPath)) {
+            return {
+              allowed: false,
+              reason: `[System Intervention - Workspace Grounding]: You are attempting to patch "${tool.path}" without first reading or verifying it in this session. You must successfully read the file using 'read_file' to understand its contents before proposing any patches.`,
+            };
+          }
+        }
+
+        // 7. JS Exception / Evidence Gating Check
+        if ((tool.name === 'patch_file' || tool.name === 'write_file') && !hasSufficientJSEvidence(currentMessages)) {
+          return {
+            allowed: false,
+            reason: `[System Intervention - Insufficient Evidence]: You are attempting to patch a JavaScript Exception/crash without having collected the actual JS error message, stack trace, or diagnostic stack. Proposing patches on blind inference is BLOCKED. Please run commands or inspect logs to retrieve the full JavaScript stack trace or error message before proposing a fix.`,
+          };
+        }
+
+        // 6. Architecture Constraint Lock / Scope Check
+        if (isSearchOrRead && blockedScopes.length > 0) {
+          const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+          const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+          const normalizedPath = fullPath.toLowerCase().replace(/\\/g, '/');
+          
+          for (const blocked of blockedScopes) {
+            if (normalizedPath.includes(blocked) || target.toLowerCase().includes(blocked)) {
+              return {
+                allowed: false,
+                reason: `[System Intervention - Architecture Boundary Violation]: You are attempting to run '${tool.name}' on '${target}', which violates the active SEARCH_SCOPE_BLOCKED constraint: '${blocked}' for the declared OWNER: ${featureOwner}. You are BLOCKED from accessing this path. If you must cross this boundary, you MUST first output an updated <architecture_routing> block explaining your JUSTIFICATION before calling this tool.`,
+              };
+            }
           }
         }
 
         // Clear read history if modifying a file or running a terminal command
         if (tool.name === 'patch_file' || tool.name === 'write_file' || tool.name === 'create_file') {
           if (tool.path) {
-            for (const key of Array.from(readHistory.keys())) {
-              if (key.startsWith(tool.path + ':')) {
-                readHistory.delete(key);
-              }
+            const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+            const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+            if (fullPath) {
+              readRangesTracker.delete(fullPath);
             }
           }
         } else if (tool.name === 'run_command') {
-          readHistory.clear();
+          readRangesTracker.clear();
         }
 
         return { allowed: true };
@@ -295,6 +446,18 @@ export class AgentOrchestrator {
             break;
           }
           loopCount++;
+
+          // Deterministic Agent State Machine transitions
+          if (!hasSufficientJSEvidence(currentMessages)) {
+            agentState = AgentState.NEEDS_EVIDENCE;
+          } else if (isErrorDirectlyLocalized(currentMessages, verifiedFiles)) {
+            hasCommittedToPatch = true;
+            agentState = AgentState.IMPLEMENTATION;
+          } else if (searchCount >= maxSearchBudget) {
+            agentState = AgentState.BLOCKED;
+          } else if (hasCommittedToPatch) {
+            agentState = AgentState.IMPLEMENTATION;
+          }
 
           // Context optimization guardrail: token-budget-based summarization
           const customEndpointUrl = config.get<string>('customEndpointUrl', 'https://api.openai.com/v1');
@@ -327,7 +490,7 @@ export class AgentOrchestrator {
           const turnsToRetain = config.get('turnsToRetain', 6);
 
           const systemPromptTokens = estimateTokenCount(
-            buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, '')),
+            buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState),
           );
           const activeMessages = currentMessages.filter((msg, idx) => {
             if (idx === 0) return false;
@@ -428,7 +591,7 @@ export class AgentOrchestrator {
           const resolvedPayload = await Promise.all(resolvedPayloadPromises);
 
           const payload: ChatMessage[] = [
-            { role: 'system', content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, '')) },
+            { role: 'system', content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState) },
             ...resolvedPayload,
           ];
 
@@ -512,30 +675,58 @@ export class AgentOrchestrator {
           signal.removeEventListener('abort', mainAbortListener);
 
           currentMessages.push({ role: 'assistant', content: assistantResponse });
+          
+          // Parse architecture routing block
+          const routingMatch = assistantResponse.match(/<architecture_routing>([\s\S]*?)<\/architecture_routing>/i);
+          if (routingMatch) {
+            const blockContent = routingMatch[1];
+            const lines = blockContent.split('\n');
+            let hasJustification = false;
+            for (const line of lines) {
+              const parts = line.split(':');
+              if (parts.length >= 2) {
+                const key = parts[0].trim().toUpperCase();
+                const value = parts.slice(1).join(':').trim();
+                if (key === 'FEATURE_OWNER') {
+                  featureOwner = value;
+                } else if (key === 'SEARCH_SCOPE_ALLOWED') {
+                  allowedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                } else if (key === 'SEARCH_SCOPE_BLOCKED') {
+                  blockedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                } else if (key === 'JUSTIFICATION') {
+                  if (value.length > 5) {
+                    hasJustification = true;
+                  }
+                }
+              }
+            }
+            if (hasJustification) {
+              blockedScopes = [];
+            }
+          }
+
           await this._saveChatHistory(currentMessages);
 
           // Commitment Detection: check if the model says it has enough context or is ready to patch
-          const lowerResponse = assistantResponse.toLowerCase();
-          const commitmentPatterns = [
-            'i will now apply the patch',
-            'i will now modify',
-            "i'll write the patch",
-            'i will write the patch',
-            'i have enough context',
-            'i will now implement',
-            'applying the patch',
-            'applying patch',
-            "i'm ready to patch",
-            'i am ready to patch',
-          ];
-          if (commitmentPatterns.some((p) => lowerResponse.includes(p))) {
+          if (canDescribePatch(assistantResponse, verifiedFiles)) {
             hasCommittedToPatch = true;
-            // agentMode = "IMPLEMENTATION";
+            agentState = AgentState.IMPLEMENTATION;
           }
 
           const toolCalls = this._parser.parseToolCalls(assistantResponse, true);
 
           if (toolCalls.length > 0) {
+            // Strict Tool Call Discipline
+            if (toolCalls.length > 1) {
+              this._sendAvatarState('error');
+              const errorMsg = '[System Intervention - Tool Discipline Warning]: You are only allowed to invoke exactly ONE tool call per turn. You provided multiple tool calls. Please proceed with exactly one tool call (SEARCH, PATCH, or VERIFY) at a time.';
+              currentMessages.push({ role: 'system', content: errorMsg });
+              await this._saveChatHistory(currentMessages);
+              this._postMessage({ type: 'updateChatHistory', history: currentMessages });
+              continueLoop = true;
+              continue;
+            }
+
             const hasModifyingTool = toolCalls.some(
               (tool) =>
                 tool.name === 'create_file' ||
@@ -608,6 +799,14 @@ export class AgentOrchestrator {
                       result.substring(result.length - keep);
                   }
 
+                   if (tool.name === 'read_file') {
+                    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+                    const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+                    if (fullPath) {
+                      verifiedFiles.add(fullPath);
+                    }
+                  }
+
                   this._sendToolStatusToWebview(
                     tool.name,
                     'success',
@@ -663,10 +862,29 @@ export class AgentOrchestrator {
 
                   // Grounding Verification Hook
                   if (tool.name === 'create_file' || tool.name === 'write_file' || tool.name === 'patch_file') {
+                    agentState = AgentState.VERIFICATION;
                     await new Promise((resolve) => setTimeout(resolve, 300));
                     if (tool.path) {
                       const diagnosticsFeed = getDiagnosticsForFile(tool.path);
                       result += diagnosticsFeed;
+                    }
+                    const folders = vscode.workspace.workspaceFolders;
+                    if (folders && folders.length > 0) {
+                      const workspaceFolder = folders[0].uri.fsPath;
+                      try {
+                        const verifyResult = this._runWorkspaceVerification(workspaceFolder);
+                        result += verifyResult;
+                      } catch (e) {
+                        console.error('Failed to run workspace verification:', e);
+                      }
+                    }
+                  }
+
+                  if (tool.name === 'read_file' || tool.name === 'create_file' || tool.name === 'write_file' || tool.name === 'patch_file') {
+                    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+                    const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+                    if (fullPath) {
+                      verifiedFiles.add(fullPath);
                     }
                   }
 
@@ -1033,5 +1251,150 @@ export class AgentOrchestrator {
       return `Error generating map: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
+
+  private _runWorkspaceVerification(workspaceFolder: string): string {
+    let output = '\n\n### AUTOMATED POST-PATCH VERIFICATION:\n';
+    output += '✅ Patch Applied Successfully.\n';
+    output += '⚠️ NOT YET VERIFIED. Requires compilation/build validation and runtime tests to verify correctness.\n';
+    
+    let compilePassed = true;
+    let lintPassed = true;
+    let testsPassed = true;
+
+    // 1. Run Compile / Build check
+    try {
+      output += '\n\nRunning build/compile check...';
+      const compileOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'compile'], { cwd: workspaceFolder, encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+      output += '\n[Build Status]: Success\n' + compileOutput.substring(0, 1000);
+    } catch (err: any) {
+      compilePassed = false;
+      output += '\n[Build Status]: FAILED\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + (err.message || '');
+    }
+
+    // 2. Run Lint check
+    try {
+      output += '\n\nRunning lint check...';
+      const lintOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'lint'], { cwd: workspaceFolder, encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+      output += '\n[Lint Status]: Success\n' + lintOutput.substring(0, 1000);
+    } catch (err: any) {
+      lintPassed = false;
+      output += '\n[Lint Status]: FAILED or Warnings detected\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n';
+    }
+
+    // 3. Run Tests
+    try {
+      output += '\n\nRunning test suite...';
+      const testOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'test'], { cwd: workspaceFolder, encoding: 'utf8', timeout: 30000, stdio: 'pipe' });
+      output += '\n[Test Status]: Success\n' + testOutput.substring(0, 1000);
+    } catch (err: any) {
+      testsPassed = false;
+      output += '\n[Test Status]: FAILED\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n';
+    }
+
+    output += '\n\n### VERIFICATION REPORT:\n';
+    if (compilePassed && lintPassed && testsPassed) {
+      output += '✅ VERIFIED: Build, lint, and tests passed successfully.\n';
+    } else {
+      output += '❌ NOT YET VERIFIED: Build or tests failed. Please review the compilation and test diagnostics output above.\n';
+    }
+
+    return output;
+  }
 }
+
+function canDescribePatch(text: string, verifiedFiles: Set<string>): boolean {
+  const lower = text.toLowerCase();
+  
+  // 1. Check for patch/plan intent or code blocks (rootCauseIdentified & exactChangeKnown)
+  const hasPlanOrCode = /<implementation_plan>|<patch_file>|```diff/i.test(text);
+  const declaresCommitment = [
+    'i will now apply the patch',
+    'i will now modify',
+    "i'll write the patch",
+    'i will write the patch',
+    'applying the patch',
+    'applying patch',
+    "i'm ready to patch",
+    'i am ready to patch',
+    'here is the code change',
+    'here is the fix',
+    'we need to change',
+    'the fix is to',
+    'should be changed to',
+    'propose the following patch',
+    'modified code',
+  ].some((p) => lower.includes(p));
+
+  if (!hasPlanOrCode && !declaresCommitment) {
+    return false;
+  }
+
+  // 2. Check that the target file mentioned in the response has been verified (read) in this session (targetFileVerified)
+  let mentionsVerifiedFile = false;
+  for (const file of verifiedFiles) {
+    const baseName = path.basename(file).toLowerCase();
+    if (baseName && lower.includes(baseName)) {
+      mentionsVerifiedFile = true;
+      break;
+    }
+  }
+
+  return mentionsVerifiedFile;
+}
+
+function hasSufficientJSEvidence(messages: ChatMessage[]): boolean {
+  let hasGenericCrash = false;
+  let hasStackTrace = false;
+  for (const msg of messages) {
+    const content = msg.content.toLowerCase();
+    if (content.includes('javascriptexception') || content.includes('js exception') || content.includes('crash')) {
+      hasGenericCrash = true;
+    }
+    if (content.includes('stack trace') || content.includes('at ') || content.includes('.js:') || content.includes('.ts:') || content.includes('error:') || content.includes('exception:')) {
+      hasStackTrace = true;
+    }
+  }
+  if (hasGenericCrash && !hasStackTrace) {
+    return false;
+  }
+  return true;
+}
+
+function isErrorDirectlyLocalized(messages: ChatMessage[], verifiedFiles: Set<string>): boolean {
+  if (verifiedFiles.size === 0) return false;
+  let hasErrorText = false;
+  let errorFileFound = false;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    const content = msg.content;
+    const lowerContent = content.toLowerCase();
+
+    const isError = 
+      lowerContent.includes('[build status]: failed') ||
+      lowerContent.includes('compilation error') ||
+      lowerContent.includes('unresolved reference') ||
+      lowerContent.includes('error:') ||
+      lowerContent.includes('failed:') ||
+      lowerContent.includes('javascriptexception') ||
+      lowerContent.includes('exception in thread') ||
+      lowerContent.includes('crash');
+
+    if (isError) {
+      hasErrorText = true;
+      for (const filePath of verifiedFiles) {
+        const baseName = path.basename(filePath).toLowerCase();
+        if (baseName && lowerContent.includes(baseName)) {
+          errorFileFound = true;
+          break;
+        }
+      }
+    }
+    if (hasErrorText && errorFileFound) {
+      return true;
+    }
+  }
+  return false;
+}
+
 

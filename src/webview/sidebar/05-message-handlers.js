@@ -146,60 +146,79 @@
   window.addEventListener('message', (event) => {
     const message = event.data;
 
+    // Autonomous mode setting sync from VS Code
+    if (message.type === 'settingValue' && message.key === 'autonomousMode') {
+      const toggle = document.getElementById('settings-autonomous-toggle');
+      if (toggle) toggle.checked = message.value === true;
+      return;
+    }
+
     switch (message.type) {
       case 'updateSettings': {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;
         
-        ollamaHostInput.value = s.ollamaHost;
+        if (ollamaHostInput) {
+          ollamaHostInput.value = s.ollamaHost;
+        }
         
         // Handle deepseek key display helper
-        if (s.hasDeepSeekKey) {
-          deepseekKeyStatus.textContent = 'Key is configured (Securely stored)';
-          deepseekKeyStatus.style.color = '#22c55e';
-          deepseekKeyInput.value = '••••••••';
-        } else {
-          deepseekKeyStatus.textContent = 'Key is not configured';
-          deepseekKeyStatus.style.color = '#ef4444';
-          deepseekKeyInput.value = '';
+        if (deepseekKeyStatus && deepseekKeyInput) {
+          if (s.hasDeepSeekKey) {
+            deepseekKeyStatus.textContent = 'Key is configured (Securely stored)';
+            deepseekKeyStatus.style.color = '#22c55e';
+            deepseekKeyInput.value = '••••••••';
+          } else {
+            deepseekKeyStatus.textContent = 'Key is not configured';
+            deepseekKeyStatus.style.color = '#ef4444';
+            deepseekKeyInput.value = '';
+          }
         }
 
         const figmaKeyStatus = document.getElementById('figma-key-status');
-        if (s.figmaKeyInput) {
-          figmaKeyInput.value = s.figmaKeyInput;
-        }
         if (s.hasFigmaKey) {
           if (figmaKeyStatus) {
             figmaKeyStatus.textContent = 'Token is configured (Securely stored)';
             figmaKeyStatus.style.color = '#22c55e';
+          }
+          if (figmaKeyInput) {
+            figmaKeyInput.value = '••••••••';
           }
         } else {
           if (figmaKeyStatus) {
             figmaKeyStatus.textContent = 'Token is not configured';
             figmaKeyStatus.style.color = '#ef4444';
           }
+          if (figmaKeyInput) {
+            figmaKeyInput.value = '';
+          }
         }
 
-        deepseekModelSelect.value = s.defaultDeepSeekModel;
+        if (deepseekModelSelect) {
+          deepseekModelSelect.value = s.defaultDeepSeekModel;
+        }
 
         if (s.deepSeekThinking !== undefined) {
-          settingsThinkingToggle.checked = s.deepSeekThinking;
-          quickThinkingToggle.checked = s.deepSeekThinking;
+          if (settingsThinkingToggle) settingsThinkingToggle.checked = s.deepSeekThinking;
+          if (quickThinkingToggle) quickThinkingToggle.checked = s.deepSeekThinking;
         }
         if (s.deepSeekThinkingLevel !== undefined) {
-          settingsThinkingLevelSelect.value = s.deepSeekThinkingLevel;
-          quickThinkingLevelSelect.value = s.deepSeekThinkingLevel;
+          if (settingsThinkingLevelSelect) settingsThinkingLevelSelect.value = s.deepSeekThinkingLevel;
+          if (quickThinkingLevelSelect) quickThinkingLevelSelect.value = s.deepSeekThinkingLevel;
         }
 
-        if (s.contextBudgetPercent !== undefined) {
+        if (s.contextBudgetPercent !== undefined && contextBudgetInput) {
           contextBudgetInput.value = s.contextBudgetPercent;
         }
-        if (s.turnsToRetain !== undefined) {
+        if (s.turnsToRetain !== undefined && turnsToRetainInput) {
           turnsToRetainInput.value = s.turnsToRetain;
         }
 
-        if (ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`)) {
-          ollamaModelSelect.value = s.defaultOllamaModel;
+        if (ollamaModelSelect && s.defaultOllamaModel) {
+          const opt = ollamaModelSelect.querySelector(`option[value="${s.defaultOllamaModel}"]`);
+          if (opt) {
+            ollamaModelSelect.value = s.defaultOllamaModel;
+          }
         }
 
         if (s.customEndpointUrl !== undefined) {
@@ -210,6 +229,9 @@
         }
         if (s.hasCustomEndpointKey !== undefined) {
           defaultCustomHasKey = s.hasCustomEndpointKey;
+          if (customEndpointKeyInput) {
+            customEndpointKeyInput.value = defaultCustomHasKey ? '••••••••' : '';
+          }
         }
 
         if (s.customApis !== undefined) {
@@ -230,11 +252,39 @@
           const customPromptArea = document.getElementById('custom-system-prompt');
           if (customPromptArea) customPromptArea.value = s.customSystemPrompt;
         }
+        if (s.autonomousMode !== undefined) {
+          const autoToggle = document.getElementById('settings-autonomous-toggle');
+          if (autoToggle) autoToggle.checked = s.autonomousMode;
+        }
+
+        if (s.planFirst !== undefined && planFirstToggle) {
+          planFirstToggle.checked = s.planFirst;
+        }
+        if (s.enableTruncationGuardrail !== undefined && truncationGuardToggle) {
+          truncationGuardToggle.checked = s.enableTruncationGuardrail;
+        }
+        if (s.aiReviewEnabled !== undefined && aiReviewToggle) {
+          aiReviewToggle.checked = s.aiReviewEnabled;
+        }
+        if (s.multiFileRefactorEnabled !== undefined && multiFileToggle) {
+          multiFileToggle.checked = s.multiFileRefactorEnabled;
+        }
+        if (s.maxTurnsBeforeSummarize !== undefined && maxTurnsSummarizeInput) {
+          maxTurnsSummarizeInput.value = s.maxTurnsBeforeSummarize;
+        }
+        if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
+          maxToolOutputInput.value = s.maxToolOutputLength;
+        }
+        if (s.embeddingModel !== undefined && embeddingModelInput) {
+          embeddingModelInput.value = s.embeddingModel;
+        }
 
         syncQuickModelSelect();
 
         // Trigger connection validation check
-        vscode.postMessage({ type: 'validateHost', host: s.ollamaHost });
+        if (s.ollamaHost) {
+          vscode.postMessage({ type: 'validateHost', host: s.ollamaHost });
+        }
         break;
       }
 

@@ -155,12 +155,6 @@
     }
   }
 
-  // Initialize
-  vscode.postMessage({ type: 'getSettings' });
-  vscode.postMessage({ type: 'fetchModels' });
-  vscode.postMessage({ type: 'getChatSessions' });
-  vscode.postMessage({ type: 'getChatHistory' });
-  vscode.postMessage({ type: 'getActiveReviews' });
 
   // Drawer Close Buttons
   document.querySelectorAll('.drawer-close-btn').forEach(btn => {
@@ -286,11 +280,11 @@
   let defaultCustomHasKey = false;
 
   function saveProviderSettings(provider) {
-    const ollamaHost = ollamaHostInput.value.trim();
-    const defaultOllamaModel = ollamaModelSelect.value;
-    const defaultDeepSeekModel = deepseekModelSelect.value;
-    const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
-    const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
+    const ollamaHost = ollamaHostInput ? ollamaHostInput.value.trim() : 'http://localhost:11434';
+    const defaultOllamaModel = ollamaModelSelect ? ollamaModelSelect.value : 'llama3';
+    const defaultDeepSeekModel = deepseekModelSelect ? deepseekModelSelect.value : 'deepseek-v4-pro';
+    const contextBudget = (contextBudgetInput && contextBudgetInput.value) ? parseInt(contextBudgetInput.value.trim(), 10) : 75;
+    const turnsToRetain = (turnsToRetainInput && turnsToRetainInput.value) ? parseInt(turnsToRetainInput.value.trim(), 10) : 6;
 
     const customEndpointUrl = customEndpointUrlInput ? customEndpointUrlInput.value.trim() : '';
     const customEndpointModel = customEndpointModelInput ? customEndpointModelInput.value.trim() : '';
@@ -312,6 +306,18 @@
 
     const agentMode = document.getElementById('agent-mode-select') ? document.getElementById('agent-mode-select').value : 'normal';
     const customSystemPrompt = document.getElementById('custom-system-prompt') ? document.getElementById('custom-system-prompt').value : '';
+    const deepSeekThinking = settingsThinkingToggle ? settingsThinkingToggle.checked : true;
+    const deepSeekThinkingLevel = settingsThinkingLevelSelect ? settingsThinkingLevelSelect.value : 'high';
+    const autoToggle = document.getElementById('settings-autonomous-toggle');
+    const autonomousMode = autoToggle ? autoToggle.checked : false;
+
+    const planFirst = planFirstToggle ? planFirstToggle.checked : true;
+    const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
+    const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
+    const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
     vscode.postMessage({
       type: 'saveSettings',
@@ -321,6 +327,16 @@
       defaultDeepSeekModel,
       contextBudgetPercent: contextBudget,
       turnsToRetain: turnsToRetain,
+      deepSeekThinking,
+      deepSeekThinkingLevel,
+      autonomousMode,
+      planFirst,
+      enableTruncationGuardrail: truncationGuard,
+      aiReviewEnabled,
+      multiFileRefactorEnabled: multiFileRefactor,
+      maxTurnsBeforeSummarize,
+      maxToolOutputLength,
+      embeddingModel,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
@@ -430,7 +446,6 @@
   });
 
   const toggleFigmaKeyVisibilityBtn = document.getElementById('toggle-figma-key-visibility');
-  const figmaKeyInput = document.getElementById('figma-key');
   if (toggleFigmaKeyVisibilityBtn && figmaKeyInput) {
     toggleFigmaKeyVisibilityBtn.addEventListener('click', () => {
       if (figmaKeyInput.type === 'password') {
@@ -471,7 +486,10 @@
     if (deepSeekKey === '••••••••') {
       deepSeekKey = undefined;
     }
-    const figmaKey = figmaKeyInput ? figmaKeyInput.value.trim() : '';
+    let figmaKey = figmaKeyInput ? figmaKeyInput.value.trim() : '';
+    if (figmaKey === '••••••••') {
+      figmaKey = undefined;
+    }
     const contextBudget = parseInt(contextBudgetInput.value.trim(), 10) || 75;
     const turnsToRetain = parseInt(turnsToRetainInput.value.trim(), 10) || 6;
 
@@ -498,6 +516,17 @@
     const agentMode = document.getElementById('agent-mode-select') ? document.getElementById('agent-mode-select').value : 'normal';
     const customSystemPrompt = document.getElementById('custom-system-prompt') ? document.getElementById('custom-system-prompt').value : '';
 
+    const autoToggle = document.getElementById('settings-autonomous-toggle');
+    const autonomousMode = autoToggle ? autoToggle.checked : false;
+
+    const planFirst = planFirstToggle ? planFirstToggle.checked : true;
+    const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
+    const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
+    const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -510,6 +539,14 @@
       turnsToRetain: turnsToRetain,
       deepSeekThinking,
       deepSeekThinkingLevel,
+      autonomousMode,
+      planFirst,
+      enableTruncationGuardrail: truncationGuard,
+      aiReviewEnabled,
+      multiFileRefactorEnabled: multiFileRefactor,
+      maxTurnsBeforeSummarize,
+      maxToolOutputLength,
+      embeddingModel,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),

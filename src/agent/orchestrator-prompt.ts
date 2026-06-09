@@ -7,8 +7,17 @@ import { getModelContextWindow, estimateTokenCount } from './orchestrator-config
 import { getBaseAgentRole } from './prompts/baseAgentRole';
 import { getWorkspaceContext } from './prompts/workspaceContext';
 import { getToolSpecifications } from './prompts/toolSpecifications';
+import { getDebugSkill } from './prompts/skills/debugSkill';
+import { getReactSkill } from './prompts/skills/reactSkill';
+import { getBackendSkill } from './prompts/skills/backendSkill';
+import { getRefactorSkill } from './prompts/skills/refactorSkill';
 
-export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = false): string {
+export function buildSystemPrompt(
+  loopCount: number = 1,
+  hasPlan: boolean = false,
+  featureOwner: string = '',
+  agentState: string = 'DISCOVERY'
+): string {
   const service = CommandService.getInstance();
   const terminals = service.getActiveTerminals();
   let terminalContext = '';
@@ -57,7 +66,23 @@ export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = fals
     }
   }
 
-  // 3. Agent Memory (via AgentMemoryService)
+  // 3. Project Memory (.mirror-vs/project-memory.json)
+  let projectMemorySection = '';
+  if (workspaceFolder) {
+    const projectMemoryPath = path.join(workspaceFolder, '.mirror-vs', 'project-memory.json');
+    if (fs.existsSync(projectMemoryPath)) {
+      try {
+        const memoryContent = fs.readFileSync(projectMemoryPath, 'utf8').trim();
+        if (memoryContent) {
+          projectMemorySection = `\n\n### PROJECT MEMORY & ARCHITECTURE PERSISTENCE:\n${memoryContent}`;
+        }
+      } catch (e) {
+        console.warn('Failed to read project-memory.json', e);
+      }
+    }
+  }
+
+  // 4. Agent Memory (via AgentMemoryService)
   let memorySection = '';
   try {
     const { AgentMemoryService } = require('../services/agent-memory-service');
@@ -81,7 +106,7 @@ export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = fals
     }
   }
 
-  // 4. Specialized Agent Mode Instructions
+  // 5. Specialized Agent Mode Instructions
   let modeSection = '';
   const activeMode = config.get<string>('agentMode', 'normal');
   if (activeMode === 'refactor') {
@@ -90,7 +115,29 @@ export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = fals
     modeSection = `\n\n### SPECIALIZED AGENT MODE: DEBUG MODE\nYou are currently operating in DEBUG MODE. You are attached to the VS Code debugger to trace errors, read logs, and inspect runtime code states. Use debug tools (debug_get_sessions, debug_get_breakpoints, debug_inspect_variables) to identify bugs and resolve them.`;
   }
 
-  return `${customPrefixSection}${baseRole}${planStatusContext}${modeSection}\n\n${toolSpecs}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${memorySection}`;
+  // 6. Dynamic Skills Integration
+  let skillsSection = '';
+  const activeSkills: string[] = [];
+  const lowerOwner = featureOwner.toLowerCase();
+  
+  if (activeMode === 'debug' || agentState === 'VERIFICATION') {
+    activeSkills.push(getDebugSkill());
+  }
+  if (lowerOwner.includes('ui') || lowerOwner.includes('react') || lowerOwner.includes('frontend')) {
+    activeSkills.push(getReactSkill());
+  }
+  if (lowerOwner.includes('backend') || lowerOwner.includes('api') || lowerOwner.includes('server')) {
+    activeSkills.push(getBackendSkill());
+  }
+  if (activeMode === 'refactor') {
+    activeSkills.push(getRefactorSkill());
+  }
+
+  if (activeSkills.length > 0) {
+    skillsSection = `\n\n### ACTIVE TASK-SPECIFIC SKILLS:\n` + activeSkills.join('\n\n');
+  }
+
+  return `${customPrefixSection}${baseRole}${planStatusContext}${modeSection}${skillsSection}\n\n${toolSpecs}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;
 }
 
 function getShellEnvDescription(): string {

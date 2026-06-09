@@ -102,12 +102,33 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
 
     // Safety Confirmation Guardrail (Only blocks if command is destructive or traverses outside the workspace)
     if (isSensitiveCommand(command)) {
-      const choice = await vscode.window.showWarningMessage(
-        `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
-        { modal: true }, // Modal dialog blocks safely and secures active developer attention
-        'Allow Execution',
-        'Deny',
-      );
+      const config = vscode.workspace.getConfiguration('mirror-vs');
+      const autonomousMode = config.get<boolean>('autonomousMode', false);
+
+      let choice: string | undefined;
+
+      if (autonomousMode) {
+        choice = await Promise.race([
+          vscode.window.showWarningMessage(
+            `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command? (Auto-allowing in 10 seconds in Autonomous Mode)`,
+            { modal: true },
+            'Allow Execution',
+            'Deny',
+          ),
+          new Promise<string>((resolve) => {
+            setTimeout(() => {
+              resolve('Allow Execution');
+            }, 10000);
+          })
+        ]);
+      } else {
+        choice = await vscode.window.showWarningMessage(
+          `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
+          { modal: true },
+          'Allow Execution',
+          'Deny',
+        );
+      }
 
       if (choice !== 'Allow Execution') {
         throw new Error(`Command execution denied by user: "${command}"`);

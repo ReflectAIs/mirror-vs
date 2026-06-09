@@ -213,6 +213,30 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               if ((data as any).agentMode !== undefined) {
                 await config.update('agentMode', (data as any).agentMode, vscode.ConfigurationTarget.Global);
               }
+              if ((data as any).autonomousMode !== undefined) {
+                await config.update('autonomousMode', (data as any).autonomousMode, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).planFirst !== undefined) {
+                await config.update('planFirst', (data as any).planFirst, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).enableTruncationGuardrail !== undefined) {
+                await config.update('enableTruncationGuardrail', (data as any).enableTruncationGuardrail, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).aiReviewEnabled !== undefined) {
+                await config.update('aiReviewEnabled', (data as any).aiReviewEnabled, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).multiFileRefactorEnabled !== undefined) {
+                await config.update('multiFileRefactorEnabled', (data as any).multiFileRefactorEnabled, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).maxTurnsBeforeSummarize !== undefined) {
+                await config.update('maxTurnsBeforeSummarize', (data as any).maxTurnsBeforeSummarize, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).maxToolOutputLength !== undefined) {
+                await config.update('maxToolOutputLength', (data as any).maxToolOutputLength, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).embeddingModel !== undefined) {
+                await config.update('embeddingModel', (data as any).embeddingModel, vscode.ConfigurationTarget.Global);
+              }
               if ((data as any).customSystemPrompt !== undefined) {
                 await config.update(
                   'customSystemPrompt',
@@ -274,6 +298,17 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
             case 'applyCode': {
               await applyCodeToActiveEditor(data.code, data.mode);
+              break;
+            }
+            case 'getSetting': {
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              const val = config.get(data.key, false);
+              this._view?.webview.postMessage({ type: 'settingValue', key: data.key, value: val });
+              break;
+            }
+            case 'saveSetting': {
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              await config.update(data.key, data.value, vscode.ConfigurationTarget.Global);
               break;
             }
             case 'getArtifacts': {
@@ -1005,6 +1040,15 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
     const agentMode = config.get<string>('agentMode', 'normal');
     const customSystemPrompt = config.get<string>('customSystemPrompt', '');
+    const autonomousMode = config.get<boolean>('autonomousMode', false);
+
+    const planFirst = config.get<boolean>('planFirst', true);
+    const enableTruncationGuardrail = config.get<boolean>('enableTruncationGuardrail', true);
+    const aiReviewEnabled = config.get<boolean>('aiReviewEnabled', false);
+    const multiFileRefactorEnabled = config.get<boolean>('multiFileRefactorEnabled', true);
+    const maxTurnsBeforeSummarize = config.get<number>('maxTurnsBeforeSummarize', 16);
+    const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
+    const embeddingModel = config.get<string>('embeddingModel', 'nomic-embed-text');
 
     const settings: ExtensionSettings = {
       provider,
@@ -1023,6 +1067,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       hasCustomEndpointKey,
       agentMode,
       customSystemPrompt,
+      autonomousMode,
+      planFirst,
+      enableTruncationGuardrail,
+      aiReviewEnabled,
+      multiFileRefactorEnabled,
+      maxTurnsBeforeSummarize,
+      maxToolOutputLength,
+      embeddingModel,
       customApis,
       configuredCustomApiKeys,
     } as any;

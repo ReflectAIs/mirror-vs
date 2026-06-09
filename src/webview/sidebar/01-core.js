@@ -26,12 +26,24 @@
   const deepseekModelSelect = document.getElementById('deepseek-model-select');
   
   const saveSettingsBtn = document.getElementById('save-settings-btn');
+  const figmaKeyInput = document.getElementById('figma-key');
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
+  
+  const planFirstToggle = document.getElementById('settings-plan-first-toggle');
+  const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');
+  const aiReviewToggle = document.getElementById('settings-ai-review-toggle');
+  const multiFileToggle = document.getElementById('settings-multi-file-toggle');
+  const maxTurnsSummarizeInput = document.getElementById('max-turns-summarize-input');
+  const maxToolOutputInput = document.getElementById('max-tool-output-input');
+  const embeddingModelInput = document.getElementById('embedding-model-input');
   
   const quickProviderSelect = document.getElementById('quick-provider-select');
   const quickModelSelect = document.getElementById('quick-model-select');
   const quickThinkingToggle = document.getElementById('thinking-toggle');
+  
+  // Autonomous Mode toggle element
+  let autonomousToggleEl = document.getElementById('settings-autonomous-toggle');
   const quickThinkingLevelSelect = document.getElementById('thinking-level-select');
   const settingsThinkingToggle = document.getElementById('settings-thinking-toggle');
   const settingsThinkingLevelSelect = document.getElementById('settings-thinking-level-select');
@@ -350,6 +362,15 @@
       vscode.postMessage({ type: 'exportChatSession' });
     });
   }
+  // Initialize autonomous mode toggle
+  const autoToggle = document.getElementById('settings-autonomous-toggle');
+  if (autoToggle) {
+    vscode.postMessage({ type: 'getSetting', key: 'autonomousMode' });
+    autoToggle.addEventListener('change', function() {
+      vscode.postMessage({ type: 'saveSetting', key: 'autonomousMode', value: this.checked ? true : false });
+    });
+  }
+
   if (gitPrDescBtn) {
     gitPrDescBtn.addEventListener('click', () => {
       vscode.postMessage({ type: 'generatePRDescription' });
