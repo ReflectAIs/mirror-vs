@@ -267,6 +267,9 @@ export class AgentOrchestrator {
       const lastSearches: string[] = [];
       let hasCommittedToPatch = false;
       let agentState = AgentState.DISCOVERY;
+      let pendingActions: any[] = [];
+      let lastSymptom = 'NONE';
+      let lastRewriteTelemetry: any = null;
 
       // Architecture Constraint & Scope Lock State
       let featureOwner = '';
@@ -458,6 +461,13 @@ export class AgentOrchestrator {
           } else if (hasCommittedToPatch) {
             agentState = AgentState.IMPLEMENTATION;
           }
+
+          // Backlog Expiration: clear pending actions if symptom changes or we enter patch/implementation mode
+          const currentSymptom = detectActiveSymptom(currentMessages);
+          if (currentSymptom !== lastSymptom || agentState === AgentState.IMPLEMENTATION) {
+            pendingActions = [];
+          }
+          lastSymptom = currentSymptom;
 
           // Context optimization guardrail: token-budget-based summarization
           const customEndpointUrl = config.get<string>('customEndpointUrl', 'https://api.openai.com/v1');
@@ -713,18 +723,41 @@ export class AgentOrchestrator {
             agentState = AgentState.IMPLEMENTATION;
           }
 
-          const toolCalls = this._parser.parseToolCalls(assistantResponse, true);
+          let toolCalls = this._parser.parseToolCalls(assistantResponse, true);
 
           if (toolCalls.length > 0) {
-            // Strict Tool Call Discipline
+            // Strict Tool Call Discipline Enforcement (Pre-Tool Validation & Rewriting)
             if (toolCalls.length > 1) {
-              this._sendAvatarState('error');
-              const errorMsg = '[System Intervention - Tool Discipline Warning]: You are only allowed to invoke exactly ONE tool call per turn. You provided multiple tool calls. Please proceed with exactly one tool call (SEARCH, PATCH, or VERIFY) at a time.';
-              currentMessages.push({ role: 'system', content: errorMsg });
-              await this._saveChatHistory(currentMessages);
+              const { selectedTool, alternatives } = selectHighestValueTool(toolCalls, currentMessages);
+              pendingActions = toolCalls.filter(t => t !== selectedTool);
+              if (pendingActions.length > 5) {
+                pendingActions = pendingActions.slice(-5);
+              }
+              
+              lastRewriteTelemetry = {
+                timestamp: new Date().toISOString(),
+                originalTools: toolCalls.length,
+                selectedTool: selectedTool.name,
+                target: selectedTool.path || selectedTool.query || selectedTool.command || selectedTool.url || '',
+                reason: `Highest priority based on active symptom: ${lastSymptom}`,
+                alternativesConsidered: alternatives
+              };
+              
+              assistantResponse = rewriteResponseToSingleTool(assistantResponse, selectedTool);
+              
+              if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
+                currentMessages[currentMessages.length - 1].content = assistantResponse;
+                await this._saveChatHistory(currentMessages);
+              }
+              
+              toolCalls = [selectedTool];
+              
+              this._postMessage({
+                type: 'chatResponseComplete',
+                fullText: assistantResponse,
+                reasoningText: '',
+              });
               this._postMessage({ type: 'updateChatHistory', history: currentMessages });
-              continueLoop = true;
-              continue;
             }
 
             const hasModifyingTool = toolCalls.some(
@@ -807,6 +840,38 @@ export class AgentOrchestrator {
                     }
                   }
 
+                  // Telemetry Outcome tracking for rewritten tool calls (Parallel Branch)
+                  if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
+                    let outcome = 'SUCCESS';
+                    let outcomeReason = 'NO_NEW_INFORMATION';
+                    const lowerResult = result.toLowerCase();
+                    if (lowerResult.includes('error') || lowerResult.includes('failed')) {
+                      outcome = 'ERROR';
+                    } else {
+                      // Observable evidence classification for ROOT_CAUSE_FOUND
+                      const isBuildErrorFound = lastSymptom === 'BUILD_FAILURE' && 
+                        tool.path && 
+                        lowerResult.includes(path.basename(tool.path).toLowerCase()) &&
+                        (lowerResult.includes('unresolved reference') || lowerResult.includes('error:'));
+                      
+                      const isNetworkConfigFound = lastSymptom === 'NETWORK_ERROR' &&
+                        (lowerResult.includes('axios') || lowerResult.includes('api_host') || lowerResult.includes('url'));
+                      
+                      const isAuthConfigFound = lastSymptom === 'AUTH_FAILURE' &&
+                        (lowerResult.includes('token') || lowerResult.includes('session') || lowerResult.includes('auth'));
+                      
+                      if (isBuildErrorFound || isNetworkConfigFound || isAuthConfigFound) {
+                        outcomeReason = 'ROOT_CAUSE_FOUND';
+                      }
+                    }
+                    
+                    lastRewriteTelemetry.outcome = outcome;
+                    lastRewriteTelemetry.outcomeReason = outcomeReason;
+                    lastRewriteTelemetry.resultSnippet = result.substring(0, 200);
+                    logRewriteTelemetryToFile(lastRewriteTelemetry);
+                    lastRewriteTelemetry = null;
+                  }
+
                   this._sendToolStatusToWebview(
                     tool.name,
                     'success',
@@ -819,6 +884,15 @@ export class AgentOrchestrator {
                   return '[Tool Result for ' + tool.name + ' on "' + target + '"]: Success - ' + result;
                 } catch (err: unknown) {
                   const errMsg = err instanceof Error ? err.message : String(err);
+                  
+                  if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
+                    lastRewriteTelemetry.outcome = 'ERROR';
+                    lastRewriteTelemetry.outcomeReason = 'TOOL_EXECUTION_FAILED';
+                    lastRewriteTelemetry.resultSnippet = errMsg.substring(0, 200);
+                    logRewriteTelemetryToFile(lastRewriteTelemetry);
+                    lastRewriteTelemetry = null;
+                  }
+
                   this._sendToolStatusToWebview(tool.name, 'error', target, errMsg);
                   this._sendAvatarState('error');
                   return (
@@ -916,6 +990,38 @@ export class AgentOrchestrator {
                         result.substring(result.length - keep);
                     }
                   }
+                  // Telemetry Outcome tracking for rewritten tool calls (Sequential Branch)
+                  if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
+                    let outcome = 'SUCCESS';
+                    let outcomeReason = 'NO_NEW_INFORMATION';
+                    const lowerResult = result.toLowerCase();
+                    if (lowerResult.includes('error') || lowerResult.includes('failed')) {
+                      outcome = 'ERROR';
+                    } else {
+                      // Observable evidence classification for ROOT_CAUSE_FOUND
+                      const isBuildErrorFound = lastSymptom === 'BUILD_FAILURE' && 
+                        tool.path && 
+                        lowerResult.includes(path.basename(tool.path).toLowerCase()) &&
+                        (lowerResult.includes('unresolved reference') || lowerResult.includes('error:'));
+                      
+                      const isNetworkConfigFound = lastSymptom === 'NETWORK_ERROR' &&
+                        (lowerResult.includes('axios') || lowerResult.includes('api_host') || lowerResult.includes('url'));
+                      
+                      const isAuthConfigFound = lastSymptom === 'AUTH_FAILURE' &&
+                        (lowerResult.includes('token') || lowerResult.includes('session') || lowerResult.includes('auth'));
+                      
+                      if (isBuildErrorFound || isNetworkConfigFound || isAuthConfigFound) {
+                        outcomeReason = 'ROOT_CAUSE_FOUND';
+                      }
+                    }
+                    
+                    lastRewriteTelemetry.outcome = outcome;
+                    lastRewriteTelemetry.outcomeReason = outcomeReason;
+                    lastRewriteTelemetry.resultSnippet = result.substring(0, 200);
+                    logRewriteTelemetryToFile(lastRewriteTelemetry);
+                    lastRewriteTelemetry = null;
+                  }
+
                   this._sendToolStatusToWebview(
                     tool.name,
                     'success',
@@ -928,6 +1034,15 @@ export class AgentOrchestrator {
                   toolResults.push('[Tool Result for ' + tool.name + ' on "' + target + '"]: Success - ' + result);
                 } catch (err: unknown) {
                   const errMsg = err instanceof Error ? err.message : String(err);
+                  
+                  if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
+                    lastRewriteTelemetry.outcome = 'ERROR';
+                    lastRewriteTelemetry.outcomeReason = 'TOOL_EXECUTION_FAILED';
+                    lastRewriteTelemetry.resultSnippet = errMsg.substring(0, 200);
+                    logRewriteTelemetryToFile(lastRewriteTelemetry);
+                    lastRewriteTelemetry = null;
+                  }
+
                   this._sendToolStatusToWebview(tool.name, 'error', target, errMsg);
                   this._sendAvatarState('error');
                   toolResults.push(
@@ -1395,6 +1510,184 @@ function isErrorDirectlyLocalized(messages: ChatMessage[], verifiedFiles: Set<st
     }
   }
   return false;
+}
+
+function detectActiveSymptom(messages: ChatMessage[]): 'BUILD_FAILURE' | 'NETWORK_ERROR' | 'AUTH_FAILURE' | 'NONE' {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const content = messages[i].content.toLowerCase();
+    if (content.includes('[build status]: failed') || content.includes('compilation error') || content.includes('unresolved reference')) {
+      return 'BUILD_FAILURE';
+    }
+    if (content.includes('network') || content.includes('axios') || content.includes('http') || content.includes('internet') || content.includes('timeout') || content.includes('fetch')) {
+      return 'NETWORK_ERROR';
+    }
+    if (content.includes('auth') || content.includes('login') || content.includes('token') || content.includes('session') || content.includes('credentials')) {
+      return 'AUTH_FAILURE';
+    }
+  }
+  return 'NONE';
+}
+
+function logRewriteTelemetryToFile(entry: any): void {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) return;
+  const workspaceRoot = folders[0].uri.fsPath;
+  const logDir = path.join(workspaceRoot, '.mirror-vs');
+  const logFile = path.join(logDir, 'rewrites.log');
+  
+  try {
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    fs.appendFileSync(logFile, JSON.stringify(entry) + '\n', 'utf8');
+    console.log('[Telemetry] Logged rewrite outcome:', entry);
+  } catch (e) {
+    console.warn('Failed to log rewrite telemetry:', e);
+  }
+}
+
+function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { selectedTool: any; alternatives: any[] } {
+  const symptom = detectActiveSymptom(messages);
+  
+  let errorFileBasename = '';
+  if (symptom === 'BUILD_FAILURE') {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const content = messages[i].content;
+      if (content.toLowerCase().includes('[build status]: failed') || content.toLowerCase().includes('compilation error')) {
+        for (const t of toolCalls) {
+          if (t.path) {
+            const base = path.basename(t.path).toLowerCase();
+            if (base && content.toLowerCase().includes(base)) {
+              errorFileBasename = base;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const getToolScoreDetails = (tool: any): { score: number; breakdown: { basePriority: number; symptomMatch: number } } => {
+    const name = tool.name;
+    let basePriority = 10;
+    let symptomMatch = 0;
+    
+    if ([
+      'patch_file',
+      'write_file',
+      'create_file',
+      'delete_file',
+      'rename_file',
+      'run_command',
+      'send_terminal_input',
+      'git_commit',
+    ].includes(name)) {
+      basePriority = 100;
+    } else if (name === 'read_file') {
+      basePriority = 50;
+      const pathLower = (tool.path || '').toLowerCase();
+      
+      if (symptom === 'BUILD_FAILURE' && errorFileBasename && pathLower.includes(errorFileBasename)) {
+        symptomMatch = 45;
+      } else if (symptom === 'NETWORK_ERROR') {
+        if (pathLower.includes('axiosinstance') || pathLower.includes('axios')) symptomMatch = 40;
+        else if (pathLower.includes('apiconfig') || pathLower.includes('config')) symptomMatch = 38;
+        else if (pathLower.includes('network') || pathLower.includes('http') || pathLower.includes('api')) symptomMatch = 35;
+      } else if (symptom === 'AUTH_FAILURE') {
+        if (pathLower.includes('auth') || pathLower.includes('login') || pathLower.includes('credential')) symptomMatch = 40;
+        else if (pathLower.includes('session') || pathLower.includes('token')) symptomMatch = 38;
+        else if (pathLower.includes('store') || pathLower.includes('context')) symptomMatch = 35;
+      }
+    } else if ([
+      'grep_search',
+      'symbol_search',
+      'git_diff',
+      'git_status',
+    ].includes(name)) {
+      basePriority = 30;
+    }
+    
+    return {
+      score: basePriority + symptomMatch,
+      breakdown: { basePriority, symptomMatch }
+    };
+  };
+
+  const alternatives = toolCalls.map(t => {
+    const details = getToolScoreDetails(t);
+    return {
+      tool: t.name,
+      target: t.path || t.query || t.command || t.url || '',
+      score: details.score,
+      scoreBreakdown: details.breakdown
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  let best = toolCalls[0];
+  let bestScore = getToolScoreDetails(best).score;
+
+  for (let i = 1; i < toolCalls.length; i++) {
+    const t = toolCalls[i];
+    const s = getToolScoreDetails(t).score;
+    if (s > bestScore) {
+      best = t;
+      bestScore = s;
+    }
+  }
+
+  return { selectedTool: best, alternatives };
+}
+
+function rewriteResponseToSingleTool(rawText: string, selectedTool: any): string {
+  let rewritten = rawText;
+  
+  const allTools = [
+    'read_file', 'list_dir', 'ls_dir', 'grep_search', 'web_search',
+    'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script', 'browser_screenshot',
+    'figma_inspect', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals',
+    'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
+    'wait', 'analyze_project', 'analyze_dependencies', 'analyze_complexity',
+    'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify', 'get_diagnostics',
+    'create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'
+  ];
+
+  for (const toolName of allTools) {
+    const openTagPattern = new RegExp('<' + toolName + '(\\s+[^>]*)?>', 'gi');
+    let match;
+    
+    while ((match = openTagPattern.exec(rewritten)) !== null) {
+      const tagStart = match.index;
+      const tagContent = match[0];
+      const pathAttr = /path\s*=\s*["']([^"']+)["']/i.exec(tagContent);
+      const queryAttr = /query\s*=\s*["']([^"']+)["']/i.exec(tagContent);
+      const commandAttr = /command\s*=\s*["']([^"']+)["']/i.exec(tagContent);
+      const urlAttr = /url\s*=\s*["']([^"']+)["']/i.exec(tagContent);
+      const inputAttr = /input\s*=\s*["']([^"']+)["']/i.exec(tagContent);
+      
+      const targetVal = pathAttr?.[1] || queryAttr?.[1] || commandAttr?.[1] || urlAttr?.[1] || inputAttr?.[1] || '';
+      
+      const isSelected = (toolName === selectedTool.name || (toolName === 'ls_dir' && selectedTool.name === 'list_dir') || (toolName === 'multipatch_file' && selectedTool.name === 'multi_patch_file')) &&
+        (targetVal.trim() === (selectedTool.path || selectedTool.query || selectedTool.command || selectedTool.url || selectedTool.content || '').trim());
+      
+      if (!isSelected) {
+        let blockEnd = match.index + match[0].length;
+        const closeTagRegex = new RegExp('</' + toolName + '\\s*>', 'i');
+        const closeMatch = closeTagRegex.exec(rewritten.substring(blockEnd));
+        
+        if (closeMatch) {
+          blockEnd += closeMatch.index + closeMatch[0].length;
+        }
+        
+        rewritten = rewritten.substring(0, tagStart) + 
+                    '\n<!-- [System Intervention: Redundant batch tool call omitted to enforce exactly one tool per turn] -->\n' + 
+                    rewritten.substring(blockEnd);
+                    
+        openTagPattern.lastIndex = 0;
+      }
+    }
+  }
+  
+  return rewritten;
 }
 
 
