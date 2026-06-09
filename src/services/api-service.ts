@@ -450,6 +450,9 @@ export function streamCustomOpenAIChat(
     model,
     messages: sanitizedMessages,
     stream: true,
+    stream_options: {
+      include_usage: true,
+    },
   };
 
   const bodyData = JSON.stringify(payload);

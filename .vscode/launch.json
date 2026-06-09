@@ -1,50 +1,44 @@
+
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Debug SST",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["dev", "--increase-timeout"],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      // sourceMapRenames helps with the loading spinner when debugging and viewing local variables
-      "sourceMapRenames": false,
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      }
-    },
-    {
-      "name": "Debug Tests - Unit",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["bind", "yarn", "\"jest\"", "\"--watch\"", "\"--config\"", "\"./jest.unit.config.cjs\"", "\"${input:scopeTestsFileName}\""],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      },
-    },
-    {
-      "name": "Debug Tests - E2E",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/sst",
-      "runtimeArgs": ["bind", "yarn", "\"vitest\"", "\"--config\"", "\"./vitest.e2e.config.ts\"", "\"${input:scopeTestsFileName}\""],
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "env": {
-        "AWS_PROFILE": "flo-ct-flo360"
-      },
-    },
-  ],
-  "inputs": [
-    {
-      "id": "scopeTestsFileName",
-      "type": "promptString",
-      "description": "Partial file name to scope test debugging to. ex. arena. Leave blank to run all tests.",
-    }
-  ]
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/dist/**/*.js"
+            ],
+            "preLaunchTask": "npm: compile",
+            "sourceMaps": true
+        },
+        {
+            "name": "Extension Tests",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--extensionTestsPath=${workspaceFolder}/dist/test/suite/index",
+                "${workspaceFolder}/src/test-utils"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/dist/**/*.js"
+            ],
+            "preLaunchTask": "npm: compile",
+            "sourceMaps": true
+        },
+        {
+            "name": "Run Vitest (Current File)",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/vitest",
+            "runtimeArgs": ["run", "${relativeFile}"],
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        }
+    ]
 }

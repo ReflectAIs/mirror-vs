@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getModelContextWindow, estimateTokenCount, estimatePayloadTokens } from './orchestrator-config';
 import { buildSystemPrompt, hasDeclaredPlan, hasActionPlanningIntent, getDiagnosticsForFile } from './orchestrator-prompt';
+import { AgentMemoryService } from '../services/agent-memory-service';
 
 export class AgentOrchestrator {
   private _activeAbortController: AbortController | undefined;
@@ -333,8 +334,32 @@ export class AgentOrchestrator {
             if (msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')) return false;
             return !msg.summarized;
           });
-          const activeTokens =
+          let activeTokens =
             systemPromptTokens + activeMessages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
+
+          // Dynamic token-driven file content eviction:
+          // If we exceed the threshold, try to prune the oldest read_file contents first
+          if (activeTokens > summarizeThreshold) {
+            const readFileMessages = activeMessages.filter(
+              (msg) =>
+                msg.role === 'system' &&
+                msg.content.startsWith('[Tool Result for read_file on "') &&
+                msg.content.includes('"]: Success -'),
+            );
+
+            for (const msg of readFileMessages) {
+              if (activeTokens <= targetBudget) break;
+              const match = msg.content.match(/^\[Tool Result for read_file on "([^"]+)"\]: Success - /);
+              if (match) {
+                const filePath = match[1];
+                const prevTokens = estimateTokenCount(msg.content);
+                msg.content = `[Tool Result for read_file on "${filePath}"]: (Content evicted dynamically to stay within token budget. Re-read the file to see contents.)`;
+                const newTokens = estimateTokenCount(msg.content);
+                activeTokens = activeTokens - prevTokens + newTokens;
+              }
+            }
+            await this._saveChatHistory(currentMessages);
+          }
 
           if (activeTokens > summarizeThreshold) {
             try {
@@ -435,6 +460,7 @@ export class AgentOrchestrator {
                 completionController.signal,
                 this._session.sessionId,
                 completionController,
+                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
               );
 
               // If response is not empty, we are good
@@ -567,10 +593,9 @@ export class AgentOrchestrator {
                   const result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
 
                   let displayResult = result;
-                  // Scale truncation threshold with model context window
-                  const currentModel = provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel;
-                  const contextWindow = getModelContextWindow(currentModel);
-                  const truncateThreshold = Math.min(60000, Math.max(15000, contextWindow / 20));
+                  // Scale truncation threshold with model config
+                  const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
+                  const truncateThreshold = maxToolOutputLength;
 
                   if (result.length > truncateThreshold) {
                     const keep = Math.floor(truncateThreshold / 2);
@@ -658,10 +683,9 @@ export class AgentOrchestrator {
                     const match = result.match(/\(Image successfully captured and sent to vision model\)/);
                     if (match) displayResult = result.replace(match[0], '(Image captured)');
                   } else {
-                    // Scale truncation threshold with model context window
-                    const currentModel = provider === 'ollama' ? defaultOllamaModel : defaultDeepSeekModel;
-                    const contextWindow = getModelContextWindow(currentModel);
-                    const truncateThreshold = Math.min(60000, Math.max(15000, contextWindow / 20));
+                    // Scale truncation threshold with model config
+                    const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
+                    const truncateThreshold = maxToolOutputLength;
 
                     if (result.length > truncateThreshold) {
                       const keep = Math.floor(truncateThreshold / 2);
@@ -743,8 +767,9 @@ export class AgentOrchestrator {
                 this._postMessage({ type: 'screenshotCapture', base64: match[1] });
                 return res.replace(match[0], '(Image successfully captured and sent to vision model)');
               }
-              // Scale truncation threshold with model context window
-              const truncateThreshold = Math.min(60000, Math.max(15000, contextWindow / 20));
+              // Scale truncation threshold with model config
+              const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
+              const truncateThreshold = maxToolOutputLength;
               if (res.length > truncateThreshold) {
                 const prefixMatch = res.match(/^\[Tool Result for \w+ on "[^"]*"\]: (Success|Error) - /);
                 const prefix = prefixMatch ? prefixMatch[0] : '';

@@ -31,7 +31,7 @@ Failing to declare this plan BEFORE executing a modifying tool will trigger an a
 ### 🎯 EXECUTION DISCIPLINE (HARD RULES)
 1. **User Intent is Source of Truth**: The user's most recent message defines what success looks like. If they change direction, immediately abandon the outdated plan and discard obsolete goals.
 2. **Completion Gate (MANDATORY)**: After EVERY read_file or grep_search call, ask yourself: "Can I write the patch right now with the information I have?" If YES → write the patch immediately. If NO → identify the ONE specific piece of missing information.
-3. **Investigation Budget**: Max 4 read/search operations per task before you MUST either write a patch or explain what is missing. For trivial tasks, your budget is 2.
+3. **Investigation Budget**: Max 10 read/search operations per task before you MUST either write a patch or explain what is missing. For trivial tasks, your budget is 2.
 4. **Patch-First Workflow**: The correct sequence is always: Read → Patch → Verify. NOT: Read → Read → Read → Read → Patch.
 5. **Never Re-Read Known Content**: Do NOT call read_file on the same file or line range you have already read in this session.
 6. **Failure Recovery (Patch Failed)**: When a patch_file fails with "SEARCH block not found": read ONLY the exact section that contains the block you tried to match, copy the exact lines, and retry.

@@ -57,23 +57,26 @@ export function buildSystemPrompt(loopCount: number = 1, hasPlan: boolean = fals
     }
   }
 
-  // 3. Agent Memory (.mirror-vs/memory.json)
+  // 3. Agent Memory (via AgentMemoryService)
   let memorySection = '';
-  if (workspaceFolder) {
-    const memoryPath = path.join(workspaceFolder, '.mirror-vs', 'memory.json');
-    if (fs.existsSync(memoryPath)) {
-      try {
-        const memoryContent = fs.readFileSync(memoryPath, 'utf8').trim();
-        if (memoryContent) {
-          try {
-            const parsed = JSON.parse(memoryContent);
-            memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${JSON.stringify(parsed, null, 2)}`;
-          } catch {
+  try {
+    const { AgentMemoryService } = require('../services/agent-memory-service');
+    const memory = AgentMemoryService.getInstance();
+    const contextStr = memory.getContextString();
+    if (contextStr) {
+      memorySection = `\n\n${contextStr}`;
+    }
+  } catch {
+    // Fallback: read memory.json directly
+    if (workspaceFolder) {
+      const memoryPath = path.join(workspaceFolder, '.mirror-vs', 'memory.json');
+      if (fs.existsSync(memoryPath)) {
+        try {
+          const memoryContent = fs.readFileSync(memoryPath, 'utf8').trim();
+          if (memoryContent) {
             memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${memoryContent}`;
           }
-        }
-      } catch (e) {
-        console.warn('Failed to read memory.json', e);
+        } catch { /* ignore */ }
       }
     }
   }

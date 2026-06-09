@@ -4,99 +4,73 @@ import * as path from 'path';
 import { ToolCall } from '../types';
 import { BrowserService } from '../../services/browser-service';
 
-export async function executeBrowserTool(tool: ToolCall): Promise<string> {
-  const browserService = BrowserService.getInstance();
+export async function executeBrowserTool(
+  tool: ToolCall,
+  getSafePath: (p: string) => string,
+): Promise<string> {
+  const browser = BrowserService.getInstance();
 
   switch (tool.name) {
     case 'browser_navigate': {
       if (!tool.url) throw new Error('Missing "url" attribute for browser_navigate.');
-      const navResult = await browserService.navigate(tool.url);
-
-      // After navigation, always return a page summary so the LLM has real DOM context
-      const summary = await browserService.getPageSummary();
-      const elementList =
-        summary.interactiveElements.length > 0
-          ? summary.interactiveElements.map((e) => `  - ${e}`).join('\n')
-          : '  (no interactive elements found — page may have failed to load)';
-
-      return `${navResult}
-Page Title: "${summary.title}"
-Current URL: ${summary.url}
-Visible Page Text (preview): ${summary.contentText || '(empty)'}
-Interactive Elements:
-${elementList}`;
+      const html = await browser.navigate(tool.url);
+      return `Navigated to ${tool.url}\nPage title: ${html.title}\nText content (first 5000 chars):\n${html.textContent.substring(0, 5000)}`;
     }
 
     case 'browser_click': {
       if (!tool.selector) throw new Error('Missing "selector" attribute for browser_click.');
-      const clickResult = await browserService.click(tool.selector);
-
-      // Return a post-click page summary to confirm state change
-      const summary = await browserService.getPageSummary();
-      return `${clickResult}
-Post-click Page Title: "${summary.title}"
-Post-click Visible Text (preview): ${summary.contentText || '(empty)'}`;
+      const result = await browser.click(tool.selector);
+      return result ? `Clicked element: ${tool.selector}` : `Failed to click element: ${tool.selector}`;
     }
 
     case 'browser_type': {
       if (!tool.selector) throw new Error('Missing "selector" attribute for browser_type.');
-      if (!tool.text) throw new Error('Missing "text" attribute for browser_type.');
-      return await browserService.type(tool.selector, tool.text);
-    }
-
-    case 'browser_evaluate_script': {
-      if (!tool.script) throw new Error('Missing "script" attribute for browser_evaluate_script.');
-      const evalResult = await browserService.evaluate(tool.script);
-      const summary = await browserService.getPageSummary();
-      return `${evalResult}
-Post-eval Page Title: "${summary.title}"
-Post-eval Visible Text (preview): ${summary.contentText || '(empty)'}`;
+      if (!tool.content) throw new Error('Missing "content" (text) attribute for browser_type.');
+      await browser.type(tool.selector, tool.content);
+      return `Typed text into element: ${tool.selector}`;
     }
 
     case 'browser_screenshot': {
-      // Wait a moment for the page to fully render before capturing
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      // Capture real base64 screenshot for display in chat + vision models
-      const base64 = await browserService.screenshot();
-
-      // Store screenshot to the .mirror-vs/screenshots folder in the workspace root
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      let fileSavedMsg = '';
-      let savedFileName = '';
-      if (workspaceFolder) {
-        try {
-          const mirrorDir = path.join(workspaceFolder, '.mirror-vs', 'screenshots');
-          if (!fs.existsSync(mirrorDir)) {
-            fs.mkdirSync(mirrorDir, { recursive: true });
-          }
-          savedFileName = `screenshot_${Date.now()}.png`;
-          const filePath = path.join(mirrorDir, savedFileName);
-          fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
-          fileSavedMsg = `Saved screenshot to .mirror-vs/screenshots/${savedFileName}\n`;
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          fileSavedMsg = `Failed to save screenshot to .mirror-vs/screenshots: ${message}\n`;
-        }
+      const screenshot = await browser.screenshot();
+      if (!screenshot) {
+        return 'Screenshot failed: no page loaded. Use browser_navigate first.';
       }
 
-      // Also get DOM summary for text-only reasoning
-      const summary = await browserService.getPageSummary();
-      const elementList =
-        summary.interactiveElements.length > 0
-          ? summary.interactiveElements.map((e) => `  - ${e}`).join('\n')
-          : '  (no interactive elements detected)';
+      const base64 = screenshot.base64;
+      const textSummary = screenshot.textContent
+        ? `Page text content (first 3000 chars):\n${screenshot.textContent.substring(0, 3000)}`
+        : 'No text content extracted.';
 
-      const textSummary = `Page Title: "${summary.title}"
-Current URL: ${summary.url}
-Visible Page Text (preview): ${summary.contentText || '(empty — page may be blank or failed to load)'}
-Interactive Elements detected:
-${elementList}`;
+      // Optionally save screenshot to workspace for reference
+      let fileSavedMsg = '';
+      try {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (workspaceFolder) {
+          const screenshotDir = path.join(workspaceFolder, '.mirror-vs');
+          if (!fs.existsSync(screenshotDir)) {
+            fs.mkdirSync(screenshotDir, { recursive: true });
+          }
+          const filename = `screenshot_${Date.now()}.png`;
+          const filePath = path.join(screenshotDir, filename);
+          const buffer = Buffer.from(base64, 'base64');
+          fs.writeFileSync(filePath, buffer);
+          fileSavedMsg = `Screenshot saved to .mirror-vs/${filename}\n`;
+        }
+      } catch (e) {
+        // Non-critical: just skip file saving
+      }
 
-      // The orchestrator strips out the base64 and sends it as a vision attachment.
-      // Format must exactly match the extraction regex in orchestrator.ts.
+      // Base64 embedded for extraction by orchestrator.ts vision pipeline.
+      // Format: (Base64 data hidden from output but sent to vision model: <base64>)
       return `${fileSavedMsg}Screenshot taken successfully.
 ${textSummary}
 (Base64 data hidden from output but sent to vision model: ${base64})`;
+    }
+
+    case 'browser_evaluate_script': {
+      if (!tool.content) throw new Error('Missing "content" (script) attribute for browser_evaluate_script.');
+      const result = await browser.evaluateScript(tool.content);
+      return `Script executed. Result: ${JSON.stringify(result)}`;
     }
 
     default:

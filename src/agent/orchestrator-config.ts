@@ -1,15 +1,7 @@
-import * as vscode from 'vscode';
-import { ChatMessage, LLMProvider } from '../types';
-import { executeTool } from './tools/tool-registry';
-import { CommandService } from '../services/command-service';
-import { RateLimiter } from '../services/rate-limiter';
-import { ProviderFallback } from '../services/provider-fallback';
-import { AgentSession } from './agent-session';
-import { AgentParser } from './agent-parser';
-import { AgentCompleter } from './agent-completer';
-import { execFileSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
+/**
+ * Mirror VS Orchestrator Configuration
+ * Token estimation, model context window lookup, and payload estimation.
+ */
 
 /** Model context window sizes in tokens. Used for token-budget-based summarization. */
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -32,17 +24,35 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 export function getModelContextWindow(model: string): number {
   const normalized = model.toLowerCase();
   if (MODEL_CONTEXT_WINDOWS[model]) return MODEL_CONTEXT_WINDOWS[model];
-  if (normalized.includes('deepseek')) return 128000; // Safe cap for cost-control for V4 models
+  if (normalized.includes('deepseek')) return 128000;
   const baseModel = model.split(':')[0];
   if (MODEL_CONTEXT_WINDOWS[baseModel]) return MODEL_CONTEXT_WINDOWS[baseModel];
   return 32000; // Conservative default
 }
 
+/**
+ * Improved token estimation using multiple heuristics.
+ * - English/ASCII-heavy text: ~4 chars per token (GPT tokenizer baseline)
+ * - Code (many symbols, whitespace): ~3 chars per token
+ * - CJK characters: ~1.5 chars per token (each char ≈ 1-2 tokens in most tokenizers)
+ * - Accounts for whitespace-heavy code blocks more accurately
+ */
 export function estimateTokenCount(text: string): number {
-  return Math.ceil(text.length / 4);
+  if (!text) return 0;
+  const len = text.length;
+  // Count CJK characters (Unicode ranges for Chinese, Japanese, Korean)
+  const cjkCount = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g) || []).length;
+  const nonCjkLen = len - cjkCount;
+  // Count code-like patterns (indentation, braces, semicolons, etc.)
+  const codeIndicatorCount = (text.match(/[{}\[\]();:=<>+\-*/%&|^!~?#@$`\\]/g) || []).length;
+  const codeDensity = codeIndicatorCount / Math.max(nonCjkLen, 1);
+  // Base rate: English ≈ 4 chars/token, code-heavy ≈ 3 chars/token, CJK ≈ 1.5 chars/token
+  const codeRate = 3 + (1 - Math.min(codeDensity * 10, 1));
+  const nonCjkTokens = nonCjkLen / codeRate;
+  const cjkTokens = cjkCount / 1.5;
+  return Math.ceil(nonCjkTokens + cjkTokens);
 }
 
 export function estimatePayloadTokens(messages: { content: string }[]): number {
   return messages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
 }
-

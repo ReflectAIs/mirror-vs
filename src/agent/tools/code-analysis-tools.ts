@@ -766,9 +766,25 @@ export async function executeCodeAnalysisTool(tool: ToolCall): Promise<string> {
     case 'analyze_complexity':
       result = complexity(root);
       break;
-    case 'analyze_coverage':
-      result = coverage(root);
+    case 'analyze_coverage': {
+      try {
+        const { TestService } = await import('../../services/test-service.js');
+        const testService = TestService.getInstance();
+        const coverageData = testService.readCoverageData();
+        if (coverageData) {
+          result = `**📊 Test Coverage**\n\n`;
+          result += `- Lines: ${coverageData.lines.covered}/${coverageData.lines.total} (${coverageData.lines.percent.toFixed(1)}%)\n`;
+          result += `- Branches: ${coverageData.branches.covered}/${coverageData.branches.total} (${coverageData.branches.percent.toFixed(1)}%)\n`;
+          result += `- Functions: ${coverageData.functions.covered}/${coverageData.functions.total} (${coverageData.functions.percent.toFixed(1)}%)\n`;
+          result += `- Statements: ${coverageData.statements.covered}/${coverageData.statements.total} (${coverageData.statements.percent.toFixed(1)}%)\n`;
+        } else {
+          result = coverage(root);
+        }
+      } catch {
+        result = coverage(root);
+      }
       break;
+    }
     case 'analyze_dead_code':
       result = deadCode(root);
       break;

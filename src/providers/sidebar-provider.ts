@@ -13,6 +13,7 @@ import { fetchOllamaModels } from '../services/api-service';
 import { ReviewManager } from '../services/review-manager';
 import { LocalRagService } from '../services/local-rag-service';
 import { TelemetryService } from '../services/telemetry-service';
+import { ArtifactService } from '../services/artifact-service';
 
 export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
@@ -33,6 +34,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     });
 
     // Initialize decoupled Agent Orchestrator
+    // Expose static post-to-active handler for plugin service and artifact notifications
+    MirrorVsSidebarProvider.postToActive = (msg: any) => {
+      this._view?.webview.postMessage(msg);
+    };
+
     this._orchestrator = new AgentOrchestrator(
       (key) => this._secretService.getSecret(key),
       () => this._getChatHistory(),
@@ -40,6 +46,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       (msg) => {
         if (msg && msg.type === 'loopComplete') {
           vscode.window.showInformationMessage('Mirror VS: Task completed successfully! 🎉');
+        }
+        // Also forward artifact updates to the sidebar
+        if (msg && msg.type === 'newArtifact' && msg.artifact) {
+          this._view?.webview.postMessage({ type: 'newArtifact', artifact: msg.artifact });
         }
         this._view?.webview.postMessage(msg);
       },
@@ -264,6 +274,21 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
             case 'applyCode': {
               await applyCodeToActiveEditor(data.code, data.mode);
+              break;
+            }
+            case 'getArtifacts': {
+              const artifacts = ArtifactService.getInstance().artifacts;
+              this._view?.webview.postMessage({ type: 'updateArtifacts', artifacts });
+              break;
+            }
+            case 'openArtifact': {
+              ArtifactService.getInstance().openArtifactPreview(data.artifactId);
+              break;
+            }
+            case 'deleteArtifact': {
+              ArtifactService.getInstance().deleteArtifact(data.artifactId);
+              const remainingArtifacts = ArtifactService.getInstance().artifacts;
+              this._view?.webview.postMessage({ type: 'updateArtifacts', artifacts: remainingArtifacts });
               break;
             }
             case 'clearChat': {
@@ -1455,6 +1480,16 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       // Fallback: send empty list gracefully
       this._view?.webview.postMessage({ type: 'workspaceFiles', files: [] });
     }
+  }
+
+  public handleMirrorTask(task: string) {
+    // Receive a task from Mirror Assistant and send it to the webview
+    if (!this._view) return;
+    vscode.window.showInformationMessage(`🪞 New task from Mirror: ${task}`);
+    this._view.webview.postMessage({
+      type: 'mirrorTask',
+      task,
+    });
   }
 
   public handleSelectionCommand(action: 'fix' | 'explain', text: string) {

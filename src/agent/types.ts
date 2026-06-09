@@ -28,6 +28,7 @@ export interface ToolCall {
     | 'rename_file'
     | 'delete_file'
     | 'wait'
+    | 'multi_patch_file'
     // Code analysis tools:
     | 'analyze_project'
     | 'analyze_dependencies'

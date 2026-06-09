@@ -7,12 +7,59 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
     const query = tool.query || tool.content || '';
     if (!query) throw new Error('Missing "query" attribute for semantic_search.');
 
-    const { LocalRagService } = await import('../../services/local-rag-service.js');
-    const rag = LocalRagService.getInstance();
-    const results = rag.search(query, 5);
+    // Hybrid: try EmbeddingService first (Ollama embeddings), fallback to TF-IDF RAG
+    let results: any[] = [];
+    try {
+      const { EmbeddingService } = await import('../../services/embedding-service.js');
+      const embeddings = EmbeddingService.getInstance();
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (workspaceFolder) {
+        const files = await vscode.workspace.findFiles(
+          '**/*',
+          '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.mirror-vs/**}',
+          100,
+        );
+        const documents: { filePath: string; content: string }[] = [];
+        for (const f of files.slice(0, 80)) {
+          try {
+            const fs = await import('fs');
+            const content = fs.readFileSync(f.fsPath, 'utf8');
+            if (content.length < 100000) {
+              documents.push({ filePath: vscode.workspace.asRelativePath(f), content });
+            }
+          } catch { /* skip */ }
+        }
+        const embedResults = await embeddings.search(query, documents);
+        if (embedResults.length > 0) {
+          results = embedResults.map((r: any) => ({
+            filePath: r.filePath,
+            content: r.snippet.substring(0, 500),
+            startLine: 1,
+            endLine: 1,
+          }));
+        }
+      }
+    } catch {
+      // EmbeddingService unavailable — try RAG fallback
+    }
+
+    // Fallback to LocalRagService
+    if (results.length === 0) {
+      try {
+        const { LocalRagService } = await import('../../services/local-rag-service.js');
+        const rag = LocalRagService.getInstance();
+        const ragResults = rag.search(query, 5);
+        results = ragResults.map((r: any) => ({
+          filePath: r.filePath,
+          content: r.content,
+          startLine: r.startLine,
+          endLine: r.endLine,
+        }));
+      } catch { /* ignore */ }
+    }
 
     if (results.length === 0) {
-      console.log(`[RAG] No semantic results. Falling back to grep search for query: ${query}`);
+      console.log(`[Search] No semantic results. Falling back to grep search for query: ${query}`);
       return await executeSearchTool({
         id: tool.id,
         name: 'grep_search',

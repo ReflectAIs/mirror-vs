@@ -144,7 +144,7 @@
     if (isReverted) {
       card.classList.add('reverted');
     }
-    if (toolName === 'create_file' || toolName === 'write_file' || toolName === 'patch_file') {
+    if (toolName === 'create_file' || toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file') {
       card.classList.add('write-tool-card');
     }
     if (checkpointId) {

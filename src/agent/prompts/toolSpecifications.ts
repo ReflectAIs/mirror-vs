@@ -8,6 +8,7 @@ Available tools:
 - create_file: <create_file path="...">content</create_file> (New files only)
 - write_file: <write_file path="...">content</write_file> (Overwrite)
 - patch_file: <patch_file path="...">\n<<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE\n</patch_file>
+- multi_patch_file: <multi_patch_file><file path="...">\n<<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE\n</file></multi_patch_file> (Patch multiple files)
 - list_dir: <list_dir path="..." />
 - grep_search: <grep_search query="..." [path="..."] />
 - semantic_search: <semantic_search query="..." />
@@ -21,7 +22,7 @@ Available tools:
 
 CRITICAL subsequent turn rule:
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
-- If you have read/grep'd enough files to propose a fix, write the <patch_file> immediately!
+- If you have read/grep'd enough files to propose a fix, write the <patch_file> or <multi_patch_file> immediately!
 `;
   }
 
@@ -30,7 +31,7 @@ CRITICAL subsequent turn rule:
 - Output valid XML tags. Parameters must be in double quotes. Self-closing tags must end with \`/>\`.
 - Call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING.
 - **File Reading Efficiency**: Avoid "keyholing" (reading files in tiny 20-line chunks). Read larger blocks (500-800 lines) or the entire file to get context quickly.
-- **Patching Files Safely**: To edit existing files, use \`patch_file\`. To ensure your \`SEARCH\` block is a 1:1 exact character-for-character match with the current file state (including whitespace and indentation), verify you have the exact file contents in context.
+- **Patching Files Safely**: To edit existing files, use \`patch_file\` or \`multi_patch_file\`. To ensure your \`SEARCH\` block is a 1:1 exact character-for-character match with the current file state (including whitespace and indentation), verify you have the exact file contents in context.
 - **Handling Long New Files**: Create a basic scaffold first using \`create_file\`, then build incrementally using \`patch_file\`.
 
 ### 🧰 AVAILABLE TOOLS
@@ -51,7 +52,24 @@ CRITICAL subsequent turn rule:
 [new replacement lines]
 >>>>>>> REPLACE
 </patch_file>
-5. LIST DIRECTORY: <list_dir path="relative/path/to/directory" />
+5. MULTI PATCH FILE (For modifying multiple existing files in a single turn):
+   <multi_patch_file>
+   <file path="relative/path/to/file1.ts">
+<<<<<<< SEARCH
+[exact original lines in file1]
+=======
+[new replacement lines in file1]
+>>>>>>> REPLACE
+   </file>
+   <file path="relative/path/to/file2.ts">
+<<<<<<< SEARCH
+[exact original lines in file2]
+=======
+[new replacement lines in file2]
+>>>>>>> REPLACE
+   </file>
+   </multi_patch_file>
+6. LIST DIRECTORY: <list_dir path="relative/path/to/directory" />
 6. GREP SEARCH (full workspace): <grep_search query="pattern" />
    GREP SEARCH (scoped to directory): <grep_search query="pattern" path="src/screens" />
    **Best practice**: Always scope with \`path\` when you know the relevant area.

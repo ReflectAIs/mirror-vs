@@ -5,6 +5,8 @@ import { executeBrowserTool } from './browser-tools';
 import { executeTerminalTool } from './terminal-tools';
 import { executeFigmaTool } from './figma-tools';
 import { executeGitTool } from './git-tools';
+import { PluginService } from '../../services/plugin-service';
+import { executeArtifactTool } from './artifact-tools';
 
 export async function executeTool(
   tool: ToolCall,
@@ -14,7 +16,23 @@ export async function executeTool(
 ): Promise<string> {
   const name = tool.name;
 
-  // Built-in wait tool that doesn't need any service
+  // Check plugin tools first (custom tools registered by extensions/users)
+  const pluginService = PluginService.getInstance();
+  if (pluginService.isPluginTool(name)) {
+    const workspaceFolder = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    return pluginService.executePlugin(tool, {
+      workspaceFolder,
+      getSafePath,
+      postMessage: (msg: any) => {
+        try {
+          const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+          MirrorVsSidebarProvider.postToActive?.(msg);
+        } catch { /* ignore */ }
+      },
+    });
+  }
+
+  // Built-in wait tool
   if (name === 'wait') {
     const ms = tool.ms !== undefined ? tool.ms : tool.seconds !== undefined ? tool.seconds * 1000 : 3000;
     const duration = Math.max(100, Math.min(60000, ms));
@@ -22,11 +40,17 @@ export async function executeTool(
     return `Waited for ${duration}ms as requested.`;
   }
 
+  // Artifact tool — creates interactive previewable content in a new VS Code window
+  if (name === 'create_artifact') {
+    return await executeArtifactTool(tool);
+  }
+
   if (
     name === 'read_file' ||
     name === 'create_file' ||
     name === 'write_file' ||
     name === 'patch_file' ||
+    name === 'multi_patch_file' ||
     name === 'list_dir' ||
     name === 'rename_file' ||
     name === 'delete_file' ||

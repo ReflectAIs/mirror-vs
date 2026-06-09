@@ -157,6 +157,59 @@ describe('executeFileTool', () => {
     });
   });
 
+  describe('multi_patch_file', () => {
+    it('should successfully apply patches to multiple files', async () => {
+      const tmpDir = createTempDir();
+      try {
+        const filePath1 = path.join(tmpDir, 'file1.txt');
+        const filePath2 = path.join(tmpDir, 'file2.txt');
+        fs.writeFileSync(filePath1, 'file one original content', 'utf8');
+        fs.writeFileSync(filePath2, 'file two original content', 'utf8');
+
+        const localGetSafe = (p: string) => path.join(tmpDir, p);
+        const tool = {
+          name: 'multi_patch_file' as const,
+          content: `
+<file path="file1.txt">
+<<<<<<< SEARCH
+one original
+=======
+one updated
+>>>>>>> REPLACE
+</file>
+<file path="file2.txt">
+SEARCH
+two original
+REPLACE
+two updated
+</file>
+`
+        };
+
+        const result = await executeFileTool(tool, localGetSafe);
+        expect(result).toContain('Patched file1.txt');
+        expect(result).toContain('Patched file2.txt');
+
+        const { ReviewManager } = await import('../../../services/review-manager.js');
+        const rm = ReviewManager.getInstance();
+        expect(rm.getProposedContent(filePath1)).toBe('file one updated content');
+        expect(rm.getProposedContent(filePath2)).toBe('file two updated content');
+      } finally {
+        cleanupTempDir(tmpDir);
+      }
+    });
+
+    it('should throw if no files are matched', async () => {
+      const tool = {
+        name: 'multi_patch_file' as const,
+        content: 'some non xml content'
+      };
+      await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
+        'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.'
+      );
+    });
+  });
+
   describe('unsupported tool', () => {
     it('should throw for invalid tool name', async () => {
       const tool = { name: 'invalid_tool' as any };

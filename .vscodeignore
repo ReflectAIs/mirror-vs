@@ -49,3 +49,10 @@ vision.md
 src/scripts/**
 *.ts.map
 *.d.ts
+jarvis/**
+
+# Exclude any stray root-level JS files (temp debug scripts, etc.)
+*.js
+
+# But include the esbuild config (needed for vscode:prepublish)
+!esbuild.js

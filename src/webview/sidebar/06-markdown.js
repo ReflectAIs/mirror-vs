@@ -216,6 +216,9 @@
     } else if (tool === 'patch_file') {
       friendlyName = 'Patching File';
       iconHtml = '✏️';
+    } else if (tool === 'multi_patch_file' || tool === 'multipatch_file') {
+      friendlyName = 'Multi Patching File';
+      iconHtml = '📑';
     } else if (tool === 'rename_file') {
       friendlyName = 'Renaming File';
       iconHtml = '🚚';
@@ -288,8 +291,8 @@
       streamingPlan = true;
     }
     
-    // Clean block tools: create_file, write_file, patch_file, send_terminal_input, rename_file, git_commit
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
+    // Clean block tools: create_file, write_file, patch_file, multi_patch_file, send_terminal_input, rename_file, git_commit
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'multi_patch_file', 'multipatch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
     for (const tool of blockTools) {
       let tagInfo;
       let startFrom = 0;
@@ -326,7 +329,7 @@
           if (pathVal) {
             pathExt = pathVal.split('.').pop() || 'plaintext';
           }
-          if (tool === 'create_file' || tool === 'write_file' || tool === 'patch_file' || tool === 'rename_file' || tool === 'git_commit') {
+          if (tool === 'create_file' || tool === 'write_file' || tool === 'patch_file' || tool === 'multi_patch_file' || tool === 'multipatch_file' || tool === 'rename_file' || tool === 'git_commit') {
             let placeholderToken = `%%%STREAMING_TOOL_PLACEHOLDER::${tool}::${escapeHtml(pathVal || '')}::${escapeHtml(actualCode)}%%%`;
             cleanText = cleanText.substring(0, tagInfo.start) + placeholderToken;
           } else {
@@ -538,6 +541,15 @@
       html = html.replace('%%%STREAMING_PLAN_PLACEHOLDER%%%', cardHtml);
     }
 
+
+    // Convert [path/to/file.ext] markers into styled, clickable file chips for history messages
+    html = html.replace(/\[([A-Za-z0-9_\-\\\/\.]+\.[A-Za-z0-9]{1,10})\]/g, function(match, filePath) {
+      var normalized = filePath.replace(/\\/g, '/');
+      var fileName = normalized.split('/').pop();
+      var escapedPath = escapeHtml(filePath);
+      var escapedFileName = escapeHtml(fileName);
+      return '<span class="history-file-tag" data-file-path="' + escapedPath + '" title="' + escapedPath + ' (click to open)">&#128196; ' + escapedFileName + '</span>';
+    });
     return html.replace(/<\/ul>\s*<ul>/g, '').replace(/<\/ol>\s*<ol>/g, '');
   }
 

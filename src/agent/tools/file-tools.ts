@@ -11,9 +11,14 @@ function normalizeLineEndings(str: string): string {
 
 /**
  * Normalizes a line's whitespace to allow fuzzy comparison.
+ * Strips syntax noise (braces, parens, quotes, punctuation) and lowercases.
  */
 function normalizeLine(line: string): string {
-  return line.trim().replace(/\s+/g, ' ');
+  return line
+    .trim()
+    .toLowerCase()
+    .replace(/[{}\[\]();,.:'"`]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 /**
@@ -29,7 +34,12 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
   for (let i = 0; i <= normalizedFile.length - normalizedSearch.length; i++) {
     let match = true;
     for (let j = 0; j < normalizedSearch.length; j++) {
-      if (normalizedFile[i + j] !== normalizedSearch[j]) {
+      const fLine = normalizedFile[i + j];
+      const sLine = normalizedSearch[j];
+      if (sLine === '' && fLine === '') {
+        continue;
+      }
+      if (sLine === '' || fLine === '' || (!fLine.includes(sLine) && !sLine.includes(fLine))) {
         match = false;
         break;
       }
@@ -314,49 +324,91 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       return `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;
     }
 
-    case 'update_agent_memory': {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceFolder) {
-        return 'Error: No workspace folder open. Agent memory cannot be updated.';
+    case 'multi_patch_file': {
+      const rawContent = tool.content || '';
+      const fileRegex = /<file\s+path="([^"]+)"\s*>([\s\S]*?)<\/file>/gi;
+      let match;
+      const filePatches: { path: string; patches: { search: string; replace: string }[] }[] = [];
+      while ((match = fileRegex.exec(rawContent)) !== null) {
+        const filePath = match[1].trim();
+        const rawPatches = match[2];
+        const patches = parsePatchBlocks(rawPatches);
+        if (patches.length > 0) {
+          filePatches.push({ path: filePath, patches });
+        }
       }
+
+      if (filePatches.length === 0) {
+        throw new Error('No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.');
+      }
+
+      const results: string[] = [];
+      for (const fp of filePatches) {
+        const safePath = getSafePath(fp.path);
+        if (!fs.existsSync(safePath)) {
+          throw new Error(`File does not exist: ${fp.path}`);
+        }
+
+        let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
+        for (let i = 0; i < fp.patches.length; i++) {
+          const { search, replace } = fp.patches[i];
+          if (fileContent.includes(search)) {
+            fileContent = fileContent.replace(search, replace);
+          } else {
+            const fileLines = fileContent.split('\n');
+            const searchLines = search.split('\n');
+            const matchRange = findFuzzyMatchRange(fileLines, searchLines);
+            if (!matchRange) {
+              throw new Error(
+                `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).\nSearch target:\n${search}`,
+              );
+            }
+            fileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, replace);
+            fileContent = fileLines.join('\n');
+          }
+        }
+
+        const { accepted, checkpointId } = await confirmChangesWithDiff(
+          safePath,
+          fileContent,
+          path.basename(fp.path),
+          'replace',
+        );
+        if (!accepted) {
+          throw new Error(`User rejected patch edits for ${fp.path}.`);
+        }
+        results.push(`Patched ${fp.path} (${fp.patches.length} block(s), Revert ID: ${checkpointId})`);
+      }
+
+      return results.join('\n');
+    }
+
+    case 'update_agent_memory': {
       const key = tool.key || tool.query || '';
       const value = tool.value || tool.path || tool.content || '';
       if (!key || !value) {
         return 'Error: Missing "key" or "value" parameters for update_agent_memory. Usage: <update_agent_memory key="preferences" value="use functional components" />';
       }
-
-      const memoryDir = path.join(workspaceFolder, '.mirror-vs');
-      if (!fs.existsSync(memoryDir)) {
-        fs.mkdirSync(memoryDir, { recursive: true });
-      }
-
-      const memoryPath = path.join(memoryDir, 'memory.json');
-      let memory: Record<string, any> = {};
-
       try {
-        if (fs.existsSync(memoryPath)) {
-          memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
-        }
-      } catch (e) {
-        // ignore
-      }
-
-      if (!memory[key]) {
-        memory[key] = [];
-      }
-
-      if (Array.isArray(memory[key])) {
-        if (!memory[key].includes(value)) {
-          memory[key].push(value);
-        }
-      } else if (typeof memory[key] === 'object') {
-        memory[key][`item_${Date.now()}`] = value;
-      } else {
+        const { AgentMemoryService } = await import('../../services/agent-memory-service.js');
+        const memory = AgentMemoryService.getInstance();
+        const category = (tool.category as any) || 'note';
+        memory.set(key, value, category, tool.path || undefined);
+        const count = memory.count;
+        return `✅ Successfully updated agent memory for key "${key}" (${category}). Total entries: ${count}.`;
+      } catch {
+        // Fallback: legacy memory file
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceFolder) return 'Error: No workspace folder open.';
+        const memoryDir = path.join(workspaceFolder, '.mirror-vs');
+        if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+        const memoryPath = path.join(memoryDir, 'memory.json');
+        let memory: Record<string, any> = {};
+        try { if (fs.existsSync(memoryPath)) memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8')); } catch { /* ignore */ }
         memory[key] = value;
+        fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2), 'utf8');
+        return `✅ Updated agent memory (legacy): "${key}" = "${value}"`;
       }
-
-      fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2), 'utf8');
-      return `✅ Successfully updated agent memory for key "${key}" with: "${value}"`;
     }
 
     default:

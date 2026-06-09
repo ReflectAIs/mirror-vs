@@ -159,7 +159,7 @@ export class AgentParser {
         startFrom = tagInfo.end;
       }
     }
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
     for (const tool of blockTools) {
       let startFrom = 0;
       let tagInfo;
@@ -178,7 +178,7 @@ export class AgentParser {
   }
 
   private autoCloseToolTags(text: string): string {
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
     let adjustedText = text;
     for (const tool of blockTools) {
       const hasOpen = this.findUnquotedTagEndEx(adjustedText, tool) !== null;
@@ -240,7 +240,7 @@ export class AgentParser {
         startFrom = tagInfo.end;
       }
     }
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit'];
+    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
     for (const tool of blockTools) {
       let startFrom = 0;
       let tagInfo;
@@ -393,8 +393,8 @@ export class AgentParser {
       startFrom = tagInfo.end;
     }
 
-    // block tools (write_file, create_file, patch_file, rename_file, git_commit)
-    const blockTools = ['write_file', 'create_file', 'patch_file', 'rename_file', 'git_commit'];
+    // block tools (write_file, create_file, patch_file, rename_file, git_commit, multi_patch_file, multipatch_file)
+    const blockTools = ['write_file', 'create_file', 'patch_file', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
     for (const toolName of blockTools) {
       startFrom = 0;
       while ((tagInfo = this.findUnquotedTagEndEx(rawText, toolName, startFrom)) !== null) {
@@ -406,7 +406,7 @@ export class AgentParser {
           continue;
         }
         const p = this.attr(tagInfo.attrs, 'path');
-        if (p || toolName === 'git_commit') {
+        if (p || toolName === 'git_commit' || toolName === 'multi_patch_file' || toolName === 'multipatch_file') {
           const closeTagPattern = '\u003C\u002F' + toolName + '\\s*\u003E';
           const closeTagRegex = new RegExp(closeTagPattern, 'i');
           const closeMatch = closeTagRegex.exec(rawText.substring(tagInfo.end));
@@ -421,7 +421,11 @@ export class AgentParser {
             }
             candidates.push({
               index: tagInfo.start,
-              tool: { name: toolName as ToolCall['name'], path: p ? p.trim() : undefined, content },
+              tool: {
+                name: (toolName === 'multipatch_file' ? 'multi_patch_file' : toolName) as ToolCall['name'],
+                path: p ? p.trim() : undefined,
+                content
+              },
             });
             startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;
             continue;

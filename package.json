@@ -275,6 +275,46 @@
             },
             "required": ["id", "name", "url", "models"]
           }
+        },
+        "mirror-vs.maxToolOutputLength": {
+          "type": "integer",
+          "default": 20000,
+          "description": "Maximum character length for tool execution output in conversation history. Excess output is tokens."
+        },
+        "mirror-vs.enableTruncationGuardrail": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prevent the agent from accidentally truncating files (deleting >50% of lines in files over 50 lines)."
+        },
+        "mirror-vs.aiReviewEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable post-save AI code review. After saving a file, Mirror VS will analyze your changes and provide suggestions."
+        },
+        "mirror-vs.multiFileRefactorEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable atomic multi-file refactoring with automatic rollback on failure."
+        },
+        "mirror-vs.embeddingModel": {
+          "type": "string",
+          "default": "nomic-embed-text",
+          "description": "Ollama embedding model for semantic search. Requires Ollama running with this model pulled."
+        },
+        "mirror-vs.autonomousMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, Mirror VS will automatically accept file changes after a 10-second countdown instead of waiting for manual approval. Enables fully agentic autonomous execution."
+        },
+        "mirror-vs.embeddingSearchMinScore": {
+          "type": "number",
+          "default": 0.3,
+          "description": "Minimum similarity score threshold for embedding-based semantic search results."
+        },
+        "mirror-vs.maxEmbeddingResults": {
+          "type": "integer",
+          "default": 10,
+          "description": "Maximum results returned from embedding-based semantic search."
         }
       }
     }

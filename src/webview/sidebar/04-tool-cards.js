@@ -12,6 +12,9 @@
     } else if (toolName === 'patch_file') {
       friendlyName = 'Patch File';
       iconHtml = '✏️';
+    } else if (toolName === 'multi_patch_file' || toolName === 'multipatch_file') {
+      friendlyName = 'Multi Patch File';
+      iconHtml = '📑';
     } else if (toolName === 'list_dir') {
       friendlyName = 'List Folder';
       iconHtml = '📁';
@@ -95,7 +98,7 @@
     card.appendChild(header);
 
     const targetSpan = header.querySelector('.tool-target');
-    if (targetSpan && target && (toolName === 'create_file' || toolName === 'write_file' || toolName === 'read_file' || toolName === 'patch_file')) {
+    if (targetSpan && target && (toolName === 'create_file' || toolName === 'write_file' || toolName === 'read_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file')) {
       targetSpan.style.cursor = 'pointer';
       targetSpan.style.textDecoration = 'underline';
       targetSpan.style.color = '#a855f7';
@@ -270,8 +273,8 @@
         detailsContainer.appendChild(pre);
       }
       
-      // For patch_file: show the diff in a highlighted code block
-      if (toolName === 'patch_file' && result) {
+      // For patch_file / multi_patch_file: show the diff in a highlighted code block
+      if ((toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file') && result) {
         const header = document.createElement('div');
         header.className = 'tool-details-header';
         header.innerHTML = '✏️ <span>Patch Applied</span>';
@@ -310,7 +313,7 @@
       }
       
       // Default: show summary for other tools
-      if (toolName !== 'read_file' && toolName !== 'grep_search' && toolName !== 'patch_file' && toolName !== 'write_file' && toolName !== 'create_file') {
+      if (toolName !== 'read_file' && toolName !== 'grep_search' && toolName !== 'patch_file' && toolName !== 'multi_patch_file' && toolName !== 'multipatch_file' && toolName !== 'write_file' && toolName !== 'create_file') {
         const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
         const details = document.createElement('div');
         details.className = 'tool-details';

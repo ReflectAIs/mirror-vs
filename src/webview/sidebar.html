@@ -83,6 +83,26 @@
 
     <!-- ===== DRAWERS ===== -->
 
+    <!-- Artifacts Drawer -->
+    <div id="artifacts-drawer" class="drawer collapsed" data-drawer="artifacts">
+      <div class="drawer-inner">
+        <div class="drawer-header">
+          <h3>🧩 Artifacts</h3>
+          <button class="drawer-close-btn" data-drawer="artifacts">✕</button>
+        </div>
+        <div class="drawer-body" style="padding:8px 10px;">
+          <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+            <button id="artifact-open-in-panel" class="btn btn-primary" style="flex:1;padding:6px 10px;font-size:11px;" disabled title="Select an artifact first">Open in New Window</button>
+          </div>
+          <div id="artifacts-list" class="artifacts-list">
+            <div class="no-artifacts" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">
+              No artifacts yet. Ask the agent to create one (e.g., "Create an HTML tooltip component as an artifact").
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings Drawer -->
     <div id="settings-drawer" class="drawer collapsed" data-drawer="settings">
       <div class="drawer-inner">

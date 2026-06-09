@@ -342,6 +342,28 @@ export class ReviewManager implements vscode.CodeLensProvider {
 
       // Show dual-mode non-blocking notification toast
       this.showReviewNotification(filePath);
+
+      // 🚀 Autonomous mode: auto-accept after 10s countdown
+      const autonomousEnabled = vscode.workspace.getConfiguration('mirror-vs').get<boolean>('autonomousMode', false);
+      if (autonomousEnabled) {
+        const maxRounds = 10;
+        let remaining = 10;
+        const timerId = setInterval(() => {
+          remaining--;
+          if (remaining > 0) {
+            vscode.window.setStatusBarMessage(`$(clock) Mirror VS: Auto-accepting changes in ${remaining}s...`, 1000);
+          }
+        }, 1000);
+
+        setTimeout(async () => {
+          clearInterval(timerId);
+          const review = this._activeReviews.get(normPath);
+          if (review) {
+            await this.resolveReview(review.filePath, true);
+            vscode.window.setStatusBarMessage(`$(check-all) Mirror VS: Changes auto-accepted for "${path.basename(filePath)}"`, 5000);
+          }
+        }, 10000);
+      }
     });
   }
 

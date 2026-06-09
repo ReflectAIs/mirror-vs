@@ -143,6 +143,16 @@
         parsedToolContents.set(pathMatch[1].trim(), content);
       }
     }
+
+    const multiPatchRegex = /<(multi_patch_file|multipatch_file)([\s\S]*?)>([\s\S]*?)<\/\1\s*>/gi;
+    while ((match = multiPatchRegex.exec(text)) !== null) {
+      const content = match[3];
+      const fileRegex = /<file\s+path="([^"]+)"\s*>([\s\S]*?)<\/file>/gi;
+      let fileMatch;
+      while ((fileMatch = fileRegex.exec(content)) !== null) {
+        parsedToolContents.set(fileMatch[1].trim(), fileMatch[2]);
+      }
+    }
   }
 
   // Initialize

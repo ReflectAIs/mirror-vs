@@ -1,6 +1,9 @@
 import { LLMProvider, ChatMessage } from '../types';
 import { streamOllamaChat, streamDeepSeekChat, streamCustomOpenAIChat } from '../services/api-service';
 import { TelemetryService } from '../services/telemetry-service';
+import * as fs from 'fs';
+import * as path from 'path';
+import { estimateTokenCount } from './orchestrator-config';
 
 /** Handles LLM streaming completion calls and context summarization */
 export class AgentCompleter {
@@ -29,6 +32,7 @@ export class AgentCompleter {
     signal: AbortSignal,
     _sessionId: string,
     abortController: AbortController,
+    workspaceRoot?: string,
   ): Promise<string> {
     const startTime = performance.now();
 
@@ -62,12 +66,48 @@ export class AgentCompleter {
 
       const onComplete = (fullText: string, _usage?: { promptTokens: number; completionTokens: number }) => {
         this._lastLatencyMeasurement = performance.now() - startTime;
-        const inputTokens = _usage?.promptTokens ?? 0;
-        const outputTokens = _usage?.completionTokens ?? 0;
+        let inputTokens = _usage?.promptTokens ?? 0;
+        let outputTokens = _usage?.completionTokens ?? 0;
+
+        // Failsafe fallback: estimate tokens if API didn't return usage
+        if (inputTokens === 0) {
+          inputTokens = messages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
+        }
+        if (outputTokens === 0) {
+          outputTokens = estimateTokenCount(fullText);
+        }
+
         const totalTokens = inputTokens + outputTokens;
 
-        const rateInput = provider === 'deepseek' ? 0.00014 / 1000 : 0.0;
-        const rateOutput = provider === 'deepseek' ? 0.00028 / 1000 : 0.0;
+        let rateInput = 0.0;
+        let rateOutput = 0.0;
+
+        if (provider === 'deepseek') {
+          if (model.toLowerCase().includes('reasoner') || model.toLowerCase().includes('r1')) {
+            rateInput = 0.00055 / 1000;
+            rateOutput = 0.00219 / 1000;
+          } else {
+            rateInput = 0.00014 / 1000;
+            rateOutput = 0.00028 / 1000;
+          }
+        } else if (provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_'))) {
+          if (model.toLowerCase().includes('gpt-4o-mini')) {
+            rateInput = 0.00015 / 1000;
+            rateOutput = 0.00060 / 1000;
+          } else if (model.toLowerCase().includes('gpt-4o')) {
+            rateInput = 0.005 / 1000;
+            rateOutput = 0.015 / 1000;
+          } else if (model.toLowerCase().includes('deepseek')) {
+            if (model.toLowerCase().includes('reasoner') || model.toLowerCase().includes('r1')) {
+              rateInput = 0.00055 / 1000;
+              rateOutput = 0.00219 / 1000;
+            } else {
+              rateInput = 0.00014 / 1000;
+              rateOutput = 0.00028 / 1000;
+            }
+          }
+        }
+
         const cost = inputTokens * rateInput + outputTokens * rateOutput;
 
         this._telemetry.recordCall({
@@ -90,6 +130,30 @@ export class AgentCompleter {
             cost: cost,
           },
         });
+
+        // Write debug turns.log if workspaceRoot is provided
+        if (workspaceRoot) {
+          try {
+            const logPath = path.join(workspaceRoot, 'turns.log');
+            const logDivider = '='.repeat(80) + '\n';
+            const subDivider = '-'.repeat(80) + '\n';
+            let logContent = logDivider;
+            logContent += `TIMESTAMP: ${new Date().toISOString()}\n`;
+            logContent += `SESSION ID: ${_sessionId}\n`;
+            logContent += `PROVIDER: ${provider} | MODEL: ${model}\n`;
+            logContent += subDivider;
+            logContent += `>>> PAYLOAD SENT TO MODEL >>>\n`;
+            for (const msg of messages) {
+              logContent += `[${msg.role.toUpperCase()}]:\n${msg.content}\n\n`;
+            }
+            logContent += subDivider;
+            logContent += `<<< MODEL RESPONSE GENERATED <<<\n${fullText}\n`;
+            logContent += logDivider + '\n';
+            fs.appendFileSync(logPath, logContent, 'utf-8');
+          } catch (e) {
+            console.error('[AgentCompleter] Failed to write to turns.log:', e);
+          }
+        }
 
         safeResolve(fullText);
       };
