@@ -582,20 +582,40 @@
   }
 
   function updateCustomProvidersUI(selectedProvider) {
-    if (!settingsCustomProviderSelect || !quickProviderSelect) return;
+    const customApiListEl = document.getElementById('custom-api-list');
+    const customApiEditor = document.getElementById('custom-api-editor');
+    const customApiPlaceholder = document.getElementById('custom-api-placeholder');
     
-    settingsCustomProviderSelect.innerHTML = '<option value="custom">Default Custom API</option>';
-    customApisList.forEach(api => {
-      const opt = document.createElement('option');
-      opt.value = api.id;
-      opt.textContent = api.name;
-      settingsCustomProviderSelect.appendChild(opt);
-    });
+    // Render the list of custom APIs
+    if (customApiListEl) {
+      if (customApisList.length === 0) {
+        customApiListEl.innerHTML = '';
+      } else {
+        customApiListEl.innerHTML = customApisList.map(api => {
+          const isActive = selectedProvider === api.id;
+          return `<div class="custom-api-item ${isActive ? 'active' : ''}" data-id="${api.id}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:4px; border-radius:6px; cursor:pointer; background:${isActive ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)'}; border:1px solid ${isActive ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}; transition:all 0.15s;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              <span style="font-size:9px; opacity:0.5;">🔌</span>
+              <span style="font-size:12px; font-weight:${isActive ? '600' : '400'}; color:${isActive ? 'var(--color-primary-light)' : 'inherit'};">${api.name}</span>
+            </div>
+            <span style="font-size:10px; opacity:0.4; white-space:nowrap;">${api.models.slice(0,2).join(', ')}${api.models.length > 2 ? '...' : ''}</span>
+          </div>`;
+        }).join('');
+        
+        // Click handler for items
+        customApiListEl.querySelectorAll('.custom-api-item').forEach(el => {
+          el.addEventListener('click', () => {
+            const id = el.dataset.id;
+            fillCustomApiEditorFields(id);
+          });
+        });
+      }
+    }
 
+    // Update the quick provider select (top dropdown) - remove default 'custom' option
     quickProviderSelect.innerHTML = `
       <option value="ollama">Ollama</option>
       <option value="deepseek">DeepSeek</option>
-      <option value="custom">Default Custom API</option>
     `;
     customApisList.forEach(api => {
       const opt = document.createElement('option');
@@ -604,70 +624,65 @@
       quickProviderSelect.appendChild(opt);
     });
 
-    const isCustomId = selectedProvider === 'custom' || (typeof selectedProvider === 'string' && selectedProvider.startsWith('custom_'));
+    const isCustomId = typeof selectedProvider === 'string' && selectedProvider.startsWith('custom_');
     if (isCustomId) {
-      settingsCustomProviderSelect.value = selectedProvider;
-    } else {
-      settingsCustomProviderSelect.value = 'custom';
+      quickProviderSelect.value = selectedProvider;
     }
-    quickProviderSelect.value = selectedProvider;
+    if (customApiPlaceholder) {
+      customApiPlaceholder.style.display = customApisList.length === 0 ? 'block' : 'none';
+    }
 
-    fillCustomApiEditorFields(settingsCustomProviderSelect.value);
+    fillCustomApiEditorFields(isCustomId ? selectedProvider : '');
   }
 
   function fillCustomApiEditorFields(providerId) {
-    if (providerId === 'custom') {
-      if (customApiEditorTitle) customApiEditorTitle.textContent = 'Configure Default Connection';
-      if (customEndpointNameInput) {
-        customEndpointNameInput.value = 'Default Custom API';
-        customEndpointNameInput.disabled = true;
-      }
-      if (customEndpointUrlInput) customEndpointUrlInput.value = defaultCustomUrl;
-      if (customEndpointModelInput) customEndpointModelInput.value = defaultCustomModel;
-      if (customEndpointKeyInput) {
-        if (customApiKeysData['custom']) {
-          customEndpointKeyInput.value = customApiKeysData['custom'];
-          customEndpointKeyInput.placeholder = 'Key configured (unsaved)';
-        } else {
-          customEndpointKeyInput.placeholder = defaultCustomHasKey ? 'Key is configured' : 'Key...';
-          customEndpointKeyInput.value = defaultCustomHasKey ? '••••••••' : '';
-        }
-      }
-    } else {
-      const api = customApisList.find(a => a.id === providerId);
-      if (api) {
-        if (customApiEditorTitle) customApiEditorTitle.textContent = 'Configure Connection';
-        if (customEndpointNameInput) {
-          customEndpointNameInput.value = api.name;
-          customEndpointNameInput.disabled = false;
-        }
-        if (customEndpointUrlInput) customEndpointUrlInput.value = api.url;
-        if (customEndpointModelInput) customEndpointModelInput.value = api.models.join(', ');
-        
-        const hasKey = configuredCustomApiKeys[api.id] || customApiKeysData[api.id];
-        if (customEndpointKeyInput) {
-          if (customApiKeysData[api.id]) {
-            customEndpointKeyInput.value = customApiKeysData[api.id];
-            customEndpointKeyInput.placeholder = 'Key configured (unsaved)';
-          } else {
-            customEndpointKeyInput.placeholder = hasKey ? 'Key is configured' : 'Key...';
-            customEndpointKeyInput.value = hasKey ? '••••••••' : '';
-          }
-        }
+    const editor = document.getElementById('custom-api-editor');
+    const activeItem = document.querySelector('.custom-api-item.active');
+    
+    // Deselect all items first
+    document.querySelectorAll('.custom-api-item').forEach(el => el.classList.remove('active'));
+    
+    if (!providerId || providerId === 'custom') {
+      // No API selected or invalid — hide editor
+      if (editor) editor.classList.add('hidden');
+      return;
+    }
+    
+    const api = customApisList.find(a => a.id === providerId);
+    if (!api) {
+      if (editor) editor.classList.add('hidden');
+      return;
+    }
+    
+    // Mark this item as active
+    const itemEl = document.querySelector(`.custom-api-item[data-id="${providerId}"]`);
+    if (itemEl) itemEl.classList.add('active');
+    
+    if (editor) editor.classList.remove('hidden');
+    
+    if (customEndpointNameInput) {
+      customEndpointNameInput.value = api.name;
+      customEndpointNameInput.disabled = false;
+    }
+    if (customEndpointUrlInput) customEndpointUrlInput.value = api.url;
+    if (customEndpointModelInput) customEndpointModelInput.value = api.models.join(', ');
+    
+    const hasKey = configuredCustomApiKeys[api.id] || customApiKeysData[api.id];
+    if (customEndpointKeyInput) {
+      if (customApiKeysData[api.id]) {
+        customEndpointKeyInput.value = customApiKeysData[api.id];
+        customEndpointKeyInput.placeholder = 'Key configured (unsaved)';
+      } else {
+        customEndpointKeyInput.placeholder = hasKey ? 'Key is configured' : 'Key...';
+        customEndpointKeyInput.value = hasKey ? '••••••••' : '';
       }
     }
   }
 
-  if (settingsCustomProviderSelect) {
-    settingsCustomProviderSelect.addEventListener('change', (e) => {
-      fillCustomApiEditorFields(e.target.value);
-    });
-  }
-
-  if (newCustomProviderBtn) {
-    newCustomProviderBtn.addEventListener('click', () => {
-      if (customApiEditorTitle) customApiEditorTitle.textContent = 'Create New Connection';
-      if (settingsCustomProviderSelect) settingsCustomProviderSelect.value = 'custom';
+  // Wire up the Add Custom API button
+  const addCustomApiBtn = document.getElementById('add-custom-api-btn');
+  if (addCustomApiBtn) {
+    addCustomApiBtn.addEventListener('click', () => {
       if (customEndpointNameInput) {
         customEndpointNameInput.value = '';
         customEndpointNameInput.disabled = false;
@@ -679,6 +694,11 @@
         customEndpointKeyInput.value = '';
         customEndpointKeyInput.placeholder = 'Key...';
       }
+      // Show the editor in "new" mode with a clear editor title
+      const editor = document.getElementById('custom-api-editor');
+      const title = editor ? editor.querySelector('.settings-card-title') : null;
+      if (title) title.textContent = 'New Custom API';
+      if (editor) editor.classList.remove('hidden');
     });
   }
 
@@ -700,32 +720,25 @@
         return;
       }
 
-      const activeId = settingsCustomProviderSelect ? settingsCustomProviderSelect.value : 'custom';
-      let targetId = activeId;
-      
-      if (activeId === 'custom') {
-        if (customApiEditorTitle && customApiEditorTitle.textContent === 'Configure Default Connection') {
-          defaultCustomUrl = url;
-          defaultCustomModel = models[0];
-          if (key && key !== '••••••••') {
-            customApiKeysData['custom'] = key;
-            defaultCustomHasKey = true;
-          }
-          saveProviderSettings(activeProvider);
-          showToast('Default Custom API settings saved!');
-          return;
-        } else {
-          targetId = 'custom_' + Date.now();
-          const newApi = { id: targetId, name, url, models };
-          customApisList.push(newApi);
+      // Determine if we are editing an existing API or creating a new one
+      const activeItem = document.querySelector('.custom-api-item.active');
+      let targetId = '';
+      let isNew = true;
+
+      if (activeItem) {
+        targetId = activeItem.dataset.id;
+        const existing = customApisList.find(a => a.id === targetId);
+        if (existing) {
+          isNew = false;
+          existing.name = name;
+          existing.url = url;
+          existing.models = models;
         }
-      } else {
-        const api = customApisList.find(a => a.id === activeId);
-        if (api) {
-          api.name = name;
-          api.url = url;
-          api.models = models;
-        }
+      }
+
+      if (isNew) {
+        targetId = 'custom_' + Date.now();
+        customApisList.push({ id: targetId, name, url, models });
       }
 
       if (key && key !== '••••••••') {
@@ -737,39 +750,32 @@
       updateCustomProvidersUI(targetId);
       selectProvider(targetId);
       saveProviderSettings(targetId);
-      showToast('Custom connection saved!');
+      showToast(name + ' saved!');
     });
   }
 
   if (deleteCustomProviderBtn) {
     deleteCustomProviderBtn.addEventListener('click', () => {
-      const activeId = settingsCustomProviderSelect ? settingsCustomProviderSelect.value : 'custom';
-      if (activeId === 'custom') {
-        // Reset default custom API
-        defaultCustomUrl = 'https://api.openai.com/v1';
-        defaultCustomModel = 'gpt-4o';
-        defaultCustomHasKey = false;
-        customApiKeysData['custom'] = '';
-
-        if (customEndpointUrlInput) customEndpointUrlInput.value = defaultCustomUrl;
-        if (customEndpointModelInput) customEndpointModelInput.value = defaultCustomModel;
-        if (customEndpointKeyInput) {
-          customEndpointKeyInput.value = '';
-          customEndpointKeyInput.placeholder = 'Key...';
-        }
-        saveProviderSettings('custom');
-        showToast('Default Custom API configuration cleared.');
+      const activeItem = document.querySelector('.custom-api-item.active');
+      if (!activeItem) {
+        showToast('Select a custom connection to delete.', 'info');
         return;
       }
 
-      // Delete a named custom connection
-      customApisList = customApisList.filter(a => a.id !== activeId);
-      customApiKeysData[activeId] = '';
+      const targetId = activeItem.dataset.id;
+      customApisList = customApisList.filter(a => a.id !== targetId);
+      customApiKeysData[targetId] = '';
 
-      updateCustomProvidersUI('custom');
-      selectProvider('custom');
-      saveProviderSettings('custom');
-      showToast('Custom connection deleted.');
+      // If the deleted API was the active provider, switch to Ollama
+      const wasActiveProvider = activeProvider === targetId;
+      
+      updateCustomProvidersUI('');
+      
+      if (wasActiveProvider) {
+        selectProvider('ollama');
+        saveProviderSettings('ollama');
+      }
+      showToast('Connection deleted.');
     });
   }
 

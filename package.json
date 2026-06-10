@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -228,7 +228,10 @@
         },
         "mirror-vs.deepSeekThinkingLevel": {
           "type": "string",
-          "enum": ["high", "max"],
+          "enum": [
+            "high",
+            "max"
+          ],
           "default": "high",
           "description": "DeepSeek V4 Thinking Effort Level."
         },
@@ -239,7 +242,11 @@
         },
         "mirror-vs.agentMode": {
           "type": "string",
-          "enum": ["normal", "refactor", "debug"],
+          "enum": [
+            "normal",
+            "refactor",
+            "debug"
+          ],
           "default": "normal",
           "description": "Select the active agent mode. Normal is for general tasks, Refactor focuses on restructuring, Debug attaches to debugger."
         },
@@ -265,15 +272,28 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "name": { "type": "string" },
-              "url": { "type": "string" },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
               "models": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               }
             },
-            "required": ["id", "name", "url", "models"]
+            "required": [
+              "id",
+              "name",
+              "url",
+              "models"
+            ]
           }
         },
         "mirror-vs.maxToolOutputLength": {

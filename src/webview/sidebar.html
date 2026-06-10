@@ -176,51 +176,57 @@
             </div>
           </div>
 
-          <!-- Custom OpenAI Endpoint Settings Panel Card -->
+          <!-- Custom API Connections Panel Card -->
           <div id="custom-panel" class="config-panel settings-card hidden">
             <div class="settings-card-title">Custom API Connections</div>
             
-            <div class="form-group" style="margin-bottom: 12px;">
-              <label for="settings-custom-provider-select">Active Connection</label>
-              <div class="select-with-btn">
-                <select id="settings-custom-provider-select">
-                  <option value="custom">Default Custom API</option>
-                </select>
-                <button type="button" id="delete-custom-provider-btn" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #f87171;" title="Delete this connection">🗑️</button>
-              </div>
+            <!-- List of saved custom APIs -->
+            <div id="custom-api-list" class="custom-api-list" style="margin-bottom: 10px;">
+              <!-- Populated dynamically by JS -->
             </div>
 
-            <div class="divider" style="margin: 8px 0; border-top: 1px dashed rgba(255,255,255,0.05);"></div>
+            <button type="button" id="add-custom-api-btn" class="btn btn-secondary" style="width: 100%; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              ➕ Add Custom API
+            </button>
 
-            <div id="custom-api-editor-title" class="settings-card-title" style="margin-top: 8px; font-size: 11px;">Configure Connection</div>
-            
-            <div class="settings-grid">
+            <div class="divider" style="margin: 8px 0; border-top: 1px dashed rgba(255,255,255,0.1);"></div>
+
+            <!-- Editor for the selected custom API -->
+            <div id="custom-api-editor" class="custom-api-editor hidden" style="margin-top: 6px;">
+              <div class="settings-card-title" style="margin-top: 0; font-size: 11px;">Edit Connection</div>
+              
+              <div class="settings-grid">
+                <div class="form-group">
+                  <label for="custom-endpoint-name">Connection Name</label>
+                  <input type="text" id="custom-endpoint-name" placeholder="e.g. Groq, Together">
+                </div>
+                <div class="form-group">
+                  <label for="custom-endpoint-url">Endpoint URL</label>
+                  <input type="text" id="custom-endpoint-url" placeholder="https://api.openai.com/v1">
+                </div>
+              </div>
+
               <div class="form-group">
-                <label for="custom-endpoint-name">Connection Name</label>
-                <input type="text" id="custom-endpoint-name" placeholder="e.g. Groq, Together">
+                <label for="custom-endpoint-model">Models (comma-separated)</label>
+                <input type="text" id="custom-endpoint-model" placeholder="gpt-4o, gpt-4o-mini">
               </div>
+
               <div class="form-group">
-                <label for="custom-endpoint-url">Endpoint URL</label>
-                <input type="text" id="custom-endpoint-url" placeholder="https://api.openai.com/v1">
+                <label for="custom-endpoint-key">API Key</label>
+                <div class="password-input-container">
+                  <input type="password" id="custom-endpoint-key" placeholder="Key...">
+                  <button type="button" id="toggle-custom-key-visibility" class="toggle-visibility-btn">Show</button>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button type="button" id="save-custom-provider-btn" class="btn btn-secondary" style="flex: 1;">Save</button>
+                <button type="button" id="delete-custom-provider-btn" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #f87171; flex: 1;">🗑️ Delete</button>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="custom-endpoint-model">Models (comma-separated)</label>
-              <input type="text" id="custom-endpoint-model" placeholder="gpt-4o, gpt-4o-mini">
-            </div>
-
-            <div class="form-group">
-              <label for="custom-endpoint-key">API Key</label>
-              <div class="password-input-container">
-                <input type="password" id="custom-endpoint-key" placeholder="Key...">
-                <button type="button" id="toggle-custom-key-visibility" class="toggle-visibility-btn">Show</button>
-              </div>
-            </div>
-
-            <div style="display: flex; gap: 8px; margin-top: 10px;">
-              <button type="button" id="save-custom-provider-btn" class="btn btn-secondary" style="flex: 1;">Save Connection</button>
-              <button type="button" id="new-custom-provider-btn" class="btn btn-secondary" style="background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.25); color: var(--color-primary-light);">➕ New</button>
+            <div id="custom-api-placeholder" class="custom-api-placeholder" style="padding: 16px; text-align: center; font-size: 11px; color: var(--text-muted);">
+              No custom APIs configured. Click "Add Custom API" to create one.
             </div>
           </div>
 

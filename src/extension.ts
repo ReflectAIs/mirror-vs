@@ -92,7 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('mirror-vs.toggleAiReview', () => {
       const reviewService = AiReviewService.getInstance();
       const enabled = reviewService.toggle();
-      vscode.window.showInformationMessage(
+      console.log(
         `Mirror VS: Post-save AI Code Review ${enabled ? 'ENABLED' : 'DISABLED'}.`
       );
     }),
@@ -130,7 +130,7 @@ export function activate(context: vscode.ExtensionContext) {
       const { ArtifactService } = require('./services/artifact-service');
       const artifacts = ArtifactService.getInstance().artifacts;
       if (artifacts.length === 0) {
-        vscode.window.showInformationMessage('No artifacts created yet. Ask Mirror VS to create one!');
+        console.log('Mirror VS: No artifacts created yet. Ask Mirror VS to create one!');
         return;
       }
       vscode.commands.executeCommand('mirror-vs.focusSidebar');

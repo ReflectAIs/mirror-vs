@@ -31,8 +31,9 @@ CRITICAL subsequent turn rule:
 - Output valid XML tags. Parameters must be in double quotes. Self-closing tags must end with \`/>\`.
 - Call ONLY ONE tool per response turn. After outputting a tool tag, immediately STOP GENERATING.
 - **File Reading Efficiency**: Avoid "keyholing" (reading files in tiny 20-line chunks). Read larger blocks (500-800 lines) or the entire file to get context quickly.
-- **Patching Files Safely**: To edit existing files, use \`patch_file\` or \`multi_patch_file\`. To ensure your \`SEARCH\` block is a 1:1 exact character-for-character match with the current file state (including whitespace and indentation), verify you have the exact file contents in context.
-- **Handling Long New Files**: Create a basic scaffold first using \`create_file\`, then build incrementally using \`patch_file\`.
+- **Patching Files Safely**: To edit existing files, use \`patch_file\` or \`multi_patch_file\`. Always prefer patch over write. Avoid using \`write_file\` to overwrite existing files unless you have no other option (e.g. the file is too small to patch or the structure must be completely replaced). To ensure your \`SEARCH\` block is a 1:1 exact character-for-character match with the current file state (including whitespace and indentation), verify you have the exact file contents in context.
+- **Handling Long New Files**: For huge new files, first use \`write_file\` to create a scaffold, then use \`patch_file\` to build up incrementally rather than writing the entire file at once in a single \`create_file\` call. This only applies to new files, not existing ones.
+- **read_file Output**: The tool displays the actual line range read (e.g. "showing lines 1-800"). When content is evicted, the eviction notice includes the original line range so you know exactly which lines to re-request.
 
 ### 🧰 AVAILABLE TOOLS
 

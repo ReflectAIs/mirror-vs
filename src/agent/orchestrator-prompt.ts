@@ -11,12 +11,15 @@ import { getDebugSkill } from './prompts/skills/debugSkill';
 import { getReactSkill } from './prompts/skills/reactSkill';
 import { getBackendSkill } from './prompts/skills/backendSkill';
 import { getRefactorSkill } from './prompts/skills/refactorSkill';
+import { getModeInstructions } from './prompts/modePrompts';
+import { TaskMode } from './orchestrator';
 
 export function buildSystemPrompt(
   loopCount: number = 1,
   hasPlan: boolean = false,
   featureOwner: string = '',
-  agentState: string = 'DISCOVERY'
+  agentState: string = 'DISCOVERY',
+  taskMode: TaskMode = TaskMode.IMPLEMENT
 ): string {
   const service = CommandService.getInstance();
   const terminals = service.getActiveTerminals();
@@ -106,13 +109,13 @@ export function buildSystemPrompt(
     }
   }
 
-  // 5. Specialized Agent Mode Instructions
-  let modeSection = '';
+  // 5. Specialized Agent Mode Instructions (Prompt Modularization)
+  let modeSection = getModeInstructions(taskMode);
   const activeMode = config.get<string>('agentMode', 'normal');
   if (activeMode === 'refactor') {
-    modeSection = `\n\n### SPECIALIZED AGENT MODE: REFACTOR MODE\nYou are currently operating in REFACTOR MODE. Your primary focus is performing high-quality, large-scale codebase refactorings. Identify structural patterns, extract modular components, migrate APIs, and explain your changes clearly.`;
+    modeSection += `\n\n### REFACTOR METHODOLOGY\nIdentify structural patterns, extract modular components, migrate APIs, and explain your changes clearly.`;
   } else if (activeMode === 'debug') {
-    modeSection = `\n\n### SPECIALIZED AGENT MODE: DEBUG MODE\nYou are currently operating in DEBUG MODE. You are attached to the VS Code debugger to trace errors, read logs, and inspect runtime code states. Use debug tools (debug_get_sessions, debug_get_breakpoints, debug_inspect_variables) to identify bugs and resolve them.`;
+    modeSection += `\n\n### DEBUG METHODOLOGY\nYou are attached to the VS Code debugger to trace errors, read logs, and inspect runtime code states. Use debug tools to identify bugs and resolve them.`;
   }
 
   // 6. Dynamic Skills Integration

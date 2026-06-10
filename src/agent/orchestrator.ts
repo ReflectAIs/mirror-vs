@@ -22,6 +22,29 @@ export enum AgentState {
   NEEDS_EVIDENCE = 'NEEDS_EVIDENCE'
 }
 
+export enum TaskMode {
+  REVIEW = 'REVIEW',
+  DEBUG = 'DEBUG',
+  IMPLEMENT = 'IMPLEMENT',
+  VERIFY = 'VERIFY'
+}
+
+export function determineTaskMode(userMessage: string, configMode: string): TaskMode {
+  const lower = userMessage.toLowerCase();
+  if ([
+    'review', 'audit', 'analyze', 'improvements', 'feedback', 'architecture review', 'frontend review'
+  ].some(keyword => lower.includes(keyword))) {
+    return TaskMode.REVIEW;
+  }
+  if (configMode === 'debug' || lower.includes('bug') || lower.includes('fix') || lower.includes('error') || lower.includes('crash') || lower.includes('fail')) {
+    return TaskMode.DEBUG;
+  }
+  if (lower.includes('verify') || lower.includes('check') || lower.includes('test')) {
+    return TaskMode.VERIFY;
+  }
+  return TaskMode.IMPLEMENT;
+}
+
 export class AgentOrchestrator {
   private _activeAbortController: AbortController | undefined;
   private readonly _rateLimiter = RateLimiter.getInstance();
@@ -260,8 +283,17 @@ export class AgentOrchestrator {
 
       // Agent Control Loop Guard State Tracking (Eradicates Execution Paralysis)
       const activeMode = config.get<string>('agentMode', 'normal');
+      const taskMode = determineTaskMode(text || '', activeMode);
       let searchCount = 0;
-      const maxSearchBudget = activeMode === 'debug' ? 15 : 6;
+      const maxSearchBudget = (() => {
+        switch (taskMode) {
+          case TaskMode.REVIEW: return 2;
+          case TaskMode.IMPLEMENT: return 4;
+          case TaskMode.DEBUG: return activeMode === 'debug' ? 15 : 6;
+          case TaskMode.VERIFY: return 6;
+          default: return 6;
+        }
+      })();
       const readRangesTracker = new Map<string, { hash: string; ranges: Set<string> }>();
       const verifiedFiles = new Set<string>();
       const lastSearches: string[] = [];
@@ -270,6 +302,7 @@ export class AgentOrchestrator {
       let pendingActions: any[] = [];
       let lastSymptom = 'NONE';
       let lastRewriteTelemetry: any = null;
+      console.log(`[Orchestrator] TaskMode resolved: ${taskMode}, searchBudget: ${maxSearchBudget}`);
 
       // Architecture Constraint & Scope Lock State
       let featureOwner = '';
@@ -301,11 +334,14 @@ export class AgentOrchestrator {
         }
       }
 
-      const validateControlLoopGuard = (tool: any): { allowed: boolean; reason?: string } => {
+      // Accumulated warnings for the current turn (fed back as system messages)
+      let activeWarnings: string[] = [];
+
+      const validateControlLoopGuard = (tool: any): { allowed: boolean; warning?: string } => {
         if (agentState === AgentState.NEEDS_EVIDENCE) {
           return {
-            allowed: false,
-            reason: `[System Intervention - NEEDS_EVIDENCE]: You are currently in the NEEDS_EVIDENCE state. You cannot perform code searches, file reads, or patches because you lack the actual JavaScript stack trace or crash logs. You MUST stop invoking tools and ask the user directly for the missing diagnostic information (e.g., Logcat, RedBox, or Crashlytics error logs).`
+            allowed: true,
+            warning: `[Needs Evidence Reminder]: You lack the JS stack trace or crash logs. Consider asking the user for diagnostic info (Logcat, RedBox, etc.) before patching.`
           };
         }
 
@@ -321,31 +357,27 @@ export class AgentOrchestrator {
         ].includes(tool.name);
 
         if (isSearchOrRead) {
-          // 0. Completion Enforcement After Direct Error Localization
+          // 0a. Review Sufficiency (warn, don't block)
+          if (hasEnoughInformationForReview(taskMode, verifiedFiles, currentMessages)) {
+            activeWarnings.push(`[Review]: You have read ${verifiedFiles.size} file(s) — consider outputting your findings soon.`);
+          }
+
+          // 0b. Error Localized (warn, don't block)
           if (isErrorDirectlyLocalized(currentMessages, verifiedFiles)) {
-            return {
-              allowed: false,
-              reason: `[System Intervention - Completion Enforcement]: The compilation/runtime error in the failing file has already been inspected and localized. You have the unresolved reference, missing import/dependency, or failing path in your context. Additional searches, greps, or exploratory actions are BLOCKED. You must immediately transition to patching the file (patch_file/write_file) or verifying the fix.`
-            };
+            activeWarnings.push(`[Error Localized]: The failing file has been inspected. You may be ready to patch.`);
           }
 
-          // 1. Commitment Lock
+          // 1. Commitment Lock (warn, don't block)
           if (hasCommittedToPatch && activeMode !== 'debug') {
-            return {
-              allowed: false,
-              reason: `[System Intervention - Commitment Locked]: You declared that you are ready to patch or have identified the changes. In this state, exploratory search/reading is BLOCKED. You must proceed immediately to implementation (using write_file or patch_file).`,
-            };
+            activeWarnings.push(`[Commitment]: You declared you are ready to patch. Prefer implementation over further exploration.`);
           }
 
-          // 2. Search Budget
+          // 2. Search Budget (warn, don't block)
           if (searchCount >= maxSearchBudget) {
-            return {
-              allowed: false,
-              reason: `[System Intervention - Search Budget Exhausted]: You have exceeded your maximum allowed discovery budget of ${maxSearchBudget} search/read steps in this session. You are BLOCKED from performing further searches or reads. You MUST either immediately output the patch (patch_file/write_file) or stop and explain what is missing.`,
-            };
+            activeWarnings.push(`[Search Budget]: ${maxSearchBudget} searches used. Consider patching or explaining what's missing.`);
           }
 
-          // 3. "No Re-Read" Rule
+          // 3. "No Re-Read" (warn, don't block — still track)
           if (tool.name === 'read_file' && activeMode !== 'debug') {
             const startLine = tool.start_line || 1;
             const endLine = tool.end_line || 1000;
@@ -368,49 +400,37 @@ export class AgentOrchestrator {
             }
 
             if (tracker.ranges.has(rangeKey)) {
-              return {
-                allowed: false,
-                reason: `[System Intervention - No Re-Read]: You have already read the file section "${tool.path}" (lines ${startLine}-${endLine}) with the current hash. Re-reading identical content is BLOCKED. Please proceed to write the patch or explain using your existing knowledge.`,
-              };
+              activeWarnings.push(`[Re-Read]: Already read "${tool.path}" (lines ${startLine}-${endLine}). Skipping may save time.`);
             }
             tracker.ranges.add(rangeKey);
           }
 
-          // 4. Convergence Detector
+          // 4. Convergence Detector (warn, don't block)
           searchCount++;
           const searchKey = `${tool.name}:${target}`;
           lastSearches.push(searchKey);
           if (lastSearches.length > 5) lastSearches.shift();
 
           if (lastSearches.length >= 3 && lastSearches.every((s) => s === searchKey)) {
-            return {
-              allowed: false,
-              reason: `[System Intervention - Convergence Detector]: You have performed the identical search or read step "${searchKey}" three times consecutively. You are BLOCKED from further redundant actions. You MUST proceed to execute the patch now.`,
-            };
+            activeWarnings.push(`[Convergence]: Repeated "${searchKey}" 3x. Consider a different approach.`);
           }
         }
 
-        // 5. Workspace Grounding Check
+        // 5. Workspace Grounding (warn, don't block)
         if (tool.name === 'patch_file') {
           const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
           const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
           if (fullPath && !verifiedFiles.has(fullPath)) {
-            return {
-              allowed: false,
-              reason: `[System Intervention - Workspace Grounding]: You are attempting to patch "${tool.path}" without first reading or verifying it in this session. You must successfully read the file using 'read_file' to understand its contents before proposing any patches.`,
-            };
+            activeWarnings.push(`[Grounding]: You haven't read "${tool.path}" yet this session. Patching without reading may cause SEARCH-block mismatches.`);
           }
         }
 
-        // 7. JS Exception / Evidence Gating Check
+        // 7. JS Exception / Evidence (warn, don't block)
         if ((tool.name === 'patch_file' || tool.name === 'write_file') && !hasSufficientJSEvidence(currentMessages)) {
-          return {
-            allowed: false,
-            reason: `[System Intervention - Insufficient Evidence]: You are attempting to patch a JavaScript Exception/crash without having collected the actual JS error message, stack trace, or diagnostic stack. Proposing patches on blind inference is BLOCKED. Please run commands or inspect logs to retrieve the full JavaScript stack trace or error message before proposing a fix.`,
-          };
+          activeWarnings.push(`[Evidence]: Patching a crash without full stack trace. The fix may be speculative.`);
         }
 
-        // 6. Architecture Constraint Lock / Scope Check
+        // 6. Architecture Constraint Lock (warn, don't block)
         if (isSearchOrRead && blockedScopes.length > 0) {
           const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
           const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
@@ -418,10 +438,7 @@ export class AgentOrchestrator {
           
           for (const blocked of blockedScopes) {
             if (normalizedPath.includes(blocked) || target.toLowerCase().includes(blocked)) {
-              return {
-                allowed: false,
-                reason: `[System Intervention - Architecture Boundary Violation]: You are attempting to run '${tool.name}' on '${target}', which violates the active SEARCH_SCOPE_BLOCKED constraint: '${blocked}' for the declared OWNER: ${featureOwner}. You are BLOCKED from accessing this path. If you must cross this boundary, you MUST first output an updated <architecture_routing> block explaining your JUSTIFICATION before calling this tool.`,
-              };
+              activeWarnings.push(`[Architecture]: Accessing '${target}' may violate SEARCH_SCOPE_BLOCKED '${blocked}'. Add JUSTIFICATION to <architecture_routing> if needed.`);
             }
           }
         }
@@ -453,6 +470,9 @@ export class AgentOrchestrator {
           // Deterministic Agent State Machine transitions
           if (!hasSufficientJSEvidence(currentMessages)) {
             agentState = AgentState.NEEDS_EVIDENCE;
+          } else if (hasEnoughInformationForReview(taskMode, verifiedFiles, currentMessages)) {
+            // In REVIEW mode, once we have read enough files, skip straight to output
+            agentState = AgentState.IMPLEMENTATION; // Reuse IMPLEMENTATION to stop searches
           } else if (isErrorDirectlyLocalized(currentMessages, verifiedFiles)) {
             hasCommittedToPatch = true;
             agentState = AgentState.IMPLEMENTATION;
@@ -500,7 +520,7 @@ export class AgentOrchestrator {
           const turnsToRetain = config.get('turnsToRetain', 6);
 
           const systemPromptTokens = estimateTokenCount(
-            buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState),
+            buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState, taskMode),
           );
           const activeMessages = currentMessages.filter((msg, idx) => {
             if (idx === 0) return false;
@@ -525,8 +545,11 @@ export class AgentOrchestrator {
               const match = msg.content.match(/^\[Tool Result for read_file on "([^"]+)"\]: Success - /);
               if (match) {
                 const filePath = match[1];
+                // Extract line range from the original result if present
+                const lineRange = msg.content.match(/showing lines (\d+-\d+)/);
+                const rangeStr = lineRange ? ` lines ${lineRange[1]}` : '';
                 const prevTokens = estimateTokenCount(msg.content);
-                msg.content = `[Tool Result for read_file on "${filePath}"]: (Content evicted dynamically to stay within token budget. Re-read the file to see contents.)`;
+                msg.content = `[Tool Result for read_file on "${filePath}"]: (Content evicted dynamically to stay within token budget. Read${rangeStr} re-read the file to see contents.)`;
                 const newTokens = estimateTokenCount(msg.content);
                 activeTokens = activeTokens - prevTokens + newTokens;
               }
@@ -601,7 +624,7 @@ export class AgentOrchestrator {
           const resolvedPayload = await Promise.all(resolvedPayloadPromises);
 
           const payload: ChatMessage[] = [
-            { role: 'system', content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState) },
+            { role: 'system', content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState, taskMode) },
             ...resolvedPayload,
           ];
 
@@ -726,38 +749,11 @@ export class AgentOrchestrator {
           let toolCalls = this._parser.parseToolCalls(assistantResponse, true);
 
           if (toolCalls.length > 0) {
-            // Strict Tool Call Discipline Enforcement (Pre-Tool Validation & Rewriting)
+            // Tool ranking info logged but NOT enforced — model runs all tools it emits
             if (toolCalls.length > 1) {
               const { selectedTool, alternatives } = selectHighestValueTool(toolCalls, currentMessages);
-              pendingActions = toolCalls.filter(t => t !== selectedTool);
-              if (pendingActions.length > 5) {
-                pendingActions = pendingActions.slice(-5);
-              }
-              
-              lastRewriteTelemetry = {
-                timestamp: new Date().toISOString(),
-                originalTools: toolCalls.length,
-                selectedTool: selectedTool.name,
-                target: selectedTool.path || selectedTool.query || selectedTool.command || selectedTool.url || '',
-                reason: `Highest priority based on active symptom: ${lastSymptom}`,
-                alternativesConsidered: alternatives
-              };
-              
-              assistantResponse = rewriteResponseToSingleTool(assistantResponse, selectedTool);
-              
-              if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
-                currentMessages[currentMessages.length - 1].content = assistantResponse;
-                await this._saveChatHistory(currentMessages);
-              }
-              
-              toolCalls = [selectedTool];
-              
-              this._postMessage({
-                type: 'chatResponseComplete',
-                fullText: assistantResponse,
-                reasoningText: '',
-              });
-              this._postMessage({ type: 'updateChatHistory', history: currentMessages });
+              console.log(`[Orchestrator] Multi-tool turn: ${toolCalls.length} tools. Top pick: ${selectedTool.name} (score shown in telemetry; all tools allowed).`);
+              // Active warnings from validateControlLoopGuard will be fed back after tool results
             }
 
             const hasModifyingTool = toolCalls.some(
@@ -1187,6 +1183,14 @@ export class AgentOrchestrator {
               currentMessages.push({ role: 'system', content: errorMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
+            } else if (routingMatch && toolCalls.length === 0) {
+              // Architecture Routing Guard: architecture_routing block is NOT a valid response boundary.
+              // If the model emitted architecture_routing but no tool call, it MUST be nudged to continue.
+              const nudgeMsg =
+                "[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.";
+              currentMessages.push({ role: 'system', content: nudgeMsg });
+              await this._saveChatHistory(currentMessages);
+              continueLoop = true;
             } else if (loopCount === 1 && hasActionPlanningIntent(assistantResponse)) {
               // Conversational nudge: if the model gave a conversational greeting in its very first turn without calling any tools,
               // but explicitly indicated that it plans to perform actions, we nudge it to execute a tool to keep the autonomous flow alive.
@@ -1512,6 +1516,26 @@ function isErrorDirectlyLocalized(messages: ChatMessage[], verifiedFiles: Set<st
   return false;
 }
 
+function hasEnoughInformationForReview(taskMode: TaskMode, verifiedFiles: Set<string>, messages: ChatMessage[]): boolean {
+  if (taskMode !== TaskMode.REVIEW) return false;
+  if (verifiedFiles.size === 0) return false;
+
+  // Confirm we have at least one successful read_file tool result in the conversation
+  let hasReadResult = false;
+  for (const msg of messages) {
+    if (
+      msg.role === 'system' &&
+      msg.content.includes('[Tool Result for read_file on "') &&
+      msg.content.includes('Success -')
+    ) {
+      hasReadResult = true;
+      break;
+    }
+  }
+
+  return hasReadResult;
+}
+
 function detectActiveSymptom(messages: ChatMessage[]): 'BUILD_FAILURE' | 'NETWORK_ERROR' | 'AUTH_FAILURE' | 'NONE' {
   for (let i = messages.length - 1; i >= 0; i--) {
     const content = messages[i].content.toLowerCase();
@@ -1549,6 +1573,9 @@ function logRewriteTelemetryToFile(entry: any): void {
 function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { selectedTool: any; alternatives: any[] } {
   const symptom = detectActiveSymptom(messages);
   
+  // Resolve workspace path for target feasibility validation
+  const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+
   let errorFileBasename = '';
   if (symptom === 'BUILD_FAILURE') {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -1567,11 +1594,25 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
     }
   }
 
-  const getToolScoreDetails = (tool: any): { score: number; breakdown: { basePriority: number; symptomMatch: number } } => {
+  const getToolScoreDetails = (tool: any): { score: number; breakdown: { basePriority: number; symptomMatch: number; feasibilityScore: number } } => {
     const name = tool.name;
     let basePriority = 10;
     let symptomMatch = 0;
-    
+    let feasibilityScore = 0;
+
+    // --- Feasibility validation: penalize tools that are structurally invalid ---
+    if (name === 'read_file' && tool.path) {
+      const fullPath = path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path);
+      try {
+        if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+          feasibilityScore = -45; // read_file on a directory is always invalid — use list_dir instead
+        }
+      } catch {
+        // Path doesn't exist yet; no penalty (could be a new file to create)
+      }
+    }
+    // -------------------------------------------------------------------------
+
     if ([
       'patch_file',
       'write_file',
@@ -1608,8 +1649,8 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
     }
     
     return {
-      score: basePriority + symptomMatch,
-      breakdown: { basePriority, symptomMatch }
+      score: basePriority + symptomMatch + feasibilityScore,
+      breakdown: { basePriority, symptomMatch, feasibilityScore }
     };
   };
 
@@ -1623,6 +1664,7 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
     };
   }).sort((a, b) => b.score - a.score);
 
+  // Parse ALL tool calls before selecting — never default to the first
   let best = toolCalls[0];
   let bestScore = getToolScoreDetails(best).score;
 
@@ -1679,7 +1721,7 @@ function rewriteResponseToSingleTool(rawText: string, selectedTool: any): string
         }
         
         rewritten = rewritten.substring(0, tagStart) + 
-                    '\n<!-- [System Intervention: Redundant batch tool call omitted to enforce exactly one tool per turn] -->\n' + 
+                    '\n' + 
                     rewritten.substring(blockEnd);
                     
         openTagPattern.lastIndex = 0;
