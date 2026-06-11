@@ -74,6 +74,44 @@
       iconHtml = '✏️';
     }
 
+    function extractReadFileLines(resStr) {
+      if (!resStr) return null;
+      const lines = resStr.split('\n');
+      const codeLines = [];
+      let startLine = null;
+      let endLine = null;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(/^(\d+): (.*)/);
+        if (match) {
+          const lineNum = parseInt(match[1]);
+          if (startLine === null) startLine = lineNum;
+          endLine = lineNum;
+          codeLines.push(match[2]);
+        }
+      }
+      if (codeLines.length === 0) return null;
+      return {
+        code: codeLines.join('\n'),
+        startLine,
+        endLine
+      };
+    }
+
+    let linesDiffHtml = '';
+    if (result) {
+      const match = result.match(/\(\+(\d+),\s*-(\d+)\)/);
+      if (match) {
+        linesDiffHtml = `<span class="tool-lines-diff"><span class="lines-added">+${match[1]}</span><span class="lines-removed">-${match[2]}</span></span>`;
+      } else if (toolName === 'read_file') {
+        const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
+        if (readRangeMatch) {
+          const linesRead = parseInt(readRangeMatch[2]) - parseInt(readRangeMatch[1]) + 1;
+          linesDiffHtml = `<span class="tool-lines-diff" style="color:var(--color-primary-light);opacity:0.8;">read ${linesRead} lines</span>`;
+        }
+      }
+    }
+
     const header = document.createElement('div');
     header.className = 'tool-card-header';
     header.innerHTML = `
@@ -84,6 +122,7 @@
         <span class="tool-name">${friendlyName}</span>
         <span class="tool-target" title="Click to open file in editor">${target}</span>
       </div>
+      ${linesDiffHtml}
       <div class="tool-header-controls">
         <span class="tool-status-badge">${isReverted ? 'Reverted' : (status === 'running' ? 'Running' : (status === 'success' ? 'Completed' : 'Failed'))}</span>
         ${status !== 'running' ? `
@@ -104,7 +143,21 @@
       targetSpan.style.color = '#a855f7';
       targetSpan.addEventListener('click', (e) => {
         e.stopPropagation();
-        vscode.postMessage({ type: 'openFile', path: target });
+        let startLine = undefined;
+        let endLine = undefined;
+        if (toolName === 'read_file' && result) {
+          const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
+          if (readRangeMatch) {
+            startLine = parseInt(readRangeMatch[1]);
+            endLine = parseInt(readRangeMatch[2]);
+          }
+        }
+        vscode.postMessage({
+          type: 'openFile',
+          path: target,
+          startLine: startLine,
+          endLine: endLine
+        });
       });
     }
 
@@ -234,29 +287,35 @@
       const detailsContainer = document.createElement('div');
       detailsContainer.className = 'tool-details-container';
       
-      // For read_file: show the full file content that the model read
-      if (toolName === 'read_file' && code) {
-        const header = document.createElement('div');
-        header.className = 'tool-details-header';
-        header.innerHTML = '📖 <span>File Content Read by Model</span>';
-        detailsContainer.appendChild(header);
-        
-        const fileExt = target.split('.').pop() || 'txt';
-        const escapedCode = escapeHtml(code.trim());
-        const codeBlock = document.createElement('div');
-        codeBlock.className = 'code-block-wrapper';
-        codeBlock.style.marginTop = '4px';
-        codeBlock.innerHTML = `
-          <div class="code-block-header">
-            <span class="code-block-lang">${fileExt}</span>
-            <div class="code-block-actions">
-              <button class="code-action-btn copy-btn">Copy</button>
+      // For read_file: show exactly the lines read with selected highlight
+      if (toolName === 'read_file' && result) {
+        const readInfo = extractReadFileLines(result);
+        if (readInfo) {
+          const header = document.createElement('div');
+          header.className = 'tool-details-header';
+          header.innerHTML = `📖 <span>File Content Read (Lines ${readInfo.startLine}-${readInfo.endLine})</span>`;
+          detailsContainer.appendChild(header);
+          
+          const fileExt = target.split('.').pop() || 'txt';
+          const escapedCode = escapeHtml(readInfo.code.trim());
+          const codeBlock = document.createElement('div');
+          codeBlock.className = 'code-block-wrapper';
+          codeBlock.style.marginTop = '4px';
+          codeBlock.innerHTML = `
+            <div class="code-block-header">
+              <span class="code-block-lang">${fileExt}</span>
+              <div class="code-block-actions">
+                <button class="code-action-btn copy-btn">Copy</button>
+              </div>
             </div>
-          </div>
-          <pre><code class="language-${fileExt}">${escapedCode}</code></pre>
-        `;
-        detailsContainer.appendChild(codeBlock);
-        bindCodeBlockButtons(codeBlock);
+            <pre class="highlight-selected-lines"><code class="language-${fileExt}">${escapedCode}</code></pre>
+          `;
+          detailsContainer.appendChild(codeBlock);
+          bindCodeBlockButtons(codeBlock);
+          if (typeof applySyntaxHighlighting === 'function') {
+            applySyntaxHighlighting(codeBlock);
+          }
+        }
       }
       
       // For grep_search: show search matches
@@ -281,10 +340,23 @@
         detailsContainer.appendChild(header);
         
         const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
-        const pre = document.createElement('pre');
-        pre.className = 'tool-result-pre diff-display';
-        pre.textContent = cleanResult;
-        detailsContainer.appendChild(pre);
+        const codeBlock = document.createElement('div');
+        codeBlock.className = 'code-block-wrapper';
+        codeBlock.style.marginTop = '4px';
+        codeBlock.innerHTML = `
+          <div class="code-block-header">
+            <span class="code-block-lang">diff</span>
+            <div class="code-block-actions">
+              <button class="code-action-btn copy-btn">Copy</button>
+            </div>
+          </div>
+          <pre><code class="language-diff">${escapeHtml(cleanResult)}</code></pre>
+        `;
+        detailsContainer.appendChild(codeBlock);
+        bindCodeBlockButtons(codeBlock);
+        if (typeof applySyntaxHighlighting === 'function') {
+          applySyntaxHighlighting(codeBlock);
+        }
       }
       
       // For write_file / create_file: show what was written
@@ -310,6 +382,9 @@
         `;
         detailsContainer.appendChild(codeBlock);
         bindCodeBlockButtons(codeBlock);
+        if (typeof applySyntaxHighlighting === 'function') {
+          applySyntaxHighlighting(codeBlock);
+        }
       }
       
       // Default: show summary for other tools
@@ -324,7 +399,7 @@
       // If there's a result for tools that also have code, show additional result text
       if ((toolName === 'read_file' || toolName === 'write_file' || toolName === 'create_file') && result) {
         const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
-        if (cleanResult && cleanResult !== 'Operation succeeded') {
+        if (cleanResult && cleanResult !== 'Operation succeeded' && toolName !== 'read_file') {
           const extraInfo = document.createElement('div');
           extraInfo.className = 'tool-details-extra';
           extraInfo.textContent = cleanResult;
@@ -339,7 +414,25 @@
       // Handle card toggle interactions
       header.style.cursor = 'pointer';
       header.addEventListener('click', () => {
+        const isExpanding = !card.classList.contains('expanded');
         card.classList.toggle('expanded');
+        if (isExpanding && target && (toolName === 'create_file' || toolName === 'write_file' || toolName === 'read_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file')) {
+          let startLine = undefined;
+          let endLine = undefined;
+          if (toolName === 'read_file' && result) {
+            const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
+            if (readRangeMatch) {
+              startLine = parseInt(readRangeMatch[1]);
+              endLine = parseInt(readRangeMatch[2]);
+            }
+          }
+          vscode.postMessage({
+            type: 'openFile',
+            path: target,
+            startLine: startLine,
+            endLine: endLine
+          });
+        }
       });
     }
 

@@ -405,7 +405,33 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 const safePath = path.resolve(workspaceFolder, data.path);
                 if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
                   const doc = await vscode.workspace.openTextDocument(safePath);
-                  await vscode.window.showTextDocument(doc, { preview: false });
+                  const editor = await vscode.window.showTextDocument(doc, { preview: false });
+                  
+                  // Try to find lines from arguments
+                  let startLine = data.startLine;
+                  let endLine = data.endLine;
+                  
+                  // If not explicitly provided, try to find active review lines
+                  if (startLine === undefined && endLine === undefined) {
+                    const review = ReviewManager.getInstance().getActiveReview(safePath);
+                    if (review) {
+                      const allLines = [...review.addedLineIndices, ...review.removedLineIndices];
+                      if (allLines.length > 0) {
+                        startLine = Math.min(...allLines) + 1;
+                        endLine = Math.max(...allLines) + 1;
+                      }
+                    }
+                  }
+                  
+                  if (startLine !== undefined && endLine !== undefined) {
+                    const docLineCount = doc.lineCount;
+                    const startIdx = Math.max(0, Math.min(docLineCount - 1, startLine - 1));
+                    const endIdx = Math.max(0, Math.min(docLineCount - 1, endLine - 1));
+                    const startPos = new vscode.Position(startIdx, 0);
+                    const endPos = new vscode.Position(endIdx, doc.lineAt(endIdx).text.length);
+                    editor.selection = new vscode.Selection(startPos, endPos);
+                    editor.revealRange(new vscode.Range(startPos, endPos), vscode.TextEditorRevealType.InCenter);
+                  }
                 } else {
                   vscode.window.showErrorMessage(`File not found: ${data.path}`);
                 }

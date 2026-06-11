@@ -514,6 +514,17 @@
     const totalMessages = chatHistory.length;
     const startIdx = Math.max(0, totalMessages - renderedLimit);
     
+    // Find the last user message and check if it is outside the visible slice
+    let lastUserMsg = null;
+    let lastUserMsgIdx = -1;
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+      if (chatHistory[i].role === 'user') {
+        lastUserMsg = chatHistory[i];
+        lastUserMsgIdx = i;
+        break;
+      }
+    }
+
     // Build new content in a document fragment to avoid flash of empty container
     const fragment = document.createDocumentFragment();
     
@@ -526,6 +537,11 @@
         loadMoreHistory();
       });
       fragment.appendChild(loadTrigger);
+    }
+
+    // Prepend the last user message as a sticky reference if it was sliced out
+    if (lastUserMsgIdx !== -1 && lastUserMsgIdx < startIdx && lastUserMsg) {
+      appendMessageBubble(lastUserMsg.role, lastUserMsg.content, lastUserMsg.images, fragment);
     }
 
     // Append visible messages
@@ -580,6 +596,7 @@
   const buddyContainer = document.getElementById('buddy-container');
   const buddyEyes = document.getElementById('buddy-eyes');
   const buddyTooltip = document.getElementById('buddy-tooltip');
+  const buddyCheeks = document.getElementById('buddy-cheeks');
 
   let avatarState = 'idle';
   let idleInterval = null;
@@ -588,62 +605,63 @@
   // Multi-expression dynamic SVG definitions
   const FACES = {
     idle: [
-      `<!-- cute open eyes -->
-       <circle cx="7" cy="11" r="2.2" />
-       <circle cx="17" cy="11" r="2.2" />
-       <path d="M9 15 Q12 17 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`,
-      `<!-- cute blink -->
-       <path d="M5 11 L9 11 M15 11 L19 11" stroke-width="1.8" stroke-linecap="round" />
-       <path d="M9 15 Q12 17 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`,
-      `<!-- cute wink -->
-       <circle cx="7" cy="11" r="2.2" />
-       <path d="M15 11 Q17 9 19 11" stroke-width="1.8" stroke-linecap="round" fill="none" />
-       <path d="M9 15 Q12 16.5 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- happy open eyes -->
+       <circle cx="6.5" cy="10" r="2.5" />
+       <circle cx="17.5" cy="10" r="2.5" />
+       <path d="M9.5 14 Q12 16.5 14.5 14" stroke-width="2" stroke-linecap="round" fill="none" />`,
+      `<!-- happy blink -->
+       <path d="M4.5 10 Q6.5 8 8.5 10 M15.5 10 Q17.5 8 19.5 10" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M9.5 14.5 Q12 16.5 14.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`,
+      `<!-- happy wink -->
+       <circle cx="6.5" cy="10" r="2.5" />
+       <path d="M15.5 10 Q17.5 8 19.5 10" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M9.5 14 Q12 16.5 14.5 14" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     thinking: [
-      `<!-- eyes looking up/curious -->
-       <ellipse cx="7" cy="9.5" rx="2.2" ry="1.5" />
-       <ellipse cx="17" cy="9" rx="1.8" ry="2.2" />
-       <path d="M10 15 L14 14.5" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- thinking / curious -->
+       <ellipse cx="6.5" cy="9.5" rx="2.5" ry="1.8" />
+       <ellipse cx="17.5" cy="9.5" rx="2.5" ry="1.8" />
+       <path d="M5 6.5 Q7 5.5 9 6.5 M15 6.5 Q17 5.5 19 6.5" stroke-width="1.8" stroke-linecap="round" fill="none" />
+       <path d="M10.5 14.5 Q12 13 13.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     coding: [
-      `<!-- dynamic matrix squint coding eyes -->
-       <path d="M5 11 L9 11 M15 11 L19 11" stroke-width="2" stroke-linecap="round" />
-       <path d="M10 15 Q12 16 14 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- coding cute squint -->
+       <path d="M4.5 9 L8.5 11 M19.5 9 L15.5 11" stroke-width="2.2" stroke-linecap="round" />
+       <path d="M9.5 14.5 Q12 17 14.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     tool_calling: [
       `<!-- focus scanning gear eyes -->
-       <circle cx="7" cy="11" r="2.2" stroke-width="1.5" stroke-dasharray="2,1" fill="none" />
-       <circle cx="17" cy="11" r="2.2" stroke-width="1.5" stroke-dasharray="2,1" fill="none" />
-       <circle cx="12" cy="15" r="1.2" />`
+       <circle cx="6.5" cy="10" r="2.5" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
+       <circle cx="17.5" cy="10" r="2.5" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
+       <path d="M9 14.5 Q12 17 15 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     error: [
-      `<!-- cute dizzy sad/worried look -->
-       <ellipse cx="7" cy="11.5" rx="1.8" ry="1.2" />
-       <ellipse cx="17" cy="11.5" rx="1.8" ry="1.2" />
-       <path d="M6 8.5 Q7.5 10 9 8.5 M15 8.5 Q16.5 10 18 8.5" stroke-width="1.2" stroke-linecap="round" fill="none" />
-       <path d="M10 16 Q12 14.5 14 16" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- dizzy sad but cute -->
+       <path d="M5 8 L8 11 M8 8 L5 11 M16 8 L19 11 M19 8 L16 11" stroke-width="1.8" stroke-linecap="round" />
+       <path d="M10 15 Q12 13.5 14 15" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     click: [
-      `<!-- happy star/wink heart eyes -->
-       <path d="M5 10 Q7 8 9 10 M15 10 Q17 8 19 10" stroke-width="1.8" stroke-linecap="round" fill="none" />
-       <path d="M9 14.5 Q12 17.5 15 14.5 Z" />`
+      `<!-- heart eyes! -->
+       <path d="M4 9 Q4 7 5.5 7 Q6.5 7 7.5 8.2 Q8.5 7 9.5 7 Q11 7 11 9 Q11 11 7.5 13.5 Q4 11 4 9 Z" fill="#f43f5e" stroke="none" />
+       <path d="M13 9 Q13 7 14.5 7 Q15.5 7 16.5 8.2 Q17.5 7 18.5 7 Q20 7 20 9 Q20 11 16.5 13.5 Q13 11 13 9 Z" fill="#f43f5e" stroke="none" />
+       <path d="M10 15.5 Q12 17.5 14 15.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     celebrate: [
-      `<!-- extremely happy starry/celebration eyes with wide smile -->
-       <path d="M3 11 L6 8 L9 11 M15 11 L18 8 L21 11" stroke-width="2" stroke-linecap="round" fill="none" />
-       <path d="M8 15 Q12 19 16 15 Z" />`
+      `<!-- starry eyes and happy mouth -->
+       <path d="M6.5 7 L7.5 9.5 L10 10 L7.5 10.5 L6.5 13 L5.5 10.5 L3 10 L5.5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M17.5 7 L18.5 9.5 L21 10 L18.5 10.5 L17.5 13 L16.5 10.5 L14 10 L16.5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M9.5 14.5 Q12 18 14.5 14.5 Z" fill="#fbbf24" stroke="none" />`
     ]
   };
 
   const FACE_COLORS = {
-    idle: '#38bdf8',
-    thinking: '#0ea5e9',
-    coding: '#10b981',
-    tool_calling: '#06b6d4',
-    error: '#f472b6', // Playful pink instead of dark red
-    click: '#fbbf24', // Warm playful amber
-    celebrate: '#10b981'
+    idle: '#22d3ee', // brighter glowing cyan
+    thinking: '#38bdf8',
+    coding: '#34d399', // brighter green
+    tool_calling: '#a78bfa', // beautiful glowing purple
+    error: '#fb7185', // soft bright rose
+    click: '#fb7185',
+    celebrate: '#fbbf24' // warm glowing gold
   };
 
   function setAvatarState(state) {
@@ -678,6 +696,23 @@
           p.setAttribute('stroke', color);
         }
       });
+
+      // Update cheeks matching the mood/state
+      if (buddyCheeks) {
+        if (state === 'error') {
+          buddyCheeks.setAttribute('fill', '#a78bfa'); // purple embarrassed cheeks
+          buddyCheeks.setAttribute('opacity', '0.6');
+        } else if (state === 'celebrate' || state === 'click') {
+          buddyCheeks.setAttribute('fill', '#f43f5e'); // bright red cheeks
+          buddyCheeks.setAttribute('opacity', '0.7');
+        } else if (state === 'thinking') {
+          buddyCheeks.setAttribute('fill', '#38bdf8'); // cyan cheeks
+          buddyCheeks.setAttribute('opacity', '0.3');
+        } else {
+          buddyCheeks.setAttribute('fill', '#f472b6'); // default soft pink cheeks
+          buddyCheeks.setAttribute('opacity', '0.45');
+        }
+      }
     }
 
     // Update tooltip text

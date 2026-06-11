@@ -288,6 +288,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (!tool.path) throw new Error('Missing "path" attribute for create_file.');
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
+      const addedLines = proposedContent ? proposedContent.split('\n').length : 0;
 
       const { accepted, checkpointId } = await confirmChangesWithDiff(
         safePath,
@@ -299,13 +300,16 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error('User rejected file creation.');
       }
 
-      return `File created and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
+      return `File created and opened in editor: ${tool.path} (+${addedLines}, -0). Revert ID: ${checkpointId}`;
     }
 
     case 'write_file': {
       if (!tool.path) throw new Error('Missing "path" attribute for write_file.');
       const safePath = getSafePath(tool.path);
       const proposedContent = tool.content || '';
+      const originalContent = fs.existsSync(safePath) ? fs.readFileSync(safePath, 'utf8') : '';
+      const subtractedLines = originalContent ? originalContent.split('\n').length : 0;
+      const addedLines = proposedContent ? proposedContent.split('\n').length : 0;
 
       const { accepted, checkpointId } = await confirmChangesWithDiff(
         safePath,
@@ -317,7 +321,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error('User rejected file overwrite changes.');
       }
 
-      return `File updated and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
+      return `File updated and opened in editor: ${tool.path} (+${addedLines}, -${subtractedLines}). Revert ID: ${checkpointId}`;
     }
 
     case 'rename_file': {
@@ -350,6 +354,8 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (stat.isDirectory()) {
         throw new Error(`Cannot delete directory with delete_file. Path is a directory: ${tool.path}`);
       }
+      const originalContent = fs.readFileSync(safePathDel, 'utf8');
+      const subtractedLines = originalContent ? originalContent.split('\n').length : 0;
 
       const { accepted, checkpointId } = await confirmChangesWithDiff(
         safePathDel,
@@ -360,7 +366,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (!accepted) {
         throw new Error('User rejected file deletion.');
       }
-      return `File deletion proposed and opened in editor: ${tool.path}. Revert ID: ${checkpointId}`;
+      return `File deletion proposed and opened in editor: ${tool.path} (+0, -${subtractedLines}). Revert ID: ${checkpointId}`;
     }
 
     case 'patch_file': {
@@ -378,10 +384,15 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error('No valid SEARCH/REPLACE blocks found in patch_file content.');
       }
 
+      let addedLines = 0;
+      let subtractedLines = 0;
+
       // Validate structural integrity of each replace block before applying
       const warnings: string[] = [];
       for (let i = 0; i < patches.length; i++) {
         const { search, replace } = patches[i];
+        subtractedLines += search.split('\n').length;
+        addedLines += replace.split('\n').length;
         const replaceIssues = validatePatchStructure(search, replace);
         if (replaceIssues.length > 0) {
           warnings.push(`Block #${i + 1}: ${replaceIssues.join('; ')}`);
@@ -418,7 +429,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error('User rejected patch edits.');
       }
 
-      let result = `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;
+      let result = `File patched: ${tool.path}. Applied ${patches.length} block(s) (+${addedLines}, -${subtractedLines}). Revert ID: ${checkpointId}`;
       if (warnings.length > 0) {
         result += `\n\n⚠️ SYNTAX WARNINGS:\n${warnings.join('\n')}\n\n_Run \`get_diagnostics\` or \`run_command command="npm run compile"\` to verify the build._`;
       }
@@ -452,8 +463,12 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
 
         const fileWarnings: string[] = [];
         let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
+        let addedLines = 0;
+        let subtractedLines = 0;
         for (let i = 0; i < fp.patches.length; i++) {
           const { search, replace } = fp.patches[i];
+          subtractedLines += search.split('\n').length;
+          addedLines += replace.split('\n').length;
           const replaceIssues = validatePatchStructure(search, replace);
           if (replaceIssues.length > 0) {
             fileWarnings.push(`Block #${i + 1}: ${replaceIssues.join('; ')}`);
@@ -484,7 +499,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         if (!accepted) {
           throw new Error(`User rejected patch edits for ${fp.path}.`);
         }
-        let fileResult = `Patched ${fp.path} (${fp.patches.length} block(s), Revert ID: ${checkpointId})`;
+        let fileResult = `Patched ${fp.path} (${fp.patches.length} block(s) (+${addedLines}, -${subtractedLines}), Revert ID: ${checkpointId})`;
         if (fileWarnings.length > 0) {
           fileResult += `\n⚠️ SYNTAX WARNINGS:\n${fileWarnings.join('\n')}`;
         }

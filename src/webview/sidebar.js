@@ -1802,6 +1802,44 @@ function attachImage(base64) {
       iconHtml = '✏️';
     }
 
+    function extractReadFileLines(resStr) {
+      if (!resStr) return null;
+      const lines = resStr.split('\n');
+      const codeLines = [];
+      let startLine = null;
+      let endLine = null;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(/^(\d+): (.*)/);
+        if (match) {
+          const lineNum = parseInt(match[1]);
+          if (startLine === null) startLine = lineNum;
+          endLine = lineNum;
+          codeLines.push(match[2]);
+        }
+      }
+      if (codeLines.length === 0) return null;
+      return {
+        code: codeLines.join('\n'),
+        startLine,
+        endLine
+      };
+    }
+
+    let linesDiffHtml = '';
+    if (result) {
+      const match = result.match(/\(\+(\d+),\s*-(\d+)\)/);
+      if (match) {
+        linesDiffHtml = `<span class="tool-lines-diff"><span class="lines-added">+${match[1]}</span><span class="lines-removed">-${match[2]}</span></span>`;
+      } else if (toolName === 'read_file') {
+        const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
+        if (readRangeMatch) {
+          const linesRead = parseInt(readRangeMatch[2]) - parseInt(readRangeMatch[1]) + 1;
+          linesDiffHtml = `<span class="tool-lines-diff" style="color:var(--color-primary-light);opacity:0.8;">read ${linesRead} lines</span>`;
+        }
+      }
+    }
+
     const header = document.createElement('div');
     header.className = 'tool-card-header';
     header.innerHTML = `
@@ -1812,6 +1850,7 @@ function attachImage(base64) {
         <span class="tool-name">${friendlyName}</span>
         <span class="tool-target" title="Click to open file in editor">${target}</span>
       </div>
+      ${linesDiffHtml}
       <div class="tool-header-controls">
         <span class="tool-status-badge">${isReverted ? 'Reverted' : (status === 'running' ? 'Running' : (status === 'success' ? 'Completed' : 'Failed'))}</span>
         ${status !== 'running' ? `
@@ -1832,7 +1871,21 @@ function attachImage(base64) {
       targetSpan.style.color = '#a855f7';
       targetSpan.addEventListener('click', (e) => {
         e.stopPropagation();
-        vscode.postMessage({ type: 'openFile', path: target });
+        let startLine = undefined;
+        let endLine = undefined;
+        if (toolName === 'read_file' && result) {
+          const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
+          if (readRangeMatch) {
+            startLine = parseInt(readRangeMatch[1]);
+            endLine = parseInt(readRangeMatch[2]);
+          }
+        }
+        vscode.postMessage({
+          type: 'openFile',
+          path: target,
+          startLine: startLine,
+          endLine: endLine
+        });
       });
     }
 
@@ -1962,29 +2015,35 @@ function attachImage(base64) {
       const detailsContainer = document.createElement('div');
       detailsContainer.className = 'tool-details-container';
       
-      // For read_file: show the full file content that the model read
-      if (toolName === 'read_file' && code) {
-        const header = document.createElement('div');
-        header.className = 'tool-details-header';
-        header.innerHTML = '📖 <span>File Content Read by Model</span>';
-        detailsContainer.appendChild(header);
-        
-        const fileExt = target.split('.').pop() || 'txt';
-        const escapedCode = escapeHtml(code.trim());
-        const codeBlock = document.createElement('div');
-        codeBlock.className = 'code-block-wrapper';
-        codeBlock.style.marginTop = '4px';
-        codeBlock.innerHTML = `
-          <div class="code-block-header">
-            <span class="code-block-lang">${fileExt}</span>
-            <div class="code-block-actions">
-              <button class="code-action-btn copy-btn">Copy</button>
+      // For read_file: show exactly the lines read with selected highlight
+      if (toolName === 'read_file' && result) {
+        const readInfo = extractReadFileLines(result);
+        if (readInfo) {
+          const header = document.createElement('div');
+          header.className = 'tool-details-header';
+          header.innerHTML = `📖 <span>File Content Read (Lines ${readInfo.startLine}-${readInfo.endLine})</span>`;
+          detailsContainer.appendChild(header);
+          
+          const fileExt = target.split('.').pop() || 'txt';
+          const escapedCode = escapeHtml(readInfo.code.trim());
+          const codeBlock = document.createElement('div');
+          codeBlock.className = 'code-block-wrapper';
+          codeBlock.style.marginTop = '4px';
+          codeBlock.innerHTML = `
+            <div class="code-block-header">
+              <span class="code-block-lang">${fileExt}</span>
+              <div class="code-block-actions">
+                <button class="code-action-btn copy-btn">Copy</button>
+              </div>
             </div>
-          </div>
-          <pre><code class="language-${fileExt}">${escapedCode}</code></pre>
-        `;
-        detailsContainer.appendChild(codeBlock);
-        bindCodeBlockButtons(codeBlock);
+            <pre class="highlight-selected-lines"><code class="language-${fileExt}">${escapedCode}</code></pre>
+          `;
+          detailsContainer.appendChild(codeBlock);
+          bindCodeBlockButtons(codeBlock);
+          if (typeof applySyntaxHighlighting === 'function') {
+            applySyntaxHighlighting(codeBlock);
+          }
+        }
       }
       
       // For grep_search: show search matches
@@ -2009,10 +2068,23 @@ function attachImage(base64) {
         detailsContainer.appendChild(header);
         
         const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
-        const pre = document.createElement('pre');
-        pre.className = 'tool-result-pre diff-display';
-        pre.textContent = cleanResult;
-        detailsContainer.appendChild(pre);
+        const codeBlock = document.createElement('div');
+        codeBlock.className = 'code-block-wrapper';
+        codeBlock.style.marginTop = '4px';
+        codeBlock.innerHTML = `
+          <div class="code-block-header">
+            <span class="code-block-lang">diff</span>
+            <div class="code-block-actions">
+              <button class="code-action-btn copy-btn">Copy</button>
+            </div>
+          </div>
+          <pre><code class="language-diff">${escapeHtml(cleanResult)}</code></pre>
+        `;
+        detailsContainer.appendChild(codeBlock);
+        bindCodeBlockButtons(codeBlock);
+        if (typeof applySyntaxHighlighting === 'function') {
+          applySyntaxHighlighting(codeBlock);
+        }
       }
       
       // For write_file / create_file: show what was written
@@ -2038,6 +2110,9 @@ function attachImage(base64) {
         `;
         detailsContainer.appendChild(codeBlock);
         bindCodeBlockButtons(codeBlock);
+        if (typeof applySyntaxHighlighting === 'function') {
+          applySyntaxHighlighting(codeBlock);
+        }
       }
       
       // Default: show summary for other tools
@@ -2052,7 +2127,7 @@ function attachImage(base64) {
       // If there's a result for tools that also have code, show additional result text
       if ((toolName === 'read_file' || toolName === 'write_file' || toolName === 'create_file') && result) {
         const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
-        if (cleanResult && cleanResult !== 'Operation succeeded') {
+        if (cleanResult && cleanResult !== 'Operation succeeded' && toolName !== 'read_file') {
           const extraInfo = document.createElement('div');
           extraInfo.className = 'tool-details-extra';
           extraInfo.textContent = cleanResult;
@@ -2067,7 +2142,25 @@ function attachImage(base64) {
       // Handle card toggle interactions
       header.style.cursor = 'pointer';
       header.addEventListener('click', () => {
+        const isExpanding = !card.classList.contains('expanded');
         card.classList.toggle('expanded');
+        if (isExpanding && target && (toolName === 'create_file' || toolName === 'write_file' || toolName === 'read_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file')) {
+          let startLine = undefined;
+          let endLine = undefined;
+          if (toolName === 'read_file' && result) {
+            const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
+            if (readRangeMatch) {
+              startLine = parseInt(readRangeMatch[1]);
+              endLine = parseInt(readRangeMatch[2]);
+            }
+          }
+          vscode.postMessage({
+            type: 'openFile',
+            path: target,
+            startLine: startLine,
+            endLine: endLine
+          });
+        }
       });
     }
 
@@ -3930,6 +4023,17 @@ function attachImage(base64) {
     const totalMessages = chatHistory.length;
     const startIdx = Math.max(0, totalMessages - renderedLimit);
     
+    // Find the last user message and check if it is outside the visible slice
+    let lastUserMsg = null;
+    let lastUserMsgIdx = -1;
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+      if (chatHistory[i].role === 'user') {
+        lastUserMsg = chatHistory[i];
+        lastUserMsgIdx = i;
+        break;
+      }
+    }
+
     // Build new content in a document fragment to avoid flash of empty container
     const fragment = document.createDocumentFragment();
     
@@ -3942,6 +4046,11 @@ function attachImage(base64) {
         loadMoreHistory();
       });
       fragment.appendChild(loadTrigger);
+    }
+
+    // Prepend the last user message as a sticky reference if it was sliced out
+    if (lastUserMsgIdx !== -1 && lastUserMsgIdx < startIdx && lastUserMsg) {
+      appendMessageBubble(lastUserMsg.role, lastUserMsg.content, lastUserMsg.images, fragment);
     }
 
     // Append visible messages
@@ -3996,6 +4105,7 @@ function attachImage(base64) {
   const buddyContainer = document.getElementById('buddy-container');
   const buddyEyes = document.getElementById('buddy-eyes');
   const buddyTooltip = document.getElementById('buddy-tooltip');
+  const buddyCheeks = document.getElementById('buddy-cheeks');
 
   let avatarState = 'idle';
   let idleInterval = null;
@@ -4004,62 +4114,68 @@ function attachImage(base64) {
   // Multi-expression dynamic SVG definitions
   const FACES = {
     idle: [
-      `<!-- cute open eyes -->
-       <circle cx="7" cy="11" r="2.2" />
-       <circle cx="17" cy="11" r="2.2" />
-       <path d="M9 15 Q12 17 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`,
-      `<!-- cute blink -->
-       <path d="M5 11 L9 11 M15 11 L19 11" stroke-width="1.8" stroke-linecap="round" />
-       <path d="M9 15 Q12 17 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`,
-      `<!-- cute wink -->
-       <circle cx="7" cy="11" r="2.2" />
-       <path d="M15 11 Q17 9 19 11" stroke-width="1.8" stroke-linecap="round" fill="none" />
-       <path d="M9 15 Q12 16.5 15 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- happy open eyes with shiny highlights -->
+       <circle cx="8" cy="12" r="2" stroke="none" />
+       <circle cx="16" cy="12" r="2" stroke="none" />
+       <circle cx="8.6" cy="11.4" r="0.6" fill="#ffffff" stroke="none" />
+       <circle cx="16.6" cy="11.4" r="0.6" fill="#ffffff" stroke="none" />
+       <path d="M10.5 14.5 Q12 15.8 13.5 14.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`,
+      `<!-- happy blink -->
+       <path d="M6 12 Q8 10 10 12 M14 12 Q16 10 18 12" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M10.5 15 Q12 16.2 13.5 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`,
+      `<!-- happy wink -->
+       <circle cx="8" cy="12" r="2" stroke="none" />
+       <circle cx="8.6" cy="11.4" r="0.6" fill="#ffffff" stroke="none" />
+       <path d="M14 12 Q16 10 18 12" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M10.5 14.5 Q12 15.8 13.5 14.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`
     ],
     thinking: [
-      `<!-- eyes looking up/curious -->
-       <ellipse cx="7" cy="9.5" rx="2.2" ry="1.5" />
-       <ellipse cx="17" cy="9" rx="1.8" ry="2.2" />
-       <path d="M10 15 L14 14.5" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- thinking / curious with highlights -->
+       <ellipse cx="8" cy="11.5" rx="2" ry="1.4" stroke="none" />
+       <ellipse cx="16" cy="11.5" rx="2" ry="1.4" stroke="none" />
+       <circle cx="8.6" cy="10.9" r="0.6" fill="#ffffff" stroke="none" />
+       <circle cx="16.6" cy="10.9" r="0.6" fill="#ffffff" stroke="none" />
+       <path d="M6 8 Q8 7.2 10 8 M14 8 Q16 7.2 18 8" stroke-width="1.4" stroke-linecap="round" fill="none" />
+       <path d="M10.5 15 Q12 14 13.5 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`
     ],
     coding: [
-      `<!-- dynamic matrix squint coding eyes -->
-       <path d="M5 11 L9 11 M15 11 L19 11" stroke-width="2" stroke-linecap="round" />
-       <path d="M10 15 Q12 16 14 15" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- coding cute squint -->
+       <path d="M5.5 11 L9 13 M18.5 11 L15 13" stroke-width="2.2" stroke-linecap="round" fill="none" />
+       <path d="M10 15 Q12 17 14 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`
     ],
     tool_calling: [
       `<!-- focus scanning gear eyes -->
-       <circle cx="7" cy="11" r="2.2" stroke-width="1.5" stroke-dasharray="2,1" fill="none" />
-       <circle cx="17" cy="11" r="2.2" stroke-width="1.5" stroke-dasharray="2,1" fill="none" />
-       <circle cx="12" cy="15" r="1.2" />`
+       <circle cx="8" cy="12" r="2.2" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
+       <circle cx="16" cy="12" r="2.2" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
+       <path d="M10 15 Q12 17 14 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`
     ],
     error: [
-      `<!-- cute dizzy sad/worried look -->
-       <ellipse cx="7" cy="11.5" rx="1.8" ry="1.2" />
-       <ellipse cx="17" cy="11.5" rx="1.8" ry="1.2" />
-       <path d="M6 8.5 Q7.5 10 9 8.5 M15 8.5 Q16.5 10 18 8.5" stroke-width="1.2" stroke-linecap="round" fill="none" />
-       <path d="M10 16 Q12 14.5 14 16" stroke-width="1.5" stroke-linecap="round" fill="none" />`
+      `<!-- dizzy sad but cute -->
+       <path d="M5.5 10 L8.5 13 M8.5 10 L5.5 13 M15.5 10 L18.5 13 M18.5 10 L15.5 13" stroke-width="1.8" stroke-linecap="round" fill="none" />
+       <path d="M10 15.5 Q12 14 14 15.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`
     ],
     click: [
-      `<!-- happy star/wink heart eyes -->
-       <path d="M5 10 Q7 8 9 10 M15 10 Q17 8 19 10" stroke-width="1.8" stroke-linecap="round" fill="none" />
-       <path d="M9 14.5 Q12 17.5 15 14.5 Z" />`
+      `<!-- heart eyes! -->
+       <path d="M4.5 11 Q4.5 9 6 9 Q7 9 8 10.2 Q9 9 10 9 Q11.5 9 11.5 11 Q11.5 13 8 15.5 Q4.5 13 4.5 11 Z" fill="#f43f5e" stroke="none" />
+       <path d="M12.5 11 Q12.5 9 14 9 Q15 9 16 10.2 Q17 9 18 9 Q19.5 9 19.5 11 Q19.5 13 16 15.5 Q12.5 13 12.5 11 Z" fill="#f43f5e" stroke="none" />
+       <path d="M10.5 15.5 Q12 17 13.5 15.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`
     ],
     celebrate: [
-      `<!-- extremely happy starry/celebration eyes with wide smile -->
-       <path d="M3 11 L6 8 L9 11 M15 11 L18 8 L21 11" stroke-width="2" stroke-linecap="round" fill="none" />
-       <path d="M8 15 Q12 19 16 15 Z" />`
+      `<!-- starry eyes and happy mouth -->
+       <path d="M8 9.5 L8.8 11.5 L10.8 11.9 L8.8 12.3 L8 14.3 L7.2 12.3 L5.2 11.9 L7.2 11.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M16 9.5 L16.8 11.5 L18.8 11.9 L16.8 12.3 L16 14.3 L15.2 12.3 L13.2 11.9 L15.2 11.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M10 15 Q12 17.5 14 15 Z" fill="#fbbf24" stroke="none" />`
     ]
   };
 
   const FACE_COLORS = {
-    idle: '#38bdf8',
-    thinking: '#0ea5e9',
-    coding: '#10b981',
-    tool_calling: '#06b6d4',
-    error: '#f472b6', // Playful pink instead of dark red
-    click: '#fbbf24', // Warm playful amber
-    celebrate: '#10b981'
+    idle: '#22d3ee', // brighter glowing cyan
+    thinking: '#38bdf8',
+    coding: '#34d399', // brighter green
+    tool_calling: '#a78bfa', // beautiful glowing purple
+    error: '#fb7185', // soft bright rose
+    click: '#fb7185',
+    celebrate: '#fbbf24' // warm glowing gold
   };
 
   function setAvatarState(state) {
@@ -4087,6 +4203,7 @@ function attachImage(base64) {
       // Update color stroke and fills matching state
       const color = FACE_COLORS[state] || FACE_COLORS.idle;
       buddyEyes.setAttribute('fill', color);
+      buddyEyes.setAttribute('stroke', color);
       // Make sure the strokes in the face also use the matching state color
       const paths = buddyEyes.querySelectorAll('path');
       paths.forEach(p => {
@@ -4094,6 +4211,23 @@ function attachImage(base64) {
           p.setAttribute('stroke', color);
         }
       });
+
+      // Update cheeks matching the mood/state
+      if (buddyCheeks) {
+        if (state === 'error') {
+          buddyCheeks.setAttribute('fill', '#f472b6'); // embarrassed cheeks
+          buddyCheeks.setAttribute('opacity', '0.7');
+        } else if (state === 'celebrate' || state === 'click') {
+          buddyCheeks.setAttribute('fill', '#f43f5e'); // bright red cheeks
+          buddyCheeks.setAttribute('opacity', '0.8');
+        } else if (state === 'thinking') {
+          buddyCheeks.setAttribute('fill', '#f472b6');
+          buddyCheeks.setAttribute('opacity', '0.45');
+        } else {
+          buddyCheeks.setAttribute('fill', '#fecdd3'); // default soft rosy cheeks
+          buddyCheeks.setAttribute('opacity', '0.9');
+        }
+      }
     }
 
     // Update tooltip text
@@ -4131,6 +4265,7 @@ function attachImage(base64) {
           
           const color = FACE_COLORS.idle;
           buddyEyes.setAttribute('fill', color);
+          buddyEyes.setAttribute('stroke', color);
           const paths = buddyEyes.querySelectorAll('path');
           paths.forEach(p => {
             if (p.getAttribute('stroke') !== 'none') {
@@ -4241,6 +4376,7 @@ function attachImage(base64) {
         buddyEyes.innerHTML = FACES.click[0];
         const color = FACE_COLORS.click;
         buddyEyes.setAttribute('fill', color);
+        buddyEyes.setAttribute('stroke', color);
         const paths = buddyEyes.querySelectorAll('path');
         paths.forEach(p => {
           if (p.getAttribute('stroke') !== 'none') {
@@ -4720,4 +4856,191 @@ function highlightLine(line, lang) {
 
 
 
+
+// ===== Artifacts Module =====
+// Handles artifact rendering, drawer toggling, and interaction with the artifact service.
+
+const artifactsState = {
+  list: [],
+  selectedId: null,
+  drawerVisible: false,
+};
+
+/**
+ * Initialize the artifacts drawer and event listeners.
+ */
+function initArtifacts() {
+  const toggleBtn = document.getElementById('toggle-artifact-btn');
+  const drawer = document.getElementById('artifacts-drawer');
+  const closeBtn = drawer?.querySelector('.drawer-close-btn');
+  const openInPanelBtn = document.getElementById('artifact-open-in-panel');
+  const artifactsList = document.getElementById('artifacts-list');
+
+  // Toggle drawer
+  toggleBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleArtifactsDrawer();
+  });
+
+  closeBtn?.addEventListener('click', () => {
+    hideArtifactsDrawer();
+  });
+
+  // Open selected artifact in a new VS Code window panel
+  openInPanelBtn?.addEventListener('click', () => {
+    if (artifactsState.selectedId) {
+      vscode.postMessage({
+        type: 'openArtifact',
+        artifactId: artifactsState.selectedId,
+      });
+    }
+  });
+
+  // Listen for artifact updates from the extension host
+  window.addEventListener('message', (event) => {
+    const message = event.data;
+    if (message.type === 'updateArtifacts') {
+      artifactsState.list = message.artifacts || [];
+      renderArtifactsList();
+    } else if (message.type === 'newArtifact') {
+      // Scroll to artifact -> open drawer briefly to show it
+      showArtifactsDrawer();
+      if (message.artifact) {
+        artifactsState.list.unshift(message.artifact);
+        renderArtifactsList();
+      }
+    }
+  });
+
+  // Also listen via the global VS Code API postMessage
+  // (some events come via window.addEventListener from the postMessage chain)
+}
+
+function toggleArtifactsDrawer() {
+  if (artifactsState.drawerVisible) {
+    hideArtifactsDrawer();
+  } else {
+    showArtifactsDrawer();
+  }
+}
+
+function showArtifactsDrawer() {
+  const drawer = document.getElementById('artifacts-drawer');
+  if (!drawer) return;
+  // Close other drawers first
+  document.querySelectorAll('.drawer:not(.collapsed)').forEach((d) => {
+    if (d.id !== 'artifacts-drawer') {
+      d.classList.add('collapsed');
+    }
+  });
+  drawer.classList.remove('collapsed');
+  artifactsState.drawerVisible = true;
+  // Sync with extension to get latest artifacts
+  vscode.postMessage({ type: 'getArtifacts' });
+}
+
+function hideArtifactsDrawer() {
+  const drawer = document.getElementById('artifacts-drawer');
+  if (!drawer) return;
+  drawer.classList.add('collapsed');
+  artifactsState.drawerVisible = false;
+}
+
+function renderArtifactsList() {
+  const container = document.getElementById('artifacts-list');
+  const openBtn = document.getElementById('artifact-open-in-panel');
+  if (!container) return;
+
+  if (!artifactsState.list || artifactsState.list.length === 0) {
+    container.innerHTML = `
+      <div class="no-artifacts" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">
+        No artifacts yet. Ask the agent to create one (e.g., "Create an HTML tooltip component as an artifact").
+      </div>
+    `;
+    if (openBtn) openBtn.disabled = true;
+    return;
+  }
+
+  if (openBtn) openBtn.disabled = false;
+
+  const typeIcons = { html: '🌐', svg: '🎨', mermaid: '📊', code: '💻', markdown: '📝' };
+  const typeLabels = { html: 'HTML Preview', svg: 'SVG Graphic', mermaid: 'Diagram', code: 'Code Snippet', markdown: 'Document' };
+
+  container.innerHTML = artifactsState.list.map((artifact) => {
+    const icon = typeIcons[artifact.type] || '📦';
+    const label = typeLabels[artifact.type] || artifact.type;
+    const timeAgo = getTimeAgo(artifact.createdAt);
+    const selected = artifact.id === artifactsState.selectedId ? ' selected' : '';
+    const preview = (artifact.content || '').substring(0, 60).replace(/\n/g, ' ').trim();
+    return `
+      <div class="artifact-item${selected}" data-id="${artifact.id}">
+        <div class="artifact-icon ${artifact.type}">${icon}</div>
+        <div class="artifact-details">
+          <div class="artifact-title">${escapeHtml(artifact.title || 'Untitled')}</div>
+          <div class="artifact-meta">${label} · ${timeAgo} · ${(artifact.content || '').length} chars</div>
+          <div class="artifact-meta" style="font-size:9px;opacity:0.6;">${escapeHtml(preview)}${(artifact.content || '').length > 60 ? '...' : ''}</div>
+        </div>
+        <button class="artifact-delete-btn" data-id="${artifact.id}" title="Delete artifact">✕</button>
+      </div>
+    `;
+  }).join('');
+
+  // Add event listeners for selection and deletion
+  container.querySelectorAll('.artifact-item').forEach((item) => {
+    item.addEventListener('click', (e) => {
+      // Ignore if clicking delete button
+      if (e.target.closest('.artifact-delete-btn')) return;
+      const id = item.dataset.id;
+      artifactsState.selectedId = id;
+      // Open in new window panel immediately on click
+      vscode.postMessage({
+        type: 'openArtifact',
+        artifactId: id,
+      });
+      renderArtifactsList();
+    });
+  });
+
+  container.querySelectorAll('.artifact-delete-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      vscode.postMessage({
+        type: 'deleteArtifact',
+        artifactId: id,
+      });
+      artifactsState.list = artifactsState.list.filter((a) => a.id !== id);
+      if (artifactsState.selectedId === id) {
+        artifactsState.selectedId = null;
+      }
+      renderArtifactsList();
+    });
+  });
+}
+
+function getTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Init when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initArtifacts();
+  });
+} else {
+  initArtifacts();
+}
 

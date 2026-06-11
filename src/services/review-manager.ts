@@ -39,11 +39,8 @@ export class ReviewManager implements vscode.CodeLensProvider {
   });
 
   private _deletedDecorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: 'rgba(239, 68, 68, 0.12)', // Translucent red highlight for deleted lines
-    isWholeLine: true,
     overviewRulerColor: 'rgba(239, 68, 68, 0.6)',
     overviewRulerLane: vscode.OverviewRulerLane.Left,
-    textDecoration: 'line-through rgba(239, 68, 68, 0.4)', // Strikethrough for deleted lines!
     gutterIconPath: vscode.Uri.parse(
       'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" stroke="%23ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>',
     ),

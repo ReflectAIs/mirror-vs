@@ -148,11 +148,13 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
       },
       (result: any) => {
         const relPath = path.relative(workspaceRoot, result.uri.fsPath).replace(/\\/g, '/');
-        if (result.preview && result.ranges && result.ranges.length > 0) {
+        if (result.preview && result.ranges) {
           const range = Array.isArray(result.ranges) ? result.ranges[0] : result.ranges;
-          const lineNum = 'start' in range ? (range as vscode.Range).start.line + 1 : 1;
-          const previewText = typeof result.preview.text === 'string' ? result.preview.text.trim() : '';
-          results.push({ file: relPath, line: lineNum, text: previewText });
+          if (range) {
+            const lineNum = 'start' in range ? (range as vscode.Range).start.line + 1 : 1;
+            const previewText = typeof result.preview.text === 'string' ? result.preview.text.trim() : '';
+            results.push({ file: relPath, line: lineNum, text: previewText });
+          }
         }
       },
     );
