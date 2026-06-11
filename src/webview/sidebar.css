@@ -1119,128 +1119,90 @@ select:focus {
 
 /* ─── TOOL CARDS ──────────────────────────────────────────────────────────── */
 .tool-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition: var(--transition-normal);
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+  margin: 4px 0 !important;
+  padding: 2px 0 !important;
 }
 
-.tool-card:hover { border-color: var(--border-glass-hover); }
-
-.tool-card.streaming-write-card {
-  background: rgba(168, 85, 247, 0.03) !important;
-  border-color: rgba(168, 85, 247, 0.2) !important;
-  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.04) !important;
-}
-
-.tool-card.streaming-write-card:hover {
-  border-color: rgba(168, 85, 247, 0.35) !important;
-  background: rgba(168, 85, 247, 0.05) !important;
-}
-
-.tool-card.write-tool-card {
-  background: rgba(168, 85, 247, 0.015);
-  border-color: rgba(168, 85, 247, 0.12);
-}
-
-.tool-card.write-tool-card:hover {
-  border-color: rgba(168, 85, 247, 0.25);
-  background: rgba(168, 85, 247, 0.035);
-}
-
-/* Custom styles for streaming write card elements */
-.tool-card.streaming-write-card .tool-icon-wrapper {
-  background: rgba(168, 85, 247, 0.08) !important;
-  border: 1px solid rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .tool-status-badge {
-  background: rgba(168, 85, 247, 0.1) !important;
-  color: #c084fc !important;
-  border: 1px solid rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .scanning-bar::after {
-  background: linear-gradient(90deg, transparent, #a855f7, transparent) !important;
-}
-
-.tool-card.streaming-write-card .code-block-wrapper {
-  margin: 8px !important;
-  border-color: rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .code-block-header {
-  background: rgba(147, 51, 234, 0.05) !important;
-  border-bottom-color: rgba(168, 85, 247, 0.15) !important;
-}
-
-.tool-card.streaming-write-card .code-block-header .streaming-label {
-  font-size: 9px !important;
-  opacity: 0.65 !important;
-  color: #c084fc !important;
+.tool-card:hover {
+  background: transparent !important;
 }
 
 .tool-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.2s var(--ease-out);
-}
-
-.tool-card-header:hover { background: rgba(255, 255, 255, 0.02); }
-
-.tool-icon-wrapper {
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-xs);
-  background: rgba(99, 102, 241, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.tool-icon { font-size: 11px; }
-
-.tool-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: row;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 2px 0;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+}
+
+.tool-card-header:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-radius: 4px;
+}
+
+.tool-state-verb {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.tool-icon-wrapper {
+  background: transparent !important;
+  border: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tool-info {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
 }
 
 .tool-name {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
-  white-space: nowrap;
 }
 
 .tool-target {
-  font-size: 9.5px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-system);
+  color: var(--text-primary) !important;
+  opacity: 1 !important;
+  cursor: pointer;
+}
+
+.tool-target:hover {
+  text-decoration: underline !important;
 }
 
 .tool-lines-diff {
   display: inline-flex;
   gap: 4px;
-  font-size: 9px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  margin-left: auto;
-  padding-right: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  font-family: var(--font-system);
+  margin-left: 4px;
 }
 
 .lines-added {
@@ -1263,51 +1225,33 @@ select:focus {
 }
 
 .tool-header-controls {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .tool-status-badge {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-  letter-spacing: 0.2px;
-  text-transform: uppercase;
-}
-
-.tool-card[data-status="success"] .tool-status-badge {
-  background: rgba(52, 211, 153, 0.08);
-  color: var(--color-success);
-}
-
-.tool-card[data-status="error"] .tool-status-badge {
-  background: rgba(248, 113, 113, 0.08);
-  color: var(--color-danger);
-}
-
-.tool-card[data-status="running"] .tool-status-badge {
-  background: rgba(56, 189, 248, 0.08);
-  color: var(--color-info);
-}
-
-.tool-card.reverted .tool-status-badge {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
+  display: none !important; /* Hide badge completely, shown via prefix verb */
 }
 
 .tool-expand-chevron {
   color: var(--text-muted);
-  display: flex;
+  opacity: 0.6;
+  display: inline-flex;
   align-items: center;
-  transition: transform 0.3s var(--ease-out);
+  transition: transform 0.2s var(--ease-out);
+  margin-left: 2px;
 }
 
-.tool-card.expanded .tool-expand-chevron { transform: rotate(180deg); }
+.tool-card.expanded .tool-expand-chevron {
+  transform: rotate(90deg); /* Rotate to point downwards when expanded */
+}
 
-.chevron-icon { width: 12px; height: 12px; }
+.chevron-icon {
+  width: 10px;
+  height: 10px;
+}
 
 /* Tool Revert Button */
 .tool-revert-btn {

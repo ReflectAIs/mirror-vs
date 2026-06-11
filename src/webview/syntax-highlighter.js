@@ -95,8 +95,8 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
     escaped = escaped.replace(/\b(echo|cd|ls|rm|cp|mv|mkdir|touch|cat|grep|find|npm|node|python|git|docker|sudo|export|source)\b/g, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'diff') {
-    if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped.substring(1) + '</span>';
-    else if (escaped.indexOf('-') === 0) escaped = '<span class="hljs-deletion">' + escaped.substring(1) + '</span>';
+    if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped + '</span>';
+    else if (escaped.indexOf('-') === 0) escaped = '<span class="hljs-deletion">' + escaped + '</span>';
   }
   
   return escaped || '&nbsp;';

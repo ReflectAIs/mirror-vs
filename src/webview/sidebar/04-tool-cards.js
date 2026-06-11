@@ -1,77 +1,61 @@
+    function getFileIcon(filePath) {
+      if (!filePath) return '';
+      const filename = filePath.split(/[/\\]/).pop().toLowerCase();
+      const ext = filePath.split('.').pop().toLowerCase();
+      
+      if (filename === 'implementation plan' || filename === 'implementation_plan.md' || filename === 'implementation_plan') {
+        return '<span class="file-icon" style="color: #c084fc; margin-right: 4px;">📄</span>';
+      }
+      if (filename === 'task.md' || filename === 'task') {
+        return '<span class="file-icon" style="color: #c084fc; margin-right: 4px;">📄</span>';
+      }
+      if (ext === 'html' || ext === 'htm') {
+        return '<span class="file-icon html-icon" style="color: #f97316; font-weight: bold; font-family: monospace; margin-right: 4px;">&lt;/&gt;</span>';
+      }
+      if (ext === 'js' || ext === 'jsx') {
+        return '<span class="file-icon js-icon" style="color: #eab308; font-weight: bold; font-family: monospace; margin-right: 4px;">JS</span>';
+      }
+      if (ext === 'ts' || ext === 'tsx') {
+        return '<span class="file-icon ts-icon" style="color: #eab308; font-weight: bold; font-family: monospace; margin-right: 4px;">TS</span>';
+      }
+      if (ext === 'css') {
+        return '<span class="file-icon css-icon" style="color: #3b82f6; font-weight: bold; font-family: monospace; margin-right: 4px;">#</span>';
+      }
+      return '<span class="file-icon" style="color: #a855f7; margin-right: 4px;">📄</span>';
+    }
+
     let friendlyName = toolName;
-    let iconHtml = '🔧';
-    if (toolName === 'read_file') {
-      friendlyName = 'Read File';
-      iconHtml = '📖';
-    } else if (toolName === 'create_file') {
-      friendlyName = 'Create File';
-      iconHtml = '🆕';
-    } else if (toolName === 'write_file') {
-      friendlyName = 'Update File';
-      iconHtml = '💾';
-    } else if (toolName === 'patch_file') {
-      friendlyName = 'Patch File';
-      iconHtml = '✏️';
-    } else if (toolName === 'multi_patch_file' || toolName === 'multipatch_file') {
-      friendlyName = 'Multi Patch File';
-      iconHtml = '📑';
+    let iconHtml = '';
+    let displayTarget = target || '';
+    
+    if (status === 'running') {
+      friendlyName = 'Working...';
+      displayTarget = '';
+      iconHtml = '';
+    } else if (toolName === 'read_file') {
+      friendlyName = 'Explored';
+      displayTarget = '1 file';
+      iconHtml = '';
     } else if (toolName === 'list_dir') {
-      friendlyName = 'List Folder';
-      iconHtml = '📁';
+      friendlyName = 'Exploring';
+      displayTarget = '1 folder';
+      iconHtml = '';
+    } else if (toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file' || toolName === 'create_file') {
+      friendlyName = 'Edited';
+      displayTarget = (target || '').split(/[/\\]/).pop() || '';
+      iconHtml = getFileIcon(target);
+    } else if (toolName === 'delete_file') {
+      friendlyName = 'Deleted';
+      displayTarget = (target || '').split(/[/\\]/).pop() || '';
+      iconHtml = getFileIcon(target);
     } else if (toolName === 'grep_search') {
-      friendlyName = 'Search Workspace';
+      friendlyName = 'Searched';
+      displayTarget = 'Workspace';
       iconHtml = '🔍';
     } else if (toolName === 'run_command') {
-      friendlyName = 'Run Command';
+      friendlyName = 'Ran';
+      displayTarget = 'Command';
       iconHtml = '💻';
-    } else if (toolName === 'send_terminal_input') {
-      friendlyName = 'Send Terminal Input';
-      iconHtml = '⌨️';
-    } else if (toolName === 'close_terminal') {
-      friendlyName = 'Close Terminal';
-      iconHtml = '🛑';
-    } else if (toolName === 'browser_navigate') {
-      friendlyName = 'Browser Navigate';
-      iconHtml = '🌐';
-    } else if (toolName === 'browser_click') {
-      friendlyName = 'Browser Click';
-      iconHtml = '🖱️';
-    } else if (toolName === 'browser_type') {
-      friendlyName = 'Browser Type';
-      iconHtml = '🔤';
-    } else if (toolName === 'browser_evaluate_script') {
-      friendlyName = 'Execute Script';
-      iconHtml = '⚡';
-    } else if (toolName === 'browser_screenshot') {
-      friendlyName = 'Browser Screenshot';
-      iconHtml = '📸';
-    } else if (toolName === 'figma_inspect') {
-      friendlyName = 'Figma Inspect';
-      iconHtml = '🎨';
-    } else if (toolName === 'rename_file') {
-      friendlyName = 'Rename File';
-      iconHtml = '🚚';
-    } else if (toolName === 'delete_file') {
-      friendlyName = 'Delete File';
-      iconHtml = '🗑️';
-    } else if (toolName === 'git_status') {
-      friendlyName = 'Git Status';
-      iconHtml = '📊';
-    } else if (toolName === 'git_diff') {
-      friendlyName = 'Git Diff';
-      iconHtml = '📝';
-    } else if (toolName === 'git_add') {
-      friendlyName = 'Git Stage';
-      iconHtml = '➕';
-    } else if (toolName === 'git_commit') {
-      friendlyName = 'Git Commit';
-      iconHtml = '📦';
-    } else if (toolName === 'symbol_search') {
-      friendlyName = 'Symbol Search';
-      iconHtml = '🔎';
-    } else if (toolName === 'rename_symbol') {
-      friendlyName = 'Rename Symbol';
-      iconHtml = '✏️';
     }
 
     function extractReadFileLines(resStr) {
@@ -102,7 +86,14 @@
     if (result) {
       const match = result.match(/\(\+(\d+),\s*-(\d+)\)/);
       if (match) {
-        linesDiffHtml = `<span class="tool-lines-diff"><span class="lines-added">+${match[1]}</span><span class="lines-removed">-${match[2]}</span></span>`;
+        const added = parseInt(match[1]);
+        const removed = parseInt(match[2]);
+        let parts = [];
+        if (added > 0) parts.push(`<span class="lines-added">+${added}</span>`);
+        if (removed > 0) parts.push(`<span class="lines-removed">-${removed}</span>`);
+        if (parts.length > 0) {
+          linesDiffHtml = `<span class="tool-lines-diff">${parts.join(' ')}</span>`;
+        }
       } else if (toolName === 'read_file') {
         const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
         if (readRangeMatch) {
@@ -114,26 +105,30 @@
 
     const header = document.createElement('div');
     header.className = 'tool-card-header';
-    header.innerHTML = `
-      <div class="tool-icon-wrapper">
-        <span class="tool-icon">${iconHtml}</span>
-      </div>
-      <div class="tool-info">
-        <span class="tool-name">${friendlyName}</span>
-        <span class="tool-target" title="Click to open file in editor">${target}</span>
-      </div>
-      ${linesDiffHtml}
-      <div class="tool-header-controls">
-        <span class="tool-status-badge">${isReverted ? 'Reverted' : (status === 'running' ? 'Running' : (status === 'success' ? 'Completed' : 'Failed'))}</span>
-        ${status !== 'running' ? `
+    if (status === 'running') {
+      header.innerHTML = `
+        <div class="tool-info">
+          <span class="tool-name" style="color: var(--text-secondary); font-style: italic;">Working...</span>
+        </div>
+      `;
+    } else {
+      header.innerHTML = `
+        <div class="tool-info">
+          <span class="tool-name">${friendlyName}</span>
+          ${iconHtml ? `<span class="tool-icon-wrapper">${iconHtml}</span>` : ''}
+          <span class="tool-target" title="Click to open file in editor">${displayTarget}</span>
+        </div>
+        ${linesDiffHtml}
+        <div class="tool-header-controls">
+          <span class="tool-status-badge">${isReverted ? 'Reverted' : (status === 'success' ? 'Completed' : 'Failed')}</span>
           <span class="tool-expand-chevron">
             <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+              <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
             </svg>
           </span>
-        ` : ''}
-      </div>
-    `;
+        </div>
+      `;
+    }
     card.appendChild(header);
 
     const targetSpan = header.querySelector('.tool-target');
@@ -389,11 +384,41 @@
       
       // Default: show summary for other tools
       if (toolName !== 'read_file' && toolName !== 'grep_search' && toolName !== 'patch_file' && toolName !== 'multi_patch_file' && toolName !== 'multipatch_file' && toolName !== 'write_file' && toolName !== 'create_file') {
-        const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
-        const details = document.createElement('div');
-        details.className = 'tool-details';
-        details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
-        detailsContainer.appendChild(details);
+        if (toolName === 'list_dir') {
+          const expandedRow = document.createElement('div');
+          expandedRow.className = 'list-dir-expanded-row';
+          expandedRow.style.display = 'flex';
+          expandedRow.style.alignItems = 'center';
+          expandedRow.style.gap = '6px';
+          expandedRow.style.padding = '4px 0 4px 12px';
+          expandedRow.style.fontSize = '11px';
+          expandedRow.style.color = 'var(--text-primary)';
+          
+          expandedRow.innerHTML = `
+            <span>Analyzed</span>
+            <span style="color: #3b82f6;">📁</span>
+            <span class="tool-target" style="font-weight: 700; cursor: pointer; text-decoration: underline; color: #a855f7;">${target}</span>
+            <span style="margin-left: auto; color: var(--text-muted); opacity: 0.6; font-size: 9px; padding-right: 4px;">&gt;</span>
+          `;
+          
+          const dirTarget = expandedRow.querySelector('.tool-target');
+          if (dirTarget) {
+            dirTarget.addEventListener('click', (e) => {
+              e.stopPropagation();
+              vscode.postMessage({
+                type: 'openFile',
+                path: target
+              });
+            });
+          }
+          detailsContainer.appendChild(expandedRow);
+        } else {
+          const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
+          const details = document.createElement('div');
+          details.className = 'tool-details';
+          details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
+          detailsContainer.appendChild(details);
+        }
       }
       
       // If there's a result for tools that also have code, show additional result text

@@ -1726,80 +1726,64 @@ function attachImage(base64) {
     }
     
 
+    function getFileIcon(filePath) {
+      if (!filePath) return '';
+      const filename = filePath.split(/[/\\]/).pop().toLowerCase();
+      const ext = filePath.split('.').pop().toLowerCase();
+      
+      if (filename === 'implementation plan' || filename === 'implementation_plan.md' || filename === 'implementation_plan') {
+        return '<span class="file-icon" style="color: #c084fc; margin-right: 4px;">📄</span>';
+      }
+      if (filename === 'task.md' || filename === 'task') {
+        return '<span class="file-icon" style="color: #c084fc; margin-right: 4px;">📄</span>';
+      }
+      if (ext === 'html' || ext === 'htm') {
+        return '<span class="file-icon html-icon" style="color: #f97316; font-weight: bold; font-family: monospace; margin-right: 4px;">&lt;/&gt;</span>';
+      }
+      if (ext === 'js' || ext === 'jsx') {
+        return '<span class="file-icon js-icon" style="color: #eab308; font-weight: bold; font-family: monospace; margin-right: 4px;">JS</span>';
+      }
+      if (ext === 'ts' || ext === 'tsx') {
+        return '<span class="file-icon ts-icon" style="color: #eab308; font-weight: bold; font-family: monospace; margin-right: 4px;">TS</span>';
+      }
+      if (ext === 'css') {
+        return '<span class="file-icon css-icon" style="color: #3b82f6; font-weight: bold; font-family: monospace; margin-right: 4px;">#</span>';
+      }
+      return '<span class="file-icon" style="color: #a855f7; margin-right: 4px;">📄</span>';
+    }
+
     let friendlyName = toolName;
-    let iconHtml = '🔧';
-    if (toolName === 'read_file') {
-      friendlyName = 'Read File';
-      iconHtml = '📖';
-    } else if (toolName === 'create_file') {
-      friendlyName = 'Create File';
-      iconHtml = '🆕';
-    } else if (toolName === 'write_file') {
-      friendlyName = 'Update File';
-      iconHtml = '💾';
-    } else if (toolName === 'patch_file') {
-      friendlyName = 'Patch File';
-      iconHtml = '✏️';
-    } else if (toolName === 'multi_patch_file' || toolName === 'multipatch_file') {
-      friendlyName = 'Multi Patch File';
-      iconHtml = '📑';
+    let iconHtml = '';
+    let displayTarget = target || '';
+    
+    if (status === 'running') {
+      friendlyName = 'Working...';
+      displayTarget = '';
+      iconHtml = '';
+    } else if (toolName === 'read_file') {
+      friendlyName = 'Explored';
+      displayTarget = '1 file';
+      iconHtml = '';
     } else if (toolName === 'list_dir') {
-      friendlyName = 'List Folder';
-      iconHtml = '📁';
+      friendlyName = 'Exploring';
+      displayTarget = '1 folder';
+      iconHtml = '';
+    } else if (toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file' || toolName === 'create_file') {
+      friendlyName = 'Edited';
+      displayTarget = (target || '').split(/[/\\]/).pop() || '';
+      iconHtml = getFileIcon(target);
+    } else if (toolName === 'delete_file') {
+      friendlyName = 'Deleted';
+      displayTarget = (target || '').split(/[/\\]/).pop() || '';
+      iconHtml = getFileIcon(target);
     } else if (toolName === 'grep_search') {
-      friendlyName = 'Search Workspace';
+      friendlyName = 'Searched';
+      displayTarget = 'Workspace';
       iconHtml = '🔍';
     } else if (toolName === 'run_command') {
-      friendlyName = 'Run Command';
+      friendlyName = 'Ran';
+      displayTarget = 'Command';
       iconHtml = '💻';
-    } else if (toolName === 'send_terminal_input') {
-      friendlyName = 'Send Terminal Input';
-      iconHtml = '⌨️';
-    } else if (toolName === 'close_terminal') {
-      friendlyName = 'Close Terminal';
-      iconHtml = '🛑';
-    } else if (toolName === 'browser_navigate') {
-      friendlyName = 'Browser Navigate';
-      iconHtml = '🌐';
-    } else if (toolName === 'browser_click') {
-      friendlyName = 'Browser Click';
-      iconHtml = '🖱️';
-    } else if (toolName === 'browser_type') {
-      friendlyName = 'Browser Type';
-      iconHtml = '🔤';
-    } else if (toolName === 'browser_evaluate_script') {
-      friendlyName = 'Execute Script';
-      iconHtml = '⚡';
-    } else if (toolName === 'browser_screenshot') {
-      friendlyName = 'Browser Screenshot';
-      iconHtml = '📸';
-    } else if (toolName === 'figma_inspect') {
-      friendlyName = 'Figma Inspect';
-      iconHtml = '🎨';
-    } else if (toolName === 'rename_file') {
-      friendlyName = 'Rename File';
-      iconHtml = '🚚';
-    } else if (toolName === 'delete_file') {
-      friendlyName = 'Delete File';
-      iconHtml = '🗑️';
-    } else if (toolName === 'git_status') {
-      friendlyName = 'Git Status';
-      iconHtml = '📊';
-    } else if (toolName === 'git_diff') {
-      friendlyName = 'Git Diff';
-      iconHtml = '📝';
-    } else if (toolName === 'git_add') {
-      friendlyName = 'Git Stage';
-      iconHtml = '➕';
-    } else if (toolName === 'git_commit') {
-      friendlyName = 'Git Commit';
-      iconHtml = '📦';
-    } else if (toolName === 'symbol_search') {
-      friendlyName = 'Symbol Search';
-      iconHtml = '🔎';
-    } else if (toolName === 'rename_symbol') {
-      friendlyName = 'Rename Symbol';
-      iconHtml = '✏️';
     }
 
     function extractReadFileLines(resStr) {
@@ -1830,7 +1814,14 @@ function attachImage(base64) {
     if (result) {
       const match = result.match(/\(\+(\d+),\s*-(\d+)\)/);
       if (match) {
-        linesDiffHtml = `<span class="tool-lines-diff"><span class="lines-added">+${match[1]}</span><span class="lines-removed">-${match[2]}</span></span>`;
+        const added = parseInt(match[1]);
+        const removed = parseInt(match[2]);
+        let parts = [];
+        if (added > 0) parts.push(`<span class="lines-added">+${added}</span>`);
+        if (removed > 0) parts.push(`<span class="lines-removed">-${removed}</span>`);
+        if (parts.length > 0) {
+          linesDiffHtml = `<span class="tool-lines-diff">${parts.join(' ')}</span>`;
+        }
       } else if (toolName === 'read_file') {
         const readRangeMatch = result.match(/showing lines (\d+)-(\d+)/);
         if (readRangeMatch) {
@@ -1842,26 +1833,30 @@ function attachImage(base64) {
 
     const header = document.createElement('div');
     header.className = 'tool-card-header';
-    header.innerHTML = `
-      <div class="tool-icon-wrapper">
-        <span class="tool-icon">${iconHtml}</span>
-      </div>
-      <div class="tool-info">
-        <span class="tool-name">${friendlyName}</span>
-        <span class="tool-target" title="Click to open file in editor">${target}</span>
-      </div>
-      ${linesDiffHtml}
-      <div class="tool-header-controls">
-        <span class="tool-status-badge">${isReverted ? 'Reverted' : (status === 'running' ? 'Running' : (status === 'success' ? 'Completed' : 'Failed'))}</span>
-        ${status !== 'running' ? `
+    if (status === 'running') {
+      header.innerHTML = `
+        <div class="tool-info">
+          <span class="tool-name" style="color: var(--text-secondary); font-style: italic;">Working...</span>
+        </div>
+      `;
+    } else {
+      header.innerHTML = `
+        <div class="tool-info">
+          <span class="tool-name">${friendlyName}</span>
+          ${iconHtml ? `<span class="tool-icon-wrapper">${iconHtml}</span>` : ''}
+          <span class="tool-target" title="Click to open file in editor">${displayTarget}</span>
+        </div>
+        ${linesDiffHtml}
+        <div class="tool-header-controls">
+          <span class="tool-status-badge">${isReverted ? 'Reverted' : (status === 'success' ? 'Completed' : 'Failed')}</span>
           <span class="tool-expand-chevron">
             <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+              <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
             </svg>
           </span>
-        ` : ''}
-      </div>
-    `;
+        </div>
+      `;
+    }
     card.appendChild(header);
 
     const targetSpan = header.querySelector('.tool-target');
@@ -2117,11 +2112,41 @@ function attachImage(base64) {
       
       // Default: show summary for other tools
       if (toolName !== 'read_file' && toolName !== 'grep_search' && toolName !== 'patch_file' && toolName !== 'multi_patch_file' && toolName !== 'multipatch_file' && toolName !== 'write_file' && toolName !== 'create_file') {
-        const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
-        const details = document.createElement('div');
-        details.className = 'tool-details';
-        details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
-        detailsContainer.appendChild(details);
+        if (toolName === 'list_dir') {
+          const expandedRow = document.createElement('div');
+          expandedRow.className = 'list-dir-expanded-row';
+          expandedRow.style.display = 'flex';
+          expandedRow.style.alignItems = 'center';
+          expandedRow.style.gap = '6px';
+          expandedRow.style.padding = '4px 0 4px 12px';
+          expandedRow.style.fontSize = '11px';
+          expandedRow.style.color = 'var(--text-primary)';
+          
+          expandedRow.innerHTML = `
+            <span>Analyzed</span>
+            <span style="color: #3b82f6;">📁</span>
+            <span class="tool-target" style="font-weight: 700; cursor: pointer; text-decoration: underline; color: #a855f7;">${target}</span>
+            <span style="margin-left: auto; color: var(--text-muted); opacity: 0.6; font-size: 9px; padding-right: 4px;">&gt;</span>
+          `;
+          
+          const dirTarget = expandedRow.querySelector('.tool-target');
+          if (dirTarget) {
+            dirTarget.addEventListener('click', (e) => {
+              e.stopPropagation();
+              vscode.postMessage({
+                type: 'openFile',
+                path: target
+              });
+            });
+          }
+          detailsContainer.appendChild(expandedRow);
+        } else {
+          const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
+          const details = document.createElement('div');
+          details.className = 'tool-details';
+          details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
+          detailsContainer.appendChild(details);
+        }
       }
       
       // If there's a result for tools that also have code, show additional result text
@@ -4114,57 +4139,52 @@ function attachImage(base64) {
   // Multi-expression dynamic SVG definitions
   const FACES = {
     idle: [
-      `<!-- happy open eyes with shiny highlights -->
-       <circle cx="8" cy="12" r="2" stroke="none" />
-       <circle cx="16" cy="12" r="2" stroke="none" />
-       <circle cx="8.6" cy="11.4" r="0.6" fill="#ffffff" stroke="none" />
-       <circle cx="16.6" cy="11.4" r="0.6" fill="#ffffff" stroke="none" />
-       <path d="M10.5 14.5 Q12 15.8 13.5 14.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`,
+      `<!-- happy open eyes -->
+       <circle cx="6.5" cy="10" r="2.5" />
+       <circle cx="17.5" cy="10" r="2.5" />
+       <path d="M9.5 14 Q12 16.5 14.5 14" stroke-width="2" stroke-linecap="round" fill="none" />`,
       `<!-- happy blink -->
-       <path d="M6 12 Q8 10 10 12 M14 12 Q16 10 18 12" stroke-width="2" stroke-linecap="round" fill="none" />
-       <path d="M10.5 15 Q12 16.2 13.5 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`,
+       <path d="M4.5 10 Q6.5 8 8.5 10 M15.5 10 Q17.5 8 19.5 10" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M9.5 14.5 Q12 16.5 14.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`,
       `<!-- happy wink -->
-       <circle cx="8" cy="12" r="2" stroke="none" />
-       <circle cx="8.6" cy="11.4" r="0.6" fill="#ffffff" stroke="none" />
-       <path d="M14 12 Q16 10 18 12" stroke-width="2" stroke-linecap="round" fill="none" />
-       <path d="M10.5 14.5 Q12 15.8 13.5 14.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`
+       <circle cx="6.5" cy="10" r="2.5" />
+       <path d="M15.5 10 Q17.5 8 19.5 10" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M9.5 14 Q12 16.5 14.5 14" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     thinking: [
-      `<!-- thinking / curious with highlights -->
-       <ellipse cx="8" cy="11.5" rx="2" ry="1.4" stroke="none" />
-       <ellipse cx="16" cy="11.5" rx="2" ry="1.4" stroke="none" />
-       <circle cx="8.6" cy="10.9" r="0.6" fill="#ffffff" stroke="none" />
-       <circle cx="16.6" cy="10.9" r="0.6" fill="#ffffff" stroke="none" />
-       <path d="M6 8 Q8 7.2 10 8 M14 8 Q16 7.2 18 8" stroke-width="1.4" stroke-linecap="round" fill="none" />
-       <path d="M10.5 15 Q12 14 13.5 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`
+      `<!-- thinking / curious -->
+       <ellipse cx="6.5" cy="9.5" rx="2.5" ry="1.8" />
+       <ellipse cx="17.5" cy="9.5" rx="2.5" ry="1.8" />
+       <path d="M5 6.5 Q7 5.5 9 6.5 M15 6.5 Q17 5.5 19 6.5" stroke-width="1.8" stroke-linecap="round" fill="none" />
+       <path d="M10.5 14.5 Q12 13 13.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     coding: [
       `<!-- coding cute squint -->
-       <path d="M5.5 11 L9 13 M18.5 11 L15 13" stroke-width="2.2" stroke-linecap="round" fill="none" />
-       <path d="M10 15 Q12 17 14 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`
+       <path d="M4.5 9 L8.5 11 M19.5 9 L15.5 11" stroke-width="2.2" stroke-linecap="round" />
+       <path d="M9.5 14.5 Q12 17 14.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     tool_calling: [
       `<!-- focus scanning gear eyes -->
-       <circle cx="8" cy="12" r="2.2" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
-       <circle cx="16" cy="12" r="2.2" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
-       <path d="M10 15 Q12 17 14 15" stroke-width="1.6" stroke-linecap="round" fill="none" />`
+       <circle cx="6.5" cy="10" r="2.5" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
+       <circle cx="17.5" cy="10" r="2.5" stroke-width="1.5" stroke-dasharray="3,1" fill="none" />
+       <path d="M9 14.5 Q12 17 15 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     error: [
       `<!-- dizzy sad but cute -->
-       <path d="M5.5 10 L8.5 13 M8.5 10 L5.5 13 M15.5 10 L18.5 13 M18.5 10 L15.5 13" stroke-width="1.8" stroke-linecap="round" fill="none" />
-       <path d="M10 15.5 Q12 14 14 15.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`
+       <path d="M5 8 L8 11 M8 8 L5 11 M16 8 L19 11 M19 8 L16 11" stroke-width="1.8" stroke-linecap="round" />
+       <path d="M10 15 Q12 13.5 14 15" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     click: [
       `<!-- heart eyes! -->
-       <path d="M4.5 11 Q4.5 9 6 9 Q7 9 8 10.2 Q9 9 10 9 Q11.5 9 11.5 11 Q11.5 13 8 15.5 Q4.5 13 4.5 11 Z" fill="#f43f5e" stroke="none" />
-       <path d="M12.5 11 Q12.5 9 14 9 Q15 9 16 10.2 Q17 9 18 9 Q19.5 9 19.5 11 Q19.5 13 16 15.5 Q12.5 13 12.5 11 Z" fill="#f43f5e" stroke="none" />
-       <path d="M10.5 15.5 Q12 17 13.5 15.5" stroke-width="1.6" stroke-linecap="round" fill="none" />`
+       <path d="M4 9 Q4 7 5.5 7 Q6.5 7 7.5 8.2 Q8.5 7 9.5 7 Q11 7 11 9 Q11 11 7.5 13.5 Q4 11 4 9 Z" fill="#f43f5e" stroke="none" />
+       <path d="M13 9 Q13 7 14.5 7 Q15.5 7 16.5 8.2 Q17.5 7 18.5 7 Q20 7 20 9 Q20 11 16.5 13.5 Q13 11 13 9 Z" fill="#f43f5e" stroke="none" />
+       <path d="M10 15.5 Q12 17.5 14 15.5" stroke-width="2" stroke-linecap="round" fill="none" />`
     ],
     celebrate: [
       `<!-- starry eyes and happy mouth -->
-       <path d="M8 9.5 L8.8 11.5 L10.8 11.9 L8.8 12.3 L8 14.3 L7.2 12.3 L5.2 11.9 L7.2 11.5 Z" fill="#fbbf24" stroke="none" />
-       <path d="M16 9.5 L16.8 11.5 L18.8 11.9 L16.8 12.3 L16 14.3 L15.2 12.3 L13.2 11.9 L15.2 11.5 Z" fill="#fbbf24" stroke="none" />
-       <path d="M10 15 Q12 17.5 14 15 Z" fill="#fbbf24" stroke="none" />`
+       <path d="M6.5 7 L7.5 9.5 L10 10 L7.5 10.5 L6.5 13 L5.5 10.5 L3 10 L5.5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M17.5 7 L18.5 9.5 L21 10 L18.5 10.5 L17.5 13 L16.5 10.5 L14 10 L16.5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M9.5 14.5 Q12 18 14.5 14.5 Z" fill="#fbbf24" stroke="none" />`
     ]
   };
 
@@ -4203,7 +4223,6 @@ function attachImage(base64) {
       // Update color stroke and fills matching state
       const color = FACE_COLORS[state] || FACE_COLORS.idle;
       buddyEyes.setAttribute('fill', color);
-      buddyEyes.setAttribute('stroke', color);
       // Make sure the strokes in the face also use the matching state color
       const paths = buddyEyes.querySelectorAll('path');
       paths.forEach(p => {
@@ -4215,17 +4234,17 @@ function attachImage(base64) {
       // Update cheeks matching the mood/state
       if (buddyCheeks) {
         if (state === 'error') {
-          buddyCheeks.setAttribute('fill', '#f472b6'); // embarrassed cheeks
-          buddyCheeks.setAttribute('opacity', '0.7');
+          buddyCheeks.setAttribute('fill', '#a78bfa'); // purple embarrassed cheeks
+          buddyCheeks.setAttribute('opacity', '0.6');
         } else if (state === 'celebrate' || state === 'click') {
           buddyCheeks.setAttribute('fill', '#f43f5e'); // bright red cheeks
-          buddyCheeks.setAttribute('opacity', '0.8');
+          buddyCheeks.setAttribute('opacity', '0.7');
         } else if (state === 'thinking') {
-          buddyCheeks.setAttribute('fill', '#f472b6');
-          buddyCheeks.setAttribute('opacity', '0.45');
+          buddyCheeks.setAttribute('fill', '#38bdf8'); // cyan cheeks
+          buddyCheeks.setAttribute('opacity', '0.3');
         } else {
-          buddyCheeks.setAttribute('fill', '#fecdd3'); // default soft rosy cheeks
-          buddyCheeks.setAttribute('opacity', '0.9');
+          buddyCheeks.setAttribute('fill', '#f472b6'); // default soft pink cheeks
+          buddyCheeks.setAttribute('opacity', '0.45');
         }
       }
     }
@@ -4265,7 +4284,6 @@ function attachImage(base64) {
           
           const color = FACE_COLORS.idle;
           buddyEyes.setAttribute('fill', color);
-          buddyEyes.setAttribute('stroke', color);
           const paths = buddyEyes.querySelectorAll('path');
           paths.forEach(p => {
             if (p.getAttribute('stroke') !== 'none') {
@@ -4376,7 +4394,6 @@ function attachImage(base64) {
         buddyEyes.innerHTML = FACES.click[0];
         const color = FACE_COLORS.click;
         buddyEyes.setAttribute('fill', color);
-        buddyEyes.setAttribute('stroke', color);
         const paths = buddyEyes.querySelectorAll('path');
         paths.forEach(p => {
           if (p.getAttribute('stroke') !== 'none') {
@@ -4503,8 +4520,8 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
     escaped = escaped.replace(/\b(echo|cd|ls|rm|cp|mv|mkdir|touch|cat|grep|find|npm|node|python|git|docker|sudo|export|source)\b/g, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'diff') {
-    if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped.substring(1) + '</span>';
-    else if (escaped.indexOf('-') === 0) escaped = '<span class="hljs-deletion">' + escaped.substring(1) + '</span>';
+    if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped + '</span>';
+    else if (escaped.indexOf('-') === 0) escaped = '<span class="hljs-deletion">' + escaped + '</span>';
   }
   
   return escaped || '&nbsp;';
