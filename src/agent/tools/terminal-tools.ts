@@ -107,27 +107,45 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
 
       let choice: string | undefined;
 
-      if (autonomousMode) {
-        choice = await Promise.race([
-          vscode.window.showWarningMessage(
-            `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command? (Auto-allowing in 10 seconds in Autonomous Mode)`,
+      // Try webview dialog first for better styling & live timer
+      const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+      if (MirrorVsSidebarProvider.postToActive) {
+        const approvalPromise = new Promise<string>((resolve) => {
+          MirrorVsSidebarProvider.pendingCommandApproval = {
+            resolve,
+            command
+          };
+        });
+        MirrorVsSidebarProvider.postToActive({
+          type: 'requestSensitiveCommandApproval',
+          command,
+          autonomousMode
+        });
+        choice = await approvalPromise;
+      } else {
+        // Fallback to VS Code native dialog
+        if (autonomousMode) {
+          choice = await Promise.race([
+            vscode.window.showWarningMessage(
+              `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command? (Auto-allowing in 10 seconds in Autonomous Mode)`,
+              { modal: true },
+              'Allow Execution',
+              'Deny',
+            ),
+            new Promise<string>((resolve) => {
+              setTimeout(() => {
+                resolve('Allow Execution');
+              }, 10000);
+            })
+          ]);
+        } else {
+          choice = await vscode.window.showWarningMessage(
+            `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
             { modal: true },
             'Allow Execution',
             'Deny',
-          ),
-          new Promise<string>((resolve) => {
-            setTimeout(() => {
-              resolve('Allow Execution');
-            }, 10000);
-          })
-        ]);
-      } else {
-        choice = await vscode.window.showWarningMessage(
-          `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
-          { modal: true },
-          'Allow Execution',
-          'Deny',
-        );
+          );
+        }
       }
 
       if (choice !== 'Allow Execution') {

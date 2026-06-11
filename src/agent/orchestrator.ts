@@ -138,50 +138,7 @@ export class AgentOrchestrator {
       const signal = this._activeAbortController.signal;
       this._sendAvatarState('thinking');
 
-      // Ambiguous Business Term Detector
-      const detectAmbiguousBusinessTerms = (input: string): string[] => {
-        const terms = ['successful', 'active', 'verified', 'qualified', 'enrolled', 'completed', 'approved'];
-        const found: string[] = [];
-        const normalized = input.toLowerCase();
-        for (const term of terms) {
-          const regex = new RegExp(`\\b${term}\\b`, 'i');
-          if (regex.test(normalized)) {
-            found.push(term);
-          }
-        }
-        return found;
-      };
-
-      const ambiguousTerms = detectAmbiguousBusinessTerms(text || '');
-      if (ambiguousTerms.length > 0) {
-        const hasAskedAlready = history.some(
-          (msg) =>
-            msg.role === 'assistant' &&
-            ambiguousTerms.every((term) => msg.content.toLowerCase().includes(term.toLowerCase())),
-        );
-        if (!hasAskedAlready) {
-          const clarificationPrompt = `I noticed your request contains the term(s): "${ambiguousTerms.join(', ')}". Before I begin exploring the codebase or proposing changes, could you please clarify what "${ambiguousTerms.join(', ')}" specifically means in this business context?`;
-          
-          let currentMessages = [...history];
-          if (text || (images && images.length > 0)) {
-            const userMsg: ChatMessage = { role: 'user', content: text || '[Image provided]' };
-            if (images && images.length > 0) userMsg.images = images;
-            currentMessages.push(userMsg);
-          }
-          currentMessages.push({ role: 'assistant', content: clarificationPrompt });
-          await this._saveChatHistory(currentMessages);
-          
-          this._postMessage({ type: 'chatResponseStart' });
-          this._postMessage({ type: 'chatResponseChunk', text: clarificationPrompt });
-          this._postMessage({ type: 'chatResponseComplete', fullText: clarificationPrompt });
-          this._postMessage({ type: 'updateChatHistory', history: currentMessages });
-          this._postMessage({ type: 'loopComplete' });
-          this._sendAvatarState('idle');
-          return;
-        }
-      }
-
-      const config = vscode.workspace.getConfiguration('mirror-vs');
+            const config = vscode.workspace.getConfiguration('mirror-vs');
       let provider = config.get<string>('defaultProvider', 'ollama') as string;
       const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434') as string;
       const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3') as string;
@@ -781,6 +738,18 @@ export class AgentOrchestrator {
 
             this._sendAvatarState('tool_calling');
             const toolResults: string[] = [];
+
+            // STRICT ONE-TOOL-PER-TURN ENFORCEMENT: Always execute only the first tool
+            if (toolCalls.length > 1) {
+              const extraCount = toolCalls.length - 1;
+              const extraNames = toolCalls.slice(1).map(t => t.name).join(', ');
+              // Execute only the first tool
+              toolCalls = [toolCalls[0]];
+              // Inject a warning result for each extra tool
+              const warningResult = `[SYSTEM NOTICE: Tools "${extraNames}" and ${extraCount - 1} other(s) were skipped because only one tool per turn is allowed. The model will have a chance to emit the next tool after this turn.]`;
+              toolResults.push(warningResult);
+              console.log(`[Orchestrator] Enforced single-tool limit: skipped ${extraCount} extra tools (${extraNames}).`);
+            }
 
             const readOnlyTools = [
               'read_file',

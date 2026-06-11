@@ -1,5 +1,5 @@
 export function getDebugSkill(): string {
-  return `### 🐛 EVIDENCE-DRIVEN DEBUGGING SKILL (ACTIVE)
+  return `### 🐛 EVIDENCE-DRIVEN DEBUGGING SKILL
 1. **Observe Symptom**: Capture error traces, logs, and visual layouts before touching code.
 2. **Identify Producer**: Track which file, function, API, or handler produces the incorrect output.
 3. **Form One Hypothesis**: Form exactly one focused theory on the root cause.

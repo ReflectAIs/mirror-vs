@@ -577,6 +577,78 @@
         break;
       }
 
+      case 'requestSensitiveCommandApproval': {
+        const { command, autonomousMode } = message;
+        if (approvalCommandText) {
+          approvalCommandText.textContent = command;
+        }
+        
+        if (commandApprovalModal) {
+          commandApprovalModal.classList.remove('hidden');
+        }
+        
+        if (approvalTimerInterval) {
+          clearInterval(approvalTimerInterval);
+          approvalTimerInterval = null;
+        }
+        
+        const handleResponse = (approved) => {
+          if (approvalTimerInterval) {
+            clearInterval(approvalTimerInterval);
+            approvalTimerInterval = null;
+          }
+          if (commandApprovalModal) {
+            commandApprovalModal.classList.add('hidden');
+          }
+          vscode.postMessage({ type: 'sensitiveCommandResponse', approved });
+        };
+        
+        if (approvalAllowBtn) {
+          approvalAllowBtn.onclick = () => handleResponse(true);
+        }
+        if (approvalDenyBtn) {
+          approvalDenyBtn.onclick = () => handleResponse(false);
+        }
+        
+        if (autonomousMode) {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.remove('hidden');
+          }
+          if (approvalTimerBar) {
+            approvalTimerBar.style.width = '100%';
+          }
+          if (approvalTimerText) {
+            approvalTimerText.textContent = 'Auto-allowing in 10s...';
+          }
+          
+          const startTime = Date.now();
+          approvalTimerInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, 10000 - elapsed);
+            
+            if (approvalTimerBar) {
+              approvalTimerBar.style.width = `${(remaining / 10000) * 100}%`;
+            }
+            
+            if (approvalTimerText) {
+              const secondsLeft = Math.ceil(remaining / 1000);
+              approvalTimerText.textContent = `Auto-allowing in ${secondsLeft}s...`;
+            }
+            
+            if (remaining <= 0) {
+              clearInterval(approvalTimerInterval);
+              approvalTimerInterval = null;
+              handleResponse(true);
+            }
+          }, 100);
+        } else {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.add('hidden');
+          }
+        }
+        break;
+      }
+
       case 'providerFallback': {
         const { message: fallbackMsg, newProvider } = message;
         selectProvider(newProvider);

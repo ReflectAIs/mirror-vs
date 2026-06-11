@@ -10,15 +10,17 @@ function normalizeLineEndings(str: string): string {
 }
 
 /**
- * Normalizes a line's whitespace to allow fuzzy comparison.
- * Strips syntax noise (braces, parens, quotes, punctuation) and lowercases.
+ * Light normalization: preserves all characters including emoji.
+ * Only normalizes whitespace (tabs→spaces, collapses multiple spaces).
  */
-function normalizeLine(line: string): string {
-  return line
-    .trim()
-    .toLowerCase()
-    .replace(/[{}\[\]();,.:'"`]/g, '')
-    .replace(/\s+/g, ' ');
+function normalizeLineExact(line: string): string {
+  // Preserves all characters including emoji — only normalizes whitespace
+  return line.replace(/\t/g, '  ').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeLineFuzzy(line: string): string {
+  // Strips syntax noise and lowercases — may corrupt emoji, used only as fallback
+  return normalizeLineExact(line).toLowerCase().replace(/[\{\}\[\]\(\);,.:'"`]/g, '').replace(/\s+/g, ' ');
 }
 
 /**
@@ -28,28 +30,117 @@ function normalizeLine(line: string): string {
 function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]): { start: number; end: number } | null {
   if (searchLines.length === 0) return null;
 
-  const normalizedSearch = searchLines.map(normalizeLine);
-  const normalizedFile = fileContentLines.map(normalizeLine);
+  const exactSearch = searchLines.map(normalizeLineExact);
+  const exactFile = fileContentLines.map(normalizeLineExact);
+  const fuzzySearch = searchLines.map(normalizeLineFuzzy);
+  const fuzzyFile = fileContentLines.map(normalizeLineFuzzy);
 
-  for (let i = 0; i <= normalizedFile.length - normalizedSearch.length; i++) {
-    let match = true;
-    for (let j = 0; j < normalizedSearch.length; j++) {
-      const fLine = normalizedFile[i + j];
-      const sLine = normalizedSearch[j];
-      if (sLine === '' && fLine === '') {
+  let bestScore = 0;
+  let bestStart = -1;
+
+  for (let i = 0; i <= exactFile.length - exactSearch.length; i++) {
+    let score = 0;
+    for (let j = 0; j < exactSearch.length; j++) {
+      const fExact = exactFile[i + j];
+      const sExact = exactSearch[j];
+      const fFuzzy = fuzzyFile[i + j];
+      const sFuzzy = fuzzySearch[j];
+      // Skip matching blank lines
+      if (sExact === '' && fExact === '') {
+        score += 1;
         continue;
       }
-      if (sLine === '' || fLine === '' || (!fLine.includes(sLine) && !sLine.includes(fLine))) {
-        match = false;
-        break;
+      // Exact whitespace-only match (preserves emoji)
+      if (fExact === sExact) {
+        score += 1;
+        continue;
       }
+      // Exact contains (handles extra whitespace in file vs search)
+      if (fExact.includes(sExact) || sExact.includes(fExact)) {
+        score += 0.9;
+        continue;
+      }
+      // Fuzzy match as fallback (may fail on emoji)
+      if (fFuzzy === sFuzzy || fFuzzy.includes(sFuzzy) || sFuzzy.includes(fFuzzy)) {
+        score += 0.7;
+        continue;
+      }
+      // Character overlap ratio
+      const overlap = [...sFuzzy].filter(ch => fFuzzy.includes(ch)).length;
+      const ratio = Math.max(overlap / Math.max(sFuzzy.length, 1), overlap / Math.max(fFuzzy.length, 1));
+      if (ratio > 0.7) {
+        score += ratio * 0.5;
+        continue;
+      }
+      score = -Infinity;
+      break;
     }
-    if (match) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestStart = i;
+    }
+    // Perfect match — return immediately
+    if (score === exactSearch.length) {
       return { start: i, end: i + searchLines.length - 1 };
     }
   }
 
+  // Accept if best score exceeds 70% of perfect
+  const perfectScore = exactSearch.length;
+  if (bestStart >= 0 && bestScore >= perfectScore * 0.7) {
+    return { start: bestStart, end: bestStart + searchLines.length - 1 };
+  }
+
+  // Report closest lines to help debug
+  if (bestStart >= 0) {
+    const snippet = fileContentLines.slice(bestStart, bestStart + searchLines.length + 2).join('\n');
+    throw new Error(
+      `SEARCH block not found (best fuzzy score ${bestScore.toFixed(1)}/${perfectScore}).\n` +
+      `Closest match at line ${bestStart + 1}:\n${snippet}\n\n` +
+      `Search target:\n${searchLines.join('\n')}`
+    );
+  }
+
   return null;
+}
+
+/**
+ * Validates structural consistency between search and replace blocks.
+ * Checks brace/bracket/paren balance and indentation consistency
+ * to catch common model mistakes in applying patches.
+ */
+function validatePatchStructure(search: string, replace: string): string[] {
+  const issues: string[] = [];
+
+  // Count structural characters
+  const count = (s: string, ch: string) => (s.match(new RegExp(`\\${ch}`, 'g')) || []).length;
+  const searchOpenBr = count(search, '{');
+  const replaceOpenBr = count(replace, '{');
+  const searchCloseBr = count(search, '}');
+  const replaceCloseBr = count(replace, '}');
+  const searchOpenP = count(search, '(');
+  const replaceOpenP = count(replace, '(');
+  const searchCloseP = count(search, ')');
+  const replaceCloseP = count(replace, ')');
+  const searchOpenB = count(search, '[');
+  const replaceOpenB = count(replace, '[');
+  const searchCloseB = count(search, ']');
+  const replaceCloseB = count(replace, ']');
+
+  // Check brace balance
+  if (searchOpenBr !== searchCloseBr || replaceOpenBr !== replaceCloseBr) {
+    issues.push(`Braces {}: SEARCH has ${searchOpenBr} open / ${searchCloseBr} close, REPLACE has ${replaceOpenBr} open / ${replaceCloseBr} close`);
+  }
+  // Check paren balance
+  if (searchOpenP !== searchCloseP || replaceOpenP !== replaceCloseP) {
+    issues.push(`Parentheses (): SEARCH has ${searchOpenP} open / ${searchCloseP} close, REPLACE has ${replaceOpenP} open / ${replaceCloseP} close`);
+  }
+  // Check bracket balance
+  if (searchOpenB !== searchCloseB || replaceOpenB !== replaceCloseB) {
+    issues.push(`Brackets []: SEARCH has ${searchOpenB} open / ${searchCloseB} close, REPLACE has ${replaceOpenB} open / ${replaceCloseB} close`);
+  }
+
+  return issues;
 }
 
 /**
@@ -287,8 +378,14 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error('No valid SEARCH/REPLACE blocks found in patch_file content.');
       }
 
+      // Validate structural integrity of each replace block before applying
+      const warnings: string[] = [];
       for (let i = 0; i < patches.length; i++) {
         const { search, replace } = patches[i];
+        const replaceIssues = validatePatchStructure(search, replace);
+        if (replaceIssues.length > 0) {
+          warnings.push(`Block #${i + 1}: ${replaceIssues.join('; ')}`);
+        }
 
         // Try exact match first
         if (fileContent.includes(search)) {
@@ -321,7 +418,11 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error('User rejected patch edits.');
       }
 
-      return `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;
+      let result = `File patched: ${tool.path}. Applied ${patches.length} block(s). Revert ID: ${checkpointId}`;
+      if (warnings.length > 0) {
+        result += `\n\n⚠️ SYNTAX WARNINGS:\n${warnings.join('\n')}\n\n_Run \`get_diagnostics\` or \`run_command command="npm run compile"\` to verify the build._`;
+      }
+      return result;
     }
 
     case 'multi_patch_file': {
@@ -349,9 +450,15 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           throw new Error(`File does not exist: ${fp.path}`);
         }
 
+        const fileWarnings: string[] = [];
         let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
         for (let i = 0; i < fp.patches.length; i++) {
           const { search, replace } = fp.patches[i];
+          const replaceIssues = validatePatchStructure(search, replace);
+          if (replaceIssues.length > 0) {
+            fileWarnings.push(`Block #${i + 1}: ${replaceIssues.join('; ')}`);
+          }
+
           if (fileContent.includes(search)) {
             fileContent = fileContent.replace(search, replace);
           } else {
@@ -377,10 +484,15 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         if (!accepted) {
           throw new Error(`User rejected patch edits for ${fp.path}.`);
         }
-        results.push(`Patched ${fp.path} (${fp.patches.length} block(s), Revert ID: ${checkpointId})`);
+        let fileResult = `Patched ${fp.path} (${fp.patches.length} block(s), Revert ID: ${checkpointId})`;
+        if (fileWarnings.length > 0) {
+          fileResult += `\n⚠️ SYNTAX WARNINGS:\n${fileWarnings.join('\n')}`;
+        }
+        results.push(fileResult);
       }
 
-      return results.join('\n');
+      let multiResult = results.join('\n');
+      return multiResult;
     }
 
     case 'update_agent_memory': {

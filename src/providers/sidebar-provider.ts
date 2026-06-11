@@ -17,6 +17,11 @@ import { ArtifactService } from '../services/artifact-service';
 
 export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
+  public static postToActive?: (msg: any) => void;
+  public static pendingCommandApproval: {
+    resolve: (choice: string) => void;
+    command: string;
+  } | null = null;
   private _view?: vscode.WebviewView;
   private readonly _secretService: SecretService;
   private readonly _storageService: StorageService;
@@ -123,6 +128,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       webviewView.webview.onDidReceiveMessage(async (data: WebviewToExtensionMessage) => {
         try {
           switch (data.type) {
+            case 'sensitiveCommandResponse': {
+              const approved = (data as any).approved;
+              if (MirrorVsSidebarProvider.pendingCommandApproval) {
+                MirrorVsSidebarProvider.pendingCommandApproval.resolve(approved ? 'Allow Execution' : 'Deny');
+                MirrorVsSidebarProvider.pendingCommandApproval = null;
+              }
+              break;
+            }
             case 'getSettings': {
               await this._sendSettingsToWebview();
               break;

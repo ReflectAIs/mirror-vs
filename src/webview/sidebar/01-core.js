@@ -101,6 +101,16 @@
   const templatesMenuBtn = document.getElementById('templates-menu-btn');
   let promptTemplates = [];
 
+  // Command Approval Modal elements
+  const commandApprovalModal = document.getElementById('command-approval-modal');
+  const approvalCommandText = document.getElementById('approval-command-text');
+  const approvalTimerContainer = document.getElementById('approval-timer-container');
+  const approvalTimerBar = document.getElementById('approval-timer-bar');
+  const approvalTimerText = document.getElementById('approval-timer-text');
+  const approvalDenyBtn = document.getElementById('approval-deny-btn');
+  const approvalAllowBtn = document.getElementById('approval-allow-btn');
+  let approvalTimerInterval = null;
+
   // Scroll container is <main class="chat-container">
   const chatScrollContainer = document.querySelector('.chat-container');
 

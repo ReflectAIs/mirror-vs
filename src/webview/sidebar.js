@@ -101,6 +101,16 @@
   const templatesMenuBtn = document.getElementById('templates-menu-btn');
   let promptTemplates = [];
 
+  // Command Approval Modal elements
+  const commandApprovalModal = document.getElementById('command-approval-modal');
+  const approvalCommandText = document.getElementById('approval-command-text');
+  const approvalTimerContainer = document.getElementById('approval-timer-container');
+  const approvalTimerBar = document.getElementById('approval-timer-bar');
+  const approvalTimerText = document.getElementById('approval-timer-text');
+  const approvalDenyBtn = document.getElementById('approval-deny-btn');
+  const approvalAllowBtn = document.getElementById('approval-allow-btn');
+  let approvalTimerInterval = null;
+
   // Scroll container is <main class="chat-container">
   const chatScrollContainer = document.querySelector('.chat-container');
 
@@ -2676,6 +2686,78 @@ function attachImage(base64) {
         stopBtn.classList.add('hidden');
         clearAllActiveAnimations();
         scrollChatToBottom();
+        break;
+      }
+
+      case 'requestSensitiveCommandApproval': {
+        const { command, autonomousMode } = message;
+        if (approvalCommandText) {
+          approvalCommandText.textContent = command;
+        }
+        
+        if (commandApprovalModal) {
+          commandApprovalModal.classList.remove('hidden');
+        }
+        
+        if (approvalTimerInterval) {
+          clearInterval(approvalTimerInterval);
+          approvalTimerInterval = null;
+        }
+        
+        const handleResponse = (approved) => {
+          if (approvalTimerInterval) {
+            clearInterval(approvalTimerInterval);
+            approvalTimerInterval = null;
+          }
+          if (commandApprovalModal) {
+            commandApprovalModal.classList.add('hidden');
+          }
+          vscode.postMessage({ type: 'sensitiveCommandResponse', approved });
+        };
+        
+        if (approvalAllowBtn) {
+          approvalAllowBtn.onclick = () => handleResponse(true);
+        }
+        if (approvalDenyBtn) {
+          approvalDenyBtn.onclick = () => handleResponse(false);
+        }
+        
+        if (autonomousMode) {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.remove('hidden');
+          }
+          if (approvalTimerBar) {
+            approvalTimerBar.style.width = '100%';
+          }
+          if (approvalTimerText) {
+            approvalTimerText.textContent = 'Auto-allowing in 10s...';
+          }
+          
+          const startTime = Date.now();
+          approvalTimerInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, 10000 - elapsed);
+            
+            if (approvalTimerBar) {
+              approvalTimerBar.style.width = `${(remaining / 10000) * 100}%`;
+            }
+            
+            if (approvalTimerText) {
+              const secondsLeft = Math.ceil(remaining / 1000);
+              approvalTimerText.textContent = `Auto-allowing in ${secondsLeft}s...`;
+            }
+            
+            if (remaining <= 0) {
+              clearInterval(approvalTimerInterval);
+              approvalTimerInterval = null;
+              handleResponse(true);
+            }
+          }, 100);
+        } else {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.add('hidden');
+          }
+        }
         break;
       }
 

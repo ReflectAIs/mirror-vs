@@ -137,7 +137,7 @@ export function buildSystemPrompt(
   }
 
   if (activeSkills.length > 0) {
-    skillsSection = `\n\n### ACTIVE TASK-SPECIFIC SKILLS:\n` + activeSkills.join('\n\n');
+    skillsSection = `\n\n### TASK-SPECIFIC SKILLS:\n` + activeSkills.join('\n\n');
   }
 
   return `${customPrefixSection}${baseRole}${planStatusContext}${modeSection}${skillsSection}\n\n${toolSpecs}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;

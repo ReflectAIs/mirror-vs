@@ -635,6 +635,35 @@
       </div>
     </div>
   </div>
+
+  <!-- Command Approval Modal -->
+  <div id="command-approval-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-glow"></div>
+      <div class="modal-header">
+        <div class="modal-icon">⚠️</div>
+        <h3>Sensitive Command Request</h3>
+      </div>
+      <div class="modal-body">
+        <p>Mirror VS is requesting to run a sensitive/destructive command:</p>
+        <div class="command-box">
+          <code id="approval-command-text"></code>
+        </div>
+        <p class="modal-warning-text">Do you want to authorize this command?</p>
+        <div id="approval-timer-container" class="timer-container hidden">
+          <div class="timer-bar-bg">
+            <div id="approval-timer-bar" class="timer-bar"></div>
+          </div>
+          <span id="approval-timer-text">Auto-allowing in 10s...</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="approval-deny-btn" class="btn btn-secondary">Deny</button>
+        <button id="approval-allow-btn" class="btn btn-primary">Allow Execution</button>
+      </div>
+    </div>
+  </div>
+
   <script src="{{scriptUri}}"></script>
 </body>
 
