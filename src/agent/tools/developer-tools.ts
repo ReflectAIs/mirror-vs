@@ -19,7 +19,7 @@ export async function executeDeveloperTool(tool: ToolCall): Promise<string> {
     return new Promise((resolve) => {
       // Find suitable python command (python3 or python)
       const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-      
+
       const child = exec(pythonCmd, { cwd }, (error, stdout, stderr) => {
         if (error) {
           resolve(`Error executing Python code: ${error.message}\nStderr: ${stderr}\nStdout: ${stdout}`);

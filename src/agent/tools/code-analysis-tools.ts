@@ -651,7 +651,22 @@ function graphify(root: string): string {
   const all = collectSrc(root);
 
   // -- helpers --
-  const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.py', '.go', '.rs', '.java']);
+  const SOURCE_EXTS = new Set([
+    '.ts',
+    '.tsx',
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.mts',
+    '.cts',
+    '.vue',
+    '.svelte',
+    '.py',
+    '.go',
+    '.rs',
+    '.java',
+  ]);
 
   /** Get one-line description from top-of-file comment */
   const getDesc = (fp: string): string => {
@@ -661,7 +676,9 @@ function graphify(root: string): string {
       if (block) return block[1].trim().substring(0, 100);
       const line = head.match(/\/\/+\s*(.{10,})/);
       if (line) return line[1].trim().substring(0, 100);
-    } catch { /* */ }
+    } catch {
+      /* */
+    }
     return '';
   };
 
@@ -670,14 +687,17 @@ function graphify(root: string): string {
     const symbols: string[] = [];
     try {
       const c = fs.readFileSync(fp, 'utf8');
-      const re = /export\s+(?:default\s+)?(?:async\s+)?(?:function\s+(\w+)|class\s+(\w+)|const\s+(\w+)|let\s+(\w+)|type\s+(\w+)|interface\s+(\w+)|enum\s+(\w+))/g;
+      const re =
+        /export\s+(?:default\s+)?(?:async\s+)?(?:function\s+(\w+)|class\s+(\w+)|const\s+(\w+)|let\s+(\w+)|type\s+(\w+)|interface\s+(\w+)|enum\s+(\w+))/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(c)) !== null) {
         const name = m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7];
         if (name) symbols.push(name);
         if (symbols.length >= 8) break;
       }
-    } catch { /* */ }
+    } catch {
+      /* */
+    }
     return symbols;
   };
 
@@ -704,9 +724,26 @@ function graphify(root: string): string {
   const printCompactTree = (dir: string, prefix: string, depth: number): void => {
     if (depth > 3) return;
     let entries: string[] = [];
-    try { entries = fs.readdirSync(dir).sort(); } catch { return; }
-    const dirs = entries.filter(e => { try { return !shouldSkip(e) && fs.statSync(path.join(dir, e)).isDirectory(); } catch { return false; } });
-    const files = entries.filter(e => { try { const fp = path.join(dir, e); return !shouldSkip(e) && fs.statSync(fp).isFile() && SOURCE_EXTS.has(path.extname(e).toLowerCase()); } catch { return false; } });
+    try {
+      entries = fs.readdirSync(dir).sort();
+    } catch {
+      return;
+    }
+    const dirs = entries.filter((e) => {
+      try {
+        return !shouldSkip(e) && fs.statSync(path.join(dir, e)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+    const files = entries.filter((e) => {
+      try {
+        const fp = path.join(dir, e);
+        return !shouldSkip(e) && fs.statSync(fp).isFile() && SOURCE_EXTS.has(path.extname(e).toLowerCase());
+      } catch {
+        return false;
+      }
+    });
     const items = [...dirs, ...files];
     items.forEach((item, idx) => {
       const isLast = idx === items.length - 1;
@@ -743,7 +780,10 @@ function graphify(root: string): string {
   for (const [dir, files] of Array.from(byDir.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
     lines.push(`**${dir === '.' ? '(root)' : dir}/**`);
     for (const fp of files) {
-      if (totalModules > 120) { lines.push('  ... (more files, use graphify scoped or analyze_project)'); break; }
+      if (totalModules > 120) {
+        lines.push('  ... (more files, use graphify scoped or analyze_project)');
+        break;
+      }
       const rel = path.relative(root, fp).replace(/\\/g, '/');
       const name = path.basename(fp);
       const desc = getDesc(fp);
@@ -753,7 +793,7 @@ function graphify(root: string): string {
       let line = `  \`${name}\``;
       if (desc) line += ` — ${desc}`;
       if (exports.length) line += `\n    ↗ exports: ${exports.join(', ')}`;
-      if (imports.length) line += `\n    ← imports: ${imports.map(i => path.basename(i)).join(', ')}`;
+      if (imports.length) line += `\n    ← imports: ${imports.map((i) => path.basename(i)).join(', ')}`;
       lines.push(line);
       totalModules++;
     }
@@ -765,7 +805,9 @@ function graphify(root: string): string {
   for (const f of all) {
     for (const imp of getLocalImports(f)) impCount.set(imp, (impCount.get(imp) || 0) + 1);
   }
-  const topImported = Array.from(impCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topImported = Array.from(impCount.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
   if (topImported.length > 0) {
     lines.push('🔑 **Most Imported Modules** (core dependencies to understand first):');
     for (const [rel, count] of topImported) {
@@ -775,7 +817,6 @@ function graphify(root: string): string {
 
   return lines.join('\n');
 }
-
 
 // ── Main Export ──
 export async function executeCodeAnalysisTool(tool: ToolCall): Promise<string> {
@@ -846,4 +887,3 @@ export function getDependentsOfFile(targetPath: string): { file: string; line: n
     return [];
   }
 }
-

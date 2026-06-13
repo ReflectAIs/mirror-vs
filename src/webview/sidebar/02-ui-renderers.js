@@ -1,12 +1,4 @@
-    });
-  }
-  if (gitCommitMsgBtn) {
-    gitCommitMsgBtn.addEventListener('click', () => {
-      vscode.postMessage({ type: 'generateCommitMessage' });
-      const gitDrawer = document.getElementById('git-drawer');
-      if (gitDrawer) gitDrawer.classList.add('collapsed');
-    });
-  }
+
 
   const sessionSearchInput = document.getElementById('session-search-input');
   if (sessionSearchInput) {

@@ -306,18 +306,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 );
               }
               if ((data as any).teacherEnabled !== undefined) {
-                await config.update(
-                  'teacherEnabled',
-                  (data as any).teacherEnabled,
-                  vscode.ConfigurationTarget.Global,
-                );
+                await config.update('teacherEnabled', (data as any).teacherEnabled, vscode.ConfigurationTarget.Global);
               }
               if ((data as any).teacherModel !== undefined) {
-                await config.update(
-                  'teacherModel',
-                  (data as any).teacherModel,
-                  vscode.ConfigurationTarget.Global,
-                );
+                await config.update('teacherModel', (data as any).teacherModel, vscode.ConfigurationTarget.Global);
               }
 
               vscode.window.showInformationMessage('Mirror VS Settings saved successfully!');

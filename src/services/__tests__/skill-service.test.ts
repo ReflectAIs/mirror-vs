@@ -10,11 +10,11 @@ vi.mock('vscode', () => {
       workspaceFolders: [
         {
           uri: {
-            fsPath: '/mock-workspace'
-          }
-        }
-      ]
-    }
+            fsPath: '/mock-workspace',
+          },
+        },
+      ],
+    },
   };
 });
 
@@ -28,12 +28,12 @@ vi.mock('fs', () => {
     }),
     readdirSync: vi.fn(() => {
       return Array.from(memStore.keys())
-        .filter(k => k.endsWith('.json'))
-        .map(k => path.basename(k));
+        .filter((k) => k.endsWith('.json'))
+        .map((k) => path.basename(k));
     }),
     readFileSync: vi.fn((p: string) => {
       return memStore.get(p) || '';
-    })
+    }),
   };
 });
 
@@ -48,7 +48,7 @@ describe('Skill Service', () => {
     category: 'testing',
     status: 'draft',
     confidence: 0.9,
-    source: 'user'
+    source: 'user',
   };
 
   it('should successfully add and retrieve a skill', () => {
@@ -70,7 +70,7 @@ describe('Skill Service', () => {
     addSkill(testSkill);
     const messages = [
       { role: 'system', content: 'Preset prompt' },
-      { role: 'user', content: 'Let us test skills now.' }
+      { role: 'user', content: 'Let us test skills now.' },
     ];
     const injected = injectRelevantSkills(messages, 'Let us test skills now.');
     expect(injected).toHaveLength(3);

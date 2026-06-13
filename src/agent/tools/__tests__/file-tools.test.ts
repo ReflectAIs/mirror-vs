@@ -225,19 +225,17 @@ two updated
         const localGetSafe = (p: string) => path.join(tmpDir, p);
         const tool = {
           name: 'update_plan' as const,
-          content: '- [x] Step 1\n- [ ] Step 2'
+          content: '- [x] Step 1\n- [ ] Step 2',
         };
 
         // Mock vscode.workspace.workspaceFolders
         const workspaceFoldersBackup = vscode.workspace.workspaceFolders;
-        (vscode.workspace as any).workspaceFolders = [
-          { uri: vscode.Uri.file(tmpDir), name: 'test', index: 0 }
-        ];
+        (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(tmpDir), name: 'test', index: 0 }];
 
         try {
           const result = await executeFileTool(tool, localGetSafe);
           expect(result).toContain('Successfully updated active plan checklist');
-          
+
           const taskPath = path.join(tmpDir, '.mirror-vs', 'task.md');
           expect(fs.existsSync(taskPath)).toBe(true);
           expect(fs.readFileSync(taskPath, 'utf8')).toBe('- [x] Step 1\n- [ ] Step 2');

@@ -2,6 +2,7 @@
 // Handles dashboard drawer visibility, widgets data updates, skill list rendering, and event stream.
 
 (function () {
+  const vscode = window.vscode;
   // DOM Elements
   const toggleBtn = document.getElementById('toggle-dashboard-btn');
   const drawer = document.getElementById('dashboard-drawer');

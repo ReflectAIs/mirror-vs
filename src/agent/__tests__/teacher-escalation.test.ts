@@ -12,7 +12,7 @@ describe('Teacher Escalation Service', () => {
         '  "description": "Export figma layouts"',
         '}',
         '```',
-        'Let me know if you need help.'
+        'Let me know if you need help.',
       ].join('\n');
 
       const extracted = extractSkillJson(response);

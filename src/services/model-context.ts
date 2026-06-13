@@ -29,10 +29,10 @@ export const KNOWN_CONTEXT_WINDOWS: Record<string, number> = {
   'gpt-4-turbo': 128000,
   'gpt-4': 8192,
   'gpt-3.5-turbo': 16385,
-  'o1': 200000,
+  o1: 200000,
   'o1-mini': 128000,
   'o1-pro': 200000,
-  'o3': 200000,
+  o3: 200000,
   'o3-mini': 200000,
   'o4-mini': 200000,
 
@@ -60,9 +60,9 @@ export const KNOWN_CONTEXT_WINDOWS: Record<string, number> = {
   'mistral-small': 32000,
   'mistral-nemo': 128000,
   'mistral-7b': 32000,
-  'mixtral': 32000,
-  'codestral': 32000,
-  'pixtral': 128000,
+  mixtral: 32000,
+  codestral: 32000,
+  pixtral: 128000,
 
   // --- xAI ---
   'grok-4': 131072,
@@ -77,10 +77,10 @@ export const KNOWN_CONTEXT_WINDOWS: Record<string, number> = {
   'llama-3': 131072,
 
   // --- Qwen ---
-  'qwen3': 131072,
+  qwen3: 131072,
   'qwen2.5': 131072,
-  'qwen2': 32768,
-  'qwq': 32768,
+  qwen2: 32768,
+  qwq: 32768,
 
   // --- Cohere ---
   'command-r-plus': 128000,
@@ -89,21 +89,21 @@ export const KNOWN_CONTEXT_WINDOWS: Record<string, number> = {
 
   // --- Perplexity ---
   'sonar-pro': 200000,
-  'sonar': 128000,
+  sonar: 128000,
 
   // --- MiniMax ---
-  'minimax': 1000000,
+  minimax: 1000000,
 
   // --- Moonshot / Kimi ---
-  'moonshot': 128000,
-  'kimi': 128000,
+  moonshot: 128000,
+  kimi: 128000,
 
   // --- Microsoft ---
   'phi-4': 16000,
   'phi-3': 128000,
 
   // --- Nvidia ---
-  'nemotron': 131072,
+  nemotron: 131072,
 
   // --- Yi ---
   'yi-large': 32768,
@@ -113,15 +113,15 @@ export const KNOWN_CONTEXT_WINDOWS: Record<string, number> = {
   'yi-lightning': 16384,
 
   // --- Nous ---
-  'hermes': 131072,
+  hermes: 131072,
   'nous-hermes': 131072,
 
   // --- Open community ---
-  'dolphin': 32768,
-  'mythomax': 4096,
-  'wizard': 32768,
-  'openchat': 8192,
-  'solar': 32768,
+  dolphin: 32768,
+  mythomax: 4096,
+  wizard: 32768,
+  openchat: 8192,
+  solar: 32768,
 };
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', 'host.docker.internal']);
@@ -320,13 +320,7 @@ async function queryContextLength(endpointUrl: string, model: string, apiKey?: s
       const modelBase = modelParts[modelParts.length - 1];
 
       if (mid === model || mBase === modelBase) {
-        const fields = [
-          'context_length',
-          'context_window',
-          'max_model_len',
-          'max_context_length',
-          'max_seq_len',
-        ];
+        const fields = ['context_length', 'context_window', 'max_model_len', 'max_context_length', 'max_seq_len'];
         for (const field of fields) {
           const val = m[field];
           if (typeof val === 'number' && val > 0) {

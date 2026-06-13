@@ -1,5 +1,7 @@
 (function () {
   const vscode = acquireVsCodeApi();
+  window.vscode = vscode;
+
 
   // DOM Elements
   const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
@@ -386,9 +388,9 @@
       vscode.postMessage({ type: 'generatePRDescription' });
       const gitDrawer = document.getElementById('git-drawer');
       if (gitDrawer) gitDrawer.classList.add('collapsed');
-
     });
   }
+
   if (gitCommitMsgBtn) {
     gitCommitMsgBtn.addEventListener('click', () => {
       vscode.postMessage({ type: 'generateCommitMessage' });
@@ -396,6 +398,8 @@
       if (gitDrawer) gitDrawer.classList.add('collapsed');
     });
   }
+
+
 
   const sessionSearchInput = document.getElementById('session-search-input');
   if (sessionSearchInput) {
@@ -2289,6 +2293,8 @@ function attachImage(base64) {
       }
     });
   }
+
+
 
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
@@ -5012,6 +5018,8 @@ function highlightLine(line, lang) {
 // ===== Artifacts Module =====
 // Handles artifact rendering, drawer toggling, and interaction with the artifact service.
 
+const vscode = window.vscode;
+
 const artifactsState = {
   list: [],
   selectedId: null,
@@ -5200,6 +5208,7 @@ if (document.readyState === 'loading') {
 // Handles dashboard drawer visibility, widgets data updates, skill list rendering, and event stream.
 
 (function () {
+  const vscode = window.vscode;
   // DOM Elements
   const toggleBtn = document.getElementById('toggle-dashboard-btn');
   const drawer = document.getElementById('dashboard-drawer');

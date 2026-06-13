@@ -41,11 +41,11 @@ describe('Model Context Service', () => {
             {
               function: {
                 name: 'run_command',
-                arguments: '{"command": "npm test"}'
-              }
-            }
-          ]
-        }
+                arguments: '{"command": "npm test"}',
+              },
+            },
+          ],
+        },
       ];
       // content: 18 chars * 0.3 = 5
       // tool_call name: 11 chars, args: 24 chars -> total 35 chars * 0.3 = 10

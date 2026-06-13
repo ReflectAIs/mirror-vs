@@ -63,7 +63,7 @@ describe('EventBus Service', () => {
 
   it('should support async handlers and log failed promises', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+
     // We want to verify that the async handler is invoked
     let resolved = false;
     let rejected = false;

@@ -363,7 +363,6 @@
     "vscode:prepublish": "node esbuild.js --minify",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "postinstall": "npm run compile",
     "lint": "eslint \"src/**/*.ts\" --max-warnings 200",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",

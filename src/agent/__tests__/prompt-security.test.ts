@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { untrustedContextMessage, sanitizeLabel, escapeGuardMarkers, GUARD_OPEN, GUARD_CLOSE } from '../prompt-security';
+import {
+  untrustedContextMessage,
+  sanitizeLabel,
+  escapeGuardMarkers,
+  GUARD_OPEN,
+  GUARD_CLOSE,
+} from '../prompt-security';
 
 describe('Prompt Security Service', () => {
   describe('sanitizeLabel', () => {
@@ -11,7 +17,8 @@ describe('Prompt Security Service', () => {
 
   describe('escapeGuardMarkers', () => {
     it('should escape guard markers in content to prevent breakout', () => {
-      const untrustedContent = 'Some content with <<<UNTRUSTED_SOURCE_DATA>>> and <<<END_UNTRUSTED_SOURCE_DATA>>> inside.';
+      const untrustedContent =
+        'Some content with <<<UNTRUSTED_SOURCE_DATA>>> and <<<END_UNTRUSTED_SOURCE_DATA>>> inside.';
       const escaped = escapeGuardMarkers(untrustedContent);
       expect(escaped).not.toContain(GUARD_OPEN);
       expect(escaped).not.toContain(GUARD_CLOSE);

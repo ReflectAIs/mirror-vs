@@ -20,7 +20,7 @@ export function computeInputTokenBudget(
     defaultBudget?: number;
     headroom?: number;
     hardMax?: number;
-  }
+  },
 ): number {
   const defaultBudget = options?.defaultBudget ?? DEFAULT_BUDGET;
   const headroom = options?.headroom ?? DEFAULT_HEADROOM;

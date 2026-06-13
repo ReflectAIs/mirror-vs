@@ -277,7 +277,6 @@ export class AgentOrchestrator {
         }
       }
 
-
       let loopCount = 0;
       const maxLoops = 50;
       let continueLoop = true;
@@ -364,19 +363,42 @@ export class AgentOrchestrator {
       const validateControlLoopGuard = (tool: any): { allowed: boolean; warning?: string; reason?: string } => {
         // Mode-specific tool gating (P2.1)
         const allRegisteredTools = new Set([
-          'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
-          'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
-          'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
-          'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
-          'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
-          'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
-          'list_terminals', 'figma_inspect', 'update_agent_memory'
+          'read_file',
+          'create_file',
+          'write_file',
+          'patch_file',
+          'multi_patch_file',
+          'list_dir',
+          'grep_search',
+          'semantic_search',
+          'web_search',
+          'get_diagnostics',
+          'browser_navigate',
+          'browser_click',
+          'browser_type',
+          'browser_evaluate_script',
+          'analyze_project',
+          'analyze_dependencies',
+          'analyze_complexity',
+          'analyze_coverage',
+          'analyze_dead_code',
+          'analyze_impact',
+          'graphify',
+          'wait',
+          'browser_screenshot',
+          'run_command',
+          'send_terminal_input',
+          'close_terminal',
+          'read_terminal',
+          'list_terminals',
+          'figma_inspect',
+          'update_agent_memory',
         ]);
         const disabledTools = getDisabledToolsForMode(taskMode, allRegisteredTools);
         if (disabledTools.has(tool.name)) {
           return {
             allowed: false,
-            reason: `Tool execution is blocked: the tool "${tool.name}" is not permitted in ${taskMode} mode.`
+            reason: `Tool execution is blocked: the tool "${tool.name}" is not permitted in ${taskMode} mode.`,
           };
         }
 
@@ -588,38 +610,30 @@ export class AgentOrchestrator {
           // Discover the actual context window using our new service
           const contextWindow = await getContextLength(currentHost, currentModel, apiKey);
           const configuredBudget = config.get('agentInputTokenBudget', 6000) as number;
-          const explicitBudget = config.inspect('agentInputTokenBudget')?.globalValue !== undefined ||
-                                 config.inspect('agentInputTokenBudget')?.workspaceValue !== undefined;
-          
+          const explicitBudget =
+            config.inspect('agentInputTokenBudget')?.globalValue !== undefined ||
+            config.inspect('agentInputTokenBudget')?.workspaceValue !== undefined;
+
           const hardMax = config.get('agentInputTokenHardMax', 200000) as number;
-          const effectiveBudget = computeInputTokenBudget(
-            configuredBudget,
-            contextWindow,
-            explicitBudget,
-            { hardMax }
-          );
+          const effectiveBudget = computeInputTokenBudget(configuredBudget, contextWindow, explicitBudget, { hardMax });
 
           // Auto-compaction check using our new context compactor service
-          const compactionResult = await maybeCompact(
-            currentMessages,
-            contextWindow,
-            async (summaryPrompt) => {
-              this._postMessage({ type: 'chatResponseStart' });
-              this._postMessage({
-                type: 'chatResponseChunk',
-                text: `Compressing context (~${Math.round(estimateTokens(currentMessages) / 1000)}K tokens, model window: ${Math.round(contextWindow / 1000)}K)...`,
-              });
-              const summary = await this._completer.summarizeHistory(
-                provider as LLMProvider,
-                currentHost,
-                currentModel,
-                apiKey,
-                summaryPrompt
-              );
-              this._postMessage({ type: 'chatResponseComplete', fullText: 'Context optimized.' });
-              return summary;
-            }
-          );
+          const compactionResult = await maybeCompact(currentMessages, contextWindow, async (summaryPrompt) => {
+            this._postMessage({ type: 'chatResponseStart' });
+            this._postMessage({
+              type: 'chatResponseChunk',
+              text: `Compressing context (~${Math.round(estimateTokens(currentMessages) / 1000)}K tokens, model window: ${Math.round(contextWindow / 1000)}K)...`,
+            });
+            const summary = await this._completer.summarizeHistory(
+              provider as LLMProvider,
+              currentHost,
+              currentModel,
+              apiKey,
+              summaryPrompt,
+            );
+            this._postMessage({ type: 'chatResponseComplete', fullText: 'Context optimized.' });
+            return summary;
+          });
 
           if (compactionResult.wasCompacted) {
             currentMessages = compactionResult.compactedMessages;
@@ -673,7 +687,7 @@ export class AgentOrchestrator {
           const payloadTokens = estimateTokens(finalPayload);
           const utilization = Math.round((payloadTokens / contextWindow) * 100);
           console.log(
-            `[Context] Payload: ${finalPayload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, budget: ${Math.round(effectiveBudget / 1000)}K, utilization: ${utilization}%)`
+            `[Context] Payload: ${finalPayload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, budget: ${Math.round(effectiveBudget / 1000)}K, utilization: ${utilization}%)`,
           );
 
           this._postMessage({ type: 'chatResponseStart' });
@@ -998,7 +1012,6 @@ export class AgentOrchestrator {
                     '. Please correct your approach and try again.'
                   );
                 }
-
               });
 
               const resolvedResults = await Promise.all(promises);
@@ -1020,7 +1033,6 @@ export class AgentOrchestrator {
                   toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${guard.reason}`);
                   continue;
                 }
-
 
                 this._sendToolStatusToWebview(tool.name, 'running', target);
                 try {
@@ -1069,7 +1081,10 @@ export class AgentOrchestrator {
                           const dependents = getDependentsOfFile(tool.path);
                           if (dependents.length > 0) {
                             const depList = dependents
-                              .map((d) => `- \`${path.relative(workspaceFolder, d.file).replace(/\\/g, '/')}\` (imports this file on line ${d.line})`)
+                              .map(
+                                (d) =>
+                                  `- \`${path.relative(workspaceFolder, d.file).replace(/\\/g, '/')}\` (imports this file on line ${d.line})`,
+                              )
                               .join('\n');
                             result += `\n\n[System Notice: Note that the following file(s) import/depend on the file you modified. Decide if you need to check them or if they are affected:\n${depList}]`;
                           }
@@ -1186,7 +1201,8 @@ export class AgentOrchestrator {
                   }
 
                   // Track consecutive patch/write failures for corrective injection
-                  const isPatchTool = tool.name === 'patch_file' || tool.name === 'multi_patch_file' || tool.name === 'write_file';
+                  const isPatchTool =
+                    tool.name === 'patch_file' || tool.name === 'multi_patch_file' || tool.name === 'write_file';
                   if (isPatchTool) {
                     const failedPath = tool.path || 'unknown';
                     if (failedPath === lastPatchFailedPath) {
@@ -1296,7 +1312,9 @@ export class AgentOrchestrator {
             }
 
             const firstTool = toolCalls[0];
-            const currentFailedToolKey = firstTool ? `${firstTool.name}:${firstTool.path || firstTool.command || ''}` : '';
+            const currentFailedToolKey = firstTool
+              ? `${firstTool.name}:${firstTool.path || firstTool.command || ''}`
+              : '';
 
             if (turnEval.status === 'failure') {
               if (currentFailedToolKey && currentFailedToolKey === lastFailedToolKey) {
@@ -1334,13 +1352,7 @@ export class AgentOrchestrator {
             await this._saveChatHistory(currentMessages);
 
             // Fire teacher escalation check (P1.4)
-            maybeEscalate(
-              text || '',
-              toolResults,
-              assistantResponse,
-              this._getSecret,
-              this._postMessage
-            );
+            maybeEscalate(text || '', toolResults, assistantResponse, this._getSecret, this._postMessage);
 
             continueLoop = true;
             consecutiveMalformedCount = 0;
@@ -1402,13 +1414,7 @@ export class AgentOrchestrator {
               await this._saveChatHistory(currentMessages);
 
               // Fire teacher escalation on verbal give-up (P1.4)
-              maybeEscalate(
-                text || '',
-                [],
-                assistantResponse,
-                this._getSecret,
-                this._postMessage
-              );
+              maybeEscalate(text || '', [], assistantResponse, this._getSecret, this._postMessage);
 
               continueLoop = true;
             } else if (hasToolAttempt && consecutiveMalformedCount < maxMalformedRetries) {
@@ -1613,7 +1619,24 @@ export class AgentOrchestrator {
         '.vscode',
       ].includes(name);
 
-    const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.py', '.go', '.rs', '.java', '.rb', '.php']);
+    const SOURCE_EXTS = new Set([
+      '.ts',
+      '.tsx',
+      '.js',
+      '.jsx',
+      '.mjs',
+      '.cjs',
+      '.mts',
+      '.cts',
+      '.vue',
+      '.svelte',
+      '.py',
+      '.go',
+      '.rs',
+      '.java',
+      '.rb',
+      '.php',
+    ]);
     const isSource = (name: string) => SOURCE_EXTS.has(path.extname(name).toLowerCase());
 
     // Extract a one-line description from the first JSDoc/comment at the top of a file
@@ -1635,8 +1658,14 @@ export class AgentOrchestrator {
       return '';
     };
 
-    interface FileEntry { rel: string; hint: string; }
-    interface DirEntry { name: string; children: (FileEntry | DirGroup)[]; }
+    interface FileEntry {
+      rel: string;
+      hint: string;
+    }
+    interface DirEntry {
+      name: string;
+      children: (FileEntry | DirGroup)[];
+    }
     type DirGroup = { isDir: true; name: string; rel: string; children: (FileEntry | DirGroup)[]; fileCount: number };
 
     const walkDir = (dir: string, depth: number): (FileEntry | DirGroup)[] => {
@@ -1657,7 +1686,9 @@ export class AgentOrchestrator {
           const s = fs.statSync(fp);
           if (s.isDirectory()) dirs.push(e);
           else if (s.isFile()) files.push(e);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
 
       // Count all files recursively for directory label
@@ -1671,9 +1702,13 @@ export class AgentOrchestrator {
               const s = fs.statSync(fp);
               if (s.isDirectory()) c += countAll(fp);
               else c++;
-            } catch { /* skip */ }
+            } catch {
+              /* skip */
+            }
           }
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
         return c;
       };
 
@@ -1692,7 +1727,12 @@ export class AgentOrchestrator {
       return result;
     };
 
-    const renderEntries = (entries: (FileEntry | DirGroup)[], prefix: string, lines: string[], maxLines: number): void => {
+    const renderEntries = (
+      entries: (FileEntry | DirGroup)[],
+      prefix: string,
+      lines: string[],
+      maxLines: number,
+    ): void => {
       for (let i = 0; i < entries.length; i++) {
         if (lines.length >= maxLines) break;
         const entry = entries[i];

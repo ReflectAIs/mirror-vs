@@ -154,13 +154,36 @@ export function buildSystemPrompt(
     guideOnlyPrompt = `\n\n${GUIDE_ONLY_DIRECTIVE}`;
   } else {
     const activeToolsSet = new Set([
-      'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
-      'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
-      'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
-      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
-      'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
-      'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
-      'list_terminals', 'figma_inspect', 'update_agent_memory'
+      'read_file',
+      'create_file',
+      'write_file',
+      'patch_file',
+      'multi_patch_file',
+      'list_dir',
+      'grep_search',
+      'semantic_search',
+      'web_search',
+      'get_diagnostics',
+      'browser_navigate',
+      'browser_click',
+      'browser_type',
+      'browser_evaluate_script',
+      'analyze_project',
+      'analyze_dependencies',
+      'analyze_complexity',
+      'analyze_coverage',
+      'analyze_dead_code',
+      'analyze_impact',
+      'graphify',
+      'wait',
+      'browser_screenshot',
+      'run_command',
+      'send_terminal_input',
+      'close_terminal',
+      'read_terminal',
+      'list_terminals',
+      'figma_inspect',
+      'update_agent_memory',
     ]);
     const prunedToolsSet = getToolsForQuery(userRequest, activeToolsSet);
     const domainRules = domainRulesForTools(prunedToolsSet);
@@ -256,7 +279,7 @@ export function getDiagnosticsForFile(filePath: string): string {
 export function pruneToolSpecsText(specs: string, activeTools: Set<string>): string {
   if (specs.includes('### 🛠️ QUICK TOOL CHEATSHEET')) {
     const lines = specs.split('\n');
-    const filtered = lines.filter(line => {
+    const filtered = lines.filter((line) => {
       const trimmed = line.trim();
       if (trimmed.startsWith('- ')) {
         const match = trimmed.match(/^-\s*([a-z0-9_]+)/i);
@@ -292,7 +315,15 @@ export function pruneToolSpecsText(specs: string, activeTools: Set<string>): str
       const toolStartMatch = trimmed.match(/^\d+\.\s+([A-Z_]+)(?:\s+\(.*?\))?:/i);
       if (toolStartMatch) {
         const toolName = toolStartMatch[1].toLowerCase().replace(/\s+/g, '_');
-        if (toolName === 'read_file' || toolName === 'create_file' || toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'list_directory' || toolName === 'grep_search') {
+        if (
+          toolName === 'read_file' ||
+          toolName === 'create_file' ||
+          toolName === 'write_file' ||
+          toolName === 'patch_file' ||
+          toolName === 'multi_patch_file' ||
+          toolName === 'list_directory' ||
+          toolName === 'grep_search'
+        ) {
           // Keep core file/search tools
           skipCurrentTool = false;
         } else {
@@ -300,14 +331,14 @@ export function pruneToolSpecsText(specs: string, activeTools: Set<string>): str
           let actualName = toolName;
           if (toolName === 'list_directory') actualName = 'list_dir';
           if (toolName === 'codebase_analysis') actualName = 'analyze_project';
-          
+
           if (actualName === 'browser_navigate') {
             skipCurrentTool = !activeTools.has('browser_navigate') && !activeTools.has('browser_screenshot');
           } else if (actualName === 'debugger_controls') {
             skipCurrentTool = !activeTools.has('debug_inspect_variables');
           } else {
             // Check if any tool in DOMAIN_TOOL_MAP starts with or matches
-            skipCurrentTool = !activeTools.has(actualName) && ![...activeTools].some(t => t.startsWith(actualName));
+            skipCurrentTool = !activeTools.has(actualName) && ![...activeTools].some((t) => t.startsWith(actualName));
           }
         }
       }

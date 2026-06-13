@@ -180,7 +180,7 @@ export function activate(context: vscode.ExtensionContext) {
         fileName: doc.fileName,
         languageId: doc.languageId,
       });
-    })
+    }),
   );
 
   // Activate AI review if configured

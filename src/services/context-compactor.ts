@@ -90,9 +90,7 @@ export function sanitizeToolMessages(msgs: ChatMessage[]): ChatMessage[] {
     if (isAssistantWithTools) {
       const nxt = i + 1 < cleaned.length ? cleaned[i + 1] : null;
       const hasFollowingToolResult =
-        nxt &&
-        (nxt.role === 'tool' ||
-          (nxt.role === 'system' && nxt.content.startsWith('[Tool Result for ')));
+        nxt && (nxt.role === 'tool' || (nxt.role === 'system' && nxt.content.startsWith('[Tool Result for ')));
       if (!hasFollowingToolResult) {
         // Strip tool_calls to preserve text content while omitting unanswered tool_calls
         const { tool_calls, ...rest } = m as any;
@@ -127,12 +125,7 @@ function truncateTextToTokenBudget(text: string, tokenBudget: number): string {
   const headLen = Math.max(100, Math.floor(keepChars * 0.7));
   const tailLen = Math.max(80, keepChars - headLen);
 
-  return (
-    text.substring(0, headLen).trimEnd() +
-    notice +
-    '\n\n' +
-    text.substring(text.length - tailLen).trimStart()
-  );
+  return text.substring(0, headLen).trimEnd() + notice + '\n\n' + text.substring(text.length - tailLen).trimStart();
 }
 
 function truncateToolCallArgs(msg: any, tokenBudget: number): any {
@@ -141,10 +134,7 @@ function truncateToolCallArgs(msg: any, tokenBudget: number): any {
     return msg;
   }
   const contentTokens = estimateTokens([{ role: msg.role, content: msg.content }]);
-  const perCall = Math.max(
-    16,
-    Math.floor(Math.max(0, tokenBudget - contentTokens) / toolCalls.length)
-  );
+  const perCall = Math.max(16, Math.floor(Math.max(0, tokenBudget - contentTokens) / toolCalls.length));
 
   let changed = false;
   const newCalls = [];
@@ -200,7 +190,7 @@ function truncateMessageToTokenBudget(msg: ChatMessage, tokenBudget: number): Ch
 export function trimForContext(
   messages: ChatMessage[],
   contextLength: number,
-  reserveTokens: number = 512
+  reserveTokens: number = 512,
 ): ChatMessage[] {
   const budget = contextLength - reserveTokens;
   const used = estimateTokens(messages);
@@ -270,10 +260,7 @@ export function trimForContext(
     const oldMsgs = priorConvo.slice(0, -(PROTECT_RECENT - 1));
     const recentMsgs = [...priorConvo.slice(-(PROTECT_RECENT - 1)), ...currentMsg];
 
-    while (
-      oldMsgs.length > 0 &&
-      estimateTokens([...essentialSystem, ...oldMsgs, ...recentMsgs]) > remainingBudget
-    ) {
+    while (oldMsgs.length > 0 && estimateTokens([...essentialSystem, ...oldMsgs, ...recentMsgs]) > remainingBudget) {
       oldMsgs.shift();
     }
     convoResult = [...oldMsgs, ...recentMsgs];
@@ -297,7 +284,7 @@ export function trimForContext(
     const availableForCurrent = Math.max(64, remainingBudget - estimateTokens(prefix));
     convoResult[convoResult.length - 1] = truncateMessageToTokenBudget(
       convoResult[convoResult.length - 1],
-      availableForCurrent
+      availableForCurrent,
     );
   }
 
@@ -310,7 +297,7 @@ export function trimForContext(
 export async function maybeCompact(
   messages: ChatMessage[],
   contextLength: number,
-  summarizeFn: (prompt: ChatMessage[]) => Promise<string>
+  summarizeFn: (prompt: ChatMessage[]) => Promise<string>,
 ): Promise<{ compactedMessages: ChatMessage[]; wasCompacted: boolean }> {
   const used = estimateTokens(messages);
   const pct = contextLength ? used / contextLength : 0;
@@ -345,13 +332,11 @@ export async function maybeCompact(
     .join('\n');
 
   // Count prior compactions from existing summary messages
-  const compactionCount = systemMsgs.filter((m) =>
-    m.content.includes('[Conversation summary')
-  ).length;
+  const compactionCount = systemMsgs.filter((m) => m.content.includes('[Conversation summary')).length;
 
   const prompt = SELF_SUMMARY_SYSTEM_PROMPT.replace('{count}', String(older.length)).replace(
     '{n}',
-    String(compactionCount + 1)
+    String(compactionCount + 1),
   );
 
   const summaryMessages: ChatMessage[] = [

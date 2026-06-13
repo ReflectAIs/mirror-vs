@@ -37,7 +37,7 @@ export function isToolError(result: string): boolean {
  */
 export function evaluateTurnResult(
   toolResults: string[],
-  agentReply: string
+  agentReply: string,
 ): { status: 'ok' | 'failure'; reason?: string } {
   for (const result of toolResults) {
     if (!result) continue;

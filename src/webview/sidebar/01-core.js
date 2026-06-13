@@ -1,5 +1,7 @@
 (function () {
   const vscode = acquireVsCodeApi();
+  window.vscode = vscode;
+
 
   // DOM Elements
   const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
@@ -386,3 +388,13 @@
       vscode.postMessage({ type: 'generatePRDescription' });
       const gitDrawer = document.getElementById('git-drawer');
       if (gitDrawer) gitDrawer.classList.add('collapsed');
+    });
+  }
+
+  if (gitCommitMsgBtn) {
+    gitCommitMsgBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'generateCommitMessage' });
+      const gitDrawer = document.getElementById('git-drawer');
+      if (gitDrawer) gitDrawer.classList.add('collapsed');
+    });
+  }

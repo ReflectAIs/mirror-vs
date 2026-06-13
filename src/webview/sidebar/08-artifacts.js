@@ -1,6 +1,8 @@
 // ===== Artifacts Module =====
 // Handles artifact rendering, drawer toggling, and interaction with the artifact service.
 
+const vscode = window.vscode;
+
 const artifactsState = {
   list: [],
   selectedId: null,

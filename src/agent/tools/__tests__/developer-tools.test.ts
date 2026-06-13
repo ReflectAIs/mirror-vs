@@ -48,9 +48,7 @@ describe('executeDeveloperTool', () => {
     it('should throw if target file does not exist', async () => {
       const tmpDir = createTempDir();
       const workspaceFoldersBackup = vscode.workspace.workspaceFolders;
-      (vscode.workspace as any).workspaceFolders = [
-        { uri: vscode.Uri.file(tmpDir), name: 'test', index: 0 }
-      ];
+      (vscode.workspace as any).workspaceFolders = [{ uri: vscode.Uri.file(tmpDir), name: 'test', index: 0 }];
 
       try {
         const tool = { name: 'lint_fix' as const, path: 'missing_file.js' };

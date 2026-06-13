@@ -37,16 +37,16 @@ describe('Tool Policy Service', () => {
   describe('getToolsForQuery', () => {
     it('should prune tools by keywords', () => {
       const allTools = new Set(['read_file', 'patch_file', 'run_command', 'git_status', 'figma_inspect']);
-      
+
       const gitTools = getToolsForQuery('check git status please', allTools);
       expect(gitTools.has('git_status')).toBe(true);
       expect(gitTools.has('run_command')).toBe(false);
       expect(gitTools.has('figma_inspect')).toBe(false);
-      
+
       const figmaTools = getToolsForQuery('view the figma inspect details', allTools);
       expect(figmaTools.has('figma_inspect')).toBe(true);
       expect(figmaTools.has('git_status')).toBe(false);
-      
+
       // Core tools (read_file, patch_file) must never be pruned
       expect(gitTools.has('read_file')).toBe(true);
       expect(gitTools.has('patch_file')).toBe(true);

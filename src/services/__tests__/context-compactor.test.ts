@@ -1,9 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  trimForContext,
-  maybeCompact,
-  sanitizeToolMessages,
-} from '../context-compactor';
+import { trimForContext, maybeCompact, sanitizeToolMessages } from '../context-compactor';
 import { ChatMessage } from '../../types';
 
 describe('Context Compactor Service', () => {
@@ -32,7 +28,11 @@ describe('Context Compactor Service', () => {
 
     it('should strip dangling assistant tool calls with no following tool response', () => {
       const messages: ChatMessage[] = [
-        { role: 'assistant', content: 'I will write a file', tool_calls: [{ name: 'write_file', arguments: '{}' }] } as any,
+        {
+          role: 'assistant',
+          content: 'I will write a file',
+          tool_calls: [{ name: 'write_file', arguments: '{}' }],
+        } as any,
         { role: 'user', content: 'wait, do not!' },
       ];
       const cleaned = sanitizeToolMessages(messages);
@@ -79,8 +79,8 @@ describe('Context Compactor Service', () => {
       ];
       // We want to force it to trim older turns
       const trimmed = trimForContext(messages, 30, 0);
-      expect(trimmed.some(m => m.content === 'latest user message')).toBe(true);
-      expect(trimmed.some(m => m.content === 'turn 1')).toBe(false);
+      expect(trimmed.some((m) => m.content === 'latest user message')).toBe(true);
+      expect(trimmed.some((m) => m.content === 'turn 1')).toBe(false);
     });
   });
 

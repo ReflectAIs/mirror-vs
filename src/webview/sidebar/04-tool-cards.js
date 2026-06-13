@@ -542,3 +542,15 @@
           isReverted = true;
         } else {
           const cpMatch = details.match(/Revert ID: (\w+)/);
+
+          if (cpMatch) {
+            checkpointId = cpMatch[1];
+          }
+        }
+        
+        const code = parsedToolContents.get(target);
+        const card = createToolCardDOM(toolName, status, target, details, checkpointId, isReverted, code);
+        placeCardInPlaceholder(card, toolName, target, container);
+      }
+    });
+  }

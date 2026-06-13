@@ -392,13 +392,13 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (patches.length === 0) {
         throw new Error(
           'No valid SEARCH/REPLACE blocks found in patch_file content.' +
-          ' The required format is:\n' +
-          '<<<<<<< SEARCH\n' +
-          '[exact original lines]\n' +
-          '=======\n' +
-          '[replacement lines]\n' +
-          '>>>>>>> REPLACE\n' +
-          'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block. Do NOT put markdown or prose between the delimiters.',
+            ' The required format is:\n' +
+            '<<<<<<< SEARCH\n' +
+            '[exact original lines]\n' +
+            '=======\n' +
+            '[replacement lines]\n' +
+            '>>>>>>> REPLACE\n' +
+            'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block. Do NOT put markdown or prose between the delimiters.',
         );
       }
 
@@ -428,8 +428,8 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           if (!matchRange) {
             throw new Error(
               `SEARCH block #${i + 1} not found in file (failed both exact and fuzzy matches).` +
-              ` The search string does not match any content in ${tool.path}.` +
-              ` Re-read the file with <read_file path="${tool.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
+                ` The search string does not match any content in ${tool.path}.` +
+                ` Re-read the file with <read_file path="${tool.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
             );
           }
 
@@ -473,17 +473,17 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (filePatches.length === 0) {
         throw new Error(
           'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.' +
-          ' The required format is:\n' +
-          '<multi_patch_file>\n' +
-          '<file path="relative/path/to/file.ts">\n' +
-          '<<<<<<< SEARCH\n' +
-          '[exact original lines]\n' +
-          '=======\n' +
-          '[replacement lines]\n' +
-          '>>>>>>> REPLACE\n' +
-          '</file>\n' +
-          '</multi_patch_file>\n' +
-          'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block.',
+            ' The required format is:\n' +
+            '<multi_patch_file>\n' +
+            '<file path="relative/path/to/file.ts">\n' +
+            '<<<<<<< SEARCH\n' +
+            '[exact original lines]\n' +
+            '=======\n' +
+            '[replacement lines]\n' +
+            '>>>>>>> REPLACE\n' +
+            '</file>\n' +
+            '</multi_patch_file>\n' +
+            'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block.',
         );
       }
 
@@ -516,7 +516,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
             if (!matchRange) {
               throw new Error(
                 `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).` +
-                ` Re-read the file with <read_file path="${fp.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
+                  ` Re-read the file with <read_file path="${fp.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
               );
             }
             fileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, replace);
@@ -586,7 +586,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         if (!workspaceFolder) return 'Error: No workspace folder open.';
         const mirrorVsDir = path.join(workspaceFolder, '.mirror-vs');
         if (!fs.existsSync(mirrorVsDir)) fs.mkdirSync(mirrorVsDir, { recursive: true });
-        
+
         const taskPath = path.join(mirrorVsDir, 'task.md');
         fs.writeFileSync(taskPath, content, 'utf8');
 
@@ -598,7 +598,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           'Task List',
           content,
           undefined,
-          false
+          false,
         );
         return `✅ Successfully updated active plan checklist. task.md updated.`;
       } catch (err: any) {
