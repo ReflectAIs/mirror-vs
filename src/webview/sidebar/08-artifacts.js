@@ -53,8 +53,8 @@ function initArtifacts() {
     }
   });
 
-  // Also listen via the global VS Code API postMessage
-  // (some events come via window.addEventListener from the postMessage chain)
+  // Request initial artifacts on load
+  vscode.postMessage({ type: 'getArtifacts' });
 }
 
 function toggleArtifactsDrawer() {

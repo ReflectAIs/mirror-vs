@@ -14,12 +14,16 @@ import { getRefactorSkill } from './prompts/skills/refactorSkill';
 import { getModeInstructions } from './prompts/modePrompts';
 import { TaskMode } from './orchestrator';
 
+import { detectGuideOnly, domainRulesForTools, GUIDE_ONLY_DIRECTIVE, getToolsForQuery } from './tool-policy';
+import { UNTRUSTED_CONTEXT_POLICY } from './prompt-security';
+
 export function buildSystemPrompt(
   loopCount: number = 1,
   hasPlan: boolean = false,
   featureOwner: string = '',
   agentState: string = 'DISCOVERY',
-  taskMode: TaskMode = TaskMode.IMPLEMENT
+  taskMode: TaskMode = TaskMode.IMPLEMENT,
+  userRequest: string = '',
 ): string {
   const service = CommandService.getInstance();
   const terminals = service.getActiveTerminals();
@@ -88,6 +92,7 @@ export function buildSystemPrompt(
   // 4. Agent Memory (via AgentMemoryService)
   let memorySection = '';
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { AgentMemoryService } = require('../services/agent-memory-service');
     const memory = AgentMemoryService.getInstance();
     const contextStr = memory.getContextString();
@@ -104,7 +109,9 @@ export function buildSystemPrompt(
           if (memoryContent) {
             memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${memoryContent}`;
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
   }
@@ -122,7 +129,7 @@ export function buildSystemPrompt(
   let skillsSection = '';
   const activeSkills: string[] = [];
   const lowerOwner = featureOwner.toLowerCase();
-  
+
   if (activeMode === 'debug' || agentState === 'VERIFICATION') {
     activeSkills.push(getDebugSkill());
   }
@@ -140,7 +147,34 @@ export function buildSystemPrompt(
     skillsSection = `\n\n### TASK-SPECIFIC SKILLS:\n` + activeSkills.join('\n\n');
   }
 
-  return `${customPrefixSection}${baseRole}${planStatusContext}${modeSection}${skillsSection}\n\n${toolSpecs}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;
+  let finalSpecs = toolSpecs;
+  let guideOnlyPrompt = '';
+  if (detectGuideOnly(userRequest)) {
+    finalSpecs = '';
+    guideOnlyPrompt = `\n\n${GUIDE_ONLY_DIRECTIVE}`;
+  } else {
+    const activeToolsSet = new Set([
+      'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
+      'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
+      'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
+      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
+      'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
+      'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
+      'list_terminals', 'figma_inspect', 'update_agent_memory'
+    ]);
+    const prunedToolsSet = getToolsForQuery(userRequest, activeToolsSet);
+    const domainRules = domainRulesForTools(prunedToolsSet);
+    const prunedSpecs = pruneToolSpecsText(toolSpecs, prunedToolsSet);
+    if (domainRules) {
+      finalSpecs = `${domainRules}\n\n${prunedSpecs}`;
+    } else {
+      finalSpecs = prunedSpecs;
+    }
+  }
+
+  const securityPolicy = `\n\n### SECURITY ENFORCEMENT:\n${UNTRUSTED_CONTEXT_POLICY}`;
+
+  return `${customPrefixSection}${baseRole}${guideOnlyPrompt}${planStatusContext}${modeSection}${skillsSection}\n\n${finalSpecs}${securityPolicy}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;
 }
 
 function getShellEnvDescription(): string {
@@ -219,3 +253,70 @@ export function getDiagnosticsForFile(filePath: string): string {
   }
 }
 
+export function pruneToolSpecsText(specs: string, activeTools: Set<string>): string {
+  if (specs.includes('### 🛠️ QUICK TOOL CHEATSHEET')) {
+    const lines = specs.split('\n');
+    const filtered = lines.filter(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('- ')) {
+        const match = trimmed.match(/^-\s*([a-z0-9_]+)/i);
+        if (match) {
+          const tool = match[1];
+          if (tool.startsWith('browser_')) {
+            return activeTools.has('browser_navigate') || activeTools.has('browser_screenshot');
+          }
+          if (tool.includes('terminal')) {
+            return activeTools.has('run_command') || activeTools.has('read_terminal');
+          }
+          return activeTools.has(tool);
+        }
+      }
+      return true;
+    });
+    return filtered.join('\n');
+  }
+
+  // First turn: filter lists of available tools
+  const lines = specs.split('\n');
+  let filtered = [];
+  let skipCurrentTool = false;
+  let inAvailableToolsSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('### 🧰 AVAILABLE TOOLS')) {
+      inAvailableToolsSection = true;
+    }
+
+    if (inAvailableToolsSection) {
+      const toolStartMatch = trimmed.match(/^\d+\.\s+([A-Z_]+)(?:\s+\(.*?\))?:/i);
+      if (toolStartMatch) {
+        const toolName = toolStartMatch[1].toLowerCase().replace(/\s+/g, '_');
+        if (toolName === 'read_file' || toolName === 'create_file' || toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'list_directory' || toolName === 'grep_search') {
+          // Keep core file/search tools
+          skipCurrentTool = false;
+        } else {
+          // Maps title to tool policy names
+          let actualName = toolName;
+          if (toolName === 'list_directory') actualName = 'list_dir';
+          if (toolName === 'codebase_analysis') actualName = 'analyze_project';
+          
+          if (actualName === 'browser_navigate') {
+            skipCurrentTool = !activeTools.has('browser_navigate') && !activeTools.has('browser_screenshot');
+          } else if (actualName === 'debugger_controls') {
+            skipCurrentTool = !activeTools.has('debug_inspect_variables');
+          } else {
+            // Check if any tool in DOMAIN_TOOL_MAP starts with or matches
+            skipCurrentTool = !activeTools.has(actualName) && ![...activeTools].some(t => t.startsWith(actualName));
+          }
+        }
+      }
+    }
+
+    if (!skipCurrentTool) {
+      filtered.push(line);
+    }
+  }
+
+  return filtered.join('\n');
+}

@@ -275,7 +275,7 @@
     // Intercept and wrap <architecture_routing> block in a gorgeous card, avoiding recursive infinite loops
     let hasRouting = false;
     let routingContent = '';
-    const routingRegex = /<architecture_routing>([\s\S]*?)<\/architecture_routing>/gi;
+    const routingRegex = /<architecture_routing(?:\s+[^>]*?)?>([\s\S]*?)<\/architecture_routing>/gi;
     cleanText = cleanText.replace(routingRegex, (match, inner) => {
       hasRouting = true;
       routingContent = inner.trim();
@@ -283,9 +283,10 @@
     });
 
     let streamingRouting = false;
-    if (cleanText.includes('<architecture_routing>') && !cleanText.includes('</architecture_routing>')) {
-      const openIdx = cleanText.indexOf('<architecture_routing>');
-      routingContent = cleanText.substring(openIdx + '<architecture_routing>'.length).trim();
+    const routingOpenMatch = /<architecture_routing(?:\s+[^>]*?)?>/i.exec(cleanText);
+    if (routingOpenMatch && !cleanText.toLowerCase().includes('</architecture_routing>')) {
+      const openIdx = routingOpenMatch.index;
+      routingContent = cleanText.substring(openIdx + routingOpenMatch[0].length).trim();
       cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_ROUTING_PLACEHOLDER%%%`;
       streamingRouting = true;
     }
@@ -293,7 +294,7 @@
     // Intercept and wrap <implementation_plan> block in a gorgeous card, avoiding recursive infinite loops
     let hasPlan = false;
     let planContent = '';
-    const planRegex = /<implementation_plan>([\s\S]*?)<\/implementation_plan>/gi;
+    const planRegex = /<implementation_plan(?:\s+[^>]*?)?>([\s\S]*?)<\/implementation_plan>/gi;
     cleanText = cleanText.replace(planRegex, (match, inner) => {
       hasPlan = true;
       planContent = inner.trim();
@@ -302,11 +303,32 @@
 
     // Also handle incomplete streaming tag
     let streamingPlan = false;
-    if (cleanText.includes('<implementation_plan>') && !cleanText.includes('</implementation_plan>')) {
-      const openIdx = cleanText.indexOf('<implementation_plan>');
-      planContent = cleanText.substring(openIdx + '<implementation_plan>'.length).trim();
+    const planOpenMatch = /<implementation_plan(?:\s+[^>]*?)?>/i.exec(cleanText);
+    if (planOpenMatch && !cleanText.toLowerCase().includes('</implementation_plan>')) {
+      const openIdx = planOpenMatch.index;
+      planContent = cleanText.substring(openIdx + planOpenMatch[0].length).trim();
       cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_PLAN_PLACEHOLDER%%%`;
       streamingPlan = true;
+    }
+
+    // Intercept and wrap <walkthrough> block in a gorgeous card, avoiding recursive infinite loops
+    let hasWalkthrough = false;
+    let walkthroughContent = '';
+    const walkthroughRegex = /<walkthrough(?:\s+[^>]*?)?>([\s\S]*?)<\/walkthrough>/gi;
+    cleanText = cleanText.replace(walkthroughRegex, (match, inner) => {
+      hasWalkthrough = true;
+      walkthroughContent = inner.trim();
+      return `%%%WALKTHROUGH_PLACEHOLDER%%%`;
+    });
+
+    // Also handle incomplete streaming tag for walkthrough
+    let streamingWalkthrough = false;
+    const walkthroughOpenMatch = /<walkthrough(?:\s+[^>]*?)?>/i.exec(cleanText);
+    if (walkthroughOpenMatch && !cleanText.toLowerCase().includes('</walkthrough>')) {
+      const openIdx = walkthroughOpenMatch.index;
+      walkthroughContent = cleanText.substring(openIdx + walkthroughOpenMatch[0].length).trim();
+      cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_WALKTHROUGH_PLACEHOLDER%%%`;
+      streamingWalkthrough = true;
     }
     
     // Clean block tools: create_file, write_file, patch_file, multi_patch_file, send_terminal_input, rename_file, git_commit
@@ -599,6 +621,45 @@
       `;
       html = html.replace('<p>%%%STREAMING_PLAN_PLACEHOLDER%%%</p>', cardHtml);
       html = html.replace('%%%STREAMING_PLAN_PLACEHOLDER%%%', cardHtml);
+    }
+
+    // Replace walkthrough cards placeholders
+    if (hasWalkthrough) {
+      const innerHtml = parseMarkdown(walkthroughContent, isPlanApproved);
+      const cardHtml = `
+        <div class="walkthrough-card" style="background: rgba(16, 185, 129, 0.04); border: 1.5px solid rgba(16, 185, 129, 0.15); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+          <div class="walkthrough-card-glow" style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 1;"></div>
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #34d399; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.7px; z-index: 2; position: relative; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 6px;">
+            <span>📖</span>
+            <span>Task Walkthrough &amp; Verification</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.9); line-height: 1.6; z-index: 2; position: relative;" class="walkthrough-inner-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%WALKTHROUGH_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%WALKTHROUGH_PLACEHOLDER%%%', cardHtml);
+    }
+
+    if (streamingWalkthrough) {
+      const innerHtml = parseMarkdown(walkthroughContent);
+      const cardHtml = `
+        <div class="walkthrough-card streaming" style="background: rgba(16, 185, 129, 0.02); border: 1.2px dashed rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative; overflow: hidden; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(16, 185, 129, 0.15); padding-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #34d399; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;">
+              <span>📖</span>
+              <span>Summarizing Changes...</span>
+            </div>
+            <span class="streaming-label" style="font-size: 9px; opacity: 0.6; color: #34d399; font-weight: 600; animation: pulse 1.5s infinite alternate;">Generating...</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.65); line-height: 1.6;" class="walkthrough-inner-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%STREAMING_WALKTHROUGH_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%STREAMING_WALKTHROUGH_PLACEHOLDER%%%', cardHtml);
     }
 
 

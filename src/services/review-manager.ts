@@ -357,7 +357,10 @@ export class ReviewManager implements vscode.CodeLensProvider {
           const review = this._activeReviews.get(normPath);
           if (review) {
             await this.resolveReview(review.filePath, true);
-            vscode.window.setStatusBarMessage(`$(check-all) Mirror VS: Changes auto-accepted for "${path.basename(filePath)}"`, 5000);
+            vscode.window.setStatusBarMessage(
+              `$(check-all) Mirror VS: Changes auto-accepted for "${path.basename(filePath)}"`,
+              5000,
+            );
           }
         }, 10000);
       }

@@ -20,7 +20,10 @@ function normalizeLineExact(line: string): string {
 
 function normalizeLineFuzzy(line: string): string {
   // Strips syntax noise and lowercases — may corrupt emoji, used only as fallback
-  return normalizeLineExact(line).toLowerCase().replace(/[\{\}\[\]\(\);,.:'"`]/g, '').replace(/\s+/g, ' ');
+  return normalizeLineExact(line)
+    .toLowerCase()
+    .replace(/[{}[\]();,.:'"`]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 /**
@@ -66,7 +69,7 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
         continue;
       }
       // Character overlap ratio
-      const overlap = [...sFuzzy].filter(ch => fFuzzy.includes(ch)).length;
+      const overlap = [...sFuzzy].filter((ch) => fFuzzy.includes(ch)).length;
       const ratio = Math.max(overlap / Math.max(sFuzzy.length, 1), overlap / Math.max(fFuzzy.length, 1));
       if (ratio > 0.7) {
         score += ratio * 0.5;
@@ -96,8 +99,8 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
     const snippet = fileContentLines.slice(bestStart, bestStart + searchLines.length + 2).join('\n');
     throw new Error(
       `SEARCH block not found (best fuzzy score ${bestScore.toFixed(1)}/${perfectScore}).\n` +
-      `Closest match at line ${bestStart + 1}:\n${snippet}\n\n` +
-      `Search target:\n${searchLines.join('\n')}`
+        `Closest match at line ${bestStart + 1}:\n${snippet}\n\n` +
+        `Search target:\n${searchLines.join('\n')}`,
     );
   }
 
@@ -129,15 +132,21 @@ function validatePatchStructure(search: string, replace: string): string[] {
 
   // Check brace balance
   if (searchOpenBr !== searchCloseBr || replaceOpenBr !== replaceCloseBr) {
-    issues.push(`Braces {}: SEARCH has ${searchOpenBr} open / ${searchCloseBr} close, REPLACE has ${replaceOpenBr} open / ${replaceCloseBr} close`);
+    issues.push(
+      `Braces {}: SEARCH has ${searchOpenBr} open / ${searchCloseBr} close, REPLACE has ${replaceOpenBr} open / ${replaceCloseBr} close`,
+    );
   }
   // Check paren balance
   if (searchOpenP !== searchCloseP || replaceOpenP !== replaceCloseP) {
-    issues.push(`Parentheses (): SEARCH has ${searchOpenP} open / ${searchCloseP} close, REPLACE has ${replaceOpenP} open / ${replaceCloseP} close`);
+    issues.push(
+      `Parentheses (): SEARCH has ${searchOpenP} open / ${searchCloseP} close, REPLACE has ${replaceOpenP} open / ${replaceCloseP} close`,
+    );
   }
   // Check bracket balance
   if (searchOpenB !== searchCloseB || replaceOpenB !== replaceCloseB) {
-    issues.push(`Brackets []: SEARCH has ${searchOpenB} open / ${searchCloseB} close, REPLACE has ${replaceOpenB} open / ${replaceCloseB} close`);
+    issues.push(
+      `Brackets []: SEARCH has ${searchOpenB} open / ${searchCloseB} close, REPLACE has ${replaceOpenB} open / ${replaceCloseB} close`,
+    );
   }
 
   return issues;
@@ -381,7 +390,16 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const patches = parsePatchBlocks(rawPatches);
 
       if (patches.length === 0) {
-        throw new Error('No valid SEARCH/REPLACE blocks found in patch_file content.');
+        throw new Error(
+          'No valid SEARCH/REPLACE blocks found in patch_file content.' +
+          ' The required format is:\n' +
+          '<<<<<<< SEARCH\n' +
+          '[exact original lines]\n' +
+          '=======\n' +
+          '[replacement lines]\n' +
+          '>>>>>>> REPLACE\n' +
+          'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block. Do NOT put markdown or prose between the delimiters.',
+        );
       }
 
       let addedLines = 0;
@@ -409,7 +427,9 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
 
           if (!matchRange) {
             throw new Error(
-              `SEARCH block #${i + 1} not found in file (failed both exact and fuzzy matches).\nSearch target:\n${search}`,
+              `SEARCH block #${i + 1} not found in file (failed both exact and fuzzy matches).` +
+              ` The search string does not match any content in ${tool.path}.` +
+              ` Re-read the file with <read_file path="${tool.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
             );
           }
 
@@ -451,7 +471,20 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       }
 
       if (filePatches.length === 0) {
-        throw new Error('No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.');
+        throw new Error(
+          'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.' +
+          ' The required format is:\n' +
+          '<multi_patch_file>\n' +
+          '<file path="relative/path/to/file.ts">\n' +
+          '<<<<<<< SEARCH\n' +
+          '[exact original lines]\n' +
+          '=======\n' +
+          '[replacement lines]\n' +
+          '>>>>>>> REPLACE\n' +
+          '</file>\n' +
+          '</multi_patch_file>\n' +
+          'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block.',
+        );
       }
 
       const results: string[] = [];
@@ -482,7 +515,8 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
             const matchRange = findFuzzyMatchRange(fileLines, searchLines);
             if (!matchRange) {
               throw new Error(
-                `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).\nSearch target:\n${search}`,
+                `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).` +
+                ` Re-read the file with <read_file path="${fp.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
               );
             }
             fileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, replace);
@@ -531,10 +565,44 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
         const memoryPath = path.join(memoryDir, 'memory.json');
         let memory: Record<string, any> = {};
-        try { if (fs.existsSync(memoryPath)) memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8')); } catch { /* ignore */ }
+        try {
+          if (fs.existsSync(memoryPath)) memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
+        } catch {
+          /* ignore */
+        }
         memory[key] = value;
         fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2), 'utf8');
         return `✅ Updated agent memory (legacy): "${key}" = "${value}"`;
+      }
+    }
+
+    case 'update_plan': {
+      const content = tool.content || tool.value || '';
+      if (!content) {
+        return 'Error: Missing "content" parameter for update_plan. Usage: <update_plan> - [x] Step 1\n- [ ] Step 2</update_plan>';
+      }
+      try {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceFolder) return 'Error: No workspace folder open.';
+        const mirrorVsDir = path.join(workspaceFolder, '.mirror-vs');
+        if (!fs.existsSync(mirrorVsDir)) fs.mkdirSync(mirrorVsDir, { recursive: true });
+        
+        const taskPath = path.join(mirrorVsDir, 'task.md');
+        fs.writeFileSync(taskPath, content, 'utf8');
+
+        // Sync to artifact service
+        const { ArtifactService } = await import('../../services/artifact-service');
+        await ArtifactService.getInstance().createOrUpdateArtifact(
+          'task',
+          'markdown',
+          'Task List',
+          content,
+          undefined,
+          false
+        );
+        return `✅ Successfully updated active plan checklist. task.md updated.`;
+      } catch (err: any) {
+        return `Error updating plan: ${err.message}`;
       }
     }
 

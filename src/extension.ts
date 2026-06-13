@@ -1,4 +1,3 @@
-
 import * as vscode from 'vscode';
 import { MirrorVsSidebarProvider } from './providers/sidebar-provider';
 import { ReviewManager } from './services/review-manager';
@@ -12,6 +11,8 @@ import { PluginService } from './services/plugin-service';
 import { TestService } from './services/test-service';
 import { DiffAwareService } from './services/diff-aware-service';
 import { RefactorService } from './services/refactor-service';
+import { ArtifactService } from './services/artifact-service';
+import { EventBus } from './services/event-bus';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Mirror VS Extension is now active!');
@@ -38,6 +39,15 @@ export function activate(context: vscode.ExtensionContext) {
     console.warn('[Mirror VS] Agent Memory initialization failed:', e);
   }
 
+  // Load persisted artifacts from disk on startup
+  try {
+    const artifactService = ArtifactService.getInstance();
+    artifactService.loadFromDisk();
+    console.log(`[Mirror VS] Loaded ${artifactService.artifacts.length} artifacts from disk`);
+  } catch (e) {
+    console.warn('[Mirror VS] Failed to load artifacts from disk:', e);
+  }
+
   // Trigger RAG indexing in background
   setTimeout(async () => {
     try {
@@ -46,7 +56,9 @@ export function activate(context: vscode.ExtensionContext) {
       if (!rag['isIndexed']) {
         rag.indexWorkspace().catch(() => {});
       }
-    } catch { /* background — non-critical */ }
+    } catch {
+      /* background — non-critical */
+    }
   }, 5000);
 
   // Initialize embedding service (lazy, on first semantic_search call)
@@ -92,9 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('mirror-vs.toggleAiReview', () => {
       const reviewService = AiReviewService.getInstance();
       const enabled = reviewService.toggle();
-      console.log(
-        `Mirror VS: Post-save AI Code Review ${enabled ? 'ENABLED' : 'DISABLED'}.`
-      );
+      console.log(`Mirror VS: Post-save AI Code Review ${enabled ? 'ENABLED' : 'DISABLED'}.`);
     }),
   );
 
@@ -106,7 +116,9 @@ export function activate(context: vscode.ExtensionContext) {
       const formatted = diffService.formatDiffForAgent(summary);
       vscode.commands.executeCommand('mirror-vs.focusSidebar');
       // Send as a task prompt to the sidebar
-      provider.handleMirrorTask(`Review my uncommitted changes:\n\n${formatted}\n\nPlease analyze these changes for bugs, style issues, and potential improvements.`);
+      provider.handleMirrorTask(
+        `Review my uncommitted changes:\n\n${formatted}\n\nPlease analyze these changes for bugs, style issues, and potential improvements.`,
+      );
     }),
   );
 
@@ -114,19 +126,24 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('mirror-vs.openArtifact', () => {
       vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask('Create an interactive artifact — an HTML page, SVG graphic, Mermaid diagram, or a beautiful code snippet preview. Choose the type based on what would be most useful.');
+      provider.handleMirrorTask(
+        'Create an interactive artifact — an HTML page, SVG graphic, Mermaid diagram, or a beautiful code snippet preview. Choose the type based on what would be most useful.',
+      );
     }),
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('mirror-vs.createHtmlArtifact', () => {
       vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask('Create an HTML artifact. This should be a self-contained interactive HTML page (with inline CSS and JS) that demonstrates something useful or beautiful.');
+      provider.handleMirrorTask(
+        'Create an HTML artifact. This should be a self-contained interactive HTML page (with inline CSS and JS) that demonstrates something useful or beautiful.',
+      );
     }),
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('mirror-vs.listArtifacts', () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { ArtifactService } = require('./services/artifact-service');
       const artifacts = ArtifactService.getInstance().artifacts;
       if (artifacts.length === 0) {
@@ -134,8 +151,10 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask(`List all my artifacts (${artifacts.length} total):\n\n` + 
-        artifacts.map((a, i) => `${i + 1}. [${a.type}] ${a.title} (ID: ${a.id})`).join('\n'));
+      provider.handleMirrorTask(
+        `List all my artifacts (${artifacts.length} total):\n\n` +
+          artifacts.map((a, i) => `${i + 1}. [${a.type}] ${a.title} (ID: ${a.id})`).join('\n'),
+      );
     }),
   );
 
@@ -148,9 +167,20 @@ export function activate(context: vscode.ExtensionContext) {
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
       vscode.commands.executeCommand('mirror-vs.focusSidebar');
       provider.handleMirrorTask(
-        `Refactor the following code in "${filePath}":\n\`\`\`\n${selectionText}\n\`\`\`\n\nAnalyze the impact of this refactoring across all files and propose changes. Use the multi_patch_file tool if multiple files need modification.`
+        `Refactor the following code in "${filePath}":\n\`\`\`\n${selectionText}\n\`\`\`\n\nAnalyze the impact of this refactoring across all files and propose changes. Use the multi_patch_file tool if multiple files need modification.`,
       );
     }),
+  );
+
+  // Register EventBus save hook
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      EventBus.getInstance().fire('file_saved', {
+        uri: doc.uri,
+        fileName: doc.fileName,
+        languageId: doc.languageId,
+      });
+    })
   );
 
   // Activate AI review if configured
@@ -212,7 +242,7 @@ export function activate(context: vscode.ExtensionContext) {
     try {
       const response = await fetch(BRIDGE_URL);
       if (!response.ok) return;
-      const tasks = await response.json() as any[];
+      const tasks = (await response.json()) as any[];
       if (!Array.isArray(tasks) || tasks.length === 0) return;
 
       for (const task of tasks) {
@@ -222,7 +252,7 @@ export function activate(context: vscode.ExtensionContext) {
         const result = await vscode.window.showInformationMessage(
           `🪞 Mirror Assistant: "${task.task}"`,
           'Accept Task',
-          'Dismiss'
+          'Dismiss',
         );
 
         if (result === 'Accept Task') {

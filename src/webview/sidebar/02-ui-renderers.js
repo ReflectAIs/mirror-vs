@@ -527,6 +527,11 @@
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
+    const teacherToggle = document.getElementById('settings-teacher-toggle');
+    const teacherEnabled = teacherToggle ? teacherToggle.checked : false;
+    const teacherModelInput = document.getElementById('settings-teacher-model-input');
+    const teacherModel = teacherModelInput ? teacherModelInput.value.trim() : 'deepseek-v4-pro';
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -555,6 +560,8 @@
       customSystemPrompt,
       customApis: customApisList,
       customApiKeys: customApiKeysData,
+      teacherEnabled,
+      teacherModel,
     });
 
     settingsDrawer.classList.add('collapsed');

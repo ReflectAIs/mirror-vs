@@ -47,6 +47,8 @@ export interface ExtensionSettings {
   customApis?: CustomApi[];
   configuredCustomApiKeys?: Record<string, boolean>;
   autonomousMode?: boolean;
+  teacherEnabled?: boolean;
+  teacherModel?: string;
 }
 
 export interface ChatMessage {

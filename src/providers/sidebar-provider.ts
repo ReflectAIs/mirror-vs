@@ -14,6 +14,8 @@ import { ReviewManager } from '../services/review-manager';
 import { LocalRagService } from '../services/local-rag-service';
 import { TelemetryService } from '../services/telemetry-service';
 import { ArtifactService } from '../services/artifact-service';
+import { EventBus } from '../services/event-bus';
+import { getAllSkills } from '../services/skill-service';
 
 export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
@@ -28,6 +30,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   private readonly _orchestrator: AgentOrchestrator;
   private readonly _migrationPromise: Promise<void>;
   private readonly _unstrippedHistoryCache = new Map<string, ChatMessage[]>();
+  private readonly _eventLogs: { eventName: string; timestamp: number; data: any }[] = [];
 
   constructor(private readonly _context: vscode.ExtensionContext) {
     this._secretService = new SecretService(_context.secrets);
@@ -69,6 +72,26 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         data: e.data,
       });
     });
+
+    // Subscribe to EventBus notifications
+    const eventBus = EventBus.getInstance();
+    const handleEvent = (eventName: string, data: any) => {
+      const logEntry = { eventName, timestamp: Date.now(), data };
+      this._eventLogs.push(logEntry);
+      if (this._eventLogs.length > 100) {
+        this._eventLogs.shift();
+      }
+      this._view?.webview.postMessage({
+        type: 'eventFired',
+        event: logEntry,
+      });
+    };
+
+    _context.subscriptions.push(eventBus.on('session_started', (data) => handleEvent('session_started', data)));
+    _context.subscriptions.push(eventBus.on('file_saved', (data) => handleEvent('file_saved', data)));
+    _context.subscriptions.push(eventBus.on('file_modified', (data) => handleEvent('file_modified', data)));
+    _context.subscriptions.push(eventBus.on('error_detected', (data) => handleEvent('error_detected', data)));
+    _context.subscriptions.push(eventBus.on('task_completed', (data) => handleEvent('task_completed', data)));
   }
 
   public async resolveWebviewView(
@@ -117,11 +140,16 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
         }
       });
 
+      const artifactsListener = ArtifactService.getInstance().onDidChangeArtifacts((artifacts) => {
+        webviewView.webview.postMessage({ type: 'updateArtifacts', artifacts });
+      });
+
       webviewView.onDidDispose(() => {
         activeEditorListener.dispose();
         visibleEditorsListener.dispose();
         activeReviewsListener.dispose();
         configChangeListener.dispose();
+        artifactsListener.dispose();
       });
 
       // Set up message listener from Webview
@@ -233,19 +261,39 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 await config.update('planFirst', (data as any).planFirst, vscode.ConfigurationTarget.Global);
               }
               if ((data as any).enableTruncationGuardrail !== undefined) {
-                await config.update('enableTruncationGuardrail', (data as any).enableTruncationGuardrail, vscode.ConfigurationTarget.Global);
+                await config.update(
+                  'enableTruncationGuardrail',
+                  (data as any).enableTruncationGuardrail,
+                  vscode.ConfigurationTarget.Global,
+                );
               }
               if ((data as any).aiReviewEnabled !== undefined) {
-                await config.update('aiReviewEnabled', (data as any).aiReviewEnabled, vscode.ConfigurationTarget.Global);
+                await config.update(
+                  'aiReviewEnabled',
+                  (data as any).aiReviewEnabled,
+                  vscode.ConfigurationTarget.Global,
+                );
               }
               if ((data as any).multiFileRefactorEnabled !== undefined) {
-                await config.update('multiFileRefactorEnabled', (data as any).multiFileRefactorEnabled, vscode.ConfigurationTarget.Global);
+                await config.update(
+                  'multiFileRefactorEnabled',
+                  (data as any).multiFileRefactorEnabled,
+                  vscode.ConfigurationTarget.Global,
+                );
               }
               if ((data as any).maxTurnsBeforeSummarize !== undefined) {
-                await config.update('maxTurnsBeforeSummarize', (data as any).maxTurnsBeforeSummarize, vscode.ConfigurationTarget.Global);
+                await config.update(
+                  'maxTurnsBeforeSummarize',
+                  (data as any).maxTurnsBeforeSummarize,
+                  vscode.ConfigurationTarget.Global,
+                );
               }
               if ((data as any).maxToolOutputLength !== undefined) {
-                await config.update('maxToolOutputLength', (data as any).maxToolOutputLength, vscode.ConfigurationTarget.Global);
+                await config.update(
+                  'maxToolOutputLength',
+                  (data as any).maxToolOutputLength,
+                  vscode.ConfigurationTarget.Global,
+                );
               }
               if ((data as any).embeddingModel !== undefined) {
                 await config.update('embeddingModel', (data as any).embeddingModel, vscode.ConfigurationTarget.Global);
@@ -254,6 +302,20 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 await config.update(
                   'customSystemPrompt',
                   (data as any).customSystemPrompt,
+                  vscode.ConfigurationTarget.Global,
+                );
+              }
+              if ((data as any).teacherEnabled !== undefined) {
+                await config.update(
+                  'teacherEnabled',
+                  (data as any).teacherEnabled,
+                  vscode.ConfigurationTarget.Global,
+                );
+              }
+              if ((data as any).teacherModel !== undefined) {
+                await config.update(
+                  'teacherModel',
+                  (data as any).teacherModel,
                   vscode.ConfigurationTarget.Global,
                 );
               }
@@ -327,6 +389,23 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             case 'getArtifacts': {
               const artifacts = ArtifactService.getInstance().artifacts;
               this._view?.webview.postMessage({ type: 'updateArtifacts', artifacts });
+              break;
+            }
+            case 'getSkills': {
+              const skills = getAllSkills();
+              this._view?.webview.postMessage({ type: 'updateSkills', skills });
+              break;
+            }
+            case 'getDashboardStats': {
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              const budget = config.get<number>('agentInputTokenBudget', 6000);
+              const skillsCount = getAllSkills().length;
+              this._view?.webview.postMessage({
+                type: 'dashboardStats',
+                budget,
+                skillsCount,
+                eventLogs: this._eventLogs,
+              });
               break;
             }
             case 'openArtifact': {
@@ -406,11 +485,11 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
                   const doc = await vscode.workspace.openTextDocument(safePath);
                   const editor = await vscode.window.showTextDocument(doc, { preview: false });
-                  
+
                   // Try to find lines from arguments
                   let startLine = data.startLine;
                   let endLine = data.endLine;
-                  
+
                   // If not explicitly provided, try to find active review lines
                   if (startLine === undefined && endLine === undefined) {
                     const review = ReviewManager.getInstance().getActiveReview(safePath);
@@ -422,7 +501,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                       }
                     }
                   }
-                  
+
                   if (startLine !== undefined && endLine !== undefined) {
                     const docLineCount = doc.lineCount;
                     const startIdx = Math.max(0, Math.min(docLineCount - 1, startLine - 1));
@@ -1088,6 +1167,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const maxTurnsBeforeSummarize = config.get<number>('maxTurnsBeforeSummarize', 16);
     const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
     const embeddingModel = config.get<string>('embeddingModel', 'nomic-embed-text');
+    const teacherEnabled = config.get<boolean>('teacherEnabled', false);
+    const teacherModel = config.get<string>('teacherModel', 'deepseek-v4-pro');
 
     const settings: ExtensionSettings = {
       provider,
@@ -1116,6 +1197,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       embeddingModel,
       customApis,
       configuredCustomApiKeys,
+      teacherEnabled,
+      teacherModel,
     } as any;
 
     this._view.webview.postMessage({

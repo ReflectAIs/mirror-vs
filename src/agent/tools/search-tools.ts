@@ -27,7 +27,9 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
             if (content.length < 100000) {
               documents.push({ filePath: vscode.workspace.asRelativePath(f), content });
             }
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
         const embedResults = await embeddings.search(query, documents);
         if (embedResults.length > 0) {
@@ -55,7 +57,9 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
           startLine: r.startLine,
           endLine: r.endLine,
         }));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     if (results.length === 0) {

@@ -138,9 +138,8 @@ export class DiffAwareService {
 
       // Include truncated diff
       const maxDiff = 3000;
-      const diff = file.diff.length > maxDiff
-        ? file.diff.substring(0, maxDiff) + '\n... (diff truncated, too large)'
-        : file.diff;
+      const diff =
+        file.diff.length > maxDiff ? file.diff.substring(0, maxDiff) + '\n... (diff truncated, too large)' : file.diff;
 
       output += '```diff\n' + diff + '\n```\n\n';
     }

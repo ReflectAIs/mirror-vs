@@ -83,10 +83,7 @@ export class PluginService {
   /**
    * Execute a plugin tool.
    */
-  async executePlugin(
-    tool: ToolCall,
-    context: ToolExecutionContext,
-  ): Promise<string> {
+  async executePlugin(tool: ToolCall, context: ToolExecutionContext): Promise<string> {
     const plugin = this._plugins.get(tool.name);
     if (!plugin) {
       return `Error: Unknown plugin tool "${tool.name}". Available plugins: ${[...this._plugins.keys()].join(', ') || 'none'}`;

@@ -44,9 +44,7 @@ export class AiReviewService {
   enable(): void {
     if (this._enabled) return;
     this._enabled = true;
-    this._disposables.push(
-      vscode.workspace.onDidSaveTextDocument(this._onDocumentSaved.bind(this)),
-    );
+    this._disposables.push(vscode.workspace.onDidSaveTextDocument(this._onDocumentSaved.bind(this)));
     vscode.window.showInformationMessage('Mirror VS: AI Code Review enabled — files will be reviewed on save.');
   }
 
@@ -100,9 +98,24 @@ export class AiReviewService {
     if (!this._enabled) return;
     // Skip non-code files
     const supportedLanguages = [
-      'typescript', 'javascript', 'typescriptreact', 'javascriptreact',
-      'python', 'go', 'rust', 'java', 'c', 'cpp', 'csharp',
-      'ruby', 'php', 'swift', 'kotlin', 'scala', 'vue', 'svelte',
+      'typescript',
+      'javascript',
+      'typescriptreact',
+      'javascriptreact',
+      'python',
+      'go',
+      'rust',
+      'java',
+      'c',
+      'cpp',
+      'csharp',
+      'ruby',
+      'php',
+      'swift',
+      'kotlin',
+      'scala',
+      'vue',
+      'svelte',
     ];
     if (!supportedLanguages.includes(doc.languageId)) return;
 
@@ -283,7 +296,7 @@ Do NOT include any text before or after the JSON.`;
 
       if (!response.ok) return null;
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
       let responseText = '';
 
       if (provider === 'ollama') {
@@ -359,14 +372,7 @@ Do NOT include any text before or after the JSON.`;
    * Show a detailed review panel with all issues.
    */
   private _showReviewPanel(review: ReviewResult): void {
-    const lines: string[] = [
-      `# Code Review: ${review.filePath}`,
-      '',
-      `**Summary:** ${review.summary}`,
-      '',
-      '---',
-      '',
-    ];
+    const lines: string[] = [`# Code Review: ${review.filePath}`, '', `**Summary:** ${review.summary}`, '', '---', ''];
 
     if (review.issues.length === 0) {
       lines.push('✅ No issues found.');
@@ -390,12 +396,9 @@ Do NOT include any text before or after the JSON.`;
       }
     }
 
-    const panel = vscode.window.createWebviewPanel(
-      'mirrorReview',
-      'Mirror VS Code Review',
-      vscode.ViewColumn.Beside,
-      { enableScripts: false },
-    );
+    const panel = vscode.window.createWebviewPanel('mirrorReview', 'Mirror VS Code Review', vscode.ViewColumn.Beside, {
+      enableScripts: false,
+    });
     panel.webview.html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:var(--vscode-editor-font-family);padding:20px;color:var(--vscode-editor-foreground);background:var(--vscode-editor-background);"><div style="max-width:800px;white-space:pre-wrap;">${lines.join('\n').replace(/\n/g, '<br>')}</div></body></html>`;
   }
 

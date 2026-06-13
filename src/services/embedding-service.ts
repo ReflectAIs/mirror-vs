@@ -39,7 +39,9 @@ export class EmbeddingService {
 
   private _init(): void {
     if (this._initialized) return;
-    this._ollamaHost = vscode.workspace.getConfiguration('mirror-vs').get<string>('ollamaHost', 'http://localhost:11434');
+    this._ollamaHost = vscode.workspace
+      .getConfiguration('mirror-vs')
+      .get<string>('ollamaHost', 'http://localhost:11434');
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (workspaceFolder) {
       const mirrorDir = path.join(workspaceFolder, '.mirror-vs');
@@ -70,7 +72,7 @@ export class EmbeddingService {
     let hash = 0;
     for (let i = 0; i < content.length; i++) {
       const char = content.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash |= 0;
     }
     return hash.toString(16);
@@ -91,7 +93,7 @@ export class EmbeddingService {
       });
       clearTimeout(timeout);
       if (!response.ok) return null;
-      const data = await response.json() as { embedding?: number[] };
+      const data = (await response.json()) as { embedding?: number[] };
       return data.embedding || null;
     } catch {
       return null;
@@ -120,7 +122,10 @@ export class EmbeddingService {
    */
   private _tfIdfSimilarity(query: string, document: string): number {
     const tokenize = (text: string): string[] =>
-      text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1);
+      text
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length > 1);
 
     const queryTokens = tokenize(query);
     const docTokens = tokenize(document);
@@ -171,7 +176,10 @@ export class EmbeddingService {
     }
 
     // Fallback: generate a pseudo-embedding from TF-IDF weights (reduced dimension)
-    const tokens = content.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1);
+    const tokens = content
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 1);
     const tf = new Map<string, number>();
     for (const t of tokens) tf.set(t, (tf.get(t) || 0) + 1);
     // Create a fixed-size sparse vector from top tokens (hash-based)
@@ -274,7 +282,18 @@ export class EmbeddingService {
   }
 
   private _getWorkspaceFiles(dir: string): string[] {
-    const skip = ['node_modules', 'dist', 'out', '.git', '.mirror-vs', 'build', '.next', '.vscode', 'coverage', '__pycache__'];
+    const skip = [
+      'node_modules',
+      'dist',
+      'out',
+      '.git',
+      '.mirror-vs',
+      'build',
+      '.next',
+      '.vscode',
+      'coverage',
+      '__pycache__',
+    ];
     const results: string[] = [];
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -285,7 +304,46 @@ export class EmbeddingService {
           results.push(...this._getWorkspaceFiles(fullPath));
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name).toLowerCase();
-          const supportedExts = ['.ts', '.js', '.tsx', '.jsx', '.py', '.go', '.rs', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.rb', '.php', '.swift', '.kt', '.scala', '.vue', '.svelte', '.css', '.scss', '.less', '.html', '.md', '.json', '.yaml', '.yml', '.xml', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.toml', '.ini', '.cfg', '.env'];
+          const supportedExts = [
+            '.ts',
+            '.js',
+            '.tsx',
+            '.jsx',
+            '.py',
+            '.go',
+            '.rs',
+            '.java',
+            '.cpp',
+            '.c',
+            '.h',
+            '.hpp',
+            '.cs',
+            '.rb',
+            '.php',
+            '.swift',
+            '.kt',
+            '.scala',
+            '.vue',
+            '.svelte',
+            '.css',
+            '.scss',
+            '.less',
+            '.html',
+            '.md',
+            '.json',
+            '.yaml',
+            '.yml',
+            '.xml',
+            '.sql',
+            '.sh',
+            '.bash',
+            '.zsh',
+            '.ps1',
+            '.toml',
+            '.ini',
+            '.cfg',
+            '.env',
+          ];
           if (supportedExts.includes(ext) || ext === '') {
             results.push(fullPath);
           }

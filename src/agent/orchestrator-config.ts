@@ -41,10 +41,12 @@ export function estimateTokenCount(text: string): number {
   if (!text) return 0;
   const len = text.length;
   // Count CJK characters (Unicode ranges for Chinese, Japanese, Korean)
-  const cjkCount = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g) || []).length;
+  const cjkCount = (
+    text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g) || []
+  ).length;
   const nonCjkLen = len - cjkCount;
   // Count code-like patterns (indentation, braces, semicolons, etc.)
-  const codeIndicatorCount = (text.match(/[{}\[\]();:=<>+\-*/%&|^!~?#@$`\\]/g) || []).length;
+  const codeIndicatorCount = (text.match(/[{}[\]();:=<>+\-*/%&|^!~?#@$`\\]/g) || []).length;
   const codeDensity = codeIndicatorCount / Math.max(nonCjkLen, 1);
   // Base rate: English ≈ 4 chars/token, code-heavy ≈ 3 chars/token, CJK ≈ 1.5 chars/token
   const codeRate = 3 + (1 - Math.min(codeDensity * 10, 1));

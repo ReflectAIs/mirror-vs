@@ -7,6 +7,7 @@ import { executeFigmaTool } from './figma-tools';
 import { executeGitTool } from './git-tools';
 import { PluginService } from '../../services/plugin-service';
 import { executeArtifactTool } from './artifact-tools';
+import { executeDeveloperTool } from './developer-tools';
 
 export async function executeTool(
   tool: ToolCall,
@@ -19,15 +20,19 @@ export async function executeTool(
   // Check plugin tools first (custom tools registered by extensions/users)
   const pluginService = PluginService.getInstance();
   if (pluginService.isPluginTool(name)) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const workspaceFolder = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     return pluginService.executePlugin(tool, {
       workspaceFolder,
       getSafePath,
       postMessage: (msg: any) => {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
           MirrorVsSidebarProvider.postToActive?.(msg);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       },
     });
   }
@@ -54,7 +59,8 @@ export async function executeTool(
     name === 'list_dir' ||
     name === 'rename_file' ||
     name === 'delete_file' ||
-    name === 'update_agent_memory'
+    name === 'update_agent_memory' ||
+    name === 'update_plan'
   ) {
     return await executeFileTool(tool, getSafePath);
   }
@@ -85,6 +91,11 @@ export async function executeTool(
 
   if (name === 'figma_inspect') {
     return await executeFigmaTool(tool, figmaKey, workspacePath);
+  }
+
+  // Developer tools
+  if (name === 'python_eval' || name === 'ast_grep' || name === 'lint_fix') {
+    return await executeDeveloperTool(tool);
   }
 
   // Git tools

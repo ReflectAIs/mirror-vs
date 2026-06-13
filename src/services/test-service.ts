@@ -237,12 +237,7 @@ export class TestService {
         // Generic fallback: extract file paths and count results
         const lines = output.split('\n');
         for (const line of lines) {
-          if (
-            line.includes('pass') ||
-            line.includes('fail') ||
-            line.includes('PASS') ||
-            line.includes('FAIL')
-          ) {
+          if (line.includes('pass') || line.includes('fail') || line.includes('PASS') || line.includes('FAIL')) {
             suites.push({
               filePath: 'unknown',
               tests: [
@@ -385,9 +380,7 @@ export class TestService {
    * Get a failure report suitable for the agent to fix.
    */
   getFailureReport(): string {
-    const failures = this._testResults
-      .flatMap((s) => s.tests.filter((t) => t.status === 'failed'))
-      .slice(0, 20);
+    const failures = this._testResults.flatMap((s) => s.tests.filter((t) => t.status === 'failed')).slice(0, 20);
 
     if (failures.length === 0) return '';
 

@@ -108,10 +108,6 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
       this._exitCode = code;
       this.writeEmitter.fire(`\r\n\x1b[90m[Process exited with code ${code ?? 0}]\x1b[0m\r\n`);
       this._resolveExit({ code, output: this.outputBuffer });
-      // Delay closing the PTY to prevent VS Code 'exit code 255' crash on fast-finishing commands
-      setTimeout(() => {
-        this.closeEmitter.fire(0); // Always emit 0 to prevent VS Code from showing error notifications
-      }, 1500);
     });
 
     this.process.on('error', (err) => {
@@ -121,9 +117,6 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
       this.appendOutput(msg);
       this.writeEmitter.fire(`\r\n\x1b[31m${msg}\x1b[0m\r\n`);
       this._resolveExit({ code: -1, output: this.outputBuffer });
-      setTimeout(() => {
-        this.closeEmitter.fire(0); // Always emit 0 to prevent VS Code from showing error notifications
-      }, 1500);
     });
   }
 
@@ -176,8 +169,6 @@ export class CommandService {
     CommandService._onDidStreamData.fire({ name, data });
   }
 
-  /** Terminal reference by name. */
-  private activeTerminals: Map<string, vscode.Terminal> = new Map();
   /** Pseudoterminal reference by name (for output reading). */
   private activePtys: Map<string, MirrorPseudoterminal> = new Map();
   /** Command metadata by terminal name. */
@@ -186,16 +177,6 @@ export class CommandService {
   private constructor() {
     // Clean up on workspace change
     vscode.workspace.onDidChangeWorkspaceFolders(() => this.cleanup());
-
-    // Listen for terminal close events to clean up tracking
-    vscode.window.onDidCloseTerminal((terminal) => {
-      const name = terminal.name;
-      if (this.activeTerminals.has(name)) {
-        this.activeTerminals.delete(name);
-        this.activePtys.delete(name);
-        this.terminalCommandMap.delete(name);
-      }
-    });
   }
 
   public static getInstance(): CommandService {
@@ -358,20 +339,17 @@ export class CommandService {
     const result: { name: string; command: string; isServer: boolean; running: boolean; exitCode: number | null }[] =
       [];
     for (const [name, info] of this.terminalCommandMap) {
-      const terminal = this.activeTerminals.get(name);
-      if (terminal && terminal.exitStatus === undefined) {
-        const pty = this.activePtys.get(name);
+      const pty = this.activePtys.get(name);
+      if (pty) {
         result.push({
           name,
           command: info.command,
           isServer: info.isServer,
-          running: pty?.running ?? false,
-          exitCode: pty?.exitCode ?? null,
+          running: pty.running,
+          exitCode: pty.exitCode,
         });
       } else {
         // Clean up stale entries
-        this.activeTerminals.delete(name);
-        this.activePtys.delete(name);
         this.terminalCommandMap.delete(name);
       }
     }
@@ -379,12 +357,8 @@ export class CommandService {
   }
 
   /** Reveal a specific terminal by name. Returns true if found and shown. */
-  public revealTerminal(name: string): boolean {
-    const terminal = this.activeTerminals.get(name);
-    if (terminal && terminal.exitStatus === undefined) {
-      terminal.show(false);
-      return true;
-    }
+  public revealTerminal(_name: string): boolean {
+    // Terminals are headless, nothing to show in VS Code terminal panel
     return false;
   }
 
@@ -479,23 +453,20 @@ export class CommandService {
     }
 
     // Deduplication by terminal name
-    let terminal = this.activeTerminals.get(terminalName);
-    const alreadyRunning = !!(terminal && terminal.exitStatus === undefined);
+    const existingPty = this.activePtys.get(terminalName);
+    const alreadyRunning = !!(existingPty && existingPty.running);
 
     if (alreadyRunning) {
-      terminal!.show(false);
-      this.logToDebug(`Terminal "${terminalName}" already running — not re-launching.`);
-      return `Server is already running in VS Code terminal "${terminalName}". Use browser_navigate to verify it is accessible.`;
+      this.logToDebug(`Terminal process "${terminalName}" already running — not re-launching.`);
+      return `Server is already running in background process "${terminalName}". Use browser_navigate to verify it is accessible.`;
     }
 
-    // Create pseudoterminal + visible terminal
+    // Create pseudoterminal and open/spawn it manually
     const pty = new MirrorPseudoterminal(cmd, cwd, terminalName);
-    terminal = vscode.window.createTerminal({ name: terminalName, pty });
-    this.activeTerminals.set(terminalName, terminal);
+    pty.open(undefined);
     this.activePtys.set(terminalName, pty);
     this.terminalCommandMap.set(terminalName, { command: cmd, isServer: true });
-    terminal.show(false);
-    this.logToDebug(`Created VS Code terminal "${terminalName}" (cwd: "${cwd}"): "${cmd}"`);
+    this.logToDebug(`Started headless terminal process "${terminalName}" (cwd: "${cwd}"): "${cmd}"`);
 
     // Wait for server to boot then probe the port
     this.logToDebug(`Waiting ${SERVER_BOOT_WAIT_MS}ms for server to boot on port ${port ?? '(unknown)'}...`);
@@ -532,14 +503,12 @@ export class CommandService {
   private async executeShortCommand(cmd: string, cwd: string, originalCommand: string): Promise<string> {
     const terminalName = this.getTerminalName(originalCommand || cmd);
 
-    // Create pseudoterminal + visible terminal
+    // Create pseudoterminal and open/spawn it manually
     const pty = new MirrorPseudoterminal(cmd, cwd, terminalName);
-    const terminal = vscode.window.createTerminal({ name: terminalName, pty });
-    this.activeTerminals.set(terminalName, terminal);
+    pty.open(undefined);
     this.activePtys.set(terminalName, pty);
     this.terminalCommandMap.set(terminalName, { command: cmd, isServer: false });
-    terminal.show(false);
-    this.logToDebug(`Created visible terminal "${terminalName}" for short command (cwd: "${cwd}"): "${cmd}"`);
+    this.logToDebug(`Started headless short terminal process "${terminalName}" (cwd: "${cwd}"): "${cmd}"`);
 
     // Race: wait for exit OR timeout OR inactivity/interactive prompt monitor
     const timeoutPromise = new Promise<'timeout'>((resolve) =>
@@ -722,13 +691,13 @@ export class CommandService {
     return false;
   }
 
-  /** Closes and disposes a specific active terminal. */
+  /** Closes and disposes a specific active terminal process. */
   public closeTerminal(terminalName: string): boolean {
-    let terminal = this.activeTerminals.get(terminalName);
+    let pty = this.activePtys.get(terminalName);
     let foundName = terminalName;
 
     // Fuzzy match using normalization
-    if (!terminal) {
+    if (!pty) {
       const normalize = (s: string) =>
         s
           .toLowerCase()
@@ -736,10 +705,10 @@ export class CommandService {
           .replace(/[^\w]/g, '');
       const normSearch = normalize(terminalName);
       if (normSearch) {
-        for (const [name, t] of this.activeTerminals) {
+        for (const [name, p] of this.activePtys) {
           const normName = normalize(name);
           if (normName.includes(normSearch) || normSearch.includes(normName)) {
-            terminal = t;
+            pty = p;
             foundName = name;
             break;
           }
@@ -747,15 +716,9 @@ export class CommandService {
       }
     }
 
-    // Fallback search across all VS Code terminals
-    if (!terminal) {
-      terminal = vscode.window.terminals.find((t) => t.name === terminalName);
-    }
-
-    if (terminal) {
-      this.logToDebug(`Disposing/closing terminal "${foundName}"`);
-      terminal.dispose();
-      this.activeTerminals.delete(foundName);
+    if (pty) {
+      this.logToDebug(`Closing terminal process "${foundName}"`);
+      pty.close();
       this.activePtys.delete(foundName);
       this.terminalCommandMap.delete(foundName);
       return true;
@@ -778,15 +741,14 @@ export class CommandService {
   /** Terminate all terminals and clean up on shutdown. */
   public cleanup() {
     this.logToDebug('Cleaning up all running terminals...');
-    for (const [name, terminal] of this.activeTerminals.entries()) {
+    for (const [name, pty] of this.activePtys.entries()) {
       try {
-        terminal.dispose();
-        this.logToDebug(`Disposed terminal "${name}" during cleanup.`);
+        pty.close();
+        this.logToDebug(`Disposed terminal process "${name}" during cleanup.`);
       } catch (e) {
         // ignore
       }
     }
-    this.activeTerminals.clear();
     this.activePtys.clear();
     this.terminalCommandMap.clear();
   }

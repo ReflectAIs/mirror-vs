@@ -4,10 +4,7 @@ import * as path from 'path';
 import { ToolCall } from '../types';
 import { BrowserService } from '../../services/browser-service';
 
-export async function executeBrowserTool(
-  tool: ToolCall,
-  getSafePath: (p: string) => string,
-): Promise<string> {
+export async function executeBrowserTool(tool: ToolCall, getSafePath: (p: string) => string): Promise<string> {
   const browser = BrowserService.getInstance();
 
   switch (tool.name) {

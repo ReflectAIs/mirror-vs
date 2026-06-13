@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 
 // Mock editor-utils
 vi.mock('../../../utils/editor-utils', () => ({
@@ -183,7 +184,7 @@ two original
 REPLACE
 two updated
 </file>
-`
+`,
         };
 
         const result = await executeFileTool(tool, localGetSafe);
@@ -202,10 +203,10 @@ two updated
     it('should throw if no files are matched', async () => {
       const tool = {
         name: 'multi_patch_file' as const,
-        content: 'some non xml content'
+        content: 'some non xml content',
       };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow(
-        'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.'
+        'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.',
       );
     });
   });
@@ -214,6 +215,38 @@ two updated
     it('should throw for invalid tool name', async () => {
       const tool = { name: 'invalid_tool' as any };
       await expect(executeFileTool(tool, getSafePath)).rejects.toThrow('Invalid file tool: invalid_tool');
+    });
+  });
+
+  describe('update_plan', () => {
+    it('should successfully write content to task.md', async () => {
+      const tmpDir = createTempDir();
+      try {
+        const localGetSafe = (p: string) => path.join(tmpDir, p);
+        const tool = {
+          name: 'update_plan' as const,
+          content: '- [x] Step 1\n- [ ] Step 2'
+        };
+
+        // Mock vscode.workspace.workspaceFolders
+        const workspaceFoldersBackup = vscode.workspace.workspaceFolders;
+        (vscode.workspace as any).workspaceFolders = [
+          { uri: vscode.Uri.file(tmpDir), name: 'test', index: 0 }
+        ];
+
+        try {
+          const result = await executeFileTool(tool, localGetSafe);
+          expect(result).toContain('Successfully updated active plan checklist');
+          
+          const taskPath = path.join(tmpDir, '.mirror-vs', 'task.md');
+          expect(fs.existsSync(taskPath)).toBe(true);
+          expect(fs.readFileSync(taskPath, 'utf8')).toBe('- [x] Step 1\n- [ ] Step 2');
+        } finally {
+          (vscode.workspace as any).workspaceFolders = workspaceFoldersBackup;
+        }
+      } finally {
+        cleanupTempDir(tmpDir);
+      }
     });
   });
 });

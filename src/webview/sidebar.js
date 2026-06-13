@@ -140,7 +140,7 @@
       // Apply sticky via inline styles (guaranteed to work regardless of CSS specificity)
       lastBubble.style.position = 'sticky';
       lastBubble.style.top = '-12px';
-      lastBubble.style.bottom = '';
+      lastBubble.style.bottom = '0px';
       lastBubble.style.zIndex = '10';
     }
     
@@ -916,6 +916,11 @@
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
+    const teacherToggle = document.getElementById('settings-teacher-toggle');
+    const teacherEnabled = teacherToggle ? teacherToggle.checked : false;
+    const teacherModelInput = document.getElementById('settings-teacher-model-input');
+    const teacherModel = teacherModelInput ? teacherModelInput.value.trim() : 'deepseek-v4-pro';
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -944,6 +949,8 @@
       customSystemPrompt,
       customApis: customApisList,
       customApiKeys: customApiKeysData,
+      teacherEnabled,
+      teacherModel,
     });
 
     settingsDrawer.classList.add('collapsed');
@@ -2063,6 +2070,45 @@ function attachImage(base64) {
         detailsContainer.appendChild(header);
         
         const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
+        let diffText = cleanResult;
+        
+        if (code && (code.includes('<<<<') || code.includes('<file'))) {
+          try {
+            let output = '';
+            const fileRegex = /<file\s+path="([^"]+)"\s*>([\s\S]*?)<\/file>/gi;
+            let match;
+            let hasFiles = false;
+            
+            const processBlocks = (content) => {
+              let res = '';
+              const blockRegex = /<<<<\n([\s\S]*?)\n====\n([\s\S]*?)\n>>>>/g;
+              let bMatch;
+              let lastIdx = 0;
+              while ((bMatch = blockRegex.exec(content)) !== null) {
+                const search = bMatch[1];
+                const replace = bMatch[2];
+                res += '@@\n';
+                if (search) res += search.split('\n').map(l => '-' + l).join('\n') + '\n';
+                if (replace) res += replace.split('\n').map(l => '+' + l).join('\n') + '\n';
+                lastIdx = blockRegex.lastIndex;
+              }
+              return lastIdx === 0 ? content : res;
+            };
+
+            while ((match = fileRegex.exec(code)) !== null) {
+              hasFiles = true;
+              output += `--- ${match[1]}\n+++ ${match[1]}\n`;
+              output += processBlocks(match[2]);
+            }
+            if (!hasFiles) {
+              output = processBlocks(code);
+            }
+            diffText = output.trim();
+          } catch (e) {
+            diffText = code;
+          }
+        }
+        
         const codeBlock = document.createElement('div');
         codeBlock.className = 'code-block-wrapper';
         codeBlock.style.marginTop = '4px';
@@ -2073,7 +2119,7 @@ function attachImage(base64) {
               <button class="code-action-btn copy-btn">Copy</button>
             </div>
           </div>
-          <pre><code class="language-diff">${escapeHtml(cleanResult)}</code></pre>
+          <pre><code class="language-diff">${escapeHtml(diffText)}</code></pre>
         `;
         detailsContainer.appendChild(codeBlock);
         bindCodeBlockButtons(codeBlock);
@@ -2144,7 +2190,11 @@ function attachImage(base64) {
           const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
           const details = document.createElement('div');
           details.className = 'tool-details';
-          details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
+          if (cleanResult) {
+            details.innerHTML = parseMarkdown(cleanResult);
+          } else {
+            details.textContent = status === 'success' ? 'Operation succeeded' : 'Operation failed';
+          }
           detailsContainer.appendChild(details);
         }
       }
@@ -2243,11 +2293,27 @@ function attachImage(base64) {
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
     if (role === 'system') {
-      if (text.startsWith('[Tool Result')) {
-        appendToolCardFromHistory(text, container);
+      let innerText = text;
+      const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
+      const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
+      if (text.includes(guardOpen) && text.includes(guardClose)) {
+        const startIndex = text.indexOf(guardOpen) + guardOpen.length;
+        const endIndex = text.indexOf(guardClose);
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+          const contentInside = text.substring(startIndex, endIndex).trim();
+          const lines = contentInside.split('\n');
+          if (lines[0] && lines[0].startsWith('Source:')) {
+            lines.shift();
+          }
+          innerText = lines.join('\n').trim();
+        }
+      }
+
+      if (innerText.startsWith('[Tool Result')) {
+        appendToolCardFromHistory(innerText, container);
         return null;
       }
-      if (text.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
+      if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
         const msgElement = document.createElement('div');
         msgElement.className = 'message system-context';
         
@@ -2259,7 +2325,7 @@ function attachImage(base64) {
             <span class="system-context-toggle">Show Details</span>
           </div>
           <div class="system-context-body collapsed">
-            ${parseMarkdown(text)}
+            ${parseMarkdown(innerText)}
           </div>
         `;
         
@@ -2507,6 +2573,14 @@ function attachImage(base64) {
         }
         if (s.embeddingModel !== undefined && embeddingModelInput) {
           embeddingModelInput.value = s.embeddingModel;
+        }
+        if (s.teacherEnabled !== undefined) {
+          const teacherToggle = document.getElementById('settings-teacher-toggle');
+          if (teacherToggle) teacherToggle.checked = s.teacherEnabled;
+        }
+        if (s.teacherModel !== undefined) {
+          const teacherModelInput = document.getElementById('settings-teacher-model-input');
+          if (teacherModelInput) teacherModelInput.value = s.teacherModel;
         }
 
         syncQuickModelSelect();
@@ -3162,7 +3236,7 @@ function attachImage(base64) {
     // Intercept and wrap <architecture_routing> block in a gorgeous card, avoiding recursive infinite loops
     let hasRouting = false;
     let routingContent = '';
-    const routingRegex = /<architecture_routing>([\s\S]*?)<\/architecture_routing>/gi;
+    const routingRegex = /<architecture_routing(?:\s+[^>]*?)?>([\s\S]*?)<\/architecture_routing>/gi;
     cleanText = cleanText.replace(routingRegex, (match, inner) => {
       hasRouting = true;
       routingContent = inner.trim();
@@ -3170,9 +3244,10 @@ function attachImage(base64) {
     });
 
     let streamingRouting = false;
-    if (cleanText.includes('<architecture_routing>') && !cleanText.includes('</architecture_routing>')) {
-      const openIdx = cleanText.indexOf('<architecture_routing>');
-      routingContent = cleanText.substring(openIdx + '<architecture_routing>'.length).trim();
+    const routingOpenMatch = /<architecture_routing(?:\s+[^>]*?)?>/i.exec(cleanText);
+    if (routingOpenMatch && !cleanText.toLowerCase().includes('</architecture_routing>')) {
+      const openIdx = routingOpenMatch.index;
+      routingContent = cleanText.substring(openIdx + routingOpenMatch[0].length).trim();
       cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_ROUTING_PLACEHOLDER%%%`;
       streamingRouting = true;
     }
@@ -3180,7 +3255,7 @@ function attachImage(base64) {
     // Intercept and wrap <implementation_plan> block in a gorgeous card, avoiding recursive infinite loops
     let hasPlan = false;
     let planContent = '';
-    const planRegex = /<implementation_plan>([\s\S]*?)<\/implementation_plan>/gi;
+    const planRegex = /<implementation_plan(?:\s+[^>]*?)?>([\s\S]*?)<\/implementation_plan>/gi;
     cleanText = cleanText.replace(planRegex, (match, inner) => {
       hasPlan = true;
       planContent = inner.trim();
@@ -3189,11 +3264,32 @@ function attachImage(base64) {
 
     // Also handle incomplete streaming tag
     let streamingPlan = false;
-    if (cleanText.includes('<implementation_plan>') && !cleanText.includes('</implementation_plan>')) {
-      const openIdx = cleanText.indexOf('<implementation_plan>');
-      planContent = cleanText.substring(openIdx + '<implementation_plan>'.length).trim();
+    const planOpenMatch = /<implementation_plan(?:\s+[^>]*?)?>/i.exec(cleanText);
+    if (planOpenMatch && !cleanText.toLowerCase().includes('</implementation_plan>')) {
+      const openIdx = planOpenMatch.index;
+      planContent = cleanText.substring(openIdx + planOpenMatch[0].length).trim();
       cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_PLAN_PLACEHOLDER%%%`;
       streamingPlan = true;
+    }
+
+    // Intercept and wrap <walkthrough> block in a gorgeous card, avoiding recursive infinite loops
+    let hasWalkthrough = false;
+    let walkthroughContent = '';
+    const walkthroughRegex = /<walkthrough(?:\s+[^>]*?)?>([\s\S]*?)<\/walkthrough>/gi;
+    cleanText = cleanText.replace(walkthroughRegex, (match, inner) => {
+      hasWalkthrough = true;
+      walkthroughContent = inner.trim();
+      return `%%%WALKTHROUGH_PLACEHOLDER%%%`;
+    });
+
+    // Also handle incomplete streaming tag for walkthrough
+    let streamingWalkthrough = false;
+    const walkthroughOpenMatch = /<walkthrough(?:\s+[^>]*?)?>/i.exec(cleanText);
+    if (walkthroughOpenMatch && !cleanText.toLowerCase().includes('</walkthrough>')) {
+      const openIdx = walkthroughOpenMatch.index;
+      walkthroughContent = cleanText.substring(openIdx + walkthroughOpenMatch[0].length).trim();
+      cleanText = cleanText.substring(0, openIdx) + `%%%STREAMING_WALKTHROUGH_PLACEHOLDER%%%`;
+      streamingWalkthrough = true;
     }
     
     // Clean block tools: create_file, write_file, patch_file, multi_patch_file, send_terminal_input, rename_file, git_commit
@@ -3486,6 +3582,45 @@ function attachImage(base64) {
       `;
       html = html.replace('<p>%%%STREAMING_PLAN_PLACEHOLDER%%%</p>', cardHtml);
       html = html.replace('%%%STREAMING_PLAN_PLACEHOLDER%%%', cardHtml);
+    }
+
+    // Replace walkthrough cards placeholders
+    if (hasWalkthrough) {
+      const innerHtml = parseMarkdown(walkthroughContent, isPlanApproved);
+      const cardHtml = `
+        <div class="walkthrough-card" style="background: rgba(16, 185, 129, 0.04); border: 1.5px solid rgba(16, 185, 129, 0.15); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+          <div class="walkthrough-card-glow" style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 1;"></div>
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #34d399; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.7px; z-index: 2; position: relative; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 6px;">
+            <span>📖</span>
+            <span>Task Walkthrough &amp; Verification</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.9); line-height: 1.6; z-index: 2; position: relative;" class="walkthrough-inner-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%WALKTHROUGH_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%WALKTHROUGH_PLACEHOLDER%%%', cardHtml);
+    }
+
+    if (streamingWalkthrough) {
+      const innerHtml = parseMarkdown(walkthroughContent);
+      const cardHtml = `
+        <div class="walkthrough-card streaming" style="background: rgba(16, 185, 129, 0.02); border: 1.2px dashed rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative; overflow: hidden; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(16, 185, 129, 0.15); padding-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #34d399; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;">
+              <span>📖</span>
+              <span>Summarizing Changes...</span>
+            </div>
+            <span class="streaming-label" style="font-size: 9px; opacity: 0.6; color: #34d399; font-weight: 600; animation: pulse 1.5s infinite alternate;">Generating...</span>
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.65); line-height: 1.6;" class="walkthrough-inner-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      html = html.replace('<p>%%%STREAMING_WALKTHROUGH_PLACEHOLDER%%%</p>', cardHtml);
+      html = html.replace('%%%STREAMING_WALKTHROUGH_PLACEHOLDER%%%', cardHtml);
     }
 
 
@@ -4929,8 +5064,8 @@ function initArtifacts() {
     }
   });
 
-  // Also listen via the global VS Code API postMessage
-  // (some events come via window.addEventListener from the postMessage chain)
+  // Request initial artifacts on load
+  vscode.postMessage({ type: 'getArtifacts' });
 }
 
 function toggleArtifactsDrawer() {
@@ -5060,4 +5195,245 @@ if (document.readyState === 'loading') {
 } else {
   initArtifacts();
 }
+
+// ===== Dashboard Module (v0.2.0) =====
+// Handles dashboard drawer visibility, widgets data updates, skill list rendering, and event stream.
+
+(function () {
+  // DOM Elements
+  const toggleBtn = document.getElementById('toggle-dashboard-btn');
+  const drawer = document.getElementById('dashboard-drawer');
+  const closeBtn = drawer?.querySelector('.drawer-close-btn');
+  const skillsList = document.getElementById('dash-skills-list');
+  const eventLogsContainer = document.getElementById('dash-event-logs');
+
+  let dashboardState = {
+    drawerVisible: false,
+    skills: [],
+    eventCount: 0,
+  };
+
+  /**
+   * Initialize dashboard events and message listeners
+   */
+  function initDashboard() {
+    // Toggle drawer
+    toggleBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDashboardDrawer();
+    });
+
+    closeBtn?.addEventListener('click', () => {
+      hideDashboardDrawer();
+    });
+
+    // Listen to messages from host
+    window.addEventListener('message', (event) => {
+      const message = event.data;
+      switch (message.type) {
+        case 'updateSkills': {
+          dashboardState.skills = message.skills || [];
+          renderSkillsList();
+          updateSkillsCountWidget(dashboardState.skills.length);
+          break;
+        }
+        case 'dashboardStats': {
+          updateStats(message);
+          break;
+        }
+        case 'eventFired': {
+          if (message.event) {
+            appendEventLog(message.event);
+            dashboardState.eventCount++;
+            const eventsVal = document.getElementById('stat-val-events');
+            if (eventsVal) eventsVal.textContent = dashboardState.eventCount;
+          }
+          break;
+        }
+      }
+    });
+
+    // Initial query
+    requestDashboardData();
+  }
+
+  function toggleDashboardDrawer() {
+    if (dashboardState.drawerVisible) {
+      hideDashboardDrawer();
+    } else {
+      showDashboardDrawer();
+    }
+  }
+
+  function showDashboardDrawer() {
+    if (!drawer) return;
+    // Close other drawers
+    document.querySelectorAll('.drawer:not(.collapsed)').forEach((d) => {
+      if (d.id !== 'dashboard-drawer') {
+        d.classList.add('collapsed');
+      }
+    });
+    drawer.classList.remove('collapsed');
+    dashboardState.drawerVisible = true;
+    requestDashboardData();
+  }
+
+  function hideDashboardDrawer() {
+    if (!drawer) return;
+    drawer.classList.add('collapsed');
+    dashboardState.drawerVisible = false;
+  }
+
+  function requestDashboardData() {
+    if (typeof vscode !== 'undefined') {
+      vscode.postMessage({ type: 'getSkills' });
+      vscode.postMessage({ type: 'getDashboardStats' });
+    }
+  }
+
+  function updateStats(data) {
+    const budgetVal = document.getElementById('stat-val-budget');
+    const budgetFill = document.getElementById('stat-fill-budget');
+    const skillsVal = document.getElementById('stat-val-skills');
+    const eventsVal = document.getElementById('stat-val-events');
+
+    if (budgetVal) {
+      budgetVal.textContent = `${(data.budget || 6000).toLocaleString()} tokens`;
+    }
+    if (budgetFill) {
+      // Show budget as fully active capacity
+      budgetFill.style.width = '100%';
+    }
+    if (skillsVal) {
+      skillsVal.textContent = data.skillsCount || 0;
+    }
+    if (eventsVal) {
+      dashboardState.eventCount = data.eventLogs ? data.eventLogs.length : 0;
+      eventsVal.textContent = dashboardState.eventCount;
+    }
+
+    // Populate events list
+    if (eventLogsContainer && data.eventLogs) {
+      eventLogsContainer.innerHTML = '';
+      data.eventLogs.forEach(appendEventLog);
+    }
+  }
+
+  function renderSkillsList() {
+    if (!skillsList) return;
+
+    if (dashboardState.skills.length === 0) {
+      skillsList.innerHTML = `
+        <div class="no-skills" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">
+          No distilled skills found yet. Run tasks to learn skills automatically.
+        </div>
+      `;
+      return;
+    }
+
+    skillsList.innerHTML = dashboardState.skills.map((skill) => {
+      const name = skill.name || 'untitled-procedure';
+      const desc = skill.description || 'No description provided.';
+      const category = skill.category || 'general';
+      return `
+        <div class="dash-skill-item" data-name="${name}">
+          <div class="dash-skill-header">
+            <div class="dash-skill-title" title="${name}">${name}</div>
+            <span class="dash-skill-category">${category}</span>
+          </div>
+          <div class="dash-skill-desc">${escapeHtml(desc)}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click listeners to open the skill file in editor
+    skillsList.querySelectorAll('.dash-skill-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const name = item.dataset.name;
+        if (typeof vscode !== 'undefined' && name) {
+          vscode.postMessage({
+            type: 'openFile',
+            path: `.mirror-vs/skills/${name}.md`
+          });
+        }
+      });
+    });
+  }
+
+  function updateSkillsCountWidget(count) {
+    const skillsVal = document.getElementById('stat-val-skills');
+    if (skillsVal) {
+      skillsVal.textContent = count;
+    }
+  }
+
+  function appendEventLog(log) {
+    if (!eventLogsContainer) return;
+
+    const item = document.createElement('div');
+    item.className = `event-log-item ${log.eventName}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'event-log-meta';
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'event-log-name';
+    nameSpan.textContent = log.eventName.replace(/_/g, ' ');
+    
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'event-log-time';
+    const d = new Date(log.timestamp);
+    timeSpan.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    meta.appendChild(nameSpan);
+    meta.appendChild(timeSpan);
+    item.appendChild(meta);
+
+    const dataDiv = document.createElement('div');
+    dataDiv.className = 'event-log-data';
+
+    // Format display content depending on event types
+    let displayData = '';
+    if (log.eventName === 'file_saved' || log.eventName === 'file_modified') {
+      displayData = log.data?.path || log.data?.filePath || JSON.stringify(log.data || {});
+      // Shorten workspace folder path if possible
+      const parts = displayData.split(/[\\/]/);
+      displayData = parts[parts.length - 1] || displayData;
+    } else if (log.eventName === 'error_detected') {
+      displayData = log.data?.reason || log.data?.error || JSON.stringify(log.data || {});
+    } else if (log.eventName === 'session_started') {
+      displayData = `Model: ${log.data?.model || 'default'}`;
+    } else if (log.eventName === 'task_completed') {
+      displayData = `Finished in ${log.data?.turns || 1} turns`;
+    } else {
+      displayData = JSON.stringify(log.data || {});
+    }
+    
+    dataDiv.textContent = displayData;
+    item.appendChild(dataDiv);
+
+    eventLogsContainer.appendChild(item);
+
+    // Auto-scroll log container to bottom
+    const parent = eventLogsContainer.parentNode;
+    if (parent) {
+      parent.scrollTop = parent.scrollHeight;
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // DOM Loaded listener
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initDashboard();
+    });
+  } else {
+    initDashboard();
+  }
+})();
 

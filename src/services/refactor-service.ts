@@ -57,11 +57,7 @@ export class RefactorService {
   /**
    * Analyze the impact of renaming a symbol across the codebase.
    */
-  async analyzeRenameImpact(
-    filePath: string,
-    oldName: string,
-    newName: string,
-  ): Promise<ImpactAnalysis> {
+  async analyzeRenameImpact(filePath: string, oldName: string, newName: string): Promise<ImpactAnalysis> {
     const graphService = GraphService.getInstance();
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceFolder) {
@@ -106,8 +102,7 @@ export class RefactorService {
 
     const filesList = [...filesToModify];
     const risk: ImpactAnalysis['riskAssessment'] =
-      filesList.length > 10 ? 'high' :
-      filesList.length > 5 ? 'medium' : 'low';
+      filesList.length > 10 ? 'high' : filesList.length > 5 ? 'medium' : 'low';
 
     return {
       filesToModify: filesList,
@@ -121,11 +116,7 @@ export class RefactorService {
   /**
    * Create a multi-file refactoring plan.
    */
-  createPlan(
-    description: string,
-    operations: RefactorOperation[],
-    impact: ImpactAnalysis,
-  ): RefactorPlan {
+  createPlan(description: string, operations: RefactorOperation[], impact: ImpactAnalysis): RefactorPlan {
     const plan: RefactorPlan = {
       id: `refactor_${Date.now()}`,
       description,

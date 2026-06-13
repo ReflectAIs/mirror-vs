@@ -13,11 +13,27 @@
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
     if (role === 'system') {
-      if (text.startsWith('[Tool Result')) {
-        appendToolCardFromHistory(text, container);
+      let innerText = text;
+      const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
+      const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
+      if (text.includes(guardOpen) && text.includes(guardClose)) {
+        const startIndex = text.indexOf(guardOpen) + guardOpen.length;
+        const endIndex = text.indexOf(guardClose);
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+          const contentInside = text.substring(startIndex, endIndex).trim();
+          const lines = contentInside.split('\n');
+          if (lines[0] && lines[0].startsWith('Source:')) {
+            lines.shift();
+          }
+          innerText = lines.join('\n').trim();
+        }
+      }
+
+      if (innerText.startsWith('[Tool Result')) {
+        appendToolCardFromHistory(innerText, container);
         return null;
       }
-      if (text.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
+      if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
         const msgElement = document.createElement('div');
         msgElement.className = 'message system-context';
         
@@ -29,7 +45,7 @@
             <span class="system-context-toggle">Show Details</span>
           </div>
           <div class="system-context-body collapsed">
-            ${parseMarkdown(text)}
+            ${parseMarkdown(innerText)}
           </div>
         `;
         
@@ -277,6 +293,14 @@
         }
         if (s.embeddingModel !== undefined && embeddingModelInput) {
           embeddingModelInput.value = s.embeddingModel;
+        }
+        if (s.teacherEnabled !== undefined) {
+          const teacherToggle = document.getElementById('settings-teacher-toggle');
+          if (teacherToggle) teacherToggle.checked = s.teacherEnabled;
+        }
+        if (s.teacherModel !== undefined) {
+          const teacherModelInput = document.getElementById('settings-teacher-model-input');
+          if (teacherModelInput) teacherModelInput.value = s.teacherModel;
         }
 
         syncQuickModelSelect();

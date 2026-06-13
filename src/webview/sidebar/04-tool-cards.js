@@ -335,6 +335,45 @@
         detailsContainer.appendChild(header);
         
         const cleanResult = result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim();
+        let diffText = cleanResult;
+        
+        if (code && (code.includes('<<<<') || code.includes('<file'))) {
+          try {
+            let output = '';
+            const fileRegex = /<file\s+path="([^"]+)"\s*>([\s\S]*?)<\/file>/gi;
+            let match;
+            let hasFiles = false;
+            
+            const processBlocks = (content) => {
+              let res = '';
+              const blockRegex = /<<<<\n([\s\S]*?)\n====\n([\s\S]*?)\n>>>>/g;
+              let bMatch;
+              let lastIdx = 0;
+              while ((bMatch = blockRegex.exec(content)) !== null) {
+                const search = bMatch[1];
+                const replace = bMatch[2];
+                res += '@@\n';
+                if (search) res += search.split('\n').map(l => '-' + l).join('\n') + '\n';
+                if (replace) res += replace.split('\n').map(l => '+' + l).join('\n') + '\n';
+                lastIdx = blockRegex.lastIndex;
+              }
+              return lastIdx === 0 ? content : res;
+            };
+
+            while ((match = fileRegex.exec(code)) !== null) {
+              hasFiles = true;
+              output += `--- ${match[1]}\n+++ ${match[1]}\n`;
+              output += processBlocks(match[2]);
+            }
+            if (!hasFiles) {
+              output = processBlocks(code);
+            }
+            diffText = output.trim();
+          } catch (e) {
+            diffText = code;
+          }
+        }
+        
         const codeBlock = document.createElement('div');
         codeBlock.className = 'code-block-wrapper';
         codeBlock.style.marginTop = '4px';
@@ -345,7 +384,7 @@
               <button class="code-action-btn copy-btn">Copy</button>
             </div>
           </div>
-          <pre><code class="language-diff">${escapeHtml(cleanResult)}</code></pre>
+          <pre><code class="language-diff">${escapeHtml(diffText)}</code></pre>
         `;
         detailsContainer.appendChild(codeBlock);
         bindCodeBlockButtons(codeBlock);
@@ -416,7 +455,11 @@
           const cleanResult = result ? result.replace(/(?:Revert|Reverted) ID: \w+/, '').trim() : '';
           const details = document.createElement('div');
           details.className = 'tool-details';
-          details.textContent = cleanResult || (status === 'success' ? 'Operation succeeded' : 'Operation failed');
+          if (cleanResult) {
+            details.innerHTML = parseMarkdown(cleanResult);
+          } else {
+            details.textContent = status === 'success' ? 'Operation succeeded' : 'Operation failed';
+          }
           detailsContainer.appendChild(details);
         }
       }

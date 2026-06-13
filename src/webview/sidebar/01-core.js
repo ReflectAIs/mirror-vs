@@ -140,7 +140,7 @@
       // Apply sticky via inline styles (guaranteed to work regardless of CSS specificity)
       lastBubble.style.position = 'sticky';
       lastBubble.style.top = '-12px';
-      lastBubble.style.bottom = '';
+      lastBubble.style.bottom = '0px';
       lastBubble.style.zIndex = '10';
     }
     

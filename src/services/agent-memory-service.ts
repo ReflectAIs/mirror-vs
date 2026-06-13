@@ -152,9 +152,7 @@ export class AgentMemoryService {
   search(query: string): MemoryEntry[] {
     this._ensureLoaded();
     const q = query.toLowerCase();
-    return this._index.entries.filter(
-      (e) => e.key.toLowerCase().includes(q) || e.value.toLowerCase().includes(q),
-    );
+    return this._index.entries.filter((e) => e.key.toLowerCase().includes(q) || e.value.toLowerCase().includes(q));
   }
 
   /**

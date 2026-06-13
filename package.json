@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -205,6 +205,26 @@
           "type": "integer",
           "default": 75,
           "description": "Context window budget utilization percentage."
+        },
+        "mirror-vs.agentInputTokenBudget": {
+          "type": "integer",
+          "default": 6000,
+          "description": "Adaptive soft input token budget (in tokens)."
+        },
+        "mirror-vs.agentInputTokenHardMax": {
+          "type": "integer",
+          "default": 200000,
+          "description": "Generous ceiling for auto-derived budget path for long-context models."
+        },
+        "mirror-vs.teacherEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable teacher-student escalation loop on self-hosted/local model failures."
+        },
+        "mirror-vs.teacherModel": {
+          "type": "string",
+          "default": "deepseek-v4-pro",
+          "description": "Model to use as the senior teacher model for failure recovery (format: provider/model)."
         },
         "mirror-vs.maxTurnsBeforeSummarize": {
           "type": "integer",

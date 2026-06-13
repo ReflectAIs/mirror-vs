@@ -15,7 +15,7 @@ if (!fs.existsSync(webviewDistDir)) {
 // Concatenate sidebar parts into a single sidebar.js
 function concatSidebarParts() {
   const partsDir = path.join(__dirname, 'src', 'webview', 'sidebar');
-  const parts = ['01-core.js', '02-ui-renderers.js', '03-submit-send.js', '04-tool-cards.js', '05-message-handlers.js', '06-markdown.js', '07-sessions-diffs.js', '08-artifacts.js'];
+  const parts = ['01-core.js', '02-ui-renderers.js', '03-submit-send.js', '04-tool-cards.js', '05-message-handlers.js', '06-markdown.js', '07-sessions-diffs.js', '08-artifacts.js', '09-dashboard.js'];
   let combined = '';
   for (const part of parts) {
     const partPath = path.join(partsDir, part);

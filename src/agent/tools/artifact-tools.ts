@@ -1,7 +1,7 @@
 /**
  * Artifact Tools — creates and manages interactive previewable artifacts
  * (HTML, SVG, Mermaid, code) that appear in a dedicated VS Code webview panel.
- * 
+ *
  * Usage by the agent:
  *   <create_artifact type="html|svg|mermaid|code|markdown" title="My Artifact" [language="typescript"]>
  *     ...content...
@@ -10,9 +10,7 @@
 import { ToolCall } from '../types';
 import { ArtifactService } from '../../services/artifact-service';
 
-export async function executeArtifactTool(
-  tool: ToolCall,
-): Promise<string> {
+export async function executeArtifactTool(tool: ToolCall): Promise<string> {
   const artifactService = ArtifactService.getInstance();
   const type = tool.type || tool.artifactType || 'html';
   const title = tool.title || tool.name || 'Untitled Artifact';

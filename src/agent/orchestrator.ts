@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ChatMessage, LLMProvider } from '../types';
 import { executeTool } from './tools/tool-registry';
+import { getDependentsOfFile } from './tools/code-analysis-tools';
 import { RateLimiter } from '../services/rate-limiter';
 import { ProviderFallback } from '../services/provider-fallback';
 import { AgentSession } from './agent-session';
@@ -11,32 +12,60 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { getModelContextWindow, estimateTokenCount, estimatePayloadTokens } from './orchestrator-config';
-import { buildSystemPrompt, hasDeclaredPlan, hasActionPlanningIntent, getDiagnosticsForFile } from './orchestrator-prompt';
+import {
+  buildSystemPrompt,
+  hasDeclaredPlan,
+  hasActionPlanningIntent,
+  getDiagnosticsForFile,
+} from './orchestrator-prompt';
 import { AgentMemoryService } from '../services/agent-memory-service';
+import { ArtifactService } from '../services/artifact-service';
+
+// P0 imports
+import { getContextLength, estimateTokens } from '../services/model-context';
+import { computeInputTokenBudget } from '../services/context-budget';
+import { maybeCompact, trimForContext } from '../services/context-compactor';
+import { evaluateTurnResult } from './failure-detector';
+
+// P1 imports
+import { untrustedContextMessage } from './prompt-security';
+import { getDisabledToolsForMode } from './tool-policy';
+import { injectRelevantSkills } from '../services/skill-service';
+import { maybeEscalate } from './teacher-escalation';
+import { EventBus } from '../services/event-bus';
 
 export enum AgentState {
   DISCOVERY = 'DISCOVERY',
   IMPLEMENTATION = 'IMPLEMENTATION',
   VERIFICATION = 'VERIFICATION',
   BLOCKED = 'BLOCKED',
-  NEEDS_EVIDENCE = 'NEEDS_EVIDENCE'
+  NEEDS_EVIDENCE = 'NEEDS_EVIDENCE',
 }
 
 export enum TaskMode {
   REVIEW = 'REVIEW',
   DEBUG = 'DEBUG',
   IMPLEMENT = 'IMPLEMENT',
-  VERIFY = 'VERIFY'
+  VERIFY = 'VERIFY',
 }
 
 export function determineTaskMode(userMessage: string, configMode: string): TaskMode {
   const lower = userMessage.toLowerCase();
-  if ([
-    'review', 'audit', 'analyze', 'improvements', 'feedback', 'architecture review', 'frontend review'
-  ].some(keyword => lower.includes(keyword))) {
+  if (
+    ['review', 'audit', 'analyze', 'improvements', 'feedback', 'architecture review', 'frontend review'].some(
+      (keyword) => lower.includes(keyword),
+    )
+  ) {
     return TaskMode.REVIEW;
   }
-  if (configMode === 'debug' || lower.includes('bug') || lower.includes('fix') || lower.includes('error') || lower.includes('crash') || lower.includes('fail')) {
+  if (
+    configMode === 'debug' ||
+    lower.includes('bug') ||
+    lower.includes('fix') ||
+    lower.includes('error') ||
+    lower.includes('crash') ||
+    lower.includes('fail')
+  ) {
     return TaskMode.DEBUG;
   }
   if (lower.includes('verify') || lower.includes('check') || lower.includes('test')) {
@@ -138,12 +167,13 @@ export class AgentOrchestrator {
       const signal = this._activeAbortController.signal;
       this._sendAvatarState('thinking');
 
-            const config = vscode.workspace.getConfiguration('mirror-vs');
+      const config = vscode.workspace.getConfiguration('mirror-vs');
       let provider = config.get<string>('defaultProvider', 'ollama') as string;
       const ollamaHost = config.get<string>('ollamaHost', 'http://localhost:11434') as string;
       const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3') as string;
       const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-v4-pro') as string;
       this._session.sessionId = 'session_' + Date.now();
+      EventBus.getInstance().fire('session_started', { sessionId: this._session.sessionId });
 
       // Rate limiter: image budget
       if (images && images.length > 0) {
@@ -208,6 +238,9 @@ export class AgentOrchestrator {
         await this._saveChatHistory(currentMessages);
       }
 
+      // Inject task-relevant learned skills into conversation context (P1.3)
+      currentMessages = injectRelevantSkills(currentMessages, text || '');
+
       await this._ensureGitBaseline();
 
       // Auto-inject lightweight project map if this is the first turn and history doesn't already have it
@@ -221,7 +254,21 @@ export class AgentOrchestrator {
           const projectMap = await this._generateLightweightProjectMap(workspaceRoot);
           const mapMsg: ChatMessage = {
             role: 'system',
-            content: `[PROJECT STRUCTURE]\nHere is a lightweight structure of the workspace to help you orient yourself:\n\n\`\`\`\n${projectMap}\n\`\`\``,
+            content: [
+              '[PROJECT STRUCTURE]',
+              'Here is the full workspace structure to help you orient yourself.',
+              '',
+              '**How to use this map:**',
+              '- The tree shows every source file (4 levels deep) with a one-line description extracted from its top comment.',
+              '- The "Source File Index" at the bottom lists every source file with its exact relative path.',
+              '- Always use paths from the Source File Index when calling `read_file`, `patch_file`, `grep_search`, or `create_file`. Do NOT guess paths.',
+              '- Run `<graphify />` if you need per-module exports, import chains, or the most-imported core modules.',
+              '- Run `<analyze_dependencies />` for circular dependency detection.',
+              '',
+              '```',
+              projectMap,
+              '```',
+            ].join('\n'),
           };
           currentMessages.unshift(mapMsg);
           await this._saveChatHistory(currentMessages);
@@ -230,6 +277,7 @@ export class AgentOrchestrator {
         }
       }
 
+
       let loopCount = 0;
       const maxLoops = 50;
       let continueLoop = true;
@@ -237,6 +285,14 @@ export class AgentOrchestrator {
       let consecutiveMalformedCount = 0;
       const maxMalformedRetries = 3;
       let sequentialExploratorySteps = 0;
+      // Track consecutive patch failures to inject corrective guidance
+      let consecutivePatchFailures = 0;
+      let lastPatchFailedPath = '';
+
+      // Generic failure detection tracking
+      let consecutiveToolFailures = 0;
+      let lastFailedToolKey = '';
+      let consecutiveVerbalGiveUps = 0;
 
       // Agent Control Loop Guard State Tracking (Eradicates Execution Paralysis)
       const activeMode = config.get<string>('agentMode', 'normal');
@@ -244,11 +300,16 @@ export class AgentOrchestrator {
       let searchCount = 0;
       const maxSearchBudget = (() => {
         switch (taskMode) {
-          case TaskMode.REVIEW: return 2;
-          case TaskMode.IMPLEMENT: return 4;
-          case TaskMode.DEBUG: return activeMode === 'debug' ? 15 : 6;
-          case TaskMode.VERIFY: return 6;
-          default: return 6;
+          case TaskMode.REVIEW:
+            return 2;
+          case TaskMode.IMPLEMENT:
+            return 4;
+          case TaskMode.DEBUG:
+            return activeMode === 'debug' ? 15 : 6;
+          case TaskMode.VERIFY:
+            return 6;
+          default:
+            return 6;
         }
       })();
       const readRangesTracker = new Map<string, { hash: string; ranges: Set<string> }>();
@@ -281,9 +342,15 @@ export class AgentOrchestrator {
                 if (key === 'FEATURE_OWNER') {
                   featureOwner = value;
                 } else if (key === 'SEARCH_SCOPE_ALLOWED') {
-                  allowedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                  allowedScopes = value
+                    .split(',')
+                    .map((s) => s.trim().toLowerCase())
+                    .filter(Boolean);
                 } else if (key === 'SEARCH_SCOPE_BLOCKED') {
-                  blockedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                  blockedScopes = value
+                    .split(',')
+                    .map((s) => s.trim().toLowerCase())
+                    .filter(Boolean);
                 }
               }
             }
@@ -294,11 +361,29 @@ export class AgentOrchestrator {
       // Accumulated warnings for the current turn (fed back as system messages)
       let activeWarnings: string[] = [];
 
-      const validateControlLoopGuard = (tool: any): { allowed: boolean; warning?: string } => {
+      const validateControlLoopGuard = (tool: any): { allowed: boolean; warning?: string; reason?: string } => {
+        // Mode-specific tool gating (P2.1)
+        const allRegisteredTools = new Set([
+          'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
+          'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
+          'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
+          'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
+          'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
+          'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
+          'list_terminals', 'figma_inspect', 'update_agent_memory'
+        ]);
+        const disabledTools = getDisabledToolsForMode(taskMode, allRegisteredTools);
+        if (disabledTools.has(tool.name)) {
+          return {
+            allowed: false,
+            reason: `Tool execution is blocked: the tool "${tool.name}" is not permitted in ${taskMode} mode.`
+          };
+        }
+
         if (agentState === AgentState.NEEDS_EVIDENCE) {
           return {
             allowed: true,
-            warning: `[Needs Evidence Reminder]: You lack the JS stack trace or crash logs. Consider asking the user for diagnostic info (Logcat, RedBox, etc.) before patching.`
+            warning: `[Needs Evidence Reminder]: You lack the JS stack trace or crash logs. Consider asking the user for diagnostic info (Logcat, RedBox, etc.) before patching.`,
           };
         }
 
@@ -316,7 +401,9 @@ export class AgentOrchestrator {
         if (isSearchOrRead) {
           // 0a. Review Sufficiency (warn, don't block)
           if (hasEnoughInformationForReview(taskMode, verifiedFiles, currentMessages)) {
-            activeWarnings.push(`[Review]: You have read ${verifiedFiles.size} file(s) — consider outputting your findings soon.`);
+            activeWarnings.push(
+              `[Review]: You have read ${verifiedFiles.size} file(s) — consider outputting your findings soon.`,
+            );
           }
 
           // 0b. Error Localized (warn, don't block)
@@ -326,12 +413,16 @@ export class AgentOrchestrator {
 
           // 1. Commitment Lock (warn, don't block)
           if (hasCommittedToPatch && activeMode !== 'debug') {
-            activeWarnings.push(`[Commitment]: You declared you are ready to patch. Prefer implementation over further exploration.`);
+            activeWarnings.push(
+              `[Commitment]: You declared you are ready to patch. Prefer implementation over further exploration.`,
+            );
           }
 
           // 2. Search Budget (warn, don't block)
           if (searchCount >= maxSearchBudget) {
-            activeWarnings.push(`[Search Budget]: ${maxSearchBudget} searches used. Consider patching or explaining what's missing.`);
+            activeWarnings.push(
+              `[Search Budget]: ${maxSearchBudget} searches used. Consider patching or explaining what's missing.`,
+            );
           }
 
           // 3. "No Re-Read" (warn, don't block — still track)
@@ -340,15 +431,21 @@ export class AgentOrchestrator {
             const endLine = tool.end_line || 1000;
             const rangeKey = `${startLine}-${endLine}`;
             const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-            const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
-            
+            const fullPath = tool.path
+              ? path.isAbsolute(tool.path)
+                ? tool.path
+                : path.join(workspacePath, tool.path)
+              : '';
+
             let currentHash = '';
             try {
               if (fullPath && fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
                 const content = fs.readFileSync(fullPath);
                 currentHash = crypto.createHash('sha256').update(content).digest('hex');
               }
-            } catch {}
+            } catch {
+              // ignore
+            }
 
             let tracker = readRangesTracker.get(fullPath);
             if (!tracker || tracker.hash !== currentHash) {
@@ -357,7 +454,9 @@ export class AgentOrchestrator {
             }
 
             if (tracker.ranges.has(rangeKey)) {
-              activeWarnings.push(`[Re-Read]: Already read "${tool.path}" (lines ${startLine}-${endLine}). Skipping may save time.`);
+              activeWarnings.push(
+                `[Re-Read]: Already read "${tool.path}" (lines ${startLine}-${endLine}). Skipping may save time.`,
+              );
             }
             tracker.ranges.add(rangeKey);
           }
@@ -376,9 +475,15 @@ export class AgentOrchestrator {
         // 5. Workspace Grounding (warn, don't block)
         if (tool.name === 'patch_file') {
           const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-          const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+          const fullPath = tool.path
+            ? path.isAbsolute(tool.path)
+              ? tool.path
+              : path.join(workspacePath, tool.path)
+            : '';
           if (fullPath && !verifiedFiles.has(fullPath)) {
-            activeWarnings.push(`[Grounding]: You haven't read "${tool.path}" yet this session. Patching without reading may cause SEARCH-block mismatches.`);
+            activeWarnings.push(
+              `[Grounding]: You haven't read "${tool.path}" yet this session. Patching without reading may cause SEARCH-block mismatches.`,
+            );
           }
         }
 
@@ -390,12 +495,18 @@ export class AgentOrchestrator {
         // 6. Architecture Constraint Lock (warn, don't block)
         if (isSearchOrRead && blockedScopes.length > 0) {
           const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-          const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+          const fullPath = tool.path
+            ? path.isAbsolute(tool.path)
+              ? tool.path
+              : path.join(workspacePath, tool.path)
+            : '';
           const normalizedPath = fullPath.toLowerCase().replace(/\\/g, '/');
-          
+
           for (const blocked of blockedScopes) {
             if (normalizedPath.includes(blocked) || target.toLowerCase().includes(blocked)) {
-              activeWarnings.push(`[Architecture]: Accessing '${target}' may violate SEARCH_SCOPE_BLOCKED '${blocked}'. Add JUSTIFICATION to <architecture_routing> if needed.`);
+              activeWarnings.push(
+                `[Architecture]: Accessing '${target}' may violate SEARCH_SCOPE_BLOCKED '${blocked}'. Add JUSTIFICATION to <architecture_routing> if needed.`,
+              );
             }
           }
         }
@@ -404,7 +515,11 @@ export class AgentOrchestrator {
         if (tool.name === 'patch_file' || tool.name === 'write_file' || tool.name === 'create_file') {
           if (tool.path) {
             const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-            const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+            const fullPath = tool.path
+              ? path.isAbsolute(tool.path)
+                ? tool.path
+                : path.join(workspacePath, tool.path)
+              : '';
             if (fullPath) {
               readRangesTracker.delete(fullPath);
             }
@@ -470,99 +585,48 @@ export class AgentOrchestrator {
                   ? activeCustomApi.url
                   : customEndpointUrl;
 
-          const contextWindow = getModelContextWindow(currentModel);
-          const budgetPercent = config.get('contextBudgetPercent', 75) as number;
-          const summarizeThreshold = contextWindow * (budgetPercent / 100);
-          const targetBudget = contextWindow * (Math.max(budgetPercent - 20, 10) / 100);
-          const turnsToRetain = config.get('turnsToRetain', 6);
-
-          const systemPromptTokens = estimateTokenCount(
-            buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState, taskMode),
+          // Discover the actual context window using our new service
+          const contextWindow = await getContextLength(currentHost, currentModel, apiKey);
+          const configuredBudget = config.get('agentInputTokenBudget', 6000) as number;
+          const explicitBudget = config.inspect('agentInputTokenBudget')?.globalValue !== undefined ||
+                                 config.inspect('agentInputTokenBudget')?.workspaceValue !== undefined;
+          
+          const hardMax = config.get('agentInputTokenHardMax', 200000) as number;
+          const effectiveBudget = computeInputTokenBudget(
+            configuredBudget,
+            contextWindow,
+            explicitBudget,
+            { hardMax }
           );
-          const activeMessages = currentMessages.filter((msg, idx) => {
-            if (idx === 0) return false;
-            if (msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')) return false;
-            return !msg.summarized;
-          });
-          let activeTokens =
-            systemPromptTokens + activeMessages.reduce((sum, msg) => sum + estimateTokenCount(msg.content), 0);
 
-          // Dynamic token-driven file content eviction:
-          // If we exceed the threshold, try to prune the oldest read_file contents first
-          if (activeTokens > summarizeThreshold) {
-            const readFileMessages = activeMessages.filter(
-              (msg) =>
-                msg.role === 'system' &&
-                msg.content.startsWith('[Tool Result for read_file on "') &&
-                msg.content.includes('"]: Success -'),
-            );
-
-            for (const msg of readFileMessages) {
-              if (activeTokens <= targetBudget) break;
-              const match = msg.content.match(/^\[Tool Result for read_file on "([^"]+)"\]: Success - /);
-              if (match) {
-                const filePath = match[1];
-                // Extract line range from the original result if present
-                const lineRange = msg.content.match(/showing lines (\d+-\d+)/);
-                const rangeStr = lineRange ? ` lines ${lineRange[1]}` : '';
-                const prevTokens = estimateTokenCount(msg.content);
-                msg.content = `[Tool Result for read_file on "${filePath}"]: (Content evicted dynamically to stay within token budget. Read${rangeStr} re-read the file to see contents.)`;
-                const newTokens = estimateTokenCount(msg.content);
-                activeTokens = activeTokens - prevTokens + newTokens;
-              }
-            }
-            await this._saveChatHistory(currentMessages);
-          }
-
-          if (activeTokens > summarizeThreshold) {
-            try {
-              // Remove oldest messages until under target budget
-              let tokensToRemove = activeTokens - targetBudget;
-              let summarizeCount = 0;
-              let removedTokens = 0;
-              for (let i = 0; i < activeMessages.length - turnsToRetain; i++) {
-                removedTokens += estimateTokenCount(activeMessages[i].content);
-                summarizeCount = i + 1;
-                if (removedTokens >= tokensToRemove) break;
-              }
-              if (summarizeCount === 0) summarizeCount = Math.max(1, activeMessages.length - turnsToRetain);
-
-              const toSummarize = activeMessages.slice(0, summarizeCount);
-              const existingSummaries = currentMessages.filter(
-                (msg) => msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]'),
-              );
+          // Auto-compaction check using our new context compactor service
+          const compactionResult = await maybeCompact(
+            currentMessages,
+            contextWindow,
+            async (summaryPrompt) => {
               this._postMessage({ type: 'chatResponseStart' });
               this._postMessage({
                 type: 'chatResponseChunk',
-                text: `Compressing context (~${Math.round(activeTokens / 1000)}K tokens → target ~${Math.round(targetBudget / 1000)}K, model window: ${Math.round(contextWindow / 1000)}K)...`,
+                text: `Compressing context (~${Math.round(estimateTokens(currentMessages) / 1000)}K tokens, model window: ${Math.round(contextWindow / 1000)}K)...`,
               });
               const summary = await this._completer.summarizeHistory(
                 provider as LLMProvider,
                 currentHost,
                 currentModel,
                 apiKey,
-                [...existingSummaries, ...toSummarize],
+                summaryPrompt
               );
-              const summaryMsg: ChatMessage = { role: 'system', content: '[CONSOLIDATED CONTEXT SUMMARY]\n' + summary };
-              const cleaned = currentMessages.filter(
-                (msg) => !(msg.role === 'system' && msg.content.includes('[CONSOLIDATED CONTEXT SUMMARY]')),
-              );
-              toSummarize.forEach((msg) => {
-                const found = cleaned.find((m) => m === msg);
-                if (found) {
-                  found.summarized = true;
-                  found.content = `[Summarized: ${found.role} message, ${found.content.length} chars original]`;
-                  if (found.images) found.images = [];
-                }
-              });
-              currentMessages = [cleaned[0], summaryMsg, ...cleaned.slice(1)];
-              await this._saveChatHistory(currentMessages);
-              this._postMessage({ type: 'updateChatHistory', history: currentMessages });
               this._postMessage({ type: 'chatResponseComplete', fullText: 'Context optimized.' });
-            } catch (e: unknown) {
-              console.warn('Failed to summarize history:', e instanceof Error ? e.message : String(e));
+              return summary;
             }
+          );
+
+          if (compactionResult.wasCompacted) {
+            currentMessages = compactionResult.compactedMessages;
+            await this._saveChatHistory(currentMessages);
+            this._postMessage({ type: 'updateChatHistory', history: currentMessages });
           }
+
           continueLoop = false;
 
           const resolvedPayloadPromises = currentMessages
@@ -581,15 +645,35 @@ export class AgentOrchestrator {
           const resolvedPayload = await Promise.all(resolvedPayloadPromises);
 
           const payload: ChatMessage[] = [
-            { role: 'system', content: buildSystemPrompt(loopCount, hasDeclaredPlan(currentMessages, ''), featureOwner, agentState, taskMode) },
+            {
+              role: 'system',
+              content: buildSystemPrompt(
+                loopCount,
+                hasDeclaredPlan(currentMessages, ''),
+                featureOwner,
+                agentState,
+                taskMode,
+                text || '',
+              ),
+            },
             ...resolvedPayload,
           ];
 
+          // Soft trim payload messages to the effective input token budget
+          const reserveTokens = 1024;
+          const trimmedPayload = trimForContext(payload, effectiveBudget, reserveTokens);
+
+          // Strip internal metadata keys before sending to the LLM API
+          const finalPayload = trimmedPayload.map((m) => {
+            const { role, content, images } = m;
+            return { role, content, images };
+          });
+
           // Payload diagnostics
-          const payloadTokens = estimatePayloadTokens(payload);
+          const payloadTokens = estimateTokens(finalPayload);
           const utilization = Math.round((payloadTokens / contextWindow) * 100);
           console.log(
-            `[Context] Payload: ${payload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, utilization: ${utilization}%)`,
+            `[Context] Payload: ${finalPayload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, budget: ${Math.round(effectiveBudget / 1000)}K, utilization: ${utilization}%)`
           );
 
           this._postMessage({ type: 'chatResponseStart' });
@@ -609,7 +693,7 @@ export class AgentOrchestrator {
                 currentHost,
                 currentModel,
                 apiKey,
-                payload,
+                finalPayload,
                 completionController.signal,
                 this._session.sessionId,
                 completionController,
@@ -665,7 +749,9 @@ export class AgentOrchestrator {
           signal.removeEventListener('abort', mainAbortListener);
 
           currentMessages.push({ role: 'assistant', content: assistantResponse });
-          
+
+          this._syncPlanningFiles(assistantResponse);
+
           // Parse architecture routing block
           const routingMatch = assistantResponse.match(/<architecture_routing>([\s\S]*?)<\/architecture_routing>/i);
           if (routingMatch) {
@@ -680,9 +766,15 @@ export class AgentOrchestrator {
                 if (key === 'FEATURE_OWNER') {
                   featureOwner = value;
                 } else if (key === 'SEARCH_SCOPE_ALLOWED') {
-                  allowedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                  allowedScopes = value
+                    .split(',')
+                    .map((s) => s.trim().toLowerCase())
+                    .filter(Boolean);
                 } else if (key === 'SEARCH_SCOPE_BLOCKED') {
-                  blockedScopes = value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                  blockedScopes = value
+                    .split(',')
+                    .map((s) => s.trim().toLowerCase())
+                    .filter(Boolean);
                 } else if (key === 'JUSTIFICATION') {
                   if (value.length > 5) {
                     hasJustification = true;
@@ -709,7 +801,9 @@ export class AgentOrchestrator {
             // Tool ranking info logged but NOT enforced — model runs all tools it emits
             if (toolCalls.length > 1) {
               const { selectedTool, alternatives } = selectHighestValueTool(toolCalls, currentMessages);
-              console.log(`[Orchestrator] Multi-tool turn: ${toolCalls.length} tools. Top pick: ${selectedTool.name} (score shown in telemetry; all tools allowed).`);
+              console.log(
+                `[Orchestrator] Multi-tool turn: ${toolCalls.length} tools. Top pick: ${selectedTool.name} (score shown in telemetry; all tools allowed).`,
+              );
               // Active warnings from validateControlLoopGuard will be fed back after tool results
             }
 
@@ -742,13 +836,18 @@ export class AgentOrchestrator {
             // STRICT ONE-TOOL-PER-TURN ENFORCEMENT: Always execute only the first tool
             if (toolCalls.length > 1) {
               const extraCount = toolCalls.length - 1;
-              const extraNames = toolCalls.slice(1).map(t => t.name).join(', ');
+              const extraNames = toolCalls
+                .slice(1)
+                .map((t) => t.name)
+                .join(', ');
               // Execute only the first tool
               toolCalls = [toolCalls[0]];
               // Inject a warning result for each extra tool
               const warningResult = `[SYSTEM NOTICE: Tools "${extraNames}" and ${extraCount - 1} other(s) were skipped because only one tool per turn is allowed. The model will have a chance to emit the next tool after this turn.]`;
               toolResults.push(warningResult);
-              console.log(`[Orchestrator] Enforced single-tool limit: skipped ${extraCount} extra tools (${extraNames}).`);
+              console.log(
+                `[Orchestrator] Enforced single-tool limit: skipped ${extraCount} extra tools (${extraNames}).`,
+              );
             }
 
             const readOnlyTools = [
@@ -771,7 +870,6 @@ export class AgentOrchestrator {
                 const guard = validateControlLoopGuard(tool);
                 if (!guard.allowed) {
                   this._sendToolStatusToWebview(tool.name, 'error', target, guard.reason);
-                  this._sendAvatarState('error');
                   return '[Tool Result for ' + tool.name + ' on "' + target + '"]: Error - ' + guard.reason;
                 }
 
@@ -780,6 +878,25 @@ export class AgentOrchestrator {
                   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                   const figmaKey = (await this._getSecret('figma_api_key')) || '';
                   const result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+
+                  if (
+                    tool.name === 'patch_file' ||
+                    tool.name === 'write_file' ||
+                    tool.name === 'create_file' ||
+                    tool.name === 'multi_patch_file' ||
+                    tool.name === 'delete_file' ||
+                    tool.name === 'rename_file'
+                  ) {
+                    try {
+                      EventBus.getInstance().fire('file_modified', {
+                        tool: tool.name,
+                        path: tool.path,
+                        content: tool.content,
+                      });
+                    } catch (e) {
+                      console.error('Failed to fire file_modified event:', e);
+                    }
+                  }
 
                   let displayResult = result;
                   // Scale truncation threshold with model config
@@ -797,9 +914,13 @@ export class AgentOrchestrator {
                       result.substring(result.length - keep);
                   }
 
-                   if (tool.name === 'read_file') {
+                  if (tool.name === 'read_file') {
                     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-                    const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+                    const fullPath = tool.path
+                      ? path.isAbsolute(tool.path)
+                        ? tool.path
+                        : path.join(workspacePath, tool.path)
+                      : '';
                     if (fullPath) {
                       verifiedFiles.add(fullPath);
                     }
@@ -814,22 +935,29 @@ export class AgentOrchestrator {
                       outcome = 'ERROR';
                     } else {
                       // Observable evidence classification for ROOT_CAUSE_FOUND
-                      const isBuildErrorFound = lastSymptom === 'BUILD_FAILURE' && 
-                        tool.path && 
+                      const isBuildErrorFound =
+                        lastSymptom === 'BUILD_FAILURE' &&
+                        tool.path &&
                         lowerResult.includes(path.basename(tool.path).toLowerCase()) &&
                         (lowerResult.includes('unresolved reference') || lowerResult.includes('error:'));
-                      
-                      const isNetworkConfigFound = lastSymptom === 'NETWORK_ERROR' &&
-                        (lowerResult.includes('axios') || lowerResult.includes('api_host') || lowerResult.includes('url'));
-                      
-                      const isAuthConfigFound = lastSymptom === 'AUTH_FAILURE' &&
-                        (lowerResult.includes('token') || lowerResult.includes('session') || lowerResult.includes('auth'));
-                      
+
+                      const isNetworkConfigFound =
+                        lastSymptom === 'NETWORK_ERROR' &&
+                        (lowerResult.includes('axios') ||
+                          lowerResult.includes('api_host') ||
+                          lowerResult.includes('url'));
+
+                      const isAuthConfigFound =
+                        lastSymptom === 'AUTH_FAILURE' &&
+                        (lowerResult.includes('token') ||
+                          lowerResult.includes('session') ||
+                          lowerResult.includes('auth'));
+
                       if (isBuildErrorFound || isNetworkConfigFound || isAuthConfigFound) {
                         outcomeReason = 'ROOT_CAUSE_FOUND';
                       }
                     }
-                    
+
                     lastRewriteTelemetry.outcome = outcome;
                     lastRewriteTelemetry.outcomeReason = outcomeReason;
                     lastRewriteTelemetry.resultSnippet = result.substring(0, 200);
@@ -849,7 +977,7 @@ export class AgentOrchestrator {
                   return '[Tool Result for ' + tool.name + ' on "' + target + '"]: Success - ' + result;
                 } catch (err: unknown) {
                   const errMsg = err instanceof Error ? err.message : String(err);
-                  
+
                   if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
                     lastRewriteTelemetry.outcome = 'ERROR';
                     lastRewriteTelemetry.outcomeReason = 'TOOL_EXECUTION_FAILED';
@@ -859,7 +987,7 @@ export class AgentOrchestrator {
                   }
 
                   this._sendToolStatusToWebview(tool.name, 'error', target, errMsg);
-                  this._sendAvatarState('error');
+                  // Do NOT set avatar to 'error' — loop will continue with error fed back to model
                   return (
                     '[Tool Result for ' +
                     tool.name +
@@ -870,6 +998,7 @@ export class AgentOrchestrator {
                     '. Please correct your approach and try again.'
                   );
                 }
+
               });
 
               const resolvedResults = await Promise.all(promises);
@@ -888,16 +1017,35 @@ export class AgentOrchestrator {
                 const guard = validateControlLoopGuard(tool);
                 if (!guard.allowed) {
                   this._sendToolStatusToWebview(tool.name, 'error', target, guard.reason);
-                  this._sendAvatarState('error');
                   toolResults.push(`[Tool Result for ${tool.name} on "${target}"]: Error - ${guard.reason}`);
                   continue;
                 }
+
 
                 this._sendToolStatusToWebview(tool.name, 'running', target);
                 try {
                   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                   const figmaKey = (await this._getSecret('figma_api_key')) || '';
                   let result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+
+                  if (
+                    tool.name === 'patch_file' ||
+                    tool.name === 'write_file' ||
+                    tool.name === 'create_file' ||
+                    tool.name === 'multi_patch_file' ||
+                    tool.name === 'delete_file' ||
+                    tool.name === 'rename_file'
+                  ) {
+                    try {
+                      EventBus.getInstance().fire('file_modified', {
+                        tool: tool.name,
+                        path: tool.path,
+                        content: tool.content,
+                      });
+                    } catch (e) {
+                      console.error('Failed to fire file_modified event:', e);
+                    }
+                  }
 
                   // Grounding Verification Hook
                   if (tool.name === 'create_file' || tool.name === 'write_file' || tool.name === 'patch_file') {
@@ -916,12 +1064,34 @@ export class AgentOrchestrator {
                       } catch (e) {
                         console.error('Failed to run workspace verification:', e);
                       }
+                      if (tool.path) {
+                        try {
+                          const dependents = getDependentsOfFile(tool.path);
+                          if (dependents.length > 0) {
+                            const depList = dependents
+                              .map((d) => `- \`${path.relative(workspaceFolder, d.file).replace(/\\/g, '/')}\` (imports this file on line ${d.line})`)
+                              .join('\n');
+                            result += `\n\n[System Notice: Note that the following file(s) import/depend on the file you modified. Decide if you need to check them or if they are affected:\n${depList}]`;
+                          }
+                        } catch (e) {
+                          console.error('Failed to analyze dependents:', e);
+                        }
+                      }
                     }
                   }
 
-                  if (tool.name === 'read_file' || tool.name === 'create_file' || tool.name === 'write_file' || tool.name === 'patch_file') {
+                  if (
+                    tool.name === 'read_file' ||
+                    tool.name === 'create_file' ||
+                    tool.name === 'write_file' ||
+                    tool.name === 'patch_file'
+                  ) {
                     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-                    const fullPath = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : '';
+                    const fullPath = tool.path
+                      ? path.isAbsolute(tool.path)
+                        ? tool.path
+                        : path.join(workspacePath, tool.path)
+                      : '';
                     if (fullPath) {
                       verifiedFiles.add(fullPath);
                     }
@@ -964,22 +1134,29 @@ export class AgentOrchestrator {
                       outcome = 'ERROR';
                     } else {
                       // Observable evidence classification for ROOT_CAUSE_FOUND
-                      const isBuildErrorFound = lastSymptom === 'BUILD_FAILURE' && 
-                        tool.path && 
+                      const isBuildErrorFound =
+                        lastSymptom === 'BUILD_FAILURE' &&
+                        tool.path &&
                         lowerResult.includes(path.basename(tool.path).toLowerCase()) &&
                         (lowerResult.includes('unresolved reference') || lowerResult.includes('error:'));
-                      
-                      const isNetworkConfigFound = lastSymptom === 'NETWORK_ERROR' &&
-                        (lowerResult.includes('axios') || lowerResult.includes('api_host') || lowerResult.includes('url'));
-                      
-                      const isAuthConfigFound = lastSymptom === 'AUTH_FAILURE' &&
-                        (lowerResult.includes('token') || lowerResult.includes('session') || lowerResult.includes('auth'));
-                      
+
+                      const isNetworkConfigFound =
+                        lastSymptom === 'NETWORK_ERROR' &&
+                        (lowerResult.includes('axios') ||
+                          lowerResult.includes('api_host') ||
+                          lowerResult.includes('url'));
+
+                      const isAuthConfigFound =
+                        lastSymptom === 'AUTH_FAILURE' &&
+                        (lowerResult.includes('token') ||
+                          lowerResult.includes('session') ||
+                          lowerResult.includes('auth'));
+
                       if (isBuildErrorFound || isNetworkConfigFound || isAuthConfigFound) {
                         outcomeReason = 'ROOT_CAUSE_FOUND';
                       }
                     }
-                    
+
                     lastRewriteTelemetry.outcome = outcome;
                     lastRewriteTelemetry.outcomeReason = outcomeReason;
                     lastRewriteTelemetry.resultSnippet = result.substring(0, 200);
@@ -999,7 +1176,7 @@ export class AgentOrchestrator {
                   toolResults.push('[Tool Result for ' + tool.name + ' on "' + target + '"]: Success - ' + result);
                 } catch (err: unknown) {
                   const errMsg = err instanceof Error ? err.message : String(err);
-                  
+
                   if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
                     lastRewriteTelemetry.outcome = 'ERROR';
                     lastRewriteTelemetry.outcomeReason = 'TOOL_EXECUTION_FAILED';
@@ -1008,8 +1185,23 @@ export class AgentOrchestrator {
                     lastRewriteTelemetry = null;
                   }
 
+                  // Track consecutive patch/write failures for corrective injection
+                  const isPatchTool = tool.name === 'patch_file' || tool.name === 'multi_patch_file' || tool.name === 'write_file';
+                  if (isPatchTool) {
+                    const failedPath = tool.path || 'unknown';
+                    if (failedPath === lastPatchFailedPath) {
+                      consecutivePatchFailures++;
+                    } else {
+                      consecutivePatchFailures = 1;
+                      lastPatchFailedPath = failedPath;
+                    }
+                  } else {
+                    consecutivePatchFailures = 0;
+                    lastPatchFailedPath = '';
+                  }
+
                   this._sendToolStatusToWebview(tool.name, 'error', target, errMsg);
-                  this._sendAvatarState('error');
+                  this._sendAvatarState('tool_calling'); // Keep tool_calling state — do NOT set error, loop will continue
                   toolResults.push(
                     '[Tool Result for ' +
                       tool.name +
@@ -1088,16 +1280,71 @@ export class AgentOrchestrator {
 
             const combined = cleanedToolResults.join('\n\n');
             let finalSystemContent = combined;
-            if (sequentialExploratorySteps >= 4) {
+
+            // Run failure detection evaluation on the tool results and assistant reply
+            const turnEval = evaluateTurnResult(toolResults, assistantResponse);
+
+            if (turnEval.status === 'failure') {
+              try {
+                EventBus.getInstance().fire('error_detected', {
+                  reason: turnEval.reason,
+                  toolResults,
+                });
+              } catch (e) {
+                console.error('Failed to fire error_detected event:', e);
+              }
+            }
+
+            const firstTool = toolCalls[0];
+            const currentFailedToolKey = firstTool ? `${firstTool.name}:${firstTool.path || firstTool.command || ''}` : '';
+
+            if (turnEval.status === 'failure') {
+              if (currentFailedToolKey && currentFailedToolKey === lastFailedToolKey) {
+                consecutiveToolFailures++;
+              } else if (currentFailedToolKey) {
+                consecutiveToolFailures = 1;
+                lastFailedToolKey = currentFailedToolKey;
+              }
+            } else {
+              consecutiveToolFailures = 0;
+              lastFailedToolKey = '';
+            }
+
+            // Patch failure recovery: after 2+ consecutive failures on the same file,
+            // force the model to re-read the file before retrying the patch.
+            if (consecutivePatchFailures >= 2 && lastPatchFailedPath) {
+              finalSystemContent +=
+                `\n\n[System: You have failed to patch "${lastPatchFailedPath}" ${consecutivePatchFailures} times in a row. ` +
+                `STOP. Do NOT emit another patch_file or multi_patch_file yet. ` +
+                `First, emit exactly: <read_file path="${lastPatchFailedPath}" /> to see the current file content. ` +
+                `Then copy the exact lines you need to change into your SEARCH block verbatim, including all whitespace and indentation. ` +
+                `As a last resort, use <write_file path="${lastPatchFailedPath}">...full file content...</write_file> to overwrite the file entirely.]`;
+            } else if (turnEval.status === 'failure' && consecutiveToolFailures < 3) {
+              finalSystemContent += `\n\n[System Notice: The previous tool call failed: ${turnEval.reason}. Retry with a different approach or state what is blocking you. Do not give up.]`;
+            } else if (turnEval.status === 'failure' && consecutiveToolFailures >= 3) {
+              finalSystemContent += `\n\n[System Notice: The tool "${currentFailedToolKey.split(':')[0]}" has failed 3 consecutive times. You may report this blocker to the user and request manual intervention if you are genuinely blocked.]`;
+            } else if (sequentialExploratorySteps >= 4) {
               finalSystemContent +=
                 '\n\n[System: You have performed several exploratory steps. Please evaluate if you have enough context. If you do, stop searching and execute the file patches immediately. Do not spend multiple turns re-reading the same file or scrolling in tiny increments. If you know the logic, write the patch block now.]';
             }
-            const systemMessage: ChatMessage = { role: 'system', content: finalSystemContent };
+            // Wrap tool results as untrusted source data (Prompt Security P1.2)
+            const systemMessage = untrustedContextMessage('tool_execution_results', finalSystemContent);
             if (images.length > 0) systemMessage.images = images;
             currentMessages.push(systemMessage);
             await this._saveChatHistory(currentMessages);
+
+            // Fire teacher escalation check (P1.4)
+            maybeEscalate(
+              text || '',
+              toolResults,
+              assistantResponse,
+              this._getSecret,
+              this._postMessage
+            );
+
             continueLoop = true;
             consecutiveMalformedCount = 0;
+            consecutiveVerbalGiveUps = 0;
           } else {
             // Malformed tool tag recovery
             const allTools = [
@@ -1136,12 +1383,35 @@ export class AgentOrchestrator {
               'analyze_impact',
               'graphify',
             ];
-            const stripped = this._parser.stripCodeBlocks(assistantResponse);
-            // Only check partial tags if we already see what looks like a tool attempt
-            const ltChar = String.fromCharCode(60);
-            const hasToolAttempt =
-              stripped.includes(ltChar + 'read_file') || allTools.some((t) => stripped.includes(ltChar + t));
-            if (hasToolAttempt && consecutiveMalformedCount < maxMalformedRetries) {
+            const hasToolAttempt = allTools.some((t) => assistantResponse.includes('<' + t));
+            const turnEval = evaluateTurnResult([], assistantResponse);
+            if (turnEval.status === 'failure') {
+              try {
+                EventBus.getInstance().fire('error_detected', {
+                  reason: turnEval.reason,
+                  assistantResponse,
+                });
+              } catch (e) {
+                console.error('Failed to fire error_detected event:', e);
+              }
+            }
+            if (turnEval.status === 'failure' && consecutiveVerbalGiveUps < 3) {
+              consecutiveVerbalGiveUps++;
+              const errorMsg = `[System Notice]: You indicated uncertainty: ${turnEval.reason}. Please use the available tools to investigate rather than guessing or giving up. You have tools like grep_search, read_file, etc. to find the necessary files and verify details.`;
+              currentMessages.push({ role: 'system', content: errorMsg });
+              await this._saveChatHistory(currentMessages);
+
+              // Fire teacher escalation on verbal give-up (P1.4)
+              maybeEscalate(
+                text || '',
+                [],
+                assistantResponse,
+                this._getSecret,
+                this._postMessage
+              );
+
+              continueLoop = true;
+            } else if (hasToolAttempt && consecutiveMalformedCount < maxMalformedRetries) {
               consecutiveMalformedCount++;
               const errorMsg =
                 '[Tool Parsing Error]: Your tool call was malformed or incomplete (attempt ' +
@@ -1156,7 +1426,7 @@ export class AgentOrchestrator {
               // Architecture Routing Guard: architecture_routing block is NOT a valid response boundary.
               // If the model emitted architecture_routing but no tool call, it MUST be nudged to continue.
               const nudgeMsg =
-                "[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.";
+                '[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.';
               currentMessages.push({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
@@ -1174,6 +1444,14 @@ export class AgentOrchestrator {
         this._sendAvatarState('idle');
         this._postMessage({ type: 'updateChatHistory', history: currentMessages });
         this._postMessage({ type: 'loopComplete' });
+        try {
+          EventBus.getInstance().fire('task_completed', {
+            sessionId: this._session.sessionId,
+            historyCount: currentMessages.length,
+          });
+        } catch (e) {
+          console.error('Failed to fire task_completed event:', e);
+        }
       } catch (err: unknown) {
         if (signal.aborted) {
           console.log('Agent stream aborted.');
@@ -1209,7 +1487,7 @@ export class AgentOrchestrator {
    */
   private async _resolveFileRefs(text: string): Promise<string> {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-    return text.replace(/\[([^\[\]]+?)\]/g, (match: string, filePath: string) => {
+    return text.replace(/\[([^[\]]+?)\]/g, (match: string, filePath: string) => {
       try {
         const trimmed = filePath.trim();
         const fullPath = path.join(workspaceRoot, trimmed);
@@ -1218,14 +1496,103 @@ export class AgentOrchestrator {
           const ext = path.extname(trimmed).slice(1) || 'txt';
           return `\n\`\`\`${ext}:${trimmed}\n${content}\n\`\`\``;
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
       return match;
     });
   }
 
+  private _syncPlanningFiles(assistantResponse: string) {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return;
+    const workspaceRoot = folders[0].uri.fsPath;
+    const mirrorVsDir = path.join(workspaceRoot, '.mirror-vs');
+
+    try {
+      if (!fs.existsSync(mirrorVsDir)) {
+        fs.mkdirSync(mirrorVsDir, { recursive: true });
+      }
+
+      // 1. Extract and write implementation plan
+      const planMatch = assistantResponse.match(/<implementation_plan>([\s\S]*?)<\/implementation_plan>/i);
+      if (planMatch) {
+        const planContent = planMatch[1].trim();
+        const planPath = path.join(mirrorVsDir, 'implementation_plan.md');
+        fs.writeFileSync(planPath, planContent, 'utf8');
+
+        // Register/update the implementation plan artifact
+        ArtifactService.getInstance()
+          .createOrUpdateArtifact(
+            'implementation_plan',
+            'markdown',
+            'Implementation Plan',
+            planContent,
+            undefined,
+            false,
+          )
+          .catch((err) => console.warn('Failed to sync implementation plan artifact:', err));
+
+        // Also automatically initialize/extract task list from the plan
+        const taskPath = path.join(mirrorVsDir, 'task.md');
+        const lines = planContent.split('\n');
+        const tasks: string[] = [];
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (/^(\d+\.|-|\*)\s+/.test(trimmed)) {
+            const taskText = trimmed.replace(/^(\d+\.|-|\*)\s+/, '');
+            tasks.push(`- [ ] ${taskText}`);
+          }
+        }
+        let taskContent = '';
+        if (tasks.length > 0) {
+          taskContent = tasks.join('\n') + '\n';
+        } else {
+          // Fallback: write a default task list if no list found in plan
+          taskContent = `- [ ] Analyze requirements\n- [ ] Implement changes\n- [ ] Verify execution\n`;
+        }
+        fs.writeFileSync(taskPath, taskContent, 'utf8');
+
+        // Register/update the task list artifact
+        ArtifactService.getInstance()
+          .createOrUpdateArtifact('task', 'markdown', 'Task List', taskContent, undefined, false)
+          .catch((err) => console.warn('Failed to sync task list artifact:', err));
+      }
+
+      // 2. Extract and write walkthrough
+      const walkthroughMatch = assistantResponse.match(/<walkthrough>([\s\S]*?)<\/walkthrough>/i);
+      if (walkthroughMatch) {
+        const walkthroughContent = walkthroughMatch[1].trim();
+        const walkthroughPath = path.join(mirrorVsDir, 'walkthrough.md');
+        fs.writeFileSync(walkthroughPath, walkthroughContent, 'utf8');
+
+        // Register/update the walkthrough artifact
+        ArtifactService.getInstance()
+          .createOrUpdateArtifact('walkthrough', 'markdown', 'Walkthrough', walkthroughContent, undefined, false)
+          .catch((err) => console.warn('Failed to sync walkthrough artifact:', err));
+
+        // When walkthrough is written, all tasks are done!
+        // We can mark all tasks as completed in task.md
+        const taskPath = path.join(mirrorVsDir, 'task.md');
+        if (fs.existsSync(taskPath)) {
+          let taskContent = fs.readFileSync(taskPath, 'utf8');
+          taskContent = taskContent.replace(/\[\s*\]/g, '[x]').replace(/\[\s*\/\]/g, '[x]');
+          fs.writeFileSync(taskPath, taskContent, 'utf8');
+
+          // Sync the updated task list artifact
+          ArtifactService.getInstance()
+            .createOrUpdateArtifact('task', 'markdown', 'Task List', taskContent, undefined, false)
+            .catch((err) => console.warn('Failed to sync updated task list artifact:', err));
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to sync planning files:', e);
+    }
+  }
+
   private async _generateLightweightProjectMap(workspaceRoot: string): Promise<string> {
-    const shouldSkipDir = (name: string): boolean => {
-      return [
+    const shouldSkipDir = (name: string): boolean =>
+      [
         'node_modules',
         'dist',
         'out',
@@ -1245,96 +1612,133 @@ export class AgentOrchestrator {
         'obj',
         '.vscode',
       ].includes(name);
-    };
 
-    const countFiles = (dir: string): number => {
-      let count = 0;
+    const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.py', '.go', '.rs', '.java', '.rb', '.php']);
+    const isSource = (name: string) => SOURCE_EXTS.has(path.extname(name).toLowerCase());
+
+    // Extract a one-line description from the first JSDoc/comment at the top of a file
+    const getFileHint = (filePath: string): string => {
       try {
-        const entries = fs.readdirSync(dir);
-        for (const e of entries) {
-          if (shouldSkipDir(e)) continue;
-          const fp = path.join(dir, e);
-          try {
-            const s = fs.statSync(fp);
-            if (s.isDirectory()) {
-              count += countFiles(fp);
-            } else if (s.isFile()) {
-              count++;
-            }
-          } catch {
-            /* skip */
-          }
-        }
+        const head = fs.readFileSync(filePath, 'utf8').substring(0, 600);
+        // Try /** ... */ block comment
+        const blockMatch = head.match(/\/\*\*?\s*([^\n*][^\n]{5,})/);
+        if (blockMatch) return blockMatch[1].trim().substring(0, 80);
+        // Try // comment line
+        const lineMatch = head.match(/\/\/+\s*(.{8,})/);
+        if (lineMatch) return lineMatch[1].trim().substring(0, 80);
+        // Try # comment (Python/shell)
+        const hashMatch = head.match(/#\s*(.{8,})/);
+        if (hashMatch) return hashMatch[1].trim().substring(0, 80);
       } catch {
         /* skip */
       }
-      return count;
+      return '';
     };
 
-    const buildTree = (dir: string, depth: number, prefix: string): string[] => {
-      if (depth > 2) return [];
-      const lines: string[] = [];
+    interface FileEntry { rel: string; hint: string; }
+    interface DirEntry { name: string; children: (FileEntry | DirGroup)[]; }
+    type DirGroup = { isDir: true; name: string; rel: string; children: (FileEntry | DirGroup)[]; fileCount: number };
+
+    const walkDir = (dir: string, depth: number): (FileEntry | DirGroup)[] => {
+      if (depth > 4) return [];
+      const result: (FileEntry | DirGroup)[] = [];
+      let entries: string[] = [];
       try {
-        const entries = fs.readdirSync(dir);
-        const dirs: string[] = [];
-        const files: string[] = [];
-
-        for (const e of entries) {
-          if (shouldSkipDir(e)) continue;
-          const fp = path.join(dir, e);
-          try {
-            const s = fs.statSync(fp);
-            if (s.isDirectory()) {
-              dirs.push(e);
-            } else if (s.isFile()) {
-              files.push(e);
-            }
-          } catch {
-            /* skip */
-          }
-        }
-
-        dirs.sort();
-        files.sort();
-
-        const allItems = [
-          ...dirs.map((d) => ({ name: d, isDir: true })),
-          ...files.map((f) => ({ name: f, isDir: false })),
-        ];
-
-        const maxItemsToDisplay = 15;
-        const displayItems = allItems.slice(0, maxItemsToDisplay);
-
-        for (let i = 0; i < displayItems.length; i++) {
-          const item = displayItems[i];
-          const isLast = i === displayItems.length - 1 && displayItems.length === allItems.length;
-          const marker = isLast ? '└── ' : '├── ';
-          const childPrefix = prefix + (isLast ? '    ' : '│   ');
-
-          if (item.isDir) {
-            const fullPath = path.join(dir, item.name);
-            const numFiles = countFiles(fullPath);
-            lines.push(`${prefix}${marker}${item.name}/ (${numFiles} files)`);
-            if (depth < 2) {
-              lines.push(...buildTree(fullPath, depth + 1, childPrefix));
-            }
-          } else {
-            lines.push(`${prefix}${marker}${item.name}`);
-          }
-        }
-        if (allItems.length > maxItemsToDisplay) {
-          lines.push(`${prefix}└── ... and ${allItems.length - maxItemsToDisplay} more items`);
-        }
+        entries = fs.readdirSync(dir).sort();
       } catch {
-        /* skip */
+        return result;
       }
-      return lines;
+      const dirs: string[] = [];
+      const files: string[] = [];
+      for (const e of entries) {
+        if (shouldSkipDir(e)) continue;
+        const fp = path.join(dir, e);
+        try {
+          const s = fs.statSync(fp);
+          if (s.isDirectory()) dirs.push(e);
+          else if (s.isFile()) files.push(e);
+        } catch { /* skip */ }
+      }
+
+      // Count all files recursively for directory label
+      const countAll = (d: string): number => {
+        let c = 0;
+        try {
+          for (const e of fs.readdirSync(d)) {
+            if (shouldSkipDir(e)) continue;
+            const fp = path.join(d, e);
+            try {
+              const s = fs.statSync(fp);
+              if (s.isDirectory()) c += countAll(fp);
+              else c++;
+            } catch { /* skip */ }
+          }
+        } catch { /* skip */ }
+        return c;
+      };
+
+      for (const d of dirs) {
+        const fullPath = path.join(dir, d);
+        const rel = path.relative(workspaceRoot, fullPath).replace(/\\/g, '/');
+        const children = walkDir(fullPath, depth + 1);
+        result.push({ isDir: true, name: d, rel, children, fileCount: countAll(fullPath) });
+      }
+      for (const f of files) {
+        const fp = path.join(dir, f);
+        const rel = path.relative(workspaceRoot, fp).replace(/\\/g, '/');
+        const hint = isSource(f) ? getFileHint(fp) : '';
+        result.push({ rel, hint });
+      }
+      return result;
+    };
+
+    const renderEntries = (entries: (FileEntry | DirGroup)[], prefix: string, lines: string[], maxLines: number): void => {
+      for (let i = 0; i < entries.length; i++) {
+        if (lines.length >= maxLines) break;
+        const entry = entries[i];
+        const isLast = i === entries.length - 1;
+        const marker = isLast ? '└── ' : '├── ';
+        const childPrefix = prefix + (isLast ? '    ' : '│   ');
+        if ('isDir' in entry && entry.isDir) {
+          lines.push(`${prefix}${marker}${entry.name}/ (${entry.fileCount} files)`);
+          renderEntries(entry.children, childPrefix, lines, maxLines);
+        } else {
+          const fe = entry as FileEntry;
+          const hint = fe.hint ? `  — ${fe.hint}` : '';
+          const fileName = path.basename(fe.rel);
+          lines.push(`${prefix}${marker}${fileName}${hint}`);
+        }
+      }
     };
 
     try {
-      const rootFilesCount = countFiles(workspaceRoot);
-      const treeLines = buildTree(workspaceRoot, 0, '');
-      return `Root: ${path.basename(workspaceRoot)} (${rootFilesCount} files total)\n` + treeLines.join('\n');
+      const topEntries = walkDir(workspaceRoot, 0);
+      const lines: string[] = [`Root: ${path.basename(workspaceRoot)}`];
+      renderEntries(topEntries, '', lines, 400);
+
+      // Append key file index — full relative paths only for source files
+      const allSrcFiles: string[] = [];
+      const collectSrc = (entries: (FileEntry | DirGroup)[]) => {
+        for (const e of entries) {
+          if ('isDir' in e && e.isDir) collectSrc(e.children);
+          else {
+            const fe = e as FileEntry;
+            if (isSource(path.basename(fe.rel))) allSrcFiles.push(fe.rel);
+          }
+        }
+      };
+      collectSrc(topEntries);
+
+      if (allSrcFiles.length > 0 && lines.length < 380) {
+        lines.push('');
+        lines.push('## Source File Index (use these exact paths with read_file/patch_file/grep_search):');
+        for (const f of allSrcFiles) {
+          if (lines.length >= 400) break;
+          lines.push(`  ${f}`);
+        }
+      }
+
+      return lines.join('\n');
     } catch (e) {
       return `Error generating map: ${e instanceof Error ? e.message : String(e)}`;
     }
@@ -1344,7 +1748,7 @@ export class AgentOrchestrator {
     let output = '\n\n### AUTOMATED POST-PATCH VERIFICATION:\n';
     output += '✅ Patch Applied Successfully.\n';
     output += '⚠️ NOT YET VERIFIED. Requires compilation/build validation and runtime tests to verify correctness.\n';
-    
+
     let compilePassed = true;
     let lintPassed = true;
     let testsPassed = true;
@@ -1352,27 +1756,44 @@ export class AgentOrchestrator {
     // 1. Run Compile / Build check
     try {
       output += '\n\nRunning build/compile check...';
-      const compileOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'compile'], { cwd: workspaceFolder, encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+      const compileOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'compile'], {
+        cwd: workspaceFolder,
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: 'pipe',
+      });
       output += '\n[Build Status]: Success\n' + compileOutput.substring(0, 1000);
     } catch (err: any) {
       compilePassed = false;
-      output += '\n[Build Status]: FAILED\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + (err.message || '');
+      output +=
+        '\n[Build Status]: FAILED\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + (err.message || '');
     }
 
     // 2. Run Lint check
     try {
       output += '\n\nRunning lint check...';
-      const lintOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'lint'], { cwd: workspaceFolder, encoding: 'utf8', timeout: 15000, stdio: 'pipe' });
+      const lintOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'lint'], {
+        cwd: workspaceFolder,
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: 'pipe',
+      });
       output += '\n[Lint Status]: Success\n' + lintOutput.substring(0, 1000);
     } catch (err: any) {
       lintPassed = false;
-      output += '\n[Lint Status]: FAILED or Warnings detected\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n';
+      output +=
+        '\n[Lint Status]: FAILED or Warnings detected\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n';
     }
 
     // 3. Run Tests
     try {
       output += '\n\nRunning test suite...';
-      const testOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'test'], { cwd: workspaceFolder, encoding: 'utf8', timeout: 30000, stdio: 'pipe' });
+      const testOutput = execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'test'], {
+        cwd: workspaceFolder,
+        encoding: 'utf8',
+        timeout: 30000,
+        stdio: 'pipe',
+      });
       output += '\n[Test Status]: Success\n' + testOutput.substring(0, 1000);
     } catch (err: any) {
       testsPassed = false;
@@ -1383,7 +1804,8 @@ export class AgentOrchestrator {
     if (compilePassed && lintPassed && testsPassed) {
       output += '✅ VERIFIED: Build, lint, and tests passed successfully.\n';
     } else {
-      output += '❌ NOT YET VERIFIED: Build or tests failed. Please review the compilation and test diagnostics output above.\n';
+      output +=
+        '❌ NOT YET VERIFIED: Build or tests failed. Please review the compilation and test diagnostics output above.\n';
     }
 
     return output;
@@ -1392,7 +1814,7 @@ export class AgentOrchestrator {
 
 function canDescribePatch(text: string, verifiedFiles: Set<string>): boolean {
   const lower = text.toLowerCase();
-  
+
   // 1. Check for patch/plan intent or code blocks (rootCauseIdentified & exactChangeKnown)
   const hasPlanOrCode = /<implementation_plan>|<patch_file>|```diff/i.test(text);
   const declaresCommitment = [
@@ -1438,7 +1860,14 @@ function hasSufficientJSEvidence(messages: ChatMessage[]): boolean {
     if (content.includes('javascriptexception') || content.includes('js exception') || content.includes('crash')) {
       hasGenericCrash = true;
     }
-    if (content.includes('stack trace') || content.includes('at ') || content.includes('.js:') || content.includes('.ts:') || content.includes('error:') || content.includes('exception:')) {
+    if (
+      content.includes('stack trace') ||
+      content.includes('at ') ||
+      content.includes('.js:') ||
+      content.includes('.ts:') ||
+      content.includes('error:') ||
+      content.includes('exception:')
+    ) {
       hasStackTrace = true;
     }
   }
@@ -1458,7 +1887,7 @@ function isErrorDirectlyLocalized(messages: ChatMessage[], verifiedFiles: Set<st
     const content = msg.content;
     const lowerContent = content.toLowerCase();
 
-    const isError = 
+    const isError =
       lowerContent.includes('[build status]: failed') ||
       lowerContent.includes('compilation error') ||
       lowerContent.includes('unresolved reference') ||
@@ -1485,7 +1914,11 @@ function isErrorDirectlyLocalized(messages: ChatMessage[], verifiedFiles: Set<st
   return false;
 }
 
-function hasEnoughInformationForReview(taskMode: TaskMode, verifiedFiles: Set<string>, messages: ChatMessage[]): boolean {
+function hasEnoughInformationForReview(
+  taskMode: TaskMode,
+  verifiedFiles: Set<string>,
+  messages: ChatMessage[],
+): boolean {
   if (taskMode !== TaskMode.REVIEW) return false;
   if (verifiedFiles.size === 0) return false;
 
@@ -1508,13 +1941,30 @@ function hasEnoughInformationForReview(taskMode: TaskMode, verifiedFiles: Set<st
 function detectActiveSymptom(messages: ChatMessage[]): 'BUILD_FAILURE' | 'NETWORK_ERROR' | 'AUTH_FAILURE' | 'NONE' {
   for (let i = messages.length - 1; i >= 0; i--) {
     const content = messages[i].content.toLowerCase();
-    if (content.includes('[build status]: failed') || content.includes('compilation error') || content.includes('unresolved reference')) {
+    if (
+      content.includes('[build status]: failed') ||
+      content.includes('compilation error') ||
+      content.includes('unresolved reference')
+    ) {
       return 'BUILD_FAILURE';
     }
-    if (content.includes('network') || content.includes('axios') || content.includes('http') || content.includes('internet') || content.includes('timeout') || content.includes('fetch')) {
+    if (
+      content.includes('network') ||
+      content.includes('axios') ||
+      content.includes('http') ||
+      content.includes('internet') ||
+      content.includes('timeout') ||
+      content.includes('fetch')
+    ) {
       return 'NETWORK_ERROR';
     }
-    if (content.includes('auth') || content.includes('login') || content.includes('token') || content.includes('session') || content.includes('credentials')) {
+    if (
+      content.includes('auth') ||
+      content.includes('login') ||
+      content.includes('token') ||
+      content.includes('session') ||
+      content.includes('credentials')
+    ) {
       return 'AUTH_FAILURE';
     }
   }
@@ -1527,7 +1977,7 @@ function logRewriteTelemetryToFile(entry: any): void {
   const workspaceRoot = folders[0].uri.fsPath;
   const logDir = path.join(workspaceRoot, '.mirror-vs');
   const logFile = path.join(logDir, 'rewrites.log');
-  
+
   try {
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
@@ -1541,7 +1991,7 @@ function logRewriteTelemetryToFile(entry: any): void {
 
 function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { selectedTool: any; alternatives: any[] } {
   const symptom = detectActiveSymptom(messages);
-  
+
   // Resolve workspace path for target feasibility validation
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
 
@@ -1549,7 +1999,10 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
   if (symptom === 'BUILD_FAILURE') {
     for (let i = messages.length - 1; i >= 0; i--) {
       const content = messages[i].content;
-      if (content.toLowerCase().includes('[build status]: failed') || content.toLowerCase().includes('compilation error')) {
+      if (
+        content.toLowerCase().includes('[build status]: failed') ||
+        content.toLowerCase().includes('compilation error')
+      ) {
         for (const t of toolCalls) {
           if (t.path) {
             const base = path.basename(t.path).toLowerCase();
@@ -1563,7 +2016,9 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
     }
   }
 
-  const getToolScoreDetails = (tool: any): { score: number; breakdown: { basePriority: number; symptomMatch: number; feasibilityScore: number } } => {
+  const getToolScoreDetails = (
+    tool: any,
+  ): { score: number; breakdown: { basePriority: number; symptomMatch: number; feasibilityScore: number } } => {
     const name = tool.name;
     let basePriority = 10;
     let symptomMatch = 0;
@@ -1582,56 +2037,57 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
     }
     // -------------------------------------------------------------------------
 
-    if ([
-      'patch_file',
-      'write_file',
-      'create_file',
-      'delete_file',
-      'rename_file',
-      'run_command',
-      'send_terminal_input',
-      'git_commit',
-    ].includes(name)) {
+    if (
+      [
+        'patch_file',
+        'write_file',
+        'create_file',
+        'delete_file',
+        'rename_file',
+        'run_command',
+        'send_terminal_input',
+        'git_commit',
+      ].includes(name)
+    ) {
       basePriority = 100;
     } else if (name === 'read_file') {
       basePriority = 50;
       const pathLower = (tool.path || '').toLowerCase();
-      
+
       if (symptom === 'BUILD_FAILURE' && errorFileBasename && pathLower.includes(errorFileBasename)) {
         symptomMatch = 45;
       } else if (symptom === 'NETWORK_ERROR') {
         if (pathLower.includes('axiosinstance') || pathLower.includes('axios')) symptomMatch = 40;
         else if (pathLower.includes('apiconfig') || pathLower.includes('config')) symptomMatch = 38;
-        else if (pathLower.includes('network') || pathLower.includes('http') || pathLower.includes('api')) symptomMatch = 35;
+        else if (pathLower.includes('network') || pathLower.includes('http') || pathLower.includes('api'))
+          symptomMatch = 35;
       } else if (symptom === 'AUTH_FAILURE') {
-        if (pathLower.includes('auth') || pathLower.includes('login') || pathLower.includes('credential')) symptomMatch = 40;
+        if (pathLower.includes('auth') || pathLower.includes('login') || pathLower.includes('credential'))
+          symptomMatch = 40;
         else if (pathLower.includes('session') || pathLower.includes('token')) symptomMatch = 38;
         else if (pathLower.includes('store') || pathLower.includes('context')) symptomMatch = 35;
       }
-    } else if ([
-      'grep_search',
-      'symbol_search',
-      'git_diff',
-      'git_status',
-    ].includes(name)) {
+    } else if (['grep_search', 'symbol_search', 'git_diff', 'git_status'].includes(name)) {
       basePriority = 30;
     }
-    
+
     return {
       score: basePriority + symptomMatch + feasibilityScore,
-      breakdown: { basePriority, symptomMatch, feasibilityScore }
+      breakdown: { basePriority, symptomMatch, feasibilityScore },
     };
   };
 
-  const alternatives = toolCalls.map(t => {
-    const details = getToolScoreDetails(t);
-    return {
-      tool: t.name,
-      target: t.path || t.query || t.command || t.url || '',
-      score: details.score,
-      scoreBreakdown: details.breakdown
-    };
-  }).sort((a, b) => b.score - a.score);
+  const alternatives = toolCalls
+    .map((t) => {
+      const details = getToolScoreDetails(t);
+      return {
+        tool: t.name,
+        target: t.path || t.query || t.command || t.url || '',
+        score: details.score,
+        scoreBreakdown: details.breakdown,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 
   // Parse ALL tool calls before selecting — never default to the first
   let best = toolCalls[0];
@@ -1651,21 +2107,52 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
 
 function rewriteResponseToSingleTool(rawText: string, selectedTool: any): string {
   let rewritten = rawText;
-  
+
   const allTools = [
-    'read_file', 'list_dir', 'ls_dir', 'grep_search', 'web_search',
-    'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script', 'browser_screenshot',
-    'figma_inspect', 'run_command', 'close_terminal', 'read_terminal', 'list_terminals',
-    'delete_file', 'git_status', 'git_diff', 'git_add', 'symbol_search', 'rename_symbol',
-    'wait', 'analyze_project', 'analyze_dependencies', 'analyze_complexity',
-    'analyze_coverage', 'analyze_dead_code', 'analyze_impact', 'graphify', 'get_diagnostics',
-    'create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'
+    'read_file',
+    'list_dir',
+    'ls_dir',
+    'grep_search',
+    'web_search',
+    'browser_navigate',
+    'browser_click',
+    'browser_type',
+    'browser_evaluate_script',
+    'browser_screenshot',
+    'figma_inspect',
+    'run_command',
+    'close_terminal',
+    'read_terminal',
+    'list_terminals',
+    'delete_file',
+    'git_status',
+    'git_diff',
+    'git_add',
+    'symbol_search',
+    'rename_symbol',
+    'wait',
+    'analyze_project',
+    'analyze_dependencies',
+    'analyze_complexity',
+    'analyze_coverage',
+    'analyze_dead_code',
+    'analyze_impact',
+    'graphify',
+    'get_diagnostics',
+    'create_file',
+    'write_file',
+    'patch_file',
+    'send_terminal_input',
+    'rename_file',
+    'git_commit',
+    'multi_patch_file',
+    'multipatch_file',
   ];
 
   for (const toolName of allTools) {
     const openTagPattern = new RegExp('<' + toolName + '(\\s+[^>]*)?>', 'gi');
     let match;
-    
+
     while ((match = openTagPattern.exec(rewritten)) !== null) {
       const tagStart = match.index;
       const tagContent = match[0];
@@ -1674,31 +2161,38 @@ function rewriteResponseToSingleTool(rawText: string, selectedTool: any): string
       const commandAttr = /command\s*=\s*["']([^"']+)["']/i.exec(tagContent);
       const urlAttr = /url\s*=\s*["']([^"']+)["']/i.exec(tagContent);
       const inputAttr = /input\s*=\s*["']([^"']+)["']/i.exec(tagContent);
-      
+
       const targetVal = pathAttr?.[1] || queryAttr?.[1] || commandAttr?.[1] || urlAttr?.[1] || inputAttr?.[1] || '';
-      
-      const isSelected = (toolName === selectedTool.name || (toolName === 'ls_dir' && selectedTool.name === 'list_dir') || (toolName === 'multipatch_file' && selectedTool.name === 'multi_patch_file')) &&
-        (targetVal.trim() === (selectedTool.path || selectedTool.query || selectedTool.command || selectedTool.url || selectedTool.content || '').trim());
-      
+
+      const isSelected =
+        (toolName === selectedTool.name ||
+          (toolName === 'ls_dir' && selectedTool.name === 'list_dir') ||
+          (toolName === 'multipatch_file' && selectedTool.name === 'multi_patch_file')) &&
+        targetVal.trim() ===
+          (
+            selectedTool.path ||
+            selectedTool.query ||
+            selectedTool.command ||
+            selectedTool.url ||
+            selectedTool.content ||
+            ''
+          ).trim();
+
       if (!isSelected) {
         let blockEnd = match.index + match[0].length;
         const closeTagRegex = new RegExp('</' + toolName + '\\s*>', 'i');
         const closeMatch = closeTagRegex.exec(rewritten.substring(blockEnd));
-        
+
         if (closeMatch) {
           blockEnd += closeMatch.index + closeMatch[0].length;
         }
-        
-        rewritten = rewritten.substring(0, tagStart) + 
-                    '\n' + 
-                    rewritten.substring(blockEnd);
-                    
+
+        rewritten = rewritten.substring(0, tagStart) + '\n' + rewritten.substring(blockEnd);
+
         openTagPattern.lastIndex = 0;
       }
     }
   }
-  
+
   return rewritten;
 }
-
-

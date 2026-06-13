@@ -82,6 +82,60 @@ export class ArtifactService {
   }
 
   /**
+   * Create a new artifact or update an existing one by ID.
+   */
+  async createOrUpdateArtifact(
+    id: string,
+    type: ArtifactType,
+    title: string,
+    content: string,
+    language?: string,
+    openInPanel: boolean = false,
+  ): Promise<Artifact> {
+    let artifact = this._artifacts.find((a) => a.id === id);
+    if (artifact) {
+      artifact.content = content;
+      artifact.title = title;
+      artifact.language = language;
+      artifact.createdAt = Date.now();
+    } else {
+      artifact = {
+        id,
+        type,
+        title: title || `${type.charAt(0).toUpperCase() + type.slice(1)} Artifact`,
+        content,
+        language,
+        createdAt: Date.now(),
+      };
+      this._artifacts.unshift(artifact);
+    }
+
+    // Trim to max 50 artifacts
+    if (this._artifacts.length > 50) {
+      this._artifacts = this._artifacts.slice(0, 50);
+    }
+
+    // Save to .mirror-vs/artifacts/ for persistence
+    this._saveToDisk(artifact);
+
+    // Fire change event
+    this._onDidChangeArtifacts.fire(this._artifacts);
+
+    // Update panel if it is already open
+    const existingPanel = this._panels.get(id);
+    if (existingPanel) {
+      existingPanel.webview.html = this._renderArtifact(artifact);
+    }
+
+    // Open in preview panel if requested
+    if (openInPanel) {
+      this.openArtifactPreview(id);
+    }
+
+    return artifact;
+  }
+
+  /**
    * Open an artifact in a VS Code webview panel (new window beside editor).
    */
   openArtifactPreview(artifactId: string): void {
@@ -98,16 +152,11 @@ export class ArtifactService {
       return;
     }
 
-    const panel = vscode.window.createWebviewPanel(
-      'mirrorArtifact',
-      `🧩 ${artifact.title}`,
-      vscode.ViewColumn.Beside,
-      {
-        enableScripts: artifact.type === 'html',
-        retainContextWhenHidden: true,
-        localResourceRoots: [],
-      },
-    );
+    const panel = vscode.window.createWebviewPanel('mirrorArtifact', `🧩 ${artifact.title}`, vscode.ViewColumn.Beside, {
+      enableScripts: artifact.type === 'html',
+      retainContextWhenHidden: true,
+      localResourceRoots: [],
+    });
 
     panel.webview.html = this._renderArtifact(artifact);
     this._panels.set(artifactId, panel);
@@ -145,7 +194,9 @@ export class ArtifactService {
           fs.unlinkSync(filePath);
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   /**
@@ -168,7 +219,9 @@ export class ArtifactService {
           fs.rmSync(artifactsDir, { recursive: true, force: true });
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   /**
@@ -290,7 +343,7 @@ export class ArtifactService {
         break;
 
       case 'code':
-      default:
+      default: {
         const lang = artifact.language || '';
         body = `
           <div class="artifact-body">
@@ -310,6 +363,7 @@ export class ArtifactService {
           </div>
         `;
         break;
+      }
     }
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8">${styleReset}</head><body>${header}${body}</body></html>`;
@@ -355,7 +409,9 @@ export class ArtifactService {
       }
       const filePath = path.join(artifactsDir, `${artifact.id}.json`);
       fs.writeFileSync(filePath, JSON.stringify(artifact, null, 2), 'utf8');
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   /**
@@ -368,6 +424,8 @@ export class ArtifactService {
       const artifactsDir = path.join(workspaceFolder, '.mirror-vs', 'artifacts');
       if (!fs.existsSync(artifactsDir)) return;
       const files = fs.readdirSync(artifactsDir).filter((f) => f.endsWith('.json'));
+      // Clear memory artifacts list before reloading to ensure no duplicates
+      this._artifacts = [];
       for (const file of files) {
         try {
           const content = fs.readFileSync(path.join(artifactsDir, file), 'utf8');
@@ -375,10 +433,14 @@ export class ArtifactService {
           if (artifact.id && artifact.content) {
             this._artifacts.push(artifact);
           }
-        } catch { /* skip corrupt files */ }
+        } catch {
+          /* skip corrupt files */
+        }
       }
       // Sort by creation date, newest first
       this._artifacts.sort((a, b) => b.createdAt - a.createdAt);
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 }

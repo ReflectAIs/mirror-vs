@@ -18,6 +18,7 @@ Available tools:
 - run_command: <run_command command="..." />
 - list_terminals / read_terminal / send_terminal_input / close_terminal
 - figma_inspect: <figma_inspect url="..." />
+- wait: <wait [ms="..."] [seconds="..."] />
 - update_agent_memory: <update_agent_memory key="..." value="..." />
 
 CRITICAL subsequent turn rule:
@@ -97,7 +98,7 @@ CRITICAL subsequent turn rule:
     <analyze_coverage /> (Test coverage)
     <analyze_dead_code /> (Unused exports)
     <analyze_impact path="src/file.ts" /> (Impact analysis)
-    <graphify /> (Mermaid structure graph)
+    <graphify /> (Module index: per-file description, exports & import chains — use when you need to understand what each file does and how they connect)
 15. WAIT: <wait ms="3000" />
 16. BROWSER SCREENSHOT: <browser_screenshot />
 17. RUN COMMAND: <run_command command="npm install" />

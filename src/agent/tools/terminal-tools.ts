@@ -108,18 +108,19 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
       let choice: string | undefined;
 
       // Try webview dialog first for better styling & live timer
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
       if (MirrorVsSidebarProvider.postToActive) {
         const approvalPromise = new Promise<string>((resolve) => {
           MirrorVsSidebarProvider.pendingCommandApproval = {
             resolve,
-            command
+            command,
           };
         });
         MirrorVsSidebarProvider.postToActive({
           type: 'requestSensitiveCommandApproval',
           command,
-          autonomousMode
+          autonomousMode,
         });
         choice = await approvalPromise;
       } else {
@@ -136,7 +137,7 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
               setTimeout(() => {
                 resolve('Allow Execution');
               }, 10000);
-            })
+            }),
           ]);
         } else {
           choice = await vscode.window.showWarningMessage(

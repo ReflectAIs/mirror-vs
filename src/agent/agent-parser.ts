@@ -159,7 +159,16 @@ export class AgentParser {
         startFrom = tagInfo.end;
       }
     }
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
+    const blockTools = [
+      'create_file',
+      'write_file',
+      'patch_file',
+      'send_terminal_input',
+      'rename_file',
+      'git_commit',
+      'multi_patch_file',
+      'multipatch_file',
+    ];
     for (const tool of blockTools) {
       let startFrom = 0;
       let tagInfo;
@@ -178,7 +187,16 @@ export class AgentParser {
   }
 
   private autoCloseToolTags(text: string): string {
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
+    const blockTools = [
+      'create_file',
+      'write_file',
+      'patch_file',
+      'send_terminal_input',
+      'rename_file',
+      'git_commit',
+      'multi_patch_file',
+      'multipatch_file',
+    ];
     let adjustedText = text;
     for (const tool of blockTools) {
       const hasOpen = this.findUnquotedTagEndEx(adjustedText, tool) !== null;
@@ -240,7 +258,16 @@ export class AgentParser {
         startFrom = tagInfo.end;
       }
     }
-    const blockTools = ['create_file', 'write_file', 'patch_file', 'send_terminal_input', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
+    const blockTools = [
+      'create_file',
+      'write_file',
+      'patch_file',
+      'send_terminal_input',
+      'rename_file',
+      'git_commit',
+      'multi_patch_file',
+      'multipatch_file',
+    ];
     for (const tool of blockTools) {
       let startFrom = 0;
       let tagInfo;
@@ -394,7 +421,15 @@ export class AgentParser {
     }
 
     // block tools (write_file, create_file, patch_file, rename_file, git_commit, multi_patch_file, multipatch_file)
-    const blockTools = ['write_file', 'create_file', 'patch_file', 'rename_file', 'git_commit', 'multi_patch_file', 'multipatch_file'];
+    const blockTools = [
+      'write_file',
+      'create_file',
+      'patch_file',
+      'rename_file',
+      'git_commit',
+      'multi_patch_file',
+      'multipatch_file',
+    ];
     for (const toolName of blockTools) {
       startFrom = 0;
       while ((tagInfo = this.findUnquotedTagEndEx(rawText, toolName, startFrom)) !== null) {
@@ -424,7 +459,7 @@ export class AgentParser {
               tool: {
                 name: (toolName === 'multipatch_file' ? 'multi_patch_file' : toolName) as ToolCall['name'],
                 path: p ? p.trim() : undefined,
-                content
+                content,
               },
             });
             startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;

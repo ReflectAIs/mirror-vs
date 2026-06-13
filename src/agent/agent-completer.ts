@@ -93,7 +93,7 @@ export class AgentCompleter {
         } else if (provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_'))) {
           if (model.toLowerCase().includes('gpt-4o-mini')) {
             rateInput = 0.00015 / 1000;
-            rateOutput = 0.00060 / 1000;
+            rateOutput = 0.0006 / 1000;
           } else if (model.toLowerCase().includes('gpt-4o')) {
             rateInput = 0.005 / 1000;
             rateOutput = 0.015 / 1000;

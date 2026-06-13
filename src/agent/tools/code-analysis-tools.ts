@@ -650,106 +650,132 @@ function impact(root: string, target: string): string {
 function graphify(root: string): string {
   const all = collectSrc(root);
 
-  // 1. Build directory tree
-  const treeNodes = new Map<string, string[]>();
-  const addPathToTree = (relPath: string) => {
-    const parts = relPath.split('/');
-    for (let i = 0; i < parts.length - 1; i++) {
-      const parent = parts.slice(0, i + 1).join('/');
-      const child = parts.slice(0, i + 2).join('/');
-      if (!treeNodes.has(parent)) treeNodes.set(parent, []);
-      const children = treeNodes.get(parent)!;
-      if (!children.includes(child)) children.push(child);
-    }
+  // -- helpers --
+  const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.py', '.go', '.rs', '.java']);
+
+  /** Get one-line description from top-of-file comment */
+  const getDesc = (fp: string): string => {
+    try {
+      const head = fs.readFileSync(fp, 'utf8').substring(0, 800);
+      const block = head.match(/\/\*\*?\s*\n?\s*\*?\s*([^\n*@][^\n]{8,})/);
+      if (block) return block[1].trim().substring(0, 100);
+      const line = head.match(/\/\/+\s*(.{10,})/);
+      if (line) return line[1].trim().substring(0, 100);
+    } catch { /* */ }
+    return '';
   };
 
-  const relFiles = all.map((f) => path.relative(root, f).replace(/\\/g, '/'));
-
-  const roots = new Set<string>();
-  for (const f of relFiles) {
-    addPathToTree(f);
-    const firstPart = f.split('/')[0];
-    roots.add(firstPart);
-  }
-
-  const printTree = (node: string, prefix: string = '', isLast: boolean = true): string => {
-    const name = path.basename(node);
-    let output = prefix + (isLast ? '└── ' : '├── ') + name + '\n';
-    const newPrefix = prefix + (isLast ? '    ' : '│   ');
-    const children = treeNodes.get(node) || [];
-    const subDirs = children;
-    const leafFiles = relFiles.filter((f) => {
-      const dir = path.dirname(f);
-      return (dir === node && !subDirs.some((sd) => sd === f)) || (node === f && !treeNodes.has(f));
-    });
-
-    const allChildren = [
-      ...subDirs.map((sd) => ({ path: sd, isDir: true })),
-      ...leafFiles.map((lf) => ({ path: lf, isDir: false })),
-    ].sort((a, b) => a.path.localeCompare(b.path));
-
-    allChildren.forEach((child, idx) => {
-      const last = idx === allChildren.length - 1;
-      if (child.isDir) {
-        output += printTree(child.path, newPrefix, last);
-      } else {
-        output += newPrefix + (last ? '└── ' : '├── ') + path.basename(child.path) + '\n';
+  /** Get exported symbols (functions, classes, types, consts) */
+  const getExports = (fp: string): string[] => {
+    const symbols: string[] = [];
+    try {
+      const c = fs.readFileSync(fp, 'utf8');
+      const re = /export\s+(?:default\s+)?(?:async\s+)?(?:function\s+(\w+)|class\s+(\w+)|const\s+(\w+)|let\s+(\w+)|type\s+(\w+)|interface\s+(\w+)|enum\s+(\w+))/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(c)) !== null) {
+        const name = m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || m[7];
+        if (name) symbols.push(name);
+        if (symbols.length >= 8) break;
       }
-    });
-    return output;
+    } catch { /* */ }
+    return symbols;
   };
 
-  let treeOutput = '📂 **Project Structure Tree:**\n```\n';
-  const rootList = Array.from(roots).sort();
-  rootList.forEach((r, idx) => {
-    const last = idx === rootList.length - 1;
-    if (treeNodes.has(r) || relFiles.includes(r)) {
-      if (treeNodes.has(r)) {
-        treeOutput += printTree(r, '', last);
-      } else {
-        treeOutput += (last ? '└── ' : '├── ') + r + '\n';
+  /** Get local imports (relative paths resolved to rel paths) */
+  const getLocalImports = (fp: string): string[] => {
+    const imports: string[] = [];
+    for (const edge of parseImports(fp)) {
+      const r = resolve(fp, edge.to, root);
+      if (r) {
+        const rel = path.relative(root, r).replace(/\\/g, '/');
+        if (!imports.includes(rel)) imports.push(rel);
       }
+      if (imports.length >= 6) break;
     }
-  });
-  treeOutput += '```\n\n';
+    return imports;
+  };
 
-  // 2. Build Dependency graph
-  const impMap = new Map<string, string[]>();
+  // --- Build output ---
+  const lines: string[] = [];
+
+  // 1. Directory tree (compact, 3 levels)
+  lines.push('📂 **Directory Structure:**');
+  lines.push('```');
+  const printCompactTree = (dir: string, prefix: string, depth: number): void => {
+    if (depth > 3) return;
+    let entries: string[] = [];
+    try { entries = fs.readdirSync(dir).sort(); } catch { return; }
+    const dirs = entries.filter(e => { try { return !shouldSkip(e) && fs.statSync(path.join(dir, e)).isDirectory(); } catch { return false; } });
+    const files = entries.filter(e => { try { const fp = path.join(dir, e); return !shouldSkip(e) && fs.statSync(fp).isFile() && SOURCE_EXTS.has(path.extname(e).toLowerCase()); } catch { return false; } });
+    const items = [...dirs, ...files];
+    items.forEach((item, idx) => {
+      const isLast = idx === items.length - 1;
+      const marker = isLast ? '└── ' : '├── ';
+      const fp = path.join(dir, item);
+      const isDir = dirs.includes(item);
+      if (isDir) {
+        lines.push(`${prefix}${marker}${item}/`);
+        printCompactTree(fp, prefix + (isLast ? '    ' : '│   '), depth + 1);
+      } else {
+        lines.push(`${prefix}${marker}${item}`);
+      }
+    });
+  };
+  printCompactTree(root, '', 0);
+  lines.push('```');
+  lines.push('');
+
+  // 2. Module Index — most important part
+  lines.push('📋 **Module Index** (path | description | exports | key imports):');
+  lines.push('');
+
+  // Group by directory
+  const byDir = new Map<string, string[]>();
   for (const f of all) {
+    if (isTest(f)) continue; // skip test files for brevity
     const rel = path.relative(root, f).replace(/\\/g, '/');
-    const deps: string[] = [];
-    for (const e of parseImports(f)) {
-      const r = resolve(f, e.to, root);
-      if (r) deps.push(path.relative(root, r).replace(/\\/g, '/'));
-    }
-    if (deps.length > 0) impMap.set(rel, deps);
+    const dir = path.dirname(rel);
+    if (!byDir.has(dir)) byDir.set(dir, []);
+    byDir.get(dir)!.push(f);
   }
 
-  let depOutput = '🔗 **Module Dependency Graph (Mermaid):**\n```mermaid\ngraph TD\n';
-  const connections: string[] = [];
-  const nodeIds = new Map<string, string>();
-  let idCounter = 0;
-  const getNodeId = (filePath: string) => {
-    if (!nodeIds.has(filePath)) {
-      idCounter++;
-      nodeIds.set(filePath, `N${idCounter}`);
-    }
-    return nodeIds.get(filePath)!;
-  };
+  let totalModules = 0;
+  for (const [dir, files] of Array.from(byDir.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
+    lines.push(`**${dir === '.' ? '(root)' : dir}/**`);
+    for (const fp of files) {
+      if (totalModules > 120) { lines.push('  ... (more files, use graphify scoped or analyze_project)'); break; }
+      const rel = path.relative(root, fp).replace(/\\/g, '/');
+      const name = path.basename(fp);
+      const desc = getDesc(fp);
+      const exports = getExports(fp);
+      const imports = getLocalImports(fp);
 
-  for (const [file, deps] of impMap.entries()) {
-    const fromId = getNodeId(file);
-    depOutput += `  ${fromId}["${file}"]\n`;
-    for (const d of deps) {
-      const toId = getNodeId(d);
-      depOutput += `  ${toId}["${d}"]\n`;
-      connections.push(`  ${fromId} --> ${toId}`);
+      let line = `  \`${name}\``;
+      if (desc) line += ` — ${desc}`;
+      if (exports.length) line += `\n    ↗ exports: ${exports.join(', ')}`;
+      if (imports.length) line += `\n    ← imports: ${imports.map(i => path.basename(i)).join(', ')}`;
+      lines.push(line);
+      totalModules++;
+    }
+    lines.push('');
+  }
+
+  // 3. Most-imported modules (top 10)
+  const impCount = new Map<string, number>();
+  for (const f of all) {
+    for (const imp of getLocalImports(f)) impCount.set(imp, (impCount.get(imp) || 0) + 1);
+  }
+  const topImported = Array.from(impCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (topImported.length > 0) {
+    lines.push('🔑 **Most Imported Modules** (core dependencies to understand first):');
+    for (const [rel, count] of topImported) {
+      lines.push(`  - \`${rel}\` — imported by ${count} module${count > 1 ? 's' : ''}`);
     }
   }
-  depOutput += connections.join('\n') + '\n```\n';
 
-  return treeOutput + depOutput;
+  return lines.join('\n');
 }
+
 
 // ── Main Export ──
 export async function executeCodeAnalysisTool(tool: ToolCall): Promise<string> {
@@ -801,3 +827,23 @@ export async function executeCodeAnalysisTool(tool: ToolCall): Promise<string> {
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
   return `${result}\n\n_Analysis completed in ${elapsed}s_`;
 }
+
+export function getDependentsOfFile(targetPath: string): { file: string; line: number }[] {
+  try {
+    const root = getRoot();
+    const abs = path.isAbsolute(targetPath) ? targetPath : path.resolve(root, targetPath);
+    if (!fs.existsSync(abs)) return [];
+    const deps: { file: string; line: number }[] = [];
+    for (const f of collectSrc(root)) {
+      if (f === abs) continue;
+      for (const imp of parseImports(f)) {
+        const r = resolve(f, imp.to, root);
+        if (r === abs) deps.push({ file: f, line: imp.line });
+      }
+    }
+    return deps;
+  } catch {
+    return [];
+  }
+}
+
