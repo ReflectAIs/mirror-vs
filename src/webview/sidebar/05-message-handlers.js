@@ -290,6 +290,9 @@
         if (s.maxTurnsBeforeSummarize !== undefined && maxTurnsSummarizeInput) {
           maxTurnsSummarizeInput.value = s.maxTurnsBeforeSummarize;
         }
+        if (s.modelContextLengths !== undefined && modelContextLengthsInput) {
+          modelContextLengthsInput.value = s.modelContextLengths ? JSON.stringify(s.modelContextLengths, null, 2) : '{}';
+        }
         if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
           maxToolOutputInput.value = s.maxToolOutputLength;
         }

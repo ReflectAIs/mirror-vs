@@ -31,6 +31,7 @@
   const figmaKeyInput = document.getElementById('figma-key');
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
+  const modelContextLengthsInput = document.getElementById('model-context-lengths-input');
   
   const planFirstToggle = document.getElementById('settings-plan-first-toggle');
   const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');
@@ -741,6 +742,18 @@
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
+    let modelContextLengths = {};
+    if (modelContextLengthsInput) {
+      try {
+        const val = modelContextLengthsInput.value.trim();
+        if (val) {
+          modelContextLengths = JSON.parse(val);
+        }
+      } catch (e) {
+        console.error('Invalid JSON for model context lengths:', e);
+      }
+    }
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -770,6 +783,7 @@
       customSystemPrompt,
       customApis: customApisList,
       customApiKeys: customApiKeysData,
+      modelContextLengths,
     });
   }
 
@@ -2651,6 +2665,9 @@ function attachImage(base64) {
         if (s.maxTurnsBeforeSummarize !== undefined && maxTurnsSummarizeInput) {
           maxTurnsSummarizeInput.value = s.maxTurnsBeforeSummarize;
         }
+        if (s.modelContextLengths !== undefined && modelContextLengthsInput) {
+          modelContextLengthsInput.value = s.modelContextLengths ? JSON.stringify(s.modelContextLengths, null, 2) : '{}';
+        }
         if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
           maxToolOutputInput.value = s.maxToolOutputLength;
         }
@@ -3599,6 +3616,7 @@ function attachImage(base64) {
 
     let html = '';
     let inCodeBlock = false;
+    let inTable = false;
     let codeBuffer = '';
     let codeLang = '';
 
@@ -3651,6 +3669,35 @@ function attachImage(base64) {
         // Inline Code (`code`)
         processedLine = processedLine.replace(/`(.*?)`/g, '<code>$1</code>');
 
+        // Check if we are in a table
+        if (inTable) {
+          if (processedLine.includes('|')) {
+            let cells = processedLine.split('|');
+            if (processedLine.trim().startsWith('|')) cells.shift();
+            if (processedLine.trim().endsWith('|')) cells.pop();
+            html += '<tr>' + cells.map(cell => `<td>${cell.trim()}</td>`).join('') + '</tr>';
+            continue;
+          } else {
+            html += '</tbody></table>';
+            inTable = false;
+          }
+        }
+
+        // Check for table header and separator row
+        if (!inTable && processedLine.includes('|') && i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          const isSeparator = /^[|:\s-]+$/.test(nextLine) && nextLine.includes('-') && nextLine.includes('|');
+          if (isSeparator) {
+            inTable = true;
+            let headers = processedLine.split('|');
+            if (processedLine.trim().startsWith('|')) headers.shift();
+            if (processedLine.trim().endsWith('|')) headers.pop();
+            html += '<table class="markdown-table"><thead><tr>' + headers.map(h => `<th>${h.trim()}</th>`).join('') + '</tr></thead><tbody>';
+            i++; // skip separator line
+            continue;
+          }
+        }
+
         // Headers
         if (processedLine.startsWith('### ')) {
           html += `<h3>${processedLine.substring(4)}</h3>`;
@@ -3676,6 +3723,10 @@ function attachImage(base64) {
           html += `<p>${processedLine}</p>`;
         }
       }
+    }
+
+    if (inTable) {
+      html += '</tbody></table>';
     }
 
     if (inCodeBlock && codeBuffer.trim()) {
@@ -4463,8 +4514,8 @@ function attachImage(base64) {
   // Buddy Avatar - Interactive Entertaining Cute Vector Mascot Expressor
   const buddyContainer = document.getElementById('buddy-container');
   const buddyEyes = document.getElementById('buddy-eyes');
-  const buddyTooltip = document.getElementById('buddy-tooltip');
   const buddyCheeks = document.getElementById('buddy-cheeks');
+  // Removed tooltip - buddy expresses itself through its face only
 
   let avatarState = 'idle';
   let idleInterval = null;
@@ -4512,7 +4563,30 @@ function attachImage(base64) {
       `<!-- heart eyes! -->
        <path d="M4 9 Q4 7 5.5 7 Q6.5 7 7.5 8.2 Q8.5 7 9.5 7 Q11 7 11 9 Q11 11 7.5 13.5 Q4 11 4 9 Z" fill="#f43f5e" stroke="none" />
        <path d="M13 9 Q13 7 14.5 7 Q15.5 7 16.5 8.2 Q17.5 7 18.5 7 Q20 7 20 9 Q20 11 16.5 13.5 Q13 11 13 9 Z" fill="#f43f5e" stroke="none" />
-       <path d="M10 15.5 Q12 17.5 14 15.5" stroke-width="2" stroke-linecap="round" fill="none" />`
+       <path d="M10 15.5 Q12 17.5 14 15.5" stroke-width="2" stroke-linecap="round" fill="none" />`,
+      `<!-- star sparkle eyes! -->
+       <path d="M6.5 7 L7.5 9.5 L10 10 L7.5 10.5 L6.5 13 L5.5 10.5 L3 10 L5.5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M17.5 7 L18.5 9.5 L21 10 L18.5 10.5 L17.5 13 L16.5 10.5 L14 10 L16.5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M9.5 14 Q12 17 14.5 14" stroke-width="2" stroke-linecap="round" fill="none" />`,
+      `<!-- big happy wide eyes! -->
+       <circle cx="6.5" cy="10" r="3.5" fill="none" stroke-width="1.8" />
+       <circle cx="17.5" cy="10" r="3.5" fill="none" stroke-width="1.8" />
+       <circle cx="6.5" cy="10" r="1.5" />
+       <circle cx="17.5" cy="10" r="1.5" />
+       <path d="M9.5 14.5 Q12 17.5 14.5 14.5" stroke-width="2" stroke-linecap="round" fill="none" />`,
+      `<!-- wink kissy face! -->
+       <circle cx="6.5" cy="10" r="2.5" />
+       <path d="M15.5 10 Q17.5 8 19.5 10" stroke-width="2" stroke-linecap="round" fill="none" />
+       <path d="M10.5 15 Q12 17 13.5 15" stroke-width="2" stroke-linecap="round" fill="none" />
+       <circle cx="12" cy="14" r="1.5" fill="none" stroke-width="1.2" />`,
+      `<!-- excited starry! -->
+       <path d="M5.5 8 L6 9.5 L7.5 9.5 L6.3 10.5 L6.8 12 L5.5 11 L4.2 12 L4.7 10.5 L3.5 9.5 L5 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M18.5 8 L19 9.5 L20.5 9.5 L19.3 10.5 L19.8 12 L18.5 11 L17.2 12 L17.7 10.5 L16.5 9.5 L18 9.5 Z" fill="#fbbf24" stroke="none" />
+       <path d="M9.5 14 Q12 17 14.5 14" stroke-width="2" stroke-linecap="round" fill="none" />`,
+      `<!-- big smile! -->
+       <circle cx="6.5" cy="10" r="2.5" />
+       <circle cx="17.5" cy="10" r="2.5" />
+       <path d="M9.5 13 Q12 17.5 14.5 13" stroke-width="2.5" stroke-linecap="round" fill="none" />`
     ],
     celebrate: [
       `<!-- starry eyes and happy mouth -->
@@ -4583,21 +4657,9 @@ function attachImage(base64) {
       }
     }
 
-    // Update tooltip text
-    const tooltips = {
-      idle: 'Ready to help!',
-      thinking: 'Thinking...',
-      coding: 'Writing code...',
-      tool_calling: 'Running tools...',
-      error: 'Oops! Something went wrong',
-      click: '👋 Hey!'
-    };
-    buddyTooltip.textContent = tooltips[state] || 'Ready to help!';
-
     if (state === 'idle') {
       startIdleRoutine();
     } else if (state === 'error') {
-      buddyTooltip.textContent = '😰 Uh oh!';
       errorResetTimeout = setTimeout(() => {
         setAvatarState('idle');
       }, 5000);
@@ -4624,19 +4686,6 @@ function attachImage(base64) {
               p.setAttribute('stroke', color);
             }
           });
-        }
-
-        if (chance < 0.35) {
-          // Random tooltip messages to entertain
-          const messages = [
-            'Ready to help!',
-            'Waiting for your command...',
-            'I can write code!',
-            'Try asking me something',
-            'Type @ to link files',
-            'I support Ollama + DeepSeek'
-          ];
-          buddyTooltip.textContent = messages[Math.floor(Math.random() * messages.length)];
         }
       }
     }, 6000);
@@ -4692,29 +4741,6 @@ function attachImage(base64) {
     animate();
   }
 
-  // Hook up premium interactive winking, 3D rotations, and dev jokes/quotes on click
-  const CLICK_EASTER_EGGS = [
-    "Why do programmers wear glasses?\nBecause they can't C#! 🤓",
-    "There are 10 types of people:\nthose who understand binary, and those who don't. 🔢",
-    "A SQL query walks into a bar,\nwalks up to two tables and asks:\n'Can I join you?' 📊",
-    "How many programmers does it take to change a light bulb?\nNone, it's a hardware problem! 💡",
-    "['hip', 'hip']\n(hip hip array!) 🎁",
-    "No place like localhost\n(127.0.0.1) 🏠",
-    "To understand recursion, you must first understand recursion. 🔄",
-    "Why did the programmer quit his job?\nBecause he didn't get arrays. 💸",
-    "Hardware: The parts of a computer system that you can kick. 🖥️",
-    "An optimist says the glass is half full.\nA pessimist says it's half empty.\nA programmer says the glass is twice as large as necessary. 🥛",
-    "\"Talk is cheap. Show me the code.\"\n— Linus Torvalds 🐧",
-    "\"First, solve the problem. Then, write the code.\"\n— John Johnson 🧩",
-    "\"Clean code always looks like it was written by someone who cares.\"\n— Michael Feathers ✨",
-    "\"Coding is the closest thing we have to magic!\" 🔮",
-    "\"Simplicity is the ultimate sophistication.\"\n— Leonardo da Vinci 🎨",
-    "\"Before software can be reusable it first has to be reusable.\"\n— Ralph Johnson ⚙️",
-    "Hey! You clicked me! Let's build something awesome today! 🚀",
-    "My circuits are fully charged and ready to write some clean code! ⚡",
-    "Need a code audit, a debug session, or a coffee break? I've got your back! ☕"
-  ];
-
   if (buddyContainer) {
     buddyContainer.addEventListener('click', () => {
       const current = avatarState;
@@ -4723,9 +4749,11 @@ function attachImage(base64) {
       buddyContainer.style.transform = 'translateY(-10px) scale(1.3) rotate(360deg)';
       buddyContainer.style.transition = 'transform 0.7s cubic-bezier(0.34, 1.6, 0.64, 1)';
       
-      // Set happy winking face
+      // Set random click face expression
       if (buddyEyes) {
-        buddyEyes.innerHTML = FACES.click[0];
+        const list = FACES.click;
+        const selectedFace = list[Math.floor(Math.random() * list.length)];
+        buddyEyes.innerHTML = selectedFace;
         const color = FACE_COLORS.click;
         buddyEyes.setAttribute('fill', color);
         const paths = buddyEyes.querySelectorAll('path');
@@ -4736,21 +4764,13 @@ function attachImage(base64) {
         });
       }
       
-      // Select a random fun developer quote or joke
-      const randomEgg = CLICK_EASTER_EGGS[Math.floor(Math.random() * CLICK_EASTER_EGGS.length)];
-      buddyTooltip.textContent = randomEgg;
-      buddyTooltip.style.opacity = '1';
-      buddyTooltip.style.transform = 'translateX(-50%) translateY(0)';
-      
       setTimeout(() => {
         buddyContainer.style.transform = '';
         buddyContainer.style.transition = '';
-        buddyTooltip.style.opacity = '';
-        buddyTooltip.style.transform = '';
         if (avatarState !== 'error') {
           setAvatarState(current);
         }
-      }, 3500); // Allow developer time to read the joke/quote
+      }, 1200); // Return to normal after 1.2s
     });
   }
 

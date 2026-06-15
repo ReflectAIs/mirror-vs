@@ -60,6 +60,7 @@ export interface ExtensionSettings {
   hasGeminiKey?: boolean;
   hasOpenRouterKey?: boolean;
   hasLiteLlmKey?: boolean;
+  modelContextLengths?: Record<string, number>;
 }
 
 export interface ChatMessage {

@@ -31,6 +31,7 @@
   const figmaKeyInput = document.getElementById('figma-key');
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
+  const modelContextLengthsInput = document.getElementById('model-context-lengths-input');
   
   const planFirstToggle = document.getElementById('settings-plan-first-toggle');
   const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');

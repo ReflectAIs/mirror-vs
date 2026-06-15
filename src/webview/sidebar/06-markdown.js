@@ -439,6 +439,7 @@
 
     let html = '';
     let inCodeBlock = false;
+    let inTable = false;
     let codeBuffer = '';
     let codeLang = '';
 
@@ -491,6 +492,35 @@
         // Inline Code (`code`)
         processedLine = processedLine.replace(/`(.*?)`/g, '<code>$1</code>');
 
+        // Check if we are in a table
+        if (inTable) {
+          if (processedLine.includes('|')) {
+            let cells = processedLine.split('|');
+            if (processedLine.trim().startsWith('|')) cells.shift();
+            if (processedLine.trim().endsWith('|')) cells.pop();
+            html += '<tr>' + cells.map(cell => `<td>${cell.trim()}</td>`).join('') + '</tr>';
+            continue;
+          } else {
+            html += '</tbody></table>';
+            inTable = false;
+          }
+        }
+
+        // Check for table header and separator row
+        if (!inTable && processedLine.includes('|') && i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          const isSeparator = /^[|:\s-]+$/.test(nextLine) && nextLine.includes('-') && nextLine.includes('|');
+          if (isSeparator) {
+            inTable = true;
+            let headers = processedLine.split('|');
+            if (processedLine.trim().startsWith('|')) headers.shift();
+            if (processedLine.trim().endsWith('|')) headers.pop();
+            html += '<table class="markdown-table"><thead><tr>' + headers.map(h => `<th>${h.trim()}</th>`).join('') + '</tr></thead><tbody>';
+            i++; // skip separator line
+            continue;
+          }
+        }
+
         // Headers
         if (processedLine.startsWith('### ')) {
           html += `<h3>${processedLine.substring(4)}</h3>`;
@@ -516,6 +546,10 @@
           html += `<p>${processedLine}</p>`;
         }
       }
+    }
+
+    if (inTable) {
+      html += '</tbody></table>';
     }
 
     if (inCodeBlock && codeBuffer.trim()) {

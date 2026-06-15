@@ -2260,65 +2260,63 @@ select:focus {
 
 /* ─── BUDDY AVATAR (GORGEOUS CYBERNETIC MASCOT ORB) ────────────────────────── */
 .buddy-container {
-  position: absolute;
-  right: 14px;
-  top: 64px;
-  z-index: 12;
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: pointer;
   user-select: none;
   perspective: 1000px;
-  transition: transform 0.4s var(--ease-spring);
+  transition: transform 0.5s var(--ease-spring);
+  position: relative;
 }
 
 .buddy-container:hover {
-  transform: translateY(-4px) scale(1.15) rotate(2deg);
+  transform: translateY(-3px) scale(1.06);
 }
 
 .buddy-container:active {
-  transform: translateY(1px) scale(0.95);
+  transform: translateY(1px) scale(0.96);
 }
 
 .buddy-glow {
   position: absolute;
-  inset: -6px;
+  inset: -4px;
   border-radius: 50%;
   background: conic-gradient(
     from 0deg,
     transparent,
-    rgba(99, 102, 241, 0.4),
+    rgba(56, 189, 248, 0.3),
     transparent,
-    rgba(168, 85, 247, 0.4),
+    rgba(139, 92, 246, 0.25),
     transparent
   );
-  filter: blur(2px);
-  animation: spin 4s linear infinite;
-  opacity: 0.45;
-  transition: all 0.4s var(--ease-out);
+  filter: blur(4px);
+  animation: spin 5s linear infinite;
+  opacity: 0.5;
+  transition: all 0.5s var(--ease-out);
+  pointer-events: none;
 }
 
 .buddy-container:hover .buddy-glow {
-  opacity: 1;
-  inset: -8px;
-  filter: blur(4px) drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
-  animation-duration: 2s;
+  opacity: 0.85;
+  inset: -6px;
+  filter: blur(6px) drop-shadow(0 0 10px rgba(56, 189, 248, 0.4));
+  animation-duration: 2.5s;
 }
 
 .buddy-container.state-thinking .buddy-glow {
   opacity: 1;
-  inset: -8px;
+  inset: -6px;
   background: conic-gradient(
     from 0deg,
     transparent,
-    rgba(99, 102, 241, 0.6),
+    rgba(56, 189, 248, 0.7),
     transparent,
-    rgba(6, 182, 212, 0.6),
+    rgba(139, 92, 246, 0.5),
     transparent
   );
-  animation: spin 1.2s linear infinite;
-  filter: blur(4px) drop-shadow(0 0 12px rgba(6, 182, 212, 0.5));
+  animation: spin 1s linear infinite;
+  filter: blur(5px) drop-shadow(0 0 14px rgba(56, 189, 248, 0.6));
 }
 
 .buddy-container.state-coding .buddy-glow {
@@ -2371,36 +2369,62 @@ select:focus {
   to   { transform: rotate(360deg); }
 }
 
+.buddy-face-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+}
+
+.buddy-head-bg {
+  transition: fill 0.5s ease;
+}
+
 .buddy-avatar {
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px) saturate(1.8);
-  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.08) 0%, rgba(15,23,42,0.6) 100%);
+  border: 1.8px solid rgba(56, 189, 248, 0.25);
+  backdrop-filter: blur(14px) saturate(1.8);
+  -webkit-backdrop-filter: blur(14px) saturate(1.8);
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    inset 0 2px 4px rgba(255, 255, 255, 0.05),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    0 0 20px rgba(56, 189, 248, 0.15),
+    0 8px 28px rgba(0, 0, 0, 0.5),
+    inset 0 2px 6px rgba(255, 255, 255, 0.06),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
-  transition: all 0.4s var(--ease-spring);
-  animation: buddy-breath 4s ease-in-out infinite;
+  overflow: visible;
+  transition: all 0.5s var(--ease-spring);
+  animation: buddy-breath 3.2s ease-in-out infinite;
+  cursor: pointer;
 }
 
 @keyframes buddy-breath {
   0%, 100% {
-    transform: translateY(0);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+    transform: scale(1) translateY(0);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.15), 0 8px 28px rgba(0, 0, 0, 0.5);
   }
-  50% {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.08);
+  30% {
+    transform: scale(1.06) translateY(-2px);
+    box-shadow: 0 0 26px rgba(56, 189, 248, 0.3), 0 12px 34px rgba(0, 0, 0, 0.55);
   }
+  60% {
+    transform: scale(1.02) translateY(-1px);
+    box-shadow: 0 0 22px rgba(56, 189, 248, 0.2), 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@keyframes buddy-blink {
+  0%, 96%, 100% { opacity: 1; }
+  97%, 99% { opacity: 0.12; }
+}
+
+#buddy-eyes {
+  transition: all 0.3s ease;
 }
 
 .buddy-container.state-thinking .buddy-avatar {
@@ -2485,52 +2509,7 @@ select:focus {
   70%  { transform: rotate(20deg) translateY(1px); }
 }
 
-.buddy-tooltip {
-  display: none !important;
-  position: absolute;
-  bottom: 52px;
-  left: 50%;
-  transform: translateX(-50%) translateY(6px);
-  background: rgba(8, 8, 16, 0.94);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--text-primary);
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.65),
-    0 4px 8px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  white-space: pre-wrap;
-  max-width: 190px;
-  text-align: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-spring);
-  line-height: 1.4;
-}
-
-.buddy-tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 5px;
-  border-style: solid;
-  border-color: rgba(8, 8, 16, 0.94) transparent transparent transparent;
-}
-
-.buddy-container:hover .buddy-tooltip,
-.buddy-container.state-thinking .buddy-tooltip,
-.buddy-container.state-coding .buddy-tooltip,
-.buddy-container.state-tool_calling .buddy-tooltip,
-.buddy-container.state-error .buddy-tooltip {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
+/* No tooltip - the buddy expresses itself through its animated face only */
 
 /* ─── UTILITY ─────────────────────────────────────────────────────────────── */
 .hidden { display: none !important; }
@@ -2747,31 +2726,10 @@ select:focus {
   font-family: inherit;
 }
 
-.buddy-tooltip {
-  position: absolute;
-  top: 36px;
-  left: 50%;
-  transform: translateX(-50%) translateY(5px);
-  font-size: 10px;
-  padding: 6px 10px;
-  max-width: 180px;
-  width: max-content;
-  white-space: normal;
-  text-align: center;
-  word-wrap: break-word;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-  z-index: 100;
-  opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
+/* Tooltip show-on-hover and show-on-state handled in main buddy-tooltip block above */
 .buddy-container:hover .buddy-tooltip {
-  opacity: 1;
+  opacity: 1 !important;
+  display: block !important;
   transform: translateX(-50%) translateY(0);
 }
 
@@ -2945,23 +2903,31 @@ select:focus {
   right: auto;
   top: auto;
   z-index: auto;
-  margin-right: 8px;
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 
 .buddy-container.header-buddy .buddy-avatar {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   background: rgba(15, 23, 42, 0.65);
-  border: 1.5px solid rgba(56, 189, 248, 0.35);
+  border: 1.8px solid rgba(56, 189, 248, 0.35);
   box-shadow: 
-    0 0 8px rgba(56, 189, 248, 0.2),
+    0 0 14px rgba(56, 189, 248, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  animation: none; /* remove breath animation in header to keep it sleek and non-distracting */
+  animation: buddy-breath-header 3.2s ease-in-out infinite;
 }
 
-.buddy-container.header-buddy .buddy-face {
-  width: 20px;
-  height: 20px;
+@keyframes buddy-breath-header {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.25), 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.4), 0 6px 20px rgba(0, 0, 0, 0.45);
+  }
 }
 
 #buddy-particles {
@@ -2973,16 +2939,6 @@ select:focus {
   pointer-events: none;
   z-index: 10;
 }
-
-#buddy-face {
-  transition: all 0.3s ease;
-  display: block;
-}
-
-#buddy-eyes {
-  transition: all 0.2s ease;
-}
-
 
 /* ─── REVAMPED SETTINGS DRAWER ───────────────────────────────────────────── */
 .drawer-inner {
@@ -4220,6 +4176,48 @@ select:focus {
 .event-log-data {
   color: var(--text-secondary);
   word-break: break-all;
+}
+
+/* Markdown Tables styling */
+.markdown-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 12px 0;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.markdown-table th {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 8px 10px;
+  font-size: 11px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.markdown-table td {
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.markdown-table tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-table tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.markdown-table tr:hover td {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 

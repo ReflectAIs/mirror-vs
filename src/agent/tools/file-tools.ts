@@ -367,12 +367,14 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const config = vscode.workspace.getConfiguration('mirror-vs');
       const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
       let approved = true;
-      if (process.env.VITEST) {
-        approved = true;
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
-        approved = await MirrorVsSidebarProvider.requestToolApproval('rename_file', `${tool.path} -> ${tool.content}`);
+      if (!autoApproveWrite) {
+        if (process.env.VITEST) {
+          approved = true;
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+          approved = await MirrorVsSidebarProvider.requestToolApproval('rename_file', `${tool.path} -> ${tool.content}`);
+        }
       }
       if (!approved) {
         throw new Error('User rejected file rename.');

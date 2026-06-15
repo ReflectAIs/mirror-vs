@@ -655,15 +655,17 @@ export class AgentOrchestrator {
             config.inspect('agentInputTokenBudget')?.globalValue !== undefined ||
             config.inspect('agentInputTokenBudget')?.workspaceValue !== undefined;
 
+          const contextBudgetPercent = config.get<number>('contextBudgetPercent', 75);
+          const headroom = contextBudgetPercent / 100;
           const hardMax = config.get('agentInputTokenHardMax', 200000) as number;
-          const effectiveBudget = computeInputTokenBudget(configuredBudget, contextWindow, explicitBudget, { hardMax });
+          const effectiveBudget = computeInputTokenBudget(configuredBudget, contextWindow, explicitBudget, { hardMax, headroom });
 
           // Auto-compaction check using our new context compactor service
-          const compactionResult = await maybeCompact(currentMessages, contextWindow, async (summaryPrompt) => {
+          const compactionResult = await maybeCompact(currentMessages, effectiveBudget, async (summaryPrompt) => {
             this._postMessage({ type: 'chatResponseStart' });
             this._postMessage({
               type: 'chatResponseChunk',
-              text: `Compressing context (~${Math.round(estimateTokens(currentMessages) / 1000)}K tokens, model window: ${Math.round(contextWindow / 1000)}K)...`,
+              text: `Compressing context (~${Math.round(estimateTokens(currentMessages) / 1000)}K tokens, budget: ${Math.round(effectiveBudget / 1000)}K)...`,
             });
             const summary = await this._completer.summarizeHistory(
               provider as LLMProvider,

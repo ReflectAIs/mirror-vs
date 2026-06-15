@@ -306,12 +306,18 @@ export async function maybeCompact(
     return { compactedMessages: messages, wasCompacted: false };
   }
 
-  // Separate system preface and conversation
+  // Separate system preface, conversation, and existing summaries
   const systemMsgs: ChatMessage[] = [];
   const convoMsgs: ChatMessage[] = [];
+  const existingSummaries: ChatMessage[] = [];
+
   for (const msg of messages) {
     if (msg.role === 'system') {
-      systemMsgs.push(msg);
+      if (msg.content && msg.content.includes('[Conversation summary')) {
+        existingSummaries.push(msg);
+      } else {
+        systemMsgs.push(msg);
+      }
     } else {
       convoMsgs.push(msg);
     }
@@ -327,12 +333,16 @@ export async function maybeCompact(
   const recent = convoMsgs.slice(splitPoint);
 
   // Build the text to summarize
-  const convoText = older
+  let convoText = '';
+  if (existingSummaries.length > 0) {
+    convoText += "PREVIOUS CONVERSATION SUMMARIES:\n" + existingSummaries.map(s => s.content).join('\n\n') + "\n\nNEW MESSAGES TO SUMMARIZE:\n";
+  }
+  convoText += older
     .map((msg) => `${msg.role.toUpperCase()}: ${contentAsText(msg.content).substring(0, 2000)}`)
     .join('\n');
 
   // Count prior compactions from existing summary messages
-  const compactionCount = systemMsgs.filter((m) => m.content.includes('[Conversation summary')).length;
+  const compactionCount = existingSummaries.length;
 
   const prompt = SELF_SUMMARY_SYSTEM_PROMPT.replace('{count}', String(older.length)).replace(
     '{n}',

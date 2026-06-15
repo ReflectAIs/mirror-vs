@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -493,6 +493,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable git-based snapshots before dangerous file operations. Allows automatic rollback on failure."
+        },
+        "mirror-vs.modelContextLengths": {
+          "type": "object",
+          "default": {},
+          "description": "Custom model context window size overrides (e.g. { 'my-custom-model': 32000 }). Maps substring of model name to context length in tokens."
         }
       }
     }

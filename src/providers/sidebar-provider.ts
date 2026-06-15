@@ -385,6 +385,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               if ((data as any).teacherModel !== undefined) {
                 await config.update('teacherModel', (data as any).teacherModel, vscode.ConfigurationTarget.Global);
               }
+              if ((data as any).modelContextLengths !== undefined) {
+                await config.update('modelContextLengths', (data as any).modelContextLengths, vscode.ConfigurationTarget.Global);
+              }
 
               vscode.window.showInformationMessage('Mirror VS Settings saved successfully!');
               await this._sendSettingsToWebview();
@@ -1318,6 +1321,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       hasGeminiKey,
       hasOpenRouterKey,
       hasLiteLlmKey,
+      modelContextLengths: config.get<Record<string, number>>('modelContextLengths', {}),
     } as any;
 
     this._view.webview.postMessage({

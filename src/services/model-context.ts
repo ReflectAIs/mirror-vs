@@ -226,6 +226,22 @@ function lookupKnown(model: string): number | null {
   let basename = parts[parts.length - 1];
   basename = basename.split(':')[0]; // strip tag (like :latest)
 
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const vscode = require('vscode');
+    const config = vscode.workspace.getConfiguration('mirror-vs');
+    const customLengths = config.get<Record<string, number>>('modelContextLengths', {});
+    for (const [key, val] of Object.entries(customLengths)) {
+      if (basename.includes(key.toLowerCase()) || name.includes(key.toLowerCase())) {
+        if (typeof val === 'number' && val > 0) {
+          return val;
+        }
+      }
+    }
+  } catch {
+    // VS Code API not available (e.g., in unit tests)
+  }
+
   let bestKey: string | null = null;
   let bestCtx: number | null = null;
 

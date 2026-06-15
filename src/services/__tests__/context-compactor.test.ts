@@ -117,5 +117,30 @@ describe('Context Compactor Service', () => {
       expect(compactedMessages[1].role).toBe('system');
       expect(compactedMessages[1].content).toContain('Mock conversation summary text.');
     });
+
+    it('should consolidate old summaries when doing a subsequent compaction', async () => {
+      const messages: ChatMessage[] = [
+        { role: 'system', content: 'sys' },
+        { role: 'system', content: '[Conversation summary — earlier messages were compacted]\nOld summary here' },
+        { role: 'user', content: 'a'.repeat(200) },
+        { role: 'assistant', content: 'b'.repeat(200) },
+        { role: 'user', content: 'c'.repeat(200) },
+        { role: 'assistant', content: 'd'.repeat(200) },
+      ];
+
+      const mockSummarize = vi.fn().mockResolvedValue('Consolidated summary text.');
+      const { compactedMessages, wasCompacted } = await maybeCompact(messages, 200, mockSummarize);
+      expect(wasCompacted).toBe(true);
+      
+      // Ensure the old summary is replaced and not present, leaving exactly one summary
+      const summaryMessages = compactedMessages.filter(m => m.role === 'system' && m.content.includes('[Conversation summary'));
+      expect(summaryMessages).toHaveLength(1);
+      expect(summaryMessages[0].content).toContain('Consolidated summary text.');
+
+      // Check the prompt passed to summarizeFn contained the old summary
+      const callArg = mockSummarize.mock.calls[0][0];
+      const userMessage = callArg.find((m: any) => m.role === 'user');
+      expect(userMessage.content).toContain('Old summary here');
+    });
   });
 });

@@ -340,6 +340,18 @@
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
+    let modelContextLengths = {};
+    if (modelContextLengthsInput) {
+      try {
+        const val = modelContextLengthsInput.value.trim();
+        if (val) {
+          modelContextLengths = JSON.parse(val);
+        }
+      } catch (e) {
+        console.error('Invalid JSON for model context lengths:', e);
+      }
+    }
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -369,6 +381,7 @@
       customSystemPrompt,
       customApis: customApisList,
       customApiKeys: customApiKeysData,
+      modelContextLengths,
     });
   }
 
