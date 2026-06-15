@@ -302,6 +302,12 @@
     const deepSeekThinkingLevel = settingsThinkingLevelSelect ? settingsThinkingLevelSelect.value : 'high';
     const autoToggle = document.getElementById('settings-autonomous-toggle');
     const autonomousMode = autoToggle ? autoToggle.checked : false;
+    const autoApproveWriteToggle = document.getElementById('settings-approve-write-toggle');
+    const autoApproveWrite = autoApproveWriteToggle ? autoApproveWriteToggle.checked : false;
+    const autoApproveCommandToggle = document.getElementById('settings-approve-command-toggle');
+    const autoApproveCommand = autoApproveCommandToggle ? autoApproveCommandToggle.checked : false;
+    const autoApproveBrowserToggle = document.getElementById('settings-approve-browser-toggle');
+    const autoApproveBrowser = autoApproveBrowserToggle ? autoApproveBrowserToggle.checked : false;
 
     const planFirst = planFirstToggle ? planFirstToggle.checked : true;
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
@@ -329,6 +335,9 @@
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
+      autoApproveWrite,
+      autoApproveCommand,
+      autoApproveBrowser,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
@@ -510,6 +519,12 @@
 
     const autoToggle = document.getElementById('settings-autonomous-toggle');
     const autonomousMode = autoToggle ? autoToggle.checked : false;
+    const autoApproveWriteToggle = document.getElementById('settings-approve-write-toggle');
+    const autoApproveWrite = autoApproveWriteToggle ? autoApproveWriteToggle.checked : false;
+    const autoApproveCommandToggle = document.getElementById('settings-approve-command-toggle');
+    const autoApproveCommand = autoApproveCommandToggle ? autoApproveCommandToggle.checked : false;
+    const autoApproveBrowserToggle = document.getElementById('settings-approve-browser-toggle');
+    const autoApproveBrowser = autoApproveBrowserToggle ? autoApproveBrowserToggle.checked : false;
 
     const planFirst = planFirstToggle ? planFirstToggle.checked : true;
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
@@ -544,6 +559,9 @@
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
+      autoApproveWrite,
+      autoApproveCommand,
+      autoApproveBrowser,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),

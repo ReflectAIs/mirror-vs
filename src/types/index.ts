@@ -49,6 +49,9 @@ export interface ExtensionSettings {
   autonomousMode?: boolean;
   teacherEnabled?: boolean;
   teacherModel?: string;
+  autoApproveWrite?: boolean;
+  autoApproveCommand?: boolean;
+  autoApproveBrowser?: boolean;
 }
 
 export interface ChatMessage {
@@ -180,7 +183,8 @@ export type WebviewToExtensionMessage =
   | { type: 'generatePRDescription' }
   | { type: 'generateCommitMessage' }
   | { type: 'searchSessions'; query: string }
-  | { type: 'showWarning'; text: string };
+  | { type: 'showWarning'; text: string }
+  | { type: 'toolApprovalResponse'; approved: boolean };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =

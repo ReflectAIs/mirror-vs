@@ -5,6 +5,23 @@ import { ToolCall } from '../types';
 import { BrowserService } from '../../services/browser-service';
 
 export async function executeBrowserTool(tool: ToolCall, getSafePath: (p: string) => string): Promise<string> {
+  const config = vscode.workspace.getConfiguration('mirror-vs');
+  const autoApproveBrowser = config.get<boolean>('autoApproveBrowser', false);
+  if (!autoApproveBrowser) {
+    const target = tool.url || tool.selector || tool.content || '';
+    let approved = true;
+    if (process.env.VITEST) {
+      approved = true;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+      approved = await MirrorVsSidebarProvider.requestToolApproval(tool.name, target);
+    }
+    if (!approved) {
+      throw new Error(`Browser action "${tool.name}" denied by user.`);
+    }
+  }
+
   const browser = BrowserService.getInstance();
 
   switch (tool.name) {

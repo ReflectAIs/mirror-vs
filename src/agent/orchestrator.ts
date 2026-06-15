@@ -68,7 +68,17 @@ export function determineTaskMode(userMessage: string, configMode: string): Task
   ) {
     return TaskMode.DEBUG;
   }
-  if (lower.includes('verify') || lower.includes('check') || lower.includes('test')) {
+  if (
+    lower.includes('run test') ||
+    lower.includes('run lint') ||
+    lower.includes('run build') ||
+    lower.includes('npm test') ||
+    lower.includes('npm run test') ||
+    lower.includes('vitest') ||
+    lower.includes('eslint') ||
+    lower.includes('typecheck') ||
+    /^(run|execute|perform|verify) (the )?(tests?|build|lint|typecheck)/i.test(lower)
+  ) {
     return TaskMode.VERIFY;
   }
   return TaskMode.IMPLEMENT;

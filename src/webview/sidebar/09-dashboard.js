@@ -1,3 +1,94 @@
+// ===== Buddy Interactive Eye & Mouth Module =====
+(function() {
+  const buddyContainer = document.getElementById('buddy-container');
+  const buddyEyes = document.getElementById('buddy-eyes');
+  const buddyAvatar = document.getElementById('buddy-avatar');
+  let mouthAnimationId = null;
+
+  // --- Eye Tracking ---
+  if (buddyContainer && buddyEyes) {
+    const pupils = buddyEyes.querySelectorAll('circle');
+    const origPupils = [];
+    pupils.forEach(c => {
+      origPupils.push({ cx: parseFloat(c.getAttribute('cx')), cy: parseFloat(c.getAttribute('cy')) });
+    });
+
+    buddyContainer.addEventListener('mousemove', (e) => {
+      const rect = buddyContainer.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx) / (rect.width / 2);
+      const dy = (e.clientY - cy) / (rect.height / 2);
+      const maxMove = 1.8;
+      const moveX = Math.max(-maxMove, Math.min(maxMove, dx * 1.2));
+      const moveY = Math.max(-maxMove, Math.min(maxMove, dy * 1.2));
+      pupils.forEach((p, i) => {
+        if (origPupils[i]) {
+          p.setAttribute('cx', origPupils[i].cx + moveX);
+          p.setAttribute('cy', origPupils[i].cy + moveY);
+        }
+      });
+    });
+
+    buddyContainer.addEventListener('mouseleave', () => {
+      pupils.forEach((p, i) => {
+        if (origPupils[i]) {
+          p.setAttribute('cx', origPupils[i].cx);
+          p.setAttribute('cy', origPupils[i].cy);
+        }
+      });
+    });
+  }
+
+  // --- Mouth Animation ---
+  function createMouth() {
+    let mouth = document.getElementById('buddy-mouth');
+    if (mouth) return mouth;
+    mouth = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    mouth.id = 'buddy-mouth';
+    mouth.setAttribute('viewBox', '0 0 24 24');
+    mouth.style.cssText = 'display:block;position:absolute;bottom:5%;left:25%;width:50%;height:20%;';
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.id = 'buddy-mouth-path';
+    path.setAttribute('d', 'M9.5 14 Q12 16.5 14.5 14');
+    path.setAttribute('stroke', '#22d3ee');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('fill', 'none');
+    mouth.appendChild(path);
+    if (buddyAvatar) buddyAvatar.appendChild(mouth);
+    return mouth;
+  }
+
+  function startMouthAnimation() {
+    if (mouthAnimationId) return;
+    createMouth();
+    const path = document.getElementById('buddy-mouth-path');
+    if (!path) return;
+    let open = false;
+    mouthAnimationId = setInterval(() => {
+      open = !open;
+      const d = open ? 'M8 15 Q12 19 16 15' : 'M9.5 14 Q12 16.5 14.5 14';
+      path.setAttribute('d', d);
+    }, 180);
+  }
+
+  function stopMouthAnimation() {
+    if (mouthAnimationId) {
+      clearInterval(mouthAnimationId);
+      mouthAnimationId = null;
+    }
+    const path = document.getElementById('buddy-mouth-path');
+    if (path) {
+      path.setAttribute('d', 'M9.5 14 Q12 16.5 14.5 14');
+    }
+  }
+
+  window._buddyStartTalking = startMouthAnimation;
+  window._buddyStopTalking = stopMouthAnimation;
+  console.log('[Buddy] Interactive eye tracking & mouth module loaded');
+})();
+
 // ===== Dashboard Module (v0.2.0) =====
 // Handles dashboard drawer visibility, widgets data updates, skill list rendering, and event stream.
 

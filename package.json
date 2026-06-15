@@ -346,6 +346,21 @@
           "default": false,
           "description": "When enabled, Mirror VS will automatically accept file changes after a 10-second countdown instead of waiting for manual approval. Enables fully agentic autonomous execution."
         },
+        "mirror-vs.autoApproveWrite": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, Mirror VS will automatically perform file write/edit/create/delete operations without prompting you for manual approval."
+        },
+        "mirror-vs.autoApproveCommand": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, Mirror VS will automatically execute terminal/shell commands without prompting you for manual approval."
+        },
+        "mirror-vs.autoApproveBrowser": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, Mirror VS will automatically perform browser navigate, click, type, and execute script actions without prompting you for manual approval."
+        },
         "mirror-vs.embeddingSearchMinScore": {
           "type": "number",
           "default": 0.3,

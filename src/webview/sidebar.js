@@ -703,6 +703,12 @@
     const deepSeekThinkingLevel = settingsThinkingLevelSelect ? settingsThinkingLevelSelect.value : 'high';
     const autoToggle = document.getElementById('settings-autonomous-toggle');
     const autonomousMode = autoToggle ? autoToggle.checked : false;
+    const autoApproveWriteToggle = document.getElementById('settings-approve-write-toggle');
+    const autoApproveWrite = autoApproveWriteToggle ? autoApproveWriteToggle.checked : false;
+    const autoApproveCommandToggle = document.getElementById('settings-approve-command-toggle');
+    const autoApproveCommand = autoApproveCommandToggle ? autoApproveCommandToggle.checked : false;
+    const autoApproveBrowserToggle = document.getElementById('settings-approve-browser-toggle');
+    const autoApproveBrowser = autoApproveBrowserToggle ? autoApproveBrowserToggle.checked : false;
 
     const planFirst = planFirstToggle ? planFirstToggle.checked : true;
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
@@ -730,6 +736,9 @@
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
+      autoApproveWrite,
+      autoApproveCommand,
+      autoApproveBrowser,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
@@ -911,6 +920,12 @@
 
     const autoToggle = document.getElementById('settings-autonomous-toggle');
     const autonomousMode = autoToggle ? autoToggle.checked : false;
+    const autoApproveWriteToggle = document.getElementById('settings-approve-write-toggle');
+    const autoApproveWrite = autoApproveWriteToggle ? autoApproveWriteToggle.checked : false;
+    const autoApproveCommandToggle = document.getElementById('settings-approve-command-toggle');
+    const autoApproveCommand = autoApproveCommandToggle ? autoApproveCommandToggle.checked : false;
+    const autoApproveBrowserToggle = document.getElementById('settings-approve-browser-toggle');
+    const autoApproveBrowser = autoApproveBrowserToggle ? autoApproveBrowserToggle.checked : false;
 
     const planFirst = planFirstToggle ? planFirstToggle.checked : true;
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
@@ -945,6 +960,9 @@
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
+      autoApproveWrite,
+      autoApproveCommand,
+      autoApproveBrowser,
       customEndpointEnabled: provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_')),
       customEndpointUrl: activeCustomId === 'custom' ? customEndpointUrl : (customApisList.find(a => a.id === activeCustomId)?.url || customEndpointUrl),
       customEndpointModel: activeCustomId === 'custom' ? customEndpointModel : (customApisList.find(a => a.id === activeCustomId)?.models[0] || customEndpointModel),
@@ -2558,6 +2576,18 @@ function attachImage(base64) {
           const autoToggle = document.getElementById('settings-autonomous-toggle');
           if (autoToggle) autoToggle.checked = s.autonomousMode;
         }
+        if (s.autoApproveWrite !== undefined) {
+          const writeToggle = document.getElementById('settings-approve-write-toggle');
+          if (writeToggle) writeToggle.checked = s.autoApproveWrite;
+        }
+        if (s.autoApproveCommand !== undefined) {
+          const cmdToggle = document.getElementById('settings-approve-command-toggle');
+          if (cmdToggle) cmdToggle.checked = s.autoApproveCommand;
+        }
+        if (s.autoApproveBrowser !== undefined) {
+          const browserToggle = document.getElementById('settings-approve-browser-toggle');
+          if (browserToggle) browserToggle.checked = s.autoApproveBrowser;
+        }
 
         if (s.planFirst !== undefined && planFirstToggle) {
           planFirstToggle.checked = s.planFirst;
@@ -2819,18 +2849,30 @@ function attachImage(base64) {
         const { toolName, status, target, result, checkpointId, code, terminalName } = message;
         if (status === 'running') {
           setAvatarState('tool_calling');
-          currentToolCardElement = createToolCardDOM(toolName, status, target, null, null, false, null, null);
-          placeCardInPlaceholder(currentToolCardElement, toolName, target);
-        } else if (currentToolCardElement) {
-          const parent = currentToolCardElement.parentNode;
-          if (parent) {
-            const updatedCard = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
-            parent.replaceChild(updatedCard, currentToolCardElement);
-            currentToolCardElement = null;
-          }
+          const runningCard = createToolCardDOM(toolName, status, target, null, null, false, null, null);
+          placeCardInPlaceholder(runningCard, toolName, target);
         } else {
-          const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
-          placeCardInPlaceholder(card, toolName, target);
+          // Find any existing running card for this tool & target in the chatMessages container
+          const cards = chatMessages.querySelectorAll('.tool-card.running');
+          let existingCard = null;
+          const cleanTarget = (target || '').trim();
+          for (let i = 0; i < cards.length; i++) {
+            if (cards[i].getAttribute('data-tool') === toolName &&
+                cards[i].getAttribute('data-target') === cleanTarget) {
+              existingCard = cards[i];
+              break;
+            }
+          }
+          if (existingCard) {
+            const parent = existingCard.parentNode;
+            if (parent) {
+              const updatedCard = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
+              parent.replaceChild(updatedCard, existingCard);
+            }
+          } else {
+            const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
+            placeCardInPlaceholder(card, toolName, target);
+          }
         }
         scrollChatToBottom();
         break;
@@ -2889,8 +2931,20 @@ function attachImage(base64) {
 
       case 'requestSensitiveCommandApproval': {
         const { command, autonomousMode } = message;
+        const iconEl = document.getElementById('approval-modal-icon');
+        const titleEl = document.getElementById('approval-modal-title');
+        const descEl = document.getElementById('approval-modal-description');
+        const warningEl = document.getElementById('approval-modal-warning');
+        
+        if (iconEl) iconEl.textContent = '⚠️';
+        if (titleEl) titleEl.textContent = 'Sensitive Command Request';
+        if (descEl) descEl.textContent = 'Mirror VS is requesting to run a sensitive/destructive command:';
         if (approvalCommandText) {
           approvalCommandText.textContent = command;
+        }
+        if (warningEl) warningEl.textContent = 'Do you want to authorize this command?';
+        if (approvalAllowBtn) {
+          approvalAllowBtn.textContent = 'Allow Execution';
         }
         
         if (commandApprovalModal) {
@@ -2911,6 +2965,98 @@ function attachImage(base64) {
             commandApprovalModal.classList.add('hidden');
           }
           vscode.postMessage({ type: 'sensitiveCommandResponse', approved });
+        };
+        
+        if (approvalAllowBtn) {
+          approvalAllowBtn.onclick = () => handleResponse(true);
+        }
+        if (approvalDenyBtn) {
+          approvalDenyBtn.onclick = () => handleResponse(false);
+        }
+        
+        if (autonomousMode) {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.remove('hidden');
+          }
+          if (approvalTimerBar) {
+            approvalTimerBar.style.width = '100%';
+          }
+          if (approvalTimerText) {
+            approvalTimerText.textContent = 'Auto-allowing in 10s...';
+          }
+          
+          const startTime = Date.now();
+          approvalTimerInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, 10000 - elapsed);
+            
+            if (approvalTimerBar) {
+              approvalTimerBar.style.width = `${(remaining / 10000) * 100}%`;
+            }
+            
+            if (approvalTimerText) {
+              const secondsLeft = Math.ceil(remaining / 1000);
+              approvalTimerText.textContent = `Auto-allowing in ${secondsLeft}s...`;
+            }
+            
+            if (remaining <= 0) {
+              clearInterval(approvalTimerInterval);
+              approvalTimerInterval = null;
+              handleResponse(true);
+            }
+          }, 100);
+        } else {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.add('hidden');
+          }
+        }
+        break;
+      }
+
+      case 'requestToolApproval': {
+        const { toolName, target, details, autonomousMode } = message;
+        const iconEl = document.getElementById('approval-modal-icon');
+        const titleEl = document.getElementById('approval-modal-title');
+        const descEl = document.getElementById('approval-modal-description');
+        const warningEl = document.getElementById('approval-modal-warning');
+        
+        if (iconEl) {
+          iconEl.textContent = (toolName === 'run_command' || toolName === 'send_terminal_input') ? '💻' : toolName === 'write_file' ? '📂' : '🌐';
+        }
+        if (titleEl) {
+          titleEl.textContent = (toolName === 'run_command' || toolName === 'send_terminal_input') ? 'Terminal Command Approval' : toolName === 'write_file' ? 'File Change Approval' : 'Browser Action Approval';
+        }
+        if (descEl) {
+          descEl.textContent = `Mirror VS is requesting approval for tool "${toolName}" on:`;
+        }
+        if (approvalCommandText) {
+          approvalCommandText.textContent = `${target}` + (details ? `\n\nContent Preview:\n${details.substring(0, 1000)}${details.length > 1000 ? '...' : ''}` : '');
+        }
+        if (warningEl) {
+          warningEl.textContent = 'Do you want to authorize this action?';
+        }
+        if (approvalAllowBtn) {
+          approvalAllowBtn.textContent = 'Allow';
+        }
+        
+        if (commandApprovalModal) {
+          commandApprovalModal.classList.remove('hidden');
+        }
+        
+        if (approvalTimerInterval) {
+          clearInterval(approvalTimerInterval);
+          approvalTimerInterval = null;
+        }
+        
+        const handleResponse = (approved) => {
+          if (approvalTimerInterval) {
+            clearInterval(approvalTimerInterval);
+            approvalTimerInterval = null;
+          }
+          if (commandApprovalModal) {
+            commandApprovalModal.classList.add('hidden');
+          }
+          vscode.postMessage({ type: 'toolApprovalResponse', approved });
         };
         
         if (approvalAllowBtn) {
@@ -5203,6 +5349,97 @@ if (document.readyState === 'loading') {
 } else {
   initArtifacts();
 }
+
+// ===== Buddy Interactive Eye & Mouth Module =====
+(function() {
+  const buddyContainer = document.getElementById('buddy-container');
+  const buddyEyes = document.getElementById('buddy-eyes');
+  const buddyAvatar = document.getElementById('buddy-avatar');
+  let mouthAnimationId = null;
+
+  // --- Eye Tracking ---
+  if (buddyContainer && buddyEyes) {
+    const pupils = buddyEyes.querySelectorAll('circle');
+    const origPupils = [];
+    pupils.forEach(c => {
+      origPupils.push({ cx: parseFloat(c.getAttribute('cx')), cy: parseFloat(c.getAttribute('cy')) });
+    });
+
+    buddyContainer.addEventListener('mousemove', (e) => {
+      const rect = buddyContainer.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx) / (rect.width / 2);
+      const dy = (e.clientY - cy) / (rect.height / 2);
+      const maxMove = 1.8;
+      const moveX = Math.max(-maxMove, Math.min(maxMove, dx * 1.2));
+      const moveY = Math.max(-maxMove, Math.min(maxMove, dy * 1.2));
+      pupils.forEach((p, i) => {
+        if (origPupils[i]) {
+          p.setAttribute('cx', origPupils[i].cx + moveX);
+          p.setAttribute('cy', origPupils[i].cy + moveY);
+        }
+      });
+    });
+
+    buddyContainer.addEventListener('mouseleave', () => {
+      pupils.forEach((p, i) => {
+        if (origPupils[i]) {
+          p.setAttribute('cx', origPupils[i].cx);
+          p.setAttribute('cy', origPupils[i].cy);
+        }
+      });
+    });
+  }
+
+  // --- Mouth Animation ---
+  function createMouth() {
+    let mouth = document.getElementById('buddy-mouth');
+    if (mouth) return mouth;
+    mouth = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    mouth.id = 'buddy-mouth';
+    mouth.setAttribute('viewBox', '0 0 24 24');
+    mouth.style.cssText = 'display:block;position:absolute;bottom:5%;left:25%;width:50%;height:20%;';
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.id = 'buddy-mouth-path';
+    path.setAttribute('d', 'M9.5 14 Q12 16.5 14.5 14');
+    path.setAttribute('stroke', '#22d3ee');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('fill', 'none');
+    mouth.appendChild(path);
+    if (buddyAvatar) buddyAvatar.appendChild(mouth);
+    return mouth;
+  }
+
+  function startMouthAnimation() {
+    if (mouthAnimationId) return;
+    createMouth();
+    const path = document.getElementById('buddy-mouth-path');
+    if (!path) return;
+    let open = false;
+    mouthAnimationId = setInterval(() => {
+      open = !open;
+      const d = open ? 'M8 15 Q12 19 16 15' : 'M9.5 14 Q12 16.5 14.5 14';
+      path.setAttribute('d', d);
+    }, 180);
+  }
+
+  function stopMouthAnimation() {
+    if (mouthAnimationId) {
+      clearInterval(mouthAnimationId);
+      mouthAnimationId = null;
+    }
+    const path = document.getElementById('buddy-mouth-path');
+    if (path) {
+      path.setAttribute('d', 'M9.5 14 Q12 16.5 14.5 14');
+    }
+  }
+
+  window._buddyStartTalking = startMouthAnimation;
+  window._buddyStopTalking = stopMouthAnimation;
+  console.log('[Buddy] Interactive eye tracking & mouth module loaded');
+})();
 
 // ===== Dashboard Module (v0.2.0) =====
 // Handles dashboard drawer visibility, widgets data updates, skill list rendering, and event stream.

@@ -162,6 +162,24 @@ async function confirmChangesWithDiff(
   _fileName: string,
   checkpointAction: 'create' | 'replace',
 ): Promise<{ accepted: boolean; checkpointId: string | null }> {
+  const config = vscode.workspace.getConfiguration('mirror-vs');
+  const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
+  if (!autoApproveWrite) {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    const relativePath = path.relative(workspaceFolder, originalPath).replace(/\\/g, '/');
+    let approved = true;
+    if (process.env.VITEST) {
+      approved = true;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+      approved = await MirrorVsSidebarProvider.requestToolApproval('write_file', relativePath, proposedContent);
+    }
+    if (!approved) {
+      return { accepted: false, checkpointId: null };
+    }
+  }
+
   // Ensure parent directory exists before writing
   const parentDir = path.dirname(originalPath);
   if (!fs.existsSync(parentDir)) {
@@ -345,6 +363,21 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       if (fs.existsSync(destPath)) {
         throw new Error(`Destination already exists: ${tool.content}`);
       }
+
+      const config = vscode.workspace.getConfiguration('mirror-vs');
+      const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
+      let approved = true;
+      if (process.env.VITEST) {
+        approved = true;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+        approved = await MirrorVsSidebarProvider.requestToolApproval('rename_file', `${tool.path} -> ${tool.content}`);
+      }
+      if (!approved) {
+        throw new Error('User rejected file rename.');
+      }
+
       const parentDir = path.dirname(destPath);
       if (!fs.existsSync(parentDir)) {
         fs.mkdirSync(parentDir, { recursive: true });

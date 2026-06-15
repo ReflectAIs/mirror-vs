@@ -302,8 +302,9 @@ export class ReviewManager implements vscode.CodeLensProvider {
     try {
       const encoder = new TextEncoder();
       await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(proposedContent));
-    } catch (e) {
-      // ignore
+    } catch (e: any) {
+      console.error(`[ReviewManager] Failed to write proposed content to ${filePath}:`, e);
+      vscode.window.showErrorMessage(`Failed to write changes to file: ${e?.message || e}`);
     }
 
     if (previousResolve) {
@@ -424,8 +425,9 @@ export class ReviewManager implements vscode.CodeLensProvider {
           await vscode.workspace.fs.writeFile(vscode.Uri.file(filePath), encoder.encode(review.proposedContent));
           vscode.window.showInformationMessage(`✅ Changes accepted for ${docName}`);
         }
-      } catch (e) {
-        // ignore
+      } catch (e: any) {
+        console.error(`[ReviewManager] Failed to write changes on accept for ${filePath}:`, e);
+        vscode.window.showErrorMessage(`Failed to save accepted changes: ${e?.message || e}`);
       }
     } else {
       try {

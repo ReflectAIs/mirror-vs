@@ -262,6 +262,18 @@
           const autoToggle = document.getElementById('settings-autonomous-toggle');
           if (autoToggle) autoToggle.checked = s.autonomousMode;
         }
+        if (s.autoApproveWrite !== undefined) {
+          const writeToggle = document.getElementById('settings-approve-write-toggle');
+          if (writeToggle) writeToggle.checked = s.autoApproveWrite;
+        }
+        if (s.autoApproveCommand !== undefined) {
+          const cmdToggle = document.getElementById('settings-approve-command-toggle');
+          if (cmdToggle) cmdToggle.checked = s.autoApproveCommand;
+        }
+        if (s.autoApproveBrowser !== undefined) {
+          const browserToggle = document.getElementById('settings-approve-browser-toggle');
+          if (browserToggle) browserToggle.checked = s.autoApproveBrowser;
+        }
 
         if (s.planFirst !== undefined && planFirstToggle) {
           planFirstToggle.checked = s.planFirst;
@@ -523,18 +535,30 @@
         const { toolName, status, target, result, checkpointId, code, terminalName } = message;
         if (status === 'running') {
           setAvatarState('tool_calling');
-          currentToolCardElement = createToolCardDOM(toolName, status, target, null, null, false, null, null);
-          placeCardInPlaceholder(currentToolCardElement, toolName, target);
-        } else if (currentToolCardElement) {
-          const parent = currentToolCardElement.parentNode;
-          if (parent) {
-            const updatedCard = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
-            parent.replaceChild(updatedCard, currentToolCardElement);
-            currentToolCardElement = null;
-          }
+          const runningCard = createToolCardDOM(toolName, status, target, null, null, false, null, null);
+          placeCardInPlaceholder(runningCard, toolName, target);
         } else {
-          const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
-          placeCardInPlaceholder(card, toolName, target);
+          // Find any existing running card for this tool & target in the chatMessages container
+          const cards = chatMessages.querySelectorAll('.tool-card.running');
+          let existingCard = null;
+          const cleanTarget = (target || '').trim();
+          for (let i = 0; i < cards.length; i++) {
+            if (cards[i].getAttribute('data-tool') === toolName &&
+                cards[i].getAttribute('data-target') === cleanTarget) {
+              existingCard = cards[i];
+              break;
+            }
+          }
+          if (existingCard) {
+            const parent = existingCard.parentNode;
+            if (parent) {
+              const updatedCard = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
+              parent.replaceChild(updatedCard, existingCard);
+            }
+          } else {
+            const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
+            placeCardInPlaceholder(card, toolName, target);
+          }
         }
         scrollChatToBottom();
         break;
@@ -593,8 +617,20 @@
 
       case 'requestSensitiveCommandApproval': {
         const { command, autonomousMode } = message;
+        const iconEl = document.getElementById('approval-modal-icon');
+        const titleEl = document.getElementById('approval-modal-title');
+        const descEl = document.getElementById('approval-modal-description');
+        const warningEl = document.getElementById('approval-modal-warning');
+        
+        if (iconEl) iconEl.textContent = '⚠️';
+        if (titleEl) titleEl.textContent = 'Sensitive Command Request';
+        if (descEl) descEl.textContent = 'Mirror VS is requesting to run a sensitive/destructive command:';
         if (approvalCommandText) {
           approvalCommandText.textContent = command;
+        }
+        if (warningEl) warningEl.textContent = 'Do you want to authorize this command?';
+        if (approvalAllowBtn) {
+          approvalAllowBtn.textContent = 'Allow Execution';
         }
         
         if (commandApprovalModal) {
@@ -615,6 +651,98 @@
             commandApprovalModal.classList.add('hidden');
           }
           vscode.postMessage({ type: 'sensitiveCommandResponse', approved });
+        };
+        
+        if (approvalAllowBtn) {
+          approvalAllowBtn.onclick = () => handleResponse(true);
+        }
+        if (approvalDenyBtn) {
+          approvalDenyBtn.onclick = () => handleResponse(false);
+        }
+        
+        if (autonomousMode) {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.remove('hidden');
+          }
+          if (approvalTimerBar) {
+            approvalTimerBar.style.width = '100%';
+          }
+          if (approvalTimerText) {
+            approvalTimerText.textContent = 'Auto-allowing in 10s...';
+          }
+          
+          const startTime = Date.now();
+          approvalTimerInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, 10000 - elapsed);
+            
+            if (approvalTimerBar) {
+              approvalTimerBar.style.width = `${(remaining / 10000) * 100}%`;
+            }
+            
+            if (approvalTimerText) {
+              const secondsLeft = Math.ceil(remaining / 1000);
+              approvalTimerText.textContent = `Auto-allowing in ${secondsLeft}s...`;
+            }
+            
+            if (remaining <= 0) {
+              clearInterval(approvalTimerInterval);
+              approvalTimerInterval = null;
+              handleResponse(true);
+            }
+          }, 100);
+        } else {
+          if (approvalTimerContainer) {
+            approvalTimerContainer.classList.add('hidden');
+          }
+        }
+        break;
+      }
+
+      case 'requestToolApproval': {
+        const { toolName, target, details, autonomousMode } = message;
+        const iconEl = document.getElementById('approval-modal-icon');
+        const titleEl = document.getElementById('approval-modal-title');
+        const descEl = document.getElementById('approval-modal-description');
+        const warningEl = document.getElementById('approval-modal-warning');
+        
+        if (iconEl) {
+          iconEl.textContent = (toolName === 'run_command' || toolName === 'send_terminal_input') ? '💻' : toolName === 'write_file' ? '📂' : '🌐';
+        }
+        if (titleEl) {
+          titleEl.textContent = (toolName === 'run_command' || toolName === 'send_terminal_input') ? 'Terminal Command Approval' : toolName === 'write_file' ? 'File Change Approval' : 'Browser Action Approval';
+        }
+        if (descEl) {
+          descEl.textContent = `Mirror VS is requesting approval for tool "${toolName}" on:`;
+        }
+        if (approvalCommandText) {
+          approvalCommandText.textContent = `${target}` + (details ? `\n\nContent Preview:\n${details.substring(0, 1000)}${details.length > 1000 ? '...' : ''}` : '');
+        }
+        if (warningEl) {
+          warningEl.textContent = 'Do you want to authorize this action?';
+        }
+        if (approvalAllowBtn) {
+          approvalAllowBtn.textContent = 'Allow';
+        }
+        
+        if (commandApprovalModal) {
+          commandApprovalModal.classList.remove('hidden');
+        }
+        
+        if (approvalTimerInterval) {
+          clearInterval(approvalTimerInterval);
+          approvalTimerInterval = null;
+        }
+        
+        const handleResponse = (approved) => {
+          if (approvalTimerInterval) {
+            clearInterval(approvalTimerInterval);
+            approvalTimerInterval = null;
+          }
+          if (commandApprovalModal) {
+            commandApprovalModal.classList.add('hidden');
+          }
+          vscode.postMessage({ type: 'toolApprovalResponse', approved });
         };
         
         if (approvalAllowBtn) {

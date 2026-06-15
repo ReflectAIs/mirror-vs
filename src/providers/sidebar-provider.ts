@@ -24,6 +24,63 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     resolve: (choice: string) => void;
     command: string;
   } | null = null;
+  public static pendingToolApproval: {
+    resolve: (approved: boolean) => void;
+    toolName: string;
+    target: string;
+    details?: string;
+  } | null = null;
+
+  public static async requestToolApproval(toolName: string, target: string, details?: string): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration('mirror-vs');
+    const autonomousMode = config.get<boolean>('autonomousMode', false);
+
+    if (MirrorVsSidebarProvider.postToActive) {
+      const approvalPromise = new Promise<boolean>((resolve) => {
+        MirrorVsSidebarProvider.pendingToolApproval = {
+          resolve,
+          toolName,
+          target,
+          details,
+        };
+      });
+
+      MirrorVsSidebarProvider.postToActive({
+        type: 'requestToolApproval',
+        toolName,
+        target,
+        details,
+        autonomousMode,
+      });
+
+      return await approvalPromise;
+    } else {
+      let choice: string | undefined;
+      const msg = `Mirror VS is requesting approval for tool "${toolName}" on "${target}"`;
+      if (autonomousMode) {
+        choice = await Promise.race([
+          vscode.window.showWarningMessage(
+            msg + '\n\nDo you want to authorize this action? (Auto-allowing in 10 seconds in Autonomous Mode)',
+            { modal: true },
+            'Allow',
+            'Deny',
+          ),
+          new Promise<string>((resolve) => {
+            setTimeout(() => resolve('Allow'), 10000);
+          }),
+        ]);
+      } else {
+        choice = await vscode.window.showWarningMessage(
+          msg + '\n\nDo you want to authorize this action?',
+          { modal: true },
+          'Allow',
+          'Deny',
+        );
+      }
+      return choice === 'Allow';
+    }
+  }
+
   private _view?: vscode.WebviewView;
   private readonly _secretService: SecretService;
   private readonly _storageService: StorageService;
@@ -164,6 +221,14 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               }
               break;
             }
+            case 'toolApprovalResponse': {
+              const approved = (data as any).approved;
+              if (MirrorVsSidebarProvider.pendingToolApproval) {
+                MirrorVsSidebarProvider.pendingToolApproval.resolve(approved);
+                MirrorVsSidebarProvider.pendingToolApproval = null;
+              }
+              break;
+            }
             case 'getSettings': {
               await this._sendSettingsToWebview();
               break;
@@ -256,6 +321,15 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               }
               if ((data as any).autonomousMode !== undefined) {
                 await config.update('autonomousMode', (data as any).autonomousMode, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).autoApproveWrite !== undefined) {
+                await config.update('autoApproveWrite', (data as any).autoApproveWrite, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).autoApproveCommand !== undefined) {
+                await config.update('autoApproveCommand', (data as any).autoApproveCommand, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).autoApproveBrowser !== undefined) {
+                await config.update('autoApproveBrowser', (data as any).autoApproveBrowser, vscode.ConfigurationTarget.Global);
               }
               if ((data as any).planFirst !== undefined) {
                 await config.update('planFirst', (data as any).planFirst, vscode.ConfigurationTarget.Global);
@@ -1151,6 +1225,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const agentMode = config.get<string>('agentMode', 'normal');
     const customSystemPrompt = config.get<string>('customSystemPrompt', '');
     const autonomousMode = config.get<boolean>('autonomousMode', false);
+    const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
+    const autoApproveCommand = config.get<boolean>('autoApproveCommand', false);
+    const autoApproveBrowser = config.get<boolean>('autoApproveBrowser', false);
 
     const planFirst = config.get<boolean>('planFirst', true);
     const enableTruncationGuardrail = config.get<boolean>('enableTruncationGuardrail', true);
@@ -1180,6 +1257,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       agentMode,
       customSystemPrompt,
       autonomousMode,
+      autoApproveWrite,
+      autoApproveCommand,
+      autoApproveBrowser,
       planFirst,
       enableTruncationGuardrail,
       aiReviewEnabled,

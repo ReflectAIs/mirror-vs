@@ -9,6 +9,13 @@ vi.mock('../../../utils/editor-utils', () => ({
   revertCheckpoint: vi.fn().mockResolvedValue(true),
 }));
 
+// Mock sidebar-provider
+vi.mock('../../../providers/sidebar-provider', () => ({
+  MirrorVsSidebarProvider: {
+    requestToolApproval: vi.fn().mockResolvedValue(true),
+  },
+}));
+
 import { executeFileTool } from '../file-tools';
 
 function createTempDir(): string {

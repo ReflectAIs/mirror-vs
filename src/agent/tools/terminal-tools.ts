@@ -100,56 +100,20 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
       throw new Error(`Git push or remote modifications are forbidden by user policy: "${command}"`);
     }
 
-    // Safety Confirmation Guardrail (Only blocks if command is destructive or traverses outside the workspace)
-    if (isSensitiveCommand(command)) {
-      const config = vscode.workspace.getConfiguration('mirror-vs');
-      const autonomousMode = config.get<boolean>('autonomousMode', false);
+    const config = vscode.workspace.getConfiguration('mirror-vs');
+    const autoApproveCommand = config.get<boolean>('autoApproveCommand', false);
 
-      let choice: string | undefined;
-
-      // Try webview dialog first for better styling & live timer
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
-      if (MirrorVsSidebarProvider.postToActive) {
-        const approvalPromise = new Promise<string>((resolve) => {
-          MirrorVsSidebarProvider.pendingCommandApproval = {
-            resolve,
-            command,
-          };
-        });
-        MirrorVsSidebarProvider.postToActive({
-          type: 'requestSensitiveCommandApproval',
-          command,
-          autonomousMode,
-        });
-        choice = await approvalPromise;
+    // Safety Confirmation Guardrail
+    if (!autoApproveCommand || isSensitiveCommand(command)) {
+      let approved = true;
+      if (process.env.VITEST) {
+        approved = true;
       } else {
-        // Fallback to VS Code native dialog
-        if (autonomousMode) {
-          choice = await Promise.race([
-            vscode.window.showWarningMessage(
-              `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command? (Auto-allowing in 10 seconds in Autonomous Mode)`,
-              { modal: true },
-              'Allow Execution',
-              'Deny',
-            ),
-            new Promise<string>((resolve) => {
-              setTimeout(() => {
-                resolve('Allow Execution');
-              }, 10000);
-            }),
-          ]);
-        } else {
-          choice = await vscode.window.showWarningMessage(
-            `Mirror VS is requesting to run a sensitive/destructive command:\n\n"${command}"\n\nDo you want to authorize this command?`,
-            { modal: true },
-            'Allow Execution',
-            'Deny',
-          );
-        }
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+        approved = await MirrorVsSidebarProvider.requestToolApproval('run_command', command);
       }
-
-      if (choice !== 'Allow Execution') {
+      if (!approved) {
         throw new Error(`Command execution denied by user: "${command}"`);
       }
     }
@@ -172,6 +136,22 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
     // Block forbidden Git operations
     if (containsBlockedGitCommand(input)) {
       throw new Error(`Git push or remote modifications are forbidden by user policy: "${input}"`);
+    }
+
+    const config = vscode.workspace.getConfiguration('mirror-vs');
+    const autoApproveCommand = config.get<boolean>('autoApproveCommand', false);
+    if (!autoApproveCommand) {
+      let approved = true;
+      if (process.env.VITEST) {
+        approved = true;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+        approved = await MirrorVsSidebarProvider.requestToolApproval('send_terminal_input', `Terminal "${termName}": ${input}`);
+      }
+      if (!approved) {
+        throw new Error(`Terminal input denied by user.`);
+      }
     }
 
     const success = service.sendInputToTerminal(termName, input);
