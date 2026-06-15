@@ -45,7 +45,8 @@ export interface ToolCall {
     | 'debug_get_breakpoints'
     | 'debug_add_breakpoint'
     | 'debug_remove_breakpoint'
-    | 'debug_inspect_variables';
+    | 'debug_inspect_variables'
+    | string; // Allow dynamic MCP tool names: mcp__serverName__toolName
   path?: string;
   depth?: number;
   query?: string;

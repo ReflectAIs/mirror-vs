@@ -153,6 +153,7 @@ export const DOMAIN_KEYWORD_MAP: Record<string, string[]> = {
   git: ['git', 'commit', 'diff', 'stage', 'status', 'add', 'push', 'pull', 'log', 'branch'],
   browser: ['browser', 'screenshot', 'navigate', 'click', 'type', 'url', 'web', 'page', 'site', 'viewport', 'preview'],
   figma: ['figma', 'design', 'inspect', 'layer', 'coordinate', 'style', 'color', 'pixel'],
+  mcp: ['mcp', 'plugin', 'external tool', 'server tool', 'custom tool'],
 };
 
 export function getToolsForQuery(query: string, allTools: Set<string>): Set<string> {

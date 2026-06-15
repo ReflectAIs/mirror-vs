@@ -370,6 +370,129 @@
           "type": "integer",
           "default": 10,
           "description": "Maximum results returned from embedding-based semantic search."
+        },
+        "mirror-vs.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Google Gemini API key. Required to use the Gemini provider."
+        },
+        "mirror-vs.geminiModel": {
+          "type": "string",
+          "default": "gemini-2.0-flash",
+          "description": "Default Gemini model to use (gemini-2.0-flash, gemini-1.5-pro, etc.)."
+        },
+        "mirror-vs.openrouterApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter API key. Provides access to 200+ models through a unified API."
+        },
+        "mirror-vs.openrouterModel": {
+          "type": "string",
+          "default": "anthropic/claude-3.5-sonnet",
+          "description": "Default OpenRouter model (e.g. anthropic/claude-3.5-sonnet, openai/gpt-4o, google/gemini-2.0-flash-001)."
+        },
+        "mirror-vs.litellmEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable LiteLLM proxy provider. LiteLLM normalizes 100+ LLM APIs into an OpenAI-compatible format."
+        },
+        "mirror-vs.litellmBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:4000/v1",
+          "description": "Base URL for the LiteLLM proxy server."
+        },
+        "mirror-vs.litellmModel": {
+          "type": "string",
+          "default": "gpt-4o",
+          "description": "Default LiteLLM model to use (model name as known to your LiteLLM instance)."
+        },
+        "mirror-vs.mcpServers": {
+          "type": "array",
+          "default": [],
+          "description": "MCP (Model Context Protocol) server configurations for dynamic tool discovery.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object"
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "disabled": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "name",
+              "command"
+            ]
+          }
+        },
+        "mirror-vs.customModes": {
+          "type": "array",
+          "default": [],
+          "description": "Custom agent modes with tool restrictions and system prompts.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "systemPrompt": {
+                "type": "string"
+              },
+              "allowedTools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "disabledTools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "temperature": {
+                "type": "number"
+              },
+              "maxTokens": {
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "mirror-vs.checkpointEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable git-based snapshots before dangerous file operations. Allows automatic rollback on failure."
         }
       }
     }

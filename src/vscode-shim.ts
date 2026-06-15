@@ -81,4 +81,8 @@ export const OverviewRulerLane = { Left: 1 };
 export const StatusBarAlignment = { Left: 1, Right: 2 };
 export const ThemeColor = {};
 
-export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment };
+export const env = {
+  appRoot: '/mock/app/root',
+};
+
+export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment, env };

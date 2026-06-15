@@ -8,6 +8,7 @@ import { executeGitTool } from './git-tools';
 import { PluginService } from '../../services/plugin-service';
 import { executeArtifactTool } from './artifact-tools';
 import { executeDeveloperTool } from './developer-tools';
+import { executeMcpTool, isMcpToolCall } from './mcp-tools';
 
 export async function executeTool(
   tool: ToolCall,
@@ -76,7 +77,7 @@ export async function executeTool(
     name === 'browser_evaluate_script' ||
     name === 'browser_screenshot'
   ) {
-    return await executeBrowserTool(tool);
+    return await executeBrowserTool(tool, getSafePath);
   }
 
   if (
@@ -133,6 +134,11 @@ export async function executeTool(
   ) {
     const { executeDebugTool } = await import('./debug-tools.js');
     return await executeDebugTool(tool);
+  }
+
+  // MCP tools (dynamic: mcp__serverName__toolName)
+  if (isMcpToolCall(name)) {
+    return await executeMcpTool(tool);
   }
 
   throw new Error(`Unsupported tool call: ${name}`);

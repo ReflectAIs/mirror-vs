@@ -443,13 +443,44 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
             case 'getSetting': {
               const config = vscode.workspace.getConfiguration('mirror-vs');
-              const val = config.get(data.key, false);
-              this._view?.webview.postMessage({ type: 'settingValue', key: data.key, value: val });
+              if (data.key === 'geminiApiKey') {
+                const hasKey = await this._secretService.hasSecret('gemini_api_key');
+                this._view?.webview.postMessage({ type: 'settingValue', key: data.key, value: hasKey ? '••••••••' : '' });
+              } else if (data.key === 'openrouterApiKey') {
+                const hasKey = await this._secretService.hasSecret('openrouter_api_key');
+                this._view?.webview.postMessage({ type: 'settingValue', key: data.key, value: hasKey ? '••••••••' : '' });
+              } else if (data.key === 'litellmApiKey') {
+                const hasKey = await this._secretService.hasSecret('litellm_api_key');
+                this._view?.webview.postMessage({ type: 'settingValue', key: data.key, value: hasKey ? '••••••••' : '' });
+              } else {
+                const val = config.get(data.key, false);
+                this._view?.webview.postMessage({ type: 'settingValue', key: data.key, value: val });
+              }
               break;
             }
             case 'saveSetting': {
               const config = vscode.workspace.getConfiguration('mirror-vs');
-              await config.update(data.key, data.value, vscode.ConfigurationTarget.Global);
+              if (data.key === 'geminiApiKey') {
+                if (data.value && data.value.trim() !== '' && data.value.trim() !== '••••••••') {
+                  await this._secretService.storeSecret('gemini_api_key', data.value.trim());
+                } else if (!data.value || data.value.trim() === '') {
+                  await this._secretService.deleteSecret('gemini_api_key');
+                }
+              } else if (data.key === 'openrouterApiKey') {
+                if (data.value && data.value.trim() !== '' && data.value.trim() !== '••••••••') {
+                  await this._secretService.storeSecret('openrouter_api_key', data.value.trim());
+                } else if (!data.value || data.value.trim() === '') {
+                  await this._secretService.deleteSecret('openrouter_api_key');
+                }
+              } else if (data.key === 'litellmApiKey') {
+                if (data.value && data.value.trim() !== '' && data.value.trim() !== '••••••••') {
+                  await this._secretService.storeSecret('litellm_api_key', data.value.trim());
+                } else if (!data.value || data.value.trim() === '') {
+                  await this._secretService.deleteSecret('litellm_api_key');
+                }
+              } else {
+                await config.update(data.key, data.value, vscode.ConfigurationTarget.Global);
+              }
               break;
             }
             case 'getArtifacts': {
@@ -1222,6 +1253,15 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       configuredCustomApiKeys[api.id] = await this._secretService.hasSecret(`custom_api_key_${api.id}`);
     }
 
+    const geminiModel = config.get<string>('geminiModel', 'gemini-2.0-flash');
+    const openrouterModel = config.get<string>('openrouterModel', 'anthropic/claude-3.5-sonnet');
+    const litellmBaseUrl = config.get<string>('litellmBaseUrl', 'http://localhost:4000/v1');
+    const litellmModel = config.get<string>('litellmModel', 'gpt-4o');
+
+    const hasGeminiKey = await this._secretService.hasSecret('gemini_api_key');
+    const hasOpenRouterKey = await this._secretService.hasSecret('openrouter_api_key');
+    const hasLiteLlmKey = await this._secretService.hasSecret('litellm_api_key');
+
     const agentMode = config.get<string>('agentMode', 'normal');
     const customSystemPrompt = config.get<string>('customSystemPrompt', '');
     const autonomousMode = config.get<boolean>('autonomousMode', false);
@@ -1271,6 +1311,13 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       configuredCustomApiKeys,
       teacherEnabled,
       teacherModel,
+      geminiModel,
+      openrouterModel,
+      litellmBaseUrl,
+      litellmModel,
+      hasGeminiKey,
+      hasOpenRouterKey,
+      hasLiteLlmKey,
     } as any;
 
     this._view.webview.postMessage({

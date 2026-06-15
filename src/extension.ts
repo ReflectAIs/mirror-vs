@@ -13,6 +13,12 @@ import { DiffAwareService } from './services/diff-aware-service';
 import { RefactorService } from './services/refactor-service';
 import { ArtifactService } from './services/artifact-service';
 import { EventBus } from './services/event-bus';
+import { McpService } from './services/mcp-service';
+import { CheckpointService } from './services/checkpoint-service';
+import { ModesManager } from './services/modes-manager';
+import { NativeToolCallParser } from './agent/native-tool-call-parser';
+import { getMcpToolNames } from './agent/tools/mcp-tools';
+import { registerMcpTools } from './agent/tool-policy';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Mirror VS Extension is now active!');

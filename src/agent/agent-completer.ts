@@ -180,6 +180,51 @@ export class AgentCompleter {
         );
       } else if (provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_'))) {
         streamCustomOpenAIChat(host, apiKey, model, messages, abortController.signal, onChunk, onComplete, onError);
+      } else if (provider === 'gemini' || provider === 'openrouter' || provider === 'litellm') {
+        (async () => {
+          try {
+            const { createProvider } = await import('../../services/providers/index.js');
+            let baseUrl = host;
+            if (provider === 'litellm') {
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              baseUrl = config.get<string>('litellmBaseUrl', 'http://localhost:4000/v1');
+            }
+
+            const providerInstance = createProvider({
+              provider,
+              apiKey,
+              baseUrl,
+              model,
+            });
+
+            const mappedMessages = messages.map((m) => ({
+              role: m.role as 'system' | 'user' | 'assistant' | 'tool',
+              content: m.content,
+              images: m.images,
+            }));
+
+            const generator = providerInstance.streamChat(mappedMessages, abortController.signal);
+            let fullText = '';
+            let inputTokens = 0;
+            let outputTokens = 0;
+
+            for await (const chunk of generator) {
+              if (chunk.type === 'text' && chunk.content) {
+                fullText += chunk.content;
+                onChunk(chunk.content);
+              } else if (chunk.type === 'reasoning' && chunk.content) {
+                onReasoningChunk(chunk.content);
+              } else if (chunk.type === 'usage') {
+                if (chunk.inputTokens) inputTokens = chunk.inputTokens;
+                if (chunk.outputTokens) outputTokens = chunk.outputTokens;
+              }
+            }
+
+            onComplete(fullText, { promptTokens: inputTokens, completionTokens: outputTokens });
+          } catch (err) {
+            onError(err instanceof Error ? err : new Error(String(err)));
+          }
+        })();
       } else {
         streamOllamaChat(host, model, messages, abortController.signal, onChunk, onComplete, onError);
       }
@@ -255,6 +300,42 @@ Rules:
           onComplete,
           onError,
         );
+      } else if (provider === 'gemini' || provider === 'openrouter' || provider === 'litellm') {
+        (async () => {
+          try {
+            const { createProvider } = await import('../../services/providers/index.js');
+            let baseUrl = host;
+            if (provider === 'litellm') {
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              baseUrl = config.get<string>('litellmBaseUrl', 'http://localhost:4000/v1');
+            }
+
+            const providerInstance = createProvider({
+              provider,
+              apiKey,
+              baseUrl,
+              model,
+            });
+
+            const mappedMessages = summaryPrompt.map((m) => ({
+              role: m.role as 'system' | 'user' | 'assistant' | 'tool',
+              content: m.content,
+            }));
+
+            const generator = providerInstance.streamChat(mappedMessages, new AbortController().signal);
+            let fullText = '';
+
+            for await (const chunk of generator) {
+              if (chunk.type === 'text' && chunk.content) {
+                fullText += chunk.content;
+              }
+            }
+
+            onComplete(fullText);
+          } catch (err) {
+            onError();
+          }
+        })();
       } else {
         streamOllamaChat(host, model, summaryPrompt, new AbortController().signal, onChunk, onComplete, onError);
       }

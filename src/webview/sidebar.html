@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'unsafe-inline'; img-src {{cspSource}} data: https:; font-src {{cspSource}};">
+      content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'unsafe-inline'; img-src {{cspSource}} data: https:; font-src {{cspSource}};">
   <link rel="stylesheet" href="{{styleUri}}">
   <title>Mirror AI Worker</title>
 </head>
@@ -158,6 +156,9 @@
             <div class="provider-switch">
               <button type="button" id="provider-ollama-btn" class="switch-btn active" data-provider="ollama">Ollama</button>
               <button type="button" id="provider-deepseek-btn" class="switch-btn" data-provider="deepseek">DeepSeek</button>
+              <button type="button" id="provider-gemini-btn" class="switch-btn" data-provider="gemini">Gemini</button>
+              <button type="button" id="provider-openrouter-btn" class="switch-btn" data-provider="openrouter">OpenRouter</button>
+              <button type="button" id="provider-litellm-btn" class="switch-btn" data-provider="litellm">LiteLLM</button>
               <button type="button" id="provider-custom-btn" class="switch-btn" data-provider="custom">Custom API</button>
             </div>
           </div>
@@ -272,6 +273,81 @@
             </div>
           </div>
 
+          <!-- Gemini Settings Panel -->
+          <div id="gemini-panel" class="config-panel settings-card hidden">
+            <div class="settings-card-title">Gemini Cloud Settings</div>
+            <div class="settings-grid">
+              <div class="form-group">
+                <label for="gemini-key">API Key</label>
+                <div class="password-input-container">
+                  <input type="password" id="gemini-key" placeholder="Key...">
+                  <button type="button" id="toggle-gemini-key-visibility" class="toggle-visibility-btn">Show</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="gemini-model-select">Model</label>
+                <select id="gemini-model-select">
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                </select>
+              </div>
+            </div>
+            <p class="settings-info-text" style="margin-top: 4px;">
+              Get key from <a href="https://aistudio.google.com/app/apikey" style="color: #38bdf8;">Google AI Studio</a>
+            </p>
+          </div>
+
+          <!-- OpenRouter Settings Panel -->
+          <div id="openrouter-panel" class="config-panel settings-card hidden">
+            <div class="settings-card-title">OpenRouter Cloud Settings</div>
+            <div class="settings-grid">
+              <div class="form-group">
+                <label for="openrouter-key">API Key</label>
+                <div class="password-input-container">
+                  <input type="password" id="openrouter-key" placeholder="sk-or-v1-...">
+                  <button type="button" id="toggle-openrouter-key-visibility" class="toggle-visibility-btn">Show</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="openrouter-model-select">Model</label>
+                <select id="openrouter-model-select">
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                  <option value="openai/gpt-4o">GPT-4o</option>
+                  <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+                  <option value="meta-llama/llama-3.1-405b-instruct">Llama 3.1 405B</option>
+                  <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+                  <option value="mistralai/mistral-large">Mistral Large</option>
+                </select>
+              </div>
+            </div>
+            <p class="settings-info-text" style="margin-top: 4px;">
+              Get key from <a href="https://openrouter.ai/keys" style="color: #38bdf8;">openrouter.ai/keys</a>
+            </p>
+          </div>
+
+          <!-- LiteLLM Settings Panel -->
+          <div id="litellm-panel" class="config-panel settings-card hidden">
+            <div class="settings-card-title">LiteLLM Proxy Settings</div>
+            <div class="settings-grid">
+              <div class="form-group">
+                <label for="litellm-base-url">Base URL</label>
+                <input type="text" id="litellm-base-url" placeholder="http://localhost:4000/v1" value="http://localhost:4000/v1">
+              </div>
+              <div class="form-group">
+                <label for="litellm-model">Model</label>
+                <input type="text" id="litellm-model" placeholder="gpt-4o" value="gpt-4o">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="litellm-key">API Key (optional)</label>
+              <div class="password-input-container">
+                <input type="password" id="litellm-key" placeholder="Optional key...">
+                <button type="button" id="toggle-litellm-key-visibility" class="toggle-visibility-btn">Show</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Integrations Card (Figma + Limits) -->
           <div class="settings-card">
             <div class="settings-card-title">Context Limits & Integrations</div>
@@ -296,18 +372,23 @@
             </div>
           </div>
 
-          <!-- Mode & Custom Prompt Prefix Card -->
+          <!-- Mode Selection Card (Enhanced) -->
           <div class="settings-card">
-            <div class="settings-card-title">Specialized Agent Settings</div>
+            <div class="settings-card-title">🎯 Agent Mode</div>
             <div class="form-group">
-              <label for="agent-mode-select">Agent Mode</label>
-              <select id="agent-mode-select">
-                <option value="normal">Normal Mode</option>
-                <option value="refactor">Refactor Mode</option>
-                <option value="debug">Debug Mode</option>
+              <label for="mode-select">Mode</label>
+              <select id="mode-select" class="mode-select-dropdown">
+                <option value="default">🔧 Default (Full Access)</option>
+                <option value="architect">🏗️ Architect (Read-only, Design)</option>
+                <option value="code-reviewer">🔍 Code Reviewer (Read-only, Analysis)</option>
+                <option value="debugger">🐛 Debugger (Debug Focus)</option>
+                <option value="doc-writer">📝 Doc Writer (Docs Only)</option>
+                <option value="test-writer">🧪 Test Writer (Tests Only)</option>
               </select>
+              <span id="mode-badge" class="mode-badge">Default</span>
+              <p id="mode-description" class="mode-description-text"></p>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top: 8px;">
               <label for="custom-system-prompt">Custom Prompt Instructions Prefix</label>
               <textarea id="custom-system-prompt" placeholder="e.g. Always use functional React components..." rows="2"></textarea>
             </div>
@@ -367,6 +448,50 @@
             <p class="settings-info-text" style="margin-top: 4px;">
               When enabled, file changes proposed by the agent will be automatically accepted after a 10-second countdown instead of waiting for manual approval. 
               Disable this if you want to review every change before it is applied.
+            </p>
+          </div>
+
+          <!-- MCP Servers Card -->
+          <div class="settings-card">
+            <div class="settings-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>🔌 MCP Servers <span id="mcp-status-dot" class="status-dot offline"></span></span>
+              <span id="mcp-tool-count" style="font-size: 9px; color: var(--text-muted);">0 servers</span>
+            </div>
+            <div id="mcp-servers-list" class="mcp-servers-list"></div>
+            <button id="add-mcp-server-btn" class="btn btn-secondary" style="width: 100%; margin-top: 6px; font-size: 10px;">
+              ➕ Add MCP Server
+            </button>
+            <!-- MCP Editor (Hidden) -->
+            <div id="mcp-editor-panel" class="mcp-editor-panel hidden" style="margin-top: 8px;">
+              <div id="mcp-editor-title" class="mcp-editor-title">Add MCP Server</div>
+              <div class="form-group" style="margin-top: 4px;">
+                <label for="mcp-server-name">Server Name</label>
+                <input type="text" id="mcp-server-name" placeholder="my-custom-tools">
+              </div>
+              <div class="form-group" style="margin-top: 4px;">
+                <label for="mcp-server-command">Command</label>
+                <input type="text" id="mcp-server-command" placeholder="npx">
+              </div>
+              <div class="form-group" style="margin-top: 4px;">
+                <label for="mcp-server-args">Arguments (space-separated)</label>
+                <input type="text" id="mcp-server-args" placeholder="-y @modelcontextprotocol/server-filesystem">
+              </div>
+              <div class="form-group" style="margin-top: 4px;">
+                <label for="mcp-server-cwd">Working Directory (optional)</label>
+                <input type="text" id="mcp-server-cwd" placeholder="/absolute/path">
+              </div>
+              <div class="form-group" style="margin-top: 4px;">
+                <label for="mcp-server-env">Environment Variables (JSON)</label>
+                <input type="text" id="mcp-server-env" placeholder='{"KEY":"value"}'>
+              </div>
+              <div style="display: flex; gap: 6px; margin-top: 8px;">
+                <button id="save-mcp-server-btn" class="btn btn-primary" style="flex: 1; font-size: 10px;">Save Server</button>
+                <button id="delete-mcp-server-btn" class="btn btn-secondary hidden" style="font-size: 10px;">🗑️ Delete</button>
+                <button id="cancel-mcp-server-btn" class="btn btn-secondary" style="font-size: 10px;">Cancel</button>
+              </div>
+            </div>
+            <p class="settings-info-text" style="margin-top: 4px;">
+              MCP (Model Context Protocol) servers provide dynamic tools. Configure servers to extend the agent's capabilities.
             </p>
           </div>
 
@@ -638,16 +763,27 @@
         
         <!-- Streamlined Input Toolbar Row -->
         <div class="input-toolbar">
-          <!-- Left: Provider & Model select list + Thinking option checks -->
+          <!-- Left: Provider, Model, and Mode selectors -->
           <div class="toolbar-left">
             <div class="quick-selectors-group">
               <select id="quick-provider-select">
                 <option value="ollama">Ollama</option>
                 <option value="deepseek">DeepSeek</option>
-                <option value="custom">Custom API</option>
+                <option value="gemini">Gemini</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="litellm">LiteLLM</option>
+                <option value="custom">Custom</option>
               </select>
               <select id="quick-model-select">
                 <option value="loading">Loading...</option>
+              </select>
+              <select id="quick-mode-select" class="mode-select-compact" title="Agent Mode">
+                <option value="default">Default</option>
+                <option value="architect">🏗️ Architect</option>
+                <option value="code-reviewer">🔍 Reviewer</option>
+                <option value="debugger">🐛 Debugger</option>
+                <option value="doc-writer">📝 Docs</option>
+                <option value="test-writer">🧪 Tests</option>
               </select>
             </div>
 

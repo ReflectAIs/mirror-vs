@@ -266,6 +266,29 @@
       saveProviderSettings('custom');
     });
   }
+  
+  const providerGeminiBtn = document.getElementById('provider-gemini-btn');
+  const providerOpenrouterBtn = document.getElementById('provider-openrouter-btn');
+  const providerLitellmBtn = document.getElementById('provider-litellm-btn');
+
+  if (providerGeminiBtn) {
+    providerGeminiBtn.addEventListener('click', () => {
+      selectProvider('gemini');
+      saveProviderSettings('gemini');
+    });
+  }
+  if (providerOpenrouterBtn) {
+    providerOpenrouterBtn.addEventListener('click', () => {
+      selectProvider('openrouter');
+      saveProviderSettings('openrouter');
+    });
+  }
+  if (providerLitellmBtn) {
+    providerLitellmBtn.addEventListener('click', () => {
+      selectProvider('litellm');
+      saveProviderSettings('litellm');
+    });
+  }
 
   let defaultCustomUrl = 'https://api.openai.com/v1';
   let defaultCustomModel = 'gpt-4o';
@@ -352,32 +375,56 @@
   function selectProvider(provider) {
     activeProvider = provider;
     
-    providerOllamaBtn.classList.remove('active');
-    providerDeepseekBtn.classList.remove('active');
-    if (providerCustomBtn) providerCustomBtn.classList.remove('active');
-    
-    ollamaPanel.classList.add('hidden');
-    deepseekPanel.classList.add('hidden');
-    if (customPanel) customPanel.classList.add('hidden');
+    const btnOllama = document.getElementById('provider-ollama-btn');
+    const btnDeepseek = document.getElementById('provider-deepseek-btn');
+    const btnGemini = document.getElementById('provider-gemini-btn');
+    const btnOpenrouter = document.getElementById('provider-openrouter-btn');
+    const btnLitellm = document.getElementById('provider-litellm-btn');
+    const btnCustom = document.getElementById('provider-custom-btn');
 
+    const panelOllama = document.getElementById('ollama-panel');
+    const panelDeepseek = document.getElementById('deepseek-panel');
+    const panelGemini = document.getElementById('gemini-panel');
+    const panelOpenrouter = document.getElementById('openrouter-panel');
+    const panelLitellm = document.getElementById('litellm-panel');
+    const panelCustom = document.getElementById('custom-panel');
+
+    // Remove active class from all buttons
+    [btnOllama, btnDeepseek, btnGemini, btnOpenrouter, btnLitellm, btnCustom].forEach(btn => {
+      if (btn) btn.classList.remove('active');
+    });
+
+    // Add hidden class to all panels
+    [panelOllama, panelDeepseek, panelGemini, panelOpenrouter, panelLitellm, panelCustom].forEach(panel => {
+      if (panel) panel.classList.add('hidden');
+    });
+
+    // Activate the selected button and panel
     if (provider === 'ollama') {
-      providerOllamaBtn.classList.add('active');
-      ollamaPanel.classList.remove('hidden');
-      if (thinkingQuickControls) {
-        thinkingQuickControls.style.opacity = '0.5';
-        thinkingQuickControls.style.pointerEvents = 'none';
-      }
+      if (btnOllama) btnOllama.classList.add('active');
+      if (panelOllama) panelOllama.classList.remove('hidden');
     } else if (provider === 'deepseek') {
-      providerDeepseekBtn.classList.add('active');
-      deepseekPanel.classList.remove('hidden');
-      if (thinkingQuickControls) {
+      if (btnDeepseek) btnDeepseek.classList.add('active');
+      if (panelDeepseek) panelDeepseek.classList.remove('hidden');
+    } else if (provider === 'gemini') {
+      if (btnGemini) btnGemini.classList.add('active');
+      if (panelGemini) panelGemini.classList.remove('hidden');
+    } else if (provider === 'openrouter') {
+      if (btnOpenrouter) btnOpenrouter.classList.add('active');
+      if (panelOpenrouter) panelOpenrouter.classList.remove('hidden');
+    } else if (provider === 'litellm') {
+      if (btnLitellm) btnLitellm.classList.add('active');
+      if (panelLitellm) panelLitellm.classList.remove('hidden');
+    } else {
+      if (btnCustom) btnCustom.classList.add('active');
+      if (panelCustom) panelCustom.classList.remove('hidden');
+    }
+
+    if (thinkingQuickControls) {
+      if (provider === 'deepseek') {
         thinkingQuickControls.style.opacity = '1';
         thinkingQuickControls.style.pointerEvents = 'auto';
-      }
-    } else {
-      if (providerCustomBtn) providerCustomBtn.classList.add('active');
-      if (customPanel) customPanel.classList.remove('hidden');
-      if (thinkingQuickControls) {
+      } else {
         thinkingQuickControls.style.opacity = '0.5';
         thinkingQuickControls.style.pointerEvents = 'none';
       }

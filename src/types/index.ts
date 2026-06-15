@@ -52,6 +52,14 @@ export interface ExtensionSettings {
   autoApproveWrite?: boolean;
   autoApproveCommand?: boolean;
   autoApproveBrowser?: boolean;
+  geminiModel?: string;
+  openrouterModel?: string;
+  litellmEnabled?: boolean;
+  litellmBaseUrl?: string;
+  litellmModel?: string;
+  hasGeminiKey?: boolean;
+  hasOpenRouterKey?: boolean;
+  hasLiteLlmKey?: boolean;
 }
 
 export interface ChatMessage {

@@ -211,6 +211,21 @@ export class AgentOrchestrator {
           console.log(`[Orchestrator] deepseek key length: ${key ? key.length : 0}`);
           return key;
         }
+        if (p === 'gemini') {
+          const key = (await this._getSecret('gemini_api_key')) || '';
+          console.log(`[Orchestrator] gemini key length: ${key ? key.length : 0}`);
+          return key;
+        }
+        if (p === 'openrouter') {
+          const key = (await this._getSecret('openrouter_api_key')) || '';
+          console.log(`[Orchestrator] openrouter key length: ${key ? key.length : 0}`);
+          return key;
+        }
+        if (p === 'litellm') {
+          const key = (await this._getSecret('litellm_api_key')) || '';
+          console.log(`[Orchestrator] litellm key length: ${key ? key.length : 0}`);
+          return key;
+        }
         if (p === 'custom') {
           const key = (await this._getSecret('custom_endpoint_api_key')) || '';
           console.log(`[Orchestrator] custom key length: ${key ? key.length : 0}`);
@@ -602,20 +617,36 @@ export class AgentOrchestrator {
               ? customApis.find((api) => api.id === provider)
               : null;
 
+          const geminiModel = config.get<string>('geminiModel', 'gemini-2.0-flash');
+          const openrouterModel = config.get<string>('openrouterModel', 'anthropic/claude-3.5-sonnet');
+          const litellmModel = config.get<string>('litellmModel', 'gpt-4o');
+
           const currentModel =
             provider === 'ollama'
               ? defaultOllamaModel
               : provider === 'deepseek'
                 ? defaultDeepSeekModel
-                : customEndpointModel;
+                : provider === 'gemini'
+                  ? geminiModel
+                  : provider === 'openrouter'
+                    ? openrouterModel
+                    : provider === 'litellm'
+                      ? litellmModel
+                      : customEndpointModel;
           const currentHost =
             provider === 'ollama'
               ? ollamaHost
               : provider === 'deepseek'
                 ? 'https://api.deepseek.com/chat/completions'
-                : activeCustomApi
-                  ? activeCustomApi.url
-                  : customEndpointUrl;
+                : provider === 'gemini'
+                  ? 'https://generativelanguage.googleapis.com'
+                  : provider === 'openrouter'
+                    ? 'https://openrouter.ai/api/v1'
+                    : provider === 'litellm'
+                      ? config.get<string>('litellmBaseUrl', 'http://localhost:4000/v1')
+                      : activeCustomApi
+                        ? activeCustomApi.url
+                        : customEndpointUrl;
 
           // Discover the actual context window using our new service
           const contextWindow = await getContextLength(currentHost, currentModel, apiKey);
@@ -857,23 +888,6 @@ export class AgentOrchestrator {
             this._sendAvatarState('tool_calling');
             const toolResults: string[] = [];
 
-            // STRICT ONE-TOOL-PER-TURN ENFORCEMENT: Always execute only the first tool
-            if (toolCalls.length > 1) {
-              const extraCount = toolCalls.length - 1;
-              const extraNames = toolCalls
-                .slice(1)
-                .map((t) => t.name)
-                .join(', ');
-              // Execute only the first tool
-              toolCalls = [toolCalls[0]];
-              // Inject a warning result for each extra tool
-              const warningResult = `[SYSTEM NOTICE: Tools "${extraNames}" and ${extraCount - 1} other(s) were skipped because only one tool per turn is allowed. The model will have a chance to emit the next tool after this turn.]`;
-              toolResults.push(warningResult);
-              console.log(
-                `[Orchestrator] Enforced single-tool limit: skipped ${extraCount} extra tools (${extraNames}).`,
-              );
-            }
-
             const readOnlyTools = [
               'read_file',
               'list_dir',
@@ -884,10 +898,12 @@ export class AgentOrchestrator {
               'git_status',
               'git_diff',
             ];
-            const isAllReadOnly = toolCalls.every((t) => readOnlyTools.includes(t.name));
-            if (isAllReadOnly) {
+            const readOnlyCalls = toolCalls.filter((t) => readOnlyTools.includes(t.name));
+            const modifyingCalls = toolCalls.filter((t) => !readOnlyTools.includes(t.name));
+
+            if (readOnlyCalls.length > 0) {
               // Parallel execution for read-only tools
-              const promises = toolCalls.map(async (tool) => {
+              const promises = readOnlyCalls.map(async (tool) => {
                 if (signal.aborted) return;
                 const target = tool.path || tool.query || tool.url || tool.selector || tool.command || '';
 
@@ -1028,9 +1044,11 @@ export class AgentOrchestrator {
               for (const r of resolvedResults) {
                 if (r) toolResults.push(r);
               }
-            } else {
+            }
+
+            if (modifyingCalls.length > 0) {
               // Sequential execution for mixed or modifying tools
-              for (const tool of toolCalls) {
+              for (const tool of modifyingCalls) {
                 if (signal.aborted) {
                   continueLoop = false;
                   break;
@@ -1306,6 +1324,7 @@ export class AgentOrchestrator {
 
             const combined = cleanedToolResults.join('\n\n');
             let finalSystemContent = combined;
+            finalSystemContent += `\n\n[SYSTEM NOTICE]: The tool results above are real, verified outputs from the development environment (file system, terminal, workspace search). They are NOT generated or fabricated. Treat them as authoritative ground truth. Do not invent different file contents, error messages, or command outputs than what is shown. If a tool reports "not found" or "error", that is accurate — do not assume the operation succeeded.`;
 
             // Run failure detection evaluation on the tool results and assistant reply
             const turnEval = evaluateTurnResult(toolResults, assistantResponse);

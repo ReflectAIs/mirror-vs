@@ -1,6 +1,53 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { ToolCall } from '../types';
+import * as child_process from 'child_process';
+import * as fs from 'fs';
+
+// Helper to find VS Code's bundled ripgrep or check if 'rg' is on system PATH
+async function getRipgrepPath(): Promise<string | undefined> {
+  // 1. Try to find rg in VS Code's app root
+  try {
+    const vscodeAppRoot = vscode.env?.appRoot;
+    if (vscodeAppRoot) {
+      const isWindows = process.platform.startsWith('win');
+      const binName = isWindows ? 'rg.exe' : 'rg';
+      const checkPath = async (pkgFolder: string) => {
+        const fullPath = path.join(vscodeAppRoot, pkgFolder, binName);
+        try {
+          await fs.promises.access(fullPath);
+          return fullPath;
+        } catch {
+          return undefined;
+        }
+      };
+
+      const foundPath = (
+        (await checkPath('node_modules/@vscode/ripgrep/bin/')) ||
+        (await checkPath('node_modules/vscode-ripgrep/bin')) ||
+        (await checkPath('node_modules.asar.unpacked/vscode-ripgrep/bin/')) ||
+        (await checkPath('node_modules.asar.unpacked/@vscode/ripgrep/bin/'))
+      );
+      if (foundPath) return foundPath;
+    }
+  } catch (e) {
+    console.error('Error finding vscode bundled ripgrep:', e);
+  }
+
+  // 2. Check if 'rg' is available globally on system PATH
+  try {
+    const isWindows = process.platform.startsWith('win');
+    const checkCmd = isWindows ? 'where' : 'which';
+    const result = child_process.spawnSync(checkCmd, ['rg'], { encoding: 'utf8' });
+    if (result.status === 0 && result.stdout.trim()) {
+      return 'rg';
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return undefined;
+}
 
 export async function executeSearchTool(tool: ToolCall): Promise<string> {
   if (tool.name === 'semantic_search') {
@@ -124,6 +171,97 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   if (!workspaceFolders || workspaceFolders.length === 0) throw new Error('No workspace folder open.');
 
   const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+  // Try Ripgrep Fast Path first
+  try {
+    const rgPath = await getRipgrepPath();
+    if (rgPath) {
+      const args = ['--json', '-i', '-F', '-e', tool.query];
+      
+      const excludes = [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/out/**',
+        '**/.git/**',
+        '**/.mirror-vs/**',
+        '**/bin/**',
+        '**/obj/**',
+        '**/build/**',
+        '**/.next/**',
+        '**/coverage/**'
+      ];
+      for (const exclude of excludes) {
+        args.push('--glob', `!${exclude}`);
+      }
+
+      const searchTarget = tool.path ? path.join(workspaceRoot, tool.path) : workspaceRoot;
+      args.push(searchTarget);
+
+      const stdout = await new Promise<string>((resolve, reject) => {
+        child_process.execFile(rgPath, args, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout) => {
+          if (error && (error as any).code !== 1) {
+            reject(error);
+          } else {
+            resolve(stdout);
+          }
+        });
+      });
+
+      const rgResults: { file: string; line: number; text: string }[] = [];
+      const lines = stdout.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === 'match') {
+            const filePath = parsed.data.path.text;
+            const relPath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
+            const lineNum = parsed.data.line_number;
+            const lineText = parsed.data.lines.text ? parsed.data.lines.text.trim() : '';
+            rgResults.push({ file: relPath, line: lineNum, text: lineText });
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      }
+
+      if (rgResults.length === 0) {
+        return 'No matches found.';
+      }
+
+      // Group results by file for compact output (matching findTextInFiles structure)
+      const grouped = new Map<string, { line: number; text: string }[]>();
+      for (const r of rgResults) {
+        if (!grouped.has(r.file)) grouped.set(r.file, []);
+        grouped.get(r.file)!.push({ line: r.line, text: r.text });
+      }
+
+      const outputLines: string[] = [];
+      let totalShown = 0;
+      for (const [file, matches] of grouped) {
+        if (totalShown >= 50) break;
+        outputLines.push(`📄 ${file}`);
+        for (const m of matches.slice(0, 5)) {
+          outputLines.push(`  L${m.line}: ${m.text}`);
+          totalShown++;
+          if (totalShown >= 50) break;
+        }
+        if (matches.length > 5) {
+          outputLines.push(`  ... and ${matches.length - 5} more matches in this file`);
+        }
+      }
+
+      if (rgResults.length > totalShown) {
+        outputLines.push(`\n(${rgResults.length - totalShown} more results not shown)`);
+      }
+
+      console.log(`[Search] Ripgrep fast path succeeded with ${rgResults.length} results.`);
+      return outputLines.join('\n');
+    }
+  } catch (e) {
+    console.warn('[Search] Ripgrep fast path failed, falling back to VS Code findTextInFiles:', e);
+    // Fall through to existing findTextInFiles implementation
+  }
 
   // Build scope: if a path is provided, restrict search to that directory/file
   let includePattern: vscode.GlobPattern | undefined;
