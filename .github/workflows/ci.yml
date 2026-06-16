@@ -32,10 +32,10 @@ jobs:
 
       - name: Lint
         run: npx eslint "src/**/*.ts" --max-warnings 100
-        continue-on-error: true
 
       - name: Run tests
         run: npx vitest run
+=======
 
       - name: Build
         run: node esbuild.js

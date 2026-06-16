@@ -20,6 +20,12 @@ src/types/**
 src/utils/**
 src/extension.ts
 
+# Exclude dev-only root configs
+.editorconfig
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+
 # But include webview static assets and media
 !media/logo.png
 

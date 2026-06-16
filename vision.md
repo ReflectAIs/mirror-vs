@@ -44,7 +44,7 @@ Line 573 shows a broken regex: `result.match(/\(Image successfully captured and 
 Line 573: `const match = result.match(/\(Image successfully captured and sent to vision model)` — no capture `()` around the base64. Line 615: `const base64 = match[1];` — but `match[1]` is undefined because there are no capture groups. The base64 image is never extracted.
 
 ### 3. Missing Feature: GitHub Copilot-style Inline Completions
-The extension currently requires the user to open the sidebar. There is NO inline code completion (ghost text) support, which is a major differentiator for AI coding assistants.
+The extension currently requires the user to open the sidebar. There is NO inline code completion (ghost text) support, which is a major differentiator for AI Pair Programmers.
 
 ### 4. Missing Feature: Diff Review UI
 The `review-manager.ts` exists but there's no actual diff review panel in the webview. The `git-changes.design.md` suggests a design but it's not implemented.

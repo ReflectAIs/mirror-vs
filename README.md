@@ -1,6 +1,6 @@
 # Mirror VS
 
-Mirror VS is a premium, highly capable, and fully autonomous **AI coding assistant** integrated directly into the Visual Studio Code sidebar activity bar. Powered by local **Ollama** models or **DeepSeek's API**, Mirror VS allows you to paired-program, refactor, search, and run workspace actions using simple natural language.
+Mirror VS is a premium, highly capable, and fully autonomous **AI Pair Programmer** integrated directly into the Visual Studio Code sidebar activity bar. Powered by local **Ollama** models or **DeepSeek's API**, Mirror VS allows you to paired-program, refactor, search, and run workspace actions using simple natural language.
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.2.1-blue.svg" alt="Version 0.2.1">

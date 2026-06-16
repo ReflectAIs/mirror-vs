@@ -106,7 +106,7 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 ## [0.0.1] - 2025-10-10
 
 ### Added
-- **Initial Release**: Fully autonomous AI coding assistant for VS Code
+- **Initial Release**: Fully autonomous AI Pair Programmer for VS Code
 - **Dual LLM Backend Support**: Ollama (local) and DeepSeek (cloud) providers
 - **Streaming Completions**: Real-time token-by-token streaming responses
 - **Multi-Session Chat Management**: Create, switch between, and delete chat sessions

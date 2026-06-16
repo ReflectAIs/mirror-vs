@@ -5,7 +5,7 @@ PROVIDER: deepseek | MODEL: deepseek-v4-pro
 --------------------------------------------------------------------------------
 >>> PAYLOAD SENT TO MODEL >>>
 [SYSTEM]:
-You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+You are Mirror VS, a highly capable, autonomous AI Pair Programmer integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
 CRITICAL: LANGUAGE CONSTRAINT
@@ -324,7 +324,7 @@ PROVIDER: deepseek | MODEL: deepseek-v4-pro
 --------------------------------------------------------------------------------
 >>> PAYLOAD SENT TO MODEL >>>
 [SYSTEM]:
-You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+You are Mirror VS, a highly capable, autonomous AI Pair Programmer integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
 CRITICAL: LANGUAGE CONSTRAINT
@@ -643,7 +643,7 @@ I'll start by examining the frontend webview files to understand the current UI 
 40:           </div>
 41:           <div class="logo-text">
 42:             <span class="title">Mirror <span class="title-accent">VS</span></span>
-43:             <span class="subtitle">AI Coding Assistant</span>
+43:             <span class="subtitle">AI Pair Programmer</span>
 44:           </div>
 45:         </div>
 46:         <div class="header-actions">
@@ -977,7 +977,7 @@ PROVIDER: deepseek | MODEL: deepseek-v4-pro
 --------------------------------------------------------------------------------
 >>> PAYLOAD SENT TO MODEL >>>
 [SYSTEM]:
-You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+You are Mirror VS, a highly capable, autonomous AI Pair Programmer integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
 CRITICAL: LANGUAGE CONSTRAINT
@@ -1296,7 +1296,7 @@ I'll start by examining the frontend webview files to understand the current UI 
 40:           </div>
 41:           <div class="logo-text">
 42:             <span class="title">Mirror <span class="title-accent">VS</span></span>
-43:             <span class="subtitle">AI Coding Assistant</span>
+43:             <span class="subtitle">AI Pair Programmer</span>
 44:           </div>
 45:         </div>
 46:         <div class="header-actions">
@@ -2335,7 +2335,7 @@ PROVIDER: deepseek | MODEL: deepseek-v4-pro
 --------------------------------------------------------------------------------
 >>> PAYLOAD SENT TO MODEL >>>
 [SYSTEM]:
-You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+You are Mirror VS, a highly capable, autonomous AI Pair Programmer integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
 CRITICAL: LANGUAGE CONSTRAINT
@@ -2654,7 +2654,7 @@ I'll start by examining the frontend webview files to understand the current UI 
 40:           </div>
 41:           <div class="logo-text">
 42:             <span class="title">Mirror <span class="title-accent">VS</span></span>
-43:             <span class="subtitle">AI Coding Assistant</span>
+43:             <span class="subtitle">AI Pair Programmer</span>
 44:           </div>
 45:         </div>
 46:         <div class="header-actions">
@@ -4116,7 +4116,7 @@ PROVIDER: deepseek | MODEL: deepseek-v4-pro
 --------------------------------------------------------------------------------
 >>> PAYLOAD SENT TO MODEL >>>
 [SYSTEM]:
-You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+You are Mirror VS, a highly capable, autonomous AI Pair Programmer integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
 CRITICAL: LANGUAGE CONSTRAINT
@@ -4435,7 +4435,7 @@ I'll start by examining the frontend webview files to understand the current UI 
 40:           </div>
 41:           <div class="logo-text">
 42:             <span class="title">Mirror <span class="title-accent">VS</span></span>
-43:             <span class="subtitle">AI Coding Assistant</span>
+43:             <span class="subtitle">AI Pair Programmer</span>
 44:           </div>
 45:         </div>
 46:         <div class="header-actions">
@@ -6360,7 +6360,7 @@ PROVIDER: deepseek | MODEL: deepseek-v4-pro
 --------------------------------------------------------------------------------
 >>> PAYLOAD SENT TO MODEL >>>
 [SYSTEM]:
-You are Mirror VS, a highly capable, autonomous AI coding assistant integrated directly into the developer's Visual Studio Code IDE.
+You are Mirror VS, a highly capable, autonomous AI Pair Programmer integrated directly into the developer's Visual Studio Code IDE.
 
 ********************************************************************************
 CRITICAL: LANGUAGE CONSTRAINT
@@ -6679,7 +6679,7 @@ I'll start by examining the frontend webview files to understand the current UI 
 40:           </div>
 41:           <div class="logo-text">
 42:             <span class="title">Mirror <span class="title-accent">VS</span></span>
-43:             <span class="subtitle">AI Coding Assistant</span>
+43:             <span class="subtitle">AI Pair Programmer</span>
 44:           </div>
 45:         </div>
 46:         <div class="header-actions">

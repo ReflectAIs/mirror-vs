@@ -1,0 +1,84 @@
+
+name: Bug Report
+description: File a bug report for Mirror VS
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please search [existing issues](https://github.com/DipeshMajithia/mirror-vs/issues) before submitting.
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension Version
+      placeholder: "e.g., 0.2.1"
+    validations:
+      required: true
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code Version
+      placeholder: "e.g., 1.98.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM Provider
+      options:
+        - Ollama (local)
+        - DeepSeek
+        - OpenRouter
+        - LiteLLM
+        - Google Gemini
+        - Multiple / Other
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: "The extension crashes when..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: |
+        1. Go to...
+        2. Click on...
+        3. Observe...
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Screenshots
+      description: |
+        - VS Code Output panel → "Mirror VS" channel
+        - Developer Console (`Help > Toggle Developer Tools`)
+        - Attach screenshots if helpful
+      render: shell

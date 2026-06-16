@@ -6,7 +6,7 @@
 // English (default)
 const EN: Record<string, string> = {
   'app.title': 'Mirror VS',
-  'app.subtitle': 'AI Coding Assistant',
+  'app.subtitle': 'AI Pair Programmer',
   'welcome.title': 'Mirror VS',
   'welcome.subtitle': 'Your interactive AI pair programmer',
   'welcome.context': 'Link files by typing @ in your prompt',

@@ -1,8 +1,9 @@
 {
   "name": "mirror-vs",
   "displayName": "Mirror VS",
-  "description": "An interactive, sidebar-based AI coding assistant for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
+  "description": "An interactive, sidebar-based AI Pair Programmer for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
   "version": "0.2.1",
+  "icon": "package_logo.png",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
   "license": "MIT",
@@ -21,8 +22,7 @@
     "chat",
     "ollama",
     "deepseek",
-    "autonomous",
-    "agent"
+    "autonomous"
   ],
   "engines": {
     "vscode": "^1.80.0"
@@ -510,9 +510,9 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "test": "powershell -Command vitest run",
-    "test:watch": "powershell -Command vitest",
-    "test:coverage": "powershell -Command vitest run --coverage",
+    "test": "npx vitest run",
+    "test:watch": "npx vitest",
+    "test:coverage": "npx vitest run --coverage",
     "check": "npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {
