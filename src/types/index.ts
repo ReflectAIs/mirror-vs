@@ -65,6 +65,7 @@ export interface ExtensionSettings {
   agentInputTokenHardMax?: number;
   skillsEnabled?: boolean;
   maxSkillsToKeep?: number;
+  maxProjectMapLines?: number;
 }
 
 export interface ChatMessage {

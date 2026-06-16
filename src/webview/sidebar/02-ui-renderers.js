@@ -337,7 +337,9 @@
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
-    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 8000;
+    const maxProjectMapLinesInput = document.getElementById('max-project-map-lines-input');
+    const maxProjectMapLines = maxProjectMapLinesInput ? parseInt(maxProjectMapLinesInput.value.trim(), 10) : 250;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
     let modelContextLengths = {};
@@ -391,6 +393,7 @@
       agentInputTokenHardMax,
       skillsEnabled,
       maxSkillsToKeep,
+      maxProjectMapLines,
     });
   }
 

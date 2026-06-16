@@ -260,7 +260,7 @@ export function injectRelevantSkills(messages: ChatMessage[], userRequest: strin
     role: 'system',
     content: `[RELEVANT ACQUIRED SKILLS]\nThe following learned skills match the current task context. Utilize their procedures to complete the work accurately:\n\n${skillsText}`,
   };
-  (skillsSystemMessage as any)._protected = true;
+  // Skills can be re-injected if context is trimmed; no _protected flag needed.
 
   // Insert right after the initial system message if present, or at index 0
   const systemIndex = messages.findIndex((m) => m.role === 'system');

@@ -1407,7 +1407,7 @@ export class AgentOrchestrator {
               finalSystemContent += `\n\n[System Notice: The file content returned above was truncated to save context window tokens. The actual file on disk is intact and complete. If you need to inspect the truncated lines, run read_file again with specific 'start_line' and 'end_line' parameters to view that region.]`;
             }
 
-            finalSystemContent += `\n\n[SYSTEM NOTICE]: The tool results above are real, verified outputs from the development environment (file system, terminal, workspace search). They are NOT generated or fabricated. Treat them as authoritative ground truth. Do not invent different file contents, error messages, or command outputs than what is shown. If a tool reports "not found" or "error", that is accurate — do not assume the operation succeeded.`;
+            // SYSTEM NOTICE removed — added once to the system prompt instead of per-turn.
 
             // Run failure detection evaluation on the tool results and assistant reply
             const turnEval = evaluateTurnResult(toolResults, assistantResponse);
@@ -1757,52 +1757,14 @@ export class AgentOrchestrator {
         '.vscode',
       ].includes(name);
 
-    const SOURCE_EXTS = new Set([
-      '.ts',
-      '.tsx',
-      '.js',
-      '.jsx',
-      '.mjs',
-      '.cjs',
-      '.mts',
-      '.cts',
-      '.vue',
-      '.svelte',
-      '.py',
-      '.go',
-      '.rs',
-      '.java',
-      '.rb',
-      '.php',
-    ]);
-    const isSource = (name: string) => SOURCE_EXTS.has(path.extname(name).toLowerCase());
+    // SOURCE_EXTS removed — no longer needed after removing file hints and source index.
 
-    // Extract a one-line description from the first JSDoc/comment at the top of a file
-    const getFileHint = (filePath: string): string => {
-      try {
-        const head = fs.readFileSync(filePath, 'utf8').substring(0, 600);
-        // Try /** ... */ block comment
-        const blockMatch = head.match(/\/\*\*?\s*([^\n*][^\n]{5,})/);
-        if (blockMatch) return blockMatch[1].trim().substring(0, 80);
-        // Try // comment line
-        const lineMatch = head.match(/\/\/+\s*(.{8,})/);
-        if (lineMatch) return lineMatch[1].trim().substring(0, 80);
-        // Try # comment (Python/shell)
-        const hashMatch = head.match(/#\s*(.{8,})/);
-        if (hashMatch) return hashMatch[1].trim().substring(0, 80);
-      } catch {
-        /* skip */
-      }
-      return '';
-    };
+    // Hints disabled — reading every file for a comment line adds I/O cost and
+    // ~2K tokens per first turn without adding unique value the tree doesn't provide.
 
     interface FileEntry {
       rel: string;
       hint: string;
-    }
-    interface DirEntry {
-      name: string;
-      children: (FileEntry | DirGroup)[];
     }
     type DirGroup = { isDir: true; name: string; rel: string; children: (FileEntry | DirGroup)[]; fileCount: number };
 
@@ -1859,8 +1821,7 @@ export class AgentOrchestrator {
       for (const f of files) {
         const fp = path.join(dir, f);
         const rel = path.relative(workspaceRoot, fp).replace(/\\/g, '/');
-        const hint = isSource(f) ? getFileHint(fp) : '';
-        result.push({ rel, hint });
+        result.push({ rel, hint: '' });
       }
       return result;
     };
@@ -1892,29 +1853,11 @@ export class AgentOrchestrator {
     try {
       const topEntries = walkDir(workspaceRoot, 0);
       const lines: string[] = [`Root: ${path.basename(workspaceRoot)}`];
-      renderEntries(topEntries, '', lines, 400);
+      const maxProjectMapLines = vscode.workspace.getConfiguration('mirror-vs').get<number>('maxProjectMapLines', 250);
+      renderEntries(topEntries, '', lines, maxProjectMapLines);
 
-      // Append key file index — full relative paths only for source files
-      const allSrcFiles: string[] = [];
-      const collectSrc = (entries: (FileEntry | DirGroup)[]) => {
-        for (const e of entries) {
-          if ('isDir' in e && e.isDir) collectSrc(e.children);
-          else {
-            const fe = e as FileEntry;
-            if (isSource(path.basename(fe.rel))) allSrcFiles.push(fe.rel);
-          }
-        }
-      };
-      collectSrc(topEntries);
-
-      if (allSrcFiles.length > 0 && lines.length < 380) {
-        lines.push('');
-        lines.push('## Source File Index (use these exact paths with read_file/patch_file/grep_search):');
-        for (const f of allSrcFiles) {
-          if (lines.length >= 400) break;
-          lines.push(`  ${f}`);
-        }
-      }
+      // Source file index omitted — the tree already shows full relative paths at leaf nodes.
+      // Agents can find exact paths by scanning the tree; a separate index is redundant.
 
       return lines.join('\n');
     } catch (e) {

@@ -206,7 +206,9 @@ export function buildSystemPrompt(
 
   const securityPolicy = `\n\n### SECURITY ENFORCEMENT:\n${UNTRUSTED_CONTEXT_POLICY}`;
 
-  return `${customPrefixSection}${baseRole}${guideOnlyPrompt}${planStatusContext}${modeSection}${skillsSection}\n\n${finalSpecs}${securityPolicy}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;
+  const trustNotice = `\n\n### TOOL OUTPUT TRUST POLICY:\nTool results shown in conversation represent authoritative file system state, terminal output, and web responses. Treat them as ground truth — do not second-guess or fabricate alternatives.`;
+
+  return `${customPrefixSection}${baseRole}${guideOnlyPrompt}${planStatusContext}${modeSection}${skillsSection}\n\n${finalSpecs}${securityPolicy}${trustNotice}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;
 }
 
 function getShellEnvDescription(): string {

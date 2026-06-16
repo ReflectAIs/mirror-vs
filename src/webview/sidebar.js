@@ -43,6 +43,7 @@
   const multiFileToggle = document.getElementById('settings-multi-file-toggle');
   const maxTurnsSummarizeInput = document.getElementById('max-turns-summarize-input');
   const maxToolOutputInput = document.getElementById('max-tool-output-input');
+  const maxProjectMapLinesInput = document.getElementById('max-project-map-lines-input');
   const embeddingModelInput = document.getElementById('embedding-model-input');
   
   const quickProviderSelect = document.getElementById('quick-provider-select');
@@ -743,7 +744,8 @@
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
-    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 8000;
+    const maxProjectMapLines = maxProjectMapLinesInput ? parseInt(maxProjectMapLinesInput.value.trim(), 10) : 250;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
     let modelContextLengths = {};
@@ -797,6 +799,7 @@
       agentInputTokenHardMax,
       skillsEnabled,
       maxSkillsToKeep,
+      maxProjectMapLines,
     });
   }
 
@@ -1006,7 +1009,8 @@
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
-    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
+    const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 8000;
+    const maxProjectMapLines = maxProjectMapLinesInput ? parseInt(maxProjectMapLinesInput.value.trim(), 10) : 250;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
 
     const teacherToggle = document.getElementById('settings-teacher-toggle');
@@ -1069,6 +1073,7 @@
       agentInputTokenHardMax,
       skillsEnabled,
       maxSkillsToKeep,
+      maxProjectMapLines,
     });
 
     settingsDrawer.classList.add('collapsed');
@@ -2733,6 +2738,9 @@ function attachImage(base64) {
         }
         if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
           maxToolOutputInput.value = s.maxToolOutputLength;
+        }
+        if (s.maxProjectMapLines !== undefined && maxProjectMapLinesInput) {
+          maxProjectMapLinesInput.value = s.maxProjectMapLines;
         }
         if (s.embeddingModel !== undefined && embeddingModelInput) {
           embeddingModelInput.value = s.embeddingModel;

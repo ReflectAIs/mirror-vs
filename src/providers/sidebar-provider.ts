@@ -369,6 +369,13 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                   vscode.ConfigurationTarget.Global,
                 );
               }
+              if ((data as any).maxProjectMapLines !== undefined) {
+                await config.update(
+                  'maxProjectMapLines',
+                  (data as any).maxProjectMapLines,
+                  vscode.ConfigurationTarget.Global,
+                );
+              }
               if ((data as any).embeddingModel !== undefined) {
                 await config.update('embeddingModel', (data as any).embeddingModel, vscode.ConfigurationTarget.Global);
               }
@@ -1297,6 +1304,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const embeddingModel = config.get<string>('embeddingModel', 'nomic-embed-text');
     const teacherEnabled = config.get<boolean>('teacherEnabled', false);
     const teacherModel = config.get<string>('teacherModel', 'deepseek-v4-pro');
+    const maxProjectMapLines = config.get<number>('maxProjectMapLines', 250);
 
     const settings: ExtensionSettings = {
       provider,
@@ -1342,6 +1350,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       agentInputTokenHardMax,
       skillsEnabled,
       maxSkillsToKeep,
+      maxProjectMapLines,
     } as any;
 
     this._view.webview.postMessage({

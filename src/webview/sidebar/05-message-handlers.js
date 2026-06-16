@@ -308,6 +308,10 @@
         if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
           maxToolOutputInput.value = s.maxToolOutputLength;
         }
+        if (s.maxProjectMapLines !== undefined) {
+          const maxProjectMapLinesInput = document.getElementById('max-project-map-lines-input');
+          if (maxProjectMapLinesInput) maxProjectMapLinesInput.value = s.maxProjectMapLines;
+        }
         if (s.embeddingModel !== undefined && embeddingModelInput) {
           embeddingModelInput.value = s.embeddingModel;
         }

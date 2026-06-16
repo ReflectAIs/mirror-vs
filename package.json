@@ -328,8 +328,8 @@
         },
         "mirror-vs.maxToolOutputLength": {
           "type": "integer",
-          "default": 20000,
-          "description": "Maximum character length for tool execution output in conversation history. Excess output is tokens."
+          "default": 8000,
+          "description": "Maximum character length for tool execution output in conversation history. Excess output is truncated to save tokens."
         },
         "mirror-vs.enableTruncationGuardrail": {
           "type": "boolean",
@@ -405,6 +405,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable LiteLLM proxy provider. LiteLLM normalizes 100+ LLM APIs into an OpenAI-compatible format."
+        },
+        "mirror-vs.maxProjectMapLines": {
+          "type": "integer",
+          "default": 250,
+          "description": "Maximum number of lines for the auto-generated project map tree shown to the agent on first turn. Lower values save tokens."
         },
         "mirror-vs.litellmBaseUrl": {
           "type": "string",

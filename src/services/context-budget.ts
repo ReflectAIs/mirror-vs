@@ -1,4 +1,4 @@
-export const DEFAULT_HARD_MAX = 200000;
+export const DEFAULT_HARD_MAX = 64000;
 export const DEFAULT_BUDGET = 6000;
 export const DEFAULT_HEADROOM = 0.85;
 
