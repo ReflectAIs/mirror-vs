@@ -1,0 +1,52 @@
+name: Provider Request
+description: Request support for a new LLM provider
+labels: ["enhancement", "provider"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new provider! Please fill in the details below.
+  - type: input
+    id: provider_name
+    attributes:
+      label: Provider Name
+      description: What is the name of the LLM provider (e.g., Anthropic, OpenAI, Groq)?
+      placeholder: "e.g., Anthropic"
+    validations:
+      required: true
+  - type: input
+    id: api_url
+    attributes:
+      label: API Endpoint
+      description: Does this provider have an OpenAI-compatible API endpoint?
+      placeholder: "https://api.example.com/v1"
+    validations:
+      required: false
+  - type: dropdown
+    id: api_type
+    attributes:
+      label: API Type
+      description: What type of API does this provider offer?
+      options:
+        - OpenAI-compatible
+        - Custom SDK
+        - REST (non-OpenAI)
+        - gRPC / Other
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: models
+    attributes:
+      label: Available Models
+      description: List the models this provider offers (especially coding-oriented ones).
+      placeholder: "e.g., claude-3-opus, claude-3-sonnet, claude-3-haiku"
+    validations:
+      required: false
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any links, docs, or notes about this provider.
+    validations:
+      required: false

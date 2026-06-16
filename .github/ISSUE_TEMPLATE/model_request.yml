@@ -1,0 +1,60 @@
+name: Model Request
+description: Request support for a new model from an existing provider
+labels: ["enhancement", "model"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new model! Please fill in the details below.
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      description: Which provider should this model be added to?
+      options:
+        - Ollama
+        - DeepSeek
+        - OpenRouter
+        - LiteLLM
+        - Gemini
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: model_name
+    attributes:
+      label: Model Name
+      description: The exact model identifier (e.g., `codestral-22b`, `gpt-4o`).
+      placeholder: "e.g., codestral-22b"
+    validations:
+      required: true
+  - type: input
+    id: context_window
+    attributes:
+      label: Context Window
+      description: What is the model's context window size (if known)?
+      placeholder: "e.g., 128000"
+    validations:
+      required: false
+  - type: dropdown
+    id: reason
+    attributes:
+      label: Why add this model?
+      options:
+        - Better coding performance
+        - Lower cost
+        - Larger context window
+        - Faster inference
+        - New capability (vision, reasoning, etc.)
+        - Other
+      multiple: true
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Link to model card, benchmarks, or blog post.
+    validations:
+      required: false

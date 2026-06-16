@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/DipeshMajithia/mirror-vs/discussions
+    about: Ask questions, share ideas, and discuss Mirror VS with the community.
+  - name: 📖 Documentation
+    url: https://github.com/DipeshMajithia/mirror-vs#readme
+    about: Check the README for setup, configuration, and usage guides.

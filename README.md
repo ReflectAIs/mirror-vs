@@ -3,9 +3,35 @@
 Mirror VS is a premium, highly capable, and fully autonomous **AI Pair Programmer** integrated directly into the Visual Studio Code sidebar activity bar. Powered by local **Ollama** models or **DeepSeek's API**, Mirror VS allows you to paired-program, refactor, search, and run workspace actions using simple natural language.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.1-blue.svg" alt="Version 0.2.1">
+  <img src="https://img.shields.io/badge/version-0.2.6-blue.svg" alt="Version 0.2.6">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
   <img src="https://img.shields.io/badge/VS%20Code-^1.80.0-purple.svg" alt="VS Code ^1.80.0">
+  <img src="https://img.shields.io/github/actions/workflow/status/DipeshMajithia/mirror-vs/ci.yml?branch=main&label=CI" alt="CI Status">
+  <img src="https://img.shields.io/github/stars/DipeshMajithia/mirror-vs?style=social" alt="GitHub Stars">
+  <img src="https://img.shields.io/visual-studio-marketplace/v/DipeshMajithia.mirror-vs" alt="Open VSX Version">
+  <img src="https://img.shields.io/visual-studio-marketplace/d/DipeshMajithia.mirror-vs" alt="Downloads">
+</p>
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="screenshots/S1.png" alt="Main Chat Interface" width="800"/>
+  <br/>
+  <em>Mirror VS chat interface with streaming responses, tool cards, and buddy avatar</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/S2.png" alt="Settings Panel" width="800"/>
+  <br/>
+  <em>Provider configuration, model selection, and extension settings</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/S3.png" alt="Git Review Workflow" width="800"/>
+  <br/>
+  <em>Diff review, commit management, and AI-powered code analysis</em>
 </p>
 
 ---
@@ -163,6 +189,8 @@ Customize Mirror VS via `settings.json` or the interactive Settings Panel:
 | `mirror-vs.contextBudgetPercent` | `number` | `75` | Context window budget utilization percentage. |
 | `mirror-vs.agentInputTokenBudget` | `number` | `6000` | Adaptive soft input token budget. |
 | `mirror-vs.agentInputTokenHardMax` | `number` | `200000` | Ceiling for long-context model budgets. |
+| `mirror-vs.maxProjectMapLines` | `number` | `250` | Max lines for project map context (range 10–5000). |
+| `mirror-vs.maxToolOutputLength` | `number` | `8000` | Max characters captured from tool output for context. |
 
 ---
 
@@ -221,11 +249,26 @@ mirror-vs/
 
 ## 🗺️ Roadmap
 
-- [ ] **Multi-model chat sessions** – Run multiple models in parallel within one conversation
-- [ ] **Enhanced artifact preview** – Interactive HTML/SVG/Mermaid artifact viewer
-- [ ] **Voice input** – Dictate prompts using speech-to-text
-- [ ] **VS Code Notebook integration** – Support for Jupyter-style notebooks
-- [ ] **Custom tool plugins** – Community-driven tool extensions
+See the full [ROADMAP.md](ROADMAP.md) for the detailed development plan across v0.3 → v1.0.
+
+High-level priorities:
+
+- **v0.3** — Persistent memory, better MCP UI, voice input, provider fallback improvements
+- **v0.4** — Multi-model chat sessions, enhanced artifacts, VS Code notebooks, custom tool plugins
+- **v0.5** — PR generation, code review agent, multi-file refactoring, git workflow assistance
+- **v1.0** — Mirror PAI integration, performance optimization, marketplace publication
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to get started:
+
+- 🐛 Found a bug? Open a [Bug Report](https://github.com/DipeshMajithia/mirror-vs/issues/new?template=bug_report.yml)
+- 💡 Have an idea? Open a [Feature Request](https://github.com/DipeshMajithia/mirror-vs/issues/new?template=feature_request.yml)
+- 👋 Want to help? Look for [good first issues](https://github.com/DipeshMajithia/mirror-vs/labels/good%20first%20issue) and [help wanted](https://github.com/DipeshMajithia/mirror-vs/labels/help%20wanted)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup and contribution guidelines.
 
 ---
 

@@ -23,9 +23,14 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### Suggesting Features 💡
 
-1. Check the [roadmap](README.md#-roadmap) and [existing feature requests](https://github.com/DipeshMajithia/mirror-vs/issues).
+1. Check the [roadmap](ROADMAP.md) and [existing feature requests](https://github.com/DipeshMajithia/mirror-vs/issues).
 2. Use the **Feature Request** issue template.
 3. Describe the use case, proposed solution, and any alternatives considered.
+
+### Requesting a Provider or Model 🧠
+
+- **New provider**: Use the [Provider Request](https://github.com/DipeshMajithia/mirror-vs/issues/new?template=provider_request.yml) template.
+- **New model**: Use the [Model Request](https://github.com/DipeshMajithia/mirror-vs/issues/new?template=model_request.yml) template.
 
 ### Making Code Changes 🛠️
 
@@ -45,6 +50,9 @@ cd mirror-vs
 # Install dependencies
 npm install
 
+# Build the extension
+npm run build
+
 # Start the dev watcher (auto-rebuilds on save)
 npm run watch
 
@@ -52,14 +60,40 @@ npm run watch
 code .
 ```
 
+#### Build Commands
+
+| Command | Description |
+| :--- | :--- |
+| `npm run build` | Full production build via esbuild |
+| `npm run watch` | Watch mode — rebuilds on file changes |
+| `npm run compile` | TypeScript type-check (no emit) |
+| `npm run lint` | Run ESLint |
+| `npm run format:check` | Check Prettier formatting |
+| `npm run format` | Auto-fix formatting with Prettier |
+| `npm run test` | Run all tests (vitest) |
+| `npm run check` | Run lint + format:check + tests together |
+
+> **Note for Windows users**: If you see `spawnSync npm.cmd EINVAL`, ensure `npm` is available from your PATH and use PowerShell or Git Bash — CMD may have compatibility issues with certain scripts.
+
 #### Branching Strategy
 
 1. Fork the repository.
-2. Create a feature branch: `git checkout -b feat/your-feature-name`
+2. Create a feature branch from `main`:
+   - `feat/your-feature-name` — new features
+   - `fix/your-bug-fix` — bug fixes
+   - `docs/your-doc-change` — documentation
+   - `refactor/your-refactor` — refactoring
+   - `test/your-test` — test additions
 3. Make your changes.
-4. Run checks: `npm run check` (lint + format + tests)
-5. Commit using [conventional commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+4. Run checks: `npm run check`
+5. Commit using [conventional commits](https://www.conventionalcommits.org/):
+   - `feat: add multi-model chat`
+   - `fix: resolve crash on empty input`
+   - `docs: update README screenshots`
+   - `refactor: extract tool registry`
+   - `test: add agent-parser tests`
 6. Push and open a pull request against `main`.
+7. Ensure the PR description clearly describes the problem and solution.
 
 #### Code Quality Standards
 
@@ -83,6 +117,7 @@ mirror-vs/
 │   └── utils/          # Shared utilities
 ├── media/              # Static assets
 ├── resources/          # Extension icons
+├── .github/            # GitHub templates, workflows, configs
 └── scratch/            # Temporary workspace files
 ```
 
@@ -110,4 +145,3 @@ When modifying sidebar UI, **edit the source files in `src/webview/sidebar/`** a
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
-
