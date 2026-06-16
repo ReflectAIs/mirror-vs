@@ -53,7 +53,6 @@ build-check.mjs
 vision.md
 .git-changes.design.md
 src/scripts/**
-*.ts.map
 *.d.ts
 jarvis/**
 
@@ -62,3 +61,13 @@ jarvis/**
 
 # But include the esbuild config (needed for vscode:prepublish)
 !esbuild.js
+
+# Exclude large stray files and old artifacts
+diff.txt
+turns.txt
+turns.log
+script.py
+logo.png
+package_logo.png
+vision.md
+dist/*.js.map
