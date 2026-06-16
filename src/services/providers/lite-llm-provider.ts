@@ -40,10 +40,11 @@ export class LiteLLMProvider extends BaseProvider {
       ...(systemMessages.length > 0
         ? [{ role: 'system' as const, content: systemMessages.map((m) => m.content).join('\n\n') }]
         : []),
-      ...otherMessages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
+      ...otherMessages.map((m: any) => ({
+        role: m.role as 'user' | 'assistant' | 'tool',
         content: m.content,
         ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
         ...(m.name ? { name: m.name } : {}),
       })),
     ];
@@ -58,10 +59,9 @@ export class LiteLLMProvider extends BaseProvider {
     };
 
     if (tools && tools.length > 0) {
-      body.tools = tools.map((t) => ({
-        type: 'function',
-        function: t,
-      }));
+      // Tools are already in {type:'function', function:{...}} format from tool-schemas.ts
+      body.tools = tools;
+      body.tool_choice = 'auto';
     }
 
     const response = await this.httpPost(url, body, signal, {}, 120000);
@@ -132,9 +132,17 @@ export class LiteLLMProvider extends BaseProvider {
       }
     }
 
-    // Emit any remaining tool call ends
-    for (const [, entry] of toolCallBuffers) {
-      yield { type: 'tool_call_end', id: entry.id };
+    // Emit any remaining tool call ends with accumulated arguments
+    // Only emit the first one (one-tool-per-turn policy)
+    const firstEntry = toolCallBuffers.get(0);
+    if (firstEntry) {
+      yield { type: 'tool_call_end', id: firstEntry.id, arguments: firstEntry.args, name: firstEntry.name };
+      toolCallBuffers.clear();
+    } else {
+      // Emit remaining if not already cleared
+      for (const [, entry] of toolCallBuffers) {
+        yield { type: 'tool_call_end', id: entry.id };
+      }
     }
 
     if (usageInput > 0 || usageOutput > 0) {

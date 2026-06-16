@@ -176,7 +176,14 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   try {
     const rgPath = await getRipgrepPath();
     if (rgPath) {
-      const args = ['--json', '-i', '-F', '-e', tool.query];
+      const args = ['--json'];
+      if (!(tool as any).case_sensitive) {
+        args.push('-i');
+      }
+      if (!(tool as any).is_regex) {
+        args.push('-F');
+      }
+      args.push('-e', tool.query);
       
       const excludes = [
         '**/node_modules/**',
@@ -192,6 +199,12 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
       ];
       for (const exclude of excludes) {
         args.push('--glob', `!${exclude}`);
+      }
+
+      if (Array.isArray((tool as any).includes)) {
+        for (const inc of (tool as any).includes) {
+          args.push('--glob', inc);
+        }
       }
 
       const searchTarget = tool.path ? path.join(workspaceRoot, tool.path) : workspaceRoot;
@@ -267,12 +280,16 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   let includePattern: vscode.GlobPattern | undefined;
   if (tool.path) {
     const scopePath = tool.path.replace(/\\/g, '/');
-    // If it looks like a directory path (no extension or ends with /), glob it recursively
-    if (scopePath.endsWith('/') || !path.extname(scopePath)) {
+    if (Array.isArray((tool as any).includes) && (tool as any).includes.length > 0) {
+      const patterns = ((tool as any).includes as string[]).map(inc => `${scopePath}/${inc}`);
+      includePattern = `{${patterns.join(',')}}`;
+    } else if (scopePath.endsWith('/') || !path.extname(scopePath)) {
       includePattern = new vscode.RelativePattern(workspaceFolders[0], `${scopePath}/**`);
     } else {
       includePattern = new vscode.RelativePattern(workspaceFolders[0], scopePath);
     }
+  } else if (Array.isArray((tool as any).includes) && (tool as any).includes.length > 0) {
+    includePattern = `{${((tool as any).includes as string[]).join(',')}}`;
   }
 
   const results: { file: string; line: number; text: string }[] = [];
@@ -280,7 +297,11 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   try {
     // Use VS Code's native text search API — delegates to ripgrep internally
     await (vscode.workspace as any).findTextInFiles(
-      { pattern: tool.query, isRegExp: false, isCaseSensitive: false },
+      { 
+        pattern: tool.query, 
+        isRegExp: !!(tool as any).is_regex, 
+        isCaseSensitive: !!(tool as any).case_sensitive 
+      },
       {
         include: includePattern,
         exclude:

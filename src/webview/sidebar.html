@@ -114,7 +114,7 @@
         <div class="drawer-body" style="padding: 10px;">
           <!-- Stats Grid -->
           <div class="dashboard-stats-grid">
-            <div class="stat-widget" id="stat-widget-budget">
+            <div class="stat-widget" id="stat-widget-budget" style="display: none !important;">
               <div class="stat-title">Context Budget</div>
               <div class="stat-value" id="stat-val-budget">6,000 / 6,000</div>
               <div class="stat-progress-bar">
@@ -424,6 +424,31 @@
               </p>
             </div>
 
+            <div class="settings-grid limit-grid" style="margin-top: 10px;">
+              <div class="form-group">
+                <label for="agent-token-budget-input" title="Soft token budget. Preserves this many tokens before scaling based on context length.">Soft Budget (Tokens)</label>
+                <input type="number" id="agent-token-budget-input" min="1000" max="1000000" value="6000">
+              </div>
+              <div class="form-group">
+                <label for="agent-token-hardmax-input" title="Hard limit on context size for long-context models.">Max Token Ceiling</label>
+                <input type="number" id="agent-token-hardmax-input" min="5000" max="5000000" value="200000">
+              </div>
+            </div>
+            <p class="settings-info-text" style="margin-top: 4px; margin-bottom: 10px;">
+              <strong>Soft Budget:</strong> Target token budget (default 6000).
+              <br>
+              <strong>Max Token Ceiling:</strong> Maximum tokens allowed for context before compressing (default 200,000). Increase this for large 1M+ context models like DeepSeek.
+            </p>
+
+            <div class="form-group checkbox-group" style="margin-top: 10px;">
+              <input type="checkbox" id="settings-skills-enabled-toggle" checked />
+              <label for="settings-skills-enabled-toggle">Enable Distilled Skills Memory</label>
+            </div>
+            <div class="form-group" style="margin-top: 6px;">
+              <label for="settings-max-skills-input" title="Maximum number of learned skills to retain. Oldest skills are pruned when limit is exceeded.">Max Retained Skills</label>
+              <input type="number" id="settings-max-skills-input" min="1" max="1000" value="20" />
+            </div>
+
             <div class="form-group" style="margin-top: 10px;">
               <label for="model-context-lengths-input">Model Context Overrides (JSON)</label>
               <textarea id="model-context-lengths-input" placeholder='e.g. { "deepseek-coder": 64000, "llama3": 8192 }' rows="2" style="font-family: monospace; font-size: 11px; width: 100%; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); background: rgba(255,255,255,0.03); color: #fff; padding: 6px;"></textarea>
@@ -582,7 +607,7 @@
           <div class="settings-footer" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 16px;">
             <button id="save-settings-btn" class="btn btn-primary" style="width: 100%;">Save Changes</button>
             <div style="font-size: 10px; color: var(--text-muted); opacity: 0.8; text-align: center; margin-top: 4px;">
-                      Version 0.2.0
+                      Version 0.2.5
             </div>
             <div style="font-size: 10px; color: var(--text-muted); opacity: 0.8; text-align: center;">
               Provide your feedback on <a href="mailto:dipeshmajithia99@gmail.com" style="color: #38bdf8; text-decoration: underline;">dipeshmajithia99@gmail.com</a>
@@ -876,16 +901,7 @@
           </div>
         </div>
 
-        <!-- Token Usage & Progress Bar -->
-        <div id="usage-dashboard" class="usage-dashboard-compact hidden">
-          <span class="token-stat-chip">
-            <span id="usage-tokens">0</span> tokens
-          </span>
-          <div class="token-progress-bar-container">
-            <div id="token-progress-bar"></div>
-          </div>
-          <span class="token-stat-chip" id="usage-cost">$0.0000</span>
-        </div>
+
       </div>
     </div>
   </div>

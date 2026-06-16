@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI Pair Programmer for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.2.1",
+  "version": "0.2.5",
   "icon": "package_logo.png",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",
@@ -235,6 +235,16 @@
           "type": "integer",
           "default": 6,
           "description": "Number of recent turns to retain as active conversation context after compression."
+        },
+        "mirror-vs.skillsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable distilled skills learning and injection."
+        },
+        "mirror-vs.maxSkillsToKeep": {
+          "type": "integer",
+          "default": 20,
+          "description": "Maximum number of learned skills to retain in workspace memory."
         },
         "mirror-vs.planFirst": {
           "type": "boolean",

@@ -20,6 +20,8 @@ import {
 } from './orchestrator-prompt';
 import { AgentMemoryService } from '../services/agent-memory-service';
 import { ArtifactService } from '../services/artifact-service';
+import { getToolSchemas, supportsNativeToolCalling } from './tool-schemas';
+import { NativeToolCallParser } from './native-tool-call-parser';
 
 // P0 imports
 import { getContextLength, estimateTokens } from '../services/model-context';
@@ -51,6 +53,32 @@ export enum TaskMode {
 
 export function determineTaskMode(userMessage: string, configMode: string): TaskMode {
   const lower = userMessage.toLowerCase();
+  
+  // If the user request contains file creation, modification, building, or setup/creation verbs,
+  // we must allow IMPLEMENT/VERIFY mode rather than locking it to read-only REVIEW/DEBUG.
+  const isWriteOrSetupAction = [
+    'create', 'build', 'write', 'generate', 'setup', 'init', 'install', 'add', 'make',
+    'implement', 'change', 'modify', 'update', 'patch', 'delete', 'remove', 'run', 'start', 'dev'
+  ].some((verb) => new RegExp(`\\b${verb}\\b`, 'i').test(lower));
+
+  if (
+    lower.includes('run test') ||
+    lower.includes('run lint') ||
+    lower.includes('run build') ||
+    lower.includes('npm test') ||
+    lower.includes('npm run test') ||
+    lower.includes('vitest') ||
+    lower.includes('eslint') ||
+    lower.includes('typecheck') ||
+    /^(run|execute|perform|verify) (the )?(tests?|build|lint|typecheck)/i.test(lower)
+  ) {
+    return TaskMode.VERIFY;
+  }
+
+  if (isWriteOrSetupAction) {
+    return TaskMode.IMPLEMENT;
+  }
+
   if (
     ['review', 'audit', 'analyze', 'improvements', 'feedback', 'architecture review', 'frontend review'].some(
       (keyword) => lower.includes(keyword),
@@ -67,19 +95,6 @@ export function determineTaskMode(userMessage: string, configMode: string): Task
     lower.includes('fail')
   ) {
     return TaskMode.DEBUG;
-  }
-  if (
-    lower.includes('run test') ||
-    lower.includes('run lint') ||
-    lower.includes('run build') ||
-    lower.includes('npm test') ||
-    lower.includes('npm run test') ||
-    lower.includes('vitest') ||
-    lower.includes('eslint') ||
-    lower.includes('typecheck') ||
-    /^(run|execute|perform|verify) (the )?(tests?|build|lint|typecheck)/i.test(lower)
-  ) {
-    return TaskMode.VERIFY;
   }
   return TaskMode.IMPLEMENT;
 }
@@ -686,6 +701,10 @@ export class AgentOrchestrator {
 
           continueLoop = false;
 
+          // Determine if this provider supports native tool calling (computed before payload assembly)
+          const useNativeTools = supportsNativeToolCalling(provider, currentModel);
+          const toolSchemas = useNativeTools ? getToolSchemas() : undefined;
+
           const resolvedPayloadPromises = currentMessages
             .filter((msg) => !msg.summarized)
             .map(async (msg) => {
@@ -693,11 +712,15 @@ export class AgentOrchestrator {
               if (msg.role === 'user' && content) {
                 content = await this._resolveFileRefs(content);
               }
-              return {
-                role: (msg.role === 'system' ? 'user' : msg.role) as 'user' | 'assistant' | 'system',
+              const mapped: any = {
+                role: (msg.role === 'system' ? 'user' : msg.role) as 'user' | 'assistant' | 'system' | 'tool',
                 content: content,
                 images: msg.images,
               };
+              // Preserve native tool calling fields — DeepSeek requires these to be present
+              if ((msg as any).tool_call_id) mapped.tool_call_id = (msg as any).tool_call_id;
+              if ((msg as any).tool_calls) mapped.tool_calls = (msg as any).tool_calls;
+              return mapped;
             });
           const resolvedPayload = await Promise.all(resolvedPayloadPromises);
 
@@ -711,6 +734,7 @@ export class AgentOrchestrator {
                 agentState,
                 taskMode,
                 text || '',
+                useNativeTools,
               ),
             },
             ...resolvedPayload,
@@ -721,16 +745,20 @@ export class AgentOrchestrator {
           const trimmedPayload = trimForContext(payload, effectiveBudget, reserveTokens);
 
           // Strip internal metadata keys before sending to the LLM API
-          const finalPayload = trimmedPayload.map((m) => {
-            const { role, content, images } = m;
-            return { role, content, images };
+          // Preserve tool_call_id and tool_calls — required for native function calling message sequences
+          const finalPayload = trimmedPayload.map((m: any) => {
+            const out: any = { role: m.role, content: m.content };
+            if (m.images) out.images = m.images;
+            if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+            if (m.tool_calls) out.tool_calls = m.tool_calls;
+            return out;
           });
 
           // Payload diagnostics
           const payloadTokens = estimateTokens(finalPayload);
           const utilization = Math.round((payloadTokens / contextWindow) * 100);
           console.log(
-            `[Context] Payload: ${finalPayload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, budget: ${Math.round(effectiveBudget / 1000)}K, utilization: ${utilization}%)`,
+            `[Context] Payload: ${finalPayload.length} msgs, ~${Math.round(payloadTokens / 1000)}K tokens (model: ${currentModel}, window: ${Math.round(contextWindow / 1000)}K, budget: ${Math.round(effectiveBudget / 1000)}K, utilization: ${utilization}%, nativeTools: ${useNativeTools})`,
           );
 
           this._postMessage({ type: 'chatResponseStart' });
@@ -738,6 +766,14 @@ export class AgentOrchestrator {
           const completionController = new AbortController();
           const mainAbortListener = () => completionController.abort();
           signal.addEventListener('abort', mainAbortListener);
+
+          // Capture native tool call from streaming callback (declared here so accessible after retry loop)
+          let nativeToolCall: { id: string; name: string; argsJson: string } | null = null;
+          const onNativeToolCall = useNativeTools
+            ? (id: string, name: string, argsJson: string) => {
+                nativeToolCall = { id, name, argsJson };
+              }
+            : undefined;
 
           let assistantResponse = '';
           let completionRetries = 0;
@@ -755,10 +791,12 @@ export class AgentOrchestrator {
                 this._session.sessionId,
                 completionController,
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
+                toolSchemas,
+                onNativeToolCall,
               );
 
-              // If response is not empty, we are good
-              if (assistantResponse && assistantResponse.trim() !== '') {
+              // If response is not empty (or we got a native tool call), we are good
+              if ((assistantResponse && assistantResponse.trim() !== '') || nativeToolCall) {
                 break;
               }
 
@@ -805,7 +843,24 @@ export class AgentOrchestrator {
 
           signal.removeEventListener('abort', mainAbortListener);
 
-          currentMessages.push({ role: 'assistant', content: assistantResponse });
+          // Push assistant message — on native path, include tool_calls array so DeepSeek
+          // can correctly associate the subsequent role:'tool' message
+          if (nativeToolCall) {
+            const ntc = nativeToolCall as { id: string; name: string; argsJson: string };
+            currentMessages.push({
+              role: 'assistant',
+              content: assistantResponse || '',
+              tool_calls: [
+                {
+                  id: ntc.id,
+                  type: 'function',
+                  function: { name: ntc.name, arguments: ntc.argsJson },
+                },
+              ],
+            } as any);
+          } else {
+            currentMessages.push({ role: 'assistant', content: assistantResponse });
+          }
 
           this._syncPlanningFiles(assistantResponse);
 
@@ -852,7 +907,25 @@ export class AgentOrchestrator {
             agentState = AgentState.IMPLEMENTATION;
           }
 
-          let toolCalls = this._parser.parseToolCalls(assistantResponse, true);
+          // Resolve tool calls: native JSON path or XML text fallback
+          let toolCalls = [] as ReturnType<typeof this._parser.parseToolCalls>;
+          if (nativeToolCall) {
+            // Native function calling path: parse structured JSON args
+            const parsed = NativeToolCallParser.parseToolCall(
+              (nativeToolCall as { id: string; name: string; argsJson: string }).name,
+              (nativeToolCall as { id: string; name: string; argsJson: string }).argsJson,
+              (nativeToolCall as { id: string; name: string; argsJson: string }).id,
+            );
+            if (parsed) {
+              toolCalls = [parsed];
+              console.log(`[Orchestrator] Native tool call: ${parsed.name}`, JSON.stringify(parsed));
+            } else {
+              console.warn(`[Orchestrator] Native tool call parse failed for: ${(nativeToolCall as any).name}`);
+            }
+          } else {
+            // XML text fallback path (Ollama or non-native providers)
+            toolCalls = this._parser.parseToolCalls(assistantResponse, true);
+          }
 
           if (toolCalls.length > 0) {
             // Tool ranking info logged but NOT enforced — model runs all tools it emits
@@ -1326,6 +1399,14 @@ export class AgentOrchestrator {
 
             const combined = cleanedToolResults.join('\n\n');
             let finalSystemContent = combined;
+
+            const hasTruncatedReadFile = cleanedToolResults.some(
+              (res) => res.includes('[TRUNCATED') && res.includes('read_file'),
+            );
+            if (hasTruncatedReadFile) {
+              finalSystemContent += `\n\n[System Notice: The file content returned above was truncated to save context window tokens. The actual file on disk is intact and complete. If you need to inspect the truncated lines, run read_file again with specific 'start_line' and 'end_line' parameters to view that region.]`;
+            }
+
             finalSystemContent += `\n\n[SYSTEM NOTICE]: The tool results above are real, verified outputs from the development environment (file system, terminal, workspace search). They are NOT generated or fabricated. Treat them as authoritative ground truth. Do not invent different file contents, error messages, or command outputs than what is shown. If a tool reports "not found" or "error", that is accurate — do not assume the operation succeeded.`;
 
             // Run failure detection evaluation on the tool results and assistant reply
@@ -1362,12 +1443,20 @@ export class AgentOrchestrator {
             // Patch failure recovery: after 2+ consecutive failures on the same file,
             // force the model to re-read the file before retrying the patch.
             if (consecutivePatchFailures >= 2 && lastPatchFailedPath) {
-              finalSystemContent +=
-                `\n\n[System: You have failed to patch "${lastPatchFailedPath}" ${consecutivePatchFailures} times in a row. ` +
-                `STOP. Do NOT emit another patch_file or multi_patch_file yet. ` +
-                `First, emit exactly: <read_file path="${lastPatchFailedPath}" /> to see the current file content. ` +
-                `Then copy the exact lines you need to change into your SEARCH block verbatim, including all whitespace and indentation. ` +
-                `As a last resort, use <write_file path="${lastPatchFailedPath}">...full file content...</write_file> to overwrite the file entirely.]`;
+              if (useNativeTools) {
+                finalSystemContent +=
+                  `\n\n[System: You have failed to patch "${lastPatchFailedPath}" ${consecutivePatchFailures} times in a row. ` +
+                  `STOP. Do NOT call patch_file or multi_patch_file yet. ` +
+                  `First, call read_file with path="${lastPatchFailedPath}" to see the current file content. ` +
+                  `Then verify the exact lines you need to change. As a last resort, call write_file with path="${lastPatchFailedPath}" and content to overwrite the file entirely.]`;
+              } else {
+                finalSystemContent +=
+                  `\n\n[System: You have failed to patch "${lastPatchFailedPath}" ${consecutivePatchFailures} times in a row. ` +
+                  `STOP. Do NOT emit another patch_file or multi_patch_file yet. ` +
+                  `First, emit exactly: <read_file path="${lastPatchFailedPath}" /> to see the current file content. ` +
+                  `Then copy the exact lines you need to change into your SEARCH block verbatim, including all whitespace and indentation. ` +
+                  `As a last resort, use <write_file path="${lastPatchFailedPath}">...full file content...</write_file> to overwrite the file entirely.]`;
+              }
             } else if (turnEval.status === 'failure' && consecutiveToolFailures < 3) {
               finalSystemContent += `\n\n[System Notice: The previous tool call failed: ${turnEval.reason}. Retry with a different approach or state what is blocking you. Do not give up.]`;
             } else if (turnEval.status === 'failure' && consecutiveToolFailures >= 3) {
@@ -1376,10 +1465,24 @@ export class AgentOrchestrator {
               finalSystemContent +=
                 '\n\n[System: You have performed several exploratory steps. Please evaluate if you have enough context. If you do, stop searching and execute the file patches immediately. Do not spend multiple turns re-reading the same file or scrolling in tiny increments. If you know the logic, write the patch block now.]';
             }
-            // Wrap tool results as untrusted source data (Prompt Security P1.2)
-            const systemMessage = untrustedContextMessage('tool_execution_results', finalSystemContent);
-            if (images.length > 0) systemMessage.images = images;
-            currentMessages.push(systemMessage);
+            // Wrap tool results and inject back into conversation
+            // Native path: use role:'tool' with tool_call_id for proper OpenAI message format
+            // XML fallback: use role:'system' wrapped as untrusted context
+            if (nativeToolCall && (nativeToolCall as any).id) {
+              // Native tool calling: push role:'tool' message for each result
+              // We combine all results into one message (only one tool runs at a time on native path)
+              const toolResultContent = finalSystemContent;
+              currentMessages.push({
+                role: 'tool' as any,
+                content: toolResultContent,
+                tool_call_id: (nativeToolCall as any).id,
+              } as ChatMessage);
+            } else {
+              // XML fallback: wrap as untrusted system message
+              const systemMessage = untrustedContextMessage('tool_execution_results', finalSystemContent);
+              if (images.length > 0) systemMessage.images = images;
+              currentMessages.push(systemMessage);
+            }
             await this._saveChatHistory(currentMessages);
 
             // Fire teacher escalation check (P1.4)
@@ -1450,28 +1553,27 @@ export class AgentOrchestrator {
               continueLoop = true;
             } else if (hasToolAttempt && consecutiveMalformedCount < maxMalformedRetries) {
               consecutiveMalformedCount++;
-              const errorMsg =
-                '[Tool Parsing Error]: Your tool call was malformed or incomplete (attempt ' +
-                consecutiveMalformedCount +
-                '/' +
-                maxMalformedRetries +
-                '). Please retry with correct XML syntax.';
+              const errorMsg = useNativeTools
+                ? `[Tool Parsing Error]: Your tool call parameters were malformed or incomplete (attempt ${consecutiveMalformedCount}/${maxMalformedRetries}). Please retry by outputting a valid tool call with properly formatted JSON arguments.`
+                : `[Tool Parsing Error]: Your tool call was malformed or incomplete (attempt ${consecutiveMalformedCount}/${maxMalformedRetries}). Please retry with correct XML syntax.`;
               currentMessages.push({ role: 'system', content: errorMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (routingMatch && toolCalls.length === 0) {
               // Architecture Routing Guard: architecture_routing block is NOT a valid response boundary.
               // If the model emitted architecture_routing but no tool call, it MUST be nudged to continue.
-              const nudgeMsg =
-                '[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.';
+              const nudgeMsg = useNativeTools
+                ? '[System Notice]: You emitted an <architecture_routing> block but did not invoke any functions. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately invoke exactly one function from the tools schema to proceed with your task.'
+                : '[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.';
               currentMessages.push({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (loopCount === 1 && hasActionPlanningIntent(assistantResponse)) {
               // Conversational nudge: if the model gave a conversational greeting in its very first turn without calling any tools,
               // but explicitly indicated that it plans to perform actions, we nudge it to execute a tool to keep the autonomous flow alive.
-              const nudgeMsg =
-                "[System Notice]: You did not invoke any tool tags in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please output a valid tool tag now to continue autonomously.";
+              const nudgeMsg = useNativeTools
+                ? "[System Notice]: You did not invoke any tool functions in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please invoke a valid tool function now to continue autonomously."
+                : "[System Notice]: You did not invoke any tool tags in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please output a valid tool tag now to continue autonomously.";
               currentMessages.push({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
@@ -1492,6 +1594,11 @@ export class AgentOrchestrator {
       } catch (err: unknown) {
         if (signal.aborted) {
           console.log('Agent stream aborted.');
+          currentMessages.push({
+            role: 'system',
+            content: '[System Notice]: The user manually aborted/stopped execution during this turn. All pending tool executions, file edits, or commands have been canceled. Stop your execution immediately and wait for the user\'s next input.'
+          });
+          await this._saveChatHistory(currentMessages);
           this._sendAvatarState('idle');
           this._postMessage({ type: 'updateChatHistory', history: currentMessages });
           this._postMessage({ type: 'loopComplete' });

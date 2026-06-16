@@ -386,12 +386,12 @@ describe('AgentParser', () => {
       expect(parser.parseToolCalls('')).toEqual([]);
     });
 
-    it('should return only the first tool call when multiple are present', () => {
+    it('should return invalid_tool_mix when multiple tool calls are present', () => {
       const parser = makeParser();
       const input = selfClosing('read_file', 'path="a.ts"') + ' ' + selfClosing('read_file', 'path="b.ts"');
       const calls = parser.parseToolCalls(input);
       expect(calls).toHaveLength(1);
-      expect(calls[0].path).toBe('a.ts');
+      expect(calls[0].name).toBe('invalid_tool_mix');
     });
 
     it('should strip code blocks before parsing so tools inside blocks are ignored', () => {

@@ -4,9 +4,9 @@ import { getContextLength, estimateTokens, KNOWN_CONTEXT_WINDOWS } from '../mode
 describe('Model Context Service', () => {
   describe('getContextLength', () => {
     it('should match known model windows by exact key', async () => {
-      // deepseek-chat has a known window of 64000
+      // deepseek-chat has a known window of 1000000
       const len = await getContextLength('https://api.deepseek.com/chat/completions', 'deepseek-chat');
-      expect(len).toBe(64000);
+      expect(len).toBe(1000000);
     });
 
     it('should match variants by longest key first (substring match)', async () => {

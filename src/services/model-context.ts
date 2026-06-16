@@ -37,12 +37,12 @@ export const KNOWN_CONTEXT_WINDOWS: Record<string, number> = {
   'o4-mini': 200000,
 
   // --- DeepSeek ---
-  'deepseek-chat': 64000,
-  'deepseek-coder': 64000,
-  'deepseek-reasoner': 64000,
-  'deepseek-r1': 64000,
-  'deepseek-v3': 64000,
-  'deepseek-v2': 64000,
+  'deepseek-chat': 1000000,
+  'deepseek-coder': 1000000,
+  'deepseek-reasoner': 1000000,
+  'deepseek-r1': 1000000,
+  'deepseek-v3': 1000000,
+  'deepseek-v2': 128000,
 
   // --- Google ---
   'gemini-2.5-pro': 1048576,

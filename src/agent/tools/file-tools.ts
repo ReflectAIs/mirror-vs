@@ -19,11 +19,11 @@ function normalizeLineExact(line: string): string {
 }
 
 function normalizeLineFuzzy(line: string): string {
-  // Strips syntax noise and lowercases — may corrupt emoji, used only as fallback
-  return normalizeLineExact(line)
+  // Strips syntax noise, whitespace, and lowercases for extremely robust fuzzy matching
+  return line
     .toLowerCase()
     .replace(/[{}[\]();,.:'"`]/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, '');
 }
 
 /**
@@ -215,21 +215,23 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         fullContent = fs.readFileSync(safePath, 'utf8');
       }
 
-      const startLine = tool.start_line;
-      const endLine = tool.end_line;
-
-      const allLines = fullContent.split('\n');
+      // Split by universal newline to handle both Windows (\r\n) and Unix (\n)
+      const allLines = fullContent.split(/\r?\n/);
       const totalLines = allLines.length;
-      const s = Math.max(1, startLine ?? 1);
-      const e = Math.min(totalLines, endLine ?? totalLines);
 
-      if (s > totalLines && totalLines > 0) {
-        throw new Error(`start_line ${s} exceeds file length (${totalLines} lines).`);
+      const start = tool.start_line !== undefined ? Math.max(1, tool.start_line) : 1;
+      const end = tool.end_line !== undefined ? Math.min(totalLines, tool.end_line) : totalLines;
+
+      if (start > totalLines && totalLines > 0) {
+        throw new Error(`start_line ${start} exceeds file length (${totalLines} lines).`);
+      }
+      if (start > end) {
+        throw new Error(`start_line (${start}) cannot be greater than end_line (${end}).`);
       }
 
-      const selectedLines = allLines.slice(s - 1, e);
-      const numbered = selectedLines.map((line, i) => `${s + i}: ${line}`).join('\n');
-      return `[File: ${tool.path} — showing lines ${s}-${e} of ${totalLines} total]\n${numbered}`;
+      const selectedLines = allLines.slice(start - 1, end);
+      const numbered = selectedLines.map((line, i) => `${start + i}: ${line}`).join('\n');
+      return `[File: ${tool.path} — showing lines ${start}-${end} of ${totalLines} total]\n${numbered}`;
     }
 
     case 'list_dir': {
@@ -421,8 +423,33 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       }
 
       let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
-      const rawPatches = tool.content || '';
-      const patches = parsePatchBlocks(rawPatches);
+      const fileLines = fileContent.split(/\r?\n/);
+
+      // Support structured line-range parameter or legacy search string
+      const isLineTargeted = tool.start_line !== undefined && tool.end_line !== undefined && tool.expected_search_content !== undefined && tool.replace_content !== undefined;
+      const patches: { search: string; replace: string }[] = [];
+
+      if (isLineTargeted) {
+        const start = Math.max(1, tool.start_line!);
+        const end = Math.min(fileLines.length, tool.end_line!);
+        const searchSegment = fileLines.slice(start - 1, end).join('\n');
+        
+        // Exact or whitespace-insensitive verification check
+        const cleanExpected = normalizeLineExact(tool.expected_search_content!);
+        const cleanTarget = normalizeLineExact(searchSegment);
+        
+        if (cleanExpected !== cleanTarget) {
+          throw new Error(
+            `Patch verification failed. Expected search content does not match the file content in specified range (lines ${start}-${end}).\n` +
+            `Expected:\n${tool.expected_search_content}\n\n` +
+            `Actual in file:\n${searchSegment}`
+          );
+        }
+        patches.push({ search: searchSegment, replace: tool.replace_content! });
+      } else {
+        const rawPatches = tool.content || '';
+        patches.push(...parsePatchBlocks(rawPatches));
+      }
 
       if (patches.length === 0) {
         throw new Error(
@@ -456,9 +483,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           fileContent = fileContent.replace(search, replace);
         } else {
           // Fuzzy match fallback
-          const fileLines = fileContent.split('\n');
-          const searchLines = search.split('\n');
-          const matchRange = findFuzzyMatchRange(fileLines, searchLines);
+          const matchRange = findFuzzyMatchRange(fileLines, search.split('\n'));
 
           if (!matchRange) {
             throw new Error(
@@ -468,8 +493,23 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
             );
           }
 
+          // Auto-adjust indentation of replacement lines based on the matched file block
+          const matchedLine = fileLines[matchRange.start];
+          const targetIndent = matchedLine.match(/^([ \t]*)/)?.[1] || '';
+          const searchIndent = search.split('\n')[0].match(/^([ \t]*)/)?.[1] || '';
+          
+          const adjustedReplace = replace
+            .split('\n')
+            .map((line) => {
+              if (line.startsWith(searchIndent)) {
+                return targetIndent + line.substring(searchIndent.length);
+              }
+              return line;
+            })
+            .join('\n');
+
           // Apply replacement on the matched lines
-          fileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, replace);
+          fileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, adjustedReplace);
           fileContent = fileLines.join('\n');
         }
       }
@@ -492,49 +532,47 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
     }
 
     case 'multi_patch_file': {
-      const rawContent = tool.content || '';
-      const fileRegex = /<file\s+path="([^"]+)"\s*>([\s\S]*?)<\/file>/gi;
-      let match;
-      const filePatches: { path: string; patches: { search: string; replace: string }[] }[] = [];
-      while ((match = fileRegex.exec(rawContent)) !== null) {
-        const filePath = match[1].trim();
-        const rawPatches = match[2];
-        const patches = parsePatchBlocks(rawPatches);
-        if (patches.length > 0) {
-          filePatches.push({ path: filePath, patches });
-        }
-      }
-
-      if (filePatches.length === 0) {
-        throw new Error(
-          'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.' +
-            ' The required format is:\n' +
-            '<multi_patch_file>\n' +
-            '<file path="relative/path/to/file.ts">\n' +
-            '<<<<<<< SEARCH\n' +
-            '[exact original lines]\n' +
-            '=======\n' +
-            '[replacement lines]\n' +
-            '>>>>>>> REPLACE\n' +
-            '</file>\n' +
-            '</multi_patch_file>\n' +
-            'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block.',
-        );
-      }
-
+      const isStructured = Array.isArray(tool.patches);
       const results: string[] = [];
-      for (const fp of filePatches) {
-        const safePath = getSafePath(fp.path);
+
+      if (isStructured) {
+        if (!tool.path) throw new Error('Missing "path" attribute for multi_patch_file.');
+        const safePath = getSafePath(tool.path);
         if (!fs.existsSync(safePath)) {
-          throw new Error(`File does not exist: ${fp.path}`);
+          throw new Error(`File does not exist: ${tool.path}`);
         }
 
         const fileWarnings: string[] = [];
         let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
+        const fileLines = fileContent.split(/\r?\n/);
+        let patchesToApply: { start_line: number; end_line: number; search: string; replace: string }[] = [];
+
+        for (const p of tool.patches!) {
+          const start = Math.max(1, p.start_line);
+          const end = Math.min(fileLines.length, p.end_line);
+          const searchSegment = fileLines.slice(start - 1, end).join('\n');
+          
+          const cleanExpected = normalizeLineExact(p.expected_search_content);
+          const cleanTarget = normalizeLineExact(searchSegment);
+          
+          if (cleanExpected !== cleanTarget) {
+            throw new Error(
+              `Multi-patch verification failed for line range ${start}-${end}.\n` +
+              `Expected:\n${p.expected_search_content}\n\n` +
+              `Actual in file:\n${searchSegment}`
+            );
+          }
+          patchesToApply.push({ start_line: start, end_line: end, search: searchSegment, replace: p.replace_content });
+        }
+
+        // Sort patches from bottom of the file to top (start_line descending) to prevent index shifting
+        patchesToApply.sort((a, b) => b.start_line - a.start_line);
+
         let addedLines = 0;
         let subtractedLines = 0;
-        for (let i = 0; i < fp.patches.length; i++) {
-          const { search, replace } = fp.patches[i];
+
+        for (let i = 0; i < patchesToApply.length; i++) {
+          const { start_line, search, replace } = patchesToApply[i];
           subtractedLines += search.split('\n').length;
           addedLines += replace.split('\n').length;
           const replaceIssues = validatePatchStructure(search, replace);
@@ -542,41 +580,141 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
             fileWarnings.push(`Block #${i + 1}: ${replaceIssues.join('; ')}`);
           }
 
-          if (fileContent.includes(search)) {
-            fileContent = fileContent.replace(search, replace);
-          } else {
-            const fileLines = fileContent.split('\n');
-            const searchLines = search.split('\n');
-            const matchRange = findFuzzyMatchRange(fileLines, searchLines);
-            if (!matchRange) {
-              throw new Error(
-                `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).` +
-                  ` Re-read the file with <read_file path="${fp.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
-              );
-            }
-            fileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, replace);
-            fileContent = fileLines.join('\n');
-          }
+          // Array splice update using the pre-sorted bottom-to-top indices
+          const currentFileLines = fileContent.split('\n');
+          // Find matching indentation
+          const matchedLine = currentFileLines[start_line - 1];
+          const targetIndent = matchedLine.match(/^([ \t]*)/)?.[1] || '';
+          const searchIndent = search.split('\n')[0].match(/^([ \t]*)/)?.[1] || '';
+
+          const adjustedReplace = replace
+            .split('\n')
+            .map((line) => {
+              if (line.startsWith(searchIndent)) {
+                return targetIndent + line.substring(searchIndent.length);
+              }
+              return line;
+            })
+            .join('\n');
+
+          currentFileLines.splice(start_line - 1, patchesToApply[i].end_line - start_line + 1, adjustedReplace);
+          fileContent = currentFileLines.join('\n');
         }
 
         const { accepted, checkpointId } = await confirmChangesWithDiff(
           safePath,
           fileContent,
-          path.basename(fp.path),
+          path.basename(tool.path),
           'replace',
         );
         if (!accepted) {
-          throw new Error(`User rejected patch edits for ${fp.path}.`);
+          throw new Error(`User rejected patch edits for ${tool.path}.`);
         }
-        let fileResult = `Patched ${fp.path} (${fp.patches.length} block(s) (+${addedLines}, -${subtractedLines}), Revert ID: ${checkpointId})`;
+        let fileResult = `Patched ${tool.path} (${patchesToApply.length} block(s) (+${addedLines}, -${subtractedLines}), Revert ID: ${checkpointId})`;
         if (fileWarnings.length > 0) {
           fileResult += `\n⚠️ SYNTAX WARNINGS:\n${fileWarnings.join('\n')}`;
         }
-        results.push(fileResult);
-      }
+        return fileResult;
+      } else {
+        // Legacy XML content parser
+        const rawContent = tool.content || '';
+        const fileRegex = /<file\s+path="([^"]+)"\s*>([\s\S]*?)<\/file>/gi;
+        let match;
+        const filePatches: { path: string; patches: { search: string; replace: string }[] }[] = [];
+        while ((match = fileRegex.exec(rawContent)) !== null) {
+          const filePath = match[1].trim();
+          const rawPatches = match[2];
+          const patches = parsePatchBlocks(rawPatches);
+          if (patches.length > 0) {
+            filePatches.push({ path: filePath, patches });
+          }
+        }
 
-      let multiResult = results.join('\n');
-      return multiResult;
+        if (filePatches.length === 0) {
+          throw new Error(
+            'No valid <file path="...">...</file> blocks containing SEARCH/REPLACE blocks found in multi_patch_file.' +
+              ' The required format is:\n' +
+              '<multi_patch_file>\n' +
+              '<file path="relative/path/to/file.ts">\n' +
+              '<<<<<<< SEARCH\n' +
+              '[exact original lines]\n' +
+              '=======\n' +
+              '[replacement lines]\n' +
+              '>>>>>>> REPLACE\n' +
+              '</file>\n' +
+              '</multi_patch_file>\n' +
+              'Ensure "=======" separates SEARCH from REPLACE and ">>>>>>> REPLACE" closes the block.',
+          );
+        }
+
+        for (const fp of filePatches) {
+          const safePath = getSafePath(fp.path);
+          if (!fs.existsSync(safePath)) {
+            throw new Error(`File does not exist: ${fp.path}`);
+          }
+
+          const fileWarnings: string[] = [];
+          let fileContent = normalizeLineEndings(fs.readFileSync(safePath, 'utf8'));
+          let addedLines = 0;
+          let subtractedLines = 0;
+          for (let i = 0; i < fp.patches.length; i++) {
+            const { search, replace } = fp.patches[i];
+            subtractedLines += search.split('\n').length;
+            addedLines += replace.split('\n').length;
+            const replaceIssues = validatePatchStructure(search, replace);
+            if (replaceIssues.length > 0) {
+              fileWarnings.push(`Block #${i + 1}: ${replaceIssues.join('; ')}`);
+            }
+
+            if (fileContent.includes(search)) {
+              fileContent = fileContent.replace(search, replace);
+            } else {
+              const currentFileLines = fileContent.split('\n');
+              const matchRange = findFuzzyMatchRange(currentFileLines, search.split('\n'));
+              if (!matchRange) {
+                throw new Error(
+                  `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).` +
+                    ` Re-read the file with <read_file path="${fp.path}" /> to get the exact current content, then copy the lines verbatim into your SEARCH block.`,
+                );
+              }
+              const matchedLine = currentFileLines[matchRange.start];
+              const targetIndent = matchedLine.match(/^([ \t]*)/)?.[1] || '';
+              const searchIndent = search.split('\n')[0].match(/^([ \t]*)/)?.[1] || '';
+              
+              const adjustedReplace = replace
+                .split('\n')
+                .map((line) => {
+                  if (line.startsWith(searchIndent)) {
+                    return targetIndent + line.substring(searchIndent.length);
+                  }
+                  return line;
+                })
+                .join('\n');
+
+              currentFileLines.splice(matchRange.start, matchRange.end - matchRange.start + 1, adjustedReplace);
+              fileContent = currentFileLines.join('\n');
+            }
+          }
+
+          const { accepted, checkpointId } = await confirmChangesWithDiff(
+            safePath,
+            fileContent,
+            path.basename(fp.path),
+            'replace',
+          );
+          if (!accepted) {
+            throw new Error(`User rejected patch edits for ${fp.path}.`);
+          }
+          let fileResult = `Patched ${fp.path} (${fp.patches.length} block(s) (+${addedLines}, -${subtractedLines}), Revert ID: ${checkpointId})`;
+          if (fileWarnings.length > 0) {
+            fileResult += `\n⚠️ SYNTAX WARNINGS:\n${fileWarnings.join('\n')}`;
+          }
+          results.push(fileResult);
+        }
+
+        let multiResult = results.join('\n');
+        return multiResult;
+      }
     }
 
     case 'update_agent_memory': {

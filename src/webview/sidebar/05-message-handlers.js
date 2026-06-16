@@ -2,7 +2,7 @@
 
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
-    if (role === 'system') {
+    if (role === 'system' || role === 'tool') {
       let innerText = text;
       const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
       const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
@@ -292,6 +292,18 @@
         }
         if (s.modelContextLengths !== undefined && modelContextLengthsInput) {
           modelContextLengthsInput.value = s.modelContextLengths ? JSON.stringify(s.modelContextLengths, null, 2) : '{}';
+        }
+        if (s.agentInputTokenBudget !== undefined && agentTokenBudgetInput) {
+          agentTokenBudgetInput.value = s.agentInputTokenBudget;
+        }
+        if (s.agentInputTokenHardMax !== undefined && agentTokenHardMaxInput) {
+          agentTokenHardMaxInput.value = s.agentInputTokenHardMax;
+        }
+        if (s.skillsEnabled !== undefined && skillsEnabledToggle) {
+          skillsEnabledToggle.checked = s.skillsEnabled;
+        }
+        if (s.maxSkillsToKeep !== undefined && maxSkillsInput) {
+          maxSkillsInput.value = s.maxSkillsToKeep;
         }
         if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
           maxToolOutputInput.value = s.maxToolOutputLength;

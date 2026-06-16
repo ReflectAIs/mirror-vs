@@ -289,7 +289,9 @@ export class AgentParser {
         startFrom = tagInfo.end;
       }
     }
-    if (earliestEnd !== -1) return closedText.substring(0, earliestEnd);
+    if (earliestEnd !== -1) {
+      return closedText.substring(0, earliestEnd);
+    }
     return closedText;
   }
 
@@ -815,35 +817,15 @@ export class AgentParser {
     if (candidates.length === 0) return [];
     candidates.sort((a, b) => a.index - b.index);
 
-    const readOnlyTools = [
-      'read_file',
-      'list_dir',
-      'grep_search',
-      'symbol_search',
-      'web_search',
-      'get_diagnostics',
-      'git_status',
-      'git_diff',
-    ];
-    const firstTool = candidates[0].tool;
-
-    if (allowParallelReadOnly && readOnlyTools.includes(firstTool.name)) {
-      const batch = candidates.filter((c) => readOnlyTools.includes(c.tool.name)).map((c) => c.tool);
-
-      // Deduplicate identical tool calls
-      const seen = new Set<string>();
-      const uniqueBatch: ToolCall[] = [];
-      for (const t of batch) {
-        const key = JSON.stringify(t);
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueBatch.push(t);
-        }
-      }
-      return uniqueBatch.slice(0, 5); // Max 5 parallel reads
+    if (candidates.length > 1) {
+      return [{
+        name: 'invalid_tool_mix' as any,
+        path: 'error',
+        content: 'Error: Multiple tool calls are not allowed in a single turn. To prevent incorrect assumptions and ensure file content is actually read first, you must call exactly ONE tool at a time and await its response before calling another.'
+      }];
     }
 
-    return [firstTool];
+    return [candidates[0].tool];
   }
 
   public formatToolStatus(

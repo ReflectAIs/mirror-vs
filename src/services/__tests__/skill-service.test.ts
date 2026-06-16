@@ -34,6 +34,12 @@ vi.mock('fs', () => {
     readFileSync: vi.fn((p: string) => {
       return memStore.get(p) || '';
     }),
+    statSync: vi.fn((p: string) => {
+      return { mtimeMs: Date.now() };
+    }),
+    unlinkSync: vi.fn((p: string) => {
+      memStore.delete(p);
+    }),
   };
 });
 

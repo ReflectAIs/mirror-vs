@@ -24,6 +24,7 @@ export function buildSystemPrompt(
   agentState: string = 'DISCOVERY',
   taskMode: TaskMode = TaskMode.IMPLEMENT,
   userRequest: string = '',
+  useNativeTools: boolean = false,
 ): string {
   const service = CommandService.getInstance();
   const terminals = service.getActiveTerminals();
@@ -149,7 +150,15 @@ export function buildSystemPrompt(
 
   let finalSpecs = toolSpecs;
   let guideOnlyPrompt = '';
-  if (detectGuideOnly(userRequest)) {
+  if (useNativeTools) {
+    // Native function calling: replace XML tool docs with a brief instruction
+    // This saves ~3K tokens per turn and prevents the model from generating XML tags
+    finalSpecs = `### TOOL CALLING PROTOCOL (NATIVE FUNCTION CALLING):
+- You have access to functions listed in the API tools schema.
+- Call EXACTLY ONE function per turn. Do NOT output any text content after a function call.
+- Do NOT wrap tool invocations in XML tags — use the native function calling format only.
+- Wait for the tool result before deciding your next action.`;
+  } else if (detectGuideOnly(userRequest)) {
     finalSpecs = '';
     guideOnlyPrompt = `\n\n${GUIDE_ONLY_DIRECTIVE}`;
   } else {

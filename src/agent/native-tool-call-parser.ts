@@ -207,8 +207,8 @@ export class NativeToolCallParser {
       case 'read_file':
         return {
           path: typeof args.path === 'string' ? args.path : typeof args.filePath === 'string' ? args.filePath : undefined,
-          start_line: typeof args.startLine === 'number' ? args.startLine : typeof args.offset === 'number' ? args.offset : undefined,
-          end_line: typeof args.endLine === 'number' ? args.endLine : typeof args.limit === 'number' ? (args.offset as number || 0) + args.limit : undefined,
+          start_line: typeof args.start_line === 'number' ? args.start_line : typeof args.startLine === 'number' ? args.startLine : typeof args.offset === 'number' ? args.offset : undefined,
+          end_line: typeof args.end_line === 'number' ? args.end_line : typeof args.endLine === 'number' ? args.endLine : typeof args.limit === 'number' ? (args.offset as number || 0) + args.limit : undefined,
         };
       case 'write_file':
         return {
@@ -223,7 +223,27 @@ export class NativeToolCallParser {
       case 'patch_file':
         return {
           path: typeof args.path === 'string' ? args.path : typeof args.filePath === 'string' ? args.filePath : undefined,
+          start_line: typeof args.start_line === 'number' ? args.start_line : typeof args.startLine === 'number' ? args.startLine : undefined,
+          end_line: typeof args.end_line === 'number' ? args.end_line : typeof args.endLine === 'number' ? args.endLine : undefined,
+          expected_search_content: typeof args.expected_search_content === 'string' ? args.expected_search_content : typeof args.expectedSearchContent === 'string' ? args.expectedSearchContent : undefined,
+          replace_content: typeof args.replace_content === 'string' ? args.replace_content : typeof args.replaceContent === 'string' ? args.replaceContent : undefined,
           chars: typeof args.patch === 'string' ? args.patch : typeof args.diff === 'string' ? args.diff : undefined,
+        };
+      case 'multi_patch_file':
+        return {
+          path: typeof args.path === 'string' ? args.path : typeof args.filePath === 'string' ? args.filePath : undefined,
+          patches: Array.isArray(args.patches)
+            ? args.patches.map((p) => {
+                if (typeof p !== 'object' || p === null) return p;
+                const item = p as any;
+                return {
+                  start_line: typeof item.start_line === 'number' ? item.start_line : typeof item.startLine === 'number' ? item.startLine : undefined,
+                  end_line: typeof item.end_line === 'number' ? item.end_line : typeof item.endLine === 'number' ? item.endLine : undefined,
+                  expected_search_content: typeof item.expected_search_content === 'string' ? item.expected_search_content : typeof item.expectedSearchContent === 'string' ? item.expectedSearchContent : undefined,
+                  replace_content: typeof item.replace_content === 'string' ? item.replace_content : typeof item.replaceContent === 'string' ? item.replaceContent : undefined,
+                };
+              })
+            : undefined,
         };
       case 'grep_search':
         return {
@@ -260,8 +280,8 @@ export class NativeToolCallParser {
         };
       case 'rename_file':
         return {
-          path: typeof args.oldPath === 'string' ? args.oldPath : typeof args.source === 'string' ? args.source : undefined,
-          text: typeof args.newPath === 'string' ? args.newPath : typeof args.destination === 'string' ? args.destination : undefined,
+          path: typeof args.source_path === 'string' ? args.source_path : typeof args.path === 'string' ? args.path : typeof args.oldPath === 'string' ? args.oldPath : typeof args.source === 'string' ? args.source : undefined,
+          content: typeof args.destination_path === 'string' ? args.destination_path : typeof args.text === 'string' ? args.text : typeof args.newPath === 'string' ? args.newPath : typeof args.destination === 'string' ? args.destination : undefined,
         };
       case 'git_commit':
         return {

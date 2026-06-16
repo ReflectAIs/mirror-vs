@@ -59,6 +59,16 @@ export interface ToolCall {
   start_line?: number;
   end_line?: number;
   chars?: string;
+  expected_search_content?: string;
+  replace_content?: string;
+  source_path?: string;
+  destination_path?: string;
+  patches?: Array<{
+    start_line: number;
+    end_line: number;
+    expected_search_content: string;
+    replace_content: string;
+  }>;
   script?: string;
   ms?: number;
   seconds?: number;

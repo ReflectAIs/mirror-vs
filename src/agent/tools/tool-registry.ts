@@ -18,6 +18,10 @@ export async function executeTool(
 ): Promise<string> {
   const name = tool.name;
 
+  if (name === 'invalid_tool_mix') {
+    throw new Error(tool.content || 'Invalid tool mix.');
+  }
+
   // Check plugin tools first (custom tools registered by extensions/users)
   const pluginService = PluginService.getInstance();
   if (pluginService.isPluginTool(name)) {

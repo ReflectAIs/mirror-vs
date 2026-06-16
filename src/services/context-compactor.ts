@@ -192,10 +192,11 @@ export function trimForContext(
   contextLength: number,
   reserveTokens: number = 512,
 ): ChatMessage[] {
+  const sanitized = sanitizeToolMessages(messages);
   const budget = contextLength - reserveTokens;
-  const used = estimateTokens(messages);
+  const used = estimateTokens(sanitized);
   if (used <= budget) {
-    return messages;
+    return sanitized;
   }
 
   // Separate system messages, protected messages, and conversation
@@ -299,7 +300,8 @@ export async function maybeCompact(
   contextLength: number,
   summarizeFn: (prompt: ChatMessage[]) => Promise<string>,
 ): Promise<{ compactedMessages: ChatMessage[]; wasCompacted: boolean }> {
-  const used = estimateTokens(messages);
+  const activeMessages = messages.filter((m) => !m.summarized);
+  const used = estimateTokens(activeMessages);
   const pct = contextLength ? used / contextLength : 0;
 
   if (pct < COMPACT_THRESHOLD) {
@@ -310,14 +312,25 @@ export async function maybeCompact(
   const systemMsgs: ChatMessage[] = [];
   const convoMsgs: ChatMessage[] = [];
   const existingSummaries: ChatMessage[] = [];
+  const alreadySummarized: ChatMessage[] = [];
 
   for (const msg of messages) {
     if (msg.role === 'system') {
-      if (msg.content && msg.content.includes('[Conversation summary')) {
+      if (msg.content && msg.content.startsWith('[Conversation summary')) {
         existingSummaries.push(msg);
+      } else if (msg.content && msg.content.includes('[Conversation summary')) {
+        // Merged system message
+        const summaryIndex = msg.content.indexOf('\n\n[Conversation summary');
+        const originalContent = msg.content.substring(0, summaryIndex);
+        const summaryContent = msg.content.substring(summaryIndex + 2); // skip newlines
+
+        existingSummaries.push({ role: 'system', content: summaryContent });
+        systemMsgs.push({ ...msg, content: originalContent });
       } else {
         systemMsgs.push(msg);
       }
+    } else if (msg.summarized) {
+      alreadySummarized.push(msg);
     } else {
       convoMsgs.push(msg);
     }
@@ -327,8 +340,24 @@ export async function maybeCompact(
     return { compactedMessages: messages, wasCompacted: false };
   }
 
-  // Split conversation: summarize older half, keep recent half
-  const splitPoint = Math.floor(convoMsgs.length / 2);
+  // Split conversation: summarize older half, keep recent half.
+  // Adjust splitPoint to avoid splitting between an assistant message with tool_calls and its corresponding tool results.
+  let splitPoint = Math.floor(convoMsgs.length / 2);
+  while (splitPoint < convoMsgs.length) {
+    const currentMsg = convoMsgs[splitPoint];
+    const isToolResult = currentMsg.role === 'tool' || 
+                         (currentMsg.role === 'system' && currentMsg.content && currentMsg.content.startsWith('[Tool Result for '));
+    
+    const prevMsg = splitPoint > 0 ? convoMsgs[splitPoint - 1] : null;
+    const prevHasToolCalls = prevMsg && prevMsg.role === 'assistant' && (prevMsg as any).tool_calls && (prevMsg as any).tool_calls.length > 0;
+    
+    if (isToolResult || prevHasToolCalls) {
+      splitPoint++;
+    } else {
+      break;
+    }
+  }
+
   const older = convoMsgs.slice(0, splitPoint);
   const recent = convoMsgs.slice(splitPoint);
 
@@ -356,14 +385,37 @@ export async function maybeCompact(
 
   try {
     const summary = await summarizeFn(summaryMessages);
-    const summaryMsg: ChatMessage = {
-      role: 'system',
-      content: `[Conversation summary — earlier messages were compacted]\n${summary}`,
-    };
-    (summaryMsg as any).compacted = true;
-    (summaryMsg as any).summarizedCount = splitPoint;
 
-    const compactedMessages = [...systemMsgs, summaryMsg, ...recent];
+    // To ensure compatibility across all API providers (many of which only support a single
+    // system message at the very beginning of the chat log), we merge the conversation
+    // summary directly into the primary system message (the system prompt) if it exists.
+    let compactedMessages: ChatMessage[];
+
+    // Mark older messages as summarized
+    const newlySummarized = older.map((msg) => ({
+      ...msg,
+      summarized: true,
+    }));
+
+    if (systemMsgs.length > 0) {
+      const primarySystemMsg = systemMsgs[0];
+      const summaryHeader = `\n\n[Conversation summary — earlier messages were compacted]\n${summary}`;
+      const mergedSystemMsg: ChatMessage = {
+        ...primarySystemMsg,
+        content: primarySystemMsg.content + summaryHeader,
+      };
+      (mergedSystemMsg as any).compacted = true;
+      (mergedSystemMsg as any).summarizedCount = splitPoint;
+      compactedMessages = [mergedSystemMsg, ...systemMsgs.slice(1), ...alreadySummarized, ...newlySummarized, ...recent];
+    } else {
+      const summaryMsg: ChatMessage = {
+        role: 'system',
+        content: `[Conversation summary — earlier messages were compacted]\n${summary}`,
+      };
+      (summaryMsg as any).compacted = true;
+      (summaryMsg as any).summarizedCount = splitPoint;
+      compactedMessages = [summaryMsg, ...alreadySummarized, ...newlySummarized, ...recent];
+    }
     return { compactedMessages, wasCompacted: true };
   } catch (error) {
     console.error('Compaction summary failed:', error);

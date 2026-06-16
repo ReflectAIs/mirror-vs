@@ -63,10 +63,9 @@ export class OpenRouterProvider extends BaseProvider {
     };
 
     if (tools && tools.length > 0) {
-      body.tools = tools.map((t) => ({
-        type: 'function',
-        function: t,
-      }));
+      // Tools are already in {type:'function', function:{...}} format from tool-schemas.ts
+      body.tools = tools;
+      body.tool_choice = 'auto';
     }
 
     const response = await this.httpPost(
@@ -84,6 +83,8 @@ export class OpenRouterProvider extends BaseProvider {
     let fullText = '';
     let usageInput = 0;
     let usageOutput = 0;
+    // Track in-progress tool calls: index → {id, name, args}
+    const toolCallBuffers = new Map<number, { id: string; name: string; args: string }>();
 
     for await (const chunk of sseStream) {
       try {
@@ -99,17 +100,26 @@ export class OpenRouterProvider extends BaseProvider {
         if (choice?.delta?.tool_calls) {
           for (const tc of choice.delta.tool_calls) {
             if (tc.index !== undefined) {
-              if (tc.id) {
+              if (!toolCallBuffers.has(tc.index)) {
+                toolCallBuffers.set(tc.index, {
+                  id: tc.id || `tc-${tc.index}`,
+                  name: tc.function?.name || '',
+                  args: '',
+                });
                 yield {
                   type: 'tool_call_start',
                   id: tc.id,
                   name: tc.function?.name || '',
                 };
               }
+              const buf = toolCallBuffers.get(tc.index)!;
+              if (tc.id) buf.id = tc.id;
+              if (tc.function?.name) buf.name = tc.function.name;
               if (tc.function?.arguments) {
+                buf.args += tc.function.arguments;
                 yield {
                   type: 'tool_call_delta',
-                  id: tc.id || `tc-${tc.index}`,
+                  id: buf.id,
                   delta: tc.function.arguments,
                 };
               }
@@ -124,6 +134,13 @@ export class OpenRouterProvider extends BaseProvider {
       } catch {
         // Skip
       }
+    }
+
+    // Emit tool_call_end with accumulated arguments for each buffered call
+    // Only emit the first one (one-tool-per-turn)
+    const firstBuf = toolCallBuffers.get(0);
+    if (firstBuf) {
+      yield { type: 'tool_call_end', id: firstBuf.id, arguments: firstBuf.args, name: firstBuf.name };
     }
 
     if (usageInput > 0 || usageOutput > 0) {

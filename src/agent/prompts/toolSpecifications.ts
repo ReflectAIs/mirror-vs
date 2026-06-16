@@ -54,30 +54,32 @@ CRITICAL subsequent turn rule:
 3. WRITE FILE (Overwrites whole file):
    <write_file path="relative/path/to/existing_file.ts">content here</write_file>
 4. PATCH FILE (For modifying existing files):
-   <patch_file path="relative/path/to/existing_file.ts">
+    <patch_file path="relative/path/to/existing_file.ts">
 <<<<<<< SEARCH
 [exact original lines]
 =======
 [new replacement lines]
 >>>>>>> REPLACE
 </patch_file>
+    **CRITICAL PATCHING RULE**: Never output any conflict markers like \`<<<<<<< SEARCH\`, \`=======\`, or \`>>>>>>> REPLACE\` *inside* the replacement content of the file. Those lines are delimiters *only* to separate search and replace blocks. If you write them inside the file, they will be left in the code as syntax errors.
 5. MULTI PATCH FILE (For modifying multiple existing files in a single turn):
-   <multi_patch_file>
-   <file path="relative/path/to/file1.ts">
+    <multi_patch_file>
+    <file path="relative/path/to/file1.ts">
 <<<<<<< SEARCH
 [exact original lines in file1]
 =======
 [new replacement lines in file1]
 >>>>>>> REPLACE
-   </file>
-   <file path="relative/path/to/file2.ts">
+    </file>
+    <file path="relative/path/to/file2.ts">
 <<<<<<< SEARCH
 [exact original lines in file2]
 =======
 [new replacement lines in file2]
 >>>>>>> REPLACE
-   </file>
-   </multi_patch_file>
+    </file>
+    </multi_patch_file>
+    **CRITICAL MULTI-PATCHING RULE**: Never output any conflict markers like \`<<<<<<< SEARCH\`, \`=======\`, or \`>>>>>>> REPLACE\` *inside* the replacement content of the file. Those lines are delimiters *only* to separate search and replace blocks. If you write them inside the file, they will be left in the code as syntax errors.
 6. LIST DIRECTORY: <list_dir path="relative/path/to/directory" />
 6. GREP SEARCH (full workspace): <grep_search query="pattern" />
    GREP SEARCH (scoped to directory): <grep_search query="pattern" path="src/screens" />

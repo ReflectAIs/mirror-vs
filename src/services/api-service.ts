@@ -122,7 +122,7 @@ export function streamOllamaChat(
     port: parsedUrl.port || (isHttps ? 443 : 80),
     path: parsedUrl.pathname,
     method: 'POST',
-    timeout: 120000, // 120 second timeout for local processing
+    timeout: 180000, // 180 second timeout for local processing
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(bodyData),
@@ -241,6 +241,15 @@ export function streamOllamaChat(
 }
 
 /**
+ * Accumulated state for a single in-progress native tool call during streaming.
+ */
+interface NativeToolCallAccumulator {
+  id: string;
+  name: string;
+  argumentsBuffer: string;
+}
+
+/**
  * Streams a chat completion response from DeepSeek API.
  */
 export function streamDeepSeekChat(
@@ -252,6 +261,9 @@ export function streamDeepSeekChat(
   onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
   onError: (err: any) => void,
   onReasoningChunk?: (text: string) => void,
+  tools?: object[],
+  onNativeToolCall?: (id: string, name: string, argsJson: string) => void,
+  onToolCallStart?: (name: string) => void,
 ): void {
   const urlStr = 'https://api.deepseek.com/chat/completions';
   const parsedUrl = new URL(urlStr);
@@ -282,7 +294,13 @@ export function streamDeepSeekChat(
     },
   };
 
-  if (thinkingEnabled) {
+  // Attach tool schemas for native function calling (mutually exclusive with thinking)
+  if (tools && tools.length > 0 && onNativeToolCall) {
+    payload.tools = tools;
+    payload.tool_choice = 'auto';
+    // DeepSeek does not support thinking when tools are active
+    payload.thinking = { type: 'disabled' };
+  } else if (thinkingEnabled) {
     payload.reasoning_effort = thinkingLevel;
     payload.thinking = {
       type: 'enabled',
@@ -300,7 +318,7 @@ export function streamDeepSeekChat(
     port: 443,
     path: parsedUrl.pathname,
     method: 'POST',
-    timeout: 60000, // 60 second timeout
+    timeout: 180000, // 180 second timeout
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
@@ -328,6 +346,8 @@ export function streamDeepSeekChat(
     let fullText = '';
     let buffer = '';
     let usage: { promptTokens: number; completionTokens: number } | undefined = undefined;
+    // Native tool call accumulation: index → accumulator
+    const nativeToolCalls = new Map<number, NativeToolCallAccumulator>();
 
     res.on('data', (chunk) => {
       if (deepseekCompleted) return;
@@ -343,6 +363,14 @@ export function streamDeepSeekChat(
 
         if (cleanLine === 'data: [DONE]') {
           deepseekCompleted = true;
+          // Fire accumulated native tool calls before completing
+          if (onNativeToolCall && nativeToolCalls.size > 0) {
+            // Only take the first tool call (one-tool-per-turn policy)
+            const first = nativeToolCalls.get(0);
+            if (first) {
+              onNativeToolCall(first.id, first.name, first.argumentsBuffer);
+            }
+          }
           onComplete(fullText, usage);
           return;
         }
@@ -360,6 +388,36 @@ export function streamDeepSeekChat(
               fullText += chunkText;
               onChunk(chunkText);
             }
+            // Accumulate native tool call delta chunks
+            const toolCallDeltas = parsed.choices?.[0]?.delta?.tool_calls;
+            if (toolCallDeltas && Array.isArray(toolCallDeltas) && onNativeToolCall) {
+              for (const delta of toolCallDeltas) {
+                const idx: number = delta.index ?? 0;
+                if (!nativeToolCalls.has(idx)) {
+                  nativeToolCalls.set(idx, {
+                    id: delta.id || `call_${idx}`,
+                    name: delta.function?.name || '',
+                    argumentsBuffer: '',
+                  });
+                  if (delta.function?.name && onToolCallStart) {
+                    onToolCallStart(delta.function.name);
+                  }
+                } else {
+                  const acc = nativeToolCalls.get(idx)!;
+                  if (delta.id) acc.id = delta.id;
+                  if (delta.function?.name) {
+                    acc.name = delta.function.name;
+                    if (onToolCallStart) {
+                      onToolCallStart(delta.function.name);
+                    }
+                  }
+                }
+                const acc = nativeToolCalls.get(idx);
+                if (acc && delta.function?.arguments) {
+                  acc.argumentsBuffer += delta.function.arguments;
+                }
+              }
+            }
             if (parsed.usage) {
               usage = {
                 promptTokens: parsed.usage.prompt_tokens,
@@ -376,6 +434,13 @@ export function streamDeepSeekChat(
     res.on('end', () => {
       if (deepseekCompleted) return;
       deepseekCompleted = true;
+      // Fire accumulated native tool calls on stream end
+      if (onNativeToolCall && nativeToolCalls.size > 0) {
+        const first = nativeToolCalls.get(0);
+        if (first) {
+          onNativeToolCall(first.id, first.name, first.argumentsBuffer);
+        }
+      }
       onComplete(fullText, usage);
     });
   });
@@ -428,6 +493,9 @@ export function streamCustomOpenAIChat(
   onChunk: (text: string) => void,
   onComplete: (fullText: string, usage?: { promptTokens: number; completionTokens: number }) => void,
   onError: (err: any) => void,
+  tools?: object[],
+  onNativeToolCall?: (id: string, name: string, argsJson: string) => void,
+  onToolCallStart?: (name: string) => void,
 ): void {
   let urlStr = baseUrl.replace(/\/$/, '');
   if (!urlStr.includes('/chat/completions')) {
@@ -450,7 +518,7 @@ export function streamCustomOpenAIChat(
     };
   });
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     model,
     messages: sanitizedMessages,
     stream: true,
@@ -458,6 +526,12 @@ export function streamCustomOpenAIChat(
       include_usage: true,
     },
   };
+
+  // Attach tool schemas for native function calling if provided
+  if (tools && tools.length > 0 && onNativeToolCall) {
+    payload.tools = tools;
+    payload.tool_choice = 'auto';
+  }
 
   const bodyData = JSON.stringify(payload);
 
@@ -475,7 +549,7 @@ export function streamCustomOpenAIChat(
     port: parsedUrl.port || (isHttps ? 443 : 80),
     path: parsedUrl.pathname + parsedUrl.search,
     method: 'POST',
-    timeout: 60000,
+    timeout: 180000,
     headers,
   };
 
@@ -499,6 +573,8 @@ export function streamCustomOpenAIChat(
     let fullText = '';
     let buffer = '';
     let usage: { promptTokens: number; completionTokens: number } | undefined = undefined;
+    // Native tool call accumulation: index → accumulator
+    const nativeToolCalls = new Map<number, NativeToolCallAccumulator>();
 
     res.on('data', (chunk) => {
       if (completed) return;
@@ -514,6 +590,13 @@ export function streamCustomOpenAIChat(
 
         if (cleanLine === 'data: [DONE]') {
           completed = true;
+          // Fire accumulated native tool calls before completing
+          if (onNativeToolCall && nativeToolCalls.size > 0) {
+            const first = nativeToolCalls.get(0);
+            if (first) {
+              onNativeToolCall(first.id, first.name, first.argumentsBuffer);
+            }
+          }
           onComplete(fullText, usage);
           return;
         }
@@ -526,6 +609,36 @@ export function streamCustomOpenAIChat(
             if (chunkText) {
               fullText += chunkText;
               onChunk(chunkText);
+            }
+            // Accumulate native tool call delta chunks
+            const toolCallDeltas = parsed.choices?.[0]?.delta?.tool_calls;
+            if (toolCallDeltas && Array.isArray(toolCallDeltas) && onNativeToolCall) {
+              for (const delta of toolCallDeltas) {
+                const idx: number = delta.index ?? 0;
+                if (!nativeToolCalls.has(idx)) {
+                  nativeToolCalls.set(idx, {
+                    id: delta.id || `call_${idx}`,
+                    name: delta.function?.name || '',
+                    argumentsBuffer: '',
+                  });
+                  if (delta.function?.name && onToolCallStart) {
+                    onToolCallStart(delta.function.name);
+                  }
+                } else {
+                  const acc = nativeToolCalls.get(idx)!;
+                  if (delta.id) acc.id = delta.id;
+                  if (delta.function?.name) {
+                    acc.name = delta.function.name;
+                    if (onToolCallStart) {
+                      onToolCallStart(delta.function.name);
+                    }
+                  }
+                }
+                const acc = nativeToolCalls.get(idx);
+                if (acc && delta.function?.arguments) {
+                  acc.argumentsBuffer += delta.function.arguments;
+                }
+              }
             }
             if (parsed.usage) {
               usage = {
@@ -543,6 +656,13 @@ export function streamCustomOpenAIChat(
     res.on('end', () => {
       if (completed) return;
       completed = true;
+      // Fire accumulated native tool calls on stream end
+      if (onNativeToolCall && nativeToolCalls.size > 0) {
+        const first = nativeToolCalls.get(0);
+        if (first) {
+          onNativeToolCall(first.id, first.name, first.argumentsBuffer);
+        }
+      }
       onComplete(fullText, usage);
     });
   });

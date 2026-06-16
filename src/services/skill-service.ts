@@ -31,12 +31,69 @@ function getSkillsDir(): string | null {
   return dir;
 }
 
+function pruneSkills(dir: string, maxKeep: number): void {
+  try {
+    const files = fs.readdirSync(dir);
+    const jsonFiles = files
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => {
+        const filePath = path.join(dir, f);
+        return {
+          filename: f,
+          filePath,
+          mtime: fs.statSync(filePath).mtimeMs,
+        };
+      });
+
+    if (jsonFiles.length <= maxKeep) return;
+
+    // Sort oldest first
+    jsonFiles.sort((a, b) => a.mtime - b.mtime);
+
+    const toDeleteCount = jsonFiles.length - maxKeep;
+    for (let i = 0; i < toDeleteCount; i++) {
+      const item = jsonFiles[i];
+      try {
+        fs.unlinkSync(item.filePath);
+        const mdPath = item.filePath.replace(/\.json$/, '.md');
+        if (fs.existsSync(mdPath)) {
+          fs.unlinkSync(mdPath);
+        }
+      } catch (e) {
+        console.error(`Failed to delete pruned skill file ${item.filename}:`, e);
+      }
+    }
+  } catch (err) {
+    console.error('Error during pruning skills:', err);
+  }
+}
+
 /**
  * Persist a new skill to the workspace memory.
  */
 export function addSkill(skill: Skill): void {
+  let skillsEnabled = true;
+  let maxKeep = 20;
+  let budget = 6000;
+  
+  try {
+    if (vscode && vscode.workspace && typeof vscode.workspace.getConfiguration === 'function') {
+      const config = vscode.workspace.getConfiguration('mirror-vs');
+      skillsEnabled = config.get<boolean>('skillsEnabled', true);
+      maxKeep = config.get<number>('maxSkillsToKeep', 20);
+      budget = config.get<number>('agentInputTokenBudget', 6000);
+    }
+  } catch {
+    // Ignore in unit test environments
+  }
+
+  if (!skillsEnabled) return;
+
   const dir = getSkillsDir();
   if (!dir) return;
+
+  // Prune first if we are going to exceed limit
+  pruneSkills(dir, maxKeep - 1);
 
   const content = [
     `# Skill: ${skill.name}`,
@@ -75,8 +132,6 @@ export function addSkill(skill: Skill): void {
         type: 'updateSkills',
         skills: allSkills,
       });
-      const config = vscode.workspace.getConfiguration('mirror-vs');
-      const budget = config.get<number>('agentInputTokenBudget', 6000);
       MirrorVsSidebarProvider.postToActive?.({
         type: 'dashboardStats',
         budget,
@@ -186,6 +241,17 @@ export function formatSkillMarkdown(skill: Skill): string {
  * Inject task-relevant skills into the prompt history as a protected system notice.
  */
 export function injectRelevantSkills(messages: ChatMessage[], userRequest: string): ChatMessage[] {
+  let skillsEnabled = true;
+  try {
+    if (vscode && vscode.workspace && typeof vscode.workspace.getConfiguration === 'function') {
+      const config = vscode.workspace.getConfiguration('mirror-vs');
+      skillsEnabled = config.get<boolean>('skillsEnabled', true);
+    }
+  } catch {
+    // Ignore in unit test environments
+  }
+  if (!skillsEnabled) return messages;
+
   const relevant = getSkillsForTask(userRequest);
   if (relevant.length === 0) return messages;
 

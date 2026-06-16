@@ -388,6 +388,18 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               if ((data as any).modelContextLengths !== undefined) {
                 await config.update('modelContextLengths', (data as any).modelContextLengths, vscode.ConfigurationTarget.Global);
               }
+              if ((data as any).agentInputTokenBudget !== undefined) {
+                await config.update('agentInputTokenBudget', (data as any).agentInputTokenBudget, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).agentInputTokenHardMax !== undefined) {
+                await config.update('agentInputTokenHardMax', (data as any).agentInputTokenHardMax, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).skillsEnabled !== undefined) {
+                await config.update('skillsEnabled', (data as any).skillsEnabled, vscode.ConfigurationTarget.Global);
+              }
+              if ((data as any).maxSkillsToKeep !== undefined) {
+                await config.update('maxSkillsToKeep', (data as any).maxSkillsToKeep, vscode.ConfigurationTarget.Global);
+              }
 
               vscode.window.showInformationMessage('Mirror VS Settings saved successfully!');
               await this._sendSettingsToWebview();
@@ -1238,6 +1250,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const defaultOllamaModel = config.get<string>('defaultOllamaModel', 'llama3');
     const defaultDeepSeekModel = config.get<string>('defaultDeepSeekModel', 'deepseek-v4-pro');
     const contextBudgetPercent = config.get<number>('contextBudgetPercent', 75);
+    const agentInputTokenBudget = config.get<number>('agentInputTokenBudget', 6000);
+    const agentInputTokenHardMax = config.get<number>('agentInputTokenHardMax', 200000);
+    const skillsEnabled = config.get<boolean>('skillsEnabled', true);
+    const maxSkillsToKeep = config.get<number>('maxSkillsToKeep', 20);
     const turnsToRetain = config.get<number>('turnsToRetain', 6);
     const deepSeekThinking = config.get<boolean>('deepSeekThinking', true);
     const deepSeekThinkingLevel = config.get<'high' | 'max'>('deepSeekThinkingLevel', 'high');
@@ -1322,6 +1338,10 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       hasOpenRouterKey,
       hasLiteLlmKey,
       modelContextLengths: config.get<Record<string, number>>('modelContextLengths', {}),
+      agentInputTokenBudget,
+      agentInputTokenHardMax,
+      skillsEnabled,
+      maxSkillsToKeep,
     } as any;
 
     this._view.webview.postMessage({

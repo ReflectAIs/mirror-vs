@@ -61,6 +61,10 @@ export interface ExtensionSettings {
   hasOpenRouterKey?: boolean;
   hasLiteLlmKey?: boolean;
   modelContextLengths?: Record<string, number>;
+  agentInputTokenBudget?: number;
+  agentInputTokenHardMax?: number;
+  skillsEnabled?: boolean;
+  maxSkillsToKeep?: number;
 }
 
 export interface ChatMessage {
@@ -138,6 +142,10 @@ export type WebviewToExtensionMessage =
       customSystemPrompt?: string;
       customApis?: CustomApi[];
       customApiKeys?: Record<string, string>;
+      agentInputTokenBudget?: number;
+      agentInputTokenHardMax?: number;
+      skillsEnabled?: boolean;
+      maxSkillsToKeep?: number;
     }
   | { type: 'fetchModels' }
   | { type: 'validateHost'; host: string }

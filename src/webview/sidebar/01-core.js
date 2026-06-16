@@ -31,7 +31,11 @@
   const figmaKeyInput = document.getElementById('figma-key');
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
+  const agentTokenBudgetInput = document.getElementById('agent-token-budget-input');
+  const agentTokenHardMaxInput = document.getElementById('agent-token-hardmax-input');
   const modelContextLengthsInput = document.getElementById('model-context-lengths-input');
+  const skillsEnabledToggle = document.getElementById('settings-skills-enabled-toggle');
+  const maxSkillsInput = document.getElementById('settings-max-skills-input');
   
   const planFirstToggle = document.getElementById('settings-plan-first-toggle');
   const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');

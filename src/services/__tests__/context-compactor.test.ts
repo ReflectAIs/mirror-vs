@@ -114,8 +114,9 @@ describe('Context Compactor Service', () => {
       const { compactedMessages, wasCompacted } = await maybeCompact(messages, 300, mockSummarize);
       expect(wasCompacted).toBe(true);
       expect(mockSummarize).toHaveBeenCalled();
-      expect(compactedMessages[1].role).toBe('system');
-      expect(compactedMessages[1].content).toContain('Mock conversation summary text.');
+      expect(compactedMessages[0].role).toBe('system');
+      expect(compactedMessages[0].content).toContain('sys');
+      expect(compactedMessages[0].content).toContain('Mock conversation summary text.');
     });
 
     it('should consolidate old summaries when doing a subsequent compaction', async () => {
@@ -135,12 +136,39 @@ describe('Context Compactor Service', () => {
       // Ensure the old summary is replaced and not present, leaving exactly one summary
       const summaryMessages = compactedMessages.filter(m => m.role === 'system' && m.content.includes('[Conversation summary'));
       expect(summaryMessages).toHaveLength(1);
+      expect(summaryMessages[0].content).toContain('sys');
       expect(summaryMessages[0].content).toContain('Consolidated summary text.');
 
       // Check the prompt passed to summarizeFn contained the old summary
       const callArg = mockSummarize.mock.calls[0][0];
       const userMessage = callArg.find((m: any) => m.role === 'user');
       expect(userMessage.content).toContain('Old summary here');
+    });
+
+    it('should retain older messages in compactedMessages and flag them with summarized: true', async () => {
+      const messages: ChatMessage[] = [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'a'.repeat(200) },
+        { role: 'assistant', content: 'b'.repeat(200) },
+        { role: 'user', content: 'c'.repeat(200) },
+        { role: 'assistant', content: 'd'.repeat(200) },
+      ];
+
+      const mockSummarize = vi.fn().mockResolvedValue('Summary');
+      const { compactedMessages, wasCompacted } = await maybeCompact(messages, 200, mockSummarize);
+      expect(wasCompacted).toBe(true);
+
+      // It should keep the older messages (first two: 'a' and 'b') marked as summarized
+      const summarized = compactedMessages.filter(m => m.summarized);
+      expect(summarized).toHaveLength(2);
+      expect(summarized[0].content).toContain('a');
+      expect(summarized[1].content).toContain('b');
+
+      // The recent messages (last two: 'c' and 'd') should NOT be marked as summarized
+      const active = compactedMessages.filter(m => m.role !== 'system' && !m.summarized);
+      expect(active).toHaveLength(2);
+      expect(active[0].content).toContain('c');
+      expect(active[1].content).toContain('d');
     });
   });
 });

@@ -33,6 +33,8 @@ export class AgentCompleter {
     _sessionId: string,
     abortController: AbortController,
     workspaceRoot?: string,
+    tools?: object[],
+    onNativeToolCall?: (id: string, name: string, argsJson: string) => void,
   ): Promise<string> {
     const startTime = performance.now();
 
@@ -167,6 +169,16 @@ export class AgentCompleter {
         return;
       }
 
+      const onToolCallStart = (name: string) => {
+        this._postMessage({
+          type: 'toolStatus',
+          toolName: name,
+          status: 'running',
+          target: '',
+          sessionId: _sessionId,
+        });
+      };
+
       if (provider === 'deepseek') {
         streamDeepSeekChat(
           apiKey,
@@ -177,9 +189,24 @@ export class AgentCompleter {
           onComplete,
           onError,
           onReasoningChunk,
+          tools,
+          onNativeToolCall,
+          onToolCallStart,
         );
       } else if (provider === 'custom' || (typeof provider === 'string' && provider.startsWith('custom_'))) {
-        streamCustomOpenAIChat(host, apiKey, model, messages, abortController.signal, onChunk, onComplete, onError);
+        streamCustomOpenAIChat(
+          host,
+          apiKey,
+          model,
+          messages,
+          abortController.signal,
+          onChunk,
+          onComplete,
+          onError,
+          tools,
+          onNativeToolCall,
+          onToolCallStart,
+        );
       } else if (provider === 'gemini' || provider === 'openrouter' || provider === 'litellm') {
         (async () => {
           try {
@@ -197,13 +224,19 @@ export class AgentCompleter {
               model,
             });
 
-            const mappedMessages = messages.map((m) => ({
-              role: m.role as 'system' | 'user' | 'assistant' | 'tool',
-              content: m.content,
-              images: m.images,
-            }));
+            const mappedMessages = messages.map((m: any) => {
+              const mapped: any = {
+                role: m.role as 'system' | 'user' | 'assistant' | 'tool',
+                content: m.content,
+                images: m.images,
+              };
+              // Preserve native tool calling fields
+              if (m.tool_call_id) mapped.tool_call_id = m.tool_call_id;
+              if (m.tool_calls) mapped.tool_calls = m.tool_calls;
+              return mapped;
+            });
 
-            const generator = providerInstance.streamChat(mappedMessages, abortController.signal);
+            const generator = providerInstance.streamChat(mappedMessages, abortController.signal, tools);
             let fullText = '';
             let inputTokens = 0;
             let outputTokens = 0;
@@ -217,6 +250,11 @@ export class AgentCompleter {
               } else if (chunk.type === 'usage') {
                 if (chunk.inputTokens) inputTokens = chunk.inputTokens;
                 if (chunk.outputTokens) outputTokens = chunk.outputTokens;
+              } else if (chunk.type === 'tool_call_start' && chunk.name) {
+                onToolCallStart(chunk.name);
+              } else if (chunk.type === 'tool_call_end' && chunk.arguments !== undefined && chunk.name && onNativeToolCall) {
+                // Native tool call complete — forward to orchestrator
+                onNativeToolCall(chunk.id || 'call_0', chunk.name, chunk.arguments);
               }
             }
 

@@ -31,7 +31,11 @@
   const figmaKeyInput = document.getElementById('figma-key');
   const contextBudgetInput = document.getElementById('context-budget-input');
   const turnsToRetainInput = document.getElementById('turns-to-retain-input');
+  const agentTokenBudgetInput = document.getElementById('agent-token-budget-input');
+  const agentTokenHardMaxInput = document.getElementById('agent-token-hardmax-input');
   const modelContextLengthsInput = document.getElementById('model-context-lengths-input');
+  const skillsEnabledToggle = document.getElementById('settings-skills-enabled-toggle');
+  const maxSkillsInput = document.getElementById('settings-max-skills-input');
   
   const planFirstToggle = document.getElementById('settings-plan-first-toggle');
   const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');
@@ -754,6 +758,11 @@
       }
     }
 
+    const agentInputTokenBudget = agentTokenBudgetInput ? parseInt(agentTokenBudgetInput.value.trim(), 10) : 6000;
+    const agentInputTokenHardMax = agentTokenHardMaxInput ? parseInt(agentTokenHardMaxInput.value.trim(), 10) : 200000;
+    const skillsEnabled = skillsEnabledToggle ? skillsEnabledToggle.checked : true;
+    const maxSkillsToKeep = maxSkillsInput ? parseInt(maxSkillsInput.value.trim(), 10) : 20;
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -784,6 +793,10 @@
       customApis: customApisList,
       customApiKeys: customApiKeysData,
       modelContextLengths,
+      agentInputTokenBudget,
+      agentInputTokenHardMax,
+      skillsEnabled,
+      maxSkillsToKeep,
     });
   }
 
@@ -1001,6 +1014,23 @@
     const teacherModelInput = document.getElementById('settings-teacher-model-input');
     const teacherModel = teacherModelInput ? teacherModelInput.value.trim() : 'deepseek-v4-pro';
 
+    let modelContextLengths = {};
+    if (modelContextLengthsInput) {
+      try {
+        const val = modelContextLengthsInput.value.trim();
+        if (val) {
+          modelContextLengths = JSON.parse(val);
+        }
+      } catch (e) {
+        console.error('Invalid JSON for model context lengths:', e);
+      }
+    }
+
+    const agentInputTokenBudget = agentTokenBudgetInput ? parseInt(agentTokenBudgetInput.value.trim(), 10) : 6000;
+    const agentInputTokenHardMax = agentTokenHardMaxInput ? parseInt(agentTokenHardMaxInput.value.trim(), 10) : 200000;
+    const skillsEnabled = skillsEnabledToggle ? skillsEnabledToggle.checked : true;
+    const maxSkillsToKeep = maxSkillsInput ? parseInt(maxSkillsInput.value.trim(), 10) : 20;
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -1034,6 +1064,11 @@
       customApiKeys: customApiKeysData,
       teacherEnabled,
       teacherModel,
+      modelContextLengths,
+      agentInputTokenBudget,
+      agentInputTokenHardMax,
+      skillsEnabled,
+      maxSkillsToKeep,
     });
 
     settingsDrawer.classList.add('collapsed');
@@ -1924,9 +1959,25 @@ function attachImage(base64) {
     const header = document.createElement('div');
     header.className = 'tool-card-header';
     if (status === 'running') {
+      let runFriendlyName = 'Working...';
+      if (toolName === 'read_file') runFriendlyName = 'Reading';
+      else if (toolName === 'list_dir') runFriendlyName = 'Listing';
+      else if (toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file' || toolName === 'create_file') runFriendlyName = 'Editing';
+      else if (toolName === 'delete_file') runFriendlyName = 'Deleting';
+      else if (toolName === 'grep_search') runFriendlyName = 'Searching';
+      else if (toolName === 'run_command') runFriendlyName = 'Running';
+
+      const runIconHtml = (toolName === 'run_command') ? '💻' : 
+                          (toolName === 'grep_search') ? '🔍' : 
+                          getFileIcon(target);
+
+      const runDisplayTarget = target ? (target.includes('/') || target.includes('\\') ? target.split(/[/\\]/).pop() : target) : '';
+
       header.innerHTML = `
         <div class="tool-info">
-          <span class="tool-name" style="color: var(--text-secondary); font-style: italic;">Working...</span>
+          <span class="tool-name" style="color: var(--text-secondary); font-style: italic;">${runFriendlyName}...</span>
+          ${runIconHtml ? `<span class="tool-icon-wrapper">${runIconHtml}</span>` : ''}
+          ${runDisplayTarget ? `<span class="tool-target">${runDisplayTarget}</span>` : ''}
         </div>
       `;
     } else {
@@ -2377,7 +2428,7 @@ function attachImage(base64) {
 
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
-    if (role === 'system') {
+    if (role === 'system' || role === 'tool') {
       let innerText = text;
       const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
       const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
@@ -2667,6 +2718,18 @@ function attachImage(base64) {
         }
         if (s.modelContextLengths !== undefined && modelContextLengthsInput) {
           modelContextLengthsInput.value = s.modelContextLengths ? JSON.stringify(s.modelContextLengths, null, 2) : '{}';
+        }
+        if (s.agentInputTokenBudget !== undefined && agentTokenBudgetInput) {
+          agentTokenBudgetInput.value = s.agentInputTokenBudget;
+        }
+        if (s.agentInputTokenHardMax !== undefined && agentTokenHardMaxInput) {
+          agentTokenHardMaxInput.value = s.agentInputTokenHardMax;
+        }
+        if (s.skillsEnabled !== undefined && skillsEnabledToggle) {
+          skillsEnabledToggle.checked = s.skillsEnabled;
+        }
+        if (s.maxSkillsToKeep !== undefined && maxSkillsInput) {
+          maxSkillsInput.value = s.maxSkillsToKeep;
         }
         if (s.maxToolOutputLength !== undefined && maxToolOutputInput) {
           maxToolOutputInput.value = s.maxToolOutputLength;

@@ -106,9 +106,25 @@
     const header = document.createElement('div');
     header.className = 'tool-card-header';
     if (status === 'running') {
+      let runFriendlyName = 'Working...';
+      if (toolName === 'read_file') runFriendlyName = 'Reading';
+      else if (toolName === 'list_dir') runFriendlyName = 'Listing';
+      else if (toolName === 'write_file' || toolName === 'patch_file' || toolName === 'multi_patch_file' || toolName === 'multipatch_file' || toolName === 'create_file') runFriendlyName = 'Editing';
+      else if (toolName === 'delete_file') runFriendlyName = 'Deleting';
+      else if (toolName === 'grep_search') runFriendlyName = 'Searching';
+      else if (toolName === 'run_command') runFriendlyName = 'Running';
+
+      const runIconHtml = (toolName === 'run_command') ? '💻' : 
+                          (toolName === 'grep_search') ? '🔍' : 
+                          getFileIcon(target);
+
+      const runDisplayTarget = target ? (target.includes('/') || target.includes('\\') ? target.split(/[/\\]/).pop() : target) : '';
+
       header.innerHTML = `
         <div class="tool-info">
-          <span class="tool-name" style="color: var(--text-secondary); font-style: italic;">Working...</span>
+          <span class="tool-name" style="color: var(--text-secondary); font-style: italic;">${runFriendlyName}...</span>
+          ${runIconHtml ? `<span class="tool-icon-wrapper">${runIconHtml}</span>` : ''}
+          ${runDisplayTarget ? `<span class="tool-target">${runDisplayTarget}</span>` : ''}
         </div>
       `;
     } else {

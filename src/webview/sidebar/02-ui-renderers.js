@@ -352,6 +352,11 @@
       }
     }
 
+    const agentInputTokenBudget = agentTokenBudgetInput ? parseInt(agentTokenBudgetInput.value.trim(), 10) : 6000;
+    const agentInputTokenHardMax = agentTokenHardMaxInput ? parseInt(agentTokenHardMaxInput.value.trim(), 10) : 200000;
+    const skillsEnabled = skillsEnabledToggle ? skillsEnabledToggle.checked : true;
+    const maxSkillsToKeep = maxSkillsInput ? parseInt(maxSkillsInput.value.trim(), 10) : 20;
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -382,6 +387,10 @@
       customApis: customApisList,
       customApiKeys: customApiKeysData,
       modelContextLengths,
+      agentInputTokenBudget,
+      agentInputTokenHardMax,
+      skillsEnabled,
+      maxSkillsToKeep,
     });
   }
 
@@ -599,6 +608,23 @@
     const teacherModelInput = document.getElementById('settings-teacher-model-input');
     const teacherModel = teacherModelInput ? teacherModelInput.value.trim() : 'deepseek-v4-pro';
 
+    let modelContextLengths = {};
+    if (modelContextLengthsInput) {
+      try {
+        const val = modelContextLengthsInput.value.trim();
+        if (val) {
+          modelContextLengths = JSON.parse(val);
+        }
+      } catch (e) {
+        console.error('Invalid JSON for model context lengths:', e);
+      }
+    }
+
+    const agentInputTokenBudget = agentTokenBudgetInput ? parseInt(agentTokenBudgetInput.value.trim(), 10) : 6000;
+    const agentInputTokenHardMax = agentTokenHardMaxInput ? parseInt(agentTokenHardMaxInput.value.trim(), 10) : 200000;
+    const skillsEnabled = skillsEnabledToggle ? skillsEnabledToggle.checked : true;
+    const maxSkillsToKeep = maxSkillsInput ? parseInt(maxSkillsInput.value.trim(), 10) : 20;
+
     vscode.postMessage({
       type: 'saveSettings',
       provider,
@@ -632,6 +658,11 @@
       customApiKeys: customApiKeysData,
       teacherEnabled,
       teacherModel,
+      modelContextLengths,
+      agentInputTokenBudget,
+      agentInputTokenHardMax,
+      skillsEnabled,
+      maxSkillsToKeep,
     });
 
     settingsDrawer.classList.add('collapsed');
