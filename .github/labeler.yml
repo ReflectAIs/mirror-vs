@@ -1,0 +1,49 @@
+# Auto-label PRs by changed paths
+# https://github.com/actions/labeler
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/webview/**/*
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/agent/**/*
+          - src/services/**/*
+          - src/providers/**/*
+          - src/extension.ts
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - '**/docs/**'
+
+tooling:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**/*
+          - esbuild.js
+          - package.json
+          - tsconfig.json
+          - vitest.config.ts
+          - .eslintrc.json
+          - .prettierrc
+
+agent:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/agent/**/*
+
+provider:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/services/providers/**/*
+
+ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/webview/**/*
+          - '**/*.css'
+          - '**/*.html'

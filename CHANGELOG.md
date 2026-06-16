@@ -3,6 +3,16 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.6] - 2025-06-13
+
+### Added
+- **Max Project Map Lines Setting**: New UI control in settings for configuring `mirror-vs.maxProjectMapLines` (default 250, range 10-5000)
+- **Max Tool Output Length Default Changed**: Default value reduced from 20000 to 8000 for better context budgeting
+
+### Changed
+- **sidebar.js**: Synced all settings handling for `maxProjectMapLines` across both save handlers and updateSettings
+- **CHANGELOG version sync**: Bumped to 0.2.6 matching package.json
+
 ## [0.0.8] - 2025-04-09
 
 ### Added

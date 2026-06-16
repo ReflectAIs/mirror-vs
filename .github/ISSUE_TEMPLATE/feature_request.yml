@@ -2,7 +2,7 @@
 name: Feature Request
 description: Propose a new feature for Mirror VS
 title: "[Feature]: "
-labels: ["enhancement"]
+labels: ["enhancement", "frontend", "backend"]
 assignees: []
 body:
   - type: markdown
@@ -17,6 +17,17 @@ body:
       placeholder: "I'm always frustrated when..."
     validations:
       required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - agent
+        - provider
+        - frontend / ui
+        - backend / api
+        - tooling / ci
+        - documentation
   - type: textarea
     id: solution
     attributes:
