@@ -18,7 +18,6 @@ import { CheckpointService } from './services/checkpoint-service';
 import { ModesManager } from './services/modes-manager';
 import { NativeToolCallParser } from './agent/native-tool-call-parser';
 import { getMcpToolNames } from './agent/tools/mcp-tools';
-import { registerMcpTools } from './agent/tool-policy';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Mirror VS Extension is now active!');
@@ -34,8 +33,13 @@ export function activate(context: vscode.ExtensionContext) {
   // Register ReviewManager service
   ReviewManager.getInstance().register(context);
 
-  // Initialize TelemetryService
-  TelemetryService.getInstance().initialize(context);
+  // Initialize TelemetryService (opt-in via mirror-vs.telemetryEnabled)
+  const telemetryEnabled = vscode.workspace.getConfiguration('mirror-vs').get<boolean>('telemetryEnabled', false);
+  if (telemetryEnabled) {
+    TelemetryService.getInstance().initialize(context);
+  } else {
+    console.log('[Mirror VS] Telemetry disabled by user preference');
+  }
 
   // Initialize Agent Memory Service
   try {
@@ -60,7 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
       const rag = LocalRagService.getInstance();
       await rag.loadIndex();
       if (!rag['isIndexed']) {
-        rag.indexWorkspace().catch(() => {});
+        rag.indexWorkspace().catch((err) => { console.error('[Mirror VS] RAG indexing error:', err); });
       }
     } catch {
       /* background — non-critical */
@@ -100,105 +104,32 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.refreshGitStatus', () => {
-      provider.refreshGitStatus();
-    }),
-  );
-
-  // AI Code Review Toggle
-  context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.toggleAiReview', () => {
-      const reviewService = AiReviewService.getInstance();
-      const enabled = reviewService.toggle();
-      console.log(`Mirror VS: Post-save AI Code Review ${enabled ? 'ENABLED' : 'DISABLED'}.`);
-    }),
-  );
-
-  // Review uncommitted changes
-  context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.reviewChanges', () => {
-      const diffService = DiffAwareService.getInstance();
-      const summary = diffService.getUncommittedDiff();
-      const formatted = diffService.formatDiffForAgent(summary);
-      vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      // Send as a task prompt to the sidebar
-      provider.handleMirrorTask(
-        `Review my uncommitted changes:\n\n${formatted}\n\nPlease analyze these changes for bugs, style issues, and potential improvements.`,
-      );
-    }),
-  );
-
-  // Artifact commands
-  context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.openArtifact', () => {
-      vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask(
-        'Create an interactive artifact — an HTML page, SVG graphic, Mermaid diagram, or a beautiful code snippet preview. Choose the type based on what would be most useful.',
-      );
+    vscode.commands.registerCommand('mirror-vs.clearSession', () => {
+      provider.clearActiveChat();
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.createHtmlArtifact', () => {
-      vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask(
-        'Create an HTML artifact. This should be a self-contained interactive HTML page (with inline CSS and JS) that demonstrates something useful or beautiful.',
-      );
+    vscode.commands.registerCommand('mirror-vs.togglePause', () => {
+      provider.togglePause();
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.listArtifacts', () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { ArtifactService } = require('./services/artifact-service');
-      const artifacts = ArtifactService.getInstance().artifacts;
-      if (artifacts.length === 0) {
-        console.log('Mirror VS: No artifacts created yet. Ask Mirror VS to create one!');
-        return;
-      }
-      vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask(
-        `List all my artifacts (${artifacts.length} total):\n\n` +
-          artifacts.map((a, i) => `${i + 1}. [${a.type}] ${a.title} (ID: ${a.id})`).join('\n'),
-      );
+    vscode.commands.registerCommand('mirror-vs.newChat', () => {
+      provider.clearActiveChat();
     }),
   );
 
-  // Refactor command - triggers multi-file refactoring analysis
   context.subscriptions.push(
-    vscode.commands.registerCommand('mirror-vs.refactorSelection', () => {
+    vscode.commands.registerCommand('mirror-vs.copyLastMessage', () => {
       const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
-      const selectionText = editor.document.getText(editor.selection);
-      const filePath = vscode.workspace.asRelativePath(editor.document.uri);
-      vscode.commands.executeCommand('mirror-vs.focusSidebar');
-      provider.handleMirrorTask(
-        `Refactor the following code in "${filePath}":\n\`\`\`\n${selectionText}\n\`\`\`\n\nAnalyze the impact of this refactoring across all files and propose changes. Use the multi_patch_file tool if multiple files need modification.`,
-      );
+      if (editor) {
+        const { selection, document } = editor;
+        provider.copyLastMessage(selection, document);
+      }
     }),
   );
-
-  // Register EventBus save hook
-  context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-      EventBus.getInstance().fire('file_saved', {
-        uri: doc.uri,
-        fileName: doc.fileName,
-        languageId: doc.languageId,
-      });
-    }),
-  );
-
-  // Activate AI review if configured
-  const aiReviewEnabled = vscode.workspace.getConfiguration('mirror-vs').get<boolean>('aiReviewEnabled', false);
-  if (aiReviewEnabled) {
-    try {
-      AiReviewService.getInstance().enable();
-      console.log('[Mirror VS] Post-save AI Code Review activated.');
-    } catch (e) {
-      console.warn('[Mirror VS] AI Review Service failed to start:', e);
-    }
-  }
 
   // Listen for config changes to toggle AI review dynamically
   context.subscriptions.push(
@@ -237,72 +168,77 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // ── Mirror Assistant Bridge — HTTP Polling ──
-  const MIRROR_PORT = process.env.MIRROR_PORT || '3000';
-  const MIRROR_HOST = process.env.MIRROR_HOST || 'localhost';
-  const BRIDGE_URL = `http://${MIRROR_HOST}:${MIRROR_PORT}/api/bridge/tasks`;
-  let pollTimer: NodeJS.Timeout | null = null;
-  let seenTasks = new Set<string>();
+  // ── Mirror Assistant Bridge — HTTP Polling (opt-in via mirror-vs.mirrorBridgeEnabled) ──
+  const mirrorBridgeEnabled = vscode.workspace.getConfiguration('mirror-vs').get<boolean>('mirrorBridgeEnabled', false);
+  if (mirrorBridgeEnabled) {
+    const MIRROR_PORT = process.env.MIRROR_PORT || '3000';
+    const MIRROR_HOST = process.env.MIRROR_HOST || 'localhost';
+    const BRIDGE_URL = `http://${MIRROR_HOST}:${MIRROR_PORT}/api/bridge/tasks`;
+    let pollTimer: NodeJS.Timeout | null = null;
+    let seenTasks = new Set<string>();
 
-  async function pollTasks() {
-    try {
-      const response = await fetch(BRIDGE_URL);
-      if (!response.ok) return;
-      const tasks = (await response.json()) as any[];
-      if (!Array.isArray(tasks) || tasks.length === 0) return;
+    async function pollTasks() {
+      try {
+        const response = await fetch(BRIDGE_URL);
+        if (!response.ok) return;
+        const tasks = (await response.json()) as any[];
+        if (!Array.isArray(tasks) || tasks.length === 0) return;
 
-      for (const task of tasks) {
-        if (seenTasks.has(task.id)) continue;
-        seenTasks.add(task.id);
+        for (const task of tasks) {
+          if (seenTasks.has(task.id)) continue;
+          seenTasks.add(task.id);
 
-        const result = await vscode.window.showInformationMessage(
-          `🪞 Mirror Assistant: "${task.task}"`,
-          'Accept Task',
-          'Dismiss',
-        );
+          const result = await vscode.window.showInformationMessage(
+            `🪞 Mirror Assistant: "${task.task}"`,
+            'Accept Task',
+            'Dismiss',
+          );
 
-        if (result === 'Accept Task') {
-          // Open the project if provided and different
-          const currentPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-          if (task.projectPath && task.projectPath !== currentPath) {
-            const uri = vscode.Uri.file(task.projectPath);
-            await vscode.commands.executeCommand('vscode.openFolder', uri, true);
+          if (result === 'Accept Task') {
+            // Open the project if provided and different
+            const currentPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+            if (task.projectPath && task.projectPath !== currentPath) {
+              const uri = vscode.Uri.file(task.projectPath);
+              await vscode.commands.executeCommand('vscode.openFolder', uri, true);
+            }
+
+            // Open the sidebar and send the task
+            await vscode.commands.executeCommand('mirror-vs.focusSidebar');
+            provider.handleMirrorTask(task.task);
+
+            // Update task status
+            await fetch(BRIDGE_URL, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId: task.id, status: 'accepted' }),
+            });
+          } else {
+            // Dismissed
+            await fetch(BRIDGE_URL, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId: task.id, status: 'dismissed' }),
+            });
           }
-
-          // Open the sidebar and send the task
-          await vscode.commands.executeCommand('mirror-vs.focusSidebar');
-          provider.handleMirrorTask(task.task);
-
-          // Update task status
-          await fetch(BRIDGE_URL, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId: task.id, status: 'accepted' }),
-          });
-        } else {
-          // Dismissed
-          await fetch(BRIDGE_URL, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId: task.id, status: 'dismissed' }),
-          });
         }
+      } catch {
+        // Mirror server not running — ignore silently
       }
-    } catch {
-      // Mirror server not running — ignore silently
     }
+
+    // Start polling every 3 seconds
+    pollTimer = setInterval(pollTasks, 3000);
+
+    // Cleanup on deactivation
+    context.subscriptions.push({
+      dispose: () => {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+      },
+    });
+  } else {
+    console.log('[Mirror VS] Mirror Bridge disabled by user preference');
   }
-
-  // Start polling every 3 seconds
-  pollTimer = setInterval(pollTasks, 3000);
-
-  // Cleanup on deactivation
-  context.subscriptions.push({
-    dispose: () => {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
-    },
-  });
 }
 
 export function deactivate() {}

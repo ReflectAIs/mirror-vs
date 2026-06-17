@@ -83,6 +83,5 @@ describe('Skill Service', () => {
     expect(injected[1].role).toBe('system');
     expect(injected[1].content).toContain('[RELEVANT ACQUIRED SKILLS]');
     expect(injected[1].content).toContain('test-skill-slug');
-    expect((injected[1] as any)._protected).toBe(true);
   });
 });

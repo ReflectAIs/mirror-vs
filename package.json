@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI Pair Programmer for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "icon": "mirror_logo.png",
   "publisher": "DIPESHMAJITHIA",
   "author": "Dipesh Majithia",
@@ -31,8 +31,8 @@
     "AI",
     "Machine Learning",
     "Programming Languages",
-    "Keymaps",
-    "Formatters"
+    "Chat",
+    "Other"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -508,6 +508,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable git-based snapshots before dangerous file operations. Allows automatic rollback on failure."
+        },
+        "mirror-vs.mirrorBridgeEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable polling the Mirror Assistant Bridge on localhost:3000 for external task injection. Disabled by default for security."
+        },
+        "mirror-vs.telemetryEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable anonymous usage telemetry. Disabled by default — enables only with user consent."
         },
         "mirror-vs.modelContextLengths": {
           "type": "object",

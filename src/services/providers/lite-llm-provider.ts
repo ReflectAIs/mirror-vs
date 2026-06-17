@@ -114,7 +114,7 @@ export class LiteLLMProvider extends BaseProvider {
               try {
                 JSON.parse(entry.args);
                 // Successfully parsed = tool call is complete
-                yield { type: 'tool_call_end', id: entry.id };
+                yield { type: 'tool_call_end', id: entry.id, name: entry.name, arguments: entry.args };
                 toolCallBuffers.delete(index);
               } catch {
                 // Still incomplete
@@ -141,7 +141,7 @@ export class LiteLLMProvider extends BaseProvider {
     } else {
       // Emit remaining if not already cleared
       for (const [, entry] of toolCallBuffers) {
-        yield { type: 'tool_call_end', id: entry.id };
+        yield { type: 'tool_call_end', id: entry.id, name: entry.name, arguments: entry.args };
       }
     }
 

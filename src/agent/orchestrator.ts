@@ -129,6 +129,7 @@ export class AgentOrchestrator {
     try {
       return execFileSync('git', args, { cwd: workspaceFolder, encoding: 'utf8', stdio: 'pipe' });
     } catch {
+      console.error('_gitExec failed: no variable captured in catch');
       return '';
     }
   }
@@ -143,6 +144,8 @@ export class AgentOrchestrator {
     try {
       gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
     } catch {
+      // 'e' not captured in no-param catch block
+      console.error('Failed to read .gitignore');
       /* ignore */
     }
     const patterns = ['node_modules/', '.mirror-vs/', 'turns.log'];
@@ -506,6 +509,7 @@ export class AgentOrchestrator {
                 currentHash = crypto.createHash('sha256').update(content).digest('hex');
               }
             } catch {
+              console.error('Failed to hash file for diff check');
               // ignore
             }
 
@@ -817,6 +821,7 @@ export class AgentOrchestrator {
             } catch (apiErr: unknown) {
               signal.removeEventListener('abort', mainAbortListener);
               const apiErrMsg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+              console.error('API error during streaming:', apiErrMsg);
               const fb = this._fallback.failover();
               if (fb.success && fb.newProvider) {
                 const nextKey = await tryGetApiKey(fb.newProvider);
@@ -1091,7 +1096,10 @@ export class AgentOrchestrator {
                   );
                   return '[Tool Result for ' + tool.name + ' on "' + target + '"]: Success - ' + result;
                 } catch (err: unknown) {
+                  console.error('Tool execution failed:', err instanceof Error ? err.message : String(err));
+                  console.error('Error in rewrite tool execution:', err instanceof Error ? err.message : String(err));
                   const errMsg = err instanceof Error ? err.message : String(err);
+                  console.error(`Tool execution failed (${tool.name}):`, errMsg);
 
                   if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
                     lastRewriteTelemetry.outcome = 'ERROR';
@@ -1293,6 +1301,7 @@ export class AgentOrchestrator {
                   );
                   toolResults.push('[Tool Result for ' + tool.name + ' on "' + target + '"]: Success - ' + result);
                 } catch (err: unknown) {
+                  console.error('Rewrite tool execution failed:', err instanceof Error ? err.message : String(err));
                   const errMsg = err instanceof Error ? err.message : String(err);
 
                   if (lastRewriteTelemetry && lastRewriteTelemetry.selectedTool === tool.name) {
@@ -1641,6 +1650,7 @@ export class AgentOrchestrator {
           return `\n\`\`\`${ext}:${trimmed}\n${content}\n\`\`\``;
         }
       } catch {
+        console.error('Failed to read embedding file:', filePath);
         // ignore
       }
       return match;
@@ -1775,6 +1785,7 @@ export class AgentOrchestrator {
       try {
         entries = fs.readdirSync(dir).sort();
       } catch {
+        console.error('readdirSync failed for:', dir);
         return result;
       }
       const dirs: string[] = [];
@@ -1787,6 +1798,7 @@ export class AgentOrchestrator {
           if (s.isDirectory()) dirs.push(e);
           else if (s.isFile()) files.push(e);
         } catch {
+          console.error('statSync failed for:', fp);
           /* skip */
         }
       }
@@ -1803,10 +1815,12 @@ export class AgentOrchestrator {
               if (s.isDirectory()) c += countAll(fp);
               else c++;
             } catch {
+              console.error('statSync failed in countAll for:', fp);
               /* skip */
             }
           }
         } catch {
+          console.error('readdirSync failed in countAll for:', d);
           /* skip */
         }
         return c;
@@ -1861,6 +1875,7 @@ export class AgentOrchestrator {
 
       return lines.join('\n');
     } catch (e) {
+      console.error('Error generating project map:', e instanceof Error ? e.message : String(e));
       return `Error generating map: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
@@ -1885,6 +1900,7 @@ export class AgentOrchestrator {
       });
       output += '\n[Build Status]: Success\n' + compileOutput.substring(0, 1000);
     } catch (err: any) {
+      console.error('Compile/build check failed:', err.message || String(err));
       compilePassed = false;
       output +=
         '\n[Build Status]: FAILED\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + (err.message || '');
@@ -1901,6 +1917,7 @@ export class AgentOrchestrator {
       });
       output += '\n[Lint Status]: Success\n' + lintOutput.substring(0, 1000);
     } catch (err: any) {
+      console.error('Lint check failed:', err.message || String(err));
       lintPassed = false;
       output +=
         '\n[Lint Status]: FAILED or Warnings detected\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n';
@@ -1917,6 +1934,7 @@ export class AgentOrchestrator {
       });
       output += '\n[Test Status]: Success\n' + testOutput.substring(0, 1000);
     } catch (err: any) {
+      console.error('Test run failed:', err.message || String(err));
       testsPassed = false;
       output += '\n[Test Status]: FAILED\n' + (err.stdout || '') + '\n' + (err.stderr || '') + '\n';
     }
@@ -2153,6 +2171,7 @@ function selectHighestValueTool(toolCalls: any[], messages: ChatMessage[]): { se
           feasibilityScore = -45; // read_file on a directory is always invalid — use list_dir instead
         }
       } catch {
+        console.error('statSync failed for feasibility check:', fullPath);
         // Path doesn't exist yet; no penalty (could be a new file to create)
       }
     }

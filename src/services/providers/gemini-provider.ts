@@ -101,19 +101,22 @@ export class GeminiProvider extends BaseProvider {
               yield { type: 'text', content: part.text };
             }
             if (part.functionCall) {
+              const tcId = `gemini-tc-${Date.now()}`;
               yield {
                 type: 'tool_call_start',
-                id: `gemini-tc-${Date.now()}`,
+                id: tcId,
                 name: part.functionCall.name,
               };
               yield {
                 type: 'tool_call_delta',
-                id: `gemini-tc-${Date.now()}`,
-                delta: JSON.stringify(part.functionCall.args),
+                id: tcId,
+                delta: JSON.stringify(part.functionCall.args || {}),
               };
               yield {
                 type: 'tool_call_end',
-                id: `gemini-tc-${Date.now()}`,
+                id: tcId,
+                name: part.functionCall.name,
+                arguments: JSON.stringify(part.functionCall.args || {}),
               };
             }
           }

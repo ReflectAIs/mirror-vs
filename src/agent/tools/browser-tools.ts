@@ -28,7 +28,7 @@ export async function executeBrowserTool(tool: ToolCall, getSafePath: (p: string
     case 'browser_navigate': {
       if (!tool.url) throw new Error('Missing "url" attribute for browser_navigate.');
       const html = await browser.navigate(tool.url);
-      return `Navigated to ${tool.url}\nPage title: ${html.title}\nText content (first 5000 chars):\n${html.textContent.substring(0, 5000)}`;
+      return `Navigated to ${tool.url}\nPage title: ${html.title}\nText content (first 5000 chars):\n${(html.textContent || '').substring(0, 5000)}`;
     }
 
     case 'browser_click': {
@@ -52,7 +52,7 @@ export async function executeBrowserTool(tool: ToolCall, getSafePath: (p: string
 
       const base64 = screenshot.base64;
       const textSummary = screenshot.textContent
-        ? `Page text content (first 3000 chars):\n${screenshot.textContent.substring(0, 3000)}`
+        ? `Page text content (first 3000 chars):\n${(screenshot.textContent || '').substring(0, 3000)}`
         : 'No text content extracted.';
 
       // Optionally save screenshot to workspace for reference
