@@ -5,7 +5,7 @@
  * Adapted from Roo Code's LiteLLM provider.
  */
 
-import { BaseProvider, ChatMessage, ProviderConfig, StreamChunk } from './base-provider';
+import { BaseProvider, ChatMessage, StreamChunk } from './base-provider';
 
 export class LiteLLMProvider extends BaseProvider {
   constructor(baseUrl: string, model: string = 'gpt-4o', apiKey?: string) {
@@ -168,9 +168,13 @@ export class LiteLLMProvider extends BaseProvider {
   async fetchModels(): Promise<string[]> {
     const url = `${this.config.baseUrl}/models`;
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(url, {
         headers: this.buildHeaders(),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = (await response.json()) as any;
       return (data.data || data || []).map((m: any) => m.id || m.name || m).filter(Boolean);
     } catch {

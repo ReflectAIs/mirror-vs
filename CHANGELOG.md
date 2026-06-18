@@ -3,7 +3,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.8] - 2025-06-30
+
+### Fixed
+- **Assistant Stopping/Give-Up Behavior**: Strengthened Failure Recovery rules with mandatory automatic retry loop (3 attempts minimum)
+- **Tool Call Gating**: Corrected prompt to enforce EXACTLY ONE tool per turn for native function calling compatibility
+
+### Changed
+- **PowerShell Compatibility**: System prompt now instructs agent to use `;` instead of `&&`/`||` for command chaining
+- **Unused Font Files**: Removed dead font assets from the repository (Font Awesome files unused by the webview)
+
 ## [0.2.6] - 2025-06-13
+
 
 ### Added
 - **Max Project Map Lines Setting**: New UI control in settings for configuring `mirror-vs.maxProjectMapLines` (default 250, range 10-5000)

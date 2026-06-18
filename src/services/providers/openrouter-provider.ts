@@ -4,7 +4,7 @@
  * Adapted from Roo Code's OpenRouter provider.
  */
 
-import { BaseProvider, ChatMessage, ProviderConfig, StreamChunk } from './base-provider';
+import { BaseProvider, ChatMessage, StreamChunk } from './base-provider';
 
 interface OpenRouterModel {
   id: string;
@@ -170,7 +170,10 @@ export class OpenRouterProvider extends BaseProvider {
   async fetchModels(): Promise<string[]> {
     const url = 'https://openrouter.ai/api/v1/models';
     try {
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
       const data = (await response.json()) as { data: OpenRouterModel[] };
       return (data.data || [])
         .filter((m) => !m.id.includes('nude') && !m.id.includes('nsfw'))
