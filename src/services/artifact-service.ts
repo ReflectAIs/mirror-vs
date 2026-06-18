@@ -153,13 +153,31 @@ export class ArtifactService {
     }
 
     const panel = vscode.window.createWebviewPanel('mirrorArtifact', `🧩 ${artifact.title}`, vscode.ViewColumn.Active, {
-      enableScripts: artifact.type === 'html',
+      enableScripts: artifact.type === 'html' || artifact.type === 'markdown',
       retainContextWhenHidden: true,
       localResourceRoots: [],
     });
 
     panel.webview.html = this._renderArtifact(artifact);
     this._panels.set(artifactId, panel);
+
+    // Handle openFile messages from the artifact preview webview
+    panel.webview.onDidReceiveMessage(async (message) => {
+      if (message.type === 'openFile' && message.filePath) {
+        try {
+          const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (workspaceFolder) {
+            const safePath = path.resolve(workspaceFolder, message.filePath);
+            if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
+              const doc = await vscode.workspace.openTextDocument(safePath);
+              await vscode.window.showTextDocument(doc, { preview: false });
+            }
+          }
+        } catch (e) {
+          console.error('Failed to open file from artifact:', e);
+        }
+      }
+    });
 
     panel.onDidDispose(() => {
       this._panels.delete(artifactId);
@@ -271,19 +289,45 @@ export class ArtifactService {
     const styleReset = `
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: var(--vscode-editor-font-family, 'Segoe UI', sans-serif); background: var(--vscode-editor-background, #1e1e1e); color: var(--vscode-editor-foreground, #d4d4d4); }
-        .artifact-header { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background, #252526); font-size: 12px; }
-        .artifact-header .type-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        body { font-family: var(--vscode-editor-font-family, 'Segoe UI', sans-serif); background: var(--vscode-editor-background, #1e1e1e); color: var(--vscode-editor-foreground, #d4d4d4); line-height: 1.6; }
+        .artifact-header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background, #252526); font-size: 11px; height: 32px; }
+        .artifact-header .type-badge { padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; }
         .artifact-header .type-html { background: #e44d26; color: #fff; }
         .artifact-header .type-svg { background: #ffb13b; color: #1e1e1e; }
         .artifact-header .type-mermaid { background: #ff3670; color: #fff; }
         .artifact-header .type-code { background: #007acc; color: #fff; }
         .artifact-header .type-markdown { background: #4ec9b0; color: #1e1e1e; }
-        .artifact-header .title { flex: 1; font-weight: 500; }
-        .artifact-body { padding: 16px; overflow: auto; height: calc(100vh - 40px); }
+        .artifact-header .title { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .artifact-body { padding: 20px 24px; overflow: auto; height: calc(100vh - 32px); }
         .artifact-body iframe { width: 100%; height: 100%; border: none; }
-        pre { background: var(--vscode-textCodeBlock-background, #1e1e1e); padding: 12px; border-radius: 6px; overflow: auto; font-family: var(--vscode-editor-font-family, 'Cascadia Code', monospace); font-size: 13px; line-height: 1.5; }
+        pre { background: var(--vscode-textCodeBlock-background, #1e1e1e); padding: 12px; border-radius: 6px; overflow: auto; font-family: var(--vscode-editor-font-family, 'Cascadia Code', monospace); font-size: 13px; line-height: 1.5; margin: 12px 0; }
         code { font-family: var(--vscode-editor-font-family, monospace); }
+        
+        /* Markdown rendering styles */
+        h1 { font-size: 1.5em; font-weight: 600; margin-top: 16px; margin-bottom: 8px; border-bottom: 1px solid var(--vscode-panel-border, #333); padding-bottom: 4px; color: var(--vscode-symbolIcon-classForeground, #4fc1ff); }
+        h2 { font-size: 1.25em; font-weight: 600; margin-top: 14px; margin-bottom: 6px; color: var(--vscode-symbolIcon-interfaceForeground, #9cdcfe); }
+        h3 { font-size: 1.1em; font-weight: 600; margin-top: 12px; margin-bottom: 6px; }
+        p { margin-bottom: 8px; font-size: 13px; }
+        ul, ol { margin-left: 20px; margin-bottom: 12px; font-size: 13px; }
+        li { margin-bottom: 4px; }
+        
+        .history-file-tag {
+          display: inline-flex;
+          align-items: center;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--vscode-panel-border, #333);
+          border-radius: 4px;
+          padding: 2px 6px;
+          font-family: var(--vscode-editor-font-family, monospace);
+          font-size: 11px;
+          cursor: pointer;
+          color: var(--vscode-textLink-foreground, #3794ff) !important;
+          margin: 4px 0;
+          transition: background 0.2s;
+        }
+        .history-file-tag:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
       </style>
     `;
 
@@ -299,7 +343,7 @@ export class ArtifactService {
       <div class="artifact-header">
         <span class="type-badge type-${artifact.type}">${typeIcons[artifact.type] || '📦'} ${artifact.type.toUpperCase()}</span>
         <span class="title">${artifact.title}</span>
-        <span style="font-size:10px;color:var(--vscode-textSecondary, #888);">${new Date(artifact.createdAt).toLocaleTimeString()}</span>
+        <span style="font-size:9px;color:var(--vscode-textSecondary, #888);">${new Date(artifact.createdAt).toLocaleTimeString()}</span>
       </div>
     `;
 
@@ -308,7 +352,7 @@ export class ArtifactService {
       case 'html':
         // For HTML artifacts, embed in an iframe via srcdoc
         body = `
-          <div class="artifact-body" style="padding:0;">
+          <div class="artifact-body" style="padding:0;height:calc(100vh - 32px);">
             <iframe srcdoc="${artifact.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" style="width:100%;height:100%;border:none;"></iframe>
           </div>
         `;
@@ -316,7 +360,7 @@ export class ArtifactService {
 
       case 'svg':
         body = `
-          <div class="artifact-body" style="display:flex;align-items:center;justify-content:center;background:#fff;">
+          <div class="artifact-body" style="display:flex;align-items:center;justify-content:center;background:#fff;height:calc(100vh - 32px);">
             ${artifact.content}
           </div>
         `;
@@ -338,6 +382,18 @@ export class ArtifactService {
         body = `
           <div class="artifact-body">
             <div style="line-height:1.7;">${this._simpleMarkdownToHtml(artifact.content)}</div>
+            <script>
+              const vscode = acquireVsCodeApi();
+              document.addEventListener('click', (e) => {
+                const tag = e.target.closest('.history-file-tag');
+                if (tag) {
+                  const filePath = tag.getAttribute('data-file-path');
+                  if (filePath) {
+                    vscode.postMessage({ type: 'openFile', filePath });
+                  }
+                }
+              });
+            </script>
           </div>
         `;
         break;
@@ -371,8 +427,15 @@ export class ArtifactService {
 
   private _simpleMarkdownToHtml(md: string): string {
     let html = this._escapeHtml(md);
-    // Convert code blocks
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+    
+    // Convert code blocks (temp placeholder to prevent escaping collision)
+    const codeBlocks: string[] = [];
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push(`<pre><code class="language-${lang}">${code}</code></pre>`);
+      return `___CODEBLOCK_${idx}___`;
+    });
+
     // Convert inline code
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
     // Convert bold/italic
@@ -380,13 +443,77 @@ export class ArtifactService {
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
     // Convert links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:#3794ff;">$1</a>');
-    // Convert headers
-    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-    // Convert paragraphs
-    html = html.replace(/\n\n/g, '</p><p>');
-    html = '<p>' + html + '</p>';
+
+    // Split into lines to parse line-based items (headers, lists, paths) properly
+    const lines = html.split('\n');
+    let inList = false;
+    const processedLines = lines.map(line => {
+      const trimmed = line.trim();
+      
+      // Headers
+      if (trimmed.startsWith('### ')) {
+        if (inList) { inList = false; return '</ul><h3>' + trimmed.substring(4) + '</h3>'; }
+        return '<h3>' + trimmed.substring(4) + '</h3>';
+      }
+      if (trimmed.startsWith('## ')) {
+        if (inList) { inList = false; return '</ul><h2>' + trimmed.substring(3) + '</h2>'; }
+        return '<h2>' + trimmed.substring(3) + '</h2>';
+      }
+      if (trimmed.startsWith('# ')) {
+        if (inList) { inList = false; return '</ul><h1>' + trimmed.substring(2) + '</h1>'; }
+        return '<h1>' + trimmed.substring(2) + '</h1>';
+      }
+
+      // Check for path block (e.g. "Path: walkthrough.md")
+      const pathMatch = line.match(/^(Path:\s*)([a-zA-Z0-9_\-\\\/\.]+\.[a-zA-Z0-9]{1,10})/i);
+      if (pathMatch) {
+        const prefix = pathMatch[1];
+        const filePath = pathMatch[2];
+        const normalized = filePath.replace(/\\/g, '/');
+        const fileName = normalized.split('/').pop() || filePath;
+        const link = `<span class="history-file-tag" data-file-path="${this._escapeHtml(filePath)}" title="${this._escapeHtml(filePath)} (click to open)" style="cursor:pointer;color:#3794ff;text-decoration:underline;">📖 ${this._escapeHtml(fileName)}</span>`;
+        if (inList) { inList = false; return '</ul><p>' + prefix + link + '</p>'; }
+        return '<p>' + prefix + link + '</p>';
+      }
+
+      // List items
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const itemContent = trimmed.substring(2);
+        if (!inList) {
+          inList = true;
+          return '<ul style="margin-left: 20px; margin-bottom: 8px;"><li>' + itemContent + '</li>';
+        }
+        return '<li>' + itemContent + '</li>';
+      }
+
+      // Plain line or paragraph separator
+      if (trimmed === '') {
+        if (inList) {
+          inList = false;
+          return '</ul>';
+        }
+        return '';
+      }
+
+      // Regular line
+      if (inList) {
+        inList = false;
+        return '</ul><p>' + line + '</p>';
+      }
+      return '<p>' + line + '</p>';
+    });
+
+    if (inList) {
+      processedLines.push('</ul>');
+    }
+
+    html = processedLines.filter(line => line !== '').join('\n');
+
+    // Restore code blocks
+    codeBlocks.forEach((block, idx) => {
+      html = html.replace(`___CODEBLOCK_${idx}___`, block);
+    });
+
     return html;
   }
 

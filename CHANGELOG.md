@@ -3,6 +3,19 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.10] - 2025-07-16
+
+### Added
+- **Markdown Artifact Rendering**: Full markdown-to-HTML conversion with support for headers, lists, code blocks (with syntax highlighting), inline code, bold/italic, and links
+- **Clickable File Paths in Artifacts**: File paths shown in markdown artifacts are clickable — clicking opens the file in VS Code (`openFile` message handling)
+
+### Fixed
+- **Markdown Code Block Escaping**: Code block content no longer gets mangled by inline markdown regex passes (uses placeholder-then-restore strategy)
+
+### Changed
+- **Artifact Panel Styling**: Refined header (32px compact), body padding (20px 24px), added text-overflow ellipsis, enabled scripts for markdown artifact type
+- **Markdown Parsing**: Rewritten from simple regex to line-by-line processor for accurate header/list/path detection
+
 ## [0.2.9] - 2025-07-15
 
 ### Added
