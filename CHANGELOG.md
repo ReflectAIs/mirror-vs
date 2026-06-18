@@ -3,16 +3,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.2.8] - 2025-06-30
+## [0.2.9] - 2025-07-15
+
+### Added
+- **Systematic Reasoning Rules**: New agent prompt rules enforcing Zero-Guessing Lookup, Call-Hierarchy analysis, and AST/Symbol accuracy
+- **Compilation-Driven Self-Correction**: Agent now runs immediate lint/compile checks after modifications, with diagnostic self-correction loop until builds are clean
 
 ### Fixed
 - **Assistant Stopping/Give-Up Behavior**: Strengthened Failure Recovery rules with mandatory automatic retry loop (3 attempts minimum)
 - **Tool Call Gating**: Corrected prompt to enforce EXACTLY ONE tool per turn for native function calling compatibility
+- **Untrusted Source Data Filtering**: Fixed system/tool message rendering to strip `<<<UNTRUSTED_SOURCE_DATA>>>` guards and tool result prefixes before display
 
 ### Changed
 - **PowerShell Compatibility**: System prompt now instructs agent to use `;` instead of `&&`/`||` for command chaining
 - **Unused Font Files**: Removed dead font assets from the repository (Font Awesome files unused by the webview)
-
+- **Artifact Panel Position**: Changed artifact webview panel from `ViewColumn.Beside` to `ViewColumn.Active` to avoid creating extra columns
+- **Message Bubble Order**: Relocated `appendMessageBubble` function below `linkifyFilePaths` for correct hoisting/closure behavior
 ## [0.2.6] - 2025-06-13
 
 

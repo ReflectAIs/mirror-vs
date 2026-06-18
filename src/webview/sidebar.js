@@ -2524,31 +2524,6 @@ function attachImage(base64) {
 
 
 
-  // Helper: Append a message bubble to DOM
-  function appendMessageBubble(role, text, images, container = chatMessages) {
-    if (role === 'system' || role === 'tool') {
-      let innerText = text;
-      const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
-      const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
-      if (text.includes(guardOpen) && text.includes(guardClose)) {
-        const startIndex = text.indexOf(guardOpen) + guardOpen.length;
-        const endIndex = text.indexOf(guardClose);
-        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-          const contentInside = text.substring(startIndex, endIndex).trim();
-          const lines = contentInside.split('\n');
-          if (lines[0] && lines[0].startsWith('Source:')) {
-            lines.shift();
-          }
-          innerText = lines.join('\n').trim();
-        }
-      }
-
-      if (innerText.startsWith('[Tool Result')) {
-        appendToolCardFromHistory(innerText, container);
-        return null;
-      }
-      if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
-        const msgElement = document.createElement('div');
   // ─── Deep-link file paths in message text ─────────────────────────
   function linkifyFilePaths(container) {
     // Match absolute and relative file paths with extensions
@@ -2586,6 +2561,32 @@ function attachImage(base64) {
       }
     });
   }
+
+  // Helper: Append a message bubble to DOM
+  function appendMessageBubble(role, text, images, container = chatMessages) {
+    if (role === 'system' || role === 'tool') {
+      let innerText = text;
+      const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
+      const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
+      if (text.includes(guardOpen) && text.includes(guardClose)) {
+        const startIndex = text.indexOf(guardOpen) + guardOpen.length;
+        const endIndex = text.indexOf(guardClose);
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+          const contentInside = text.substring(startIndex, endIndex).trim();
+          const lines = contentInside.split('\n');
+          if (lines[0] && lines[0].startsWith('Source:')) {
+            lines.shift();
+          }
+          innerText = lines.join('\n').trim();
+        }
+      }
+
+      if (innerText.startsWith('[Tool Result')) {
+        appendToolCardFromHistory(innerText, container);
+        return null;
+      }
+      if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
+        const msgElement = document.createElement('div');
         msgElement.className = 'message system-context';
         
         const banner = document.createElement('div');

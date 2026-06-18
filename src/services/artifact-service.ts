@@ -148,11 +148,11 @@ export class ArtifactService {
     // If already open, reveal it
     const existingPanel = this._panels.get(artifactId);
     if (existingPanel) {
-      existingPanel.reveal(vscode.ViewColumn.Beside);
+      existingPanel.reveal(vscode.ViewColumn.Active);
       return;
     }
 
-    const panel = vscode.window.createWebviewPanel('mirrorArtifact', `🧩 ${artifact.title}`, vscode.ViewColumn.Beside, {
+    const panel = vscode.window.createWebviewPanel('mirrorArtifact', `🧩 ${artifact.title}`, vscode.ViewColumn.Active, {
       enableScripts: artifact.type === 'html',
       retainContextWhenHidden: true,
       localResourceRoots: [],
