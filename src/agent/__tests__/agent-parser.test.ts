@@ -180,6 +180,19 @@ describe('AgentParser', () => {
       expect(calls[0].content).toBe('const x = 1;');
     });
 
+    it('should parse create_artifact with attributes and content', () => {
+      const parser = makeParser();
+      const input = blockOpen('create_artifact', 'type="markdown" title="My Plan" id="plan_123" language="markdown"') + '# Plan Content' + blockClose('create_artifact');
+      const calls = parser.parseToolCalls(input);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe('create_artifact');
+      expect(calls[0].type).toBe('markdown');
+      expect(calls[0].title).toBe('My Plan');
+      expect(calls[0].id).toBe('plan_123');
+      expect(calls[0].language).toBe('markdown');
+      expect(calls[0].content).toBe('# Plan Content');
+    });
+
     it('should parse patch_file with SEARCH/REPLACE content', () => {
       const parser = makeParser();
       const content = 'SEARCH\nold code\nREPLACE\nnew code';

@@ -426,6 +426,41 @@ const TOOL_SCHEMAS: ToolSchema[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'create_artifact',
+      description:
+        'Create a new interactive previewable artifact or update an existing one by ID (HTML, SVG, Mermaid, code, markdown). ' +
+        'Use this to publish planning documents, task lists, or walkthrough summaries.',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'The unique identifier of the artifact. Required when updating an existing plan, task list, or code snippet.',
+          },
+          type: {
+            type: 'string',
+            description: 'The artifact type. Supported: "html", "svg", "mermaid", "code", "markdown".',
+          },
+          title: {
+            type: 'string',
+            description: 'The user-friendly title of the artifact tab/window.',
+          },
+          content: {
+            type: 'string',
+            description: 'The complete code, diagram text, markdown body, or HTML markup for the artifact.',
+          },
+          language: {
+            type: 'string',
+            description: 'Syntax highlighting language (e.g. "typescript", "javascript", "python", "css", etc.) if type is "code".',
+          },
+        },
+        required: ['type', 'title', 'content'],
+      },
+    },
+  },
 ];
 
 /**

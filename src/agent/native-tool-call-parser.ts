@@ -366,6 +366,14 @@ export class NativeToolCallParser {
         return {
           query: typeof args.query === 'string' ? args.query : undefined,
         };
+      case 'create_artifact':
+        return {
+          id: typeof args.id === 'string' ? args.id : undefined,
+          type: typeof args.type === 'string' ? args.type : undefined,
+          title: typeof args.title === 'string' ? args.title : undefined,
+          content: typeof args.content === 'string' ? args.content : undefined,
+          language: typeof args.language === 'string' ? args.language : undefined,
+        };
       default:
         return {
           path: typeof args.path === 'string' ? args.path : typeof args.filePath === 'string' ? args.filePath : undefined,

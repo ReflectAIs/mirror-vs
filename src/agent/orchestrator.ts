@@ -30,7 +30,7 @@ import { maybeCompact, trimForContext } from '../services/context-compactor';
 import { evaluateTurnResult } from './failure-detector';
 
 // P1 imports
-import { untrustedContextMessage } from './prompt-security';
+import { untrustedContextMessage, sanitizeUserPrompt } from './prompt-security';
 import { getDisabledToolsForMode } from './tool-policy';
 import { injectRelevantSkills } from '../services/skill-service';
 import { maybeEscalate } from './teacher-escalation';
@@ -275,7 +275,8 @@ export class AgentOrchestrator {
       let currentMessages = [...history];
 
       if (text || (images && images.length > 0)) {
-        const userMsg: ChatMessage = { role: 'user', content: text || '[Image provided]' };
+        const safeContent = sanitizeUserPrompt(text || '[Image provided]');
+        const userMsg: ChatMessage = { role: 'user', content: safeContent };
         if (images && images.length > 0) userMsg.images = images;
         currentMessages.push(userMsg);
         await this._saveChatHistory(currentMessages);

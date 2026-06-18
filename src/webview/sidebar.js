@@ -404,6 +404,100 @@
     });
   }
 
+  // ===== TOAST NOTIFICATION SYSTEM =====
+  let _toastTimer = null;
+  /**
+   * Show a toast notification.
+   * @param {string} message - The message text
+   * @param {'success'|'error'|'info'|'warning'} type - Toast type
+   * @param {number} [duration=3500] - Auto-dismiss duration in ms
+   */
+  window.showToast = function (message, type, duration) {
+    type = type || 'info';
+    duration = duration || 3500;
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    const iconMap = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    toast.innerHTML = '<span style="font-size:14px;">' + (iconMap[type] || 'ℹ️') + '</span><span>' + message + '</span>';
+    toast.style.animationDuration = '0.3s, 0.3s';
+    toast.style.animationDelay = '0s, ' + (duration / 1000) + 's';
+    container.appendChild(toast);
+    // Auto-remove
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function () {
+      if (toast.parentNode) toast.remove();
+    }, duration + 350);
+    // Click to dismiss
+    toast.style.cursor = 'pointer';
+    toast.addEventListener('click', function () { toast.remove(); });
+  };
+
+  // ─── Search in Chat History ───────────────────────────────────────
+  var searchBar = document.getElementById('chat-search-bar');
+  var searchInput = document.getElementById('chat-search-input');
+  var searchClearBtn = document.getElementById('chat-search-clear');
+  var searchCount = document.getElementById('chat-search-count');
+  var searchHits = [];
+
+  function toggleSearchBar() {
+    var visible = searchBar.style.display !== 'none';
+    if (visible) {
+      searchBar.style.display = 'none';
+      searchInput.value = '';
+      clearSearchHighlights();
+    } else {
+      searchBar.style.display = 'flex';
+      searchInput.focus();
+    }
+  }
+
+  searchInput && searchInput.addEventListener('input', function () {
+    var query = searchInput.value.toLowerCase().trim();
+    clearSearchHighlights();
+    searchHits = [];
+    searchCount.textContent = '';
+    if (!query) return;
+    var bubbles = document.querySelectorAll('.message-bubble');
+    bubbles.forEach(function (bubble) {
+      var text = bubble.textContent || '';
+      if (text.toLowerCase().indexOf(query) !== -1) {
+        bubble.classList.add('search-hit');
+        searchHits.push(bubble);
+      }
+    });
+    searchCount.textContent = searchHits.length ? searchHits.length + ' match' + (searchHits.length > 1 ? 'es' : '') : 'No matches';
+    if (searchHits.length > 0) {
+      searchHits[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  searchClearBtn && searchClearBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    clearSearchHighlights();
+    searchCount.textContent = '';
+    searchInput.focus();
+  });
+
+  function clearSearchHighlights() {
+    document.querySelectorAll('.message-bubble.search-hit').forEach(function (el) {
+      el.classList.remove('search-hit');
+    });
+    searchHits = [];
+  }
+
+  // Ctrl+F / Cmd+F to toggle search
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== searchInput) {
+      e.preventDefault();
+      toggleSearchBar();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+      toggleSearchBar();
+    }
+  });
+
 
 
   const sessionSearchInput = document.getElementById('session-search-input');
@@ -1731,6 +1825,7 @@ function attachImage(base64) {
     sendBtn.classList.remove('hidden');
     setAvatarState('idle');
     clearAllActiveAnimations();
+    if (typeof showToast === 'function') showToast('Response cancelled', 'warning', 2000);
   });
 
   function getPromptInputValue() {
@@ -2454,6 +2549,43 @@ function attachImage(base64) {
       }
       if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
         const msgElement = document.createElement('div');
+  // ─── Deep-link file paths in message text ─────────────────────────
+  function linkifyFilePaths(container) {
+    // Match absolute and relative file paths with extensions
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    var textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach(function (node) {
+      var text = node.textContent;
+      // Match common file path patterns: /absolute/path/file.ts, relative/path/file.tsx, dir/file.go
+      var pattern = /(\b(?:[a-zA-Z]:[\\\/])?[\w\.\-_\/\\]+\.(?:ts|tsx|js|jsx|json|html|css|py|go|rs|java|rb|php|c|cpp|h|hpp|md|txt|yml|yaml|toml|svg|png|jpg|gif|vue|svelte)\b)/gi;
+      if (pattern.test(text)) {
+        pattern.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var lastIdx = 0;
+        var match;
+        while ((match = pattern.exec(text)) !== null) {
+          var before = text.slice(lastIdx, match.index);
+          if (before) frag.appendChild(document.createTextNode(before));
+          var link = document.createElement('span');
+          link.className = 'file-path-link';
+          link.textContent = match[0];
+          link.title = 'Click to open: ' + match[0];
+          link.style.cssText = 'cursor:pointer;color:var(--color-primary-light);text-decoration:underline;';
+          link.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var path = this.textContent;
+            vscode.postMessage({ type: 'openFile', filePath: path });
+          });
+          frag.appendChild(link);
+          lastIdx = pattern.lastIndex;
+        }
+        var remaining = text.slice(lastIdx);
+        if (remaining) frag.appendChild(document.createTextNode(remaining));
+        node.parentNode && node.parentNode.replaceChild(frag, node);
+      }
+    });
+  }
         msgElement.className = 'message system-context';
         
         const banner = document.createElement('div');
@@ -2567,6 +2699,7 @@ function attachImage(base64) {
       textContainer.innerHTML = parseMarkdown(text, isApproved);
       bindCodeBlockButtons(textContainer);
       applySyntaxHighlighting(textContainer);
+      linkifyFilePaths(textContainer);
       bubble.appendChild(textContainer);
     }
     

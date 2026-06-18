@@ -20,6 +20,7 @@ Available tools:
 - figma_inspect: <figma_inspect url="..." />
 - wait: <wait [ms="..."] [seconds="..."] />
 - update_agent_memory: <update_agent_memory key="..." value="..." />
+- create_artifact: <create_artifact type="html|svg|mermaid|code|markdown" title="..." [id="..."] [language="..."]>content</create_artifact>
 
 CRITICAL subsequent turn rule:
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
@@ -112,11 +113,10 @@ CRITICAL subsequent turn rule:
 23. UPDATE AGENT MEMORY:
     <update_agent_memory key="preferences" value="Always use functional React components." />
     Saves developer preferences, key architectural decisions, or code patterns in the local workspace.
-24. DEBUGGER CONTROLS (Only in Debug Mode):
-    - debug_get_sessions: <debug_get_sessions /> (lists active debugging sessions)
-    - debug_get_breakpoints: <debug_get_breakpoints /> (lists active breakpoints)
-    - debug_add_breakpoint: <debug_add_breakpoint path="relative/file.ts" line="25" /> (adds breakpoint)
-    - debug_remove_breakpoint: <debug_remove_breakpoint breakpoint_id="..." /> (removes breakpoint)
     - debug_inspect_variables: <debug_inspect_variables /> (dumps active threads, callstack, scopes, and variables)
+25. CREATE ARTIFACT:
+    <create_artifact type="html|svg|mermaid|code|markdown" title="My Title" [id="unique_id"] [language="typescript"]>content</create_artifact>
+    Creates or updates an interactive previewable artifact rendered in a side-by-side webview panel. If an id is provided, it updates the existing panel. Use type="markdown" for planning docs, checklists, or walkthroughs.
+
 `;
 }

@@ -29,6 +29,7 @@
     sendBtn.classList.remove('hidden');
     setAvatarState('idle');
     clearAllActiveAnimations();
+    if (typeof showToast === 'function') showToast('Response cancelled', 'warning', 2000);
   });
 
   function getPromptInputValue() {

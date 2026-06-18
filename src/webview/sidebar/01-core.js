@@ -403,3 +403,97 @@
       if (gitDrawer) gitDrawer.classList.add('collapsed');
     });
   }
+
+  // ===== TOAST NOTIFICATION SYSTEM =====
+  let _toastTimer = null;
+  /**
+   * Show a toast notification.
+   * @param {string} message - The message text
+   * @param {'success'|'error'|'info'|'warning'} type - Toast type
+   * @param {number} [duration=3500] - Auto-dismiss duration in ms
+   */
+  window.showToast = function (message, type, duration) {
+    type = type || 'info';
+    duration = duration || 3500;
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    const iconMap = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    toast.innerHTML = '<span style="font-size:14px;">' + (iconMap[type] || 'ℹ️') + '</span><span>' + message + '</span>';
+    toast.style.animationDuration = '0.3s, 0.3s';
+    toast.style.animationDelay = '0s, ' + (duration / 1000) + 's';
+    container.appendChild(toast);
+    // Auto-remove
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function () {
+      if (toast.parentNode) toast.remove();
+    }, duration + 350);
+    // Click to dismiss
+    toast.style.cursor = 'pointer';
+    toast.addEventListener('click', function () { toast.remove(); });
+  };
+
+  // ─── Search in Chat History ───────────────────────────────────────
+  var searchBar = document.getElementById('chat-search-bar');
+  var searchInput = document.getElementById('chat-search-input');
+  var searchClearBtn = document.getElementById('chat-search-clear');
+  var searchCount = document.getElementById('chat-search-count');
+  var searchHits = [];
+
+  function toggleSearchBar() {
+    var visible = searchBar.style.display !== 'none';
+    if (visible) {
+      searchBar.style.display = 'none';
+      searchInput.value = '';
+      clearSearchHighlights();
+    } else {
+      searchBar.style.display = 'flex';
+      searchInput.focus();
+    }
+  }
+
+  searchInput && searchInput.addEventListener('input', function () {
+    var query = searchInput.value.toLowerCase().trim();
+    clearSearchHighlights();
+    searchHits = [];
+    searchCount.textContent = '';
+    if (!query) return;
+    var bubbles = document.querySelectorAll('.message-bubble');
+    bubbles.forEach(function (bubble) {
+      var text = bubble.textContent || '';
+      if (text.toLowerCase().indexOf(query) !== -1) {
+        bubble.classList.add('search-hit');
+        searchHits.push(bubble);
+      }
+    });
+    searchCount.textContent = searchHits.length ? searchHits.length + ' match' + (searchHits.length > 1 ? 'es' : '') : 'No matches';
+    if (searchHits.length > 0) {
+      searchHits[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  searchClearBtn && searchClearBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    clearSearchHighlights();
+    searchCount.textContent = '';
+    searchInput.focus();
+  });
+
+  function clearSearchHighlights() {
+    document.querySelectorAll('.message-bubble.search-hit').forEach(function (el) {
+      el.classList.remove('search-hit');
+    });
+    searchHits = [];
+  }
+
+  // Ctrl+F / Cmd+F to toggle search
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== searchInput) {
+      e.preventDefault();
+      toggleSearchBar();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+      toggleSearchBar();
+    }
+  });

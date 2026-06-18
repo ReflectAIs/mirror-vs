@@ -45,4 +45,18 @@ describe('NativeToolCallParser JSON Repair', () => {
     expect(call?.name).toBe('read_file');
     expect(call?.path).toBe('src/index.ts');
   });
+
+  it('should parse valid create_artifact JSON', () => {
+    const call = NativeToolCallParser.parseToolCall(
+      'create_artifact',
+      '{"id": "test_artifact", "type": "markdown", "title": "My Title", "content": "# Hello World\\nContent here", "language": "markdown"}'
+    );
+    expect(call).not.toBeNull();
+    expect(call?.name).toBe('create_artifact');
+    expect(call?.id).toBe('test_artifact');
+    expect(call?.type).toBe('markdown');
+    expect(call?.title).toBe('My Title');
+    expect(call?.content).toBe('# Hello World\nContent here');
+    expect(call?.language).toBe('markdown');
+  });
 });

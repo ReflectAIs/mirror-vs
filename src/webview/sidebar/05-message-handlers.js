@@ -25,6 +25,43 @@
       }
       if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
         const msgElement = document.createElement('div');
+  // ─── Deep-link file paths in message text ─────────────────────────
+  function linkifyFilePaths(container) {
+    // Match absolute and relative file paths with extensions
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    var textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach(function (node) {
+      var text = node.textContent;
+      // Match common file path patterns: /absolute/path/file.ts, relative/path/file.tsx, dir/file.go
+      var pattern = /(\b(?:[a-zA-Z]:[\\\/])?[\w\.\-_\/\\]+\.(?:ts|tsx|js|jsx|json|html|css|py|go|rs|java|rb|php|c|cpp|h|hpp|md|txt|yml|yaml|toml|svg|png|jpg|gif|vue|svelte)\b)/gi;
+      if (pattern.test(text)) {
+        pattern.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var lastIdx = 0;
+        var match;
+        while ((match = pattern.exec(text)) !== null) {
+          var before = text.slice(lastIdx, match.index);
+          if (before) frag.appendChild(document.createTextNode(before));
+          var link = document.createElement('span');
+          link.className = 'file-path-link';
+          link.textContent = match[0];
+          link.title = 'Click to open: ' + match[0];
+          link.style.cssText = 'cursor:pointer;color:var(--color-primary-light);text-decoration:underline;';
+          link.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var path = this.textContent;
+            vscode.postMessage({ type: 'openFile', filePath: path });
+          });
+          frag.appendChild(link);
+          lastIdx = pattern.lastIndex;
+        }
+        var remaining = text.slice(lastIdx);
+        if (remaining) frag.appendChild(document.createTextNode(remaining));
+        node.parentNode && node.parentNode.replaceChild(frag, node);
+      }
+    });
+  }
         msgElement.className = 'message system-context';
         
         const banner = document.createElement('div');
@@ -138,6 +175,7 @@
       textContainer.innerHTML = parseMarkdown(text, isApproved);
       bindCodeBlockButtons(textContainer);
       applySyntaxHighlighting(textContainer);
+      linkifyFilePaths(textContainer);
       bubble.appendChild(textContainer);
     }
     
