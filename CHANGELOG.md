@@ -16,7 +16,7 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Changed
 - **🌐 Browser Navigation Overhaul**: `BrowserService.navigate()` now returns `{title, textContent}` instead of plain string; timeout increased to 30s; wait time increased to 10s for JS-heavy/SPA pages
-- **✨ Syntax Highlighting Fix**: Regex replacement for string literals changed from `$1` to `## [0.2.10] - 2025-07-16` across all syntax highlighters (JS/TS, Python, CSS, Bash, JSON, Diff) to correctly wrap the full string match
+- **✨ Syntax Highlighting Fix**: Regex replacement for string literals changed from `$1` to `- **✨ Syntax Highlighting Fix**: Regex replacement for string literals changed from `$1` to `## [0.2.10] - 2025-07-16` across all syntax highlighters (JS/TS, Python, CSS, Bash, JSON, Diff) to correctly wrap the full string match` across all syntax highlighters (JS/TS, Python, CSS, Bash, JSON, Diff) to correctly wrap the full string match
 - **📏 Context Compactor**: Type narrowing for `role` property in `sanitizeToolMessages` and `maybeCompact` to resolve TypeScript strict-mode errors
 - **📋 Prompt Specs Updated**: `toolSpecifications.ts` now includes `delete_file` and `rename_file` tool documentation, plus image read support instructions
 
