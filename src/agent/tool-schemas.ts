@@ -145,35 +145,7 @@ const TOOL_SCHEMAS: ToolSchema[] = [
       },
     },
   },
-  {
-    type: 'function',
-    function: {
-      name: 'delete_file',
-      description: 'Permanently delete a file from the workspace.',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Path of the file to delete.' },
-        },
-        required: ['path'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'rename_file',
-      description: 'Rename or move a file from one path to another.',
-      parameters: {
-        type: 'object',
-        properties: {
-          source_path: { type: 'string', description: 'Current absolute or relative file path.' },
-          destination_path: { type: 'string', description: 'The new destination file path.' },
-        },
-        required: ['source_path', 'destination_path'],
-      },
-    },
-  },
+
 
   // ─── Directory ────────────────────────────────────────────────────────────────
   {
