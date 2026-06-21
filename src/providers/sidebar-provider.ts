@@ -16,6 +16,7 @@ import { TelemetryService } from '../services/telemetry-service';
 import { ArtifactService } from '../services/artifact-service';
 import { EventBus } from '../services/event-bus';
 import { getAllSkills } from '../services/skill-service';
+import { McpService, McpServerConfig } from '../services/mcp-service';
 
 export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'mirror-vs.sidebar';
@@ -194,6 +195,12 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       const configChangeListener = vscode.workspace.onDidChangeConfiguration(async (e) => {
         if (e.affectsConfiguration('mirror-vs')) {
           await this._sendSettingsToWebview();
+          const config = vscode.workspace.getConfiguration('mirror-vs');
+          const servers = config.get<McpServerConfig[]>('mcpServers') || [];
+          this._view?.webview.postMessage({
+            type: 'mcpServers',
+            servers,
+          });
         }
       });
 
@@ -231,6 +238,68 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
             case 'getSettings': {
               await this._sendSettingsToWebview();
+              break;
+            }
+            case 'getMcpServers': {
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              const servers = config.get<McpServerConfig[]>('mcpServers') || [];
+              
+              // Ensure active servers are registered in McpService when requested
+              for (const server of servers) {
+                if (!server.disabled) {
+                  McpService.getInstance().addServer(server);
+                  try {
+                    await McpService.getInstance().discoverTools(server.name);
+                  } catch (err) {
+                    console.warn(`Failed to auto-start MCP server ${server.name}:`, err);
+                  }
+                }
+              }
+
+              this._view?.webview.postMessage({
+                type: 'mcpServers',
+                servers,
+              });
+              break;
+            }
+            case 'saveMcpServer': {
+              const newServer = (data as any).server as McpServerConfig;
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              const servers = config.get<McpServerConfig[]>('mcpServers') || [];
+              const index = servers.findIndex(s => s.name === newServer.name);
+              if (index >= 0) {
+                servers[index] = newServer;
+              } else {
+                servers.push(newServer);
+              }
+              await config.update('mcpServers', servers, vscode.ConfigurationTarget.Global);
+              
+              McpService.getInstance().addServer(newServer);
+              try {
+                await McpService.getInstance().discoverTools(newServer.name);
+              } catch (err) {
+                console.error(`Failed to discover tools for ${newServer.name}:`, err);
+              }
+
+              this._view?.webview.postMessage({
+                type: 'mcpServers',
+                servers,
+              });
+              break;
+            }
+            case 'deleteMcpServer': {
+              const name = (data as any).name;
+              const config = vscode.workspace.getConfiguration('mirror-vs');
+              const servers = config.get<McpServerConfig[]>('mcpServers') || [];
+              const filtered = servers.filter(s => s.name !== name);
+              await config.update('mcpServers', filtered, vscode.ConfigurationTarget.Global);
+
+              McpService.getInstance().removeServer(name);
+
+              this._view?.webview.postMessage({
+                type: 'mcpServers',
+                servers: filtered,
+              });
               break;
             }
             case 'saveSettings': {
@@ -558,7 +627,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 // Auto-revert any checkpoints in the deleted history
                 for (let i = deletedHistory.length - 1; i >= 0; i--) {
                   const msg = deletedHistory[i];
-                  if (msg.role === 'system' && msg.content) {
+                  if ((msg.role === 'system' || (msg.role as string) === 'tool') && msg.content) {
                     // Look for un-reverted checkpoints
                     const match = msg.content.match(/Revert ID: (\w+)/);
                     if (match) {

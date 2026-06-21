@@ -75,8 +75,9 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
         score += ratio * 0.5;
         continue;
       }
-      score = -Infinity;
-      break;
+      // Give it a 0 score for this line mismatch instead of setting score to -Infinity and breaking.
+      // This allows the rest of the lines in the block to match and verify.
+      score += 0;
     }
     if (score > bestScore) {
       bestScore = score;
@@ -354,16 +355,18 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
     }
 
     case 'rename_file': {
-      if (!tool.path) throw new Error('Missing "path" attribute for rename_file. Use path for source.');
-      if (!tool.content)
-        throw new Error('Missing "content" attribute for rename_file. Use content for destination path.');
-      const safePath = getSafePath(tool.path);
-      const destPath = getSafePath(tool.content.trim());
+      const source = tool.source_path || tool.path;
+      const destination = tool.destination_path || tool.content;
+      if (!source) throw new Error('Missing "source_path" or "path" attribute for rename_file.');
+      if (!destination)
+        throw new Error('Missing "destination_path" or "content" attribute for rename_file.');
+      const safePath = getSafePath(source);
+      const destPath = getSafePath(destination.trim());
       if (!fs.existsSync(safePath)) {
-        throw new Error(`Source file does not exist: ${tool.path}`);
+        throw new Error(`Source file does not exist: ${source}`);
       }
       if (fs.existsSync(destPath)) {
-        throw new Error(`Destination already exists: ${tool.content}`);
+        throw new Error(`Destination already exists: ${destination}`);
       }
 
       const config = vscode.workspace.getConfiguration('mirror-vs');
@@ -375,7 +378,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         } else {
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
-          approved = await MirrorVsSidebarProvider.requestToolApproval('rename_file', `${tool.path} -> ${tool.content}`);
+          approved = await MirrorVsSidebarProvider.requestToolApproval('rename_file', `${source} -> ${destination}`);
         }
       }
       if (!approved) {
@@ -387,7 +390,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         fs.mkdirSync(parentDir, { recursive: true });
       }
       fs.renameSync(safePath, destPath);
-      return `File renamed: ${tool.path} -> ${tool.content}`;
+      return `File renamed: ${source} -> ${destination}`;
     }
 
     case 'delete_file': {

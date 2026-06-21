@@ -107,6 +107,8 @@ export class AgentOrchestrator {
   private readonly _session: AgentSession;
   private readonly _completer: AgentCompleter;
 
+  private _activeMessages: ChatMessage[] | undefined;
+
   constructor(
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
     _getChatHistory: () => ChatMessage[],
@@ -116,6 +118,53 @@ export class AgentOrchestrator {
   ) {
     this._session = new AgentSession(_getSecret, _getChatHistory, _saveChatHistory, _postMessage, _getSafePath);
     this._completer = new AgentCompleter(_postMessage);
+  }
+
+  private _getOrCreateActiveMessages(incomingHistory: ChatMessage[]): ChatMessage[] {
+    if (!this._activeMessages) {
+      this._activeMessages = [...incomingHistory];
+      return this._activeMessages;
+    }
+
+    // Filter out system messages and summarized messages to compare the actual conversation sequence
+    const cachedConvo = this._activeMessages.filter((m) => m.role !== 'system' && !m.summarized);
+    const incomingConvo = incomingHistory.filter((m) => m.role !== 'system' && !m.summarized);
+
+    // Check if the cached conversation is a prefix of the incoming conversation
+    let isMatch = cachedConvo.length <= incomingConvo.length;
+    if (isMatch) {
+      for (let i = 0; i < cachedConvo.length; i++) {
+        if (
+          cachedConvo[i].role !== incomingConvo[i].role ||
+          cachedConvo[i].content !== incomingConvo[i].content
+        ) {
+          isMatch = false;
+          break;
+        }
+      }
+    }
+
+    if (isMatch) {
+      // Find the new messages in incomingHistory that are not in this._activeMessages
+      let newMessagesStartIdx = 0;
+      const lastAlignedMsg = cachedConvo[cachedConvo.length - 1];
+      if (lastAlignedMsg) {
+        for (let i = incomingHistory.length - 1; i >= 0; i--) {
+          const m = incomingHistory[i];
+          if (m.role === lastAlignedMsg.role && m.content === lastAlignedMsg.content) {
+            newMessagesStartIdx = i + 1;
+            break;
+          }
+        }
+      }
+      
+      const newMessages = incomingHistory.slice(newMessagesStartIdx);
+      this._activeMessages = [...this._activeMessages, ...newMessages];
+    } else {
+      this._activeMessages = [...incomingHistory];
+    }
+
+    return this._activeMessages;
   }
 
   public cancelActiveStream() {
@@ -284,6 +333,13 @@ export class AgentOrchestrator {
 
       // Inject task-relevant learned skills into conversation context (P1.3)
       currentMessages = injectRelevantSkills(currentMessages, text || '');
+      let activeMessages = this._getOrCreateActiveMessages(currentMessages);
+      activeMessages = injectRelevantSkills(activeMessages, text || '');
+
+      const pushToHistory = (msg: ChatMessage) => {
+        currentMessages.push(msg);
+        activeMessages.push(msg);
+      };
 
       await this._ensureGitBaseline();
 
@@ -315,6 +371,7 @@ export class AgentOrchestrator {
             ].join('\n'),
           };
           currentMessages.unshift(mapMsg);
+          activeMessages.unshift(mapMsg);
           await this._saveChatHistory(currentMessages);
         } catch (e) {
           console.warn('Failed to generate project map:', e);
@@ -681,11 +738,11 @@ export class AgentOrchestrator {
           const effectiveBudget = computeInputTokenBudget(configuredBudget, contextWindow, explicitBudget, { hardMax, headroom });
 
           // Auto-compaction check using our new context compactor service
-          const compactionResult = await maybeCompact(currentMessages, effectiveBudget, async (summaryPrompt) => {
+          const compactionResult = await maybeCompact(activeMessages, effectiveBudget, async (summaryPrompt) => {
             this._postMessage({ type: 'chatResponseStart' });
             this._postMessage({
               type: 'chatResponseChunk',
-              text: `Compressing context (~${Math.round(estimateTokens(currentMessages) / 1000)}K tokens, budget: ${Math.round(effectiveBudget / 1000)}K)...`,
+              text: `Compressing context (~${Math.round(estimateTokens(activeMessages) / 1000)}K tokens, budget: ${Math.round(effectiveBudget / 1000)}K)...`,
             });
             const summary = await this._completer.summarizeHistory(
               provider as LLMProvider,
@@ -699,9 +756,8 @@ export class AgentOrchestrator {
           });
 
           if (compactionResult.wasCompacted) {
-            currentMessages = compactionResult.compactedMessages;
-            await this._saveChatHistory(currentMessages);
-            this._postMessage({ type: 'updateChatHistory', history: currentMessages });
+            activeMessages = compactionResult.compactedMessages;
+            this._activeMessages = activeMessages; // Keep cache updated
           }
 
           continueLoop = false;
@@ -710,7 +766,7 @@ export class AgentOrchestrator {
           const useNativeTools = supportsNativeToolCalling(provider, currentModel);
           const toolSchemas = useNativeTools ? getToolSchemas() : undefined;
 
-          const resolvedPayloadPromises = currentMessages
+          const resolvedPayloadPromises = activeMessages
             .filter((msg) => !msg.summarized)
             .map(async (msg) => {
               let content = msg.content;
@@ -734,7 +790,7 @@ export class AgentOrchestrator {
               role: 'system',
               content: buildSystemPrompt(
                 loopCount,
-                hasDeclaredPlan(currentMessages, ''),
+                hasDeclaredPlan(activeMessages, ''),
                 featureOwner,
                 agentState,
                 taskMode,
@@ -853,7 +909,7 @@ export class AgentOrchestrator {
           // can correctly associate the subsequent role:'tool' message
           if (nativeToolCall) {
             const ntc = nativeToolCall as { id: string; name: string; argsJson: string };
-            currentMessages.push({
+            pushToHistory({
               role: 'assistant',
               content: assistantResponse || '',
               tool_calls: [
@@ -865,7 +921,7 @@ export class AgentOrchestrator {
               ],
             } as any);
           } else {
-            currentMessages.push({ role: 'assistant', content: assistantResponse });
+            pushToHistory({ role: 'assistant', content: assistantResponse });
           }
 
           this._syncPlanningFiles(assistantResponse);
@@ -1482,7 +1538,7 @@ export class AgentOrchestrator {
               // Native tool calling: push role:'tool' message for each result
               // We combine all results into one message (only one tool runs at a time on native path)
               const toolResultContent = finalSystemContent;
-              currentMessages.push({
+              pushToHistory({
                 role: 'tool' as any,
                 content: toolResultContent,
                 tool_call_id: (nativeToolCall as any).id,
@@ -1491,7 +1547,7 @@ export class AgentOrchestrator {
               // XML fallback: wrap as untrusted system message
               const systemMessage = untrustedContextMessage('tool_execution_results', finalSystemContent);
               if (images.length > 0) systemMessage.images = images;
-              currentMessages.push(systemMessage);
+              pushToHistory(systemMessage);
             }
             await this._saveChatHistory(currentMessages);
 
@@ -1535,7 +1591,6 @@ export class AgentOrchestrator {
               'analyze_dependencies',
               'analyze_complexity',
               'analyze_coverage',
-              'analyze_dead_code',
               'analyze_impact',
               'graphify',
             ];
@@ -1554,19 +1609,19 @@ export class AgentOrchestrator {
             if (turnEval.status === 'failure' && consecutiveVerbalGiveUps < 3) {
               consecutiveVerbalGiveUps++;
               const errorMsg = `[System Notice]: You indicated uncertainty: ${turnEval.reason}. Please use the available tools to investigate rather than guessing or giving up. You have tools like grep_search, read_file, etc. to find the necessary files and verify details.`;
-              currentMessages.push({ role: 'system', content: errorMsg });
+              pushToHistory({ role: 'system', content: errorMsg });
               await this._saveChatHistory(currentMessages);
-
+ 
               // Fire teacher escalation on verbal give-up (P1.4)
               maybeEscalate(text || '', [], assistantResponse, this._getSecret, this._postMessage);
-
+ 
               continueLoop = true;
             } else if (hasToolAttempt && consecutiveMalformedCount < maxMalformedRetries) {
               consecutiveMalformedCount++;
               const errorMsg = useNativeTools
                 ? `[Tool Parsing Error]: Your tool call parameters were malformed or incomplete (attempt ${consecutiveMalformedCount}/${maxMalformedRetries}). Please retry by outputting a valid tool call with properly formatted JSON arguments.`
                 : `[Tool Parsing Error]: Your tool call was malformed or incomplete (attempt ${consecutiveMalformedCount}/${maxMalformedRetries}). Please retry with correct XML syntax.`;
-              currentMessages.push({ role: 'system', content: errorMsg });
+              pushToHistory({ role: 'system', content: errorMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (routingMatch && toolCalls.length === 0) {
@@ -1575,7 +1630,7 @@ export class AgentOrchestrator {
               const nudgeMsg = useNativeTools
                 ? '[System Notice]: You emitted an <architecture_routing> block but did not invoke any functions. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately invoke exactly one function from the tools schema to proceed with your task.'
                 : '[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.';
-              currentMessages.push({ role: 'system', content: nudgeMsg });
+              pushToHistory({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (loopCount === 1 && hasActionPlanningIntent(assistantResponse)) {
@@ -1584,7 +1639,20 @@ export class AgentOrchestrator {
               const nudgeMsg = useNativeTools
                 ? "[System Notice]: You did not invoke any tool functions in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please invoke a valid tool function now to continue autonomously."
                 : "[System Notice]: You did not invoke any tool tags in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please output a valid tool tag now to continue autonomously.";
-              currentMessages.push({ role: 'system', content: nudgeMsg });
+              pushToHistory({ role: 'system', content: nudgeMsg });
+              await this._saveChatHistory(currentMessages);
+              continueLoop = true;
+            } else if (
+              (taskMode === TaskMode.IMPLEMENT || taskMode === TaskMode.DEBUG || taskMode === TaskMode.VERIFY) &&
+              !assistantResponse.includes('<walkthrough>') &&
+              toolCalls.length === 0
+            ) {
+              // Non-completion conversational nudge: if the model is in implementation/debugging/verification mode
+              // and did not produce a tool call or output a walkthrough, keep the loop alive by nudging it.
+              const nudgeMsg = useNativeTools
+                ? "[System Notice]: You did not invoke any tool functions or output a final <walkthrough> block. If you are still working on the task, you MUST invoke a tool (such as read_file, patch_file, run_command, etc.) to continue implementation. If you have completed the task, you MUST output a <walkthrough>...</walkthrough> block to document your changes and conclude the session."
+                : "[System Notice]: You did not invoke any tool tags or output a final <walkthrough> block. If you are still working on the task, you MUST output a valid tool tag (such as <read_file ...>, <patch_file ...>, <run_command ...>, etc.) to continue implementation. If you have completed the task, you MUST output a <walkthrough>...</walkthrough> block to document your changes and conclude the session.";
+              pushToHistory({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             }
@@ -1604,7 +1672,7 @@ export class AgentOrchestrator {
       } catch (err: unknown) {
         if (signal.aborted) {
           console.log('Agent stream aborted.');
-          currentMessages.push({
+          pushToHistory({
             role: 'system',
             content: '[System Notice]: The user manually aborted/stopped execution during this turn. All pending tool executions, file edits, or commands have been canceled. Stop your execution immediately and wait for the user\'s next input.'
           });
