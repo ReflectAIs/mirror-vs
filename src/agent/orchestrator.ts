@@ -760,6 +760,12 @@ export class AgentOrchestrator {
             this._activeMessages = activeMessages; // Keep cache updated
           }
 
+          this._postMessage({
+            type: 'contextUsage',
+            usedTokens: estimateTokens(activeMessages),
+            maxTokens: effectiveBudget,
+          });
+
           continueLoop = false;
 
           // Determine if this provider supports native tool calling (computed before payload assembly)

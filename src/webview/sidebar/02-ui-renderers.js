@@ -99,6 +99,223 @@
   let isAutocompleteOpen = false;
   let validationTimeout = null;
 
+  // ─── Token Usage Bar ────────────────────────────────────────────────────────
+  let sessionInputTokens = 0;
+  let sessionOutputTokens = 0;
+  let sessionCost = 0;
+  const tokenBar = document.getElementById('token-usage-bar');
+  const tokenInLabel = document.getElementById('token-in-label');
+  const tokenOutLabel = document.getElementById('token-out-label');
+  const tokenCostLabel = document.getElementById('token-cost-label');
+  const tokenResetBtn = document.getElementById('token-reset-btn');
+
+  function updateTokenBar(inputDelta, outputDelta, costDelta) {
+    sessionInputTokens += inputDelta;
+    sessionOutputTokens += outputDelta;
+    sessionCost += costDelta;
+    if (tokenBar) tokenBar.classList.remove('hidden');
+    if (tokenInLabel) tokenInLabel.textContent = '↑ ' + (sessionInputTokens >= 1000 ? (sessionInputTokens / 1000).toFixed(1) + 'k' : sessionInputTokens);
+    if (tokenOutLabel) tokenOutLabel.textContent = '↓ ' + (sessionOutputTokens >= 1000 ? (sessionOutputTokens / 1000).toFixed(1) + 'k' : sessionOutputTokens);
+    if (tokenCostLabel) tokenCostLabel.textContent = sessionCost > 0 ? '~$' + sessionCost.toFixed(4) : '~$0.000';
+  }
+  window.updateTokenBar = updateTokenBar;
+
+  if (tokenResetBtn) {
+    tokenResetBtn.addEventListener('click', () => {
+      sessionInputTokens = 0; sessionOutputTokens = 0; sessionCost = 0;
+      if (tokenBar) tokenBar.classList.add('hidden');
+    });
+  }
+
+  // ─── Context Usage Bar ──────────────────────────────────────────────────────
+  const contextUsageRow = document.getElementById('context-usage-row');
+  const contextUsageFill = document.getElementById('context-usage-fill');
+  const contextUsageLabel = document.getElementById('context-usage-label');
+
+  function updateContextBar(usedTokens, maxTokens) {
+    if (!contextUsageRow || !contextUsageFill || !contextUsageLabel) return;
+    const pct = Math.min(100, Math.round((usedTokens / Math.max(maxTokens, 1)) * 100));
+    contextUsageRow.classList.remove('hidden');
+    contextUsageFill.style.width = pct + '%';
+    contextUsageFill.classList.toggle('warn', pct >= 60 && pct < 85);
+    contextUsageFill.classList.toggle('danger', pct >= 85);
+    const toK = (n) => n >= 1000 ? (n / 1000).toFixed(0) + 'k' : n;
+    contextUsageLabel.textContent = 'Context: ' + toK(usedTokens) + ' / ' + toK(maxTokens);
+  }
+  window.updateContextBar = updateContextBar;
+
+  // ─── Slash Command Picker ───────────────────────────────────────────────────
+  const SLASH_COMMANDS = [
+    { key: '/fix',      desc: 'Find and fix bugs in the active file' },
+    { key: '/explain',  desc: 'Explain the current file or selected code' },
+    { key: '/test',     desc: 'Write unit tests for the active file' },
+    { key: '/commit',   desc: 'Generate a git commit message from staged changes' },
+    { key: '/refactor', desc: 'Refactor the active file for readability & performance' },
+    { key: '/review',   desc: 'Code review: bugs, security, style' },
+    { key: '/docs',     desc: 'Generate JSDoc/TSDoc documentation' },
+    { key: '/ask',      desc: 'Ask a general question' },
+  ];
+  const slashPicker = document.getElementById('slash-command-picker');
+  let slashPickerIndex = 0;
+  let slashPickerOpen = false;
+  let slashFilteredCmds = SLASH_COMMANDS;
+
+  function renderSlashPicker(filter) {
+    if (!slashPicker) return;
+    slashFilteredCmds = filter ? SLASH_COMMANDS.filter(c => c.key.startsWith('/' + filter)) : SLASH_COMMANDS;
+    if (slashFilteredCmds.length === 0) { closeSlashPicker(); return; }
+    slashPickerIndex = 0;
+    slashPicker.innerHTML = '<div class="slash-picker-header">Slash Commands</div>' +
+      slashFilteredCmds.map((c, i) =>
+        `<div class="slash-cmd-row${i === 0 ? ' selected' : ''}" data-cmd="${c.key}" role="option">
+          <span class="slash-cmd-key">${c.key}</span>
+          <span class="slash-cmd-desc">${c.desc}</span>
+        </div>`
+      ).join('');
+    slashPicker.querySelectorAll('.slash-cmd-row').forEach((row, i) => {
+      row.addEventListener('mouseenter', () => { slashPickerIndex = i; highlightSlashRow(); });
+      row.addEventListener('click', () => applySlashCommand(slashFilteredCmds[i].key));
+    });
+    slashPicker.classList.remove('hidden');
+    slashPickerOpen = true;
+  }
+
+  function highlightSlashRow() {
+    if (!slashPicker) return;
+    slashPicker.querySelectorAll('.slash-cmd-row').forEach((r, i) => r.classList.toggle('selected', i === slashPickerIndex));
+  }
+
+  function closeSlashPicker() {
+    if (slashPicker) slashPicker.classList.add('hidden');
+    slashPickerOpen = false;
+  }
+
+  function applySlashCommand(cmd) {
+    if (!promptInput) return;
+    promptInput.textContent = cmd + ' ';
+    // Move cursor to end
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(promptInput);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    closeSlashPicker();
+    promptInput.focus();
+  }
+
+  if (promptInput) {
+    promptInput.addEventListener('input', () => {
+      const text = promptInput.textContent || '';
+      if (text === '/') {
+        renderSlashPicker('');
+      } else if (text.startsWith('/') && !text.includes(' ')) {
+        renderSlashPicker(text.slice(1));
+      } else {
+        closeSlashPicker();
+      }
+    });
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (!slashPickerOpen) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        slashPickerIndex = (slashPickerIndex + 1) % slashFilteredCmds.length;
+        highlightSlashRow();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        slashPickerIndex = (slashPickerIndex - 1 + slashFilteredCmds.length) % slashFilteredCmds.length;
+        highlightSlashRow();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applySlashCommand(slashFilteredCmds[slashPickerIndex].key);
+      } else if (e.key === 'Escape') {
+        closeSlashPicker();
+      }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (slashPicker && !slashPicker.contains(e.target) && e.target !== promptInput) closeSlashPicker();
+  });
+
+  // ─── Memory Panel ───────────────────────────────────────────────────────────
+  const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
+  const memoryDrawer = document.getElementById('memory-drawer');
+  const memoryEntriesList = document.getElementById('memory-entries-list');
+  const memoryRefreshBtn = document.getElementById('memory-refresh-btn');
+  const memoryClearBtn = document.getElementById('memory-clear-btn');
+
+  function renderMemoryPanel(entries) {
+    if (!memoryEntriesList) return;
+    if (!entries || entries.length === 0) {
+      memoryEntriesList.innerHTML = '<div class="no-memory-msg" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">No memory entries yet.</div>';
+      return;
+    }
+    const categories = ['convention', 'architecture', 'pattern', 'preference', 'note'];
+    const catLabels = { convention: '📋 Conventions', architecture: '🏗️ Architecture', pattern: '🔁 Patterns', preference: '⚙️ Preferences', note: '📝 Notes' };
+    let html = '';
+    for (const cat of categories) {
+      const catEntries = entries.filter(e => e.category === cat);
+      if (!catEntries.length) continue;
+      html += `<div class="memory-category-header">${catLabels[cat] || cat}</div>`;
+      for (const entry of catEntries) {
+        html += `<div class="memory-entry">
+          <div class="memory-entry-body">
+            <div class="memory-entry-key">${entry.key}</div>
+            <div class="memory-entry-value">${entry.value}</div>
+          </div>
+          <button class="memory-entry-delete" data-key="${entry.key}" title="Delete this memory entry">🗑</button>
+        </div>`;
+      }
+    }
+    memoryEntriesList.innerHTML = html;
+    memoryEntriesList.querySelectorAll('.memory-entry-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        vscode.postMessage({ type: 'deleteMemory', key });
+        btn.closest('.memory-entry').style.opacity = '0.3';
+        setTimeout(() => vscode.postMessage({ type: 'getMemory' }), 300);
+      });
+    });
+  }
+  window.renderMemoryPanel = renderMemoryPanel;
+
+  if (toggleMemoryBtn) {
+    toggleMemoryBtn.addEventListener('click', () => {
+      const isOpen = memoryDrawer && !memoryDrawer.classList.contains('collapsed');
+      // Close all drawers
+      document.querySelectorAll('.drawer').forEach(d => d.classList.add('collapsed'));
+      if (!isOpen && memoryDrawer) {
+        memoryDrawer.classList.remove('collapsed');
+        vscode.postMessage({ type: 'getMemory' });
+      }
+    });
+  }
+  if (memoryRefreshBtn) memoryRefreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'getMemory' }));
+  if (memoryClearBtn) memoryClearBtn.addEventListener('click', () => {
+    if (confirm('Clear all agent memory entries?')) {
+      vscode.postMessage({ type: 'clearMemory' });
+      setTimeout(() => vscode.postMessage({ type: 'getMemory' }), 300);
+    }
+  });
+
+  // ─── Commit / PR Generator Buttons ──────────────────────────────────────────
+  const genCommitBtn = document.getElementById('gen-commit-btn');
+  const genPrBtn = document.getElementById('gen-pr-btn');
+
+  if (genCommitBtn) {
+    genCommitBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'genCommitMessage' });
+    });
+  }
+  if (genPrBtn) {
+    genPrBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'genPrDescription' });
+    });
+  }
+
+
+
   // Map to store parsed created/updated file contents from assistant messages
   const parsedToolContents = new Map();
 

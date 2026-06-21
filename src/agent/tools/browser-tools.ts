@@ -27,8 +27,8 @@ export async function executeBrowserTool(tool: ToolCall, getSafePath: (p: string
   switch (tool.name) {
     case 'browser_navigate': {
       if (!tool.url) throw new Error('Missing "url" attribute for browser_navigate.');
-      const html = await browser.navigate(tool.url);
-      return `Navigated to ${tool.url}\nPage title: ${html.title}\nText content (first 5000 chars):\n${(html.textContent || '').substring(0, 5000)}`;
+      const { title, textContent } = await browser.navigate(tool.url);
+      return `Navigated to ${tool.url}\nPage title: ${title}\nText content (first 5000 chars):\n${textContent.substring(0, 5000)}`;
     }
 
     case 'browser_click': {

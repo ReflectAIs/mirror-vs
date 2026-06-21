@@ -198,7 +198,32 @@
       return;
     }
 
+    // Token usage update
+    if (message.type === 'tokenUsage' && message.usage) {
+      if (typeof window.updateTokenBar === 'function') {
+        window.updateTokenBar(message.usage.input || 0, message.usage.output || 0, message.usage.cost || 0);
+      }
+      return;
+    }
+
+    // Context window usage update
+    if (message.type === 'contextUsage') {
+      if (typeof window.updateContextBar === 'function') {
+        window.updateContextBar(message.usedTokens || 0, message.maxTokens || 200000);
+      }
+      return;
+    }
+
+    // Memory panel data
+    if (message.type === 'memoryData') {
+      if (typeof window.renderMemoryPanel === 'function') {
+        window.renderMemoryPanel(message.entries || []);
+      }
+      return;
+    }
+
     switch (message.type) {
+
       case 'updateSettings': {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;

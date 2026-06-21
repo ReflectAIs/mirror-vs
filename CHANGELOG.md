@@ -3,6 +3,26 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.11] - 2025-07-16
+
+### Added
+- **🧠 Agent Memory Drawer**: New memory drawer panel with refresh/clear controls, category-based rendering (`convention`, `architecture`, `pattern`, `preference`, `note`), and per-entry deletion — accessible via the new memory icon button in the sidebar header
+- **⚡ Token Usage & Cost Tracking**: Live real-time token usage bar showing input/output tokens and estimated cost, with context window utilization progress bar; resets on click
+- **🗂️ Slash Command Picker**: Inline `/` command palette supporting `/fix`, `/explain`, `/test`, `/commit`, `/refactor`, `/review`, `/docs`, `/ask` with keyboard navigation and autocomplete
+- **🗑️ delete_file Tool**: Agent can now permanently delete files with automatic checkpoint creation for revertability and user approval flow
+- **📂 rename_file Tool**: Agent can rename/move files within the workspace with automatic parent directory creation and checkpoint support
+- **🖼️ Image Vision Support**: Agent can read image files (PNG, JPG, GIF, WEBP) via `read_file` — images are auto-encoded to base64 and sent to the vision model
+- **🔐 SecretService Singleton**: `SecretService.getInstance()` for shared access across the extension, with convenient `get()` alias method
+
+### Changed
+- **🌐 Browser Navigation Overhaul**: `BrowserService.navigate()` now returns `{title, textContent}` instead of plain string; timeout increased to 30s; wait time increased to 10s for JS-heavy/SPA pages
+- **✨ Syntax Highlighting Fix**: Regex replacement for string literals changed from `$1` to `## [0.2.10] - 2025-07-16` across all syntax highlighters (JS/TS, Python, CSS, Bash, JSON, Diff) to correctly wrap the full string match
+- **📏 Context Compactor**: Type narrowing for `role` property in `sanitizeToolMessages` and `maybeCompact` to resolve TypeScript strict-mode errors
+- **📋 Prompt Specs Updated**: `toolSpecifications.ts` now includes `delete_file` and `rename_file` tool documentation, plus image read support instructions
+
+### Fixed
+- **🔧 Context Usage Emission**: Orchestrator now emits `contextUsage` message to the webview with accurate `usedTokens` and `maxTokens` values
+
 ## [0.2.10] - 2025-07-16
 
 ### Added

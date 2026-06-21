@@ -75,6 +75,20 @@ export interface ToolCall {
   key?: string;
   value?: string;
   id?: string;
+  // Artifact tool properties
+  type?: string;
+  artifactType?: string;
+  language?: string;
+  body?: string;
+  // Developer tool properties
+  code?: string;
+  pattern?: string;
+  target?: string;
+  // Agent memory property
+  category?: string;
+  // File rename properties
+  from?: string;
+  to?: string;
 }
 
 export type ToolStatus = 'running' | 'success' | 'error';

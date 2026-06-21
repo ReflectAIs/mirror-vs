@@ -57,25 +57,28 @@
     // Slash command handling
     let text = rawText;
     let isSlashCommand = false;
-    const slashMatch = text.match(/^\/(fix|explain|test)\b\s*(.*)/i);
+    const slashMatch = text.match(/^\/(fix|explain|test|commit|refactor|review|docs|ask)\b\s*(.*)/is);
     if (slashMatch) {
       const command = slashMatch[1].toLowerCase();
       const rest = slashMatch[2].trim();
       isSlashCommand = true;
-      const selection = window.getSelection()?.toString() || '';
-
-      if ((command === 'fix' || command === 'explain') && !selection && !rest) {
-        appendMessageBubble('system', 'Please select code in the editor first, or add a description after the slash command (e.g., /fix this bug where...).');
-        scrollChatToBottom(true);
-        return;
-      }
 
       if (command === 'fix') {
-        text = rest ? 'Fix the following code/issue: ' + rest : 'Fix this code:\n';
+        text = rest ? 'Fix the following code/issue: ' + rest : 'Analyze the active file and fix any bugs, errors, or issues you find. Explain each fix.';
       } else if (command === 'explain') {
-        text = rest ? 'Explain this: ' + rest : 'Explain this code:\n';
+        text = rest ? 'Explain this: ' + rest : 'Explain the current file or selected code in detail — what it does, why it works that way, and any potential issues.';
       } else if (command === 'test') {
-        text = rest ? 'Write tests for: ' + rest : 'Write unit tests for this code:\n';
+        text = rest ? 'Write tests for: ' + rest : 'Write comprehensive unit tests for the active file. Use the existing test framework in this project.';
+      } else if (command === 'commit') {
+        text = 'Generate a concise, conventional commit message for the current staged git changes. Run `git diff --staged` first to see the changes, then output ONLY the commit message (no extra commentary).';
+      } else if (command === 'refactor') {
+        text = rest ? 'Refactor this: ' + rest : 'Refactor the active file for better readability, maintainability, and performance. Preserve all functionality. Explain each refactoring decision.';
+      } else if (command === 'review') {
+        text = rest ? 'Code review: ' + rest : 'Perform a thorough code review of the active file. Check for bugs, performance issues, security vulnerabilities, missing error handling, and style inconsistencies.';
+      } else if (command === 'docs') {
+        text = rest ? 'Generate documentation for: ' + rest : 'Generate comprehensive JSDoc/TSDoc comments for all exported functions, classes, and types in the active file.';
+      } else if (command === 'ask') {
+        text = rest || 'What can I help you with?';
       }
     }
 

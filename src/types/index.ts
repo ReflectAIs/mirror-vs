@@ -202,7 +202,14 @@ export type WebviewToExtensionMessage =
   | { type: 'generateCommitMessage' }
   | { type: 'searchSessions'; query: string }
   | { type: 'showWarning'; text: string }
-  | { type: 'toolApprovalResponse'; approved: boolean };
+  | { type: 'toolApprovalResponse'; approved: boolean }
+  // MCP / sensitive command messages
+  | { type: 'sensitiveCommandResponse'; approved: boolean }
+  | { type: 'getMcpServers' }
+  | { type: 'saveMcpServer'; server: any }
+  | { type: 'deleteMcpServer'; name: string }
+  // Settings query
+  | { type: 'getSetting'; key: string };
 
 // Messages sent from Extension Host -> Webview
 export type ExtensionToWebviewMessage =

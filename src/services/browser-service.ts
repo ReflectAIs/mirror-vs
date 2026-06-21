@@ -84,15 +84,19 @@ export class BrowserService {
     }
   }
 
-  public async navigate(url: string): Promise<string> {
+  public async navigate(url: string): Promise<{ title: string; textContent: string }> {
     try {
       const page = await this.getPage();
       // Use 'domcontentloaded' — 'networkidle2' hangs indefinitely on dev servers
       // that maintain persistent connections (e.g. python http.server, vite HMR).
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-      // Give scripts a moment to execute before reading the DOM
-      await new Promise((r) => setTimeout(r, 800));
-      return `Navigated to ${url}`;
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Wait 10 seconds for JS-heavy pages, SPAs, and dev servers to finish rendering.
+      await new Promise((r) => setTimeout(r, 10000));
+      const title: string = await page.title();
+      const textContent: string = await page.evaluate(
+        () => (document.body?.innerText || '').trim(),
+      );
+      return { title, textContent };
     } catch (error) {
       this.logError(`navigate(${url})`, error);
       throw error;

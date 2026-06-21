@@ -29,7 +29,7 @@ const TOOL_SCHEMAS: ToolSchema[] = [
     function: {
       name: 'read_file',
       description:
-        'Read the contents of a file from the workspace. Use start_line and end_line to read a specific range. Always read a file before patching it.',
+        'Read the contents of a file from the workspace. If the file is an image (PNG, JPG, JPEG, GIF, WEBP, etc.), reading it will automatically encode the image to base64 and feed it into your vision model context. Use start_line and end_line to read specific ranges of text files.',
       parameters: {
         type: 'object',
         properties: {
@@ -458,6 +458,48 @@ const TOOL_SCHEMAS: ToolSchema[] = [
           },
         },
         required: ['type', 'title', 'content'],
+      },
+    },
+  },
+
+  // ─── File Management ──────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'delete_file',
+      description:
+        'Permanently delete a file from the workspace. Use with caution — a checkpoint is created automatically so the action can be reverted. Requires user approval unless auto-approve is enabled.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Absolute or workspace-relative path of the file to delete.',
+          },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'rename_file',
+      description:
+        'Rename or move a file within the workspace. Provide the current path as "from" and the new path as "to". Parent directories for the destination are created automatically. A checkpoint is created so the action can be reverted.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: {
+            type: 'string',
+            description: 'Current path of the file to rename/move.',
+          },
+          to: {
+            type: 'string',
+            description: 'New path (including new filename) for the file.',
+          },
+        },
+        required: ['from', 'to'],
       },
     },
   },

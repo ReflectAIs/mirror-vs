@@ -154,6 +154,42 @@ function validatePatchStructure(search: string, replace: string): string[] {
 }
 
 /**
+ * Validates the final file content after patch application.
+ */
+function verifyPostPatch(filePath: string, content: string): string[] {
+  const warnings: string[] = [];
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.json') {
+    try {
+      JSON.parse(content);
+    } catch (err: any) {
+      warnings.push(`JSON Syntax Error: Patched file is not valid JSON: ${err.message}`);
+    }
+  }
+
+  const countBr = (s: string, ch: string) => (s.match(new RegExp(`\\${ch}`, 'g')) || []).length;
+  const openBr = countBr(content, '{');
+  const closeBr = countBr(content, '}');
+  const openP = countBr(content, '(');
+  const closeP = countBr(content, ')');
+  const openB = countBr(content, '[');
+  const closeB = countBr(content, ']');
+
+  if (openBr !== closeBr) {
+    warnings.push(`Mismatched braces {}: file has ${openBr} open braces and ${closeBr} closing braces`);
+  }
+  if (openP !== closeP) {
+    warnings.push(`Mismatched parentheses (): file has ${openP} open parentheses and ${closeP} closing parentheses`);
+  }
+  if (openB !== closeB) {
+    warnings.push(`Mismatched brackets []: file has ${openB} open brackets and ${closeB} closing brackets`);
+  }
+
+  return warnings;
+}
+
+/**
  * Writes changes to the file instantly and silently, opening it in the active editor.
  * Returns accepted: true immediately so the model never blocks or halts.
  */
@@ -362,69 +398,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       return `File updated and opened in editor: ${tool.path} (+${addedLines}, -${subtractedLines}). Revert ID: ${checkpointId}`;
     }
 
-    case 'rename_file': {
-      const source = tool.source_path || tool.path;
-      const destination = tool.destination_path || tool.content;
-      if (!source) throw new Error('Missing "source_path" or "path" attribute for rename_file.');
-      if (!destination)
-        throw new Error('Missing "destination_path" or "content" attribute for rename_file.');
-      const safePath = getSafePath(source);
-      const destPath = getSafePath(destination.trim());
-      if (!fs.existsSync(safePath)) {
-        throw new Error(`Source file does not exist: ${source}`);
-      }
-      if (fs.existsSync(destPath)) {
-        throw new Error(`Destination already exists: ${destination}`);
-      }
 
-      const config = vscode.workspace.getConfiguration('mirror-vs');
-      const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
-      let approved = true;
-      if (!autoApproveWrite) {
-        if (process.env.VITEST) {
-          approved = true;
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
-          approved = await MirrorVsSidebarProvider.requestToolApproval('rename_file', `${source} -> ${destination}`);
-        }
-      }
-      if (!approved) {
-        throw new Error('User rejected file rename.');
-      }
-
-      const parentDir = path.dirname(destPath);
-      if (!fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
-      }
-      fs.renameSync(safePath, destPath);
-      return `File renamed: ${source} -> ${destination}`;
-    }
-
-    case 'delete_file': {
-      if (!tool.path) throw new Error('Missing "path" attribute for delete_file.');
-      const safePathDel = getSafePath(tool.path);
-      if (!fs.existsSync(safePathDel)) {
-        throw new Error(`File does not exist: ${tool.path}`);
-      }
-      const stat = fs.statSync(safePathDel);
-      if (stat.isDirectory()) {
-        throw new Error(`Cannot delete directory with delete_file. Path is a directory: ${tool.path}`);
-      }
-      const originalContent = fs.readFileSync(safePathDel, 'utf8');
-      const subtractedLines = originalContent ? originalContent.split('\n').length : 0;
-
-      const { accepted, checkpointId } = await confirmChangesWithDiff(
-        safePathDel,
-        '',
-        path.basename(tool.path),
-        'replace',
-      );
-      if (!accepted) {
-        throw new Error('User rejected file deletion.');
-      }
-      return `File deletion proposed and opened in editor: ${tool.path} (+0, -${subtractedLines}). Revert ID: ${checkpointId}`;
-    }
 
     case 'patch_file': {
       if (!tool.path) throw new Error('Missing "path" attribute for patch_file.');
@@ -524,6 +498,9 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           fileContent = fileLines.join('\n');
         }
       }
+      // Run post-patch verification
+      const postPatchWarnings = verifyPostPatch(tool.path, fileContent);
+      warnings.push(...postPatchWarnings);
 
       const { accepted, checkpointId } = await confirmChangesWithDiff(
         safePath,
@@ -611,6 +588,9 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           currentFileLines.splice(start_line - 1, patchesToApply[i].end_line - start_line + 1, adjustedReplace);
           fileContent = currentFileLines.join('\n');
         }
+        // Run post-patch verification
+        const postPatchWarnings = verifyPostPatch(tool.path, fileContent);
+        fileWarnings.push(...postPatchWarnings);
 
         const { accepted, checkpointId } = await confirmChangesWithDiff(
           safePath,
@@ -775,7 +755,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         fs.writeFileSync(taskPath, content, 'utf8');
 
         // Sync to artifact service
-        const { ArtifactService } = await import('../../services/artifact-service');
+        const { ArtifactService } = await import('../../services/artifact-service.js');
         await ArtifactService.getInstance().createOrUpdateArtifact(
           'task',
           'markdown',
@@ -790,8 +770,74 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       }
     }
 
+
+    case 'delete_file': {
+      if (!tool.path) throw new Error('Missing "path" attribute for delete_file.');
+      const safePath = getSafePath(tool.path);
+      if (!fs.existsSync(safePath)) {
+        throw new Error(`File does not exist: ${tool.path}`);
+      }
+
+      // Request approval (respects autoApproveWrite setting)
+      const config = vscode.workspace.getConfiguration('mirror-vs');
+      const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
+      if (!autoApproveWrite && !process.env.VITEST) {
+        const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+        const approved = await MirrorVsSidebarProvider.requestToolApproval(
+          'delete_file',
+          tool.path,
+          `Permanently delete file: ${tool.path}`,
+        );
+        if (!approved) throw new Error(`User rejected deletion of ${tool.path}.`);
+      }
+
+      // Create checkpoint so the delete can be reverted
+      const checkpointId = await createCheckpoint(safePath, 'create');
+      fs.unlinkSync(safePath);
+      return `✅ Deleted file: ${tool.path} (Revert ID: ${checkpointId})`;
+    }
+
+    case 'rename_file': {
+      const fromPath = tool.from || tool.path || '';
+      const toPath = tool.to || tool.content || '';
+      if (!fromPath) throw new Error('Missing "from" attribute for rename_file.');
+      if (!toPath) throw new Error('Missing "to" attribute for rename_file.');
+
+      const safeFrom = getSafePath(fromPath);
+      if (!fs.existsSync(safeFrom)) {
+        throw new Error(`Source file does not exist: ${fromPath}`);
+      }
+
+      const safeTo = getSafePath(toPath);
+
+      // Request approval
+      const renameConfig = vscode.workspace.getConfiguration('mirror-vs');
+      const autoApproveRename = renameConfig.get<boolean>('autoApproveWrite', false);
+      if (!autoApproveRename && !process.env.VITEST) {
+        const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
+        const approved = await MirrorVsSidebarProvider.requestToolApproval(
+          'rename_file',
+          `${fromPath} → ${toPath}`,
+          `Rename file from ${fromPath} to ${toPath}`,
+        );
+        if (!approved) throw new Error(`User rejected renaming ${fromPath}.`);
+      }
+
+      // Ensure destination parent directory exists
+      const toDir = path.dirname(safeTo);
+      if (!fs.existsSync(toDir)) {
+        fs.mkdirSync(toDir, { recursive: true });
+      }
+
+      // Create checkpoint of the source before renaming
+      const renameCheckpointId = await createCheckpoint(safeFrom, 'create');
+      fs.renameSync(safeFrom, safeTo);
+      return `✅ Renamed file: ${fromPath} → ${toPath} (Revert ID: ${renameCheckpointId})`;
+    }
+
     default:
       throw new Error(`Invalid file tool: ${tool.name}`);
+
   }
 }
 

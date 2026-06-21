@@ -78,6 +78,11 @@
                 d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z" />
             </svg>
           </button>
+          <button id="toggle-memory-btn" class="icon-btn" title="Agent Memory" aria-label="Agent Memory">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 0a5 5 0 0 0-5 5v.5A2.5 2.5 0 0 0 2 8v1a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 14 9V8a2.5 2.5 0 0 0-1-2V5a5 5 0 0 0-5-5zm3 5.5v.5H5V5a3 3 0 0 1 6 0z"/>
+            </svg>
+          </button>
         </div>
       </div>
     </header>
@@ -155,7 +160,32 @@
       </div>
     </div>
 
+    <!-- Memory Drawer -->
+    <div id="memory-drawer" class="drawer collapsed" data-drawer="memory">
+      <div class="drawer-inner">
+        <div class="drawer-header">
+          <h3>🧠 Agent Memory</h3>
+          <button class="drawer-close-btn" data-drawer="memory">✕</button>
+        </div>
+        <div class="drawer-body" style="padding:8px 10px;">
+          <p style="font-size:11px;color:var(--text-muted);margin:0 0 10px;">
+            Persistent knowledge the agent remembers across sessions. Use <code>update_agent_memory</code> to add entries.
+          </p>
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <button id="memory-refresh-btn" class="btn btn-secondary" style="flex:1;font-size:11px;padding:5px 8px;">↻ Refresh</button>
+            <button id="memory-clear-btn" class="btn btn-danger" style="flex:1;font-size:11px;padding:5px 8px;">🗑️ Clear All</button>
+          </div>
+          <div id="memory-entries-list" class="memory-entries-list">
+            <div class="no-memory-msg" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">
+              No memory entries yet. Ask the agent to remember something!
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings Drawer -->
+
     <div id="settings-drawer" class="drawer collapsed" data-drawer="settings">
       <div class="drawer-inner">
         <div class="drawer-header">
@@ -803,6 +833,14 @@
 
     <div class="input-panel">
       <button id="accept-all-btn" class="accept-all-btn hidden" title="Accept All Active Reviews">✨ Accept All</button>
+      <!-- Token & Cost Display Bar -->
+      <div id="token-usage-bar" class="token-usage-bar hidden">
+        <span class="token-bar-icon">⚡</span>
+        <span id="token-in-label" class="token-bar-stat" title="Input tokens this session">↑ 0</span>
+        <span id="token-out-label" class="token-bar-stat" title="Output tokens this session">↓ 0</span>
+        <span id="token-cost-label" class="token-bar-cost" title="Estimated cost this session">~$0.000</span>
+        <button id="token-reset-btn" class="token-bar-reset" title="Reset session token count">✕</button>
+      </div>
       <div class="input-card">
         <!-- Card Header: Active File Context Bar (Kept in DOM but hidden via CSS) -->
         <div id="context-bar" class="context-bar">
@@ -813,8 +851,17 @@
           <div class="context-actions">
             <button id="gen-tests-btn" class="context-action-btn hidden" title="Generate Unit Tests for active file">🧪 Test</button>
             <button id="gen-docs-btn" class="context-action-btn hidden" title="Generate JSDoc/TSDoc for active file">📝 Doc</button>
+            <button id="gen-commit-btn" class="context-action-btn" title="Generate Commit Message from staged changes">💬 Commit</button>
+            <button id="gen-pr-btn" class="context-action-btn" title="Generate PR Description from git diff">🔀 PR</button>
             <button id="open-multi-diff-btn" class="context-action-btn hidden" title="Open Multi-File Diff Review Drawer">🔍 Review</button>
           </div>
+        </div>
+        <!-- Context Window Usage Bar -->
+        <div id="context-usage-row" class="context-usage-row hidden">
+          <div class="context-usage-track">
+            <div id="context-usage-fill" class="context-usage-fill"></div>
+          </div>
+          <span id="context-usage-label" class="context-usage-label">Context: 0k / 200k</span>
         </div>
 
         <!-- Autocomplete + Chips -->
@@ -826,6 +873,9 @@
 
         <!-- Queue chips - shows queued messages above input -->
         <div id="queue-chips-container" class="queue-chips-container hidden"></div>
+
+        <!-- Slash Command Picker -->
+        <div id="slash-command-picker" class="slash-command-picker hidden" role="listbox" aria-label="Slash commands"></div>
 
         <!-- Sleek prompt input contenteditable div (renders inline file tags) -->
         <div id="prompt-input" class="prompt-editable" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Ask to modify code... Type '@' to link files"></div>

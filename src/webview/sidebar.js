@@ -599,6 +599,223 @@
   let isAutocompleteOpen = false;
   let validationTimeout = null;
 
+  // ─── Token Usage Bar ────────────────────────────────────────────────────────
+  let sessionInputTokens = 0;
+  let sessionOutputTokens = 0;
+  let sessionCost = 0;
+  const tokenBar = document.getElementById('token-usage-bar');
+  const tokenInLabel = document.getElementById('token-in-label');
+  const tokenOutLabel = document.getElementById('token-out-label');
+  const tokenCostLabel = document.getElementById('token-cost-label');
+  const tokenResetBtn = document.getElementById('token-reset-btn');
+
+  function updateTokenBar(inputDelta, outputDelta, costDelta) {
+    sessionInputTokens += inputDelta;
+    sessionOutputTokens += outputDelta;
+    sessionCost += costDelta;
+    if (tokenBar) tokenBar.classList.remove('hidden');
+    if (tokenInLabel) tokenInLabel.textContent = '↑ ' + (sessionInputTokens >= 1000 ? (sessionInputTokens / 1000).toFixed(1) + 'k' : sessionInputTokens);
+    if (tokenOutLabel) tokenOutLabel.textContent = '↓ ' + (sessionOutputTokens >= 1000 ? (sessionOutputTokens / 1000).toFixed(1) + 'k' : sessionOutputTokens);
+    if (tokenCostLabel) tokenCostLabel.textContent = sessionCost > 0 ? '~$' + sessionCost.toFixed(4) : '~$0.000';
+  }
+  window.updateTokenBar = updateTokenBar;
+
+  if (tokenResetBtn) {
+    tokenResetBtn.addEventListener('click', () => {
+      sessionInputTokens = 0; sessionOutputTokens = 0; sessionCost = 0;
+      if (tokenBar) tokenBar.classList.add('hidden');
+    });
+  }
+
+  // ─── Context Usage Bar ──────────────────────────────────────────────────────
+  const contextUsageRow = document.getElementById('context-usage-row');
+  const contextUsageFill = document.getElementById('context-usage-fill');
+  const contextUsageLabel = document.getElementById('context-usage-label');
+
+  function updateContextBar(usedTokens, maxTokens) {
+    if (!contextUsageRow || !contextUsageFill || !contextUsageLabel) return;
+    const pct = Math.min(100, Math.round((usedTokens / Math.max(maxTokens, 1)) * 100));
+    contextUsageRow.classList.remove('hidden');
+    contextUsageFill.style.width = pct + '%';
+    contextUsageFill.classList.toggle('warn', pct >= 60 && pct < 85);
+    contextUsageFill.classList.toggle('danger', pct >= 85);
+    const toK = (n) => n >= 1000 ? (n / 1000).toFixed(0) + 'k' : n;
+    contextUsageLabel.textContent = 'Context: ' + toK(usedTokens) + ' / ' + toK(maxTokens);
+  }
+  window.updateContextBar = updateContextBar;
+
+  // ─── Slash Command Picker ───────────────────────────────────────────────────
+  const SLASH_COMMANDS = [
+    { key: '/fix',      desc: 'Find and fix bugs in the active file' },
+    { key: '/explain',  desc: 'Explain the current file or selected code' },
+    { key: '/test',     desc: 'Write unit tests for the active file' },
+    { key: '/commit',   desc: 'Generate a git commit message from staged changes' },
+    { key: '/refactor', desc: 'Refactor the active file for readability & performance' },
+    { key: '/review',   desc: 'Code review: bugs, security, style' },
+    { key: '/docs',     desc: 'Generate JSDoc/TSDoc documentation' },
+    { key: '/ask',      desc: 'Ask a general question' },
+  ];
+  const slashPicker = document.getElementById('slash-command-picker');
+  let slashPickerIndex = 0;
+  let slashPickerOpen = false;
+  let slashFilteredCmds = SLASH_COMMANDS;
+
+  function renderSlashPicker(filter) {
+    if (!slashPicker) return;
+    slashFilteredCmds = filter ? SLASH_COMMANDS.filter(c => c.key.startsWith('/' + filter)) : SLASH_COMMANDS;
+    if (slashFilteredCmds.length === 0) { closeSlashPicker(); return; }
+    slashPickerIndex = 0;
+    slashPicker.innerHTML = '<div class="slash-picker-header">Slash Commands</div>' +
+      slashFilteredCmds.map((c, i) =>
+        `<div class="slash-cmd-row${i === 0 ? ' selected' : ''}" data-cmd="${c.key}" role="option">
+          <span class="slash-cmd-key">${c.key}</span>
+          <span class="slash-cmd-desc">${c.desc}</span>
+        </div>`
+      ).join('');
+    slashPicker.querySelectorAll('.slash-cmd-row').forEach((row, i) => {
+      row.addEventListener('mouseenter', () => { slashPickerIndex = i; highlightSlashRow(); });
+      row.addEventListener('click', () => applySlashCommand(slashFilteredCmds[i].key));
+    });
+    slashPicker.classList.remove('hidden');
+    slashPickerOpen = true;
+  }
+
+  function highlightSlashRow() {
+    if (!slashPicker) return;
+    slashPicker.querySelectorAll('.slash-cmd-row').forEach((r, i) => r.classList.toggle('selected', i === slashPickerIndex));
+  }
+
+  function closeSlashPicker() {
+    if (slashPicker) slashPicker.classList.add('hidden');
+    slashPickerOpen = false;
+  }
+
+  function applySlashCommand(cmd) {
+    if (!promptInput) return;
+    promptInput.textContent = cmd + ' ';
+    // Move cursor to end
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(promptInput);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    closeSlashPicker();
+    promptInput.focus();
+  }
+
+  if (promptInput) {
+    promptInput.addEventListener('input', () => {
+      const text = promptInput.textContent || '';
+      if (text === '/') {
+        renderSlashPicker('');
+      } else if (text.startsWith('/') && !text.includes(' ')) {
+        renderSlashPicker(text.slice(1));
+      } else {
+        closeSlashPicker();
+      }
+    });
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (!slashPickerOpen) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        slashPickerIndex = (slashPickerIndex + 1) % slashFilteredCmds.length;
+        highlightSlashRow();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        slashPickerIndex = (slashPickerIndex - 1 + slashFilteredCmds.length) % slashFilteredCmds.length;
+        highlightSlashRow();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applySlashCommand(slashFilteredCmds[slashPickerIndex].key);
+      } else if (e.key === 'Escape') {
+        closeSlashPicker();
+      }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (slashPicker && !slashPicker.contains(e.target) && e.target !== promptInput) closeSlashPicker();
+  });
+
+  // ─── Memory Panel ───────────────────────────────────────────────────────────
+  const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
+  const memoryDrawer = document.getElementById('memory-drawer');
+  const memoryEntriesList = document.getElementById('memory-entries-list');
+  const memoryRefreshBtn = document.getElementById('memory-refresh-btn');
+  const memoryClearBtn = document.getElementById('memory-clear-btn');
+
+  function renderMemoryPanel(entries) {
+    if (!memoryEntriesList) return;
+    if (!entries || entries.length === 0) {
+      memoryEntriesList.innerHTML = '<div class="no-memory-msg" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">No memory entries yet.</div>';
+      return;
+    }
+    const categories = ['convention', 'architecture', 'pattern', 'preference', 'note'];
+    const catLabels = { convention: '📋 Conventions', architecture: '🏗️ Architecture', pattern: '🔁 Patterns', preference: '⚙️ Preferences', note: '📝 Notes' };
+    let html = '';
+    for (const cat of categories) {
+      const catEntries = entries.filter(e => e.category === cat);
+      if (!catEntries.length) continue;
+      html += `<div class="memory-category-header">${catLabels[cat] || cat}</div>`;
+      for (const entry of catEntries) {
+        html += `<div class="memory-entry">
+          <div class="memory-entry-body">
+            <div class="memory-entry-key">${entry.key}</div>
+            <div class="memory-entry-value">${entry.value}</div>
+          </div>
+          <button class="memory-entry-delete" data-key="${entry.key}" title="Delete this memory entry">🗑</button>
+        </div>`;
+      }
+    }
+    memoryEntriesList.innerHTML = html;
+    memoryEntriesList.querySelectorAll('.memory-entry-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        vscode.postMessage({ type: 'deleteMemory', key });
+        btn.closest('.memory-entry').style.opacity = '0.3';
+        setTimeout(() => vscode.postMessage({ type: 'getMemory' }), 300);
+      });
+    });
+  }
+  window.renderMemoryPanel = renderMemoryPanel;
+
+  if (toggleMemoryBtn) {
+    toggleMemoryBtn.addEventListener('click', () => {
+      const isOpen = memoryDrawer && !memoryDrawer.classList.contains('collapsed');
+      // Close all drawers
+      document.querySelectorAll('.drawer').forEach(d => d.classList.add('collapsed'));
+      if (!isOpen && memoryDrawer) {
+        memoryDrawer.classList.remove('collapsed');
+        vscode.postMessage({ type: 'getMemory' });
+      }
+    });
+  }
+  if (memoryRefreshBtn) memoryRefreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'getMemory' }));
+  if (memoryClearBtn) memoryClearBtn.addEventListener('click', () => {
+    if (confirm('Clear all agent memory entries?')) {
+      vscode.postMessage({ type: 'clearMemory' });
+      setTimeout(() => vscode.postMessage({ type: 'getMemory' }), 300);
+    }
+  });
+
+  // ─── Commit / PR Generator Buttons ──────────────────────────────────────────
+  const genCommitBtn = document.getElementById('gen-commit-btn');
+  const genPrBtn = document.getElementById('gen-pr-btn');
+
+  if (genCommitBtn) {
+    genCommitBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'genCommitMessage' });
+    });
+  }
+  if (genPrBtn) {
+    genPrBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'genPrDescription' });
+    });
+  }
+
+
+
   // Map to store parsed created/updated file contents from assistant messages
   const parsedToolContents = new Map();
 
@@ -1985,25 +2202,28 @@
     // Slash command handling
     let text = rawText;
     let isSlashCommand = false;
-    const slashMatch = text.match(/^\/(fix|explain|test)\b\s*(.*)/i);
+    const slashMatch = text.match(/^\/(fix|explain|test|commit|refactor|review|docs|ask)\b\s*(.*)/is);
     if (slashMatch) {
       const command = slashMatch[1].toLowerCase();
       const rest = slashMatch[2].trim();
       isSlashCommand = true;
-      const selection = window.getSelection()?.toString() || '';
-
-      if ((command === 'fix' || command === 'explain') && !selection && !rest) {
-        appendMessageBubble('system', 'Please select code in the editor first, or add a description after the slash command (e.g., /fix this bug where...).');
-        scrollChatToBottom(true);
-        return;
-      }
 
       if (command === 'fix') {
-        text = rest ? 'Fix the following code/issue: ' + rest : 'Fix this code:\n';
+        text = rest ? 'Fix the following code/issue: ' + rest : 'Analyze the active file and fix any bugs, errors, or issues you find. Explain each fix.';
       } else if (command === 'explain') {
-        text = rest ? 'Explain this: ' + rest : 'Explain this code:\n';
+        text = rest ? 'Explain this: ' + rest : 'Explain the current file or selected code in detail — what it does, why it works that way, and any potential issues.';
       } else if (command === 'test') {
-        text = rest ? 'Write tests for: ' + rest : 'Write unit tests for this code:\n';
+        text = rest ? 'Write tests for: ' + rest : 'Write comprehensive unit tests for the active file. Use the existing test framework in this project.';
+      } else if (command === 'commit') {
+        text = 'Generate a concise, conventional commit message for the current staged git changes. Run `git diff --staged` first to see the changes, then output ONLY the commit message (no extra commentary).';
+      } else if (command === 'refactor') {
+        text = rest ? 'Refactor this: ' + rest : 'Refactor the active file for better readability, maintainability, and performance. Preserve all functionality. Explain each refactoring decision.';
+      } else if (command === 'review') {
+        text = rest ? 'Code review: ' + rest : 'Perform a thorough code review of the active file. Check for bugs, performance issues, security vulnerabilities, missing error handling, and style inconsistencies.';
+      } else if (command === 'docs') {
+        text = rest ? 'Generate documentation for: ' + rest : 'Generate comprehensive JSDoc/TSDoc comments for all exported functions, classes, and types in the active file.';
+      } else if (command === 'ask') {
+        text = rest || 'What can I help you with?';
       }
     }
 
@@ -2875,7 +3095,32 @@
       return;
     }
 
+    // Token usage update
+    if (message.type === 'tokenUsage' && message.usage) {
+      if (typeof window.updateTokenBar === 'function') {
+        window.updateTokenBar(message.usage.input || 0, message.usage.output || 0, message.usage.cost || 0);
+      }
+      return;
+    }
+
+    // Context window usage update
+    if (message.type === 'contextUsage') {
+      if (typeof window.updateContextBar === 'function') {
+        window.updateContextBar(message.usedTokens || 0, message.maxTokens || 200000);
+      }
+      return;
+    }
+
+    // Memory panel data
+    if (message.type === 'memoryData') {
+      if (typeof window.renderMemoryPanel === 'function') {
+        window.renderMemoryPanel(message.entries || []);
+      }
+      return;
+    }
+
     switch (message.type) {
+
       case 'updateSettings': {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;
@@ -5192,7 +5437,7 @@ function highlightLine(line, lang) {
     // Comments
     escaped = escaped.replace(/(\/\/.*$)/g, '<span class="hljs-comment">$1</span>');
     // Strings
-    escaped = escaped.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     // Numbers
     escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hljs-number">$1</span>');
     // Keywords
@@ -5207,7 +5452,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(biRegex, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'python') {
     escaped = escaped.replace(/(#.*$)/g, '<span class="hljs-comment">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hljs-number">$1</span>');
     var pyKw = ['def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'import', 'from', 'as', 'try', 'except', 'finally', 'with', 'yield', 'lambda', 'pass', 'break', 'continue', 'and', 'or', 'not', 'in', 'is', 'None', 'True', 'False', 'self', 'async', 'await', 'raise'];
     var pyKwRegex = new RegExp('\\b(' + pyKw.join('|') + ')\\b', 'g');
@@ -5220,7 +5465,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/\.[\w-]+|#[\w-]+|[\w-]+(?=\s*{)/g, '<span class="hljs-selector">$1</span>');
     escaped = escaped.replace(/([\w-]+)(?=\s*:)/g, '<span class="hljs-property">$1</span>');
     escaped = escaped.replace(/(#[0-9a-fA-F]{3,6}|rgba?\([^)]+\))/g, '<span class="hljs-number">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
   } else if (lang === 'json') {
     escaped = escaped.replace(/("[^"]*")(\s*:)/g, '<span class="hljs-attr">$1</span>$2');
     escaped = escaped.replace(/("[^"]*")(?=\s*[,}\]])/g, '<span class="hljs-string">$1</span>');
@@ -5228,7 +5473,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/\b(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, '<span class="hljs-number">$1</span>');
   } else if (lang === 'bash' || lang === 'sh') {
     escaped = escaped.replace(/(#.*$)/g, '<span class="hljs-comment">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     escaped = escaped.replace(/\b(echo|cd|ls|rm|cp|mv|mkdir|touch|cat|grep|find|npm|node|python|git|docker|sudo|export|source)\b/g, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'diff') {
     if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped + '</span>';
