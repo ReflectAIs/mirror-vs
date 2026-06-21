@@ -79,12 +79,21 @@
       }
     }
 
-    if (!text && attachedImages.length === 0) return;
+    let textToSend = text;
+    if (typeof attachedFiles !== 'undefined' && attachedFiles.length > 0) {
+      const fileBlocks = attachedFiles.map(file => {
+        const ext = file.name.split('.').pop() || 'txt';
+        return `\n\n[Attached File: ${file.name}]\n\`\`\`${ext}\n${file.content}\n\`\`\``;
+      }).join('');
+      textToSend += fileBlocks;
+    }
+
+    if (!textToSend && attachedImages.length === 0) return;
     
     // If already sending, queue the message instead of discarding
     if (isSending) {
       messageQueue.push({
-        text: text,
+        text: textToSend,
         images: [...attachedImages],
         userDisplayMessage: isSlashCommand ? rawText : text,
         rawText: rawText
@@ -98,13 +107,20 @@
       scrollChatToBottom(true);
       
       // Also add to chatHistory as a real user message so it's preserved
-      chatHistory.push({ role: 'user', content: text });
+      chatHistory.push({ role: 'user', content: textToSend });
       vscode.postMessage({
         type: 'saveHistory',
         history: chatHistory
       });
       
       promptInput.innerHTML = '';
+      if (typeof attachedFiles !== 'undefined') {
+        attachedFiles.length = 0;
+      }
+      attachedImages = [];
+      if (typeof renderAttachments === 'function') {
+        renderAttachments();
+      }
       return;
     }
 
@@ -127,11 +143,16 @@
       userDisplayMessage += '\n\n_Slash command expanded to: ' + text.substring(0, 120) + (text.length > 120 ? '...' : '') + '_';
     }
 
-    executeSend(text, attachedImages, undefined, userDisplayMessage);
+    executeSend(textToSend, attachedImages, undefined, userDisplayMessage);
 
     
     attachedImages = [];
-    renderImageAttachments();
+    if (typeof attachedFiles !== 'undefined') {
+      attachedFiles.length = 0;
+    }
+    if (typeof renderAttachments === 'function') {
+      renderAttachments();
+    }
   }
 
   let currentToolCardElement = null;

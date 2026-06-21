@@ -208,6 +208,14 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         throw new Error(`File does not exist: ${tool.path}`);
       }
 
+      const ext = path.extname(safePath).toLowerCase();
+      const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.ico'];
+      if (imageExtensions.includes(ext)) {
+        const buffer = fs.readFileSync(safePath);
+        const base64 = buffer.toString('base64');
+        return `[File: ${tool.path} (Image)]\n(Base64 data hidden from output but sent to vision model: ${base64})`;
+      }
+
       let fullContent = '';
       const proposed = ReviewManager.getInstance().getProposedContent(safePath);
       if (proposed !== undefined) {

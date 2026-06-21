@@ -2104,6 +2104,44 @@ select:focus {
   line-height: 1;
 }
 
+.file-attachment-chip {
+  position: relative;
+  width: auto;
+  max-width: 140px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  padding-right: 20px;
+  transition: var(--transition-fast);
+  color: var(--text-primary);
+}
+
+.file-attachment-chip:hover {
+  transform: scale(1.03);
+  border-color: var(--border-glass-hover);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.file-attachment-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+}
+
+.file-attachment-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
 .bubble-images-container {
   display: flex;
   flex-wrap: wrap;

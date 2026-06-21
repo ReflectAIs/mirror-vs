@@ -90,6 +90,7 @@
   }
   // Attached Images State
   let attachedImages = [];
+  let attachedFiles = [];
 
   // New features state
   let workspaceFiles = [];
@@ -1168,6 +1169,54 @@
     autocompleteDropdown.classList.add('hidden');
   }
 
+  // Intercept paste event on promptInput to force plain text insertion
+  promptInput.addEventListener('paste', (e) => {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData) return;
+
+    // Check if there is an image in the paste payload
+    const types = clipboardData.types || [];
+    const hasImage = Array.from(types).some(type => type.indexOf('image') !== -1);
+    const files = clipboardData.files;
+    let hasImageFile = false;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type && files[i].type.indexOf('image') !== -1) {
+          hasImageFile = true;
+          break;
+        }
+      }
+    }
+
+    // If it has image data, do NOT preventDefault here; let the window listener attach it
+    if (hasImage || hasImageFile) {
+      return;
+    }
+
+    // Prevent rich text / HTML styling from rendering in the contenteditable area
+    e.preventDefault();
+    const text = clipboardData.getData('text/plain');
+
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const textNode = document.createTextNode(text);
+      range.insertNode(textNode);
+
+      // Move cursor after the inserted text
+      range.setStartAfter(textNode);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      promptInput.textContent += text;
+    }
+
+    autoGrowTextarea();
+    handleAutocompleteSearch();
+  });
+
   // Global Window-level Paste Event Listener for Images
   window.addEventListener('paste', (e) => {
     const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
@@ -1216,8 +1265,7 @@
     }
   });
 
-  
-  // Drag-and-Drop Image Support
+  // Drag-and-Drop Support for files/images
   promptInput.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1237,33 +1285,93 @@
     e.stopPropagation();
     promptInput.style.borderColor = '';
     promptInput.style.boxShadow = '';
-    
+
+    // Check text data first (e.g. dragging a file from VS Code workspace explorer)
+    const textData = e.dataTransfer.getData('text/plain');
+    if (textData) {
+      const normalizedPath = textData.trim().replace(/\\/g, '/');
+      const foundFile = workspaceFiles.find(f => 
+        f === normalizedPath || 
+        f.endsWith('/' + normalizedPath) || 
+        normalizedPath.endsWith('/' + f)
+      );
+      if (foundFile) {
+        insertFileTagAtCaret(foundFile);
+        return;
+      }
+    }
+
     const files = e.dataTransfer.files;
     for (let i = 0; i < files.length; i++) {
-      if (files[i].type.indexOf('image') !== -1) {
+      const file = files[i];
+      if (file.type && file.type.indexOf('image') !== -1) {
         const reader = new FileReader();
         reader.onload = function(event) {
           const base64 = event.target.result.split(',')[1];
           attachImage(base64);
         };
-        reader.readAsDataURL(files[i]);
+        reader.readAsDataURL(file);
+      } else {
+        attachFile(file);
       }
     }
   });
 
+  function insertFileTagAtCaret(filePath) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) { promptInput.focus(); return; }
+    const range = sel.getRangeAt(0);
 
-function attachImage(base64) {
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'inline-file-tag';
+    tagSpan.contentEditable = 'false';
+    const fileName = filePath.split('/').pop() || filePath;
+    tagSpan.textContent = '@' + fileName;
+    tagSpan.dataset.path = filePath;
+    tagSpan.title = filePath;
+
+    range.insertNode(tagSpan);
+    const newRange = document.createRange();
+    newRange.setStartAfter(tagSpan);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    autoGrowTextarea();
+  }
+
+  function attachFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const content = event.target.result;
+      attachedFiles.push({
+        name: file.name,
+        content: content
+      });
+      renderAttachments();
+    };
+    reader.readAsText(file);
+  }
+
+  function removeAttachedFile(index) {
+    attachedFiles.splice(index, 1);
+    renderAttachments();
+  }
+
+  function attachImage(base64) {
     attachedImages.push(base64);
-    renderImageAttachments();
+    renderAttachments();
   }
 
   function removeAttachedImage(index) {
     attachedImages.splice(index, 1);
-    renderImageAttachments();
+    renderAttachments();
   }
 
-  function renderImageAttachments() {
+  function renderAttachments() {
     imageAttachmentsContainer.innerHTML = '';
+
+    // Render image attachment chips
     attachedImages.forEach((base64, index) => {
       const chip = document.createElement('div');
       chip.className = 'image-attachment-chip';
@@ -1277,7 +1385,31 @@ function attachImage(base64) {
       chip.appendChild(removeBtn);
       imageAttachmentsContainer.appendChild(chip);
     });
+
+    // Render non-image file attachment chips
+    attachedFiles.forEach((file, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'file-attachment-chip';
+
+      const fileExt = file.name.split('.').pop() || 'txt';
+      chip.innerHTML = `
+        <span class="file-attachment-icon">&#128196;</span>
+        <span class="file-attachment-name" title="${file.name}">${file.name}</span>
+      `;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'image-attachment-remove';
+      removeBtn.innerHTML = '&#x2715;';
+      removeBtn.addEventListener('click', () => removeAttachedFile(index));
+
+      chip.appendChild(removeBtn);
+      imageAttachmentsContainer.appendChild(chip);
+    });
   }
+
+  // Export state/handlers globally or to other parts as needed
+  window.attachedFiles = attachedFiles;
+  window.renderAttachments = renderAttachments;
 
   function clearAllActiveAnimations() {
     // 1. Clear any running tool cards

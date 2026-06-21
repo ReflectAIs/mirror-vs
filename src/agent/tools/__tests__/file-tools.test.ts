@@ -85,6 +85,25 @@ describe('executeFileTool', () => {
         cleanupTempDir(tmpDir);
       }
     });
+
+    it('should return base64 encoded string if file is an image', async () => {
+      const tmpDir = createTempDir();
+      try {
+        const filePath = 'logo.png';
+        const absolutePath = path.join(tmpDir, filePath);
+        const buffer = Buffer.from('fake image bytes');
+        fs.writeFileSync(absolutePath, buffer);
+
+        const localGetSafe = (p: string) => path.join(tmpDir, p);
+        const tool = { name: 'read_file' as const, path: filePath };
+        const result = await executeFileTool(tool, localGetSafe);
+
+        const base64 = buffer.toString('base64');
+        expect(result).toBe(`[File: logo.png (Image)]\n(Base64 data hidden from output but sent to vision model: ${base64})`);
+      } finally {
+        cleanupTempDir(tmpDir);
+      }
+    });
   });
 
   describe('create_file', () => {

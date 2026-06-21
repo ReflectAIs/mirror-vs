@@ -1820,10 +1820,8 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
 
   private _sendWorkspaceFileTokenSource: vscode.CancellationTokenSource | undefined;
 
-  // Recursive glob patterns to find files at any directory depth.
-  // VS Code's findFiles automatically ignores standard system folders like node_modules via user settings.
   private static readonly _WORKSPACE_GLOB_PATTERNS = [
-    '**/*.{ts,tsx,js,jsx,json,html,css,scss,py,rb,go,rs,md,yaml,yml,toml,sh,bash}',
+    '**/*',
   ];
 
   private async _sendWorkspaceFiles() {
