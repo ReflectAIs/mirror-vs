@@ -1666,7 +1666,9 @@ export class AgentOrchestrator {
         }
         this._sendAvatarState('idle');
         this._postMessage({ type: 'updateChatHistory', history: currentMessages });
-        this._postMessage({ type: 'loopComplete' });
+        const lastMsg = currentMessages[currentMessages.length - 1];
+        const isCompleted = lastMsg && lastMsg.role === 'assistant' && lastMsg.content && lastMsg.content.includes('<walkthrough>');
+        this._postMessage({ type: 'loopComplete', completed: !!isCompleted });
         try {
           EventBus.getInstance().fire('task_completed', {
             sessionId: this._session.sessionId,
@@ -1685,7 +1687,7 @@ export class AgentOrchestrator {
           await this._saveChatHistory(currentMessages);
           this._sendAvatarState('idle');
           this._postMessage({ type: 'updateChatHistory', history: currentMessages });
-          this._postMessage({ type: 'loopComplete' });
+          this._postMessage({ type: 'loopComplete', completed: false });
         } else {
           this._sendAvatarState('error');
           this._postMessage({ type: 'chatResponseError', error: err instanceof Error ? err.message : String(err) });

@@ -3,6 +3,15 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.12] - 2025-07-16
+
+### Added
+- **🧠 Smart Completion Detection**: `loopComplete` message now carries a `completed` boolean — notification toast and avatar celebration only trigger when the agent emits a `<walkthrough>` (implying genuine completion vs user abort)
+- **✂️ Token Truncation Warning**: When generation hits the `max_tokens` limit (configurable via `mirror-vs.maxTokens`, default 8192), a warning message is appended: `⚠️ [Generation truncated: reached maximum output token limit.]` — applied in both streaming and non-streaming API paths
+
+### Changed
+- **🔍 Smarter Review Editor Reuse**: When the current file is already open in the active editor, the review system no longer re-opens the diff or file editor — it applies decorations to existing visible splits instead
+
 ## [0.2.11] - 2025-07-16
 
 ### Added

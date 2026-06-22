@@ -110,7 +110,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       () => this._getChatHistory(),
       (history) => this._saveChatHistory(history),
       (msg) => {
-        if (msg && msg.type === 'loopComplete') {
+        if (msg && msg.type === 'loopComplete' && msg.completed) {
           vscode.window.showInformationMessage('Mirror VS: Task completed successfully! 🎉');
         }
         // Also forward artifact updates to the sidebar

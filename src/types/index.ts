@@ -217,7 +217,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'chatResponseComplete'; fullText: string }
   | { type: 'chatResponseError'; error: string }
   | { type: 'chatResponseStart' }
-  | { type: 'loopComplete' }
+  | { type: 'loopComplete'; completed?: boolean }
   | {
       type: 'toolStatus';
       toolName: string;

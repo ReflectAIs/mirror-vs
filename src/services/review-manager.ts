@@ -328,21 +328,39 @@ export class ReviewManager implements vscode.CodeLensProvider {
       this._onDidChangeActiveReviews.fire();
       this.updateStatusBar();
 
-      // Automatically open the visual side-by-side diff editor
-      vscode.commands.executeCommand('mirror-vs.diffReview', filePath).then(
-        () => {},
-        (err) => console.warn('Failed to automatically open visual diff:', err)
-      );
+      const activeEditor = vscode.window.activeTextEditor;
+      const isCurrentFile = activeEditor && activeEditor.document.uri.fsPath.toLowerCase() === filePath.toLowerCase();
 
-      // Open the original file in the active editor with preserveFocus: true to apply decorations in background
-      vscode.workspace.openTextDocument(filePath).then(
-        (doc) => {
-          vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
-            this.applyDecorations(editor);
-          });
-        },
-        () => {},
-      );
+      if (!activeEditor || isCurrentFile) {
+        // Automatically open the visual side-by-side diff editor
+        vscode.commands.executeCommand('mirror-vs.diffReview', filePath).then(
+          () => {},
+          (err) => console.warn('Failed to automatically open visual diff:', err)
+        );
+
+        // Open the original file in the active editor with preserveFocus: true to apply decorations in background
+        vscode.workspace.openTextDocument(filePath).then(
+          (doc) => {
+            vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
+              this.applyDecorations(editor);
+            });
+          },
+          () => {},
+        );
+      } else {
+        // Just open the document in the background to apply decorations to any visible splits
+        vscode.workspace.openTextDocument(filePath).then(
+          (doc) => {
+            const visible = vscode.window.visibleTextEditors.find(
+              (e) => e.document.uri.fsPath.toLowerCase() === filePath.toLowerCase()
+            );
+            if (visible) {
+              this.applyDecorations(visible);
+            }
+          },
+          () => {},
+        );
+      }
 
       // Show dual-mode non-blocking notification toast
       this.showReviewNotification(filePath);

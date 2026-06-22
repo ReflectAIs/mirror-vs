@@ -3549,24 +3549,28 @@
           promptInput.contentEditable = 'true';
           sendBtn.disabled = false;
           processNextInQueue();
-        promptInput.focus();
-        currentStreamingBubble = null;
-        currentStreamingText = '';
-        currentStreamingReasoningText = '';
-        setAvatarState('celebrate');
-        triggerParticleExplosion();
-        setTimeout(() => {
-          if (avatarState === 'celebrate') {
+          promptInput.focus();
+          currentStreamingBubble = null;
+          currentStreamingText = '';
+          currentStreamingReasoningText = '';
+          if (message.completed) {
+            setAvatarState('celebrate');
+            triggerParticleExplosion();
+            setTimeout(() => {
+              if (avatarState === 'celebrate') {
+                setAvatarState('idle');
+              }
+            }, 4000);
+          } else {
             setAvatarState('idle');
           }
-        }, 4000);
-        sendBtn.classList.remove('hidden');
-        stopBtn.classList.add('hidden');
-        clearAllActiveAnimations();
-        updateStickyUserMessage();
-        scrollChatToBottom();
-        break;
-      }
+          sendBtn.classList.remove('hidden');
+          stopBtn.classList.add('hidden');
+          clearAllActiveAnimations();
+          updateStickyUserMessage();
+          scrollChatToBottom();
+          break;
+        }
 
       case 'chatResponseError': {
         setAvatarState('error');
