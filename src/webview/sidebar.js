@@ -5852,7 +5852,6 @@ function initArtifacts() {
   const toggleBtn = document.getElementById('toggle-artifact-btn');
   const drawer = document.getElementById('artifacts-drawer');
   const closeBtn = drawer?.querySelector('.drawer-close-btn');
-  const openInPanelBtn = document.getElementById('artifact-open-in-panel');
   const artifactsList = document.getElementById('artifacts-list');
 
   // Toggle drawer
@@ -5863,16 +5862,6 @@ function initArtifacts() {
 
   closeBtn?.addEventListener('click', () => {
     hideArtifactsDrawer();
-  });
-
-  // Open selected artifact in a new VS Code window panel
-  openInPanelBtn?.addEventListener('click', () => {
-    if (artifactsState.selectedId) {
-      vscode.postMessage({
-        type: 'openArtifact',
-        artifactId: artifactsState.selectedId,
-      });
-    }
   });
 
   // Listen for artifact updates from the extension host
@@ -5927,7 +5916,6 @@ function hideArtifactsDrawer() {
 
 function renderArtifactsList() {
   const container = document.getElementById('artifacts-list');
-  const openBtn = document.getElementById('artifact-open-in-panel');
   if (!container) return;
 
   if (!artifactsState.list || artifactsState.list.length === 0) {
@@ -5936,11 +5924,8 @@ function renderArtifactsList() {
         No artifacts yet. Ask the agent to create one (e.g., "Create an HTML tooltip component as an artifact").
       </div>
     `;
-    if (openBtn) openBtn.disabled = true;
     return;
   }
-
-  if (openBtn) openBtn.disabled = false;
 
   const typeIcons = { html: '🌐', svg: '🎨', mermaid: '📊', code: '💻', markdown: '📝' };
   const typeLabels = { html: 'HTML Preview', svg: 'SVG Graphic', mermaid: 'Diagram', code: 'Code Snippet', markdown: 'Document' };

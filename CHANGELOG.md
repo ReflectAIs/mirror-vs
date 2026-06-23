@@ -10,6 +10,10 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **🧪 Integration Test — Walkthrough Fallback**: New test verifies the auto-wrap logic works end-to-end: when the model outputs "Here is my walkthrough of changes:" without tags, the orchestrator detects it, wraps it, creates the `walkthrough.md` file, and emits `loopComplete: true`
 - **🔬 Unit Tests — `detectAndNormalizeWalkthrough`**: 8 new tests covering tag preservation, tool-execution bypass, keyword auto-wrap, preparatory expression avoidance, code-block/blockquote filtering, and casual verb usage filtering (97 test cases added to `orchestrator.test.ts`)
 
+### Removed
+- **🗑️ Artifacts "Open in New Window" Button**: Removed the `artifact-open-in-panel` UI button and its associated `openArtifact` messaging from `sidebar.html`, `08-artifacts.js`, and `sidebar.js` — simplifies the artifacts drawer by dropping the unused VS Code panel opening flow
+- **🔇 Failure Detector False-Positive Pattern**: Removed `/doesn'?t (?:exist|appear to be|seem to)/i` from `HELPLESS_PATTERNS` in `failure-detector.ts` — this regex was causing false-positive helplessness escalations when models legitimately described file existence checks
+
 ## [0.2.12] - 2025-07-17
 
 ### Added

@@ -12,7 +12,6 @@ export const REPLY_GIVE_UP_PATTERNS = [
   /\bI'?m not sure (?:which|how|what)\b/i,
   /\b[Cc]ould you (?:tell me|specify|clarify)\b/,
   /\bunable to (?:open|find|switch|complete)\b/i,
-  /\bdoesn'?t (?:exist|appear to be|seem to)\b/i,
 ];
 
 /**
