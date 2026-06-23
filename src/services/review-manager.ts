@@ -348,15 +348,17 @@ export class ReviewManager implements vscode.CodeLensProvider {
           () => {},
         );
       } else {
-        // Just open the document in the background to apply decorations to any visible splits
+        // The active editor is NOT the file being changed.
+        // We open it adjacent, but preserve focus.
         vscode.workspace.openTextDocument(filePath).then(
           (doc) => {
-            const visible = vscode.window.visibleTextEditors.find(
-              (e) => e.document.uri.fsPath.toLowerCase() === filePath.toLowerCase()
-            );
-            if (visible) {
-              this.applyDecorations(visible);
-            }
+            vscode.window.showTextDocument(doc, {
+              viewColumn: vscode.ViewColumn.Beside,
+              preview: false,
+              preserveFocus: true,
+            }).then((editor) => {
+              this.applyDecorations(editor);
+            });
           },
           () => {},
         );

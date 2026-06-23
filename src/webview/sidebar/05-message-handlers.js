@@ -25,8 +25,8 @@
           link.style.cssText = 'cursor:pointer;color:var(--color-primary-light);text-decoration:underline;';
           link.addEventListener('click', function (e) {
             e.stopPropagation();
-            var path = this.textContent;
-            vscode.postMessage({ type: 'openFile', filePath: path });
+            var pathVal = this.textContent;
+            vscode.postMessage({ type: 'openFile', path: pathVal });
           });
           frag.appendChild(link);
           lastIdx = pattern.lastIndex;

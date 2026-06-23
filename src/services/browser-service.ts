@@ -203,12 +203,21 @@ export class BrowserService {
     }
   }
 
-  public async screenshot(): Promise<string> {
+  public async screenshot(): Promise<{ base64: string; textContent: string }> {
     try {
       const page = await this.getPage();
       // Return base64 encoded image
       const buffer = await page.screenshot({ type: 'png', encoding: 'base64' });
-      return buffer as string;
+      let textContent = '';
+      try {
+        textContent = await page.evaluate(() => (document.body?.innerText || '').trim());
+      } catch (e) {
+        // Ignore if page is not ready or evaluate fails
+      }
+      return {
+        base64: buffer as string,
+        textContent,
+      };
     } catch (error) {
       this.logError('screenshot', error);
       throw error;

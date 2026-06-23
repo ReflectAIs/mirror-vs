@@ -668,11 +668,21 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
             }
             case 'openFile': {
               const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-              if (workspaceFolder && data.path) {
-                const safePath = path.resolve(workspaceFolder, data.path);
+              const targetPath = data.path || (data as any).filePath;
+              if (workspaceFolder && targetPath) {
+                const safePath = path.resolve(workspaceFolder, targetPath);
                 if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
                   const doc = await vscode.workspace.openTextDocument(safePath);
-                  const editor = await vscode.window.showTextDocument(doc, { preview: false });
+                  
+                  const activeEditor = vscode.window.activeTextEditor;
+                  const isCurrentFile = activeEditor && activeEditor.document.uri.fsPath.toLowerCase() === safePath.toLowerCase();
+                  const viewColumn = (activeEditor && !isCurrentFile) ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
+                  
+                  const editor = await vscode.window.showTextDocument(doc, {
+                    viewColumn,
+                    preview: false,
+                    preserveFocus: true
+                  });
 
                   // Try to find lines from arguments
                   let startLine = data.startLine;

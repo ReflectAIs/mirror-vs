@@ -99,7 +99,7 @@ export async function executeLanguageTool(tool: ToolCall): Promise<string> {
       try {
         // Use VS Code's built-in rename
         const edits = await vscode.commands.executeCommand<vscode.WorkspaceEdit>(
-          'vscode.executeDocumentRename',
+          'vscode.executeDocumentRenameProvider',
           document.uri,
           position,
           newName,

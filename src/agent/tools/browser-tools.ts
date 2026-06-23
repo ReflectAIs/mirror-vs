@@ -83,7 +83,7 @@ ${textSummary}
 
     case 'browser_evaluate_script': {
       if (!tool.content) throw new Error('Missing "content" (script) attribute for browser_evaluate_script.');
-      const result = await browser.evaluateScript(tool.content);
+      const result = await browser.evaluate(tool.content);
       return `Script executed. Result: ${JSON.stringify(result)}`;
     }
 

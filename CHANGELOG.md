@@ -3,14 +3,24 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.2.12] - 2025-07-16
+## [0.2.12] - 2025-07-17
 
 ### Added
 - **🧠 Smart Completion Detection**: `loopComplete` message now carries a `completed` boolean — notification toast and avatar celebration only trigger when the agent emits a `<walkthrough>` (implying genuine completion vs user abort)
 - **✂️ Token Truncation Warning**: When generation hits the `max_tokens` limit (configurable via `mirror-vs.maxTokens`, default 8192), a warning message is appended: `⚠️ [Generation truncated: reached maximum output token limit.]` — applied in both streaming and non-streaming API paths
+- **🏗️ Orchestrator Modularization**: Decomposed the 2416-line `orchestrator.ts` monolith into focused modules:
+  - `state-machine.ts` — `AgentState`/`TaskMode` enums, transitions, symptom detection, commitment/patch-ready checks
+  - `control-loop-guard.ts` — Tool validation, search budget, re-read detection, architecture scope locking
+  - `project-map.ts` — Lightweight workspace structure map generation (extracted from private method)
+  - `rewrite-engine.ts` — Tool ranking, telemetry logging, multi-tool response rewriting
+  - `verification-runner.ts` — Post-patch compile/lint/test verification pipeline
+- **📋 Single Source of Truth**: `ALL_REGISTERED_TOOLS` exported from `tool-registry.ts` — eliminates duplicate tool name lists across 4+ locations in the codebase
+- **📊 Logger Service**: New `LoggerService` singleton with `DEBUG`/`INFO`/`WARN`/`ERROR` levels, VS Code Output Channel integration, and structured formatting — replaces scattered `console.log` calls
+- **🧪 Expanded Test Suite**: Added 10 new orchestration tests (`orchestrator.test.ts`), 5 browser tool tests, 6 language tool tests, 9 terminal tool tests, and 1 integration test with mock LLM provider — total test count: 199 tests across 22 test files
 
 ### Changed
 - **🔍 Smarter Review Editor Reuse**: When the current file is already open in the active editor, the review system no longer re-opens the diff or file editor — it applies decorations to existing visible splits instead
+- **♻️ Orchestrator refactoring**: Reduced `orchestrator.ts` from 2416 to 1430 lines (-40%); removed duplicated tool execution blocks, centralized tool name lists, extracted state machine and guard logic
 
 ## [0.2.11] - 2025-07-16
 
