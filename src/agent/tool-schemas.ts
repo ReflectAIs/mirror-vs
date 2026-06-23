@@ -29,7 +29,7 @@ const TOOL_SCHEMAS: ToolSchema[] = [
     function: {
       name: 'read_file',
       description:
-        'Read the contents of a file from the workspace. Use start_line and end_line to read a specific range. Always read a file before patching it.',
+        'Read the contents of a file from the workspace. If the file is an image (PNG, JPG, JPEG, GIF, WEBP, etc.), reading it will automatically encode the image to base64 and feed it into your vision model context. Use start_line and end_line to read specific ranges of text files.',
       parameters: {
         type: 'object',
         properties: {
@@ -145,35 +145,7 @@ const TOOL_SCHEMAS: ToolSchema[] = [
       },
     },
   },
-  {
-    type: 'function',
-    function: {
-      name: 'delete_file',
-      description: 'Permanently delete a file from the workspace.',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Path of the file to delete.' },
-        },
-        required: ['path'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'rename_file',
-      description: 'Rename or move a file from one path to another.',
-      parameters: {
-        type: 'object',
-        properties: {
-          source_path: { type: 'string', description: 'Current absolute or relative file path.' },
-          destination_path: { type: 'string', description: 'The new destination file path.' },
-        },
-        required: ['source_path', 'destination_path'],
-      },
-    },
-  },
+
 
   // ─── Directory ────────────────────────────────────────────────────────────────
   {
@@ -423,6 +395,83 @@ const TOOL_SCHEMAS: ToolSchema[] = [
           value: { type: 'string', description: 'Value to store.' },
         },
         required: ['key', 'value'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_artifact',
+      description:
+        'Create a new interactive previewable artifact or update an existing one by ID (HTML, SVG, Mermaid, code, markdown). ' +
+        'Use this to publish planning documents, task lists, or walkthrough summaries.',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'The unique identifier of the artifact. Required when updating an existing plan, task list, or code snippet.',
+          },
+          type: {
+            type: 'string',
+            description: 'The artifact type. Supported: "html", "svg", "mermaid", "code", "markdown".',
+          },
+          title: {
+            type: 'string',
+            description: 'The user-friendly title of the artifact tab/window.',
+          },
+          content: {
+            type: 'string',
+            description: 'The complete code, diagram text, markdown body, or HTML markup for the artifact.',
+          },
+          language: {
+            type: 'string',
+            description: 'Syntax highlighting language (e.g. "typescript", "javascript", "python", "css", etc.) if type is "code".',
+          },
+        },
+        required: ['type', 'title', 'content'],
+      },
+    },
+  },
+
+  // ─── File Management ──────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'delete_file',
+      description:
+        'Permanently delete a file from the workspace. Use with caution — a checkpoint is created automatically so the action can be reverted. Requires user approval unless auto-approve is enabled.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Absolute or workspace-relative path of the file to delete.',
+          },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'rename_file',
+      description:
+        'Rename or move a file within the workspace. Provide the current path as "from" and the new path as "to". Parent directories for the destination are created automatically. A checkpoint is created so the action can be reverted.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: {
+            type: 'string',
+            description: 'Current path of the file to rename/move.',
+          },
+          to: {
+            type: 'string',
+            description: 'New path (including new filename) for the file.',
+          },
+        },
+        required: ['from', 'to'],
       },
     },
   },

@@ -207,7 +207,9 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
         }
       }
 
-      const searchTarget = tool.path ? path.join(workspaceRoot, tool.path) : workspaceRoot;
+      const searchTarget = tool.path
+        ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspaceRoot, tool.path))
+        : workspaceRoot;
       args.push(searchTarget);
 
       const stdout = await new Promise<string>((resolve, reject) => {
@@ -279,7 +281,10 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
   // Build scope: if a path is provided, restrict search to that directory/file
   let includePattern: vscode.GlobPattern | undefined;
   if (tool.path) {
-    const scopePath = tool.path.replace(/\\/g, '/');
+    const relativeScope = path.isAbsolute(tool.path)
+      ? path.relative(workspaceRoot, tool.path).replace(/\\/g, '/')
+      : tool.path.replace(/\\/g, '/');
+    const scopePath = relativeScope;
     if (Array.isArray((tool as any).includes) && (tool as any).includes.length > 0) {
       const patterns = ((tool as any).includes as string[]).map(inc => `${scopePath}/${inc}`);
       includePattern = `{${patterns.join(',')}}`;

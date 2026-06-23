@@ -1,13 +1,34 @@
 import * as vscode from 'vscode';
 
 export class SecretService {
-  constructor(private readonly _secrets: vscode.SecretStorage) {}
+  private static _instance: SecretService | undefined;
+
+  constructor(private readonly _secrets: vscode.SecretStorage) {
+    SecretService._instance = this;
+  }
+
+  /**
+   * Retrieves the singleton instance. Must be initialized with constructor first.
+   */
+  public static getInstance(): SecretService {
+    if (!SecretService._instance) {
+      throw new Error('SecretService not initialized. Call constructor with SecretStorage first.');
+    }
+    return SecretService._instance;
+  }
 
   /**
    * Retrieves a secret from storage.
    */
   public async getSecret(key: string): Promise<string | undefined> {
     return await this._secrets.get(key);
+  }
+
+  /**
+   * Alias for getSecret for convenience.
+   */
+  public async get(key: string): Promise<string | undefined> {
+    return this.getSecret(key);
   }
 
   /**

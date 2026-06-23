@@ -56,7 +56,7 @@ function highlightLine(line, lang) {
     // Comments
     escaped = escaped.replace(/(\/\/.*$)/g, '<span class="hljs-comment">$1</span>');
     // Strings
-    escaped = escaped.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     // Numbers
     escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hljs-number">$1</span>');
     // Keywords
@@ -71,7 +71,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(biRegex, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'python') {
     escaped = escaped.replace(/(#.*$)/g, '<span class="hljs-comment">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hljs-number">$1</span>');
     var pyKw = ['def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'import', 'from', 'as', 'try', 'except', 'finally', 'with', 'yield', 'lambda', 'pass', 'break', 'continue', 'and', 'or', 'not', 'in', 'is', 'None', 'True', 'False', 'self', 'async', 'await', 'raise'];
     var pyKwRegex = new RegExp('\\b(' + pyKw.join('|') + ')\\b', 'g');
@@ -84,7 +84,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/\.[\w-]+|#[\w-]+|[\w-]+(?=\s*{)/g, '<span class="hljs-selector">$1</span>');
     escaped = escaped.replace(/([\w-]+)(?=\s*:)/g, '<span class="hljs-property">$1</span>');
     escaped = escaped.replace(/(#[0-9a-fA-F]{3,6}|rgba?\([^)]+\))/g, '<span class="hljs-number">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
   } else if (lang === 'json') {
     escaped = escaped.replace(/("[^"]*")(\s*:)/g, '<span class="hljs-attr">$1</span>$2');
     escaped = escaped.replace(/("[^"]*")(?=\s*[,}\]])/g, '<span class="hljs-string">$1</span>');
@@ -92,7 +92,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/\b(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, '<span class="hljs-number">$1</span>');
   } else if (lang === 'bash' || lang === 'sh') {
     escaped = escaped.replace(/(#.*$)/g, '<span class="hljs-comment">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     escaped = escaped.replace(/\b(echo|cd|ls|rm|cp|mv|mkdir|touch|cat|grep|find|npm|node|python|git|docker|sudo|export|source)\b/g, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'diff') {
     if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped + '</span>';

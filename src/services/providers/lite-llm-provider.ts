@@ -5,7 +5,7 @@
  * Adapted from Roo Code's LiteLLM provider.
  */
 
-import { BaseProvider, ChatMessage, ProviderConfig, StreamChunk } from './base-provider';
+import { BaseProvider, ChatMessage, StreamChunk } from './base-provider';
 
 export class LiteLLMProvider extends BaseProvider {
   constructor(baseUrl: string, model: string = 'gpt-4o', apiKey?: string) {
@@ -114,7 +114,7 @@ export class LiteLLMProvider extends BaseProvider {
               try {
                 JSON.parse(entry.args);
                 // Successfully parsed = tool call is complete
-                yield { type: 'tool_call_end', id: entry.id };
+                yield { type: 'tool_call_end', id: entry.id, name: entry.name, arguments: entry.args };
                 toolCallBuffers.delete(index);
               } catch {
                 // Still incomplete
@@ -141,7 +141,7 @@ export class LiteLLMProvider extends BaseProvider {
     } else {
       // Emit remaining if not already cleared
       for (const [, entry] of toolCallBuffers) {
-        yield { type: 'tool_call_end', id: entry.id };
+        yield { type: 'tool_call_end', id: entry.id, name: entry.name, arguments: entry.args };
       }
     }
 
@@ -168,9 +168,13 @@ export class LiteLLMProvider extends BaseProvider {
   async fetchModels(): Promise<string[]> {
     const url = `${this.config.baseUrl}/models`;
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(url, {
         headers: this.buildHeaders(),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = (await response.json()) as any;
       return (data.data || data || []).map((m: any) => m.id || m.name || m).filter(Boolean);
     } catch {

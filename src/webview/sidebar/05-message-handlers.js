@@ -1,5 +1,43 @@
 
 
+  // ─── Deep-link file paths in message text ─────────────────────────
+  function linkifyFilePaths(container) {
+    // Match absolute and relative file paths with extensions
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    var textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach(function (node) {
+      var text = node.textContent;
+      // Match common file path patterns: /absolute/path/file.ts, relative/path/file.tsx, dir/file.go
+      var pattern = /(\b(?:[a-zA-Z]:[\\\/])?[\w\.\-_\/\\]+\.(?:ts|tsx|js|jsx|json|html|css|py|go|rs|java|rb|php|c|cpp|h|hpp|md|txt|yml|yaml|toml|svg|png|jpg|gif|vue|svelte)\b)/gi;
+      if (pattern.test(text)) {
+        pattern.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var lastIdx = 0;
+        var match;
+        while ((match = pattern.exec(text)) !== null) {
+          var before = text.slice(lastIdx, match.index);
+          if (before) frag.appendChild(document.createTextNode(before));
+          var link = document.createElement('span');
+          link.className = 'file-path-link';
+          link.textContent = match[0];
+          link.title = 'Click to open: ' + match[0];
+          link.style.cssText = 'cursor:pointer;color:var(--color-primary-light);text-decoration:underline;';
+          link.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var pathVal = this.textContent;
+            vscode.postMessage({ type: 'openFile', path: pathVal });
+          });
+          frag.appendChild(link);
+          lastIdx = pattern.lastIndex;
+        }
+        var remaining = text.slice(lastIdx);
+        if (remaining) frag.appendChild(document.createTextNode(remaining));
+        node.parentNode && node.parentNode.replaceChild(frag, node);
+      }
+    });
+  }
+
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
     if (role === 'system' || role === 'tool') {
@@ -138,6 +176,7 @@
       textContainer.innerHTML = parseMarkdown(text, isApproved);
       bindCodeBlockButtons(textContainer);
       applySyntaxHighlighting(textContainer);
+      linkifyFilePaths(textContainer);
       bubble.appendChild(textContainer);
     }
     
@@ -159,7 +198,32 @@
       return;
     }
 
+    // Token usage update
+    if (message.type === 'tokenUsage' && message.usage) {
+      if (typeof window.updateTokenBar === 'function') {
+        window.updateTokenBar(message.usage.input || 0, message.usage.output || 0, message.usage.cost || 0);
+      }
+      return;
+    }
+
+    // Context window usage update
+    if (message.type === 'contextUsage') {
+      if (typeof window.updateContextBar === 'function') {
+        window.updateContextBar(message.usedTokens || 0, message.maxTokens || 200000);
+      }
+      return;
+    }
+
+    // Memory panel data
+    if (message.type === 'memoryData') {
+      if (typeof window.renderMemoryPanel === 'function') {
+        window.renderMemoryPanel(message.entries || []);
+      }
+      return;
+    }
+
     switch (message.type) {
+
       case 'updateSettings': {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;
@@ -588,24 +652,28 @@
           promptInput.contentEditable = 'true';
           sendBtn.disabled = false;
           processNextInQueue();
-        promptInput.focus();
-        currentStreamingBubble = null;
-        currentStreamingText = '';
-        currentStreamingReasoningText = '';
-        setAvatarState('celebrate');
-        triggerParticleExplosion();
-        setTimeout(() => {
-          if (avatarState === 'celebrate') {
+          promptInput.focus();
+          currentStreamingBubble = null;
+          currentStreamingText = '';
+          currentStreamingReasoningText = '';
+          if (message.completed) {
+            setAvatarState('celebrate');
+            triggerParticleExplosion();
+            setTimeout(() => {
+              if (avatarState === 'celebrate') {
+                setAvatarState('idle');
+              }
+            }, 4000);
+          } else {
             setAvatarState('idle');
           }
-        }, 4000);
-        sendBtn.classList.remove('hidden');
-        stopBtn.classList.add('hidden');
-        clearAllActiveAnimations();
-        updateStickyUserMessage();
-        scrollChatToBottom();
-        break;
-      }
+          sendBtn.classList.remove('hidden');
+          stopBtn.classList.add('hidden');
+          clearAllActiveAnimations();
+          updateStickyUserMessage();
+          scrollChatToBottom();
+          break;
+        }
 
       case 'chatResponseError': {
         setAvatarState('error');

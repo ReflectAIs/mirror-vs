@@ -328,15 +328,41 @@ export class ReviewManager implements vscode.CodeLensProvider {
       this._onDidChangeActiveReviews.fire();
       this.updateStatusBar();
 
-      // Open the original file in the active editor with preserveFocus: true to prevent focus hijacking
-      vscode.workspace.openTextDocument(filePath).then(
-        (doc) => {
-          vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
-            this.applyDecorations(editor);
-          });
-        },
-        () => {},
-      );
+      const activeEditor = vscode.window.activeTextEditor;
+      const isCurrentFile = activeEditor && activeEditor.document.uri.fsPath.toLowerCase() === filePath.toLowerCase();
+
+      if (!activeEditor || isCurrentFile) {
+        // Automatically open the visual side-by-side diff editor
+        vscode.commands.executeCommand('mirror-vs.diffReview', filePath).then(
+          () => {},
+          (err) => console.warn('Failed to automatically open visual diff:', err)
+        );
+
+        // Open the original file in the active editor with preserveFocus: true to apply decorations in background
+        vscode.workspace.openTextDocument(filePath).then(
+          (doc) => {
+            vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
+              this.applyDecorations(editor);
+            });
+          },
+          () => {},
+        );
+      } else {
+        // The active editor is NOT the file being changed.
+        // We open it adjacent, but preserve focus.
+        vscode.workspace.openTextDocument(filePath).then(
+          (doc) => {
+            vscode.window.showTextDocument(doc, {
+              viewColumn: vscode.ViewColumn.Beside,
+              preview: false,
+              preserveFocus: true,
+            }).then((editor) => {
+              this.applyDecorations(editor);
+            });
+          },
+          () => {},
+        );
+      }
 
       // Show dual-mode non-blocking notification toast
       this.showReviewNotification(filePath);

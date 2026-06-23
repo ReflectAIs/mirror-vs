@@ -4,7 +4,7 @@
  * Uses Google's Generative Language API (gemini-2.0-flash, gemini-1.5-pro, etc.).
  */
 
-import { BaseProvider, ChatMessage, ProviderConfig, StreamChunk } from './base-provider';
+import { BaseProvider, ChatMessage, StreamChunk } from './base-provider';
 
 interface GeminiContent {
   role: string;
@@ -101,19 +101,22 @@ export class GeminiProvider extends BaseProvider {
               yield { type: 'text', content: part.text };
             }
             if (part.functionCall) {
+              const tcId = `gemini-tc-${Date.now()}`;
               yield {
                 type: 'tool_call_start',
-                id: `gemini-tc-${Date.now()}`,
+                id: tcId,
                 name: part.functionCall.name,
               };
               yield {
                 type: 'tool_call_delta',
-                id: `gemini-tc-${Date.now()}`,
-                delta: JSON.stringify(part.functionCall.args),
+                id: tcId,
+                delta: JSON.stringify(part.functionCall.args || {}),
               };
               yield {
                 type: 'tool_call_end',
-                id: `gemini-tc-${Date.now()}`,
+                id: tcId,
+                name: part.functionCall.name,
+                arguments: JSON.stringify(part.functionCall.args || {}),
               };
             }
           }
@@ -164,7 +167,10 @@ export class GeminiProvider extends BaseProvider {
     const url = `${this.config.baseUrl}/${this.apiVersion}/models?key=${this.config.apiKey}`;
 
     try {
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
       const data = (await response.json()) as any;
       return (data.models || [])
         .filter(

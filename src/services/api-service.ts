@@ -285,10 +285,12 @@ export function streamDeepSeekChat(
   const thinkingEnabled = config.get<boolean>('deepSeekThinking', true);
   const thinkingLevel = config.get<string>('deepSeekThinkingLevel', 'high');
 
+  const maxTokens = config.get<number>('maxTokens', 8192);
   const payload: any = {
     model,
     messages: sanitizedMessages,
     stream: true,
+    max_tokens: maxTokens,
     stream_options: {
       include_usage: true,
     },
@@ -387,6 +389,12 @@ export function streamDeepSeekChat(
             if (chunkText) {
               fullText += chunkText;
               onChunk(chunkText);
+            }
+            const finishReason = parsed.choices?.[0]?.finish_reason;
+            if (finishReason === 'length') {
+              const warningMsg = '\n\n⚠️ [Generation truncated: reached maximum output token limit.]';
+              fullText += warningMsg;
+              onChunk(warningMsg);
             }
             // Accumulate native tool call delta chunks
             const toolCallDeltas = parsed.choices?.[0]?.delta?.tool_calls;
@@ -609,6 +617,12 @@ export function streamCustomOpenAIChat(
             if (chunkText) {
               fullText += chunkText;
               onChunk(chunkText);
+            }
+            const finishReason = parsed.choices?.[0]?.finish_reason;
+            if (finishReason === 'length') {
+              const warningMsg = '\n\n⚠️ [Generation truncated: reached maximum output token limit.]';
+              fullText += warningMsg;
+              onChunk(warningMsg);
             }
             // Accumulate native tool call delta chunks
             const toolCallDeltas = parsed.choices?.[0]?.delta?.tool_calls;

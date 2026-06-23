@@ -404,6 +404,100 @@
     });
   }
 
+  // ===== TOAST NOTIFICATION SYSTEM =====
+  let _toastTimer = null;
+  /**
+   * Show a toast notification.
+   * @param {string} message - The message text
+   * @param {'success'|'error'|'info'|'warning'} type - Toast type
+   * @param {number} [duration=3500] - Auto-dismiss duration in ms
+   */
+  window.showToast = function (message, type, duration) {
+    type = type || 'info';
+    duration = duration || 3500;
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    const iconMap = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    toast.innerHTML = '<span style="font-size:14px;">' + (iconMap[type] || 'ℹ️') + '</span><span>' + message + '</span>';
+    toast.style.animationDuration = '0.3s, 0.3s';
+    toast.style.animationDelay = '0s, ' + (duration / 1000) + 's';
+    container.appendChild(toast);
+    // Auto-remove
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function () {
+      if (toast.parentNode) toast.remove();
+    }, duration + 350);
+    // Click to dismiss
+    toast.style.cursor = 'pointer';
+    toast.addEventListener('click', function () { toast.remove(); });
+  };
+
+  // ─── Search in Chat History ───────────────────────────────────────
+  var searchBar = document.getElementById('chat-search-bar');
+  var searchInput = document.getElementById('chat-search-input');
+  var searchClearBtn = document.getElementById('chat-search-clear');
+  var searchCount = document.getElementById('chat-search-count');
+  var searchHits = [];
+
+  function toggleSearchBar() {
+    var visible = searchBar.style.display !== 'none';
+    if (visible) {
+      searchBar.style.display = 'none';
+      searchInput.value = '';
+      clearSearchHighlights();
+    } else {
+      searchBar.style.display = 'flex';
+      searchInput.focus();
+    }
+  }
+
+  searchInput && searchInput.addEventListener('input', function () {
+    var query = searchInput.value.toLowerCase().trim();
+    clearSearchHighlights();
+    searchHits = [];
+    searchCount.textContent = '';
+    if (!query) return;
+    var bubbles = document.querySelectorAll('.message-bubble');
+    bubbles.forEach(function (bubble) {
+      var text = bubble.textContent || '';
+      if (text.toLowerCase().indexOf(query) !== -1) {
+        bubble.classList.add('search-hit');
+        searchHits.push(bubble);
+      }
+    });
+    searchCount.textContent = searchHits.length ? searchHits.length + ' match' + (searchHits.length > 1 ? 'es' : '') : 'No matches';
+    if (searchHits.length > 0) {
+      searchHits[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  searchClearBtn && searchClearBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    clearSearchHighlights();
+    searchCount.textContent = '';
+    searchInput.focus();
+  });
+
+  function clearSearchHighlights() {
+    document.querySelectorAll('.message-bubble.search-hit').forEach(function (el) {
+      el.classList.remove('search-hit');
+    });
+    searchHits = [];
+  }
+
+  // Ctrl+F / Cmd+F to toggle search
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== searchInput) {
+      e.preventDefault();
+      toggleSearchBar();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+      toggleSearchBar();
+    }
+  });
+
 
 
   const sessionSearchInput = document.getElementById('session-search-input');
@@ -496,6 +590,7 @@
   }
   // Attached Images State
   let attachedImages = [];
+  let attachedFiles = [];
 
   // New features state
   let workspaceFiles = [];
@@ -503,6 +598,223 @@
   let autocompleteActiveIndex = 0;
   let isAutocompleteOpen = false;
   let validationTimeout = null;
+
+  // ─── Token Usage Bar ────────────────────────────────────────────────────────
+  let sessionInputTokens = 0;
+  let sessionOutputTokens = 0;
+  let sessionCost = 0;
+  const tokenBar = document.getElementById('token-usage-bar');
+  const tokenInLabel = document.getElementById('token-in-label');
+  const tokenOutLabel = document.getElementById('token-out-label');
+  const tokenCostLabel = document.getElementById('token-cost-label');
+  const tokenResetBtn = document.getElementById('token-reset-btn');
+
+  function updateTokenBar(inputDelta, outputDelta, costDelta) {
+    sessionInputTokens += inputDelta;
+    sessionOutputTokens += outputDelta;
+    sessionCost += costDelta;
+    if (tokenBar) tokenBar.classList.remove('hidden');
+    if (tokenInLabel) tokenInLabel.textContent = '↑ ' + (sessionInputTokens >= 1000 ? (sessionInputTokens / 1000).toFixed(1) + 'k' : sessionInputTokens);
+    if (tokenOutLabel) tokenOutLabel.textContent = '↓ ' + (sessionOutputTokens >= 1000 ? (sessionOutputTokens / 1000).toFixed(1) + 'k' : sessionOutputTokens);
+    if (tokenCostLabel) tokenCostLabel.textContent = sessionCost > 0 ? '~$' + sessionCost.toFixed(4) : '~$0.000';
+  }
+  window.updateTokenBar = updateTokenBar;
+
+  if (tokenResetBtn) {
+    tokenResetBtn.addEventListener('click', () => {
+      sessionInputTokens = 0; sessionOutputTokens = 0; sessionCost = 0;
+      if (tokenBar) tokenBar.classList.add('hidden');
+    });
+  }
+
+  // ─── Context Usage Bar ──────────────────────────────────────────────────────
+  const contextUsageRow = document.getElementById('context-usage-row');
+  const contextUsageFill = document.getElementById('context-usage-fill');
+  const contextUsageLabel = document.getElementById('context-usage-label');
+
+  function updateContextBar(usedTokens, maxTokens) {
+    if (!contextUsageRow || !contextUsageFill || !contextUsageLabel) return;
+    const pct = Math.min(100, Math.round((usedTokens / Math.max(maxTokens, 1)) * 100));
+    contextUsageRow.classList.remove('hidden');
+    contextUsageFill.style.width = pct + '%';
+    contextUsageFill.classList.toggle('warn', pct >= 60 && pct < 85);
+    contextUsageFill.classList.toggle('danger', pct >= 85);
+    const toK = (n) => n >= 1000 ? (n / 1000).toFixed(0) + 'k' : n;
+    contextUsageLabel.textContent = 'Context: ' + toK(usedTokens) + ' / ' + toK(maxTokens);
+  }
+  window.updateContextBar = updateContextBar;
+
+  // ─── Slash Command Picker ───────────────────────────────────────────────────
+  const SLASH_COMMANDS = [
+    { key: '/fix',      desc: 'Find and fix bugs in the active file' },
+    { key: '/explain',  desc: 'Explain the current file or selected code' },
+    { key: '/test',     desc: 'Write unit tests for the active file' },
+    { key: '/commit',   desc: 'Generate a git commit message from staged changes' },
+    { key: '/refactor', desc: 'Refactor the active file for readability & performance' },
+    { key: '/review',   desc: 'Code review: bugs, security, style' },
+    { key: '/docs',     desc: 'Generate JSDoc/TSDoc documentation' },
+    { key: '/ask',      desc: 'Ask a general question' },
+  ];
+  const slashPicker = document.getElementById('slash-command-picker');
+  let slashPickerIndex = 0;
+  let slashPickerOpen = false;
+  let slashFilteredCmds = SLASH_COMMANDS;
+
+  function renderSlashPicker(filter) {
+    if (!slashPicker) return;
+    slashFilteredCmds = filter ? SLASH_COMMANDS.filter(c => c.key.startsWith('/' + filter)) : SLASH_COMMANDS;
+    if (slashFilteredCmds.length === 0) { closeSlashPicker(); return; }
+    slashPickerIndex = 0;
+    slashPicker.innerHTML = '<div class="slash-picker-header">Slash Commands</div>' +
+      slashFilteredCmds.map((c, i) =>
+        `<div class="slash-cmd-row${i === 0 ? ' selected' : ''}" data-cmd="${c.key}" role="option">
+          <span class="slash-cmd-key">${c.key}</span>
+          <span class="slash-cmd-desc">${c.desc}</span>
+        </div>`
+      ).join('');
+    slashPicker.querySelectorAll('.slash-cmd-row').forEach((row, i) => {
+      row.addEventListener('mouseenter', () => { slashPickerIndex = i; highlightSlashRow(); });
+      row.addEventListener('click', () => applySlashCommand(slashFilteredCmds[i].key));
+    });
+    slashPicker.classList.remove('hidden');
+    slashPickerOpen = true;
+  }
+
+  function highlightSlashRow() {
+    if (!slashPicker) return;
+    slashPicker.querySelectorAll('.slash-cmd-row').forEach((r, i) => r.classList.toggle('selected', i === slashPickerIndex));
+  }
+
+  function closeSlashPicker() {
+    if (slashPicker) slashPicker.classList.add('hidden');
+    slashPickerOpen = false;
+  }
+
+  function applySlashCommand(cmd) {
+    if (!promptInput) return;
+    promptInput.textContent = cmd + ' ';
+    // Move cursor to end
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(promptInput);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    closeSlashPicker();
+    promptInput.focus();
+  }
+
+  if (promptInput) {
+    promptInput.addEventListener('input', () => {
+      const text = promptInput.textContent || '';
+      if (text === '/') {
+        renderSlashPicker('');
+      } else if (text.startsWith('/') && !text.includes(' ')) {
+        renderSlashPicker(text.slice(1));
+      } else {
+        closeSlashPicker();
+      }
+    });
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (!slashPickerOpen) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        slashPickerIndex = (slashPickerIndex + 1) % slashFilteredCmds.length;
+        highlightSlashRow();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        slashPickerIndex = (slashPickerIndex - 1 + slashFilteredCmds.length) % slashFilteredCmds.length;
+        highlightSlashRow();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applySlashCommand(slashFilteredCmds[slashPickerIndex].key);
+      } else if (e.key === 'Escape') {
+        closeSlashPicker();
+      }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (slashPicker && !slashPicker.contains(e.target) && e.target !== promptInput) closeSlashPicker();
+  });
+
+  // ─── Memory Panel ───────────────────────────────────────────────────────────
+  const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
+  const memoryDrawer = document.getElementById('memory-drawer');
+  const memoryEntriesList = document.getElementById('memory-entries-list');
+  const memoryRefreshBtn = document.getElementById('memory-refresh-btn');
+  const memoryClearBtn = document.getElementById('memory-clear-btn');
+
+  function renderMemoryPanel(entries) {
+    if (!memoryEntriesList) return;
+    if (!entries || entries.length === 0) {
+      memoryEntriesList.innerHTML = '<div class="no-memory-msg" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">No memory entries yet.</div>';
+      return;
+    }
+    const categories = ['convention', 'architecture', 'pattern', 'preference', 'note'];
+    const catLabels = { convention: '📋 Conventions', architecture: '🏗️ Architecture', pattern: '🔁 Patterns', preference: '⚙️ Preferences', note: '📝 Notes' };
+    let html = '';
+    for (const cat of categories) {
+      const catEntries = entries.filter(e => e.category === cat);
+      if (!catEntries.length) continue;
+      html += `<div class="memory-category-header">${catLabels[cat] || cat}</div>`;
+      for (const entry of catEntries) {
+        html += `<div class="memory-entry">
+          <div class="memory-entry-body">
+            <div class="memory-entry-key">${entry.key}</div>
+            <div class="memory-entry-value">${entry.value}</div>
+          </div>
+          <button class="memory-entry-delete" data-key="${entry.key}" title="Delete this memory entry">🗑</button>
+        </div>`;
+      }
+    }
+    memoryEntriesList.innerHTML = html;
+    memoryEntriesList.querySelectorAll('.memory-entry-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        vscode.postMessage({ type: 'deleteMemory', key });
+        btn.closest('.memory-entry').style.opacity = '0.3';
+        setTimeout(() => vscode.postMessage({ type: 'getMemory' }), 300);
+      });
+    });
+  }
+  window.renderMemoryPanel = renderMemoryPanel;
+
+  if (toggleMemoryBtn) {
+    toggleMemoryBtn.addEventListener('click', () => {
+      const isOpen = memoryDrawer && !memoryDrawer.classList.contains('collapsed');
+      // Close all drawers
+      document.querySelectorAll('.drawer').forEach(d => d.classList.add('collapsed'));
+      if (!isOpen && memoryDrawer) {
+        memoryDrawer.classList.remove('collapsed');
+        vscode.postMessage({ type: 'getMemory' });
+      }
+    });
+  }
+  if (memoryRefreshBtn) memoryRefreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'getMemory' }));
+  if (memoryClearBtn) memoryClearBtn.addEventListener('click', () => {
+    if (confirm('Clear all agent memory entries?')) {
+      vscode.postMessage({ type: 'clearMemory' });
+      setTimeout(() => vscode.postMessage({ type: 'getMemory' }), 300);
+    }
+  });
+
+  // ─── Commit / PR Generator Buttons ──────────────────────────────────────────
+  const genCommitBtn = document.getElementById('gen-commit-btn');
+  const genPrBtn = document.getElementById('gen-pr-btn');
+
+  if (genCommitBtn) {
+    genCommitBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'genCommitMessage' });
+    });
+  }
+  if (genPrBtn) {
+    genPrBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'genPrDescription' });
+    });
+  }
+
+
 
   // Map to store parsed created/updated file contents from assistant messages
   const parsedToolContents = new Map();
@@ -1574,6 +1886,54 @@
     autocompleteDropdown.classList.add('hidden');
   }
 
+  // Intercept paste event on promptInput to force plain text insertion
+  promptInput.addEventListener('paste', (e) => {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData) return;
+
+    // Check if there is an image in the paste payload
+    const types = clipboardData.types || [];
+    const hasImage = Array.from(types).some(type => type.indexOf('image') !== -1);
+    const files = clipboardData.files;
+    let hasImageFile = false;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type && files[i].type.indexOf('image') !== -1) {
+          hasImageFile = true;
+          break;
+        }
+      }
+    }
+
+    // If it has image data, do NOT preventDefault here; let the window listener attach it
+    if (hasImage || hasImageFile) {
+      return;
+    }
+
+    // Prevent rich text / HTML styling from rendering in the contenteditable area
+    e.preventDefault();
+    const text = clipboardData.getData('text/plain');
+
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const textNode = document.createTextNode(text);
+      range.insertNode(textNode);
+
+      // Move cursor after the inserted text
+      range.setStartAfter(textNode);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      promptInput.textContent += text;
+    }
+
+    autoGrowTextarea();
+    handleAutocompleteSearch();
+  });
+
   // Global Window-level Paste Event Listener for Images
   window.addEventListener('paste', (e) => {
     const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
@@ -1622,8 +1982,7 @@
     }
   });
 
-  
-  // Drag-and-Drop Image Support
+  // Drag-and-Drop Support for files/images
   promptInput.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1643,33 +2002,93 @@
     e.stopPropagation();
     promptInput.style.borderColor = '';
     promptInput.style.boxShadow = '';
-    
+
+    // Check text data first (e.g. dragging a file from VS Code workspace explorer)
+    const textData = e.dataTransfer.getData('text/plain');
+    if (textData) {
+      const normalizedPath = textData.trim().replace(/\\/g, '/');
+      const foundFile = workspaceFiles.find(f => 
+        f === normalizedPath || 
+        f.endsWith('/' + normalizedPath) || 
+        normalizedPath.endsWith('/' + f)
+      );
+      if (foundFile) {
+        insertFileTagAtCaret(foundFile);
+        return;
+      }
+    }
+
     const files = e.dataTransfer.files;
     for (let i = 0; i < files.length; i++) {
-      if (files[i].type.indexOf('image') !== -1) {
+      const file = files[i];
+      if (file.type && file.type.indexOf('image') !== -1) {
         const reader = new FileReader();
         reader.onload = function(event) {
           const base64 = event.target.result.split(',')[1];
           attachImage(base64);
         };
-        reader.readAsDataURL(files[i]);
+        reader.readAsDataURL(file);
+      } else {
+        attachFile(file);
       }
     }
   });
 
+  function insertFileTagAtCaret(filePath) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) { promptInput.focus(); return; }
+    const range = sel.getRangeAt(0);
 
-function attachImage(base64) {
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'inline-file-tag';
+    tagSpan.contentEditable = 'false';
+    const fileName = filePath.split('/').pop() || filePath;
+    tagSpan.textContent = '@' + fileName;
+    tagSpan.dataset.path = filePath;
+    tagSpan.title = filePath;
+
+    range.insertNode(tagSpan);
+    const newRange = document.createRange();
+    newRange.setStartAfter(tagSpan);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    autoGrowTextarea();
+  }
+
+  function attachFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const content = event.target.result;
+      attachedFiles.push({
+        name: file.name,
+        content: content
+      });
+      renderAttachments();
+    };
+    reader.readAsText(file);
+  }
+
+  function removeAttachedFile(index) {
+    attachedFiles.splice(index, 1);
+    renderAttachments();
+  }
+
+  function attachImage(base64) {
     attachedImages.push(base64);
-    renderImageAttachments();
+    renderAttachments();
   }
 
   function removeAttachedImage(index) {
     attachedImages.splice(index, 1);
-    renderImageAttachments();
+    renderAttachments();
   }
 
-  function renderImageAttachments() {
+  function renderAttachments() {
     imageAttachmentsContainer.innerHTML = '';
+
+    // Render image attachment chips
     attachedImages.forEach((base64, index) => {
       const chip = document.createElement('div');
       chip.className = 'image-attachment-chip';
@@ -1683,7 +2102,31 @@ function attachImage(base64) {
       chip.appendChild(removeBtn);
       imageAttachmentsContainer.appendChild(chip);
     });
+
+    // Render non-image file attachment chips
+    attachedFiles.forEach((file, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'file-attachment-chip';
+
+      const fileExt = file.name.split('.').pop() || 'txt';
+      chip.innerHTML = `
+        <span class="file-attachment-icon">&#128196;</span>
+        <span class="file-attachment-name" title="${file.name}">${file.name}</span>
+      `;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'image-attachment-remove';
+      removeBtn.innerHTML = '&#x2715;';
+      removeBtn.addEventListener('click', () => removeAttachedFile(index));
+
+      chip.appendChild(removeBtn);
+      imageAttachmentsContainer.appendChild(chip);
+    });
   }
+
+  // Export state/handlers globally or to other parts as needed
+  window.attachedFiles = attachedFiles;
+  window.renderAttachments = renderAttachments;
 
   function clearAllActiveAnimations() {
     // 1. Clear any running tool cards
@@ -1731,6 +2174,7 @@ function attachImage(base64) {
     sendBtn.classList.remove('hidden');
     setAvatarState('idle');
     clearAllActiveAnimations();
+    if (typeof showToast === 'function') showToast('Response cancelled', 'warning', 2000);
   });
 
   function getPromptInputValue() {
@@ -1758,34 +2202,46 @@ function attachImage(base64) {
     // Slash command handling
     let text = rawText;
     let isSlashCommand = false;
-    const slashMatch = text.match(/^\/(fix|explain|test)\b\s*(.*)/i);
+    const slashMatch = text.match(/^\/(fix|explain|test|commit|refactor|review|docs|ask)\b\s*(.*)/is);
     if (slashMatch) {
       const command = slashMatch[1].toLowerCase();
       const rest = slashMatch[2].trim();
       isSlashCommand = true;
-      const selection = window.getSelection()?.toString() || '';
-
-      if ((command === 'fix' || command === 'explain') && !selection && !rest) {
-        appendMessageBubble('system', 'Please select code in the editor first, or add a description after the slash command (e.g., /fix this bug where...).');
-        scrollChatToBottom(true);
-        return;
-      }
 
       if (command === 'fix') {
-        text = rest ? 'Fix the following code/issue: ' + rest : 'Fix this code:\n';
+        text = rest ? 'Fix the following code/issue: ' + rest : 'Analyze the active file and fix any bugs, errors, or issues you find. Explain each fix.';
       } else if (command === 'explain') {
-        text = rest ? 'Explain this: ' + rest : 'Explain this code:\n';
+        text = rest ? 'Explain this: ' + rest : 'Explain the current file or selected code in detail — what it does, why it works that way, and any potential issues.';
       } else if (command === 'test') {
-        text = rest ? 'Write tests for: ' + rest : 'Write unit tests for this code:\n';
+        text = rest ? 'Write tests for: ' + rest : 'Write comprehensive unit tests for the active file. Use the existing test framework in this project.';
+      } else if (command === 'commit') {
+        text = 'Generate a concise, conventional commit message for the current staged git changes. Run `git diff --staged` first to see the changes, then output ONLY the commit message (no extra commentary).';
+      } else if (command === 'refactor') {
+        text = rest ? 'Refactor this: ' + rest : 'Refactor the active file for better readability, maintainability, and performance. Preserve all functionality. Explain each refactoring decision.';
+      } else if (command === 'review') {
+        text = rest ? 'Code review: ' + rest : 'Perform a thorough code review of the active file. Check for bugs, performance issues, security vulnerabilities, missing error handling, and style inconsistencies.';
+      } else if (command === 'docs') {
+        text = rest ? 'Generate documentation for: ' + rest : 'Generate comprehensive JSDoc/TSDoc comments for all exported functions, classes, and types in the active file.';
+      } else if (command === 'ask') {
+        text = rest || 'What can I help you with?';
       }
     }
 
-    if (!text && attachedImages.length === 0) return;
+    let textToSend = text;
+    if (typeof attachedFiles !== 'undefined' && attachedFiles.length > 0) {
+      const fileBlocks = attachedFiles.map(file => {
+        const ext = file.name.split('.').pop() || 'txt';
+        return `\n\n[Attached File: ${file.name}]\n\`\`\`${ext}\n${file.content}\n\`\`\``;
+      }).join('');
+      textToSend += fileBlocks;
+    }
+
+    if (!textToSend && attachedImages.length === 0) return;
     
     // If already sending, queue the message instead of discarding
     if (isSending) {
       messageQueue.push({
-        text: text,
+        text: textToSend,
         images: [...attachedImages],
         userDisplayMessage: isSlashCommand ? rawText : text,
         rawText: rawText
@@ -1799,13 +2255,20 @@ function attachImage(base64) {
       scrollChatToBottom(true);
       
       // Also add to chatHistory as a real user message so it's preserved
-      chatHistory.push({ role: 'user', content: text });
+      chatHistory.push({ role: 'user', content: textToSend });
       vscode.postMessage({
         type: 'saveHistory',
         history: chatHistory
       });
       
       promptInput.innerHTML = '';
+      if (typeof attachedFiles !== 'undefined') {
+        attachedFiles.length = 0;
+      }
+      attachedImages = [];
+      if (typeof renderAttachments === 'function') {
+        renderAttachments();
+      }
       return;
     }
 
@@ -1828,11 +2291,16 @@ function attachImage(base64) {
       userDisplayMessage += '\n\n_Slash command expanded to: ' + text.substring(0, 120) + (text.length > 120 ? '...' : '') + '_';
     }
 
-    executeSend(text, attachedImages, undefined, userDisplayMessage);
+    executeSend(textToSend, attachedImages, undefined, userDisplayMessage);
 
     
     attachedImages = [];
-    renderImageAttachments();
+    if (typeof attachedFiles !== 'undefined') {
+      attachedFiles.length = 0;
+    }
+    if (typeof renderAttachments === 'function') {
+      renderAttachments();
+    }
   }
 
   let currentToolCardElement = null;
@@ -2429,6 +2897,44 @@ function attachImage(base64) {
 
 
 
+  // ─── Deep-link file paths in message text ─────────────────────────
+  function linkifyFilePaths(container) {
+    // Match absolute and relative file paths with extensions
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    var textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach(function (node) {
+      var text = node.textContent;
+      // Match common file path patterns: /absolute/path/file.ts, relative/path/file.tsx, dir/file.go
+      var pattern = /(\b(?:[a-zA-Z]:[\\\/])?[\w\.\-_\/\\]+\.(?:ts|tsx|js|jsx|json|html|css|py|go|rs|java|rb|php|c|cpp|h|hpp|md|txt|yml|yaml|toml|svg|png|jpg|gif|vue|svelte)\b)/gi;
+      if (pattern.test(text)) {
+        pattern.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var lastIdx = 0;
+        var match;
+        while ((match = pattern.exec(text)) !== null) {
+          var before = text.slice(lastIdx, match.index);
+          if (before) frag.appendChild(document.createTextNode(before));
+          var link = document.createElement('span');
+          link.className = 'file-path-link';
+          link.textContent = match[0];
+          link.title = 'Click to open: ' + match[0];
+          link.style.cssText = 'cursor:pointer;color:var(--color-primary-light);text-decoration:underline;';
+          link.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var pathVal = this.textContent;
+            vscode.postMessage({ type: 'openFile', path: pathVal });
+          });
+          frag.appendChild(link);
+          lastIdx = pattern.lastIndex;
+        }
+        var remaining = text.slice(lastIdx);
+        if (remaining) frag.appendChild(document.createTextNode(remaining));
+        node.parentNode && node.parentNode.replaceChild(frag, node);
+      }
+    });
+  }
+
   // Helper: Append a message bubble to DOM
   function appendMessageBubble(role, text, images, container = chatMessages) {
     if (role === 'system' || role === 'tool') {
@@ -2567,6 +3073,7 @@ function attachImage(base64) {
       textContainer.innerHTML = parseMarkdown(text, isApproved);
       bindCodeBlockButtons(textContainer);
       applySyntaxHighlighting(textContainer);
+      linkifyFilePaths(textContainer);
       bubble.appendChild(textContainer);
     }
     
@@ -2588,7 +3095,32 @@ function attachImage(base64) {
       return;
     }
 
+    // Token usage update
+    if (message.type === 'tokenUsage' && message.usage) {
+      if (typeof window.updateTokenBar === 'function') {
+        window.updateTokenBar(message.usage.input || 0, message.usage.output || 0, message.usage.cost || 0);
+      }
+      return;
+    }
+
+    // Context window usage update
+    if (message.type === 'contextUsage') {
+      if (typeof window.updateContextBar === 'function') {
+        window.updateContextBar(message.usedTokens || 0, message.maxTokens || 200000);
+      }
+      return;
+    }
+
+    // Memory panel data
+    if (message.type === 'memoryData') {
+      if (typeof window.renderMemoryPanel === 'function') {
+        window.renderMemoryPanel(message.entries || []);
+      }
+      return;
+    }
+
     switch (message.type) {
+
       case 'updateSettings': {
         const s = message.settings;
         savedDefaultOllamaModel = s.defaultOllamaModel;
@@ -3017,24 +3549,28 @@ function attachImage(base64) {
           promptInput.contentEditable = 'true';
           sendBtn.disabled = false;
           processNextInQueue();
-        promptInput.focus();
-        currentStreamingBubble = null;
-        currentStreamingText = '';
-        currentStreamingReasoningText = '';
-        setAvatarState('celebrate');
-        triggerParticleExplosion();
-        setTimeout(() => {
-          if (avatarState === 'celebrate') {
+          promptInput.focus();
+          currentStreamingBubble = null;
+          currentStreamingText = '';
+          currentStreamingReasoningText = '';
+          if (message.completed) {
+            setAvatarState('celebrate');
+            triggerParticleExplosion();
+            setTimeout(() => {
+              if (avatarState === 'celebrate') {
+                setAvatarState('idle');
+              }
+            }, 4000);
+          } else {
             setAvatarState('idle');
           }
-        }, 4000);
-        sendBtn.classList.remove('hidden');
-        stopBtn.classList.add('hidden');
-        clearAllActiveAnimations();
-        updateStickyUserMessage();
-        scrollChatToBottom();
-        break;
-      }
+          sendBtn.classList.remove('hidden');
+          stopBtn.classList.add('hidden');
+          clearAllActiveAnimations();
+          updateStickyUserMessage();
+          scrollChatToBottom();
+          break;
+        }
 
       case 'chatResponseError': {
         setAvatarState('error');
@@ -4905,7 +5441,7 @@ function highlightLine(line, lang) {
     // Comments
     escaped = escaped.replace(/(\/\/.*$)/g, '<span class="hljs-comment">$1</span>');
     // Strings
-    escaped = escaped.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     // Numbers
     escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hljs-number">$1</span>');
     // Keywords
@@ -4920,7 +5456,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(biRegex, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'python') {
     escaped = escaped.replace(/(#.*$)/g, '<span class="hljs-comment">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hljs-number">$1</span>');
     var pyKw = ['def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'import', 'from', 'as', 'try', 'except', 'finally', 'with', 'yield', 'lambda', 'pass', 'break', 'continue', 'and', 'or', 'not', 'in', 'is', 'None', 'True', 'False', 'self', 'async', 'await', 'raise'];
     var pyKwRegex = new RegExp('\\b(' + pyKw.join('|') + ')\\b', 'g');
@@ -4933,7 +5469,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/\.[\w-]+|#[\w-]+|[\w-]+(?=\s*{)/g, '<span class="hljs-selector">$1</span>');
     escaped = escaped.replace(/([\w-]+)(?=\s*:)/g, '<span class="hljs-property">$1</span>');
     escaped = escaped.replace(/(#[0-9a-fA-F]{3,6}|rgba?\([^)]+\))/g, '<span class="hljs-number">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
   } else if (lang === 'json') {
     escaped = escaped.replace(/("[^"]*")(\s*:)/g, '<span class="hljs-attr">$1</span>$2');
     escaped = escaped.replace(/("[^"]*")(?=\s*[,}\]])/g, '<span class="hljs-string">$1</span>');
@@ -4941,7 +5477,7 @@ function highlightLine(line, lang) {
     escaped = escaped.replace(/\b(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, '<span class="hljs-number">$1</span>');
   } else if (lang === 'bash' || lang === 'sh') {
     escaped = escaped.replace(/(#.*$)/g, '<span class="hljs-comment">$1</span>');
-    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$1</span>');
+    escaped = escaped.replace(/(["'])(?:(?!\1|\\).|\\.)*\1/g, '<span class="hljs-string">$&</span>');
     escaped = escaped.replace(/\b(echo|cd|ls|rm|cp|mv|mkdir|touch|cat|grep|find|npm|node|python|git|docker|sudo|export|source)\b/g, '<span class="hljs-built_in">$1</span>');
   } else if (lang === 'diff') {
     if (escaped.indexOf('+') === 0) escaped = '<span class="hljs-addition">' + escaped + '</span>';
@@ -5316,7 +5852,6 @@ function initArtifacts() {
   const toggleBtn = document.getElementById('toggle-artifact-btn');
   const drawer = document.getElementById('artifacts-drawer');
   const closeBtn = drawer?.querySelector('.drawer-close-btn');
-  const openInPanelBtn = document.getElementById('artifact-open-in-panel');
   const artifactsList = document.getElementById('artifacts-list');
 
   // Toggle drawer
@@ -5327,16 +5862,6 @@ function initArtifacts() {
 
   closeBtn?.addEventListener('click', () => {
     hideArtifactsDrawer();
-  });
-
-  // Open selected artifact in a new VS Code window panel
-  openInPanelBtn?.addEventListener('click', () => {
-    if (artifactsState.selectedId) {
-      vscode.postMessage({
-        type: 'openArtifact',
-        artifactId: artifactsState.selectedId,
-      });
-    }
   });
 
   // Listen for artifact updates from the extension host
@@ -5391,7 +5916,6 @@ function hideArtifactsDrawer() {
 
 function renderArtifactsList() {
   const container = document.getElementById('artifacts-list');
-  const openBtn = document.getElementById('artifact-open-in-panel');
   if (!container) return;
 
   if (!artifactsState.list || artifactsState.list.length === 0) {
@@ -5400,11 +5924,8 @@ function renderArtifactsList() {
         No artifacts yet. Ask the agent to create one (e.g., "Create an HTML tooltip component as an artifact").
       </div>
     `;
-    if (openBtn) openBtn.disabled = true;
     return;
   }
-
-  if (openBtn) openBtn.disabled = false;
 
   const typeIcons = { html: '🌐', svg: '🎨', mermaid: '📊', code: '💻', markdown: '📝' };
   const typeLabels = { html: 'HTML Preview', svg: 'SVG Graphic', mermaid: 'Diagram', code: 'Code Snippet', markdown: 'Document' };

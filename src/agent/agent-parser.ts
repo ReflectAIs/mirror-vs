@@ -168,6 +168,7 @@ export class AgentParser {
       'git_commit',
       'multi_patch_file',
       'multipatch_file',
+      'create_artifact',
     ];
     for (const tool of blockTools) {
       let startFrom = 0;
@@ -196,6 +197,7 @@ export class AgentParser {
       'git_commit',
       'multi_patch_file',
       'multipatch_file',
+      'create_artifact',
     ];
     let adjustedText = text;
     for (const tool of blockTools) {
@@ -267,6 +269,7 @@ export class AgentParser {
       'git_commit',
       'multi_patch_file',
       'multipatch_file',
+      'create_artifact',
     ];
     for (const tool of blockTools) {
       let startFrom = 0;
@@ -431,6 +434,7 @@ export class AgentParser {
       'git_commit',
       'multi_patch_file',
       'multipatch_file',
+      'create_artifact',
     ];
     for (const toolName of blockTools) {
       startFrom = 0;
@@ -443,7 +447,7 @@ export class AgentParser {
           continue;
         }
         const p = this.attr(tagInfo.attrs, 'path');
-        if (p || toolName === 'git_commit' || toolName === 'multi_patch_file' || toolName === 'multipatch_file') {
+        if (p || toolName === 'git_commit' || toolName === 'multi_patch_file' || toolName === 'multipatch_file' || toolName === 'create_artifact') {
           const closeTagPattern = '\u003C\u002F' + toolName + '\\s*\u003E';
           const closeTagRegex = new RegExp(closeTagPattern, 'i');
           const closeMatch = closeTagRegex.exec(rawText.substring(tagInfo.end));
@@ -456,13 +460,24 @@ export class AgentParser {
               const trimmed = content.trim();
               content = trimmed.substring(cdataStart.length, trimmed.length - cdataEnd.length);
             }
+            const tool: any = {
+              name: (toolName === 'multipatch_file' ? 'multi_patch_file' : toolName) as ToolCall['name'],
+              path: p ? p.trim() : undefined,
+              content,
+            };
+            if (toolName === 'create_artifact') {
+              const id = this.attr(tagInfo.attrs, 'id');
+              const type = this.attr(tagInfo.attrs, 'type');
+              const title = this.attr(tagInfo.attrs, 'title');
+              const language = this.attr(tagInfo.attrs, 'language');
+              if (id) tool.id = id.trim();
+              if (type) tool.type = type.trim();
+              if (title) tool.title = title.trim();
+              if (language) tool.language = language.trim();
+            }
             candidates.push({
               index: tagInfo.start,
-              tool: {
-                name: (toolName === 'multipatch_file' ? 'multi_patch_file' : toolName) as ToolCall['name'],
-                path: p ? p.trim() : undefined,
-                content,
-              },
+              tool,
             });
             startFrom = tagInfo.end + closeMatch.index + closeMatch[0].length;
             continue;

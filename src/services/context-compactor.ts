@@ -63,7 +63,7 @@ export function sanitizeToolMessages(msgs: ChatMessage[]): ChatMessage[] {
 
   for (const m of msgs) {
     const role = m.role;
-    const isToolResult = role === 'tool' || (role === 'system' && m.content.startsWith('[Tool Result for '));
+    const isToolResult = (role as string) === 'tool' || (role === 'system' && m.content.startsWith('[Tool Result for '));
     const isAssistantWithTools = role === 'assistant' && (m as any).tool_calls && (m as any).tool_calls.length > 0;
 
     if (isToolResult) {
@@ -90,7 +90,7 @@ export function sanitizeToolMessages(msgs: ChatMessage[]): ChatMessage[] {
     if (isAssistantWithTools) {
       const nxt = i + 1 < cleaned.length ? cleaned[i + 1] : null;
       const hasFollowingToolResult =
-        nxt && (nxt.role === 'tool' || (nxt.role === 'system' && nxt.content.startsWith('[Tool Result for ')));
+        nxt && ((nxt.role as string) === 'tool' || (nxt.role === 'system' && nxt.content.startsWith('[Tool Result for ')));
       if (!hasFollowingToolResult) {
         // Strip tool_calls to preserve text content while omitting unanswered tool_calls
         const { tool_calls, ...rest } = m as any;
@@ -345,7 +345,7 @@ export async function maybeCompact(
   let splitPoint = Math.floor(convoMsgs.length / 2);
   while (splitPoint < convoMsgs.length) {
     const currentMsg = convoMsgs[splitPoint];
-    const isToolResult = currentMsg.role === 'tool' || 
+    const isToolResult = (currentMsg.role as string) === 'tool' || 
                          (currentMsg.role === 'system' && currentMsg.content && currentMsg.content.startsWith('[Tool Result for '));
     
     const prevMsg = splitPoint > 0 ? convoMsgs[splitPoint - 1] : null;

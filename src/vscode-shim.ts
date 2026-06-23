@@ -14,6 +14,8 @@ export const workspace = {
       lineCount: 0,
       lineAt: () => ({ range: {} }),
     }),
+  applyEdit: async () => true,
+  onDidChangeWorkspaceFolders: () => ({ dispose: () => {} }),
 };
 
 const mockTextEditor = {
@@ -79,10 +81,52 @@ export const EventEmitter = class {
 export const SecretStorage = class {};
 export const OverviewRulerLane = { Left: 1 };
 export const StatusBarAlignment = { Left: 1, Right: 2 };
+export const ViewColumn = { Active: -1, Beside: -2 };
 export const ThemeColor = {};
 
 export const env = {
   appRoot: '/mock/app/root',
 };
 
-export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment, env };
+export const SymbolKind = {
+  File: 0,
+  Module: 1,
+  Namespace: 2,
+  Package: 3,
+  Class: 4,
+  Method: 5,
+  Property: 6,
+  Field: 7,
+  Constructor: 8,
+  Enum: 9,
+  Interface: 10,
+  Function: 11,
+  Variable: 12,
+  Constant: 13,
+  String: 14,
+  Number: 15,
+  Boolean: 16,
+  Array: 17,
+  Object: 18,
+  Key: 19,
+  Null: 20,
+  EnumMember: 21,
+  Struct: 22,
+  Event: 23,
+  Operator: 24,
+  TypeParameter: 25,
+};
+
+export class Position {
+  constructor(public readonly line: number, public readonly character: number) {}
+}
+
+export class Range {
+  constructor(public readonly start: Position, public readonly end: Position) {}
+}
+
+export class Location {
+  constructor(public readonly uri: any, public readonly rangeOrPosition: any) {}
+}
+
+export default { workspace, window, commands, Uri, ConfigurationTarget, StatusBarAlignment, env, SymbolKind, Position, Range, Location };

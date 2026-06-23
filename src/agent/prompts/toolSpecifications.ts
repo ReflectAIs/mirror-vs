@@ -20,6 +20,9 @@ Available tools:
 - figma_inspect: <figma_inspect url="..." />
 - wait: <wait [ms="..."] [seconds="..."] />
 - update_agent_memory: <update_agent_memory key="..." value="..." />
+- delete_file: <delete_file path="..." />
+- rename_file: <rename_file from="..." to="..." />
+- create_artifact: <create_artifact type="html|svg|mermaid|code|markdown" title="..." [id="..."] [language="..."]>content</create_artifact>
 
 CRITICAL subsequent turn rule:
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
@@ -40,7 +43,6 @@ CRITICAL subsequent turn rule:
   2. Then use \`patch_file\` repeatedly, each adding a logical section (e.g. one method or handler at a time, ~50-150 lines per patch).
   3. Keep each patch small and focused — a single function, method, or logical block.
   4. If you catch yourself writing more than 500 lines in a \`create_file\` or \`write_file\` call, stop immediately. Replace it with the skeleton approach.
-=======
 - **read_file Output**: The tool displays the actual line range read (e.g. "showing lines 1-800"). When content is evicted, the eviction notice includes the original line range so you know exactly which lines to re-request.
 
 ### 🧰 AVAILABLE TOOLS
@@ -49,6 +51,7 @@ CRITICAL subsequent turn rule:
    <read_file path="relative/path/to/file.ts" />
    For extremely long files, you can read specific line ranges (up to 800 lines per turn):
    <read_file path="relative/path/to/file.ts" start_line="1" end_line="800" />
+   *IMAGE SUPPORT*: You can call read_file on workspace image files (PNG, JPG, JPEG, GIF, WEBP, etc.). The system will automatically encode the image to base64 and feed it into your vision model so you can inspect/understand it.
 2. CREATE FILE (Only for completely new files):
    <create_file path="relative/path/to/new_file.ts">content here</create_file>
 3. WRITE FILE (Overwrites whole file):
@@ -112,11 +115,16 @@ CRITICAL subsequent turn rule:
 23. UPDATE AGENT MEMORY:
     <update_agent_memory key="preferences" value="Always use functional React components." />
     Saves developer preferences, key architectural decisions, or code patterns in the local workspace.
-24. DEBUGGER CONTROLS (Only in Debug Mode):
-    - debug_get_sessions: <debug_get_sessions /> (lists active debugging sessions)
-    - debug_get_breakpoints: <debug_get_breakpoints /> (lists active breakpoints)
-    - debug_add_breakpoint: <debug_add_breakpoint path="relative/file.ts" line="25" /> (adds breakpoint)
-    - debug_remove_breakpoint: <debug_remove_breakpoint breakpoint_id="..." /> (removes breakpoint)
     - debug_inspect_variables: <debug_inspect_variables /> (dumps active threads, callstack, scopes, and variables)
+25. CREATE ARTIFACT:
+    <create_artifact type="html|svg|mermaid|code|markdown" title="My Title" [id="unique_id"] [language="typescript"]>content</create_artifact>
+    Creates or updates an interactive previewable artifact rendered in a side-by-side webview panel. If an id is provided, it updates the existing panel. Use type="markdown" for planning docs, checklists, or walkthroughs.
+26. DELETE FILE:
+    <delete_file path="relative/path/to/file.ts" />
+    Permanently deletes a file. A checkpoint is created so the action can be reverted. Requires user approval.
+27. RENAME / MOVE FILE:
+    <rename_file from="old/path/file.ts" to="new/path/file.ts" />
+    Renames or moves a file. Parent directories for the destination are created automatically. Requires user approval.
+
 `;
 }

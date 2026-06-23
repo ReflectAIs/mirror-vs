@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'unsafe-inline'; img-src {{cspSource}} data: https:; font-src {{cspSource}};">
   <link rel="stylesheet" href="{{styleUri}}">
   <title>Mirror AI Worker</title>
 </head>
-
 <body>
   <div class="app-container">
     <!-- ===== HEADER WITH LOGO ===== -->
@@ -40,42 +40,47 @@
           </div>
         </div>
         <div class="header-actions">
-          <button id="new-chat-btn" class="icon-btn" title="New Chat Session">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <button id="new-chat-btn" class="icon-btn" title="New Chat Session" aria-label="New Chat Session">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
               <path
                 d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
             </svg>
           </button>
-          <button id="toggle-history-btn" class="icon-btn" title="Chat Sessions">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <button id="toggle-history-btn" class="icon-btn" title="Chat Sessions" aria-label="Chat Sessions">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
               <path
                 d="M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2zm3.5 4.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 3a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5z" />
             </svg>
           </button>
-          <button id="toggle-git-btn" class="icon-btn" title="Git Changes">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <button id="toggle-git-btn" class="icon-btn" title="Git Changes" aria-label="Git Changes">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
               <path
                 d="M2 6.5A4.5 4.5 0 0 1 6.5 2h3A4.5 4.5 0 0 1 14 6.5v3A4.5 4.5 0 0 1 9.5 14h-3A4.5 4.5 0 0 1 2 9.5v-3zM6.5 3A3.5 3.5 0 0 0 3 6.5v3A3.5 3.5 0 0 0 6.5 13h3A3.5 3.5 0 0 0 13 9.5v-3A3.5 3.5 0 0 0 9.5 3h-3z" />
               <path d="M6.5 5.5v5h1v-5h-1zm2 0v5h1v-5h-1zM5.5 6.5h5v1h-5v-1z" />
             </svg>
           </button>
-          <button id="toggle-checkpoint-btn" class="icon-btn" title="Undo/Redo Checkpoints">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <button id="toggle-checkpoint-btn" class="icon-btn" title="Undo/Redo Checkpoints" aria-label="Undo/Redo Checkpoints">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
               <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
               <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
             </svg>
           </button>
-          <button id="toggle-dashboard-btn" class="icon-btn" title="Extension Dashboard">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <button id="toggle-dashboard-btn" class="icon-btn" title="Extension Dashboard" aria-label="Extension Dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5v12h-2V2h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3z"/>
             </svg>
           </button>
-          <button id="toggle-settings-btn" class="icon-btn" title="Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <button id="toggle-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
               <path
                 d="M9.405 1.02c.28-.558 1.078-.558 1.357 0l.87 1.737 1.916.279c.617.09.862.846.416 1.29L12.57 5.688l.328 1.908c.106.617-.54 1.087-1.09.8L10 7.5l-1.808.996c-.55.286-1.196-.183-1.09-.8l.328-1.908L6.038 4.326c-.446-.443-.2-.199.416-1.29l1.916-.28.87-1.736z" />
               <path
                 d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z" />
+            </svg>
+          </button>
+          <button id="toggle-memory-btn" class="icon-btn" title="Agent Memory" aria-label="Agent Memory">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 0a5 5 0 0 0-5 5v.5A2.5 2.5 0 0 0 2 8v1a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 14 9V8a2.5 2.5 0 0 0-1-2V5a5 5 0 0 0-5-5zm3 5.5v.5H5V5a3 3 0 0 1 6 0z"/>
             </svg>
           </button>
         </div>
@@ -92,9 +97,6 @@
           <button class="drawer-close-btn" data-drawer="artifacts">✕</button>
         </div>
         <div class="drawer-body" style="padding:8px 10px;">
-          <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-            <button id="artifact-open-in-panel" class="btn btn-primary" style="flex:1;padding:6px 10px;font-size:11px;" disabled title="Select an artifact first">Open in New Window</button>
-          </div>
           <div id="artifacts-list" class="artifacts-list">
             <div class="no-artifacts" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">
               No artifacts yet. Ask the agent to create one (e.g., "Create an HTML tooltip component as an artifact").
@@ -155,7 +157,32 @@
       </div>
     </div>
 
+    <!-- Memory Drawer -->
+    <div id="memory-drawer" class="drawer collapsed" data-drawer="memory">
+      <div class="drawer-inner">
+        <div class="drawer-header">
+          <h3>🧠 Agent Memory</h3>
+          <button class="drawer-close-btn" data-drawer="memory">✕</button>
+        </div>
+        <div class="drawer-body" style="padding:8px 10px;">
+          <p style="font-size:11px;color:var(--text-muted);margin:0 0 10px;">
+            Persistent knowledge the agent remembers across sessions. Use <code>update_agent_memory</code> to add entries.
+          </p>
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <button id="memory-refresh-btn" class="btn btn-secondary" style="flex:1;font-size:11px;padding:5px 8px;">↻ Refresh</button>
+            <button id="memory-clear-btn" class="btn btn-danger" style="flex:1;font-size:11px;padding:5px 8px;">🗑️ Clear All</button>
+          </div>
+          <div id="memory-entries-list" class="memory-entries-list">
+            <div class="no-memory-msg" style="padding:16px;font-size:11px;color:var(--text-muted);text-align:center;">
+              No memory entries yet. Ask the agent to remember something!
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings Drawer -->
+
     <div id="settings-drawer" class="drawer collapsed" data-drawer="settings">
       <div class="drawer-inner">
         <div class="drawer-header">
@@ -611,7 +638,7 @@
           <div class="settings-footer" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 16px;">
             <button id="save-settings-btn" class="btn btn-primary" style="width: 100%;">Save Changes</button>
             <div style="font-size: 10px; color: var(--text-muted); opacity: 0.8; text-align: center; margin-top: 4px;">
-                      Version 0.2.5
+                      Version 0.2.13
             </div>
             <div style="font-size: 10px; color: var(--text-muted); opacity: 0.8; text-align: center;">
               Provide your feedback on <a href="mailto:dipeshmajithia99@gmail.com" style="color: #38bdf8; text-decoration: underline;">dipeshmajithia99@gmail.com</a>
@@ -741,6 +768,12 @@
 
     <!-- ===== CHAT AREA ===== -->
     <main class="chat-container">
+      <!-- Search bar (hidden by default, toggled via Ctrl+F) -->
+      <div id="chat-search-bar" class="chat-search-bar" style="display:none;">
+        <input id="chat-search-input" type="text" placeholder="Search in chat..." autocomplete="off">
+        <span id="chat-search-count" class="chat-search-count"></span>
+        <button id="chat-search-clear" class="chat-search-clear" title="Clear search">&times;</button>
+      </div>
       <div id="chat-messages" class="messages-list">
         <!-- Welcome Screen -->
         <div class="welcome-card" id="welcome-card">
@@ -797,6 +830,14 @@
 
     <div class="input-panel">
       <button id="accept-all-btn" class="accept-all-btn hidden" title="Accept All Active Reviews">✨ Accept All</button>
+      <!-- Token & Cost Display Bar -->
+      <div id="token-usage-bar" class="token-usage-bar hidden">
+        <span class="token-bar-icon">⚡</span>
+        <span id="token-in-label" class="token-bar-stat" title="Input tokens this session">↑ 0</span>
+        <span id="token-out-label" class="token-bar-stat" title="Output tokens this session">↓ 0</span>
+        <span id="token-cost-label" class="token-bar-cost" title="Estimated cost this session">~$0.000</span>
+        <button id="token-reset-btn" class="token-bar-reset" title="Reset session token count">✕</button>
+      </div>
       <div class="input-card">
         <!-- Card Header: Active File Context Bar (Kept in DOM but hidden via CSS) -->
         <div id="context-bar" class="context-bar">
@@ -807,8 +848,17 @@
           <div class="context-actions">
             <button id="gen-tests-btn" class="context-action-btn hidden" title="Generate Unit Tests for active file">🧪 Test</button>
             <button id="gen-docs-btn" class="context-action-btn hidden" title="Generate JSDoc/TSDoc for active file">📝 Doc</button>
+            <button id="gen-commit-btn" class="context-action-btn" title="Generate Commit Message from staged changes">💬 Commit</button>
+            <button id="gen-pr-btn" class="context-action-btn" title="Generate PR Description from git diff">🔀 PR</button>
             <button id="open-multi-diff-btn" class="context-action-btn hidden" title="Open Multi-File Diff Review Drawer">🔍 Review</button>
           </div>
+        </div>
+        <!-- Context Window Usage Bar -->
+        <div id="context-usage-row" class="context-usage-row hidden">
+          <div class="context-usage-track">
+            <div id="context-usage-fill" class="context-usage-fill"></div>
+          </div>
+          <span id="context-usage-label" class="context-usage-label">Context: 0k / 200k</span>
         </div>
 
         <!-- Autocomplete + Chips -->
@@ -820,6 +870,9 @@
 
         <!-- Queue chips - shows queued messages above input -->
         <div id="queue-chips-container" class="queue-chips-container hidden"></div>
+
+        <!-- Slash Command Picker -->
+        <div id="slash-command-picker" class="slash-command-picker hidden" role="listbox" aria-label="Slash commands"></div>
 
         <!-- Sleek prompt input contenteditable div (renders inline file tags) -->
         <div id="prompt-input" class="prompt-editable" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Ask to modify code... Type '@' to link files"></div>
@@ -864,6 +917,12 @@
 
           <!-- Right: Templates Library, Voice recorder, and Send/Stop actions -->
           <div class="toolbar-right">
+            <button id="toggle-artifact-btn" class="toolbar-btn" title="View Artifacts">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5 8 5.961 14.154 3.5 8.186 1.113zM15 4.239l-6.5 2.6v7.922l6.5-2.6V4.239zM7.5 14.762V6.838L1 4.239v7.923l6.5 2.6z"/>
+              </svg>
+            </button>
+
             <div class="templates-menu-wrapper">
               <button id="templates-menu-btn" class="toolbar-btn" title="Prompt Library Templates">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
@@ -938,6 +997,8 @@
     </div>
   </div>
 
+  <!-- Toast notification container -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true" style="position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none;"></div>
   <script src="{{scriptUri}}"></script>
 </body>
 
