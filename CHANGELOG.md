@@ -3,6 +3,13 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.13] - 2025-07-17
+
+### Added
+- **🔄 Walkthrough Auto-Detection**: `detectAndNormalizeWalkthrough()` in `orchestrator.ts` automatically wraps agent responses in `<walkthrough>` tags when the model mentions "walkthrough" or uses completion verbiage with structural formatting (lists, headings) — no more missing walkthrough wraps from LLM forgetfulness
+- **🧪 Integration Test — Walkthrough Fallback**: New test verifies the auto-wrap logic works end-to-end: when the model outputs "Here is my walkthrough of changes:" without tags, the orchestrator detects it, wraps it, creates the `walkthrough.md` file, and emits `loopComplete: true`
+- **🔬 Unit Tests — `detectAndNormalizeWalkthrough`**: 8 new tests covering tag preservation, tool-execution bypass, keyword auto-wrap, preparatory expression avoidance, code-block/blockquote filtering, and casual verb usage filtering (97 test cases added to `orchestrator.test.ts`)
+
 ## [0.2.12] - 2025-07-17
 
 ### Added

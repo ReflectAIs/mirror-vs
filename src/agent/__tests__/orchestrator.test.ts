@@ -11,6 +11,7 @@ import {
 import { selectHighestValueTool, rewriteResponseToSingleTool } from '../rewrite-engine';
 import { validateControlLoopGuard } from '../control-loop-guard';
 import { ChatMessage } from '../../types';
+import { detectAndNormalizeWalkthrough } from '../orchestrator';
 
 // Mock vscode module using importOriginal to preserve shim exports
 vi.mock('vscode', async (importOriginal) => {
@@ -157,6 +158,57 @@ describe('Agent Orchestrator Modular Components', () => {
 
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain('not permitted in REVIEW mode');
+    });
+  });
+
+  describe('detectAndNormalizeWalkthrough', () => {
+    it('should return untouched if walkthrough tag is already present', () => {
+      const response = 'Done! <walkthrough>changes list</walkthrough>';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+    });
+
+    it('should return untouched if tools are executed', () => {
+      const response = 'Here is the walkthrough of changes: ...';
+      expect(detectAndNormalizeWalkthrough(response, 2)).toBe(response);
+    });
+
+    it('should auto-wrap from walkthrough keyword if structural indicators exist', () => {
+      const response = 'I have finished.\nHere is the walkthrough:\n- Updated index.ts\n- Added helper.ts';
+      const normalized = detectAndNormalizeWalkthrough(response, 0);
+      expect(normalized).toContain('<walkthrough>');
+      expect(normalized).toContain('Here is the walkthrough:\n- Updated index.ts\n- Added helper.ts');
+      expect(normalized.startsWith('I have finished.')).toBe(true);
+    });
+
+    it('should wrap entire response as fallback if no walkthrough keyword but completion and structure exist', () => {
+      const response = 'Task is completed.\n1. Modified parser\n2. Fixed tests';
+      const normalized = detectAndNormalizeWalkthrough(response, 0);
+      expect(normalized).toBe('<walkthrough>\nTask is completed.\n1. Modified parser\n2. Fixed tests\n</walkthrough>');
+    });
+
+    it('should not wrap if it matches preparatory expressions', () => {
+      const response = 'I will now write a walkthrough of changes next.';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+    });
+
+    it('should return untouched if it is just a conversational query/clarification', () => {
+      const response = 'Could you please verify what the target path is?';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+    });
+
+    it('should not wrap if list structure is inside a code block', () => {
+      const response = 'I completed the task. Check this code:\n```typescript\n// - step 1\n// - step 2\n```';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+    });
+
+    it('should not wrap if list structure is inside a blockquote', () => {
+      const response = 'I completed the task.\n> - structural list in quote\n> - another item';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+    });
+
+    it('should not wrap for casual verb usage of walkthrough', () => {
+      const response = 'I need to walkthrough the codebase to identify the layout.';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
     });
   });
 });

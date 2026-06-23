@@ -860,6 +860,9 @@ export class AgentOrchestrator {
 
           signal.removeEventListener('abort', mainAbortListener);
 
+          const earlyToolCalls = nativeToolCall ? [1] : this._parser.parseToolCalls(assistantResponse, true);
+          assistantResponse = detectAndNormalizeWalkthrough(assistantResponse, earlyToolCalls.length);
+
           if (nativeToolCall) {
             const ntc = nativeToolCall as { id: string; name: string; argsJson: string };
             pushToHistory({
@@ -1426,4 +1429,63 @@ export class AgentOrchestrator {
       console.warn('Failed to sync planning files:', e);
     }
   }
+}
+
+export function detectAndNormalizeWalkthrough(response: string, toolCallsCount: number): string {
+  if (response.includes('<walkthrough>')) {
+    return response;
+  }
+
+  if (toolCallsCount > 0) {
+    return response;
+  }
+
+  // Strip code blocks and blockquotes to avoid markdown structure edge cases
+  const cleanText = response
+    .replace(/```[\s\S]*?```/g, '')  // strip code fences
+    .replace(/^\s*>\s*.*$/gm, '');   // strip blockquotes
+
+  const lower = cleanText.toLowerCase();
+  
+  const walkthroughKeywords = [
+    'walkthrough of changes',
+    'walkthrough of the changes',
+    'here is my walkthrough',
+    'here is the walkthrough',
+    'summary of changes',
+    'summary of modifications',
+    'walkthrough:',
+    '### walkthrough',
+    '## walkthrough',
+  ];
+  
+  const hasExplicitWalkthrough = walkthroughKeywords.some(kw => lower.includes(kw));
+  const completionKeywords = ['completed', 'finished', 'implemented', 'fixed', 'verified', 'all changes'];
+  const hasCompletionKeywords = completionKeywords.some(kw => lower.includes(kw));
+  const hasStructure = /^\s*[-*+]\s+/m.test(cleanText) || 
+                       /^\s*\d+\.\s+/m.test(cleanText) || 
+                       /^###?\s+/m.test(cleanText);
+
+  const isPreparatory = /i will (now )?(write|create|start|output|do|perform) (a|the|some) walkthrough/i.test(cleanText) ||
+                        /let's (start|write|do|perform) (a|the) walkthrough/i.test(cleanText) ||
+                        /walkthrough the codebase/i.test(cleanText) ||
+                        /walkthrough of the files/i.test(cleanText) ||
+                        /walkthrough to/i.test(cleanText);
+
+  if ((hasExplicitWalkthrough || (hasCompletionKeywords && hasStructure)) && !isPreparatory) {
+    const rawLower = response.toLowerCase();
+    const walkthroughIndex = rawLower.indexOf('walkthrough');
+    if (walkthroughIndex !== -1 && response.substring(walkthroughIndex).length > 20) {
+      const lineStart = response.lastIndexOf('\n', walkthroughIndex) + 1;
+      const explanation = response.substring(0, lineStart).trim();
+      const contentToWrap = response.substring(lineStart).trim();
+      return explanation
+        ? `${explanation}\n\n<walkthrough>\n${contentToWrap}\n</walkthrough>`
+        : `<walkthrough>\n${contentToWrap}\n</walkthrough>`;
+    }
+
+    return `<walkthrough>\n${response.trim()}\n</walkthrough>`;
+  }
+
+  return response;
 }

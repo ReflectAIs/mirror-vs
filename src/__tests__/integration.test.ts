@@ -165,4 +165,37 @@ describe('Orchestrator Integration Test with Mock LLM', () => {
     const loopCompleted = postMessages.some(m => m.type === 'loopComplete');
     expect(loopCompleted).toBe(true);
   });
+
+  it('should auto-wrap walkthrough tags if model forgets them but outputs the word walkthrough', async () => {
+    const turn1 = 'Here is my walkthrough of changes: everything is completed and verified.';
+    MockLLMProvider.setMockResponses([turn1]);
+
+    const getSecret = vi.fn().mockResolvedValue('mock-api-key');
+    const getChatHistory = () => [];
+    const saveChatHistory = vi.fn().mockResolvedValue(undefined);
+    
+    const postMessages: any[] = [];
+    const postMessage = (msg: any) => {
+      postMessages.push(msg);
+    };
+    
+    const getSafePath = (p: string) => path.join(testWorkspacePath, p);
+
+    const orchestrator = new AgentOrchestrator(
+      getSecret,
+      getChatHistory,
+      saveChatHistory,
+      postMessage,
+      getSafePath
+    );
+
+    await orchestrator.handleMessageStream('Review changes', []);
+
+    // Verify walkthrough file was created in mock workspace
+    const walkthroughPath = path.join(testWorkspacePath, '.mirror-vs', 'walkthrough.md');
+    expect(fs.existsSync(walkthroughPath)).toBe(true);
+
+    const loopCompleted = postMessages.find(m => m.type === 'loopComplete');
+    expect(loopCompleted?.completed).toBe(true);
+  });
 });
