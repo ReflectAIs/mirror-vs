@@ -182,6 +182,30 @@ describe('executeFileTool', () => {
         cleanupTempDir(tmpDir);
       }
     });
+
+    it('should successfully apply fuzzy patches even with backslash escaping differences', async () => {
+      const tmpDir = createTempDir();
+      try {
+        const filePath = path.join(tmpDir, 'test.txt');
+        fs.writeFileSync(filePath, 'const match = result.match(/\\\\(Image successfully captured)/);', 'utf8');
+
+        const localGetSafe = (p: string) => path.join(tmpDir, p);
+        const tool = {
+          name: 'patch_file' as const,
+          path: 'test.txt',
+          content: '<<<<<<< SEARCH\nconst match = result.match(/\\(Image successfully captured)/);\n=======\nconst match = true;\n>>>>>>> REPLACE',
+        };
+        const result = await executeFileTool(tool, localGetSafe);
+        expect(result).toContain('File patched: test.txt');
+
+        const { ReviewManager } = await import('../../../services/review-manager.js');
+        const rm = ReviewManager.getInstance();
+        const proposed = rm.getProposedContent(filePath);
+        expect(proposed).toBe('const match = true;');
+      } finally {
+        cleanupTempDir(tmpDir);
+      }
+    });
   });
 
   describe('multi_patch_file', () => {

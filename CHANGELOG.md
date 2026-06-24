@@ -3,6 +3,12 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.15] - 2025-07-17
+
+### Fixed
+- **Screenshot Base64 Extraction**: Fixed regex mismatches in orchestrator.ts where screenshot base64 data was not being extracted and forwarded to the vision model. Both the display-result cleaning regex and the image-extraction pipeline regex were matching an outdated return format from browser-tools.ts, causing match[1] to be undefined and the vision model to never receive screenshot data.
+- **Fuzzy Patch Robustness**: Improved normalizeLineFuzzy() in file-tools.ts to strip backslash characters before comparison, preventing false mismatches when SEARCH blocks contain escaped special characters. Includes new test case verifying fuzzy patch success with backslash-containing content.
+
 ## [0.2.14] - 2025-07-17
 
 ### Added

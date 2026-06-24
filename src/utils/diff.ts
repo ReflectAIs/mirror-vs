@@ -126,3 +126,79 @@ export function diffLines(original: string, proposed: string): LineDiffResult[] 
     return results;
   }
 }
+
+export function generateUnifiedDiff(filePath: string, original: string, proposed: string, contextLines: number = 3): string {
+  const diffs = diffLines(original, proposed);
+  if (diffs.length === 0) return '';
+
+  const hunks: string[] = [];
+  let i = 0;
+  while (i < diffs.length) {
+    if (diffs[i].type === 'common') {
+      i++;
+      continue;
+    }
+
+    const startIdx = Math.max(0, i - contextLines);
+    let endIdx = i;
+
+    let lastChangeIdx = i;
+    while (endIdx < diffs.length) {
+      if (diffs[endIdx].type !== 'common') {
+        lastChangeIdx = endIdx;
+      }
+      if (endIdx - lastChangeIdx > 2 * contextLines) {
+        break;
+      }
+      endIdx++;
+    }
+    
+    const actualEndIdx = Math.min(diffs.length - 1, lastChangeIdx + contextLines);
+
+    let origStart = 0;
+    let propStart = 0;
+    let origCount = 0;
+    let propCount = 0;
+
+    const hunkLines: string[] = [];
+    for (let k = startIdx; k <= actualEndIdx; k++) {
+      const d = diffs[k];
+      if (d.type === 'common') {
+        hunkLines.push(`  ${d.line}`);
+        origCount++;
+        propCount++;
+      } else if (d.type === 'removed') {
+        hunkLines.push(`- ${d.line}`);
+        origCount++;
+      } else if (d.type === 'added') {
+        hunkLines.push(`+ ${d.line}`);
+        propCount++;
+      }
+    }
+
+    for (let k = startIdx; k <= actualEndIdx; k++) {
+      const d = diffs[k];
+      if (d.originalLineNum !== undefined) {
+        origStart = d.originalLineNum + 1;
+        break;
+      }
+    }
+    for (let k = startIdx; k <= actualEndIdx; k++) {
+      const d = diffs[k];
+      if (d.proposedLineNum !== undefined) {
+        propStart = d.proposedLineNum + 1;
+        break;
+      }
+    }
+
+    if (origStart === 0 && startIdx === 0) origStart = 1;
+    if (propStart === 0 && startIdx === 0) propStart = 1;
+
+    hunks.push(`@@ -${origStart},${origCount} +${propStart},${propCount} @@\n${hunkLines.join('\n')}`);
+
+    i = actualEndIdx + 1;
+  }
+
+  if (hunks.length === 0) return '';
+  return `--- a/${filePath}\n+++ b/${filePath}\n${hunks.join('\n')}`;
+}

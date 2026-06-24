@@ -20,6 +20,8 @@ import {
 import { ArtifactService } from '../services/artifact-service';
 import { getToolSchemas, supportsNativeToolCalling } from './tool-schemas';
 import { NativeToolCallParser } from './native-tool-call-parser';
+import * as crypto from 'crypto';
+import { generateUnifiedDiff } from '../utils/diff';
 
 // Modular imports
 import { getContextLength, estimateTokens } from '../services/model-context';
@@ -62,6 +64,7 @@ export class AgentOrchestrator {
   private readonly _completer: AgentCompleter;
 
   private _activeMessages: ChatMessage[] | undefined;
+  private readonly _sentFiles = new Map<string, { hash: string; content: string }>();
 
   constructor(
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
@@ -113,6 +116,7 @@ export class AgentOrchestrator {
       this._activeMessages = [...this._activeMessages, ...newMessages];
     } else {
       this._activeMessages = [...incomingHistory];
+      this._sentFiles.clear();
     }
 
     return this._activeMessages;
@@ -319,7 +323,7 @@ export class AgentOrchestrator {
 
       let displayResult = result;
       if (tool.name === 'browser_screenshot') {
-        const match = result.match(/\(Image successfully captured and sent to vision model\)/);
+        const match = result.match(/\(Base64 data hidden from output but sent to vision model:\s*([^)]+)\)/);
         if (match) displayResult = result.replace(match[0], '(Image captured)');
       } else {
         const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
@@ -1110,8 +1114,9 @@ export class AgentOrchestrator {
             const cleanedToolResults = toolResults.map((res) => {
               const match = res.match(/\(Base64 data hidden from output but sent to vision model: (.*)\)/);
               if (match) {
-                images.push(match[1]);
-                this._postMessage({ type: 'screenshotCapture', base64: match[1] });
+                const base64 = match[1].trim();
+                images.push(base64);
+                this._postMessage({ type: 'screenshotCapture', base64 });
                 return res.replace(match[0], '(Image successfully captured and sent to vision model)');
               }
               const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
@@ -1324,10 +1329,28 @@ export class AgentOrchestrator {
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
           const content = fs.readFileSync(fullPath, 'utf-8');
           const ext = path.extname(trimmed).slice(1) || 'txt';
-          return `\n\`\`\`${ext}:${trimmed}\n${content}\n\`\`\``;
+          const hash = crypto.createHash('sha256').update(content).digest('hex');
+
+          if (!this._sentFiles.has(trimmed)) {
+            this._sentFiles.set(trimmed, { hash, content });
+            return `\n\`\`\`${ext}:${trimmed}\n${content}\n\`\`\``;
+          }
+
+          const cached = this._sentFiles.get(trimmed)!;
+          if (cached.hash === hash) {
+            return `\n[File: ${trimmed} (unchanged since last sent)]`;
+          }
+
+          const diff = generateUnifiedDiff(trimmed, cached.content, content);
+          this._sentFiles.set(trimmed, { hash, content });
+          
+          if (!diff) {
+            return `\n[File: ${trimmed} (unchanged since last sent)]`;
+          }
+          return `\n[File: ${trimmed} (diff since last sent)]\n\`\`\`diff\n${diff}\n\`\`\``;
         }
-      } catch {
-        console.error('Failed to read embedding file:', filePath);
+      } catch (e) {
+        console.error('Failed to read embedding file:', filePath, e);
       }
       return match;
     });
@@ -1431,19 +1454,22 @@ export function detectAndNormalizeWalkthrough(response: string, toolCallsCount: 
 
   const lower = cleanText.toLowerCase();
   
-  const walkthroughKeywords = [
+  const highConfidenceKeywords = [
     'walkthrough of changes',
     'walkthrough of the changes',
     'here is my walkthrough',
     'here is the walkthrough',
     'summary of changes',
     'summary of modifications',
+  ];
+  const structureRequiredKeywords = [
     'walkthrough:',
     '### walkthrough',
     '## walkthrough',
   ];
   
-  const hasExplicitWalkthrough = walkthroughKeywords.some(kw => lower.includes(kw));
+  const hasHighConfidence = highConfidenceKeywords.some(kw => lower.includes(kw));
+  const hasStructureKeywords = structureRequiredKeywords.some(kw => lower.includes(kw));
   const completionKeywords = ['completed', 'finished', 'implemented', 'fixed', 'verified', 'all changes'];
   const hasCompletionKeywords = completionKeywords.some(kw => lower.includes(kw));
   const hasStructure = /^\s*[-*+]\s+/m.test(cleanText) || 
@@ -1456,7 +1482,15 @@ export function detectAndNormalizeWalkthrough(response: string, toolCallsCount: 
                         /walkthrough of the files/i.test(cleanText) ||
                         /walkthrough to/i.test(cleanText);
 
-  if ((hasExplicitWalkthrough || (hasCompletionKeywords && hasStructure)) && !isPreparatory) {
+  const isCodeDiscussion = /walkthrough (?:method|function|class|variable|field|property|parameter|argument|endpoint|api|test|code|comment|logic|service|helper|component|route|page)/i.test(cleanText) ||
+                           /\b(function|class|const|let|var|def|import|export)\s+\w*walkthrough/i.test(cleanText) ||
+                           /walkthrough\s*\(/i.test(cleanText);
+
+  const shouldWrap = (hasHighConfidence || (hasStructure && (hasStructureKeywords || hasCompletionKeywords))) && 
+                     !isPreparatory && 
+                     !isCodeDiscussion;
+
+  if (shouldWrap) {
     const rawLower = response.toLowerCase();
     const walkthroughIndex = rawLower.indexOf('walkthrough');
     if (walkthroughIndex !== -1 && response.substring(walkthroughIndex).length > 20) {

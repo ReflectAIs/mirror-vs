@@ -1,5 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { diffLines } from '../diff';
+import { diffLines, generateUnifiedDiff } from '../diff';
 
 describe('diffLines', () => {
   it('should handle completely identical files', () => {
@@ -96,5 +95,26 @@ describe('diffLines', () => {
       { type: 'common', line: 'c', originalLineNum: 2, proposedLineNum: 1 },
       { type: 'added', line: 'd', proposedLineNum: 2 },
     ]);
+  });
+});
+
+describe('generateUnifiedDiff', () => {
+  it('should generate an empty string for empty input', () => {
+    expect(generateUnifiedDiff('test.ts', '', '')).toBe('');
+  });
+
+  it('should generate diff hunks with correct context lines', () => {
+    const original = '1\n2\n3\n4\n5\n6\n7\n8\n9';
+    const proposed = '1\n2\n3\n4\nupdated 5\n6\n7\n8\n9';
+    const diff = generateUnifiedDiff('test.ts', original, proposed, 2);
+
+    expect(diff).toContain('--- a/test.ts');
+    expect(diff).toContain('+++ b/test.ts');
+    expect(diff).toContain('@@ -3,5 +3,5 @@');
+    expect(diff).toContain('  3');
+    expect(diff).toContain('  4');
+    expect(diff).toContain('+ updated 5');
+    expect(diff).not.toContain('  1'); // Excluded by contextLines = 2
+    expect(diff).not.toContain('  9'); // Excluded by contextLines = 2
   });
 });

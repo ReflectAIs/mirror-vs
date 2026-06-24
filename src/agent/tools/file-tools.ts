@@ -22,6 +22,7 @@ function normalizeLineFuzzy(line: string): string {
   // Strips syntax noise, whitespace, and lowercases for extremely robust fuzzy matching
   return line
     .toLowerCase()
+    .replace(/\\+/g, '')
     .replace(/[{}[\]();,.:'"`]/g, '')
     .replace(/\s+/g, '');
 }

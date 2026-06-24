@@ -13,6 +13,30 @@ import { validateControlLoopGuard } from '../control-loop-guard';
 import { ChatMessage } from '../../types';
 import { detectAndNormalizeWalkthrough } from '../orchestrator';
 
+// Mock fs module using importOriginal to support diff-aware testing
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    existsSync: (p: string) => {
+      if (p.includes('file.ts')) return true;
+      return actual.existsSync(p);
+    },
+    statSync: (p: string) => {
+      if (p.includes('file.ts')) {
+        return { isFile: () => true } as any;
+      }
+      return actual.statSync(p);
+    },
+    readFileSync: (p: string, encoding: any) => {
+      if (p.includes('file.ts')) {
+        return (global as any).__mockFileContent || 'line 1\nline 2\nline 3';
+      }
+      return actual.readFileSync(p, encoding);
+    }
+  };
+});
+
 // Mock vscode module using importOriginal to preserve shim exports
 vi.mock('vscode', async (importOriginal) => {
   const actual = await importOriginal<any>();
@@ -209,6 +233,43 @@ describe('Agent Orchestrator Modular Components', () => {
     it('should not wrap for casual verb usage of walkthrough', () => {
       const response = 'I need to walkthrough the codebase to identify the layout.';
       expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+    });
+
+    it('should not wrap for code discussions mentioning walkthrough class/method/function', () => {
+      const response = 'You should declare a walkthrough method like: \n- walkthrough() {\n  return true;\n}';
+      expect(detectAndNormalizeWalkthrough(response, 0)).toBe(response);
+
+      const response2 = 'const walkthrough = new WalkthroughService();\n- walkthrough.start();';
+      expect(detectAndNormalizeWalkthrough(response2, 0)).toBe(response2);
+    });
+  });
+
+  describe('Diff-Aware Context Resolution', () => {
+    it('should send full content on first resolution, then unchanged, then diff on change', async () => {
+      const getSecret = vi.fn().mockResolvedValue('mock-api-key');
+      const getChatHistory = () => [];
+      const saveChatHistory = vi.fn().mockResolvedValue(undefined);
+      const postMessage = vi.fn();
+      const getSafePath = (p: string) => `/mock/workspace/${p}`;
+
+      const { AgentOrchestrator } = await import('../orchestrator');
+      const orchestrator = new AgentOrchestrator(getSecret, getChatHistory, saveChatHistory, postMessage, getSafePath);
+
+      // Initialize global state for readFileSync mock
+      (global as any).__mockFileContent = 'line 1\nline 2\nline 3';
+
+      const res1 = await (orchestrator as any)._resolveFileRefs('Check [file.ts]');
+      expect(res1).toContain('line 1\nline 2\nline 3');
+      expect(res1).toContain('```ts:file.ts');
+
+      const res2 = await (orchestrator as any)._resolveFileRefs('Check [file.ts] again');
+      expect(res2).toContain('[File: file.ts (unchanged since last sent)]');
+
+      (global as any).__mockFileContent = 'line 1\nline 2 updated\nline 3';
+      const res3 = await (orchestrator as any)._resolveFileRefs('Check [file.ts] third time');
+      expect(res3).toContain('[File: file.ts (diff since last sent)]');
+      expect(res3).toContain('+ line 2 updated');
+      expect(res3).toContain('- line 2');
     });
   });
 });
