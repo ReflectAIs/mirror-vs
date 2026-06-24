@@ -23,10 +23,12 @@ Available tools:
 - delete_file: <delete_file path="..." />
 - rename_file: <rename_file from="..." to="..." />
 - create_artifact: <create_artifact type="html|svg|mermaid|code|markdown" title="..." [id="..."] [language="..."]>content</create_artifact>
+- search_chat_history: <search_chat_history query="..." [limit="..."] />
 
 CRITICAL subsequent turn rule:
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
 - If you have read/grep'd enough files to propose a fix, write the <patch_file> or <multi_patch_file> immediately!
+- Use search_chat_history if you need to look up error traces, files, or decisions from earlier in the chat session that have been pruned from your active context.
 `;
   }
 
@@ -125,6 +127,9 @@ CRITICAL subsequent turn rule:
 27. RENAME / MOVE FILE:
     <rename_file from="old/path/file.ts" to="new/path/file.ts" />
     Renames or moves a file. Parent directories for the destination are created automatically. Requires user approval.
+28. SEARCH CHAT HISTORY:
+    <search_chat_history query="keyword or phrase" [limit="5"] />
+    Search the current session's chat history (including system instructions, user queries, assistant replies, tool calls, and tool results) for a keyword or phrase. Useful to recall details (like error traces or files) that have been pruned from your active context.
 
 `;
 }

@@ -1,4 +1,4 @@
-import { ToolCall } from '../types';
+import { ToolCall, ChatMessage } from '../types';
 import { executeFileTool } from './file-tools';
 import { executeSearchTool } from './search-tools';
 import { executeBrowserTool } from './browser-tools';
@@ -9,10 +9,12 @@ import { PluginService } from '../../services/plugin-service';
 import { executeArtifactTool } from './artifact-tools';
 import { executeDeveloperTool } from './developer-tools';
 import { executeMcpTool, isMcpToolCall } from './mcp-tools';
+import { executeHistoryTool } from './history-tools';
 
 export const ALL_REGISTERED_TOOLS = new Set([
   'wait',
   'create_artifact',
+  'search_chat_history',
   'read_file',
   'create_file',
   'write_file',
@@ -66,6 +68,7 @@ export async function executeTool(
   getSafePath: (p: string) => string,
   figmaKey?: string,
   workspacePath?: string,
+  activeMessages?: ChatMessage[],
 ): Promise<string> {
   const name = tool.name;
 
@@ -147,6 +150,10 @@ export async function executeTool(
 
   if (name === 'figma_inspect') {
     return await executeFigmaTool(tool, figmaKey, workspacePath);
+  }
+
+  if (name === 'search_chat_history') {
+    return await executeHistoryTool(tool, activeMessages);
   }
 
   // Developer tools

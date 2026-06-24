@@ -361,64 +361,19 @@ export async function maybeCompact(
   const older = convoMsgs.slice(0, splitPoint);
   const recent = convoMsgs.slice(splitPoint);
 
-  // Build the text to summarize
-  let convoText = '';
-  if (existingSummaries.length > 0) {
-    convoText += "PREVIOUS CONVERSATION SUMMARIES:\n" + existingSummaries.map(s => s.content).join('\n\n') + "\n\nNEW MESSAGES TO SUMMARIZE:\n";
+  // Mark older messages as summarized (sliding window: pruned from active context payload)
+  const newlySummarized = older.map((msg) => ({
+    ...msg,
+    summarized: true,
+  }));
+
+  let compactedMessages: ChatMessage[];
+  if (systemMsgs.length > 0) {
+    const primarySystemMsg = systemMsgs[0];
+    compactedMessages = [primarySystemMsg, ...systemMsgs.slice(1), ...alreadySummarized, ...newlySummarized, ...recent];
+  } else {
+    compactedMessages = [...alreadySummarized, ...newlySummarized, ...recent];
   }
-  convoText += older
-    .map((msg) => `${msg.role.toUpperCase()}: ${contentAsText(msg.content).substring(0, 2000)}`)
-    .join('\n');
 
-  // Count prior compactions from existing summary messages
-  const compactionCount = existingSummaries.length;
-
-  const prompt = SELF_SUMMARY_SYSTEM_PROMPT.replace('{count}', String(older.length)).replace(
-    '{n}',
-    String(compactionCount + 1),
-  );
-
-  const summaryMessages: ChatMessage[] = [
-    { role: 'system', content: prompt },
-    { role: 'user', content: convoText },
-  ];
-
-  try {
-    const summary = await summarizeFn(summaryMessages);
-
-    // To ensure compatibility across all API providers (many of which only support a single
-    // system message at the very beginning of the chat log), we merge the conversation
-    // summary directly into the primary system message (the system prompt) if it exists.
-    let compactedMessages: ChatMessage[];
-
-    // Mark older messages as summarized
-    const newlySummarized = older.map((msg) => ({
-      ...msg,
-      summarized: true,
-    }));
-
-    if (systemMsgs.length > 0) {
-      const primarySystemMsg = systemMsgs[0];
-      const summaryHeader = `\n\n[Conversation summary — earlier messages were compacted]\n${summary}`;
-      const mergedSystemMsg: ChatMessage = {
-        ...primarySystemMsg,
-        content: primarySystemMsg.content + summaryHeader,
-      };
-      (mergedSystemMsg as any).compacted = true;
-      (mergedSystemMsg as any).summarizedCount = splitPoint;
-      compactedMessages = [mergedSystemMsg, ...systemMsgs.slice(1), ...alreadySummarized, ...newlySummarized, ...recent];
-    } else {
-      const summaryMsg: ChatMessage = {
-        role: 'system',
-        content: `[Conversation summary — earlier messages were compacted]\n${summary}`,
-      };
-      (summaryMsg as any).compacted = true;
-      (summaryMsg as any).summarizedCount = splitPoint;
-      compactedMessages = [summaryMsg, ...alreadySummarized, ...newlySummarized, ...recent];
-    }
-    return { compactedMessages, wasCompacted: true };
-  } catch (error) {
-    console.error('Compaction summary failed:', error);
-    return { compactedMessages: messages, wasCompacted: false };
-  }
+  return { compactedMessages, wasCompacted: true };
 }

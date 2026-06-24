@@ -61,16 +61,29 @@ export function buildSystemPrompt(
   let rulesSection = '';
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (workspaceFolder) {
-    const rulesPath = path.join(workspaceFolder, '.mirror-vs', 'rules.md');
-    if (fs.existsSync(rulesPath)) {
-      try {
-        const rulesContent = fs.readFileSync(rulesPath, 'utf8').trim();
-        if (rulesContent) {
-          rulesSection = `\n\n### WORKSPACE RULES (MANDATORY):\n${rulesContent}`;
+    const possibleRulesPaths = [
+      path.join(workspaceFolder, '.mirror-vs', 'rules.md'),
+      path.join(workspaceFolder, 'CLAUDE.md'),
+      path.join(workspaceFolder, 'MIRROR.md'),
+      path.join(workspaceFolder, '.claudemd'),
+    ];
+    
+    const rulesContents: string[] = [];
+    for (const rulesPath of possibleRulesPaths) {
+      if (fs.existsSync(rulesPath)) {
+        try {
+          const content = fs.readFileSync(rulesPath, 'utf8').trim();
+          if (content) {
+            rulesContents.push(`--- File: ${path.basename(rulesPath)} ---\n${content}`);
+          }
+        } catch (e) {
+          console.warn(`Failed to read rules file at ${rulesPath}:`, e);
         }
-      } catch (e) {
-        console.warn('Failed to read workspace rules.md', e);
       }
+    }
+    
+    if (rulesContents.length > 0) {
+      rulesSection = `\n\n### WORKSPACE RULES & INSTRUCTIONS (MANDATORY):\n${rulesContents.join('\n\n')}`;
     }
   }
 

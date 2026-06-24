@@ -97,7 +97,7 @@ describe('Context Compactor Service', () => {
       expect(mockSummarize).not.toHaveBeenCalled();
     });
 
-    it('should compact older half of conversation when above threshold', async () => {
+    it('should compact older half of conversation when above threshold by flagging them', async () => {
       // Create a list of messages that would exceed budget threshold (using small mock context)
       const messages: ChatMessage[] = [
         { role: 'system', content: 'sys' },
@@ -110,39 +110,14 @@ describe('Context Compactor Service', () => {
       ];
 
       const mockSummarize = vi.fn().mockResolvedValue('Mock conversation summary text.');
-      // Context length = 500, used ≈ 1200 * 0.3 = 360 tokens. 360/500 = 72%? No, let's use contextLength = 300 to be sure it is above 85% threshold
       const { compactedMessages, wasCompacted } = await maybeCompact(messages, 300, mockSummarize);
       expect(wasCompacted).toBe(true);
-      expect(mockSummarize).toHaveBeenCalled();
+      expect(mockSummarize).not.toHaveBeenCalled();
       expect(compactedMessages[0].role).toBe('system');
-      expect(compactedMessages[0].content).toContain('sys');
-      expect(compactedMessages[0].content).toContain('Mock conversation summary text.');
-    });
-
-    it('should consolidate old summaries when doing a subsequent compaction', async () => {
-      const messages: ChatMessage[] = [
-        { role: 'system', content: 'sys' },
-        { role: 'system', content: '[Conversation summary — earlier messages were compacted]\nOld summary here' },
-        { role: 'user', content: 'a'.repeat(200) },
-        { role: 'assistant', content: 'b'.repeat(200) },
-        { role: 'user', content: 'c'.repeat(200) },
-        { role: 'assistant', content: 'd'.repeat(200) },
-      ];
-
-      const mockSummarize = vi.fn().mockResolvedValue('Consolidated summary text.');
-      const { compactedMessages, wasCompacted } = await maybeCompact(messages, 200, mockSummarize);
-      expect(wasCompacted).toBe(true);
+      expect(compactedMessages[0].content).toBe('sys');
       
-      // Ensure the old summary is replaced and not present, leaving exactly one summary
-      const summaryMessages = compactedMessages.filter(m => m.role === 'system' && m.content.includes('[Conversation summary'));
-      expect(summaryMessages).toHaveLength(1);
-      expect(summaryMessages[0].content).toContain('sys');
-      expect(summaryMessages[0].content).toContain('Consolidated summary text.');
-
-      // Check the prompt passed to summarizeFn contained the old summary
-      const callArg = mockSummarize.mock.calls[0][0];
-      const userMessage = callArg.find((m: any) => m.role === 'user');
-      expect(userMessage.content).toContain('Old summary here');
+      const summarized = compactedMessages.filter(m => m.summarized);
+      expect(summarized.length).toBeGreaterThan(0);
     });
 
     it('should retain older messages in compactedMessages and flag them with summarized: true', async () => {

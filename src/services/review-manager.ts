@@ -349,11 +349,11 @@ export class ReviewManager implements vscode.CodeLensProvider {
         );
       } else {
         // The active editor is NOT the file being changed.
-        // We open it adjacent, but preserve focus.
+        // We open it in the active column, but preserve focus.
         vscode.workspace.openTextDocument(filePath).then(
           (doc) => {
             vscode.window.showTextDocument(doc, {
-              viewColumn: vscode.ViewColumn.Beside,
+              viewColumn: vscode.ViewColumn.Active,
               preview: false,
               preserveFocus: true,
             }).then((editor) => {

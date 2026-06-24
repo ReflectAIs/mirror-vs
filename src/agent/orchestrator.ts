@@ -239,7 +239,7 @@ export class AgentOrchestrator {
     try {
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const figmaKey = (await this._getSecret('figma_api_key')) || '';
-      let result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath);
+      let result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath, this._activeMessages);
 
       const isModifying = [
         'create_file', 'write_file', 'patch_file', 'multi_patch_file', 'delete_file', 'rename_file'
@@ -697,26 +697,10 @@ export class AgentOrchestrator {
           const hardMax = config.get('agentInputTokenHardMax', 200000) as number;
           const effectiveBudget = computeInputTokenBudget(configuredBudget, contextWindow, explicitBudget, { hardMax, headroom });
 
-          const compactionResult = await maybeCompact(activeMessages, effectiveBudget, async (summaryPrompt) => {
-            this._postMessage({ type: 'chatResponseStart' });
-            this._postMessage({
-              type: 'chatResponseChunk',
-              text: `Compressing context (~${Math.round(estimateTokens(activeMessages) / 1000)}K tokens, budget: ${Math.round(effectiveBudget / 1000)}K)...`,
-            });
-            const summary = await this._completer.summarizeHistory(
-              provider as LLMProvider,
-              currentHost,
-              currentModel,
-              apiKey,
-              summaryPrompt,
-            );
-            this._postMessage({ type: 'chatResponseComplete', fullText: 'Context optimized.' });
-            return summary;
-          });
-
+          const compactionResult = await maybeCompact(activeMessages, effectiveBudget, async () => '');
           if (compactionResult.wasCompacted) {
             activeMessages = compactionResult.compactedMessages;
-            this._activeMessages = activeMessages; 
+            this._activeMessages = activeMessages;
           }
 
           this._postMessage({

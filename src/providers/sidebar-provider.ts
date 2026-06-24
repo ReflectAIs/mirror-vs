@@ -674,9 +674,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
                 if (safePath.startsWith(workspaceFolder) && fs.existsSync(safePath)) {
                   const doc = await vscode.workspace.openTextDocument(safePath);
                   
-                  const activeEditor = vscode.window.activeTextEditor;
-                  const isCurrentFile = activeEditor && activeEditor.document.uri.fsPath.toLowerCase() === safePath.toLowerCase();
-                  const viewColumn = (activeEditor && !isCurrentFile) ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
+                  const viewColumn = vscode.ViewColumn.Active;
                   
                   const editor = await vscode.window.showTextDocument(doc, {
                     viewColumn,
