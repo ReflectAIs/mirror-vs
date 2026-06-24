@@ -3,6 +3,38 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.2.14] - 2025-07-17
+
+### Added
+- **🏗️ Orchestrator Modularization**: Decomposed the ~1800-line `orchestrator.ts` monolith into focused, testable modules:
+  - `state-machine.ts` — `AgentState`/`TaskMode` enums, `determineTaskMode()`, `detectActiveSymptom()`, `canDescribePatch()`, `hasSufficientJSEvidence()`, `isErrorDirectlyLocalized()`, `hasEnoughInformationForReview()`
+  - `control-loop-guard.ts` — Tool validation, search budget enforcement, re-read detection, architecture scope locking
+  - `rewrite-engine.ts` — `selectHighestValueTool()`, `rewriteResponseToSingleTool()`, `logRewriteTelemetryToFile()` for multi-tool response rewriting
+  - `project-map.ts` — `generateLightweightProjectMap()` for workspace-aware context generation
+  - `verification-runner.ts` — `runWorkspaceVerification()` for automated post-patch build/lint/test verification
+- **🛠️ History Tools**: New `history-tools.ts` module with `executeHistoryTool()` — enables the agent to review and manage conversation history programmatically
+- **🏭 Mock LLM Infrastructure**: `src/services/providers/__mocks__/mock-llm.ts` providing a configurable mock streaming LLM for reliable integration testing
+- **📝 Logger Service**: New `logger-service.ts` for structured, file-based logging across agent modules
+- **🧪 Extended Test Suite**:
+  - Integration tests (`integration.test.ts`) — full orchestrator loop with mock LLM (168+ lines)
+  - Orchestrator unit tests (`orchestrator.test.ts`) — 162+ new test cases
+  - Tool unit tests: `browser-tools.test.ts`, `language-tools.test.ts`, `terminal-tools.test.ts` covering file ops, browser navigation, and terminal execution
+  - History tools tests (`history-tools.test.ts`) — 62 lines covering history management
+  - Context compactor tests — refined with additional edge cases
+- **🔬 Walkthrough Auto-Detection**: `detectAndNormalizeWalkthrough()` in `orchestrator.ts` automatically wraps agent responses in `<walkthrough>` tags when the model mentions "walkthrough" or uses completion verbiage with structural formatting (lists, headings)
+
+### Changed
+- **📦 Version**: 0.2.12 → 0.2.14
+- **🔄 Tool Registry Refactoring**: `tool-registry.ts` overhauled with dynamic registration, `ALL_REGISTERED_TOOLS` array, and improved schema generation
+- **🔧 Orchestrator Prompt Update**: `orchestrator-prompt.ts` updated with new tool specifications and improved system prompt construction
+- **📐 Editor Utils**: `editor-utils.ts` refined with additional util patterns
+- **📡 Browser Service**: `browser-service.ts` enhanced for more reliable web navigation
+- **👁️ Sidebar Integration**: `sidebar.html`, `sidebar.js`, `05-message-handlers.js` updated with approval workflow UI and event handling for tool registration integration
+
+### Removed
+- **🗑️ Artifacts "Open in New Window" Button**: Removed the `artifact-open-in-panel` UI button and its associated `openArtifact` messaging from `sidebar.html`, `08-artifacts.js`, and `sidebar.js` — simplifies the artifacts drawer by dropping the unused VS Code panel opening flow
+- **🔇 Failure Detector False-Positive Pattern**: Removed `/doesn'?t (?:exist|appear to be|seem to)/i` from `HELPLESS_PATTERNS` in `failure-detector.ts` — this regex was causing false-positive helplessness escalations when models legitimately described file existence checks
+
 ## [0.2.13] - 2025-07-17
 
 ### Added
