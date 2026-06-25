@@ -1,4 +1,4 @@
-export type EventName = 'file_saved' | 'file_modified' | 'task_completed' | 'session_started' | 'error_detected';
+export type EventName = 'file_saved' | 'file_modified' | 'task_completed' | 'session_started' | 'error_detected' | 'FilePatched' | 'DiagnosticsUpdated' | 'JobCompleted' | 'WorkspaceChanged' | 'UserInterrupted' | 'VerificationPassed';
 
 export type EventHandler = (data?: any) => void | Promise<void>;
 

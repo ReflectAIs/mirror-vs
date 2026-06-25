@@ -80,6 +80,10 @@ describe('Agent Orchestrator Modular Components', () => {
       // DEBUG Mode
       expect(determineTaskMode('fix the compilation error', 'normal')).toBe(TaskMode.DEBUG);
       expect(determineTaskMode('normal query', 'debug')).toBe(TaskMode.DEBUG);
+
+      // CONVERSATIONAL Mode
+      expect(determineTaskMode('how are you?', 'normal')).toBe(TaskMode.CONVERSATIONAL);
+      expect(determineTaskMode('hi', 'normal')).toBe(TaskMode.CONVERSATIONAL);
     });
   });
 
@@ -258,15 +262,31 @@ describe('Agent Orchestrator Modular Components', () => {
       // Initialize global state for readFileSync mock
       (global as any).__mockFileContent = 'line 1\nline 2\nline 3';
 
-      const res1 = await (orchestrator as any)._resolveFileRefs('Check [file.ts]');
+      const placeholder1 = await (orchestrator as any)._resolveFileRefs('Check [file.ts]', 1);
+      expect(placeholder1).toBe('Check [File Cache: file.ts]');
+
+      // Manually register it in ContextStore like the eviction system does
+      const fileData1 = (orchestrator as any)._virtualPageCache.get('file.ts');
+      expect(fileData1).toBeDefined();
+      (orchestrator as any)._contextStore.addItem('file:file.ts', fileData1, 'tool', 10, 0, false);
+
+      const res1 = (orchestrator as any)._resolveCachePlaceholders(placeholder1);
       expect(res1).toContain('line 1\nline 2\nline 3');
       expect(res1).toContain('```ts:file.ts');
 
-      const res2 = await (orchestrator as any)._resolveFileRefs('Check [file.ts] again');
+      const placeholder2 = await (orchestrator as any)._resolveFileRefs('Check [file.ts] again', 2);
+      // Ensure it's in ContextStore
+      const fileData2 = (orchestrator as any)._virtualPageCache.get('file.ts');
+      (orchestrator as any)._contextStore.addItem('file:file.ts', fileData2, 'tool', 10, 0, false);
+      const res2 = (orchestrator as any)._resolveCachePlaceholders(placeholder2);
       expect(res2).toContain('[File: file.ts (unchanged since last sent)]');
 
       (global as any).__mockFileContent = 'line 1\nline 2 updated\nline 3';
-      const res3 = await (orchestrator as any)._resolveFileRefs('Check [file.ts] third time');
+      const placeholder3 = await (orchestrator as any)._resolveFileRefs('Check [file.ts] third time', 3);
+      // Ensure updated file is in ContextStore
+      const fileData3 = (orchestrator as any)._virtualPageCache.get('file.ts');
+      (orchestrator as any)._contextStore.addItem('file:file.ts', fileData3, 'tool', 10, 0, false);
+      const res3 = (orchestrator as any)._resolveCachePlaceholders(placeholder3);
       expect(res3).toContain('[File: file.ts (diff since last sent)]');
       expect(res3).toContain('+ line 2 updated');
       expect(res3).toContain('- line 2');

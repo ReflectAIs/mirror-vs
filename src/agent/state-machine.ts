@@ -14,6 +14,7 @@ export enum TaskMode {
   DEBUG = 'DEBUG',
   IMPLEMENT = 'IMPLEMENT',
   VERIFY = 'VERIFY',
+  CONVERSATIONAL = 'CONVERSATIONAL',
 }
 
 export function determineTaskMode(userMessage: string, configMode: string): TaskMode {
@@ -58,6 +59,18 @@ export function determineTaskMode(userMessage: string, configMode: string): Task
     lower.includes('fail')
   ) {
     return TaskMode.DEBUG;
+  }
+
+  const isConversational = [
+    'hello', 'hi', 'hey', 'how are you', 'good morning', 'good afternoon', 'good evening',
+    'who are you', 'what can you do', 'explain yourself', 'thank you', 'thanks', 'help'
+  ].some((gnd) => new RegExp(`\\b${gnd}\\b`, 'i').test(lower)) || (
+    lower.trim().split(/\s+/).length <= 4 &&
+    !['run', 'wait', 'test', 'read', 'write', 'patch', 'check', 'do', 'git', 'list', 'grep', 'search', 'build', 'compile', 'eslint', 'vitest', 'typecheck', 'fix', 'bug', 'error'].some(verb => lower.includes(verb))
+  );
+
+  if (isConversational) {
+    return TaskMode.CONVERSATIONAL;
   }
   return TaskMode.IMPLEMENT;
 }

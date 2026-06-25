@@ -53,6 +53,25 @@ import {
 import { runWorkspaceVerification } from './verification-runner';
 import { validateControlLoopGuard } from './control-loop-guard';
 
+// Mirror VS Runtime integration
+import { StateGraph } from './runtime/state-graph';
+import { TaskQueue } from './runtime/task-queue';
+import { ContextStore } from './runtime/context-store';
+import { ActionRequestManager } from './runtime/action-request';
+import { LoopDetector } from './runtime/loop-detector';
+import { ExplorerModeManager } from './runtime/explorer-mode';
+import { ConfidenceEngine } from './runtime/confidence-engine';
+import { JobManager } from './runtime/job-manager';
+import { detectWorkspaceAdapter, WorkspaceAdapter } from './runtime/workspace-adapters';
+import { ExecutionState } from './runtime/types';
+import { sanitizeToolMessages } from '../services/context-compactor';
+import { RecoveryEngine } from './runtime/recovery-engine';
+import { VerificationPipeline } from './runtime/verification-pipeline';
+import { ASTParser } from './runtime/ast-parser';
+import { KnowledgeGraph } from './runtime/knowledge-graph';
+import { MultiAgentCoordinator } from './runtime/multi-agent';
+import { LearningEngine } from './runtime/learning-engine';
+
 export { AgentState, TaskMode, determineTaskMode };
 
 export class AgentOrchestrator {
@@ -66,6 +85,23 @@ export class AgentOrchestrator {
   private _activeMessages: ChatMessage[] | undefined;
   private readonly _sentFiles = new Map<string, { hash: string; content: string }>();
 
+  // Runtime instances
+  private readonly _stateGraph = new StateGraph();
+  private readonly _taskQueue = new TaskQueue();
+  private readonly _contextStore = new ContextStore();
+  private readonly _actionManager = new ActionRequestManager();
+  private readonly _loopDetector = new LoopDetector();
+  private readonly _explorerManager = new ExplorerModeManager();
+  private readonly _confidenceEngine = new ConfidenceEngine();
+  private readonly _jobManager = new JobManager();
+  private readonly _recoveryEngine = new RecoveryEngine();
+  private readonly _astParser = new ASTParser();
+  private readonly _knowledgeGraph = new KnowledgeGraph();
+  private readonly _multiAgent = new MultiAgentCoordinator();
+  private readonly _virtualPageCache = new Map<string, { content: string; ext: string; hash: string }>();
+  private _learningEngine: LearningEngine | undefined;
+  private _workspaceAdapter: WorkspaceAdapter | undefined;
+
   constructor(
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
     _getChatHistory: () => ChatMessage[],
@@ -75,6 +111,12 @@ export class AgentOrchestrator {
   ) {
     this._session = new AgentSession(_getSecret, _getChatHistory, _saveChatHistory, _postMessage, _getSafePath);
     this._completer = new AgentCompleter(_postMessage);
+    
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceFolder) {
+      this._workspaceAdapter = detectWorkspaceAdapter(workspaceFolder);
+      this._learningEngine = new LearningEngine(workspaceFolder);
+    }
   }
 
   private _getOrCreateActiveMessages(incomingHistory: ChatMessage[]): ChatMessage[] {
@@ -239,6 +281,25 @@ export class AgentOrchestrator {
       return '[Tool Result for ' + tool.name + ' on "' + target + '"]: Error - ' + guard.reason;
     }
 
+    // Parse stable ActionRequest
+    const request = this._actionManager.parseActionRequest(tool);
+    
+    // Track execution as a job
+    const isJobType = [
+      'create_file', 'write_file', 'patch_file', 'multi_patch_file',
+      'delete_file', 'rename_file', 'run_command'
+    ].includes(tool.name);
+
+    let jobId = '';
+    if (isJobType) {
+      const job = this._jobManager.createJob(
+        tool.name === 'run_command' ? (tool.command || 'run_command') : `File Ops: ${tool.name} on ${target}`,
+        tool.name === 'run_command' ? 'generic' : 'generic'
+      );
+      jobId = job.id;
+      this._jobManager.startJob(jobId);
+    }
+
     this._sendToolStatusToWebview(tool.name, 'running', target);
     try {
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -259,6 +320,26 @@ export class AgentOrchestrator {
         } catch (e) {
           console.error('Failed to fire file_modified event:', e);
         }
+
+        // Build Knowledge Graph dynamically
+        if (tool.path) {
+          try {
+            const fullPath = this._getSafePath(tool.path);
+            if (fs.existsSync(fullPath)) {
+              const fileContent = fs.readFileSync(fullPath, 'utf8');
+              this._knowledgeGraph.addNode(tool.path, 'file');
+              const importRegex = /import\s+.*from\s+['"]([^'"]+)['"]/g;
+              let match;
+              while ((match = importRegex.exec(fileContent)) !== null) {
+                const imported = match[1];
+                this._knowledgeGraph.addNode(imported, 'file');
+                this._knowledgeGraph.addEdge(tool.path, imported, 'imports');
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to construct dynamic knowledge graph relationship:', e);
+          }
+        }
       }
 
       // Grounding Verification Hook
@@ -271,10 +352,27 @@ export class AgentOrchestrator {
             result += diagnosticsFeed;
           }
           try {
-            const verifyResult = runWorkspaceVerification(workspaceFolder);
-            result += verifyResult;
+            if (this._workspaceAdapter) {
+              const pipeline = new VerificationPipeline(this._workspaceAdapter);
+              const report = await pipeline.verify();
+              result += `\n\n### 🔎 WORKSPACE VERIFICATION STATUS [${this._workspaceAdapter.name}]:\n`;
+              result += `- Build status: ${report.buildStatus.toUpperCase()}\n`;
+              result += `- Diagnostics error/warning count: ${report.diagnosticsCount}\n`;
+              result += `- Test status: ${report.testStatus.toUpperCase()}\n`;
+              
+              if (report.success) {
+                try {
+                  EventBus.getInstance().fire('VerificationPassed', { adapter: this._workspaceAdapter.name });
+                } catch (e) {
+                  console.error('Failed to fire VerificationPassed event:', e);
+                }
+              }
+            } else {
+              const verifyResult = runWorkspaceVerification(workspaceFolder);
+              result += verifyResult;
+            }
           } catch (e) {
-            console.error('Failed to run workspace verification:', e);
+            console.error('Failed to run verification pipeline:', e);
           }
           if (tool.path) {
             try {
@@ -379,6 +477,37 @@ export class AgentOrchestrator {
         lastRewriteTelemetryWrapper.val = null;
       }
 
+      if (jobId) {
+        this._jobManager.completeJob(jobId, result, 0);
+      }
+
+      if (isModifying && this._learningEngine && tool.path) {
+        this._learningEngine.registerOutcome(
+          this._taskQueue.activeTaskId || 'task',
+          request.patchStrategy || 'line',
+          true
+        );
+      }
+
+      // Loop Detector progress tracking
+      if (tool.name === 'create_file') {
+        this._loopDetector.registerProgress('new_file', target);
+      } else if (tool.name === 'patch_file' || tool.name === 'write_file' || tool.name === 'multi_patch_file') {
+        this._loopDetector.registerProgress('patch_applied', target);
+      } else if (tool.name === 'run_command') {
+        this._loopDetector.registerProgress('build_completed', target);
+      }
+
+      // If this was modifying, transition StateGraph to Verifying state
+      if (isModifying) {
+        await this._stateGraph.transitionTo(ExecutionState.Verifying);
+        try {
+          EventBus.getInstance().fire('FilePatched', { path: tool.path });
+        } catch (e) {
+          console.error('Failed to fire FilePatched event:', e);
+        }
+      }
+
       this._sendToolStatusToWebview(
         tool.name,
         'success',
@@ -392,6 +521,34 @@ export class AgentOrchestrator {
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(`Tool execution failed (${tool.name}):`, errMsg);
+
+      if (jobId) {
+        this._jobManager.failJob(jobId, errMsg, 1);
+      }
+
+      // Transition StateGraph to Recovery state
+      await this._stateGraph.transitionTo(ExecutionState.Recovery);
+
+      let recoveryNotice = '';
+      if (tool.path) {
+        this._recoveryEngine.registerFailure(tool.path);
+        const request = this._actionManager.parseActionRequest(tool);
+        
+        if (this._learningEngine) {
+          this._learningEngine.registerOutcome(
+            this._taskQueue.activeTaskId || 'task',
+            request.patchStrategy || 'line',
+            false
+          );
+        }
+
+        const escalated = this._recoveryEngine.suggestRecovery(request, errMsg);
+        if (escalated.patchStrategy === 'rewrite') {
+          recoveryNotice = `\n[Recovery Engine Notice]: Consecutive patch failures detected for "${tool.path}". Escalating strategy to rewrite. Do NOT use patch_file or multi_patch_file. Instead, use write_file to overwrite the file contents completely.`;
+        } else if (escalated.details && escalated.details._recoveryNotice) {
+          recoveryNotice = `\n[Recovery Engine Notice]: ${escalated.details._recoveryNotice}`;
+        }
+      }
 
       if (lastRewriteTelemetryWrapper.val && lastRewriteTelemetryWrapper.val.selectedTool === tool.name) {
         lastRewriteTelemetryWrapper.val.outcome = 'ERROR';
@@ -424,6 +581,7 @@ export class AgentOrchestrator {
         target +
         '"]: Error - ' +
         errMsg +
+        recoveryNotice +
         '. Please correct your approach and try again.'
       );
     }
@@ -507,6 +665,16 @@ export class AgentOrchestrator {
         if (images && images.length > 0) userMsg.images = images;
         currentMessages.push(userMsg);
         await this._saveChatHistory(currentMessages);
+
+        // Reset and initialize runtime components
+        this._stateGraph.reset();
+        this._taskQueue.clear();
+        this._taskQueue.addTask(text || 'Execute workspace tasks');
+        this._loopDetector.clear();
+        this._explorerManager.reset();
+        this._jobManager.clear();
+        this._recoveryEngine.clear();
+        this._virtualPageCache.clear();
       }
 
       currentMessages = injectRelevantSkills(currentMessages, text || '');
@@ -632,18 +800,29 @@ export class AgentOrchestrator {
           }
           loopCount++;
 
+          // 1. Transition state graph based on heuristics
           if (!hasSufficientJSEvidence(currentMessages)) {
             agentState = AgentState.NEEDS_EVIDENCE;
+            await this._stateGraph.transitionTo(ExecutionState.Reasoning);
           } else if (hasEnoughInformationForReview(taskMode, verifiedFiles, currentMessages)) {
             agentState = AgentState.IMPLEMENTATION; 
+            await this._stateGraph.transitionTo(ExecutionState.Planning);
           } else if (isErrorDirectlyLocalized(currentMessages, verifiedFiles)) {
             hasCommittedToPatch = true;
             agentState = AgentState.IMPLEMENTATION;
+            await this._stateGraph.transitionTo(ExecutionState.Executing);
           } else if (searchCount >= maxSearchBudget) {
             agentState = AgentState.BLOCKED;
+            await this._stateGraph.transitionTo(ExecutionState.Interrupted);
           } else if (hasCommittedToPatch) {
             agentState = AgentState.IMPLEMENTATION;
+            await this._stateGraph.transitionTo(ExecutionState.Executing);
+          } else {
+            await this._stateGraph.transitionTo(ExecutionState.Reasoning);
           }
+
+          // 2. Register turn with loop detector
+          this._loopDetector.registerTurn();
 
           const currentSymptom = detectActiveSymptom(currentMessages);
           if (currentSymptom !== lastSymptom || agentState === AgentState.IMPLEMENTATION) {
@@ -701,15 +880,129 @@ export class AgentOrchestrator {
           const hardMax = config.get('agentInputTokenHardMax', 200000) as number;
           const effectiveBudget = computeInputTokenBudget(configuredBudget, contextWindow, explicitBudget, { hardMax, headroom });
 
-          const compactionResult = await maybeCompact(activeMessages, effectiveBudget, async () => '');
-          if (compactionResult.wasCompacted) {
-            activeMessages = compactionResult.compactedMessages;
-            this._activeMessages = activeMessages;
+          // Pre-resolve file references to populate _virtualPageCache and use placeholders
+          const processedMessages = await Promise.all(
+            activeMessages.map(async (msg) => {
+              if (msg.role === 'user' && msg.content) {
+                const resolved = await this._resolveFileRefs(msg.content, loopCount);
+                return { ...msg, content: resolved };
+              }
+              return msg;
+            })
+          );
+
+          // 3. Scored Context Eviction Manager
+          this._contextStore.clear();
+          for (let i = 0; i < processedMessages.length; i++) {
+            const msg = processedMessages[i];
+            const isApprovedPlan = msg.content && msg.content.includes('APPROVED PLAN');
+            const isProtected = (msg as any)._protected || isApprovedPlan;
+            
+            let priority = 5; // default for tool/logs
+            if (msg.role === 'system') priority = 100;
+            else if (msg.role === 'user') priority = 50;
+            else if (msg.role === 'assistant') priority = 20;
+
+            let dependencyCount = 0;
+            if (msg.content) {
+              for (const file of verifiedFiles) {
+                if (msg.content.includes(path.basename(file))) {
+                  dependencyCount++;
+                }
+              }
+            }
+
+            this._contextStore.addItem(
+              `msg-${i}`,
+              msg,
+              msg.role as any,
+              priority,
+              dependencyCount,
+              !!isProtected
+            );
           }
+
+          // Add files from page cache to ContextStore
+          const activeEditor = vscode.window?.activeTextEditor;
+          const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+          const activeFile = activeEditor ? path.relative(workspaceRoot, activeEditor.document.fileName || activeEditor.document.uri?.fsPath || '').replace(/\\/g, '/') : '';
+
+          for (const [filePath, fileData] of this._virtualPageCache.entries()) {
+            let priority = 10; // Default config/others
+            
+            const isTarget = 
+              filePath === activeFile || 
+              filePath === lastPatchFailedPath ||
+              filePath === 'main.py' ||
+              path.basename(filePath) === 'main.py' ||
+              path.basename(filePath) === 'main.ts' ||
+              path.basename(filePath) === 'app.ts' ||
+              path.basename(filePath) === 'index.ts';
+
+            const isTypes = 
+              filePath.endsWith('.d.ts') || 
+              /type|model|interface|schema/i.test(filePath);
+
+            if (isTarget) {
+              priority = 100;
+            } else if (isTypes) {
+              priority = 50;
+            }
+
+            let dependencyCount = 0;
+            for (const msg of processedMessages) {
+              if (msg.content && (msg.content.includes(filePath) || msg.content.includes(path.basename(filePath)))) {
+                dependencyCount++;
+              }
+            }
+
+            this._contextStore.addItem(
+              `file:${filePath}`,
+              fileData,
+              'tool',
+              priority,
+              dependencyCount,
+              false,
+              fileData.lastAccessedTurn
+            );
+          }
+
+          // Evict low priority context items if we exceed budget
+          const evictedKeys = this._contextStore.evictToBudget(
+            effectiveBudget,
+            (item) => {
+              if (item.key.startsWith('file:')) {
+                const fileData = item.value as { content: string; ext: string };
+                return estimateTokens([{ role: 'user', content: fileData.content }]);
+              } else {
+                return estimateTokens([item.value]);
+              }
+            }
+          );
+
+          if (evictedKeys.length > 0) {
+            console.log(`[Scored Eviction] Evicted ${evictedKeys.length} items (messages/files) from context due to budget limits.`);
+          }
+
+          // Rebuild activeMessages from non-file kept items
+          const keptItems = this._contextStore.items.sort((a, b) => a.recency - b.recency);
+          const keptMessages: ChatMessage[] = [];
+          let usedTokens = 0;
+          for (const item of keptItems) {
+            if (!item.key.startsWith('file:')) {
+              keptMessages.push(item.value);
+              usedTokens += estimateTokens([item.value]);
+            } else {
+              const fileData = item.value as { content: string; ext: string };
+              usedTokens += estimateTokens([{ role: 'user', content: fileData.content }]);
+            }
+          }
+          activeMessages = sanitizeToolMessages(keptMessages);
+          this._activeMessages = activeMessages;
 
           this._postMessage({
             type: 'contextUsage',
-            usedTokens: estimateTokens(activeMessages),
+            usedTokens: usedTokens,
             maxTokens: effectiveBudget,
           });
 
@@ -722,8 +1015,8 @@ export class AgentOrchestrator {
             .filter((msg) => !msg.summarized)
             .map(async (msg) => {
               let content = msg.content;
-              if (msg.role === 'user' && content) {
-                content = await this._resolveFileRefs(content);
+              if (content) {
+                content = this._resolveCachePlaceholders(content);
               }
               const mapped: any = {
                 role: (msg.role === 'system' ? 'user' : msg.role) as 'user' | 'assistant' | 'system' | 'tool',
@@ -736,18 +1029,29 @@ export class AgentOrchestrator {
             });
           const resolvedPayload = await Promise.all(resolvedPayloadPromises);
 
+          // 4. Inject Active Task and loop warnings into system prompt
+          const activeTaskPrompt = this._taskQueue.getActiveTaskPromptContext();
+          const loopWarning = this._loopDetector.detectLoop().reason;
+          const loopWarningPrompt = loopWarning ? `\n\n### ⚠️ LOOP DETECTOR WARNING:\n${loopWarning}` : '';
+          const activeJobs = this._jobManager.jobs.filter(j => j.status === 'running' || j.status === 'queued');
+          const jobsPrompt = activeJobs.length > 0
+            ? `\n\n### ⚙️ RUNNING JOBS:\n` + activeJobs.map(j => `- Job [${j.id}]: ${j.name} (${j.status})`).join('\n')
+            : '';
+
+          const systemPromptContent = buildSystemPrompt(
+            loopCount,
+            hasDeclaredPlan(activeMessages, ''),
+            featureOwner,
+            agentState,
+            taskMode,
+            text || '',
+            useNativeTools,
+          ) + `\n\n### 🎯 RUNTIME CONTEXT:\n${activeTaskPrompt}${loopWarningPrompt}${jobsPrompt}`;
+
           const payload: ChatMessage[] = [
             {
               role: 'system',
-              content: buildSystemPrompt(
-                loopCount,
-                hasDeclaredPlan(activeMessages, ''),
-                featureOwner,
-                agentState,
-                taskMode,
-                text || '',
-                useNativeTools,
-              ),
+              content: systemPromptContent,
             },
             ...resolvedPayload,
           ];
@@ -1217,8 +1521,13 @@ export class AgentOrchestrator {
             consecutiveMalformedCount = 0;
             consecutiveVerbalGiveUps = 0;
           } else {
-            const allTools = Array.from(ALL_REGISTERED_TOOLS);
-            const hasToolAttempt = allTools.some((t) => assistantResponse.includes('<' + t));
+            if (taskMode === TaskMode.CONVERSATIONAL) {
+              continueLoop = false;
+              consecutiveMalformedCount = 0;
+              consecutiveVerbalGiveUps = 0;
+            } else {
+              const allTools = Array.from(ALL_REGISTERED_TOOLS);
+              const hasToolAttempt = allTools.some((t) => assistantResponse.includes('<' + t));
             const turnEval = evaluateTurnResult([], assistantResponse);
             if (turnEval.status === 'failure') {
               try {
@@ -1262,6 +1571,7 @@ export class AgentOrchestrator {
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (
+              loopCount > 1 &&
               (taskMode === TaskMode.IMPLEMENT || taskMode === TaskMode.DEBUG || taskMode === TaskMode.VERIFY) &&
               !assistantResponse.includes('<walkthrough>') &&
               toolCalls.length === 0
@@ -1274,6 +1584,7 @@ export class AgentOrchestrator {
               continueLoop = true;
             }
           }
+        }
         }
         this._sendAvatarState('idle');
         this._postMessage({ type: 'updateChatHistory', history: currentMessages });
@@ -1320,7 +1631,7 @@ export class AgentOrchestrator {
     }
   }
 
-  private async _resolveFileRefs(text: string): Promise<string> {
+  private async _resolveFileRefs(text: string, currentTurn: number): Promise<string> {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     return text.replace(/\[([^[\]]+?)\]/g, (match: string, filePath: string) => {
       try {
@@ -1331,28 +1642,49 @@ export class AgentOrchestrator {
           const ext = path.extname(trimmed).slice(1) || 'txt';
           const hash = crypto.createHash('sha256').update(content).digest('hex');
 
-          if (!this._sentFiles.has(trimmed)) {
-            this._sentFiles.set(trimmed, { hash, content });
-            return `\n\`\`\`${ext}:${trimmed}\n${content}\n\`\`\``;
-          }
+          this._virtualPageCache.set(trimmed, {
+            content,
+            ext,
+            hash,
+            lastAccessedTurn: currentTurn,
+          });
 
-          const cached = this._sentFiles.get(trimmed)!;
-          if (cached.hash === hash) {
-            return `\n[File: ${trimmed} (unchanged since last sent)]`;
-          }
-
-          const diff = generateUnifiedDiff(trimmed, cached.content, content);
-          this._sentFiles.set(trimmed, { hash, content });
-          
-          if (!diff) {
-            return `\n[File: ${trimmed} (unchanged since last sent)]`;
-          }
-          return `\n[File: ${trimmed} (diff since last sent)]\n\`\`\`diff\n${diff}\n\`\`\``;
+          return `[File Cache: ${trimmed}]`;
         }
       } catch (e) {
         console.error('Failed to read embedding file:', filePath, e);
       }
       return match;
+    });
+  }
+
+  public _resolveCachePlaceholders(text: string): string {
+    if (!text) return text;
+    return text.replace(/\[File Cache:\s*([^\]]+?)\]/g, (match, trimmedPath) => {
+      const filePath = trimmedPath.trim();
+      const fileItem = this._contextStore.getItem(`file:${filePath}`);
+      if (fileItem) {
+        const fileData = fileItem.value;
+        if (!this._sentFiles.has(filePath)) {
+          this._sentFiles.set(filePath, { hash: fileData.hash, content: fileData.content });
+          return `\n\`\`\`${fileData.ext}:${filePath}\n${fileData.content}\n\`\`\``;
+        }
+
+        const cached = this._sentFiles.get(filePath)!;
+        if (cached.hash === fileData.hash) {
+          return `\n[File: ${filePath} (unchanged since last sent)]`;
+        }
+
+        const diff = generateUnifiedDiff(filePath, cached.content, fileData.content);
+        this._sentFiles.set(filePath, { hash: fileData.hash, content: fileData.content });
+        
+        if (!diff) {
+          return `\n[File: ${filePath} (unchanged since last sent)]`;
+        }
+        return `\n[File: ${filePath} (diff since last sent)]\n\`\`\`diff\n${diff}\n\`\`\``;
+      } else {
+        return `\n[File: ${filePath} (evicted from cache to save tokens)]`;
+      }
     });
   }
 

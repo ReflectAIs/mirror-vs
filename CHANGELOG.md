@@ -3,6 +3,37 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.3.0] - 2025-07-17
+
+### Added
+- **Mirror VS Runtime v1.0 (Phase 1-4)**: Ground-up architecture overhaul adding a production-grade agent execution runtime with 17 new modules:
+  - runtime/state-graph.ts - Formal ExecutionState machine (Planning, Scheduling, Reasoning, Executing, Verifying, Recovery) with transition listeners
+  - runtime/task-queue.ts - Hierarchical task decomposition with parent-child relationship tracking and queuing
+  - runtime/context-store.ts - In-memory context store with add/remove/get operations for virtual page caching
+  - runtime/action-request.ts - Structured tool call parsing with name, args, and metadata extraction
+  - runtime/loop-detector.ts - Agent loop stucking detection based on repeated tool calls or identical argument patterns
+  - runtime/explorer-mode.ts - Explorer mode management with adaptive search budget scaling based on file structure complexity
+  - runtime/confidence-engine.ts - Turn-level self-assessment scoring (0-1) with recovery triggers at configurable thresholds
+  - runtime/job-manager.ts - Job lifecycle management with tracking of tool execution jobs, their outputs, and statuses
+  - runtime/recovery-engine.ts - Automatic recovery strategies on failure: retry, escalate, skip, or fallback
+  - runtime/verification-pipeline.ts - Multi-stage verification pipeline: syntax, typecheck, build, test with per-stage pass/fail tracking
+  - runtime/ast-parser.ts - Lightweight AST analysis supporting import detection and symbol extraction
+  - runtime/knowledge-graph.ts - Directed graph of code entities (files, symbols, dependencies) for smarter code navigation
+  - runtime/multi-agent.ts - Multi-agent coordination with Planner, Executor, Reviewer role delegation and message passing
+  - runtime/learning-engine.ts - Session-based learning that tracks successful patterns and avoids repeated mistakes
+  - runtime/workspace-adapters.ts - Workspace type detection (Node.js, React, generic) with adapter-specific tool availability
+  - runtime/types.ts - Shared ExecutionState enum, Task interface, and ContextItem interface
+- **Context Store + Virtual Page Cache**: _resolveFileRefs() now writes file references as [File Cache: path] placeholders, resolved to full content (or diffs for unchanged files) via _resolveCachePlaceholders() with eviction tracking
+- **CONVERSATIONAL TaskMode**: New state-machine.ts mode automatically detected for greetings, casual queries, and short non-actionable inputs (<5 words with no action verbs) - avoids unnecessary tool execution
+- **Dependency-Boosted RAG Search**: search-tools.ts now boosts semantic search results by 5% per dependent file, sorted by combined relevance score
+- **Extended Event Bus**: event-bus.ts now supports 6 new event types: FilePatched, DiagnosticsUpdated, JobCompleted, WorkspaceChanged, UserInterrupted, VerificationPassed
+- **Runtime Test Suite**: 18 new tests across 3 test files covering StateGraph transitions, TaskQueue scheduling, ContextStore operations, MultiAgent message passing, RecoveryEngine strategies, AST parsing, and KnowledgeGraph indexing
+
+### Changed
+- **Version**: 0.2.15 to 0.3.0 (major milestone - production-grade agent runtime)
+- **Orchestrator Architecture**: Integrated 15+ runtime modules into AgentOrchestrator; agent loop now leverages StateGraph for state transitions and VerificationPipeline for post-patch verification
+- **File Reference Resolution**: Changed from inline full-content expansion to two-pass system: pass 1 writes [File Cache: ...] placeholder, pass 2 resolves via _resolveCachePlaceholders() using ContextStore items (supports unchanged, diff, and evicted states)
+
 ## [0.2.15] - 2025-07-17
 
 ### Fixed

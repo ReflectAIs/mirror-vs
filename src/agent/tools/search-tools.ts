@@ -96,9 +96,28 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
     if (results.length === 0) {
       try {
         const { LocalRagService } = await import('../../services/local-rag-service.js');
+        const { getDependentsOfFile } = await import('./code-analysis-tools.js');
         const rag = LocalRagService.getInstance();
         const ragResults = rag.search(query, 5);
-        results = ragResults.map((r: any) => ({
+        
+        // Boost semantic search relevance based on code dependency graph references
+        const boosted = ragResults.map((r: any) => {
+          let scoreBoost = 0;
+          try {
+            const dependents = getDependentsOfFile(r.filePath);
+            scoreBoost += dependents.length * 0.05; // 5% relevance boost per dependent file
+          } catch {
+            // ignore
+          }
+          return {
+            ...r,
+            score: (r.score || 1.0) + scoreBoost,
+          };
+        });
+
+        boosted.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
+
+        results = boosted.map((r: any) => ({
           filePath: r.filePath,
           content: r.content,
           startLine: r.startLine,
