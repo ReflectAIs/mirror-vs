@@ -3,6 +3,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.3.1] - 2025-07-17
+
+### Added
+- **Worked Accordion UI**: Tool cards are now grouped into a collapsible "Worked" accordion per turn, with a live elapsed timer, a spinning indicator during execution, and auto-collapse on completion/error.
+- **Line-Targeted Patch Format**: Updated `patch_file` and `multi_patch_file` tool specifications to prioritize structured line-range attributes (`start_line`, `end_line`, `expected_search_content`, `replace_content`) over the legacy SEARCH/REPLACE block format.
+- **Input Tabs Bar**: Added a tabs bar above the chat input with categorized action buttons (Review, Chat, etc.) for quick access.
+
+### Fixed
+- **Publisher Namespace Verification**: Changed `publisher` field in `package.json` from `"DIPESHMAJITHIA"` (all-caps) to `"DipeshMajithia"` (PascalCase) to match the registered VS Code Marketplace / Open VSX namespace, eliminating the "not a verified publisher" warning on extension install.
+- **Robust Patch Matching**: Added `findFuzzyMatchRange` and `normalizeLineExact` fallback logic in `file-tools.ts` for both `patch_file` and `multi_patch_file`. When a line-range match fails exactly, the system now searches a ±15 line neighborhood and performs fuzzy content matching before throwing an error.
+- **History Tool Card Accordion**: Tool card history is now rendered inside a collapsible accordion container with a card count badge instead of inline in the chat.
+
+### Changed
+- **Tool Specifications Prompt** (`toolSpecifications.ts`): Updated tool usage instructions to emphasize the line-targeted format, with the legacy SEARCH/REPLACE block format as a secondary fallback. Added detailed examples for both `patch_file` and `multi_patch_file`.
+- **Tool Status Rendering** (`05-message-handlers.js`, `sidebar.js`): Tool status updates (running/success/error) now target the worked accordion content container instead of the top-level `chatMessages` container.
+
 ## [0.3.0] - 2025-07-17
 
 ### Added

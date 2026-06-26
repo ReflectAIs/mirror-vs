@@ -1,4 +1,6 @@
-
+  let currentTurnStartTime = null;
+  let currentTurnTimerInterval = null;
+  let currentWorkedAccordion = null;
 
   // ─── Deep-link file paths in message text ─────────────────────────
   function linkifyFilePaths(container) {
@@ -185,6 +187,34 @@
     container.appendChild(msgElement);
     
     return bubble;
+  }
+  function createWorkedAccordion() {
+    const accordion = document.createElement('div');
+    accordion.className = 'worked-accordion';
+    
+    const header = document.createElement('div');
+    header.className = 'worked-accordion-header';
+    header.innerHTML = `
+      <span class="worked-accordion-spinner"></span>
+      <span class="worked-accordion-label">Working...</span>
+      <span class="worked-accordion-chevron">
+        <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+        </svg>
+      </span>
+    `;
+    
+    const content = document.createElement('div');
+    content.className = 'worked-accordion-content';
+    
+    accordion.appendChild(header);
+    accordion.appendChild(content);
+    
+    header.addEventListener('click', () => {
+      accordion.classList.toggle('collapsed');
+    });
+    
+    return accordion;
   }
 
   // 8. Listen to Messages from Extension Host
@@ -473,6 +503,26 @@
         sendBtn.classList.add('hidden');
         stopBtn.classList.remove('hidden');
 
+        if (!currentWorkedAccordion) {
+          currentTurnStartTime = Date.now();
+          if (currentTurnTimerInterval) {
+            clearInterval(currentTurnTimerInterval);
+            currentTurnTimerInterval = null;
+          }
+          currentWorkedAccordion = createWorkedAccordion();
+          chatMessages.appendChild(currentWorkedAccordion);
+          
+          currentTurnTimerInterval = setInterval(() => {
+            if (currentWorkedAccordion) {
+              const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+              const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+              if (labelEl) {
+                labelEl.textContent = `Working for ${elapsed}s...`;
+              }
+            }
+          }, 1000);
+        }
+
         if (!currentStreamingBubble) {
           const assistantBubble = appendMessageBubble('assistant', '');
           const typingIndicator = document.createElement('div');
@@ -572,6 +622,24 @@
       }
 
       case 'chatResponseComplete': {
+        if (currentTurnTimerInterval) {
+          clearInterval(currentTurnTimerInterval);
+          currentTurnTimerInterval = null;
+        }
+        if (currentWorkedAccordion) {
+          const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+          const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+          if (labelEl) {
+            labelEl.textContent = `Worked for ${elapsed}s`;
+          }
+          const spinner = currentWorkedAccordion.querySelector('.worked-accordion-spinner');
+          if (spinner) {
+            spinner.style.display = 'none';
+          }
+          currentWorkedAccordion.classList.add('collapsed');
+          currentWorkedAccordion = null;
+        }
+
         setAvatarState('idle');
         if (!currentStreamingBubble) {
           updateStickyUserMessage();
@@ -616,13 +684,35 @@
 
       case 'toolStatus': {
         const { toolName, status, target, result, checkpointId, code, terminalName } = message;
+        
+        // Ensure worked accordion exists when tool activity begins
+        if (!currentTurnStartTime) {
+          currentTurnStartTime = Date.now();
+        }
+        if (!currentWorkedAccordion) {
+          currentWorkedAccordion = createWorkedAccordion();
+          chatMessages.appendChild(currentWorkedAccordion);
+          
+          currentTurnTimerInterval = setInterval(() => {
+            if (currentWorkedAccordion) {
+              const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+              const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+              if (labelEl) {
+                labelEl.textContent = `Working for ${elapsed}s...`;
+              }
+            }
+          }, 1000);
+        }
+
+        const contentContainer = currentWorkedAccordion.querySelector('.worked-accordion-content');
+
         if (status === 'running') {
           setAvatarState('tool_calling');
           const runningCard = createToolCardDOM(toolName, status, target, null, null, false, null, null);
-          placeCardInPlaceholder(runningCard, toolName, target);
+          placeCardInPlaceholder(runningCard, toolName, target, contentContainer);
         } else {
-          // Find any existing running card for this tool & target in the chatMessages container
-          const cards = chatMessages.querySelectorAll('.tool-card.running');
+          // Find any existing running card for this tool & target in the accordion content container
+          const cards = contentContainer.querySelectorAll('.tool-card.running');
           let existingCard = null;
           const cleanTarget = (target || '').trim();
           for (let i = 0; i < cards.length; i++) {
@@ -640,7 +730,7 @@
             }
           } else {
             const card = createToolCardDOM(toolName, status, target, result, checkpointId, false, code, terminalName);
-            placeCardInPlaceholder(card, toolName, target);
+            placeCardInPlaceholder(card, toolName, target, contentContainer);
           }
         }
         scrollChatToBottom();
@@ -648,6 +738,24 @@
       }
 
         case 'loopComplete': {
+          if (currentTurnTimerInterval) {
+            clearInterval(currentTurnTimerInterval);
+            currentTurnTimerInterval = null;
+          }
+          if (currentWorkedAccordion) {
+            const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+            const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+            if (labelEl) {
+              labelEl.textContent = `Worked for ${elapsed}s`;
+            }
+            const spinner = currentWorkedAccordion.querySelector('.worked-accordion-spinner');
+            if (spinner) {
+              spinner.style.display = 'none';
+            }
+            currentWorkedAccordion.classList.add('collapsed');
+            currentWorkedAccordion = null;
+          }
+
           isSending = false;
           promptInput.contentEditable = 'true';
           sendBtn.disabled = false;
@@ -676,6 +784,24 @@
         }
 
       case 'chatResponseError': {
+        if (currentTurnTimerInterval) {
+          clearInterval(currentTurnTimerInterval);
+          currentTurnTimerInterval = null;
+        }
+        if (currentWorkedAccordion) {
+          const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+          const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+          if (labelEl) {
+            labelEl.textContent = `Failed after ${elapsed}s`;
+          }
+          const spinner = currentWorkedAccordion.querySelector('.worked-accordion-spinner');
+          if (spinner) {
+            spinner.style.display = 'none';
+          }
+          currentWorkedAccordion.classList.add('collapsed');
+          currentWorkedAccordion = null;
+        }
+
         setAvatarState('error');
         if (currentStreamingBubble) {
           const loader = currentStreamingBubble.querySelector('.typing-indicator');

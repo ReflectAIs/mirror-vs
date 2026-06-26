@@ -416,20 +416,54 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
       const patches: { search: string; replace: string }[] = [];
 
       if (isLineTargeted) {
-        const start = Math.max(1, tool.start_line!);
-        const end = Math.min(fileLines.length, tool.end_line!);
-        const searchSegment = fileLines.slice(start - 1, end).join('\n');
+        let start = Math.max(1, tool.start_line!);
+        let end = Math.min(fileLines.length, tool.end_line!);
+        let searchSegment = fileLines.slice(start - 1, end).join('\n');
         
         // Exact or whitespace-insensitive verification check
         const cleanExpected = normalizeLineExact(tool.expected_search_content!);
-        const cleanTarget = normalizeLineExact(searchSegment);
+        let cleanTarget = normalizeLineExact(searchSegment);
         
         if (cleanExpected !== cleanTarget) {
-          throw new Error(
-            `Patch verification failed. Expected search content does not match the file content in specified range (lines ${start}-${end}).\n` +
-            `Expected:\n${tool.expected_search_content}\n\n` +
-            `Actual in file:\n${searchSegment}`
-          );
+          // Fallback 1: Scan surrounding neighborhood (+/- 15 lines) for the exact block
+          let found = false;
+          const searchLength = end - start + 1;
+          for (let offset = -15; offset <= 15; offset++) {
+            if (offset === 0) continue;
+            const newStart = start + offset;
+            const newEnd = end + offset;
+            if (newStart >= 1 && newEnd <= fileLines.length) {
+              const neighborSegment = fileLines.slice(newStart - 1, newEnd).join('\n');
+              if (normalizeLineExact(neighborSegment) === cleanExpected) {
+                start = newStart;
+                end = newEnd;
+                searchSegment = neighborSegment;
+                cleanTarget = normalizeLineExact(searchSegment);
+                found = true;
+                break;
+              }
+            }
+          }
+          
+          // Fallback 2: Full file fuzzy range matching
+          if (!found) {
+            const matchRange = findFuzzyMatchRange(fileLines, tool.expected_search_content!.split(/\r?\n/));
+            if (matchRange) {
+              start = matchRange.start + 1;
+              end = matchRange.end + 1;
+              searchSegment = fileLines.slice(matchRange.start, matchRange.end + 1).join('\n');
+              cleanTarget = normalizeLineExact(searchSegment);
+              found = true;
+            }
+          }
+
+          if (!found) {
+            throw new Error(
+              `Patch verification failed. Expected search content does not match the file content in specified range (lines ${tool.start_line}-${tool.end_line}) or nearby.\n` +
+              `Expected:\n${tool.expected_search_content}\n\n` +
+              `Actual in file at specified range:\n${searchSegment}`
+            );
+          }
         }
         patches.push({ search: searchSegment, replace: tool.replace_content! });
       } else {
@@ -537,19 +571,52 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
         let patchesToApply: { start_line: number; end_line: number; search: string; replace: string }[] = [];
 
         for (const p of tool.patches!) {
-          const start = Math.max(1, p.start_line);
-          const end = Math.min(fileLines.length, p.end_line);
-          const searchSegment = fileLines.slice(start - 1, end).join('\n');
+          let start = Math.max(1, p.start_line);
+          let end = Math.min(fileLines.length, p.end_line);
+          let searchSegment = fileLines.slice(start - 1, end).join('\n');
           
           const cleanExpected = normalizeLineExact(p.expected_search_content);
-          const cleanTarget = normalizeLineExact(searchSegment);
+          let cleanTarget = normalizeLineExact(searchSegment);
           
           if (cleanExpected !== cleanTarget) {
-            throw new Error(
-              `Multi-patch verification failed for line range ${start}-${end}.\n` +
-              `Expected:\n${p.expected_search_content}\n\n` +
-              `Actual in file:\n${searchSegment}`
-            );
+            // Fallback 1: Scan surrounding neighborhood (+/- 15 lines)
+            let found = false;
+            for (let offset = -15; offset <= 15; offset++) {
+              if (offset === 0) continue;
+              const newStart = start + offset;
+              const newEnd = end + offset;
+              if (newStart >= 1 && newEnd <= fileLines.length) {
+                const neighborSegment = fileLines.slice(newStart - 1, newEnd).join('\n');
+                if (normalizeLineExact(neighborSegment) === cleanExpected) {
+                  start = newStart;
+                  end = newEnd;
+                  searchSegment = neighborSegment;
+                  cleanTarget = normalizeLineExact(searchSegment);
+                  found = true;
+                  break;
+                }
+              }
+            }
+            
+            // Fallback 2: Full file fuzzy range matching
+            if (!found) {
+              const matchRange = findFuzzyMatchRange(fileLines, p.expected_search_content.split(/\r?\n/));
+              if (matchRange) {
+                start = matchRange.start + 1;
+                end = matchRange.end + 1;
+                searchSegment = fileLines.slice(matchRange.start, matchRange.end + 1).join('\n');
+                cleanTarget = normalizeLineExact(searchSegment);
+                found = true;
+              }
+            }
+
+            if (!found) {
+              throw new Error(
+                `Multi-patch verification failed for line range ${p.start_line}-${p.end_line} or nearby.\n` +
+                `Expected:\n${p.expected_search_content}\n\n` +
+                `Actual in file at specified range:\n${searchSegment}`
+              );
+            }
           }
           patchesToApply.push({ start_line: start, end_line: end, search: searchSegment, replace: p.replace_content });
         }

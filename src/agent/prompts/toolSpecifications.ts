@@ -7,8 +7,8 @@ Available tools:
 - read_file: <read_file path="..." [start_line="..." end_line="..."] />
 - create_file: <create_file path="...">content</create_file> (New files only)
 - write_file: <write_file path="...">content</write_file> (Overwrite)
-- patch_file: <patch_file path="...">\n<<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE\n</patch_file>
-- multi_patch_file: <multi_patch_file><file path="...">\n<<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE\n</file></multi_patch_file> (Patch multiple files)
+- patch_file: <patch_file path="..." start_line="..." end_line="..." expected_search_content="..." replace_content="..." /> (Prioritize this line-based format first! Expects exact matched range)
+- multi_patch_file: <multi_patch_file><file path="..." start_line="..." end_line="..." expected_search_content="..." replace_content="..." /></multi_patch_file> (Patch multiple files using structured line range attributes)
 - list_dir: <list_dir path="..." />
 - grep_search: <grep_search query="..." [path="..."] />
 - semantic_search: <semantic_search query="..." />
@@ -59,6 +59,9 @@ CRITICAL subsequent turn rule:
 3. WRITE FILE (Overwrites whole file):
    <write_file path="relative/path/to/existing_file.ts">content here</write_file>
 4. PATCH FILE (For modifying existing files):
+    **PRIORITIZE LINE-TARGETED FORMAT**: Always prioritize the line-targeted format first. It is extremely robust and fast:
+    <patch_file path="relative/path/to/existing_file.ts" start_line="10" end_line="15" expected_search_content="[exact lines 10 to 15 verbatim]" replace_content="[new replacement lines]" />
+    Only if line numbers are completely unknown or shifts make matching impossible, fall back to the legacy SEARCH/REPLACE block format:
     <patch_file path="relative/path/to/existing_file.ts">
 <<<<<<< SEARCH
 [exact original lines]
@@ -68,6 +71,12 @@ CRITICAL subsequent turn rule:
 </patch_file>
     **CRITICAL PATCHING RULE**: Never output any conflict markers like \`<<<<<<< SEARCH\`, \`=======\`, or \`>>>>>>> REPLACE\` *inside* the replacement content of the file. Those lines are delimiters *only* to separate search and replace blocks. If you write them inside the file, they will be left in the code as syntax errors.
 5. MULTI PATCH FILE (For modifying multiple existing files in a single turn):
+    **PRIORITIZE LINE-TARGETED FORMAT**: Always prioritize the line-targeted format first:
+    <multi_patch_file>
+    <file path="relative/path/to/file1.ts" start_line="10" end_line="12" expected_search_content="[lines 10-12]" replace_content="[new lines]" />
+    <file path="relative/path/to/file2.ts" start_line="45" end_line="50" expected_search_content="[lines 45-50]" replace_content="[new lines]" />
+    </multi_patch_file>
+    Only if line numbers are unknown, fall back to the legacy SEARCH/REPLACE block format:
     <multi_patch_file>
     <file path="relative/path/to/file1.ts">
 <<<<<<< SEARCH

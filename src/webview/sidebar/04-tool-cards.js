@@ -543,6 +543,9 @@
 
   function appendToolCardFromHistory(text, container = chatMessages) {
     const results = text.split('\n\n');
+    let historyAccordion = null;
+    let cardCount = 0;
+    
     results.forEach(res => {
       const match = res.match(/\[Tool Result for (\w+) on "([\s\S]*?)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
       if (match) {
@@ -566,7 +569,45 @@
         
         const code = parsedToolContents.get(target);
         const card = createToolCardDOM(toolName, status, target, details, checkpointId, isReverted, code);
-        placeCardInPlaceholder(card, toolName, target, container);
+        
+        if (!historyAccordion) {
+          historyAccordion = document.createElement('div');
+          historyAccordion.className = 'worked-accordion collapsed';
+          
+          const header = document.createElement('div');
+          header.className = 'worked-accordion-header';
+          header.innerHTML = `
+            <span class="worked-accordion-label">Worked (History)</span>
+            <span class="worked-accordion-chevron">
+              <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </span>
+          `;
+          
+          const content = document.createElement('div');
+          content.className = 'worked-accordion-content';
+          
+          historyAccordion.appendChild(header);
+          historyAccordion.appendChild(content);
+          
+          header.addEventListener('click', () => {
+            historyAccordion.classList.toggle('collapsed');
+          });
+          
+          container.appendChild(historyAccordion);
+        }
+        
+        const contentContainer = historyAccordion.querySelector('.worked-accordion-content');
+        placeCardInPlaceholder(card, toolName, target, contentContainer);
+        cardCount++;
       }
     });
+    
+    if (historyAccordion && cardCount > 0) {
+      const label = historyAccordion.querySelector('.worked-accordion-label');
+      if (label) {
+        label.textContent = `Worked (${cardCount} action${cardCount > 1 ? 's' : ''})`;
+      }
+    }
   }

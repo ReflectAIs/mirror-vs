@@ -468,6 +468,7 @@
     vscode.postMessage({ type: 'newSession' });
   });
 
+
   // 2. Provider Switch Tabs
   providerOllamaBtn.addEventListener('click', () => {
     selectProvider('ollama');
