@@ -3,6 +3,20 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.4.0] - 2025-07-18
+
+### Added
+- **Structured Agent Memory Output**: Agent memory service now returns memories as structured JSON (`getPersistentMemoryObject()`) with categorized lists (conventions, architectureDecisions, knownPatterns, userPreferences, notes) for clearer LLM consumption.
+- **Contextual Memory Goal**: `getContextString()` now accepts an optional `currentGoal` parameter, injecting it into memory context so the agent can align its behavior with the user's current objective.
+- **Streaming Suppression for Tool Loops**: `agent-completer.ts` now suppresses intermediate streaming chunks for subsequent tool-loop turns (when `isSubsequent=true`), reducing UI noise. Pure conversational replies without tool calls are still emitted to the sidebar.
+
+### Changed
+- **System Prompt Architecture (v2)**: Refactored `baseAgentRole.ts` to produce a streamlined, principle-driven prompt with three pillars — Maximum Information Gain, Read-Before-Patch Grounding, Diagnostics-Driven Repair, and Call-Hierarchy Safety — replacing the verbose numbered rule list.
+- **Control Loop Guard Improvements**: Added comprehensive test coverage for `list_dir` validation, ensuring standard workspace directories are permitted with appropriate warnings.
+
+### Fixed
+- **Cross-Platform Path Handling**: All `fs` mocks in `orchestrator.test.ts` now normalize paths with `.replace(/\\/g, '/')` to resolve Windows backslash mismatches in test assertions.
+
 ## [0.3.2] - 2025-07-18
 
 ### Added

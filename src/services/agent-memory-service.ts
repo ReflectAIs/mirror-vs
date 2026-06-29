@@ -156,16 +156,47 @@ export class AgentMemoryService {
   }
 
   /**
-   * Get all memories formatted as a context string for the agent.
+   * Get all persistent memories as a raw object.
    */
-  getContextString(): string {
+  getPersistentMemoryObject(): Record<string, any> {
     this._ensureLoaded();
-    if (this._index.entries.length === 0) return '';
-    const lines: string[] = ['[AGENT MEMORY - Persistent project knowledge]', ''];
+    const structured: Record<string, any> = {
+      conventions: [],
+      architectureDecisions: [],
+      knownPatterns: [],
+      userPreferences: [],
+      notes: [],
+    };
+
+    const mapping: Record<string, string> = {
+      convention: 'conventions',
+      architecture: 'architectureDecisions',
+      pattern: 'knownPatterns',
+      preference: 'userPreferences',
+      note: 'notes',
+    };
+
     for (const entry of this._index.entries) {
-      lines.push(`[${entry.category}] ${entry.key}: ${entry.value}`);
+      const targetList = mapping[entry.category] || 'notes';
+      structured[targetList].push({
+        key: entry.key,
+        value: entry.value,
+        source: entry.source,
+      });
     }
-    return lines.join('\n');
+
+    return structured;
+  }
+
+  /**
+   * Get all memories formatted as a structured JSON context string for the agent.
+   */
+  getContextString(currentGoal?: string): string {
+    const structured = this.getPersistentMemoryObject();
+    if (currentGoal) {
+      (structured as any).currentGoal = currentGoal;
+    }
+    return `### 🧠 PERSISTENT AGENT MEMORY (JSON):\n\`\`\`json\n${JSON.stringify(structured, null, 2)}\n\`\`\``;
   }
 
   /**

@@ -25,6 +25,19 @@ export async function generateLightweightProjectMap(workspaceRoot: string): Prom
       '.vscode',
     ].includes(name);
 
+  const shouldSkipFile = (name: string): boolean => {
+    const ext = path.extname(name).toLowerCase();
+    const binaryExts = [
+      '.ttf', '.woff', '.woff2', '.eot', '.otf',
+      '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.svg',
+      '.mp4', '.mkv', '.webm', '.avi', '.mov', '.mp3', '.wav', '.ogg',
+      '.zip', '.tar', '.gz', '.7z', '.rar',
+      '.exe', '.dll', '.so', '.dylib', '.bin',
+      '.vsix', '.db', '.sqlite', '.sqlite3'
+    ];
+    return binaryExts.includes(ext);
+  };
+
   interface FileEntry {
     rel: string;
     hint: string;
@@ -49,7 +62,10 @@ export async function generateLightweightProjectMap(workspaceRoot: string): Prom
       try {
         const s = fs.statSync(fp);
         if (s.isDirectory()) dirs.push(e);
-        else if (s.isFile()) files.push(e);
+        else if (s.isFile()) {
+          if (shouldSkipFile(e)) continue;
+          files.push(e);
+        }
       } catch {
         console.error('statSync failed for:', fp);
         /* skip */
@@ -66,7 +82,10 @@ export async function generateLightweightProjectMap(workspaceRoot: string): Prom
           try {
             const s = fs.statSync(fp);
             if (s.isDirectory()) c += countAll(fp);
-            else c++;
+            else {
+              if (shouldSkipFile(e)) continue;
+              c++;
+            }
           } catch {
             console.error('statSync failed in countAll for:', fp);
             /* skip */

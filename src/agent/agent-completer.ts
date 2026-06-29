@@ -35,6 +35,7 @@ export class AgentCompleter {
     workspaceRoot?: string,
     tools?: object[],
     onNativeToolCall?: (id: string, name: string, argsJson: string) => void,
+    isSubsequent?: boolean,
   ): Promise<string> {
     const startTime = performance.now();
 
@@ -53,7 +54,16 @@ export class AgentCompleter {
         reject(err);
       };
 
+      // Track whether any chunks have been streamed to UI (used to decide final emit).
+      let _chunksSent = false;
+
       const onChunk = (chunk: string) => {
+        if (isSubsequent) {
+          // Suppress intermediate streaming chunks for subsequent tool-loop turns.
+          // We will decide at onComplete whether to emit the final reply.
+          return;
+        }
+        _chunksSent = true;
         this._postMessage({ type: 'chatResponseChunk', text: chunk, sessionId: _sessionId });
       };
 
@@ -154,6 +164,20 @@ export class AgentCompleter {
             fs.appendFileSync(logPath, logContent, 'utf-8');
           } catch (e) {
             console.error('[AgentCompleter] Failed to write to turns.log:', e);
+          }
+        }
+
+        // If streaming was suppressed (isSubsequent) and the final response contains
+        // no tool XML tag or native function call structure, it is a pure conversational
+        // reply — emit it now so the UI sidebar shows it to the user.
+        if (isSubsequent && !_chunksSent) {
+          const hasToolCall =
+            /<[a-z_]+(\s[^>]*)?\/?>/.test(fullText) ||
+            fullText.includes('"function"') ||
+            fullText.includes('"tool_calls"') ||
+            /<\/[a-z_]+>/.test(fullText);
+          if (!hasToolCall) {
+            this._postMessage({ type: 'chatResponseChunk', text: fullText, sessionId: _sessionId });
           }
         }
 

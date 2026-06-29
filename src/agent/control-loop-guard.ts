@@ -131,6 +131,27 @@ export function validateControlLoopGuard(
       tracker.ranges.add(rangeKey);
     }
 
+    // 3b. "No Redundant List Dir"
+    if (tool.name === 'list_dir') {
+      const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+      const targetDir = tool.path ? (path.isAbsolute(tool.path) ? tool.path : path.join(workspacePath, tool.path)) : workspacePath;
+      const relPath = path.relative(workspacePath, targetDir).replace(/\\/g, '/');
+
+      // If it's a standard directory within the workspace, it's already in the project map
+      if (fs.existsSync(targetDir) && !relPath.startsWith('..')) {
+        const parts = relPath.split('/');
+        const isSkipped = parts.some(p => [
+          'node_modules', 'dist', 'out', '.git', '.mirror-vs', 'build', '.next', 'coverage', 'bin', 'obj'
+        ].includes(p));
+
+        if (!isSkipped) {
+          warningsToAdd.push(
+            `[Information Redundancy Warning]: The directory structure and files of "${tool.path || '.'}" are already fully detailed in the [PROJECT STRUCTURE] map in your system prompt. Calling list_dir provides 0 new information. In future turns, please inspect the project map, identify the target file you need (e.g. "frontend/src/App.tsx"), and call read_file directly to maximize your information gain per turn.`
+          );
+        }
+      }
+    }
+
     // 4. Convergence Detector
     updatedSearchCount++;
     const searchKey = `${tool.name}:${target}`;

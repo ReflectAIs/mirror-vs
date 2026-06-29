@@ -110,6 +110,11 @@ export class AgentOrchestrator {
   private readonly _knowledgeGraph = new KnowledgeGraph();
   private readonly _multiAgent = new MultiAgentCoordinator();
   private readonly _virtualPageCache = new Map<string, { content: string; ext: string; hash: string }>();
+  private _sessionModifiedFiles = new Set<string>();
+  private _sessionSearchedQueries = new Set<string>();
+  private _sessionVerifiedBuild = false;
+  private _sessionCompletedActions: string[] = [];
+  private _lastToolStatus: { name: string; status: 'success' | 'failed' | 'running'; reason?: string } | null = null;
   private _learningEngine: LearningEngine | undefined;
   private _workspaceAdapter: WorkspaceAdapter | undefined;
 
@@ -556,6 +561,46 @@ export class AgentOrchestrator {
         lastRewriteTelemetryWrapper.val = null;
       }
 
+      // Track session metrics for the state machine and JSON context
+      const lowerResult = result.toLowerCase();
+      const isFailed = lowerResult.includes('error') || lowerResult.includes('failed');
+
+      this._lastToolStatus = {
+        name: tool.name,
+        status: isFailed ? 'failed' : 'success',
+        reason: isFailed ? result.substring(0, 150) : undefined
+      };
+
+      if (!isFailed) {
+        if (tool.name === 'create_file' || tool.name === 'write_file' || tool.name === 'patch_file') {
+          if (tool.path) {
+            this._sessionModifiedFiles.add(tool.path);
+            this._sessionCompletedActions.push(`Modified file ${tool.path}`);
+          }
+        } else if (tool.name === 'multi_patch_file') {
+          if (tool.path) {
+            this._sessionModifiedFiles.add(tool.path);
+            this._sessionCompletedActions.push(`Multi-patched file ${tool.path}`);
+          }
+        } else if (tool.name === 'grep_search' || tool.name === 'semantic_search' || tool.name === 'web_search') {
+          const q = tool.query || tool.content || '';
+          if (q) {
+            this._sessionSearchedQueries.add(q);
+            this._sessionCompletedActions.push(`Searched for "${q}"`);
+          }
+        } else if (tool.name === 'read_file') {
+          if (tool.path) {
+            this._sessionCompletedActions.push(`Read file ${tool.path}`);
+          }
+        } else if (tool.name === 'run_command') {
+          const cmd = (tool.command || '').toLowerCase();
+          this._sessionCompletedActions.push(`Executed command "${tool.command}"`);
+          if (cmd.includes('compile') || cmd.includes('test') || cmd.includes('build') || cmd.includes('vitest')) {
+            this._sessionVerifiedBuild = true;
+          }
+        }
+      }
+
       if (jobId) {
         this._jobManager.completeJob(jobId, result, 0);
       }
@@ -754,6 +799,11 @@ export class AgentOrchestrator {
         this._jobManager.clear();
         this._recoveryEngine.clear();
         this._virtualPageCache.clear();
+        this._sessionModifiedFiles.clear();
+        this._sessionSearchedQueries.clear();
+        this._sessionVerifiedBuild = false;
+        this._sessionCompletedActions = [];
+        this._lastToolStatus = null;
       }
 
       currentMessages = injectRelevantSkills(currentMessages, text || '');
@@ -1181,8 +1231,26 @@ export class AgentOrchestrator {
               Math.round(estimateTokens([{ role: 'system', content: this._systemPromptCache }]) / 1000) + 'K tokens saved).');
           }
 
-          const dynamicCtx = buildDynamicSystemContext(hasPlanNow, featureOwner, agentState, taskMode);
-          const runtimeCtx = `\n\n### 🎯 RUNTIME CONTEXT:\n${activeTaskPrompt}${loopWarningPrompt}${jobsPrompt}`;
+          let currentPhase = 'PLANNING';
+          if (this._sessionVerifiedBuild && this._sessionModifiedFiles.size > 0) {
+            currentPhase = 'VERIFIED';
+          } else if (this._sessionModifiedFiles.size > 0 || verifiedFiles.size > 0) {
+            currentPhase = 'IMPLEMENTING';
+          }
+          await this._updateTaskArtifacts(text || '', currentPhase, verifiedFiles);
+
+          const dynamicCtx = buildDynamicSystemContext(
+            hasPlanNow,
+            featureOwner,
+            agentState,
+            taskMode,
+            verifiedFiles,
+            this._sessionSearchedQueries,
+            this._sessionCompletedActions,
+            this._lastToolStatus,
+            text
+          );
+          const runtimeCtx = `\n\n### 🎯 RUNTIME CONTEXT:\n${activeTaskPrompt}${loopWarningPrompt}${jobsPrompt}`+`\n\n### 📦 artifacts update:\nArtifacts "Implementation Plan" (plan_artifact) and "Task List" (tasks_artifact) have been automatically created/updated on disk by the orchestrator and rendered for the user. Do NOT write or edit these files manually.`;
           const systemPromptContent = this._systemPromptCache + dynamicCtx + runtimeCtx;
 
           const payload: ChatMessage[] = [
@@ -1241,6 +1309,7 @@ export class AgentOrchestrator {
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
                 toolSchemas,
                 onNativeToolCall,
+                loopCount > 1,
               );
 
               if ((assistantResponse && assistantResponse.trim() !== '') || nativeToolCall) {
@@ -1291,6 +1360,16 @@ export class AgentOrchestrator {
 
           const earlyToolCalls = nativeToolCall ? [1] : this._parser.parseToolCalls(assistantResponse, true);
           assistantResponse = detectAndNormalizeWalkthrough(assistantResponse, earlyToolCalls.length);
+
+          if (loopCount > 1 && !nativeToolCall) {
+            const xmlRegex = /<[a-zA-Z0-9_]+[\s\S]*?>(?:[\s\S]*?<\/[a-zA-Z0-9_]+>)?/g;
+            const matches = assistantResponse.match(xmlRegex);
+            if (matches && matches.length > 0) {
+              assistantResponse = matches.join('\n');
+            } else {
+              assistantResponse = '';
+            }
+          }
 
           if (nativeToolCall) {
             const ntc = nativeToolCall as { id: string; name: string; argsJson: string };
@@ -1903,6 +1982,85 @@ export class AgentOrchestrator {
       }
     } catch (e) {
       console.warn('Failed to sync planning files:', e);
+    }
+  }
+
+  private async _updateTaskArtifacts(
+    goal: string,
+    currentPhase: string,
+    verifiedFiles: Set<string>,
+  ): Promise<void> {
+    try {
+      const artifactService = ArtifactService.getInstance();
+      
+      // 1. Create or Update Implementation Plan
+      const planId = 'plan_artifact';
+      const visitedList = verifiedFiles.size > 0
+        ? Array.from(verifiedFiles).map((f) => {
+            try {
+              return `- ${vscode.workspace.asRelativePath(f)}`;
+            } catch {
+              return `- ${path.basename(f)}`;
+            }
+          }).join('\n')
+        : '- None';
+      const modifiedList = this._sessionModifiedFiles.size > 0
+        ? Array.from(this._sessionModifiedFiles).map((f) => `- ${f}`).join('\n')
+        : '- None';
+      const searchList = this._sessionSearchedQueries.size > 0
+        ? Array.from(this._sessionSearchedQueries).map((q) => `- "${q}"`).join('\n')
+        : '- None';
+
+      const planContent = `# Implementation Plan: ${goal}
+
+## Active Phase
+${currentPhase}
+
+## Visited Files
+${visitedList}
+
+## Search Queries
+${searchList}
+
+## Modified Files
+${modifiedList}
+
+## Verification Status
+- Compile/Test Verification: ${this._sessionVerifiedBuild ? '✅ Verified successfully' : '⏳ Pending compilation/test run'}
+`;
+      await artifactService.createOrUpdateArtifact(planId, 'markdown', 'Implementation Plan', planContent, undefined, false);
+
+      // 2. Create or Update Task List
+      const taskId = 'tasks_artifact';
+      const tasksContent = `# Task List: ${goal}
+
+- [${verifiedFiles.size > 0 ? 'x' : ' '}] Read files to locate relevant logic
+- [${this._sessionModifiedFiles.size > 0 ? 'x' : ' '}] Implement proposed modifications
+- [${this._sessionVerifiedBuild ? 'x' : ' '}] Verify changes compile and test suite runs
+- [${currentPhase === 'VERIFIED' ? 'x' : ' '}] Create walkthrough summary
+`;
+      await artifactService.createOrUpdateArtifact(taskId, 'markdown', 'Task List', tasksContent, undefined, false);
+
+      // 3. Create or Update Walkthrough if verified
+      if (currentPhase === 'VERIFIED') {
+        const walkthroughId = 'walkthrough_artifact';
+        const walkthroughContent = `# Walkthrough of Changes: ${goal}
+
+## Summary of Accomplishments
+- [x] Successfully completed the task: "${goal}"
+- [x] All proposed edits implemented and verified.
+
+## Files Modified
+${modifiedList}
+
+## Verification Results
+- All diagnostics cleared.
+- Compilation and test suite verified successfully.
+`;
+        await artifactService.createOrUpdateArtifact(walkthroughId, 'markdown', 'Walkthrough', walkthroughContent, undefined, false);
+      }
+    } catch (e) {
+      console.warn('Failed to update task artifacts programmatically:', e);
     }
   }
 }

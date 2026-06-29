@@ -13,6 +13,8 @@ import { getBackendSkill } from './prompts/skills/backendSkill';
 import { getRefactorSkill } from './prompts/skills/refactorSkill';
 import { getModeInstructions } from './prompts/modePrompts';
 import { TaskMode } from './orchestrator';
+import { ArtifactService } from '../services/artifact-service';
+import { AgentMemoryService } from '../services/agent-memory-service';
 
 import { detectGuideOnly, domainRulesForTools, GUIDE_ONLY_DIRECTIVE, getToolsForQuery } from './tool-policy';
 import { UNTRUSTED_CONTEXT_POLICY } from './prompt-security';
@@ -33,7 +35,7 @@ export function buildStaticSystemPromptCore(
   const config = vscode.workspace.getConfiguration('mirror-vs');
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
-  const baseRole = getBaseAgentRole();
+  const baseRole = getBaseAgentRole(useNativeTools);
   const workspaceContext = getWorkspaceContext();
   const toolSpecs = getToolSpecifications(isSubsequent);
 
@@ -80,13 +82,14 @@ export function buildStaticSystemPromptCore(
     }
   }
 
-  // 4. Agent Memory
+  // 4. Agent Memory — never use raw userRequest as goal (filters out greetings)
+  // Only pass userRequest as goal if it looks like an engineering task, not a greeting.
+  const GREETING_PATTERNS = /^\s*(hi|hello|hey|how are you|good morning|good afternoon|good evening|thanks|thank you|what can you do|who are you|help)\s*[?!.]?\s*$/i;
+  const goalForMemory = GREETING_PATTERNS.test(userRequest.trim()) ? undefined : userRequest;
   let memorySection = '';
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { AgentMemoryService } = require('../services/agent-memory-service');
     const memory = AgentMemoryService.getInstance();
-    const contextStr = memory.getContextString();
+    const contextStr = memory.getContextString(goalForMemory);
     if (contextStr) memorySection = `\n\n${contextStr}`;
   } catch {
     if (workspaceFolder) {
@@ -144,10 +147,104 @@ export function buildDynamicSystemContext(
   featureOwner: string,
   agentState: string,
   taskMode: TaskMode,
+  verifiedFiles?: Set<string>,
+  searchedQueries?: Set<string>,
+  completedActions?: string[],
+  lastToolStatus?: { name: string; status: 'success' | 'failed' | 'running'; reason?: string } | null,
+  currentGoal?: string | null,
 ): string {
   const config = vscode.workspace.getConfiguration('mirror-vs');
   const service = CommandService.getInstance();
   const terminals = service.getActiveTerminals();
+
+  // Determine phase and allowedTools based on taskMode first.
+  // CONVERSATIONAL turns bypass artifact scanning entirely to avoid phase conflicts.
+  let currentPhase: string;
+  let allowedTools: string[];
+
+  if (taskMode === TaskMode.CONVERSATIONAL) {
+    currentPhase = 'WAITING_FOR_TASK';
+    allowedTools = []; // No tools needed — model should respond directly without calling any tool
+  } else {
+    // Retrieve state machine artifact details for active engineering tasks
+    const artifactService = ArtifactService.getInstance();
+    artifactService.loadFromDisk();
+    const planCreated = artifactService.artifacts.some((a) => a.id === 'plan_artifact');
+    const taskListCreated = artifactService.artifacts.some((a) => a.id === 'tasks_artifact');
+    const walkthroughCreated = artifactService.artifacts.some((a) => a.id === 'walkthrough_artifact');
+
+    if (walkthroughCreated) {
+      currentPhase = 'VERIFIED';
+      allowedTools = ['wait'];
+    } else if (taskListCreated) {
+      currentPhase = 'IMPLEMENTING';
+      allowedTools = [
+        'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
+        'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
+        'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
+        'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
+        'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
+        'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
+        'list_terminals', 'figma_inspect', 'update_agent_memory'
+      ];
+    } else if (planCreated) {
+      currentPhase = 'PLANNING_APPROVED';
+      allowedTools = [
+        'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
+        'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
+        'run_command', 'wait', 'update_agent_memory'
+      ];
+    } else {
+      currentPhase = 'PLANNING';
+      allowedTools = [
+        'read_file', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics', 'list_dir', 'wait'
+      ];
+    }
+  }
+
+  const persistent = AgentMemoryService.getInstance().getPersistentMemoryObject();
+
+  const isIdle = taskMode === TaskMode.CONVERSATIONAL;
+  const goalValue = isIdle ? null : (currentGoal || null);
+  const executionMode = isIdle ? 'IDLE' : 'ACTIVE';
+
+  const session = {
+    mode: executionMode,
+    goal: goalValue,
+    phase: currentPhase,
+    allowedTools: allowedTools,
+    visited: verifiedFiles && verifiedFiles.size > 0
+      ? Array.from(verifiedFiles).map((f) => {
+          try {
+            return vscode.workspace.asRelativePath(f);
+          } catch {
+            return path.basename(f);
+          }
+        })
+      : [],
+    searched: searchedQueries && searchedQueries.size > 0
+      ? Array.from(searchedQueries)
+      : [],
+    completed: completedActions || [],
+    lastTool: lastToolStatus || null,
+    successCriteria: isIdle ? [] : [
+      "diagnostics clean",
+      "tests pass",
+      "requested change implemented"
+    ]
+  };
+
+  const structuredState = {
+    persistent: persistent,
+    session: session
+  };
+
+  const currentStateContext = `
+### 📊 CURRENT EXECUTION STATE (JSON):
+\`\`\`json
+${JSON.stringify(structuredState, null, 2)}
+\`\`\`
+`;
 
   const terminalContext =
     terminals.length > 0
@@ -175,7 +272,12 @@ export function buildDynamicSystemContext(
   if (activeMode === 'refactor') activeSkills.push(getRefactorSkill());
   const skillsSection = activeSkills.length > 0 ? `\n\n### TASK-SPECIFIC SKILLS:\n${activeSkills.join('\n\n')}` : '';
 
-  return `${terminalContext}${planStatusContext}${modeSection}${skillsSection}`;
+  // When the session is IDLE (greeting / no task), explicitly instruct the model not to call tools.
+  const idleGuidance = isIdle
+    ? '\n\n### 🟡 IDLE MODE:\nThe user sent a greeting or question — no engineering task is active. Respond conversationally and ask what they need. Do NOT call any tools.'  
+    : '';
+
+  return `${currentStateContext}${terminalContext}${planStatusContext}${modeSection}${skillsSection}${idleGuidance}`;
 }
 
 /**

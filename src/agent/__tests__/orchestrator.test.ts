@@ -19,17 +19,21 @@ vi.mock('fs', async (importOriginal) => {
   return {
     ...actual,
     existsSync: (p: string) => {
-      if (p.includes('file.ts')) return true;
+      const norm = p.replace(/\\/g, '/');
+      if (norm.includes('file.ts')) return true;
+      if (norm.includes('mock/workspace')) return true;
       return actual.existsSync(p);
     },
     statSync: (p: string) => {
-      if (p.includes('file.ts')) {
+      const norm = p.replace(/\\/g, '/');
+      if (norm.includes('file.ts')) {
         return { isFile: () => true } as any;
       }
       return actual.statSync(p);
     },
     readFileSync: (p: string, encoding: any) => {
-      if (p.includes('file.ts')) {
+      const norm = p.replace(/\\/g, '/');
+      if (norm.includes('file.ts')) {
         return (global as any).__mockFileContent || 'line 1\nline 2\nline 3';
       }
       return actual.readFileSync(p, encoding);
@@ -186,6 +190,35 @@ describe('Agent Orchestrator Modular Components', () => {
 
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain('not permitted in REVIEW mode');
+    });
+
+    it('should warn but allow list_dir if it targets a standard workspace directory', () => {
+      const tool = { name: 'list_dir', path: 'src' };
+      const verified = new Set<string>();
+      const messages: ChatMessage[] = [];
+      const readRangesTracker = new Map();
+      const lastSearches: string[] = [];
+
+      const result = validateControlLoopGuard(
+        tool,
+        TaskMode.IMPLEMENT,
+        'normal',
+        verified,
+        messages,
+        0,
+        5,
+        readRangesTracker,
+        lastSearches,
+        false,
+        AgentState.DISCOVERY,
+        [],
+        [],
+        ''
+      );
+
+      expect(result.allowed).toBe(true);
+      expect(result.warningsToAdd).toBeDefined();
+      expect(result.warningsToAdd?.[0]).toContain('already fully detailed in the [PROJECT STRUCTURE] map');
     });
   });
 
