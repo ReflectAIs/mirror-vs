@@ -219,34 +219,38 @@ export class EmbeddingService {
     const results: SearchResult[] = [];
 
     for (const doc of documents) {
-      let score: number;
-
-      if (queryEmbedding) {
-        const docEmbedding = await this.embedDocument(doc.filePath, doc.content);
-        score = this.cosineSimilarity(queryEmbedding, docEmbedding);
-      } else {
-        // Pure TF-IDF fallback
-        score = this._tfIdfSimilarity(query, doc.content);
-      }
-
-      // Extract relevant snippet (lines containing query terms)
-      const queryTerms = query.toLowerCase().split(/\s+/);
       const lines = doc.content.split('\n');
-      const matchingLines: string[] = [];
-      for (const line of lines) {
-        const lowerLine = line.toLowerCase();
-        if (queryTerms.some((t) => lowerLine.includes(t))) {
-          matchingLines.push(line.trim());
-          if (matchingLines.length >= 5) break;
-        }
-      }
-      const snippet = matchingLines.join('\n').substring(0, 500);
+      const chunkSize = 50;
+      const overlap = 5;
 
-      results.push({
-        filePath: doc.filePath,
-        score,
-        snippet,
-      });
+      for (let i = 0; i < lines.length; i += (chunkSize - overlap)) {
+        const chunkLines = lines.slice(i, i + chunkSize);
+        const chunkContent = chunkLines.join('\n');
+        if (!chunkContent.trim()) {
+          if (i + chunkSize >= lines.length) break;
+          continue;
+        }
+
+        let score: number;
+        const chunkKey = `${doc.filePath}#${i + 1}-${i + chunkLines.length}`;
+
+        if (queryEmbedding) {
+          const docEmbedding = await this.embedDocument(chunkKey, chunkContent);
+          score = this.cosineSimilarity(queryEmbedding, docEmbedding);
+        } else {
+          score = this._tfIdfSimilarity(query, chunkContent);
+        }
+
+        const snippet = chunkContent.substring(0, 500);
+
+        results.push({
+          filePath: `${doc.filePath} (Lines ${i + 1}-${i + chunkLines.length})`,
+          score,
+          snippet,
+        });
+
+        if (i + chunkSize >= lines.length) break;
+      }
     }
 
     // Sort by score descending

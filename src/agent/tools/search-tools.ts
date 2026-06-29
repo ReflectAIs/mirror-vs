@@ -54,6 +54,7 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
     const query = tool.query || tool.content || '';
     if (!query) throw new Error('Missing "query" attribute for semantic_search.');
 
+    const topK = parseInt(tool.top_k || (tool as any).topK || '5', 10);
     // Hybrid: try EmbeddingService first (Ollama embeddings), fallback to TF-IDF RAG
     let results: any[] = [];
     try {
@@ -80,12 +81,23 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
         }
         const embedResults = await embeddings.search(query, documents);
         if (embedResults.length > 0) {
-          results = embedResults.map((r: any) => ({
-            filePath: r.filePath,
-            content: r.snippet.substring(0, 500),
-            startLine: 1,
-            endLine: 1,
-          }));
+          results = embedResults.map((r: any) => {
+            const match = r.filePath.match(/^(.*?) \(Lines (\d+)-(\d+)\)$/);
+            if (match) {
+              return {
+                filePath: match[1],
+                content: r.snippet,
+                startLine: parseInt(match[2], 10),
+                endLine: parseInt(match[3], 10),
+              };
+            }
+            return {
+              filePath: r.filePath,
+              content: r.snippet,
+              startLine: 1,
+              endLine: 1,
+            };
+          });
         }
       }
     } catch {
@@ -98,7 +110,7 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
         const { LocalRagService } = await import('../../services/local-rag-service.js');
         const { getDependentsOfFile } = await import('./code-analysis-tools.js');
         const rag = LocalRagService.getInstance();
-        const ragResults = rag.search(query, 5);
+        const ragResults = rag.search(query, topK);
         
         // Boost semantic search relevance based on code dependency graph references
         const boosted = ragResults.map((r: any) => {
@@ -127,6 +139,8 @@ export async function executeSearchTool(tool: ToolCall): Promise<string> {
         /* ignore */
       }
     }
+
+    results = results.slice(0, topK);
 
     if (results.length === 0) {
       console.log(`[Search] No semantic results. Falling back to grep search for query: ${query}`);

@@ -3,6 +3,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.3.2] - 2025-07-18
+
+### Added
+- **Tool Result Eviction Service**: New `tool-result-eviction.ts` service that intelligently evicts low-value tool results (read_file, grep_search, semantic_search output) from the conversation history when context is tight, keeping only high-signal content like patches and errors.
+- **Git Tools Test Suite**: Comprehensive test suite for `git-tools.ts` covering diff, log, status, and commit operations.
+
+### Changed
+- **Embedding Service Chunking**: Document embedding now processes files in 50-line chunks with 5-line overlap, producing finer-grained search results with line-numbered file paths for more precise semantic retrieval.
+- **Context Compaction Threshold**: Lowered compaction trigger from 65% to 50% of context window for leaner history with earlier summarization.
+- **Default Tool Output Limit**: Reduced `maxToolOutputLength` from 20,000 to 8,000 characters to keep context in check.
+- **System Prompt Architecture**: Split the monolithic `buildSystemPrompt` into `buildStaticSystemPromptCore` (cached, rarely-changing content) and `buildDynamicSystemPrompt` (per-turn context), improving token efficiency by ~4–8K tokens per turn.
+
+### Fixed
+- **Removed Stale Architecture Constraint Lock**: Cleaned up dead code in `control-loop-guard.ts` that checked `SEARCH_SCOPE_BLOCKED` against tool paths — this logic was unused and added unnecessary warning noise.
+- **Security Hardening**: Removed `turns.txt` (conversation log with potential sensitive data) from git tracking; excluded source maps from VSIX package; added `dist/*.js.map`, `turns.txt`, and `*.js.map` to `.gitignore`/`.vscodeignore`.
+
 ## [0.3.1] - 2025-07-17
 
 ### Added

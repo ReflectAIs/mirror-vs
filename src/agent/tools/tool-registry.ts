@@ -47,6 +47,8 @@ export const ALL_REGISTERED_TOOLS = new Set([
   'git_diff',
   'git_commit',
   'git_add',
+  'git_checkpoint',
+  'git_rollback',
   'symbol_search',
   'rename_symbol',
   'analyze_project',
@@ -162,7 +164,14 @@ export async function executeTool(
   }
 
   // Git tools
-  if (name === 'git_status' || name === 'git_diff' || name === 'git_commit' || name === 'git_add') {
+  if (
+    name === 'git_status' ||
+    name === 'git_diff' ||
+    name === 'git_commit' ||
+    name === 'git_add' ||
+    name === 'git_checkpoint' ||
+    name === 'git_rollback'
+  ) {
     return await executeGitTool(tool, workspacePath);
   }
 

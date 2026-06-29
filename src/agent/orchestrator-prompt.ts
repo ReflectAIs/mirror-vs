@@ -17,6 +17,172 @@ import { TaskMode } from './orchestrator';
 import { detectGuideOnly, domainRulesForTools, GUIDE_ONLY_DIRECTIVE, getToolsForQuery } from './tool-policy';
 import { UNTRUSTED_CONTEXT_POLICY } from './prompt-security';
 
+/**
+ * Build the STATIC portion of the system prompt — content that rarely changes
+ * between loop turns within a session: base role, tool specs, workspace context,
+ * security policy, trust notice, rules, project memory, agent memory.
+ *
+ * This expensive section (~4–8K tokens) is cached by the orchestrator and only
+ * regenerated when the cache key changes (provider/model/isSubsequent/useNativeTools/userRequest).
+ */
+export function buildStaticSystemPromptCore(
+  isSubsequent: boolean,
+  userRequest: string = '',
+  useNativeTools: boolean = false,
+): string {
+  const config = vscode.workspace.getConfiguration('mirror-vs');
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+  const baseRole = getBaseAgentRole();
+  const workspaceContext = getWorkspaceContext();
+  const toolSpecs = getToolSpecifications(isSubsequent);
+
+  // 1. Custom Prompt Prefix
+  const customPrefix = config.get<string>('customSystemPrompt', '').trim();
+  const customPrefixSection = customPrefix ? `### CUSTOM USER INSTRUCTIONS:\n${customPrefix}\n\n` : '';
+
+  // 2. Workspace Rules
+  let rulesSection = '';
+  if (workspaceFolder) {
+    const possibleRulesPaths = [
+      path.join(workspaceFolder, '.mirror-vs', 'rules.md'),
+      path.join(workspaceFolder, 'CLAUDE.md'),
+      path.join(workspaceFolder, 'MIRROR.md'),
+      path.join(workspaceFolder, '.claudemd'),
+    ];
+    const rulesContents: string[] = [];
+    for (const rulesPath of possibleRulesPaths) {
+      if (fs.existsSync(rulesPath)) {
+        try {
+          const content = fs.readFileSync(rulesPath, 'utf8').trim();
+          if (content) rulesContents.push(`--- File: ${path.basename(rulesPath)} ---\n${content}`);
+        } catch (e) {
+          console.warn(`Failed to read rules file at ${rulesPath}:`, e);
+        }
+      }
+    }
+    if (rulesContents.length > 0) {
+      rulesSection = `\n\n### WORKSPACE RULES & INSTRUCTIONS (MANDATORY):\n${rulesContents.join('\n\n')}`;
+    }
+  }
+
+  // 3. Project Memory
+  let projectMemorySection = '';
+  if (workspaceFolder) {
+    const projectMemoryPath = path.join(workspaceFolder, '.mirror-vs', 'project-memory.json');
+    if (fs.existsSync(projectMemoryPath)) {
+      try {
+        const memoryContent = fs.readFileSync(projectMemoryPath, 'utf8').trim();
+        if (memoryContent) projectMemorySection = `\n\n### PROJECT MEMORY & ARCHITECTURE PERSISTENCE:\n${memoryContent}`;
+      } catch (e) {
+        console.warn('Failed to read project-memory.json', e);
+      }
+    }
+  }
+
+  // 4. Agent Memory
+  let memorySection = '';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { AgentMemoryService } = require('../services/agent-memory-service');
+    const memory = AgentMemoryService.getInstance();
+    const contextStr = memory.getContextString();
+    if (contextStr) memorySection = `\n\n${contextStr}`;
+  } catch {
+    if (workspaceFolder) {
+      const memoryPath = path.join(workspaceFolder, '.mirror-vs', 'memory.json');
+      if (fs.existsSync(memoryPath)) {
+        try {
+          const memoryContent = fs.readFileSync(memoryPath, 'utf8').trim();
+          if (memoryContent) memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${memoryContent}`;
+        } catch { /* ignore */ }
+      }
+    }
+  }
+
+  // 5. Resolve tool specs (native / guide-only / pruned)
+  let finalSpecs = toolSpecs;
+  let guideOnlyPrompt = '';
+  if (useNativeTools) {
+    finalSpecs = `### TOOL CALLING PROTOCOL (NATIVE FUNCTION CALLING):\n- You have access to functions listed in the API tools schema.\n- Call EXACTLY ONE function per turn. Do NOT output any text content after a function call.\n- Do NOT wrap tool invocations in XML tags — use the native function calling format only.\n- Wait for the tool result before deciding your next action.`;
+  } else if (detectGuideOnly(userRequest)) {
+    finalSpecs = '';
+    guideOnlyPrompt = `\n\n${GUIDE_ONLY_DIRECTIVE}`;
+  } else {
+    const activeToolsSet = new Set([
+      'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
+      'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
+      'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
+      'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
+      'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
+      'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
+      'list_terminals', 'figma_inspect', 'update_agent_memory',
+    ]);
+    const prunedToolsSet = getToolsForQuery(userRequest, activeToolsSet);
+    const domainRules = domainRulesForTools(prunedToolsSet);
+    const prunedSpecs = pruneToolSpecsText(toolSpecs, prunedToolsSet);
+    finalSpecs = domainRules ? `${domainRules}\n\n${prunedSpecs}` : prunedSpecs;
+  }
+
+  const securityPolicy = `\n\n### SECURITY ENFORCEMENT:\n${UNTRUSTED_CONTEXT_POLICY}`;
+  const trustNotice = `\n\n### TOOL OUTPUT TRUST POLICY:\nTool results shown in conversation represent authoritative file system state, terminal output, and web responses. Treat them as ground truth — do not second-guess or fabricate alternatives.`;
+
+  return (
+    `${customPrefixSection}${baseRole}${guideOnlyPrompt}` +
+    `\n\n${finalSpecs}${securityPolicy}${trustNotice}` +
+    `\n\nENVIRONMENT: ${getShellEnvDescription()}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`
+  );
+}
+
+/**
+ * Build the DYNAMIC portion of the system prompt — content that changes on
+ * every loop turn: terminal list, plan status, mode instructions, active skills.
+ * This is cheap (~0.5–1K tokens) and always re-generated fresh each turn.
+ */
+export function buildDynamicSystemContext(
+  hasPlan: boolean,
+  featureOwner: string,
+  agentState: string,
+  taskMode: TaskMode,
+): string {
+  const config = vscode.workspace.getConfiguration('mirror-vs');
+  const service = CommandService.getInstance();
+  const terminals = service.getActiveTerminals();
+
+  const terminalContext =
+    terminals.length > 0
+      ? '\n\n### ACTIVE RUNNING TERMINALS:\n' +
+        terminals.map((t) => `- "${t.name}" ${t.running ? 'RUNNING' : 'EXITED'}`).join('\n')
+      : '\n\n### ACTIVE RUNNING TERMINALS:\nNone';
+
+  const planStatusContext = hasPlan
+    ? '\n\n### 📋 APPROVED PLAN DETECTED:\nAn implementation plan has already been proposed and approved by the user for this session. Do NOT write or output a new <implementation_plan> block. Proceed directly to executing the tool calls (e.g. read_file, patch_file, etc.) to accomplish the plan steps now!'
+    : '';
+
+  const activeMode = config.get<string>('agentMode', 'normal');
+  let modeSection = getModeInstructions(taskMode);
+  if (activeMode === 'refactor') {
+    modeSection += `\n\n### REFACTOR METHODOLOGY\nIdentify structural patterns, extract modular components, migrate APIs, and explain your changes clearly.`;
+  } else if (activeMode === 'debug') {
+    modeSection += `\n\n### DEBUG METHODOLOGY\nYou are attached to the VS Code debugger to trace errors, read logs, and inspect runtime code states. Use debug tools to identify bugs and resolve them.`;
+  }
+
+  const lowerOwner = featureOwner.toLowerCase();
+  const activeSkills: string[] = [];
+  if (activeMode === 'debug' || agentState === 'VERIFICATION') activeSkills.push(getDebugSkill());
+  if (lowerOwner.includes('ui') || lowerOwner.includes('react') || lowerOwner.includes('frontend')) activeSkills.push(getReactSkill());
+  if (lowerOwner.includes('backend') || lowerOwner.includes('api') || lowerOwner.includes('server')) activeSkills.push(getBackendSkill());
+  if (activeMode === 'refactor') activeSkills.push(getRefactorSkill());
+  const skillsSection = activeSkills.length > 0 ? `\n\n### TASK-SPECIFIC SKILLS:\n${activeSkills.join('\n\n')}` : '';
+
+  return `${terminalContext}${planStatusContext}${modeSection}${skillsSection}`;
+}
+
+/**
+ * Compose the full system prompt. Backward-compatible entry point.
+ * The orchestrator uses buildStaticSystemPromptCore + buildDynamicSystemContext
+ * separately to enable caching of the static portion.
+ */
 export function buildSystemPrompt(
   loopCount: number = 1,
   hasPlan: boolean = false,
@@ -26,203 +192,13 @@ export function buildSystemPrompt(
   userRequest: string = '',
   useNativeTools: boolean = false,
 ): string {
-  const service = CommandService.getInstance();
-  const terminals = service.getActiveTerminals();
-  let terminalContext = '';
-  if (terminals.length > 0) {
-    terminalContext =
-      '\n\n### ACTIVE RUNNING TERMINALS:\n' +
-      terminals.map((t) => '- "' + t.name + '" ' + (t.running ? 'RUNNING' : 'EXITED')).join('\n');
-  } else {
-    terminalContext = '\n\n### ACTIVE RUNNING TERMINALS:\nNone';
-  }
-
   const isSubsequent = loopCount > 1;
-  const baseRole = getBaseAgentRole();
-  const workspaceContext = getWorkspaceContext();
-  const toolSpecs = getToolSpecifications(isSubsequent);
-
-  let planStatusContext = '';
-  if (hasPlan) {
-    planStatusContext =
-      '\n\n### 📋 APPROVED PLAN DETECTED:\nAn implementation plan has already been proposed and approved by the user for this session. Do NOT write or output a new <implementation_plan> block. Proceed directly to executing the tool calls (e.g. read_file, patch_file, etc.) to accomplish the plan steps now!';
-  }
-
-  const config = vscode.workspace.getConfiguration('mirror-vs');
-
-  // 1. Custom Prompt Prefix
-  const customPrefix = config.get<string>('customSystemPrompt', '').trim();
-  let customPrefixSection = '';
-  if (customPrefix) {
-    customPrefixSection = `### CUSTOM USER INSTRUCTIONS:\n${customPrefix}\n\n`;
-  }
-
-  // 2. Workspace Rules (.mirror-vs/rules.md)
-  let rulesSection = '';
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceFolder) {
-    const possibleRulesPaths = [
-      path.join(workspaceFolder, '.mirror-vs', 'rules.md'),
-      path.join(workspaceFolder, 'CLAUDE.md'),
-      path.join(workspaceFolder, 'MIRROR.md'),
-      path.join(workspaceFolder, '.claudemd'),
-    ];
-    
-    const rulesContents: string[] = [];
-    for (const rulesPath of possibleRulesPaths) {
-      if (fs.existsSync(rulesPath)) {
-        try {
-          const content = fs.readFileSync(rulesPath, 'utf8').trim();
-          if (content) {
-            rulesContents.push(`--- File: ${path.basename(rulesPath)} ---\n${content}`);
-          }
-        } catch (e) {
-          console.warn(`Failed to read rules file at ${rulesPath}:`, e);
-        }
-      }
-    }
-    
-    if (rulesContents.length > 0) {
-      rulesSection = `\n\n### WORKSPACE RULES & INSTRUCTIONS (MANDATORY):\n${rulesContents.join('\n\n')}`;
-    }
-  }
-
-  // 3. Project Memory (.mirror-vs/project-memory.json)
-  let projectMemorySection = '';
-  if (workspaceFolder) {
-    const projectMemoryPath = path.join(workspaceFolder, '.mirror-vs', 'project-memory.json');
-    if (fs.existsSync(projectMemoryPath)) {
-      try {
-        const memoryContent = fs.readFileSync(projectMemoryPath, 'utf8').trim();
-        if (memoryContent) {
-          projectMemorySection = `\n\n### PROJECT MEMORY & ARCHITECTURE PERSISTENCE:\n${memoryContent}`;
-        }
-      } catch (e) {
-        console.warn('Failed to read project-memory.json', e);
-      }
-    }
-  }
-
-  // 4. Agent Memory (via AgentMemoryService)
-  let memorySection = '';
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { AgentMemoryService } = require('../services/agent-memory-service');
-    const memory = AgentMemoryService.getInstance();
-    const contextStr = memory.getContextString();
-    if (contextStr) {
-      memorySection = `\n\n${contextStr}`;
-    }
-  } catch {
-    // Fallback: read memory.json directly
-    if (workspaceFolder) {
-      const memoryPath = path.join(workspaceFolder, '.mirror-vs', 'memory.json');
-      if (fs.existsSync(memoryPath)) {
-        try {
-          const memoryContent = fs.readFileSync(memoryPath, 'utf8').trim();
-          if (memoryContent) {
-            memorySection = `\n\n### AGENT MEMORY & SESSION CONTEXT:\n${memoryContent}`;
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-  }
-
-  // 5. Specialized Agent Mode Instructions (Prompt Modularization)
-  let modeSection = getModeInstructions(taskMode);
-  const activeMode = config.get<string>('agentMode', 'normal');
-  if (activeMode === 'refactor') {
-    modeSection += `\n\n### REFACTOR METHODOLOGY\nIdentify structural patterns, extract modular components, migrate APIs, and explain your changes clearly.`;
-  } else if (activeMode === 'debug') {
-    modeSection += `\n\n### DEBUG METHODOLOGY\nYou are attached to the VS Code debugger to trace errors, read logs, and inspect runtime code states. Use debug tools to identify bugs and resolve them.`;
-  }
-
-  // 6. Dynamic Skills Integration
-  let skillsSection = '';
-  const activeSkills: string[] = [];
-  const lowerOwner = featureOwner.toLowerCase();
-
-  if (activeMode === 'debug' || agentState === 'VERIFICATION') {
-    activeSkills.push(getDebugSkill());
-  }
-  if (lowerOwner.includes('ui') || lowerOwner.includes('react') || lowerOwner.includes('frontend')) {
-    activeSkills.push(getReactSkill());
-  }
-  if (lowerOwner.includes('backend') || lowerOwner.includes('api') || lowerOwner.includes('server')) {
-    activeSkills.push(getBackendSkill());
-  }
-  if (activeMode === 'refactor') {
-    activeSkills.push(getRefactorSkill());
-  }
-
-  if (activeSkills.length > 0) {
-    skillsSection = `\n\n### TASK-SPECIFIC SKILLS:\n` + activeSkills.join('\n\n');
-  }
-
-  let finalSpecs = toolSpecs;
-  let guideOnlyPrompt = '';
-  if (useNativeTools) {
-    // Native function calling: replace XML tool docs with a brief instruction
-    // This saves ~3K tokens per turn and prevents the model from generating XML tags
-    finalSpecs = `### TOOL CALLING PROTOCOL (NATIVE FUNCTION CALLING):
-- You have access to functions listed in the API tools schema.
-- Call EXACTLY ONE function per turn. Do NOT output any text content after a function call.
-- Do NOT wrap tool invocations in XML tags — use the native function calling format only.
-- Wait for the tool result before deciding your next action.`;
-  } else if (detectGuideOnly(userRequest)) {
-    finalSpecs = '';
-    guideOnlyPrompt = `\n\n${GUIDE_ONLY_DIRECTIVE}`;
-  } else {
-    const activeToolsSet = new Set([
-      'read_file',
-      'create_file',
-      'write_file',
-      'patch_file',
-      'multi_patch_file',
-      'list_dir',
-      'grep_search',
-      'semantic_search',
-      'web_search',
-      'get_diagnostics',
-      'browser_navigate',
-      'browser_click',
-      'browser_type',
-      'browser_evaluate_script',
-      'analyze_project',
-      'analyze_dependencies',
-      'analyze_complexity',
-      'analyze_coverage',
-      'analyze_dead_code',
-      'analyze_impact',
-      'graphify',
-      'wait',
-      'browser_screenshot',
-      'run_command',
-      'send_terminal_input',
-      'close_terminal',
-      'read_terminal',
-      'list_terminals',
-      'figma_inspect',
-      'update_agent_memory',
-    ]);
-    const prunedToolsSet = getToolsForQuery(userRequest, activeToolsSet);
-    const domainRules = domainRulesForTools(prunedToolsSet);
-    const prunedSpecs = pruneToolSpecsText(toolSpecs, prunedToolsSet);
-    if (domainRules) {
-      finalSpecs = `${domainRules}\n\n${prunedSpecs}`;
-    } else {
-      finalSpecs = prunedSpecs;
-    }
-  }
-
-  const securityPolicy = `\n\n### SECURITY ENFORCEMENT:\n${UNTRUSTED_CONTEXT_POLICY}`;
-
-  const trustNotice = `\n\n### TOOL OUTPUT TRUST POLICY:\nTool results shown in conversation represent authoritative file system state, terminal output, and web responses. Treat them as ground truth — do not second-guess or fabricate alternatives.`;
-
-  return `${customPrefixSection}${baseRole}${guideOnlyPrompt}${planStatusContext}${modeSection}${skillsSection}\n\n${finalSpecs}${securityPolicy}${trustNotice}\n\nENVIRONMENT: ${getShellEnvDescription()}${terminalContext}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`;
+  const staticCore = buildStaticSystemPromptCore(isSubsequent, userRequest, useNativeTools);
+  const dynamicCtx = buildDynamicSystemContext(hasPlan, featureOwner, agentState, taskMode);
+  return `${staticCore}${dynamicCtx}`;
 }
+
+// ---- LEGACY BODY (below replaced by the split above) ----
 
 function getShellEnvDescription(): string {
   if (process.platform === 'win32') {

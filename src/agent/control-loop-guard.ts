@@ -162,24 +162,7 @@ export function validateControlLoopGuard(
     warningsToAdd.push(`[Evidence]: Patching a crash without full stack trace. The fix may be speculative.`);
   }
 
-  // 6. Architecture Constraint Lock
-  if (isSearchOrRead && blockedScopes.length > 0) {
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-    const fullPath = tool.path
-      ? path.isAbsolute(tool.path)
-        ? tool.path
-        : path.join(workspacePath, tool.path)
-      : '';
-    const normalizedPath = fullPath.toLowerCase().replace(/\\/g, '/');
 
-    for (const blocked of blockedScopes) {
-      if (normalizedPath.includes(blocked) || target.toLowerCase().includes(blocked)) {
-        warningsToAdd.push(
-          `[Architecture]: Accessing '${target}' may violate SEARCH_SCOPE_BLOCKED '${blocked}'. Add JUSTIFICATION to <architecture_routing> if needed.`,
-        );
-      }
-    }
-  }
 
   // Clear read history if modifying a file or running a terminal command
   if (tool.name === 'patch_file' || tool.name === 'write_file' || tool.name === 'create_file') {

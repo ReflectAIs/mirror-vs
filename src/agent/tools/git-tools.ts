@@ -238,6 +238,35 @@ export async function executeGitTool(tool: ToolCall, workspacePath?: string): Pr
       }
     }
 
+    case 'git_checkpoint': {
+      try {
+        execFileSync('git', ['add', '-A'], { cwd: ws, encoding: 'utf8' });
+        const timestamp = Date.now();
+        const commitMsg = `mirror-checkpoint-${timestamp}`;
+        execFileSync('git', ['commit', '--allow-empty', '-m', commitMsg], { cwd: ws, encoding: 'utf8' });
+        const hash = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ws, encoding: 'utf8' }).trim();
+        return `✅ Checkpoint created successfully.\nCheckpoint ID: ${hash}\nUse <git_rollback checkpoint_id="${hash}" /> to revert to this state.`;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return `Error creating git checkpoint: ${msg}`;
+      }
+    }
+
+    case 'git_rollback': {
+      const checkpointId = tool.checkpoint_id || (tool as any).checkpointId || tool.query || '';
+      if (!checkpointId) {
+        return `Error: Missing "checkpoint_id" parameter for git_rollback.`;
+      }
+      try {
+        execFileSync('git', ['reset', '--hard', checkpointId], { cwd: ws, encoding: 'utf8' });
+        execFileSync('git', ['clean', '-fd'], { cwd: ws, encoding: 'utf8' });
+        return `✅ Workspace rolled back successfully to checkpoint: ${checkpointId}.`;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return `Error performing git rollback: ${msg}`;
+      }
+    }
+
     default:
       return `Error: Unknown git tool: ${tool.name}`;
   }

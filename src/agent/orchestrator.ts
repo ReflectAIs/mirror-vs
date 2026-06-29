@@ -13,10 +13,13 @@ import * as path from 'path';
 import { getModelContextWindow } from './orchestrator-config';
 import {
   buildSystemPrompt,
+  buildStaticSystemPromptCore,
+  buildDynamicSystemContext,
   hasDeclaredPlan,
   hasActionPlanningIntent,
   getDiagnosticsForFile,
 } from './orchestrator-prompt';
+import { evictStaleToolResults } from '../services/tool-result-eviction';
 import { ArtifactService } from '../services/artifact-service';
 import { getToolSchemas, supportsNativeToolCalling } from './tool-schemas';
 import { NativeToolCallParser } from './native-tool-call-parser';
@@ -84,6 +87,14 @@ export class AgentOrchestrator {
 
   private _activeMessages: ChatMessage[] | undefined;
   private readonly _sentFiles = new Map<string, { hash: string; content: string }>();
+
+  // Context reduction: read_file dedup cache
+  // key = file path  →  { hash of last-returned result, loop turn number }
+  private readonly _readFileCache = new Map<string, { hash: string; turn: number }>();
+
+  // Context reduction: system prompt static-core cache
+  private _systemPromptCache: string | null = null;
+  private _systemPromptCacheKey: string = '';
 
   // Runtime instances
   private readonly _stateGraph = new StateGraph();
@@ -419,23 +430,91 @@ export class AgentOrchestrator {
         if (tnMatch) terminalName = tnMatch[1];
       }
 
+      // Strategy 5: read_file deduplication
+      // If the model reads the same file twice and the content is unchanged, return a compact
+      // placeholder instead of the full content again — avoids duplicate KB-size entries in history.
+      // The placeholder contains exact re-read instructions as the model's "way out".
+      if (tool.name === 'read_file' && tool.path) {
+        const resultHash = crypto.createHash('md5').update(result).digest('hex').substring(0, 12);
+        const cached = this._readFileCache.get(tool.path);
+        if (cached && cached.hash === resultHash) {
+          result =
+            `[File: ${tool.path} — content identical to earlier read this session ` +
+            `(hash: ${resultHash}). The full content is already in your context above. ` +
+            `Re-read with <read_file path="${tool.path}" /> or a specific range ` +
+            `<read_file path="${tool.path}" start_line="N" end_line="M" /> if it has scrolled out of view.]`;
+          console.log(`[ReadFileDedup] Returning compact placeholder for ${tool.path} (unchanged, hash ${resultHash})`);
+        } else {
+          // New content or first read — update cache
+          this._readFileCache.set(tool.path, { hash: resultHash, turn: readRangesTracker.size });
+        }
+      }
+
+      // Invalidate read_file dedup cache for edited files so the next read always returns fresh content
+      if (
+        (tool.name === 'patch_file' || tool.name === 'multi_patch_file' ||
+         tool.name === 'write_file' || tool.name === 'create_file') &&
+        tool.path
+      ) {
+        if (this._readFileCache.has(tool.path)) {
+          this._readFileCache.delete(tool.path);
+          console.log(`[ReadFileDedup] Cache invalidated for ${tool.path} after write/patch`);
+        }
+      }
+
       let displayResult = result;
       if (tool.name === 'browser_screenshot') {
         const match = result.match(/\(Base64 data hidden from output but sent to vision model:\s*([^)]+)\)/);
         if (match) displayResult = result.replace(match[0], '(Image captured)');
       } else {
-        const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
-        const truncateThreshold = maxToolOutputLength;
+        // Per-tool output limits — read_file gets more budget (needs full context),
+        // run_command / browser ops get less (usually just status / errors matter).
+        const defaultMax = config.get<number>('maxToolOutputLength', 8000);
+        const toolOutputLimits: Record<string, number> = {
+          read_file:               Math.min(defaultMax * 2, 20000),  // needs full content for patching
+          grep_search:             Math.min(defaultMax, 6000),
+          semantic_search:         Math.min(defaultMax, 5000),
+          web_search:              Math.min(defaultMax, 5000),
+          list_dir:                Math.min(defaultMax, 3000),
+          run_command:             Math.min(defaultMax, 4000),
+          browser_evaluate_script: Math.min(defaultMax, 3000),
+          browser_navigate:        Math.min(defaultMax, 2000),
+          read_terminal:           Math.min(defaultMax, 3000),
+          get_diagnostics:         Math.min(defaultMax, 5000),
+        };
+        const truncateThreshold = toolOutputLimits[tool.name] ?? defaultMax;
 
         if (result.length > truncateThreshold) {
-          const keep = Math.floor(truncateThreshold / 2);
-          const truncated = result.length - truncateThreshold;
+          // Keep 70% from start (most important context), 30% from tail (end state)
+          const keep = Math.floor(truncateThreshold * 0.7);
+          const tail = Math.max(200, truncateThreshold - keep);
+          const truncatedChars = result.length - keep - tail;
+
+          // Build a helpful recovery hint so the model always has a way out
+          const recoveryHint = (() => {
+            const p = tool.path || tool.file || tool.target || tool.url || '';
+            switch (tool.name) {
+              case 'read_file':
+                return p
+                  ? ` Use <read_file path="${p}" start_line="N" end_line="M" /> to read specific line ranges.`
+                  : ' Use read_file with start_line/end_line to read specific sections.';
+              case 'grep_search':
+                return ' Narrow with a more specific path/query or use start_line/end_line on matched files.';
+              case 'run_command':
+                return ' Run a more targeted command or pipe output through head/tail/grep.';
+              case 'web_search':
+                return ' Re-run with a more specific query, or use browser_navigate to read the page directly.';
+              case 'list_dir':
+                return p ? ` Re-list a subdirectory: <list_dir path="${p}/subdir" />.` : '';
+              default:
+                return ' Re-run the tool with a more targeted query if needed.';
+            }
+          })();
+
           displayResult =
-            result.substring(0, keep) +
-            ' [TRUNCATED ' +
-            truncated +
-            ' CHARS] ' +
-            result.substring(result.length - keep);
+            result.substring(0, keep).trimEnd() +
+            `\n\n[... ${truncatedChars} characters omitted to save context.${recoveryHint}]\n\n` +
+            result.substring(result.length - tail).trimStart();
         }
       }
 
@@ -1000,6 +1079,51 @@ export class AgentOrchestrator {
           activeMessages = sanitizeToolMessages(keptMessages);
           this._activeMessages = activeMessages;
 
+          // Strategy 1: Evict stale, re-readable tool results to keep history lean.
+          // Target 60% of effectiveBudget, leaving headroom for the system prompt (~5K) and response.
+          // Each eviction leaves a placeholder with exact re-run instructions (the model's "way out").
+          const historyEvictionCap = Math.floor(effectiveBudget * 0.60);
+          const evictionResult = evictStaleToolResults(activeMessages, historyEvictionCap);
+          if (evictionResult.evictedCount > 0) {
+            console.log(
+              `[ToolEviction] Evicted ${evictionResult.evictedCount} tool results, ` +
+              `saved ~${Math.round(evictionResult.savedTokens / 1000)}K tokens (history was over ${Math.round(historyEvictionCap / 1000)}K cap)`,
+            );
+            activeMessages = evictionResult.messages;
+            this._activeMessages = activeMessages;
+          }
+
+          // Strategy 4: Auto-prune project structure map after turn 3.
+          // By then the model has already oriented itself; it can call <analyze_project /> to get it again.
+          if (loopCount > 3) {
+            let projectMapPruned = false;
+            activeMessages = activeMessages.map((msg) => {
+              if (
+                msg.role === 'system' &&
+                typeof msg.content === 'string' &&
+                msg.content.includes('[PROJECT STRUCTURE]') &&
+                !msg.summarized
+              ) {
+                projectMapPruned = true;
+                return {
+                  ...msg,
+                  summarized: true,
+                  content:
+                    msg.content +
+                    '\n[Project map excluded from context after turn 3. Re-run <analyze_project /> or <graphify /> to restore.]',
+                };
+              }
+              return msg;
+            });
+            if (projectMapPruned) {
+              this._activeMessages = activeMessages;
+              console.log('[ProjectMapPrune] Project structure map marked summarized after turn 3.');
+            }
+          }
+
+          // Recompute usedTokens after evictions
+          usedTokens = estimateTokens(activeMessages);
+
           this._postMessage({
             type: 'contextUsage',
             usedTokens: usedTokens,
@@ -1038,15 +1162,28 @@ export class AgentOrchestrator {
             ? `\n\n### ⚙️ RUNNING JOBS:\n` + activeJobs.map(j => `- Job [${j.id}]: ${j.name} (${j.status})`).join('\n')
             : '';
 
-          const systemPromptContent = buildSystemPrompt(
-            loopCount,
-            hasDeclaredPlan(activeMessages, ''),
-            featureOwner,
-            agentState,
-            taskMode,
-            text || '',
-            useNativeTools,
-          ) + `\n\n### 🎯 RUNTIME CONTEXT:\n${activeTaskPrompt}${loopWarningPrompt}${jobsPrompt}`;
+          // Strategy 2: System prompt caching.
+          // The static core (base role, tool specs, workspace context, rules, memory) is ~4–8K tokens
+          // and does not change between loop turns within the same session unless key inputs change.
+          // We cache it and only rebuild on cache miss — saving those tokens every subsequent turn.
+          const isSubsequentForPrompt = loopCount > 1;
+          const hasPlanNow = hasDeclaredPlan(activeMessages, '');
+          const staticCacheKey = [
+            provider, currentModel, String(isSubsequentForPrompt), String(useNativeTools), text || '',
+          ].join('||');
+
+          if (!this._systemPromptCache || this._systemPromptCacheKey !== staticCacheKey) {
+            this._systemPromptCache = buildStaticSystemPromptCore(isSubsequentForPrompt, text || '', useNativeTools);
+            this._systemPromptCacheKey = staticCacheKey;
+            console.log('[PromptCache] Static system prompt rebuilt (cache miss).');
+          } else {
+            console.log('[PromptCache] Static system prompt cache hit — reusing (~' +
+              Math.round(estimateTokens([{ role: 'system', content: this._systemPromptCache }]) / 1000) + 'K tokens saved).');
+          }
+
+          const dynamicCtx = buildDynamicSystemContext(hasPlanNow, featureOwner, agentState, taskMode);
+          const runtimeCtx = `\n\n### 🎯 RUNTIME CONTEXT:\n${activeTaskPrompt}${loopWarningPrompt}${jobsPrompt}`;
+          const systemPromptContent = this._systemPromptCache + dynamicCtx + runtimeCtx;
 
           const payload: ChatMessage[] = [
             {

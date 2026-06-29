@@ -22,10 +22,14 @@ Available tools:
 - update_agent_memory: <update_agent_memory key="..." value="..." />
 - delete_file: <delete_file path="..." />
 - rename_file: <rename_file from="..." to="..." />
+- git_checkpoint: <git_checkpoint />
+- git_rollback: <git_rollback checkpoint_id="..." />
 - create_artifact: <create_artifact type="html|svg|mermaid|code|markdown" title="..." [id="..."] [language="..."]>content</create_artifact>
 - search_chat_history: <search_chat_history query="..." [limit="..."] />
+- semantic_search: <semantic_search query="..." [top_k="5"] />
 
 CRITICAL subsequent turn rule:
+- STRICTLY NO CONVERSATION: Do NOT output any conversational text, explanations, justifications, preambles, or comments. Output ONLY the tool XML tag. Do not explain what you are doing, do not summarize previous outputs. Go straight to the tool call.
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
 - If you have read/grep'd enough files to propose a fix, write the <patch_file> or <multi_patch_file> immediately!
 - Use search_chat_history if you need to look up error traces, files, or decisions from earlier in the chat session that have been pruned from your active context.
@@ -98,8 +102,8 @@ CRITICAL subsequent turn rule:
 6. GREP SEARCH (full workspace): <grep_search query="pattern" />
    GREP SEARCH (scoped to directory): <grep_search query="pattern" path="src/screens" />
    **Best practice**: Always scope with \`path\` when you know the relevant area.
-7. SEMANTIC SEARCH (RAG): <semantic_search query="concept or keywords" />
-   Use this to search the workspace semantically for related context or code concepts.
+7. SEMANTIC SEARCH (RAG): <semantic_search query="concept or keywords" [top_k="5"] />
+   Use this to search the workspace semantically for related context or code concepts at a code-chunk level. Optional top_k specifies how many results to return.
 8. WEB SEARCH: <web_search query="pattern" />
 9. GET DIAGNOSTICS (all errors/warnings): <get_diagnostics />
    GET DIAGNOSTICS (scoped): <get_diagnostics path="src/screens" />
@@ -139,6 +143,12 @@ CRITICAL subsequent turn rule:
 28. SEARCH CHAT HISTORY:
     <search_chat_history query="keyword or phrase" [limit="5"] />
     Search the current session's chat history (including system instructions, user queries, assistant replies, tool calls, and tool results) for a keyword or phrase. Useful to recall details (like error traces or files) that have been pruned from your active context.
+29. GIT CHECKPOINT:
+    <git_checkpoint />
+    Create a temporary Git commit checkpoint of the workspace state. Returns the commit hash/ID.
+30. GIT ROLLBACK:
+    <git_rollback checkpoint_id="..." />
+    Rollback the workspace state hard to a previously created Git checkpoint ID, discarding unstaged modifications.
 
 `;
 }

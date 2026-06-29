@@ -1,7 +1,7 @@
 import { estimateTokens } from './model-context';
 import { ChatMessage } from '../types';
 
-export const COMPACT_THRESHOLD = 0.65; // Trigger compaction at 65% of context window
+export const COMPACT_THRESHOLD = 0.50; // Trigger compaction at 50% of context window (earlier = leaner history)
 export const SUMMARY_MAX_TOKENS = 1024;
 
 // Cursor-style self-summarization prompt — produces structured, dense summaries

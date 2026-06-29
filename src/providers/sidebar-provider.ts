@@ -1377,7 +1377,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const aiReviewEnabled = config.get<boolean>('aiReviewEnabled', false);
     const multiFileRefactorEnabled = config.get<boolean>('multiFileRefactorEnabled', true);
     const maxTurnsBeforeSummarize = config.get<number>('maxTurnsBeforeSummarize', 16);
-    const maxToolOutputLength = config.get<number>('maxToolOutputLength', 20000);
+    const maxToolOutputLength = config.get<number>('maxToolOutputLength', 8000);
     const embeddingModel = config.get<string>('embeddingModel', 'nomic-embed-text');
     const teacherEnabled = config.get<boolean>('teacherEnabled', false);
     const teacherModel = config.get<string>('teacherModel', 'deepseek-v4-pro');
