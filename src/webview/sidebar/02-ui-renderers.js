@@ -555,6 +555,7 @@
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const browserToolsEnabled = browserToolsToggle ? browserToolsToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 8000;
     const maxProjectMapLinesInput = document.getElementById('max-project-map-lines-input');
@@ -593,6 +594,7 @@
       enableTruncationGuardrail: truncationGuard,
       aiReviewEnabled,
       multiFileRefactorEnabled: multiFileRefactor,
+      browserToolsEnabled,
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
@@ -821,6 +823,7 @@
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const browserToolsEnabled = browserToolsToggle ? browserToolsToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
@@ -864,6 +867,7 @@
       enableTruncationGuardrail: truncationGuard,
       aiReviewEnabled,
       multiFileRefactorEnabled: multiFileRefactor,
+      browserToolsEnabled,
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,

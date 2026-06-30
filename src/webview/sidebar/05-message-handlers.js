@@ -394,6 +394,9 @@
         if (s.multiFileRefactorEnabled !== undefined && multiFileToggle) {
           multiFileToggle.checked = s.multiFileRefactorEnabled;
         }
+        if (s.browserToolsEnabled !== undefined && browserToolsToggle) {
+          browserToolsToggle.checked = s.browserToolsEnabled;
+        }
         if (s.maxTurnsBeforeSummarize !== undefined && maxTurnsSummarizeInput) {
           maxTurnsSummarizeInput.value = s.maxTurnsBeforeSummarize;
         }
@@ -787,6 +790,7 @@
             placeCardInPlaceholder(card, toolName, target, contentContainer);
           }
         }
+        updateStickyUserMessage();
         scrollChatToBottom();
         break;
       }

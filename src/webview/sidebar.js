@@ -41,6 +41,7 @@
   const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');
   const aiReviewToggle = document.getElementById('settings-ai-review-toggle');
   const multiFileToggle = document.getElementById('settings-multi-file-toggle');
+  const browserToolsToggle = document.getElementById('settings-browser-tools-toggle');
   const maxTurnsSummarizeInput = document.getElementById('max-turns-summarize-input');
   const maxToolOutputInput = document.getElementById('max-tool-output-input');
   const embeddingModelInput = document.getElementById('embedding-model-input');
@@ -339,6 +340,7 @@
     // Build user display message — text already contains [filepath] markers inline from autocomplete
     let displayMsg = userDisplayMessage || text;
     appendMessageBubble('user', displayMsg, images);
+    updateStickyUserMessage();
     scrollChatToBottom(true);
 
     const assistantBubble = appendMessageBubble('assistant', '');
@@ -1057,6 +1059,7 @@
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const browserToolsEnabled = browserToolsToggle ? browserToolsToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 8000;
     const maxProjectMapLinesInput = document.getElementById('max-project-map-lines-input');
@@ -1095,6 +1098,7 @@
       enableTruncationGuardrail: truncationGuard,
       aiReviewEnabled,
       multiFileRefactorEnabled: multiFileRefactor,
+      browserToolsEnabled,
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
@@ -1323,6 +1327,7 @@
     const truncationGuard = truncationGuardToggle ? truncationGuardToggle.checked : true;
     const aiReviewEnabled = aiReviewToggle ? aiReviewToggle.checked : false;
     const multiFileRefactor = multiFileToggle ? multiFileToggle.checked : true;
+    const browserToolsEnabled = browserToolsToggle ? browserToolsToggle.checked : true;
     const maxTurnsBeforeSummarize = maxTurnsSummarizeInput ? parseInt(maxTurnsSummarizeInput.value.trim(), 10) : 16;
     const maxToolOutputLength = maxToolOutputInput ? parseInt(maxToolOutputInput.value.trim(), 10) : 20000;
     const embeddingModel = embeddingModelInput ? embeddingModelInput.value.trim() : 'nomic-embed-text';
@@ -1366,6 +1371,7 @@
       enableTruncationGuardrail: truncationGuard,
       aiReviewEnabled,
       multiFileRefactorEnabled: multiFileRefactor,
+      browserToolsEnabled,
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,
@@ -3335,6 +3341,9 @@
         if (s.multiFileRefactorEnabled !== undefined && multiFileToggle) {
           multiFileToggle.checked = s.multiFileRefactorEnabled;
         }
+        if (s.browserToolsEnabled !== undefined && browserToolsToggle) {
+          browserToolsToggle.checked = s.browserToolsEnabled;
+        }
         if (s.maxTurnsBeforeSummarize !== undefined && maxTurnsSummarizeInput) {
           maxTurnsSummarizeInput.value = s.maxTurnsBeforeSummarize;
         }
@@ -3728,6 +3737,7 @@
             placeCardInPlaceholder(card, toolName, target, contentContainer);
           }
         }
+        updateStickyUserMessage();
         scrollChatToBottom();
         break;
       }

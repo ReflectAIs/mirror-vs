@@ -41,6 +41,7 @@
   const truncationGuardToggle = document.getElementById('settings-truncation-guard-toggle');
   const aiReviewToggle = document.getElementById('settings-ai-review-toggle');
   const multiFileToggle = document.getElementById('settings-multi-file-toggle');
+  const browserToolsToggle = document.getElementById('settings-browser-tools-toggle');
   const maxTurnsSummarizeInput = document.getElementById('max-turns-summarize-input');
   const maxToolOutputInput = document.getElementById('max-tool-output-input');
   const embeddingModelInput = document.getElementById('embedding-model-input');
@@ -339,6 +340,7 @@
     // Build user display message — text already contains [filepath] markers inline from autocomplete
     let displayMsg = userDisplayMessage || text;
     appendMessageBubble('user', displayMsg, images);
+    updateStickyUserMessage();
     scrollChatToBottom(true);
 
     const assistantBubble = appendMessageBubble('assistant', '');

@@ -371,6 +371,11 @@
           "default": false,
           "description": "When enabled, Mirror VS will automatically perform browser navigate, click, type, and execute script actions without prompting you for manual approval."
         },
+        "mirror-vs.browserToolsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, the assistant has access to the embedded browser tools (navigate, click, type, screenshot, execute script)."
+        },
         "mirror-vs.embeddingSearchMinScore": {
           "type": "number",
           "default": 0.3,

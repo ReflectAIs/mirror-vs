@@ -66,6 +66,7 @@ export interface ExtensionSettings {
   skillsEnabled?: boolean;
   maxSkillsToKeep?: number;
   maxProjectMapLines?: number;
+  browserToolsEnabled?: boolean;
 }
 
 export interface ChatMessage {
@@ -147,6 +148,7 @@ export type WebviewToExtensionMessage =
       agentInputTokenHardMax?: number;
       skillsEnabled?: boolean;
       maxSkillsToKeep?: number;
+      browserToolsEnabled?: boolean;
     }
   | { type: 'fetchModels' }
   | { type: 'validateHost'; host: string }

@@ -400,6 +400,9 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
               if ((data as any).autoApproveBrowser !== undefined) {
                 await config.update('autoApproveBrowser', (data as any).autoApproveBrowser, vscode.ConfigurationTarget.Global);
               }
+              if ((data as any).browserToolsEnabled !== undefined) {
+                await config.update('browserToolsEnabled', (data as any).browserToolsEnabled, vscode.ConfigurationTarget.Global);
+              }
               if ((data as any).planFirst !== undefined) {
                 await config.update('planFirst', (data as any).planFirst, vscode.ConfigurationTarget.Global);
               }
@@ -1376,6 +1379,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
     const enableTruncationGuardrail = config.get<boolean>('enableTruncationGuardrail', true);
     const aiReviewEnabled = config.get<boolean>('aiReviewEnabled', false);
     const multiFileRefactorEnabled = config.get<boolean>('multiFileRefactorEnabled', true);
+    const browserToolsEnabled = config.get<boolean>('browserToolsEnabled', true);
     const maxTurnsBeforeSummarize = config.get<number>('maxTurnsBeforeSummarize', 16);
     const maxToolOutputLength = config.get<number>('maxToolOutputLength', 8000);
     const embeddingModel = config.get<string>('embeddingModel', 'nomic-embed-text');
@@ -1408,6 +1412,7 @@ export class MirrorVsSidebarProvider implements vscode.WebviewViewProvider {
       enableTruncationGuardrail,
       aiReviewEnabled,
       multiFileRefactorEnabled,
+      browserToolsEnabled,
       maxTurnsBeforeSummarize,
       maxToolOutputLength,
       embeddingModel,

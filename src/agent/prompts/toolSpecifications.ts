@@ -1,4 +1,14 @@
+import * as vscode from 'vscode';
+
 export function getToolSpecifications(isSubsequentTurn: boolean = false): string {
+  let browserEnabled = true;
+  try {
+    const config = vscode.workspace.getConfiguration('mirror-vs');
+    browserEnabled = config.get<boolean>('browserToolsEnabled', true);
+  } catch {
+    browserEnabled = true;
+  }
+
   if (isSubsequentTurn) {
     return `
 ### 🛠️ QUICK TOOL CHEATSHEET (Subsequent Turn)
@@ -14,8 +24,7 @@ Available tools:
 - semantic_search: <semantic_search query="..." />
 - web_search: <web_search query="..." />
 - get_diagnostics: <get_diagnostics [path="..."] />
-- browser_navigate / browser_click / browser_type / browser_screenshot / browser_evaluate_script
-- run_command: <run_command command="..." />
+${browserEnabled ? `- browser_navigate / browser_click / browser_type / browser_screenshot / browser_evaluate_script\n` : ''}- run_command: <run_command command="..." />
 - list_terminals / read_terminal / send_terminal_input / close_terminal
 - figma_inspect: <figma_inspect url="..." />
 - wait: <wait [ms="..."] [seconds="..."] />
@@ -107,11 +116,10 @@ CRITICAL subsequent turn rule:
 8. WEB SEARCH: <web_search query="pattern" />
 9. GET DIAGNOSTICS (all errors/warnings): <get_diagnostics />
    GET DIAGNOSTICS (scoped): <get_diagnostics path="src/screens" />
-10. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
+${browserEnabled ? `10. BROWSER NAVIGATE: <browser_navigate url="http://localhost:3000" />
 11. BROWSER CLICK: <browser_click selector="#my-button" />
 12. BROWSER TYPE: <browser_type selector="#search-input" text="hello world" />
-13. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />
-14. CODEBASE ANALYSIS:
+13. BROWSER EVALUATE SCRIPT: <browser_evaluate_script script="..." />\n` : ''}14. CODEBASE ANALYSIS:
     <analyze_project /> (Overview)
     <analyze_dependencies /> (Import graph)
     <analyze_complexity /> (Complexity)
@@ -120,8 +128,7 @@ CRITICAL subsequent turn rule:
     <analyze_impact path="src/file.ts" /> (Impact analysis)
     <graphify /> (Module index: per-file description, exports & import chains — use when you need to understand what each file does and how they connect)
 15. WAIT: <wait ms="3000" />
-16. BROWSER SCREENSHOT: <browser_screenshot />
-17. RUN COMMAND: <run_command command="npm install" />
+${browserEnabled ? `16. BROWSER SCREENSHOT: <browser_screenshot />\n` : ''}17. RUN COMMAND: <run_command command="npm install" />
 18. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
 19. CLOSE TERMINAL: <close_terminal terminal_name="..." />
 20. READ TERMINAL: <read_terminal terminal_name="..." />

@@ -1223,7 +1223,18 @@ export class AgentOrchestrator {
           continueLoop = false;
 
           const useNativeTools = supportsNativeToolCalling(provider, currentModel);
-          const toolSchemas = useNativeTools ? getToolSchemas() : undefined;
+          const browserEnabled = config.get<boolean>('browserToolsEnabled', true);
+          const excludedTools: string[] = [];
+          if (!browserEnabled) {
+            excludedTools.push(
+              'browser_navigate',
+              'browser_click',
+              'browser_type',
+              'browser_evaluate_script',
+              'browser_screenshot'
+            );
+          }
+          const toolSchemas = useNativeTools ? getToolSchemas(excludedTools) : undefined;
 
           const resolvedPayloadPromises = activeMessages
             .filter((msg) => !msg.summarized)

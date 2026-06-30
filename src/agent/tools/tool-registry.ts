@@ -137,6 +137,15 @@ export async function executeTool(
     name === 'browser_evaluate_script' ||
     name === 'browser_screenshot'
   ) {
+    let browserEnabled = true;
+    try {
+      browserEnabled = require('vscode').workspace.getConfiguration('mirror-vs').get('browserToolsEnabled', true);
+    } catch {
+      browserEnabled = true;
+    }
+    if (!browserEnabled) {
+      throw new Error(`Tool "${name}" is disabled by configuration (mirror-vs.browserToolsEnabled is false).`);
+    }
     return await executeBrowserTool(tool, getSafePath);
   }
 
