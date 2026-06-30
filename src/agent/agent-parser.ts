@@ -299,12 +299,31 @@ export class AgentParser {
   }
 
   private attr(attrs: string, name: string): string | null {
+    // 1. Straight double quotes
     const dqName = name + '\\s*=\\s*"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"';
     const dq = new RegExp(dqName, 'i').exec(attrs);
     if (dq) return dq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+
+    // 2. Straight single quotes
     const sqName = name + "\\s*=\\s*'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'";
     const sq = new RegExp(sqName, 'i').exec(attrs);
     if (sq) return sq[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+
+    // 3. Curly double quotes
+    const cdqName = name + '\\s*=\\s*[“"]([^“”"\\\\]*(?:\\\\.[^“”"\\\\]*)*)[”"]';
+    const cdq = new RegExp(cdqName, 'i').exec(attrs);
+    if (cdq) return cdq[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+
+    // 4. Curly single quotes
+    const csqName = name + '\\s*=\\s*[‘\']([^‘’\'\\\\]*(?:\\\\.[^‘’\'\\\\]*)*)[’\']';
+    const csq = new RegExp(csqName, 'i').exec(attrs);
+    if (csq) return csq[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+
+    // 5. Unquoted fallback
+    const simpleName = name + '\\s*=\\s*([^\\s>]+)';
+    const simple = new RegExp(simpleName, 'i').exec(attrs);
+    if (simple) return simple[1];
+
     return null;
   }
 

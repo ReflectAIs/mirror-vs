@@ -2,6 +2,18 @@
   let currentTurnTimerInterval = null;
   let currentWorkedAccordion = null;
 
+  function normalizePathForMatching(p) {
+    if (!p) return '';
+    return p.replace(/\\/g, '/').toLowerCase().trim();
+  }
+
+  function pathsMatch(p1, p2) {
+    const n1 = normalizePathForMatching(p1);
+    const n2 = normalizePathForMatching(p2);
+    if (!n1 || !n2) return n1 === n2;
+    return n1 === n2 || n1.endsWith('/' + n2) || n2.endsWith('/' + n1);
+  }
+
   // ─── Deep-link file paths in message text ─────────────────────────
   function linkifyFilePaths(container) {
     // Match absolute and relative file paths with extensions
@@ -105,7 +117,8 @@
     
     const meta = document.createElement('div');
     meta.className = 'message-meta';
-    meta.textContent = role === 'user' ? 'You' : 'Mirror VS';
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    meta.innerHTML = `${role === 'user' ? 'You' : 'Mirror VS'} <span class="message-time" style="font-size: 9px; opacity: 0.5; margin-left: 6px; font-weight: normal; font-family: var(--font-mono, monospace);">${timeStr}</span>`;
     msgElement.appendChild(meta);
 
     const actions = document.createElement('div');
@@ -521,6 +534,27 @@
               }
             }
           }, 1000);
+        } else {
+          // Resume worked accordion timer for next turn in same loop
+          const spinner = currentWorkedAccordion.querySelector('.worked-accordion-spinner');
+          if (spinner) {
+            spinner.style.display = '';
+          }
+          const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+          if (labelEl) {
+            labelEl.textContent = 'Working...';
+          }
+          if (!currentTurnTimerInterval) {
+            currentTurnTimerInterval = setInterval(() => {
+              if (currentWorkedAccordion) {
+                const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+                const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+                if (labelEl) {
+                  labelEl.textContent = `Working for ${elapsed}s...`;
+                }
+              }
+            }, 1000);
+          }
         }
 
         if (!currentStreamingBubble) {
@@ -530,6 +564,16 @@
           typingIndicator.innerHTML = '<span></span><span></span><span></span>';
           assistantBubble.appendChild(typingIndicator);
           currentStreamingBubble = assistantBubble;
+          currentStreamingText = '';
+          currentStreamingReasoningText = '';
+          accumulatedStreamingText = '';
+          accumulatedReasoningText = '';
+        } else {
+          // Re-append the typing indicator to the existing bubble to show we are still generating
+          const typingIndicator = document.createElement('div');
+          typingIndicator.className = 'typing-indicator';
+          typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+          currentStreamingBubble.appendChild(typingIndicator);
           currentStreamingText = '';
           currentStreamingReasoningText = '';
         }
@@ -558,8 +602,9 @@
         }
 
         let html = '';
-        if (currentStreamingReasoningText) {
-          const escapedReasoning = escapeHtml(currentStreamingReasoningText).replace(/\n/g, '<br/>');
+        const combinedReasoningText = accumulatedReasoningText + (accumulatedReasoningText && currentStreamingReasoningText ? '\n\n' : '') + currentStreamingReasoningText;
+        if (combinedReasoningText) {
+          const escapedReasoning = escapeHtml(combinedReasoningText).replace(/\n/g, '<br/>');
           html += `
             <details class="thought-process-container" open style="margin-bottom: 12px; border-left: 2px solid rgba(168, 85, 247, 0.4); padding-left: 10px; background: rgba(168, 85, 247, 0.03); border-radius: 0 6px 6px 0;">
               <summary style="cursor: pointer; font-size: 11px; color: #a855f7; font-weight: 600; user-select: none; outline: none; margin-bottom: 6px;">
@@ -572,8 +617,9 @@
           `;
         }
 
-        if (currentStreamingText) {
-          html += parseMarkdown(currentStreamingText);
+        const combinedText = accumulatedStreamingText + (accumulatedStreamingText && currentStreamingText ? '\n\n' : '') + currentStreamingText;
+        if (combinedText) {
+          html += parseMarkdown(combinedText);
         }
 
         const existingCard = currentStreamingBubble.querySelector('.streaming-write-card');
@@ -636,8 +682,6 @@
           if (spinner) {
             spinner.style.display = 'none';
           }
-          currentWorkedAccordion.classList.add('collapsed');
-          currentWorkedAccordion = null;
         }
 
         setAvatarState('idle');
@@ -651,13 +695,18 @@
           currentStreamingBubble.removeChild(loader);
         }
 
-        currentStreamingText = message.fullText;
-        currentStreamingReasoningText = message.reasoningText || currentStreamingReasoningText;
-        extractToolContents(currentStreamingText);
+        if (message.fullText) {
+          accumulatedStreamingText += (accumulatedStreamingText ? '\n\n' : '') + message.fullText;
+        }
+        if (message.reasoningText) {
+          accumulatedReasoningText += (accumulatedReasoningText ? '\n\n' : '') + message.reasoningText;
+        }
+
+        extractToolContents(message.fullText || '');
 
         let html = '';
-        if (currentStreamingReasoningText) {
-          const escapedReasoning = escapeHtml(currentStreamingReasoningText).replace(/\n/g, '<br/>');
+        if (accumulatedReasoningText) {
+          const escapedReasoning = escapeHtml(accumulatedReasoningText).replace(/\n/g, '<br/>');
           html += `
             <details class="thought-process-container" style="margin-bottom: 12px; border-left: 2px solid rgba(168, 85, 247, 0.4); padding-left: 10px; background: rgba(168, 85, 247, 0.03); border-radius: 0 6px 6px 0;">
               <summary style="cursor: pointer; font-size: 11px; color: #a855f7; font-weight: 600; user-select: none; outline: none; margin-bottom: 6px;">
@@ -669,12 +718,18 @@
             </details>
           `;
         }
-        html += parseMarkdown(currentStreamingText);
+        html += parseMarkdown(accumulatedStreamingText);
 
         currentStreamingBubble.innerHTML = html;
         bindCodeBlockButtons(currentStreamingBubble);
 
-        currentStreamingBubble = null;
+        // Remove the bubble if it ended up empty (no text/content other than tool calls)
+        const textContent = currentStreamingBubble.textContent || '';
+        const hasVisibleContent = textContent.trim().length > 0 || currentStreamingBubble.querySelector('img, details, pre');
+        if (!hasVisibleContent && currentStreamingBubble.parentNode) {
+          currentStreamingBubble.parentNode.removeChild(currentStreamingBubble);
+        }
+
         currentStreamingText = '';
         currentStreamingReasoningText = '';
         updateStickyUserMessage();
@@ -714,10 +769,9 @@
           // Find any existing running card for this tool & target in the accordion content container
           const cards = contentContainer.querySelectorAll('.tool-card.running');
           let existingCard = null;
-          const cleanTarget = (target || '').trim();
           for (let i = 0; i < cards.length; i++) {
             if (cards[i].getAttribute('data-tool') === toolName &&
-                cards[i].getAttribute('data-target') === cleanTarget) {
+                pathsMatch(cards[i].getAttribute('data-target'), target)) {
               existingCard = cards[i];
               break;
             }
@@ -754,6 +808,20 @@
             }
             currentWorkedAccordion.classList.add('collapsed');
             currentWorkedAccordion = null;
+
+            // Save duration on the last tool message in history
+            for (let idx = chatHistory.length - 1; idx >= 0; idx--) {
+              const m = chatHistory[idx];
+              if ((m.role === 'system' || m.role === 'tool') && m.content && m.content.startsWith('[Tool Result')) {
+                m.duration = elapsed;
+                break;
+              }
+            }
+            // Trigger history save to persist duration
+            vscode.postMessage({
+              type: 'saveHistory',
+              history: chatHistory
+            });
           }
 
           isSending = false;
@@ -764,6 +832,27 @@
           currentStreamingBubble = null;
           currentStreamingText = '';
           currentStreamingReasoningText = '';
+          accumulatedStreamingText = '';
+          accumulatedReasoningText = '';
+
+          // Full re-render from final saved history now that loop is done.
+          // isSending is false so updateChatHistory will no longer be suppressed,
+          // but we trigger it explicitly here to ensure the DOM is in sync.
+          renderedLimit = 15;
+          parsedToolContents.clear();
+          renderVisibleHistory(false);
+
+          // Stop all active spinners and scanning animations in the chat
+          document.querySelectorAll('.worked-accordion-spinner').forEach(el => el.style.display = 'none');
+          document.querySelectorAll('.scanning-bar').forEach(el => el.style.display = 'none');
+          document.querySelectorAll('.tool-card.running').forEach(card => {
+            card.classList.remove('running');
+            const badge = card.querySelector('.tool-status-badge');
+            if (badge && badge.textContent === 'Working...') {
+              badge.textContent = 'Interrupted';
+            }
+          });
+
           if (message.completed) {
             setAvatarState('celebrate');
             triggerParticleExplosion();
@@ -800,6 +889,21 @@
           }
           currentWorkedAccordion.classList.add('collapsed');
           currentWorkedAccordion = null;
+
+          // Save duration on the last tool message in history
+          for (let idx = chatHistory.length - 1; idx >= 0; idx--) {
+            const m = chatHistory[idx];
+            if ((m.role === 'system' || m.role === 'tool') && m.content && m.content.startsWith('[Tool Result')) {
+              m.duration = elapsed;
+              m.failed = true;
+              break;
+            }
+          }
+          // Trigger history save to persist duration
+          vscode.postMessage({
+            type: 'saveHistory',
+            history: chatHistory
+          });
         }
 
         setAvatarState('error');
@@ -821,6 +925,22 @@
         sendBtn.disabled = false;
         processNextInQueue();
         currentStreamingBubble = null;
+        currentStreamingText = '';
+        currentStreamingReasoningText = '';
+        accumulatedStreamingText = '';
+        accumulatedReasoningText = '';
+
+        // Stop all active spinners and scanning animations in the chat
+        document.querySelectorAll('.worked-accordion-spinner').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.scanning-bar').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tool-card.running').forEach(card => {
+          card.classList.remove('running');
+          const badge = card.querySelector('.tool-status-badge');
+          if (badge && badge.textContent === 'Working...') {
+            badge.textContent = 'Failed';
+          }
+        });
+
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
         clearAllActiveAnimations();

@@ -526,11 +526,11 @@
   function placeCardInPlaceholder(card, toolName, target, container = chatMessages) {
     const placeholders = container.querySelectorAll('.tool-card-placeholder');
     let placed = false;
-    const cleanTarget = unescapeHtml(target).trim();
     for (let i = 0; i < placeholders.length; i++) {
       const placeholderTool = placeholders[i].getAttribute('data-tool');
-      const placeholderTarget = unescapeHtml(placeholders[i].getAttribute('data-target')).trim();
-      if (placeholderTool === toolName && placeholderTarget === cleanTarget && placeholders[i].children.length === 0) {
+      if (placeholderTool === toolName && 
+          pathsMatch(unescapeHtml(placeholders[i].getAttribute('data-target')), target) && 
+          placeholders[i].children.length === 0) {
         placeholders[i].appendChild(card);
         placed = true;
         break;

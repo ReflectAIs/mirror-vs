@@ -613,6 +613,11 @@ export class AgentOrchestrator {
         );
       }
 
+      // Track action for repetition loop detection
+      const actionTarget = tool.path || tool.query || tool.command || target || '';
+      const actionKey = `${tool.name}:${actionTarget}`;
+      this._loopDetector.registerAction(actionKey);
+
       // Loop Detector progress tracking
       if (tool.name === 'create_file') {
         this._loopDetector.registerProgress('new_file', target);
@@ -1171,7 +1176,42 @@ export class AgentOrchestrator {
             }
           }
 
-          // Recompute usedTokens after evictions
+          // Strategy 5: Context Compaction and Summarization.
+          // When history grows and approaches the budget threshold, summarize the older half using
+          // the model itself, and store the summary as a system message to keep memory intact.
+          const summarizeFn = async (convoToSummarize: ChatMessage[]): Promise<string> => {
+            const { SELF_SUMMARY_SYSTEM_PROMPT } = require('../services/context-compactor');
+            const summaryPayload: ChatMessage[] = [
+              { role: 'system', content: SELF_SUMMARY_SYSTEM_PROMPT },
+              ...convoToSummarize,
+            ];
+            const summaryController = new AbortController();
+            const res = await this._completer.getLLMCompletion(
+              provider as LLMProvider,
+              currentHost,
+              currentModel,
+              apiKey,
+              summaryPayload.map(m => ({ role: m.role === 'system' ? 'user' : m.role, content: m.content || '' })),
+              summaryController.signal,
+              this._session.sessionId,
+              summaryController,
+              vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
+              undefined,
+              undefined,
+              false
+            );
+            return res;
+          };
+
+          const compactResult = await maybeCompact(activeMessages, effectiveBudget, summarizeFn);
+          if (compactResult.wasCompacted) {
+            console.log('[Orchestrator] History compacted and older messages summarized.');
+            activeMessages = compactResult.compactedMessages;
+            this._activeMessages = activeMessages;
+            await this._saveChatHistory(activeMessages);
+          }
+
+          // Recompute usedTokens after evictions and compaction
           usedTokens = estimateTokens(activeMessages);
 
           this._postMessage({
@@ -1206,7 +1246,9 @@ export class AgentOrchestrator {
           // 4. Inject Active Task and loop warnings into system prompt
           const activeTaskPrompt = this._taskQueue.getActiveTaskPromptContext();
           const loopWarning = this._loopDetector.detectLoop().reason;
-          const loopWarningPrompt = loopWarning ? `\n\n### ⚠️ LOOP DETECTOR WARNING:\n${loopWarning}` : '';
+          const loopWarningPrompt = loopWarning
+            ? `\n\n### ⚠️ LOOP DETECTOR WARNING:\nI seem to be repeating actions without making positive progress. [Details: ${loopWarning}]\nSTRICT RULE: If you are confident you are progressing (e.g. searching/reading new/different files, or adjusting your search parameters), then continue searching. Or else, you MUST immediately stop calling tools and ask the user your query or explain your blockers.`
+            : '';
           const activeJobs = this._jobManager.jobs.filter(j => j.status === 'running' || j.status === 'queued');
           const jobsPrompt = activeJobs.length > 0
             ? `\n\n### ⚙️ RUNNING JOBS:\n` + activeJobs.map(j => `- Job [${j.id}]: ${j.name} (${j.status})`).join('\n')
@@ -1361,7 +1403,7 @@ export class AgentOrchestrator {
           const earlyToolCalls = nativeToolCall ? [1] : this._parser.parseToolCalls(assistantResponse, true);
           assistantResponse = detectAndNormalizeWalkthrough(assistantResponse, earlyToolCalls.length);
 
-          if (loopCount > 1 && !nativeToolCall) {
+          if (loopCount > 1 && !nativeToolCall && earlyToolCalls.length > 0) {
             const xmlRegex = /<[a-zA-Z0-9_]+[\s\S]*?>(?:[\s\S]*?<\/[a-zA-Z0-9_]+>)?/g;
             const matches = assistantResponse.match(xmlRegex);
             if (matches && matches.length > 0) {
@@ -1714,7 +1756,7 @@ export class AgentOrchestrator {
               finalSystemContent += `\n\n[System Notice: The tool has failed 3 consecutive times. You may report this blocker to the user and request manual intervention if you are genuinely blocked.]`;
             } else if (sequentialExploratorySteps >= 4) {
               finalSystemContent +=
-                '\n\n[System: You have performed several exploratory steps. Please evaluate if you have enough context. If you do, stop searching and execute the file patches immediately. Do not spend multiple turns re-reading the same file or scrolling in tiny increments. If you know the logic, write the patch block now.]';
+                '\n\n[System: You have performed several exploratory steps. Please evaluate if you have enough context. If you do, stop searching and execute the file patches immediately. Do not spend multiple turns re-reading the same file or scrolling in tiny increments. If you know the logic, write the patch block now. If you do not have enough context or if your search returned no results, please explain this to the user and ask for clarification, rather than making redundant searches or generating an empty patch.]';
             }
 
             if (nativeToolCall && (nativeToolCall as any).id) {
@@ -1774,27 +1816,28 @@ export class AgentOrchestrator {
               continueLoop = true;
             } else if (routingMatch && toolCalls.length === 0) {
               const nudgeMsg = useNativeTools
-                ? '[System Notice]: You emitted an <architecture_routing> block but did not invoke any functions. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately invoke exactly one function from the tools schema to proceed with your task.'
-                : '[System Notice]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.';
+                ? '[SYSTEM AUTOMATED NOTICE - DO NOT ADD CONVERSATIONAL PREAMBLE. Just invoke a tool directly]: You emitted an <architecture_routing> block but did not invoke any functions. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately invoke exactly one function from the tools schema to proceed with your task.'
+                : '[SYSTEM AUTOMATED NOTICE - DO NOT ADD CONVERSATIONAL PREAMBLE. Just output a tool tag directly]: You emitted an <architecture_routing> block but did not invoke any tool tags. The architecture_routing block is guidance metadata and does not count as a response. You MUST immediately output exactly one valid tool tag (e.g., <read_file ...>) to proceed with your task.';
               pushToHistory({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (loopCount === 1 && hasActionPlanningIntent(assistantResponse)) {
               const nudgeMsg = useNativeTools
-                ? "[System Notice]: You did not invoke any tool functions in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please invoke a valid tool function now to continue autonomously."
-                : "[System Notice]: You did not invoke any tool tags in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please output a valid tool tag now to continue autonomously.";
+                ? "[SYSTEM AUTOMATED NOTICE - DO NOT ADD CONVERSATIONAL PREAMBLE. Just invoke a tool directly]: You did not invoke any tool functions in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please invoke a valid tool function now to continue autonomously."
+                : "[SYSTEM AUTOMATED NOTICE - DO NOT ADD CONVERSATIONAL PREAMBLE. Just output a tool tag directly]: You did not invoke any tool tags in your response. If you need to search, read/write files, run commands, or analyze the workspace to fulfill the user's request, please output a valid tool tag now to continue autonomously.";
               pushToHistory({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;
             } else if (
               loopCount > 1 &&
               (taskMode === TaskMode.IMPLEMENT || taskMode === TaskMode.DEBUG || taskMode === TaskMode.VERIFY) &&
+              (hasCommittedToPatch || verifiedFiles.size > 0) &&
               !assistantResponse.includes('<walkthrough>') &&
               toolCalls.length === 0
             ) {
               const nudgeMsg = useNativeTools
-                ? "[System Notice]: You did not invoke any tool functions or output a final <walkthrough> block. If you are still working on the task, you MUST invoke a tool (such as read_file, patch_file, run_command, etc.) to continue implementation. If you have completed the task, you MUST output a <walkthrough>...</walkthrough> block to document your changes and conclude the session."
-                : "[System Notice]: You did not invoke any tool tags or output a final <walkthrough> block. If you are still working on the task, you MUST output a valid tool tag (such as <read_file ...>, <patch_file ...>, <run_command ...>, etc.) to continue implementation. If you have completed the task, you MUST output a <walkthrough>...</walkthrough> block to document your changes and conclude the session.";
+                ? "[SYSTEM AUTOMATED NOTICE - DO NOT REPLY CONVERSATIONALLY OR DEFEND PREVIOUS RESPONSE. Just execute the next step directly]: You did not invoke any tool functions or output a final <walkthrough> block. If you are still working on the task, you MUST invoke a tool (such as read_file, patch_file, run_command, etc.) to continue implementation. If you have completed the task, you MUST output a <walkthrough>...</walkthrough> block to document your changes and conclude the session."
+                : "[SYSTEM AUTOMATED NOTICE - DO NOT REPLY CONVERSATIONALLY OR DEFEND PREVIOUS RESPONSE. Just execute the next step directly]: You did not invoke any tool tags or output a final <walkthrough> block. If you are still working on the task, you MUST output a valid tool tag (such as <read_file ...>, <patch_file ...>, <run_command ...>, etc.) to continue implementation. If you have completed the task, you MUST output a <walkthrough>...</walkthrough> block to document your changes and conclude the session.";
               pushToHistory({ role: 'system', content: nudgeMsg });
               await this._saveChatHistory(currentMessages);
               continueLoop = true;

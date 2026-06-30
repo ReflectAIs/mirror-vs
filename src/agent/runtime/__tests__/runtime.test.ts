@@ -138,9 +138,9 @@ describe('Mirror VS Runtime v1.0 Tests', () => {
       const detector = new LoopDetector();
       expect(detector.detectLoop().isLoop).toBe(false);
 
-      detector.registerTurn();
-      detector.registerTurn();
-      detector.registerTurn();
+      for (let i = 0; i < 14; i++) {
+        detector.registerTurn();
+      }
       expect(detector.detectLoop().isLoop).toBe(false);
 
       detector.registerTurn();
@@ -149,6 +149,20 @@ describe('Mirror VS Runtime v1.0 Tests', () => {
       // register progress resets loop detection
       detector.registerProgress('patch_applied', 'Patched index.ts');
       expect(detector.detectLoop().isLoop).toBe(false);
+    });
+
+    it('should detect exact repetitive action loops immediately', () => {
+      const detector = new LoopDetector();
+      expect(detector.detectLoop().isLoop).toBe(false);
+
+      detector.registerAction('read_file:src/screens/buyers/tpm/plans/Monthly.jsx');
+      detector.registerAction('read_file:src/screens/buyers/tpm/plans/Monthly.jsx');
+      expect(detector.detectLoop().isLoop).toBe(false);
+
+      detector.registerAction('read_file:src/screens/buyers/tpm/plans/Monthly.jsx');
+      const check = detector.detectLoop();
+      expect(check.isLoop).toBe(true);
+      expect(check.reason).toContain('has been repeated 3 times');
     });
   });
 

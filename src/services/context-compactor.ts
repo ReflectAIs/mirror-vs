@@ -367,12 +367,31 @@ export async function maybeCompact(
     summarized: true,
   }));
 
+  let allSummaries = [...existingSummaries];
+  try {
+    const summaryText = await summarizeFn(older);
+    const newSummaryMsg: ChatMessage = {
+      role: 'system',
+      content: `[Conversation summary of turns ${alreadySummarized.length} to ${alreadySummarized.length + older.length}]:\n${summaryText}`,
+    };
+    allSummaries.push(newSummaryMsg);
+  } catch (err) {
+    console.error('Failed to generate compaction summary:', err);
+  }
+
   let compactedMessages: ChatMessage[];
   if (systemMsgs.length > 0) {
     const primarySystemMsg = systemMsgs[0];
-    compactedMessages = [primarySystemMsg, ...systemMsgs.slice(1), ...alreadySummarized, ...newlySummarized, ...recent];
+    compactedMessages = [
+      primarySystemMsg,
+      ...systemMsgs.slice(1),
+      ...allSummaries,
+      ...alreadySummarized,
+      ...newlySummarized,
+      ...recent,
+    ];
   } else {
-    compactedMessages = [...alreadySummarized, ...newlySummarized, ...recent];
+    compactedMessages = [...allSummaries, ...alreadySummarized, ...newlySummarized, ...recent];
   }
 
   return { compactedMessages, wasCompacted: true };

@@ -242,6 +242,8 @@
   let currentStreamingBubble = null;
   let currentStreamingText = '';
   let currentStreamingReasoningText = '';
+  let accumulatedStreamingText = '';
+  let accumulatedReasoningText = '';
   let activeProvider = 'ollama';
   let isSending = false;
   let messageQueue = [];  // Array of { text, images, selectedFiles, userDisplayMessage, rawText }

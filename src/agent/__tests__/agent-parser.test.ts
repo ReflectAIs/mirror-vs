@@ -389,6 +389,25 @@ describe('AgentParser', () => {
       );
     });
 
+    it('should parse attributes with smart (curly) quotes and unquoted values', () => {
+      const parser = makeParser();
+      
+      // Curly double quotes
+      const callsCdq = parser.parseToolCalls('<read_file path=“src/app.tsx” />');
+      expect(callsCdq).toHaveLength(1);
+      expect(callsCdq[0]).toEqual({ name: 'read_file', path: 'src/app.tsx' });
+
+      // Curly single quotes
+      const callsCsq = parser.parseToolCalls('<read_file path=‘src/index.ts’ />');
+      expect(callsCsq).toHaveLength(1);
+      expect(callsCsq[0]).toEqual({ name: 'read_file', path: 'src/index.ts' });
+
+      // Unquoted value
+      const callsUnquoted = parser.parseToolCalls('<read_file path=src/main.ts />');
+      expect(callsUnquoted).toHaveLength(1);
+      expect(callsUnquoted[0]).toEqual({ name: 'read_file', path: 'src/main.ts' });
+    });
+
     it('should return empty array for text with no tool tags', () => {
       const parser = makeParser();
       expect(parser.parseToolCalls('Just some text')).toEqual([]);

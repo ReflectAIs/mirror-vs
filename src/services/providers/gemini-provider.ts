@@ -90,6 +90,11 @@ export class GeminiProvider extends BaseProvider {
         const candidates = parsed.candidates || [];
 
         for (const candidate of candidates) {
+          if (candidate.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+            const blockMsg = `\n\n⚠️ **[Response Blocked/Terminated Early by Gemini Safety or Recitation Filters]** (Finish Reason: ${candidate.finishReason})`;
+            yield { type: 'text', content: blockMsg };
+            continue;
+          }
           const content = candidate.content;
           if (!content) continue;
 

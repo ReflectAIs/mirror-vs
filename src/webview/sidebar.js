@@ -242,6 +242,8 @@
   let currentStreamingBubble = null;
   let currentStreamingText = '';
   let currentStreamingReasoningText = '';
+  let accumulatedStreamingText = '';
+  let accumulatedReasoningText = '';
   let activeProvider = 'ollama';
   let isSending = false;
   let messageQueue = [];  // Array of { text, images, selectedFiles, userDisplayMessage, rawText }
@@ -2851,11 +2853,11 @@
   function placeCardInPlaceholder(card, toolName, target, container = chatMessages) {
     const placeholders = container.querySelectorAll('.tool-card-placeholder');
     let placed = false;
-    const cleanTarget = unescapeHtml(target).trim();
     for (let i = 0; i < placeholders.length; i++) {
       const placeholderTool = placeholders[i].getAttribute('data-tool');
-      const placeholderTarget = unescapeHtml(placeholders[i].getAttribute('data-target')).trim();
-      if (placeholderTool === toolName && placeholderTarget === cleanTarget && placeholders[i].children.length === 0) {
+      if (placeholderTool === toolName && 
+          pathsMatch(unescapeHtml(placeholders[i].getAttribute('data-target')), target) && 
+          placeholders[i].children.length === 0) {
         placeholders[i].appendChild(card);
         placed = true;
         break;
@@ -2940,6 +2942,18 @@
   let currentTurnStartTime = null;
   let currentTurnTimerInterval = null;
   let currentWorkedAccordion = null;
+
+  function normalizePathForMatching(p) {
+    if (!p) return '';
+    return p.replace(/\\/g, '/').toLowerCase().trim();
+  }
+
+  function pathsMatch(p1, p2) {
+    const n1 = normalizePathForMatching(p1);
+    const n2 = normalizePathForMatching(p2);
+    if (!n1 || !n2) return n1 === n2;
+    return n1 === n2 || n1.endsWith('/' + n2) || n2.endsWith('/' + n1);
+  }
 
   // ─── Deep-link file paths in message text ─────────────────────────
   function linkifyFilePaths(container) {
@@ -3044,7 +3058,8 @@
     
     const meta = document.createElement('div');
     meta.className = 'message-meta';
-    meta.textContent = role === 'user' ? 'You' : 'Mirror VS';
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    meta.innerHTML = `${role === 'user' ? 'You' : 'Mirror VS'} <span class="message-time" style="font-size: 9px; opacity: 0.5; margin-left: 6px; font-weight: normal; font-family: var(--font-mono, monospace);">${timeStr}</span>`;
     msgElement.appendChild(meta);
 
     const actions = document.createElement('div');
@@ -3460,6 +3475,27 @@
               }
             }
           }, 1000);
+        } else {
+          // Resume worked accordion timer for next turn in same loop
+          const spinner = currentWorkedAccordion.querySelector('.worked-accordion-spinner');
+          if (spinner) {
+            spinner.style.display = '';
+          }
+          const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+          if (labelEl) {
+            labelEl.textContent = 'Working...';
+          }
+          if (!currentTurnTimerInterval) {
+            currentTurnTimerInterval = setInterval(() => {
+              if (currentWorkedAccordion) {
+                const elapsed = Math.round((Date.now() - currentTurnStartTime) / 1000);
+                const labelEl = currentWorkedAccordion.querySelector('.worked-accordion-label');
+                if (labelEl) {
+                  labelEl.textContent = `Working for ${elapsed}s...`;
+                }
+              }
+            }, 1000);
+          }
         }
 
         if (!currentStreamingBubble) {
@@ -3469,6 +3505,16 @@
           typingIndicator.innerHTML = '<span></span><span></span><span></span>';
           assistantBubble.appendChild(typingIndicator);
           currentStreamingBubble = assistantBubble;
+          currentStreamingText = '';
+          currentStreamingReasoningText = '';
+          accumulatedStreamingText = '';
+          accumulatedReasoningText = '';
+        } else {
+          // Re-append the typing indicator to the existing bubble to show we are still generating
+          const typingIndicator = document.createElement('div');
+          typingIndicator.className = 'typing-indicator';
+          typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+          currentStreamingBubble.appendChild(typingIndicator);
           currentStreamingText = '';
           currentStreamingReasoningText = '';
         }
@@ -3497,8 +3543,9 @@
         }
 
         let html = '';
-        if (currentStreamingReasoningText) {
-          const escapedReasoning = escapeHtml(currentStreamingReasoningText).replace(/\n/g, '<br/>');
+        const combinedReasoningText = accumulatedReasoningText + (accumulatedReasoningText && currentStreamingReasoningText ? '\n\n' : '') + currentStreamingReasoningText;
+        if (combinedReasoningText) {
+          const escapedReasoning = escapeHtml(combinedReasoningText).replace(/\n/g, '<br/>');
           html += `
             <details class="thought-process-container" open style="margin-bottom: 12px; border-left: 2px solid rgba(168, 85, 247, 0.4); padding-left: 10px; background: rgba(168, 85, 247, 0.03); border-radius: 0 6px 6px 0;">
               <summary style="cursor: pointer; font-size: 11px; color: #a855f7; font-weight: 600; user-select: none; outline: none; margin-bottom: 6px;">
@@ -3511,8 +3558,9 @@
           `;
         }
 
-        if (currentStreamingText) {
-          html += parseMarkdown(currentStreamingText);
+        const combinedText = accumulatedStreamingText + (accumulatedStreamingText && currentStreamingText ? '\n\n' : '') + currentStreamingText;
+        if (combinedText) {
+          html += parseMarkdown(combinedText);
         }
 
         const existingCard = currentStreamingBubble.querySelector('.streaming-write-card');
@@ -3575,8 +3623,6 @@
           if (spinner) {
             spinner.style.display = 'none';
           }
-          currentWorkedAccordion.classList.add('collapsed');
-          currentWorkedAccordion = null;
         }
 
         setAvatarState('idle');
@@ -3590,13 +3636,18 @@
           currentStreamingBubble.removeChild(loader);
         }
 
-        currentStreamingText = message.fullText;
-        currentStreamingReasoningText = message.reasoningText || currentStreamingReasoningText;
-        extractToolContents(currentStreamingText);
+        if (message.fullText) {
+          accumulatedStreamingText += (accumulatedStreamingText ? '\n\n' : '') + message.fullText;
+        }
+        if (message.reasoningText) {
+          accumulatedReasoningText += (accumulatedReasoningText ? '\n\n' : '') + message.reasoningText;
+        }
+
+        extractToolContents(message.fullText || '');
 
         let html = '';
-        if (currentStreamingReasoningText) {
-          const escapedReasoning = escapeHtml(currentStreamingReasoningText).replace(/\n/g, '<br/>');
+        if (accumulatedReasoningText) {
+          const escapedReasoning = escapeHtml(accumulatedReasoningText).replace(/\n/g, '<br/>');
           html += `
             <details class="thought-process-container" style="margin-bottom: 12px; border-left: 2px solid rgba(168, 85, 247, 0.4); padding-left: 10px; background: rgba(168, 85, 247, 0.03); border-radius: 0 6px 6px 0;">
               <summary style="cursor: pointer; font-size: 11px; color: #a855f7; font-weight: 600; user-select: none; outline: none; margin-bottom: 6px;">
@@ -3608,12 +3659,18 @@
             </details>
           `;
         }
-        html += parseMarkdown(currentStreamingText);
+        html += parseMarkdown(accumulatedStreamingText);
 
         currentStreamingBubble.innerHTML = html;
         bindCodeBlockButtons(currentStreamingBubble);
 
-        currentStreamingBubble = null;
+        // Remove the bubble if it ended up empty (no text/content other than tool calls)
+        const textContent = currentStreamingBubble.textContent || '';
+        const hasVisibleContent = textContent.trim().length > 0 || currentStreamingBubble.querySelector('img, details, pre');
+        if (!hasVisibleContent && currentStreamingBubble.parentNode) {
+          currentStreamingBubble.parentNode.removeChild(currentStreamingBubble);
+        }
+
         currentStreamingText = '';
         currentStreamingReasoningText = '';
         updateStickyUserMessage();
@@ -3653,10 +3710,9 @@
           // Find any existing running card for this tool & target in the accordion content container
           const cards = contentContainer.querySelectorAll('.tool-card.running');
           let existingCard = null;
-          const cleanTarget = (target || '').trim();
           for (let i = 0; i < cards.length; i++) {
             if (cards[i].getAttribute('data-tool') === toolName &&
-                cards[i].getAttribute('data-target') === cleanTarget) {
+                pathsMatch(cards[i].getAttribute('data-target'), target)) {
               existingCard = cards[i];
               break;
             }
@@ -3693,6 +3749,20 @@
             }
             currentWorkedAccordion.classList.add('collapsed');
             currentWorkedAccordion = null;
+
+            // Save duration on the last tool message in history
+            for (let idx = chatHistory.length - 1; idx >= 0; idx--) {
+              const m = chatHistory[idx];
+              if ((m.role === 'system' || m.role === 'tool') && m.content && m.content.startsWith('[Tool Result')) {
+                m.duration = elapsed;
+                break;
+              }
+            }
+            // Trigger history save to persist duration
+            vscode.postMessage({
+              type: 'saveHistory',
+              history: chatHistory
+            });
           }
 
           isSending = false;
@@ -3703,6 +3773,27 @@
           currentStreamingBubble = null;
           currentStreamingText = '';
           currentStreamingReasoningText = '';
+          accumulatedStreamingText = '';
+          accumulatedReasoningText = '';
+
+          // Full re-render from final saved history now that loop is done.
+          // isSending is false so updateChatHistory will no longer be suppressed,
+          // but we trigger it explicitly here to ensure the DOM is in sync.
+          renderedLimit = 15;
+          parsedToolContents.clear();
+          renderVisibleHistory(false);
+
+          // Stop all active spinners and scanning animations in the chat
+          document.querySelectorAll('.worked-accordion-spinner').forEach(el => el.style.display = 'none');
+          document.querySelectorAll('.scanning-bar').forEach(el => el.style.display = 'none');
+          document.querySelectorAll('.tool-card.running').forEach(card => {
+            card.classList.remove('running');
+            const badge = card.querySelector('.tool-status-badge');
+            if (badge && badge.textContent === 'Working...') {
+              badge.textContent = 'Interrupted';
+            }
+          });
+
           if (message.completed) {
             setAvatarState('celebrate');
             triggerParticleExplosion();
@@ -3739,6 +3830,21 @@
           }
           currentWorkedAccordion.classList.add('collapsed');
           currentWorkedAccordion = null;
+
+          // Save duration on the last tool message in history
+          for (let idx = chatHistory.length - 1; idx >= 0; idx--) {
+            const m = chatHistory[idx];
+            if ((m.role === 'system' || m.role === 'tool') && m.content && m.content.startsWith('[Tool Result')) {
+              m.duration = elapsed;
+              m.failed = true;
+              break;
+            }
+          }
+          // Trigger history save to persist duration
+          vscode.postMessage({
+            type: 'saveHistory',
+            history: chatHistory
+          });
         }
 
         setAvatarState('error');
@@ -3760,6 +3866,22 @@
         sendBtn.disabled = false;
         processNextInQueue();
         currentStreamingBubble = null;
+        currentStreamingText = '';
+        currentStreamingReasoningText = '';
+        accumulatedStreamingText = '';
+        accumulatedReasoningText = '';
+
+        // Stop all active spinners and scanning animations in the chat
+        document.querySelectorAll('.worked-accordion-spinner').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.scanning-bar').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tool-card.running').forEach(card => {
+          card.classList.remove('running');
+          const badge = card.querySelector('.tool-status-badge');
+          if (badge && badge.textContent === 'Working...') {
+            badge.textContent = 'Failed';
+          }
+        });
+
         sendBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
         clearAllActiveAnimations();
@@ -4072,6 +4194,15 @@
         const history = message.history;
         chatHistory = history || [];
         
+        // While the agent loop is active, suppress the full DOM rebuild.
+        // We keep chatHistory up-to-date in memory (for tool card lookups etc.)
+        // but we do NOT wipe and re-render the live streaming bubbles and
+        // worked accordion. The full re-render happens naturally when loopComplete
+        // or chatResponseError fires and clears isSending.
+        if (isSending) {
+          break;
+        }
+
         renderedLimit = 15;
         parsedToolContents.clear();
         currentStreamingBubble = null;
@@ -4216,6 +4347,56 @@
         </div>
       </div>
     `;
+  }
+
+  function formatWalkthroughXmlTags(content) {
+    if (!content) return '';
+    let formatted = content;
+    
+    // Replace <title>...</title>
+    formatted = formatted.replace(/<title>([\s\S]*?)<\/title>/gi, (_, text) => {
+      return `\n\n### 📌 ${text.trim()}\n`;
+    });
+    
+    // Replace <description>...</description>
+    formatted = formatted.replace(/<description>([\s\S]*?)<\/description>/gi, (_, text) => {
+      return `\n\n#### 📝 Description\n${text.trim()}\n`;
+    });
+    
+    // Replace <changes>...</changes>
+    formatted = formatted.replace(/<changes>([\s\S]*?)<\/changes>/gi, (_, text) => {
+      return `\n\n#### 🛠️ Changes\n${text.trim()}\n`;
+    });
+    
+    // Replace <diagnostics>...</diagnostics>
+    formatted = formatted.replace(/<diagnostics>([\s\S]*?)<\/diagnostics>/gi, (_, text) => {
+      return `\n\n#### 🔍 Diagnostics\n${text.trim()}\n`;
+    });
+    
+    // Replace <task id="...">...</task> with a styled heading
+    formatted = formatted.replace(/<task(?:\s+id="[^"]*?")?>([\s\S]*?)<\/task>/gi, (_, taskText) => {
+      return `\n\n#### 🎯 Task: ${taskText.trim()}\n`;
+    });
+    
+    // Replace <execution-log> with a heading
+    formatted = formatted.replace(/<execution-log>/gi, '\n\n#### 📋 Execution Log:\n');
+    formatted = formatted.replace(/<\/execution-log>/gi, '\n');
+    
+    // Replace <outcomes> with a heading
+    formatted = formatted.replace(/<outcomes>/gi, '\n\n#### ✅ Outcomes:\n');
+    formatted = formatted.replace(/<\/outcomes>/gi, '\n');
+    
+    // Fallback: strip any remaining custom XML markup blocks
+    formatted = formatted.replace(/<\/?[a-zA-Z0-9_\-]+(?:\s+[^>]*?)?>/g, (tag) => {
+      const tagName = tag.replace(/[<\/>]/g, '').split(' ')[0].toLowerCase();
+      const customXmlTags = ['task', 'execution-log', 'outcomes', 'verification', 'outcome', 'title', 'description', 'changes', 'diagnostics'];
+      if (customXmlTags.includes(tagName)) {
+        return '';
+      }
+      return tag;
+    });
+
+    return formatted;
   }
 
   // 9. Markdown Parser Implementation
@@ -4473,7 +4654,9 @@
         }
 
         // Headers
-        if (processedLine.startsWith('### ')) {
+        if (processedLine.startsWith('#### ')) {
+          html += `<h4>${processedLine.substring(5)}</h4>`;
+        } else if (processedLine.startsWith('### ')) {
           html += `<h3>${processedLine.substring(4)}</h3>`;
         } else if (processedLine.startsWith('## ')) {
           html += `<h2>${processedLine.substring(3)}</h2>`;
@@ -4610,7 +4793,8 @@
 
     // Replace walkthrough cards placeholders
     if (hasWalkthrough) {
-      const innerHtml = parseMarkdown(walkthroughContent, isPlanApproved);
+      const formattedContent = formatWalkthroughXmlTags(walkthroughContent);
+      const innerHtml = parseMarkdown(formattedContent, isPlanApproved);
       const cardHtml = `
         <div class="walkthrough-card" style="background: rgba(16, 185, 129, 0.04); border: 1.5px solid rgba(16, 185, 129, 0.15); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
           <div class="walkthrough-card-glow" style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 1;"></div>
@@ -4628,7 +4812,8 @@
     }
 
     if (streamingWalkthrough) {
-      const innerHtml = parseMarkdown(walkthroughContent);
+      const formattedContent = formatWalkthroughXmlTags(walkthroughContent);
+      const innerHtml = parseMarkdown(formattedContent);
       const cardHtml = `
         <div class="walkthrough-card streaming" style="background: rgba(16, 185, 129, 0.02); border: 1.2px dashed rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative; overflow: hidden; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(16, 185, 129, 0.15); padding-bottom: 6px;">
@@ -5237,11 +5422,168 @@
       appendMessageBubble(lastUserMsg.role, lastUserMsg.content, lastUserMsg.images, fragment);
     }
 
-    // Append visible messages
+    // Append visible messages with tool card grouping
     const visibleSlice = chatHistory.slice(startIdx);
-    visibleSlice.forEach((msg) => {
-      appendMessageBubble(msg.role, msg.content, msg.images, fragment);
-    });
+    let activeAccordion = null;
+    let actionCount = 0;
+
+    function ensureActiveAccordion() {
+      if (activeAccordion) return activeAccordion;
+      
+      activeAccordion = document.createElement('div');
+      activeAccordion.className = 'worked-accordion collapsed';
+      
+      const header = document.createElement('div');
+      header.className = 'worked-accordion-header';
+      header.innerHTML = `
+        <span class="worked-accordion-label">Worked</span>
+        <span class="worked-accordion-chevron">
+          <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </span>
+      `;
+      
+      const content = document.createElement('div');
+      content.className = 'worked-accordion-content';
+      
+      activeAccordion.appendChild(header);
+      activeAccordion.appendChild(content);
+      
+      const localAccordion = activeAccordion;
+      header.addEventListener('click', () => {
+        localAccordion.classList.toggle('collapsed');
+      });
+      
+      fragment.appendChild(activeAccordion);
+      return activeAccordion;
+    }
+
+    for (let i = 0; i < visibleSlice.length; i++) {
+      const msg = visibleSlice[i];
+      if (msg.role === 'user') {
+        activeAccordion = null;
+        actionCount = 0;
+        appendMessageBubble(msg.role, msg.content, msg.images, fragment);
+      } else if (msg.role === 'system' || msg.role === 'tool') {
+        let innerText = msg.content || '';
+        const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
+        const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
+        if (innerText.includes(guardOpen) && innerText.includes(guardClose)) {
+          const startIndex = innerText.indexOf(guardOpen) + guardOpen.length;
+          const endIndex = innerText.indexOf(guardClose);
+          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            const contentInside = innerText.substring(startIndex, endIndex).trim();
+            const lines = contentInside.split('\n');
+            if (lines[0] && lines[0].startsWith('Source:')) {
+              lines.shift();
+            }
+            innerText = lines.join('\n').trim();
+          }
+        }
+
+        if (innerText.startsWith('[Tool Result')) {
+          ensureActiveAccordion();
+
+          const results = innerText.split('\n\n');
+          results.forEach(res => {
+            try {
+              const match = res.match(/\[Tool Result for (\w+) on "([\s\S]*?)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
+              if (match) {
+                const [_, toolName, target, statusString, details] = match;
+                const status = statusString.toLowerCase() === 'success' ? 'success' : 'error';
+                
+                let checkpointId;
+                let isReverted = false;
+                const revertedMatch = details.match(/Reverted ID: (\w+)/);
+                if (revertedMatch) {
+                  checkpointId = revertedMatch[1];
+                  isReverted = true;
+                } else {
+                  const cpMatch = details.match(/Revert ID: (\w+)/);
+                  if (cpMatch) checkpointId = cpMatch[1];
+                }
+                
+                const code = parsedToolContents.get(target);
+                const card = createToolCardDOM(toolName, status, target, details, checkpointId, isReverted, code);
+                const contentContainer = activeAccordion.querySelector('.worked-accordion-content');
+                placeCardInPlaceholder(card, toolName, target, contentContainer);
+                actionCount++;
+              }
+            } catch (cardErr) {
+              console.error("Error rendering historical tool card:", cardErr);
+            }
+          });
+
+          if (msg.duration) {
+            activeAccordion.dataset.duration = msg.duration;
+            if (msg.failed) activeAccordion.dataset.failed = 'true';
+          }
+
+          const label = activeAccordion.querySelector('.worked-accordion-label');
+          if (label) {
+            const isFailed = msg.failed || activeAccordion.dataset.failed === 'true';
+            const durText = msg.duration || activeAccordion.dataset.duration || '';
+            const actionText = `${actionCount} action${actionCount > 1 ? 's' : ''}`;
+            if (isFailed) {
+              label.textContent = durText ? `Failed (${actionText}) after ${durText}s` : `Failed (${actionText})`;
+            } else {
+              label.textContent = durText ? `Worked (${actionText}) in ${durText}s` : `Worked (${actionText})`;
+            }
+          }
+        } else {
+          appendMessageBubble(msg.role, msg.content, msg.images, fragment);
+        }
+      } else if (msg.role === 'assistant') {
+        // Look ahead to see if this is the last assistant message in this turn
+        let isLastAssistantInTurn = true;
+        for (let j = i + 1; j < visibleSlice.length; j++) {
+          if (visibleSlice[j].role === 'user') {
+            break;
+          }
+          if (visibleSlice[j].role === 'assistant') {
+            isLastAssistantInTurn = false;
+            break;
+          }
+        }
+
+        let cleanText = (msg.content || '')
+          .replace(/<read_file(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .replace(/<write_file(?:\s+[^>]*?)?>([\s\S]*?)<\/write_file>/gi, '')
+          .replace(/<create_file(?:\s+[^>]*?)?>([\s\S]*?)<\/create_file>/gi, '')
+          .replace(/<patch_file(?:\s+[^>]*?)?>([\s\S]*?)<\/patch_file>/gi, '')
+          .replace(/<multi_patch_file(?:\s+[^>]*?)?>([\s\S]*?)<\/multi_patch_file>/gi, '')
+          .replace(/<multipatch_file(?:\s+[^>]*?)?>([\s\S]*?)<\/multipatch_file>/gi, '')
+          .replace(/<list_dir(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .replace(/<grep_search(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .replace(/<run_command(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .trim();
+
+        if (isLastAssistantInTurn) {
+          if (cleanText) {
+            appendMessageBubble(msg.role, msg.content, msg.images, fragment);
+          }
+        } else {
+          // Intermediate assistant message: render as a clean commentary block inside the active Worked accordion
+          if (cleanText) {
+            ensureActiveAccordion();
+            const annotation = document.createElement('div');
+            annotation.className = 'worked-accordion-annotation';
+            annotation.style.fontSize = '10.5px';
+            annotation.style.color = 'var(--text-secondary)';
+            annotation.style.padding = '4px 6px';
+            annotation.style.borderLeft = '2px solid rgba(168, 85, 247, 0.4)';
+            annotation.style.margin = '4px 0 8px 6px';
+            annotation.style.background = 'rgba(255, 255, 255, 0.015)';
+            annotation.style.borderRadius = '2px';
+            annotation.innerHTML = parseMarkdown(cleanText);
+            
+            const contentContainer = activeAccordion.querySelector('.worked-accordion-content');
+            contentContainer.appendChild(annotation);
+          }
+        }
+      }
+    }
 
     // Atomic swap: replace all children in one paint cycle
     chatMessages.replaceChildren(fragment);

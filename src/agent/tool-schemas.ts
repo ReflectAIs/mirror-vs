@@ -263,7 +263,47 @@ const TOOL_SCHEMAS: ToolSchema[] = [
           terminal_name: { type: 'string', description: 'Name of the terminal to send input to.' },
           text: { type: 'string', description: 'Text to send (include \\n for Enter).' },
         },
-        required: ['text'],
+        required: ['terminal_name', 'text'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'read_terminal',
+      description: 'Read the output from an active running terminal panel.',
+      parameters: {
+        type: 'object',
+        properties: {
+          terminal_name: { type: 'string', description: 'Name of the terminal to read from.' },
+          chars: { type: 'number', description: 'Optional number of characters to read from the end of the output buffer. Default is 5000.' },
+        },
+        required: ['terminal_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'close_terminal',
+      description: 'Terminate and close an active terminal panel.',
+      parameters: {
+        type: 'object',
+        properties: {
+          terminal_name: { type: 'string', description: 'Name of the terminal to close.' },
+        },
+        required: ['terminal_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_terminals',
+      description: 'List all active running terminal panels managed by the agent.',
+      parameters: {
+        type: 'object',
+        properties: {},
       },
     },
   },

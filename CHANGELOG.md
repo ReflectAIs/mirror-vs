@@ -6,16 +6,24 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 ## [0.4.0] - 2025-07-18
 
 ### Added
+- **Smart Quote & Unquoted Attribute Parsing**: `agent-parser.ts` now handles curly/smart double quotes (`"..."`), curly single quotes (`'...'`), and unquoted values in tool call attributes, improving compatibility with LLM outputs that use typographic quotes.
+- **Loop Action Tracking for Repetition Detection**: `orchestrator.ts` now registers tool action keys (name + target) with the loop detector, enabling earlier detection of repetitive tool call patterns.
+- **Context Compaction Strategy 5**: Added intelligent summarization of older conversation history when approaching the budget threshold, preserving high-signal content while trimming low-value exchanges.
+- **Intermediate Assistant Annotations in UI**: `05-message-handlers.js` now renders intermediate assistant commentary (non-tool-call text between tool calls) as styled annotation blocks inside the Worked accordion, showing the agent's reasoning inline.
+- **Tool Card Duration Display**: Historical tool cards in the sidebar now show duration and action count labels (e.g., "Worked (3 actions) in 4.2s", "Failed (1 action)").
 - **Structured Agent Memory Output**: Agent memory service now returns memories as structured JSON (`getPersistentMemoryObject()`) with categorized lists (conventions, architectureDecisions, knownPatterns, userPreferences, notes) for clearer LLM consumption.
-- **Contextual Memory Goal**: `getContextString()` now accepts an optional `currentGoal` parameter, injecting it into memory context so the agent can align its behavior with the user's current objective.
-- **Streaming Suppression for Tool Loops**: `agent-completer.ts` now suppresses intermediate streaming chunks for subsequent tool-loop turns (when `isSubsequent=true`), reducing UI noise. Pure conversational replies without tool calls are still emitted to the sidebar.
+- **Contextual Memory Goal**: `getContextString()` now accepts an optional `currentGoal` parameter, injecting it into memory context.
+- **Streaming Suppression for Tool Loops**: `agent-completer.ts` suppresses intermediate streaming chunks for subsequent tool-loop turns.
 
 ### Changed
-- **System Prompt Architecture (v2)**: Refactored `baseAgentRole.ts` to produce a streamlined, principle-driven prompt with three pillars — Maximum Information Gain, Read-Before-Patch Grounding, Diagnostics-Driven Repair, and Call-Hierarchy Safety — replacing the verbose numbered rule list.
-- **Control Loop Guard Improvements**: Added comprehensive test coverage for `list_dir` validation, ensuring standard workspace directories are permitted with appropriate warnings.
+- **System Prompt Architecture (v2)**: Refactored `baseAgentRole.ts` to produce a streamlined, principle-driven prompt.
+- **Control Loop Guard Improvements**: Added comprehensive test coverage for `list_dir` validation.
+- **Tool Result Eviction Refinement**: Updated eviction logic in `tool-result-eviction.ts` to better preserve high-signal content like patches and errors.
+- **UI Tool Card Rendering**: Sidebar tool cards now strip XML tags from rendered content for cleaner display.
 
 ### Fixed
-- **Cross-Platform Path Handling**: All `fs` mocks in `orchestrator.test.ts` now normalize paths with `.replace(/\\/g, '/')` to resolve Windows backslash mismatches in test assertions.
+- **Cross-Platform Path Handling**: All `fs` mocks in `orchestrator.test.ts` now normalize paths to resolve Windows backslash mismatches.
+- **Gemini Provider Rate Limit Handling**: Improved error recovery in `gemini-provider.ts` for rate-limited requests.
 
 ## [0.3.2] - 2025-07-18
 

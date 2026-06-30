@@ -160,6 +160,26 @@ export interface ToolResultEvictionResult {
  * @param tokenCap    Target token budget to reduce towards.
  * @param keepRecentN How many recent messages to protect (default 8).
  */
+import { untrustedContextMessage } from '../agent/prompt-security';
+
+function getCleanContent(msgContent: string): string {
+  const guardOpen = '<<<UNTRUSTED_SOURCE_DATA>>>';
+  const guardClose = '<<<END_UNTRUSTED_SOURCE_DATA>>>';
+  if (msgContent.includes(guardOpen) && msgContent.includes(guardClose)) {
+    const startIndex = msgContent.indexOf(guardOpen) + guardOpen.length;
+    const endIndex = msgContent.indexOf(guardClose);
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+      const contentInside = msgContent.substring(startIndex, endIndex).trim();
+      const lines = contentInside.split('\n');
+      if (lines[0] && lines[0].startsWith('Source:')) {
+        lines.shift();
+      }
+      return lines.join('\n').trim();
+    }
+  }
+  return msgContent;
+}
+
 export function evictStaleToolResults(
   messages: ChatMessage[],
   tokenCap: number,
@@ -177,16 +197,17 @@ export function evictStaleToolResults(
   const candidates: { index: number; tokens: number }[] = [];
   for (let i = 0; i < protectFromIndex; i++) {
     const msg = messages[i];
-    if (msg.role !== 'system') continue;
+    if (msg.role !== 'system' && (msg.role as string) !== 'tool') continue;
     const content = typeof msg.content === 'string' ? msg.content : '';
+    const cleanContent = getCleanContent(content);
 
-    // Skip non-tool-result system messages
-    if (!content.startsWith('[Tool Result for ')) continue;
+    // Skip non-tool-result messages
+    if (!cleanContent.startsWith('[Tool Result for ')) continue;
 
     // Skip already-evicted placeholders
-    if (content.includes('evicted from context to reduce token usage')) continue;
+    if (cleanContent.includes('evicted from context to reduce token usage')) continue;
 
-    const toolName = extractToolName(content);
+    const toolName = extractToolName(cleanContent);
     if (!toolName) continue;
 
     // Skip protected tools
@@ -211,14 +232,20 @@ export function evictStaleToolResults(
 
     const msg = result[candidate.index];
     const content = typeof msg.content === 'string' ? msg.content : '';
-    const toolName = extractToolName(content)!;
-    const targetPath = extractTargetPath(content);
+    const cleanContent = getCleanContent(content);
+    const toolName = extractToolName(cleanContent)!;
+    const targetPath = extractTargetPath(cleanContent);
 
-    const placeholder = buildEvictionPlaceholder(content, toolName, targetPath);
-    const placeholderTokens = estimateTokens([{ role: 'system', content: placeholder }]);
+    const placeholder = buildEvictionPlaceholder(cleanContent, toolName, targetPath);
+    let finalPlaceholder = placeholder;
+    if (msg.role === 'system') {
+      finalPlaceholder = untrustedContextMessage('tool_execution_results', placeholder).content;
+    }
+
+    const placeholderTokens = estimateTokens([{ role: msg.role, content: finalPlaceholder }]);
     const saved = candidate.tokens - placeholderTokens;
 
-    result[candidate.index] = { ...msg, content: placeholder };
+    result[candidate.index] = { ...msg, content: finalPlaceholder };
     savedTokens += saved;
     currentSize -= saved;
     evictedCount++;

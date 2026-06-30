@@ -112,9 +112,10 @@ describe('Context Compactor Service', () => {
       const mockSummarize = vi.fn().mockResolvedValue('Mock conversation summary text.');
       const { compactedMessages, wasCompacted } = await maybeCompact(messages, 300, mockSummarize);
       expect(wasCompacted).toBe(true);
-      expect(mockSummarize).not.toHaveBeenCalled();
+      expect(mockSummarize).toHaveBeenCalled();
       expect(compactedMessages[0].role).toBe('system');
       expect(compactedMessages[0].content).toBe('sys');
+      expect(compactedMessages.some(m => m.role === 'system' && m.content.includes('Mock conversation summary text.'))).toBe(true);
       
       const summarized = compactedMessages.filter(m => m.summarized);
       expect(summarized.length).toBeGreaterThan(0);

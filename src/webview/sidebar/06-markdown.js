@@ -121,6 +121,15 @@
         const history = message.history;
         chatHistory = history || [];
         
+        // While the agent loop is active, suppress the full DOM rebuild.
+        // We keep chatHistory up-to-date in memory (for tool card lookups etc.)
+        // but we do NOT wipe and re-render the live streaming bubbles and
+        // worked accordion. The full re-render happens naturally when loopComplete
+        // or chatResponseError fires and clears isSending.
+        if (isSending) {
+          break;
+        }
+
         renderedLimit = 15;
         parsedToolContents.clear();
         currentStreamingBubble = null;
@@ -265,6 +274,56 @@
         </div>
       </div>
     `;
+  }
+
+  function formatWalkthroughXmlTags(content) {
+    if (!content) return '';
+    let formatted = content;
+    
+    // Replace <title>...</title>
+    formatted = formatted.replace(/<title>([\s\S]*?)<\/title>/gi, (_, text) => {
+      return `\n\n### 📌 ${text.trim()}\n`;
+    });
+    
+    // Replace <description>...</description>
+    formatted = formatted.replace(/<description>([\s\S]*?)<\/description>/gi, (_, text) => {
+      return `\n\n#### 📝 Description\n${text.trim()}\n`;
+    });
+    
+    // Replace <changes>...</changes>
+    formatted = formatted.replace(/<changes>([\s\S]*?)<\/changes>/gi, (_, text) => {
+      return `\n\n#### 🛠️ Changes\n${text.trim()}\n`;
+    });
+    
+    // Replace <diagnostics>...</diagnostics>
+    formatted = formatted.replace(/<diagnostics>([\s\S]*?)<\/diagnostics>/gi, (_, text) => {
+      return `\n\n#### 🔍 Diagnostics\n${text.trim()}\n`;
+    });
+    
+    // Replace <task id="...">...</task> with a styled heading
+    formatted = formatted.replace(/<task(?:\s+id="[^"]*?")?>([\s\S]*?)<\/task>/gi, (_, taskText) => {
+      return `\n\n#### 🎯 Task: ${taskText.trim()}\n`;
+    });
+    
+    // Replace <execution-log> with a heading
+    formatted = formatted.replace(/<execution-log>/gi, '\n\n#### 📋 Execution Log:\n');
+    formatted = formatted.replace(/<\/execution-log>/gi, '\n');
+    
+    // Replace <outcomes> with a heading
+    formatted = formatted.replace(/<outcomes>/gi, '\n\n#### ✅ Outcomes:\n');
+    formatted = formatted.replace(/<\/outcomes>/gi, '\n');
+    
+    // Fallback: strip any remaining custom XML markup blocks
+    formatted = formatted.replace(/<\/?[a-zA-Z0-9_\-]+(?:\s+[^>]*?)?>/g, (tag) => {
+      const tagName = tag.replace(/[<\/>]/g, '').split(' ')[0].toLowerCase();
+      const customXmlTags = ['task', 'execution-log', 'outcomes', 'verification', 'outcome', 'title', 'description', 'changes', 'diagnostics'];
+      if (customXmlTags.includes(tagName)) {
+        return '';
+      }
+      return tag;
+    });
+
+    return formatted;
   }
 
   // 9. Markdown Parser Implementation
@@ -522,7 +581,9 @@
         }
 
         // Headers
-        if (processedLine.startsWith('### ')) {
+        if (processedLine.startsWith('#### ')) {
+          html += `<h4>${processedLine.substring(5)}</h4>`;
+        } else if (processedLine.startsWith('### ')) {
           html += `<h3>${processedLine.substring(4)}</h3>`;
         } else if (processedLine.startsWith('## ')) {
           html += `<h2>${processedLine.substring(3)}</h2>`;
@@ -659,7 +720,8 @@
 
     // Replace walkthrough cards placeholders
     if (hasWalkthrough) {
-      const innerHtml = parseMarkdown(walkthroughContent, isPlanApproved);
+      const formattedContent = formatWalkthroughXmlTags(walkthroughContent);
+      const innerHtml = parseMarkdown(formattedContent, isPlanApproved);
       const cardHtml = `
         <div class="walkthrough-card" style="background: rgba(16, 185, 129, 0.04); border: 1.5px solid rgba(16, 185, 129, 0.15); border-radius: 8px; padding: 12px 14px; margin: 10px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
           <div class="walkthrough-card-glow" style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 1;"></div>
@@ -677,7 +739,8 @@
     }
 
     if (streamingWalkthrough) {
-      const innerHtml = parseMarkdown(walkthroughContent);
+      const formattedContent = formatWalkthroughXmlTags(walkthroughContent);
+      const innerHtml = parseMarkdown(formattedContent);
       const cardHtml = `
         <div class="walkthrough-card streaming" style="background: rgba(16, 185, 129, 0.02); border: 1.2px dashed rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 14px; margin: 10px 0; position: relative; overflow: hidden; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(16, 185, 129, 0.15); padding-bottom: 6px;">

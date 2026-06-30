@@ -544,11 +544,168 @@
       appendMessageBubble(lastUserMsg.role, lastUserMsg.content, lastUserMsg.images, fragment);
     }
 
-    // Append visible messages
+    // Append visible messages with tool card grouping
     const visibleSlice = chatHistory.slice(startIdx);
-    visibleSlice.forEach((msg) => {
-      appendMessageBubble(msg.role, msg.content, msg.images, fragment);
-    });
+    let activeAccordion = null;
+    let actionCount = 0;
+
+    function ensureActiveAccordion() {
+      if (activeAccordion) return activeAccordion;
+      
+      activeAccordion = document.createElement('div');
+      activeAccordion.className = 'worked-accordion collapsed';
+      
+      const header = document.createElement('div');
+      header.className = 'worked-accordion-header';
+      header.innerHTML = `
+        <span class="worked-accordion-label">Worked</span>
+        <span class="worked-accordion-chevron">
+          <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </span>
+      `;
+      
+      const content = document.createElement('div');
+      content.className = 'worked-accordion-content';
+      
+      activeAccordion.appendChild(header);
+      activeAccordion.appendChild(content);
+      
+      const localAccordion = activeAccordion;
+      header.addEventListener('click', () => {
+        localAccordion.classList.toggle('collapsed');
+      });
+      
+      fragment.appendChild(activeAccordion);
+      return activeAccordion;
+    }
+
+    for (let i = 0; i < visibleSlice.length; i++) {
+      const msg = visibleSlice[i];
+      if (msg.role === 'user') {
+        activeAccordion = null;
+        actionCount = 0;
+        appendMessageBubble(msg.role, msg.content, msg.images, fragment);
+      } else if (msg.role === 'system' || msg.role === 'tool') {
+        let innerText = msg.content || '';
+        const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
+        const guardClose = "<<<END_UNTRUSTED_SOURCE_DATA>>>";
+        if (innerText.includes(guardOpen) && innerText.includes(guardClose)) {
+          const startIndex = innerText.indexOf(guardOpen) + guardOpen.length;
+          const endIndex = innerText.indexOf(guardClose);
+          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            const contentInside = innerText.substring(startIndex, endIndex).trim();
+            const lines = contentInside.split('\n');
+            if (lines[0] && lines[0].startsWith('Source:')) {
+              lines.shift();
+            }
+            innerText = lines.join('\n').trim();
+          }
+        }
+
+        if (innerText.startsWith('[Tool Result')) {
+          ensureActiveAccordion();
+
+          const results = innerText.split('\n\n');
+          results.forEach(res => {
+            try {
+              const match = res.match(/\[Tool Result for (\w+) on "([\s\S]*?)"]:\s*(Success|Error)\s*-\s*([\s\S]*)/i);
+              if (match) {
+                const [_, toolName, target, statusString, details] = match;
+                const status = statusString.toLowerCase() === 'success' ? 'success' : 'error';
+                
+                let checkpointId;
+                let isReverted = false;
+                const revertedMatch = details.match(/Reverted ID: (\w+)/);
+                if (revertedMatch) {
+                  checkpointId = revertedMatch[1];
+                  isReverted = true;
+                } else {
+                  const cpMatch = details.match(/Revert ID: (\w+)/);
+                  if (cpMatch) checkpointId = cpMatch[1];
+                }
+                
+                const code = parsedToolContents.get(target);
+                const card = createToolCardDOM(toolName, status, target, details, checkpointId, isReverted, code);
+                const contentContainer = activeAccordion.querySelector('.worked-accordion-content');
+                placeCardInPlaceholder(card, toolName, target, contentContainer);
+                actionCount++;
+              }
+            } catch (cardErr) {
+              console.error("Error rendering historical tool card:", cardErr);
+            }
+          });
+
+          if (msg.duration) {
+            activeAccordion.dataset.duration = msg.duration;
+            if (msg.failed) activeAccordion.dataset.failed = 'true';
+          }
+
+          const label = activeAccordion.querySelector('.worked-accordion-label');
+          if (label) {
+            const isFailed = msg.failed || activeAccordion.dataset.failed === 'true';
+            const durText = msg.duration || activeAccordion.dataset.duration || '';
+            const actionText = `${actionCount} action${actionCount > 1 ? 's' : ''}`;
+            if (isFailed) {
+              label.textContent = durText ? `Failed (${actionText}) after ${durText}s` : `Failed (${actionText})`;
+            } else {
+              label.textContent = durText ? `Worked (${actionText}) in ${durText}s` : `Worked (${actionText})`;
+            }
+          }
+        } else {
+          appendMessageBubble(msg.role, msg.content, msg.images, fragment);
+        }
+      } else if (msg.role === 'assistant') {
+        // Look ahead to see if this is the last assistant message in this turn
+        let isLastAssistantInTurn = true;
+        for (let j = i + 1; j < visibleSlice.length; j++) {
+          if (visibleSlice[j].role === 'user') {
+            break;
+          }
+          if (visibleSlice[j].role === 'assistant') {
+            isLastAssistantInTurn = false;
+            break;
+          }
+        }
+
+        let cleanText = (msg.content || '')
+          .replace(/<read_file(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .replace(/<write_file(?:\s+[^>]*?)?>([\s\S]*?)<\/write_file>/gi, '')
+          .replace(/<create_file(?:\s+[^>]*?)?>([\s\S]*?)<\/create_file>/gi, '')
+          .replace(/<patch_file(?:\s+[^>]*?)?>([\s\S]*?)<\/patch_file>/gi, '')
+          .replace(/<multi_patch_file(?:\s+[^>]*?)?>([\s\S]*?)<\/multi_patch_file>/gi, '')
+          .replace(/<multipatch_file(?:\s+[^>]*?)?>([\s\S]*?)<\/multipatch_file>/gi, '')
+          .replace(/<list_dir(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .replace(/<grep_search(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .replace(/<run_command(?:\s+[^>]*?)?\s*\/?>/gi, '')
+          .trim();
+
+        if (isLastAssistantInTurn) {
+          if (cleanText) {
+            appendMessageBubble(msg.role, msg.content, msg.images, fragment);
+          }
+        } else {
+          // Intermediate assistant message: render as a clean commentary block inside the active Worked accordion
+          if (cleanText) {
+            ensureActiveAccordion();
+            const annotation = document.createElement('div');
+            annotation.className = 'worked-accordion-annotation';
+            annotation.style.fontSize = '10.5px';
+            annotation.style.color = 'var(--text-secondary)';
+            annotation.style.padding = '4px 6px';
+            annotation.style.borderLeft = '2px solid rgba(168, 85, 247, 0.4)';
+            annotation.style.margin = '4px 0 8px 6px';
+            annotation.style.background = 'rgba(255, 255, 255, 0.015)';
+            annotation.style.borderRadius = '2px';
+            annotation.innerHTML = parseMarkdown(cleanText);
+            
+            const contentContainer = activeAccordion.querySelector('.worked-accordion-content');
+            contentContainer.appendChild(annotation);
+          }
+        }
+      }
+    }
 
     // Atomic swap: replace all children in one paint cycle
     chatMessages.replaceChildren(fragment);
