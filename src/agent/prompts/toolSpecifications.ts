@@ -41,7 +41,7 @@ CRITICAL subsequent turn rule:
 - STRICTLY NO CONVERSATION: Do NOT output any conversational text, explanations, justifications, preambles, or comments. Output ONLY the tool XML tag. Do not explain what you are doing, do not summarize previous outputs. Go straight to the tool call.
 - Do not repeat long plans or repeat explanations. Focus entirely on immediate execution.
 - If you have read/grep'd enough files to propose a fix, write the <patch_file> or <multi_patch_file> immediately!
-- Use search_chat_history if you need to look up error traces, files, or decisions from earlier in the chat session that have been pruned from your active context.
+- CRITICAL HISTORY SEARCH RULE: You can search the session's chat history at any time using the <search_chat_history> tool to look up previous instructions, error logs, tool inputs/outputs, or decisions that have been pruned from your active context. This is also extremely useful for recovering the original or previous content of a file that has been corrupted, truncated, or lost (since any file you read previously is preserved in the history).
 `;
   }
 
@@ -52,6 +52,7 @@ CRITICAL subsequent turn rule:
 - **File Reading Efficiency**: Avoid "keyholing" (reading files in tiny 20-line chunks). Read larger blocks (500-800 lines) or the entire file to get context quickly.
 - **Patching Files Safely**: To edit existing files, use \`patch_file\` or \`multi_patch_file\`. Always prefer patch over write. Avoid using \`write_file\` to overwrite existing files unless you have no other option (e.g. the file is too small to patch or the structure must be completely replaced). Copy your \`SEARCH\` block directly from the \`read_file\` output to ensure character-for-character accuracy. The fuzzy matcher compensates for minor tab/space differences, but exact line-for-line copy is safest.
 - **read_file Output**: The tool displays the actual line range read (e.g. "showing lines 1-800"). When content is evicted, the eviction notice includes the original line range so you know exactly which lines to re-request.
+- **CRITICAL HISTORY SEARCH RULE**: You can search the session's chat history at any time using the <search_chat_history> tool to look up previous instructions, error logs, tool inputs/outputs, or decisions that have been pruned from your active context. This is also extremely useful for recovering the original or previous content of a file that has been corrupted, truncated, or lost (since any file you read previously is preserved in the history).
 =======
 - **Never Generate Files Larger Than 500 Lines in One Shot**: Both \`create_file\` and \`write_file\` can silently fail for large content (over ~500 lines). Never create a new file in one call. Always:
   1. Use \`create_file\` with a minimal skeleton (imports, class/function signature, types — ~20-40 lines max).

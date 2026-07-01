@@ -16,23 +16,23 @@
 
 :root {
   /* Core background palette — deeper, premium luxury darkness */
-  --bg-deep: #06060a;
-  --bg-surface: #0b0c11;
-  --bg-elevated: #11131a;
-  --bg-card: rgba(17, 19, 26, 0.65);
-  --bg-glass: rgba(255, 255, 255, 0.02);
-  --bg-glass-hover: rgba(255, 255, 255, 0.05);
-  --bg-glass-active: rgba(255, 255, 255, 0.08);
+  --bg-deep: #030305;
+  --bg-surface: #07070b;
+  --bg-elevated: #0f0f15;
+  --bg-card: rgba(14, 14, 24, 0.45);
+  --bg-glass: rgba(255, 255, 255, 0.015);
+  --bg-glass-hover: rgba(255, 255, 255, 0.04);
+  --bg-glass-active: rgba(255, 255, 255, 0.06);
 
   /* Primary gradient — refined cybernetic blue-to-cyan signature glow */
-  --gradient-primary: linear-gradient(135deg, #4f46e5, #06b6d4);
-  --gradient-primary-hover: linear-gradient(135deg, #4338ca, #0891b2);
-  --gradient-header: linear-gradient(180deg, rgba(6, 6, 10, 0.96) 0%, rgba(11, 12, 17, 0.85) 100%);
-  --gradient-glow: linear-gradient(90deg, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.2));
+  --gradient-primary: linear-gradient(135deg, #2563eb, #38bdf8);
+  --gradient-primary-hover: linear-gradient(135deg, #1d4ed8, #0ea5e9);
+  --gradient-header: linear-gradient(180deg, rgba(7, 7, 11, 0.95) 0%, rgba(7, 7, 11, 0.8) 100%);
+  --gradient-glow: linear-gradient(90deg, rgba(37, 99, 235, 0.25), rgba(56, 189, 248, 0.25));
 
   /* Functional colors */
-  --color-primary: #4f46e5;
-  --color-primary-light: #06b6d4;
+  --color-primary: #2563eb;
+  --color-primary-light: #38bdf8;
   --color-accent: #06b6d4;
   --color-success: #10b981;
   --color-warning: #f59e0b;
@@ -40,14 +40,14 @@
   --color-info: #06b6d4;
 
   /* Text hierarchy */
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #64748b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
 
-  /* Borders — ultra-thin clean glass borders */
-  --border-glass: rgba(255, 255, 255, 0.06);
-  --border-glass-hover: rgba(255, 255, 255, 0.1);
-  --border-glow: rgba(79, 70, 229, 0.25);
+  /* Borders — ultra-thin clean borders */
+  --border-glass: rgba(255, 255, 255, 0.05);
+  --border-glass-hover: rgba(255, 255, 255, 0.09);
+  --border-glow: rgba(37, 99, 235, 0.15);
 
   /* Border radii */
   --radius-xs: 4px;
@@ -836,140 +836,83 @@ select:focus {
 
 /* ─── WELCOME CARD ────────────────────────────────────────────────────────── */
 .welcome-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-xl);
-  padding: 28px 22px;
-  margin-top: 24px;
-  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.3);
+  background: transparent;
+  border: none;
+  padding: 48px 16px 24px;
+  margin: 0 auto;
+  max-width: 320px;
   position: relative;
-  overflow: hidden;
   text-align: center;
-  animation: welcome-in 0.6s var(--ease-spring) forwards;
-}
-
-.welcome-glow {
-  position: absolute;
-  top: -60%;
-  left: -60%;
-  width: 220%;
-  height: 220%;
-  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.06), transparent 60%);
-  animation: glow-rotate 8s linear infinite;
-}
-
-@keyframes glow-rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  animation: welcome-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes welcome-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .welcome-header {
-  position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 32px;
 }
 
 .welcome-logo {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 12px;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.4));
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
 .welcome-logo img {
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-lg);
-  filter: drop-shadow(0 4px 16px rgba(99, 102, 241, 0.25));
+  border-radius: 50%;
+  object-fit: contain;
 }
 
 .welcome-header h3 {
-  font-size: 16px;
-  font-weight: 800;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--vscode-editor-foreground, #cccccc);
+  margin: 0 0 6px 0;
 }
 
-.welcome-header p {
-  font-size: 12px;
-  color: var(--text-secondary);
+.welcome-subtitle {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888888);
+  margin: 0;
 }
 
-.welcome-features {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-  position: relative;
+.welcome-message {
+  padding: 0 12px;
+  margin-bottom: 28px;
 }
 
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-md);
-  text-align: left;
-  transition: var(--transition-normal);
-}
-
-.feature-item:hover {
-  background: rgba(255, 255, 255, 0.035);
-  border-color: var(--border-glass-hover);
-}
-
-.feature-icon-wrapper {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: rgba(99, 102, 241, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.feature-icon { font-size: 16px; }
-
-.feature-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.feature-text strong {
+.welcome-headline {
   font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-primary);
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--vscode-editor-foreground, #cccccc);
+  margin: 0 0 12px 0 !important;
 }
 
-.feature-text span {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.feature-text code {
-  background: rgba(168, 85, 247, 0.1);
-  color: var(--color-accent);
-  padding: 0 4px;
-  border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
+.welcome-beta-notice {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground, #888888);
+  margin: 0 !important;
+  opacity: 0.85;
 }
 
 .welcome-hint {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  position: relative;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888888);
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* ─── MESSAGE BUBBLES ─────────────────────────────────────────────────────── */

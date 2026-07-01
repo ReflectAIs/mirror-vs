@@ -657,7 +657,7 @@
               }
 
               bindCodeBlockButtons(existingCard);
-              scrollChatToBottom();
+              scrollChatToBottom(true);
               break;
             }
           }
@@ -666,7 +666,7 @@
           bindCodeBlockButtons(currentStreamingBubble);
         }
         
-        scrollChatToBottom();
+        scrollChatToBottom(true);
         break;
       }
 
@@ -791,7 +791,7 @@
           }
         }
         updateStickyUserMessage();
-        scrollChatToBottom();
+        scrollChatToBottom(true);
         break;
       }
 
@@ -872,7 +872,7 @@
           stopBtn.classList.add('hidden');
           clearAllActiveAnimations();
           updateStickyUserMessage();
-          scrollChatToBottom();
+          scrollChatToBottom(true);
           break;
         }
 
