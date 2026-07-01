@@ -561,6 +561,6 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "puppeteer-core": "^25.0.4"
+    "puppeteer-core": "^25.1.0"
   }
 }
