@@ -546,7 +546,7 @@
     "check": "npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {
-    "@types/node": "^18.17.1",
+    "@types/node": "^25.9.3",
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
