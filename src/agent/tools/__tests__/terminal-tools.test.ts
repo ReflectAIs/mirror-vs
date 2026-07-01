@@ -92,6 +92,52 @@ describe('executeTerminalTool', () => {
       expect(result).toContain('Terminal contents');
       expect(serviceMock.readTerminalOutput).toHaveBeenCalledWith('test-term', 1000);
     });
+
+    it('should fallback to the most recently created active terminal if terminal_name is missing', async () => {
+      serviceMock.getActiveTerminals.mockReturnValue([
+        { name: 'term-old', running: true },
+        { name: 'term-newest', running: true },
+      ]);
+      serviceMock.readTerminalOutput.mockReturnValue({
+        output: 'Newest terminal output',
+        running: true,
+        exitCode: null,
+      });
+
+      const tool = { name: 'read_terminal' as const };
+      const result = await executeTerminalTool(tool);
+
+      expect(result).toContain('Newest terminal output');
+      expect(serviceMock.readTerminalOutput).toHaveBeenCalledWith('term-newest', 5000);
+    });
+
+    it('should throw if terminal_name is missing and no active terminals are registered', async () => {
+      serviceMock.getActiveTerminals.mockReturnValue([]);
+      const tool = { name: 'read_terminal' as const };
+      await expect(executeTerminalTool(tool)).rejects.toThrow('terminal_name parameter is missing and no active terminals are registered');
+    });
+  });
+
+  describe('run_script', () => {
+    it('should execute command with script forceType override', async () => {
+      serviceMock.executeCommand.mockResolvedValue('Script run output');
+      const tool = { name: 'run_script' as const, command: 'npm run test' };
+      const result = await executeTerminalTool(tool);
+
+      expect(result).toBe('Script run output');
+      expect(serviceMock.executeCommand).toHaveBeenCalledWith('npm run test', 'script');
+    });
+  });
+
+  describe('run_server', () => {
+    it('should execute command with server forceType override', async () => {
+      serviceMock.executeCommand.mockResolvedValue('Server started output');
+      const tool = { name: 'run_server' as const, command: 'npm run dev' };
+      const result = await executeTerminalTool(tool);
+
+      expect(result).toBe('Server started output');
+      expect(serviceMock.executeCommand).toHaveBeenCalledWith('npm run dev', 'server');
+    });
   });
 
   describe('list_terminals', () => {

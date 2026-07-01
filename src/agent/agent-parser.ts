@@ -130,6 +130,8 @@ export class AgentParser {
       'browser_screenshot',
       'figma_inspect',
       'run_command',
+      'run_script',
+      'run_server',
       'close_terminal',
       'read_terminal',
       'list_terminals',
@@ -225,6 +227,8 @@ export class AgentParser {
       'browser_screenshot',
       'figma_inspect',
       'run_command',
+      'run_script',
+      'run_server',
       'close_terminal',
       'read_terminal',
       'list_terminals',
@@ -683,7 +687,52 @@ export class AgentParser {
         continue;
       }
       const c = this.attr(tagInfo.attrs, 'command');
-      if (c) candidates.push({ index: tagInfo.start, tool: { name: 'run_command', command: c } });
+      const t = this.attr(tagInfo.attrs, 'terminal_name');
+      if (c) {
+        const tool: ToolCall = { name: 'run_command', command: c };
+        if (t) tool.terminal_name = t;
+        candidates.push({ index: tagInfo.start, tool });
+      }
+      startFrom = tagInfo.end;
+    }
+
+    // run_script
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'run_script', startFrom)) !== null) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const c = this.attr(tagInfo.attrs, 'command');
+      const t = this.attr(tagInfo.attrs, 'terminal_name');
+      if (c) {
+        const tool: ToolCall = { name: 'run_script', command: c };
+        if (t) tool.terminal_name = t;
+        candidates.push({ index: tagInfo.start, tool });
+      }
+      startFrom = tagInfo.end;
+    }
+
+    // run_server
+    startFrom = 0;
+    while ((tagInfo = this.findUnquotedTagEndEx(rawText, 'run_server', startFrom)) !== null) {
+      if (
+        this.isInsideFencedCodeBlock(rawText, tagInfo.start) ||
+        this.isInsideInlineCodeBlock(rawText, tagInfo.start)
+      ) {
+        startFrom = tagInfo.end;
+        continue;
+      }
+      const c = this.attr(tagInfo.attrs, 'command');
+      const t = this.attr(tagInfo.attrs, 'terminal_name');
+      if (c) {
+        const tool: ToolCall = { name: 'run_server', command: c };
+        if (t) tool.terminal_name = t;
+        candidates.push({ index: tagInfo.start, tool });
+      }
       startFrom = tagInfo.end;
     }
 
@@ -770,13 +819,11 @@ export class AgentParser {
         startFrom = tagInfo.end;
         continue;
       }
-      const termName = this.attr(tagInfo.attrs, 'terminal_name');
-      if (termName) {
-        const chars = this.attr(tagInfo.attrs, 'chars');
-        const tool: ToolCall = { name: 'read_terminal', terminal_name: termName.trim() };
-        if (chars) tool.chars = chars;
-        candidates.push({ index: tagInfo.start, tool });
-      }
+      const termName = this.attr(tagInfo.attrs, 'terminal_name') || '';
+      const chars = this.attr(tagInfo.attrs, 'chars');
+      const tool: ToolCall = { name: 'read_terminal', terminal_name: termName.trim() };
+      if (chars) tool.chars = chars;
+      candidates.push({ index: tagInfo.start, tool });
       startFrom = tagInfo.end;
     }
 

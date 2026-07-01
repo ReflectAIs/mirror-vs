@@ -29,7 +29,7 @@ import { generateUnifiedDiff } from '../utils/diff';
 // Modular imports
 import { getContextLength, estimateTokens } from '../services/model-context';
 import { computeInputTokenBudget } from '../services/context-budget';
-import { maybeCompact, trimForContext } from '../services/context-compactor';
+import { maybeCompact, trimForContext, COMPACT_THRESHOLD, SELF_SUMMARY_SYSTEM_PROMPT } from '../services/context-compactor';
 import { evaluateTurnResult } from './failure-detector';
 import { sanitizeUserPrompt, untrustedContextMessage } from './prompt-security';
 import { injectRelevantSkills } from '../services/skill-service';
@@ -86,6 +86,7 @@ export class AgentOrchestrator {
   private readonly _completer: AgentCompleter;
 
   private _activeMessages: ChatMessage[] | undefined;
+  private _isCompacting = false;
   private readonly _sentFiles = new Map<string, { hash: string; content: string }>();
 
   // Context reduction: read_file dedup cache
@@ -1176,39 +1177,142 @@ export class AgentOrchestrator {
             }
           }
 
-          // Strategy 5: Context Compaction and Summarization.
-          // When history grows and approaches the budget threshold, summarize the older half using
-          // the model itself, and store the summary as a system message to keep memory intact.
-          const summarizeFn = async (convoToSummarize: ChatMessage[]): Promise<string> => {
-            const { SELF_SUMMARY_SYSTEM_PROMPT } = require('../services/context-compactor');
-            const summaryPayload: ChatMessage[] = [
-              { role: 'system', content: SELF_SUMMARY_SYSTEM_PROMPT },
-              ...convoToSummarize,
-            ];
-            const summaryController = new AbortController();
-            const res = await this._completer.getLLMCompletion(
-              provider as LLMProvider,
-              currentHost,
-              currentModel,
-              apiKey,
-              summaryPayload.map(m => ({ role: m.role === 'system' ? 'user' : m.role, content: m.content || '' })),
-              summaryController.signal,
-              this._session.sessionId,
-              summaryController,
-              vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
-              undefined,
-              undefined,
-              false
-            );
-            return res;
-          };
+          // Strategy 5: Context Compaction and Summarization (Non-blocking Out-of-band)
+          const activeMessagesForCheck = activeMessages.filter((m) => !m.summarized);
+          const used = estimateTokens(activeMessagesForCheck);
+          const pct = effectiveBudget ? used / effectiveBudget : 0;
 
-          const compactResult = await maybeCompact(activeMessages, effectiveBudget, summarizeFn);
-          if (compactResult.wasCompacted) {
-            console.log('[Orchestrator] History compacted and older messages summarized.');
-            activeMessages = compactResult.compactedMessages;
-            this._activeMessages = activeMessages;
-            await this._saveChatHistory(activeMessages);
+          if (pct >= COMPACT_THRESHOLD && !this._isCompacting) {
+            this._isCompacting = true;
+
+            // Separate system preface, conversation, and existing summaries
+            const systemMsgs: ChatMessage[] = [];
+            const convoMsgs: ChatMessage[] = [];
+            const existingSummaries: ChatMessage[] = [];
+            const alreadySummarized: ChatMessage[] = [];
+
+            for (const msg of activeMessages) {
+              if (msg.role === 'system') {
+                if (msg.content && msg.content.startsWith('[Conversation summary')) {
+                  existingSummaries.push(msg);
+                } else if (msg.content && msg.content.includes('\n\n[Conversation summary')) {
+                  const summaryIndex = msg.content.indexOf('\n\n[Conversation summary');
+                  const originalContent = msg.content.substring(0, summaryIndex);
+                  const summaryContent = msg.content.substring(summaryIndex + 2);
+
+                  existingSummaries.push({ role: 'system', content: summaryContent });
+                  systemMsgs.push({ ...msg, content: originalContent });
+                } else {
+                  systemMsgs.push(msg);
+                }
+              } else if (msg.summarized) {
+                alreadySummarized.push(msg);
+              } else {
+                convoMsgs.push(msg);
+              }
+            }
+
+            if (convoMsgs.length >= 4) {
+              // Split conversation: summarize older half, keep recent half.
+              let splitPoint = Math.floor(convoMsgs.length / 2);
+              while (splitPoint < convoMsgs.length) {
+                const currentMsg = convoMsgs[splitPoint];
+                const isToolResult = (currentMsg.role as string) === 'tool' || 
+                                     (currentMsg.role === 'system' && currentMsg.content && currentMsg.content.startsWith('[Tool Result for '));
+                
+                const prevMsg = splitPoint > 0 ? convoMsgs[splitPoint - 1] : null;
+                const prevHasToolCalls = prevMsg && prevMsg.role === 'assistant' && (prevMsg as any).tool_calls && (prevMsg as any).tool_calls.length > 0;
+                
+                if (isToolResult || prevHasToolCalls) {
+                  splitPoint++;
+                } else {
+                  break;
+                }
+              }
+
+              const older = convoMsgs.slice(0, splitPoint);
+              const olderMessageIds = new Set(older.map(m => m.id || (m as any)._id).filter(Boolean));
+
+              console.log('[Orchestrator] Starting background context compaction...');
+              
+              // Run the LLM summarization asynchronously
+              const summarizePayload = async (): Promise<string> => {
+                const summaryPayload: ChatMessage[] = [
+                  { role: 'system', content: SELF_SUMMARY_SYSTEM_PROMPT },
+                  ...older,
+                ];
+                const summaryController = new AbortController();
+                const res = await this._completer.getLLMCompletion(
+                  provider as LLMProvider,
+                  currentHost,
+                  currentModel,
+                  apiKey,
+                  summaryPayload.map(m => ({ role: m.role === 'system' ? 'user' : m.role, content: m.content || '' })),
+                  summaryController.signal,
+                  this._session.sessionId,
+                  summaryController,
+                  vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
+                  undefined,
+                  undefined,
+                  false
+                );
+                return res;
+              };
+
+              const actualSlicePoint = splitPoint;
+
+              summarizePayload().then(async (summaryText) => {
+                const newSummaryMsg: ChatMessage = {
+                  role: 'system',
+                  content: `[Conversation summary of turns ${alreadySummarized.length} to ${alreadySummarized.length + older.length}]:\n${summaryText}`,
+                };
+
+                const updatedMessages: ChatMessage[] = [];
+                for (const m of this._activeMessages || []) {
+                  const mId = m.id || (m as any)._id;
+                  if (mId && olderMessageIds.has(mId)) {
+                    updatedMessages.push({ ...m, summarized: true });
+                  } else {
+                    updatedMessages.push(m);
+                  }
+                }
+
+                let lastSummaryIndex = -1;
+                for (let i = 0; i < updatedMessages.length; i++) {
+                  if (updatedMessages[i].role === 'system' && updatedMessages[i].content && updatedMessages[i].content.startsWith('[Conversation summary')) {
+                    lastSummaryIndex = i;
+                  }
+                }
+
+                if (lastSummaryIndex !== -1) {
+                  updatedMessages.splice(lastSummaryIndex + 1, 0, newSummaryMsg);
+                } else {
+                  const sysIndex = updatedMessages.findIndex(m => m.role === 'system');
+                  if (sysIndex !== -1) {
+                    updatedMessages.splice(sysIndex + 1, 0, newSummaryMsg);
+                  } else {
+                    updatedMessages.unshift(newSummaryMsg);
+                  }
+                }
+
+                this._activeMessages = updatedMessages;
+                await this._saveChatHistory(updatedMessages);
+                console.log('[Orchestrator] Background context compaction complete.');
+
+                const newTokens = estimateTokens(updatedMessages.filter(m => !m.summarized));
+                this._postMessage({
+                  type: 'contextUsage',
+                  usedTokens: newTokens,
+                  maxTokens: effectiveBudget,
+                });
+              }).catch((err) => {
+                console.error('[Orchestrator] Background context compaction failed:', err);
+              }).finally(() => {
+                this._isCompacting = false;
+              });
+            } else {
+              this._isCompacting = false;
+            }
           }
 
           // Recompute usedTokens after evictions and compaction

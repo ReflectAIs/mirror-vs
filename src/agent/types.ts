@@ -13,6 +13,8 @@ export interface ToolCall {
     | 'browser_evaluate_script'
     | 'browser_screenshot'
     | 'run_command'
+    | 'run_script'
+    | 'run_server'
     | 'send_terminal_input'
     | 'close_terminal'
     | 'read_terminal'

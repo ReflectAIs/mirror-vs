@@ -255,6 +255,44 @@ const TOOL_SCHEMAS: ToolSchema[] = [
   {
     type: 'function',
     function: {
+      name: 'run_script',
+      description:
+        'Execute a finite, short-running script or command in the terminal (e.g., run tests, compile/build code, run database migrations, or trigger code generation). This tool is strictly blocking, waiting for the command to finish executing, and returns the full stdout/stderr output in a single turn.',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The shell command or script to execute.' },
+          terminal_name: {
+            type: 'string',
+            description: 'Optional name for the terminal panel (for reuse across turns).',
+          },
+        },
+        required: ['command'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_server',
+      description:
+        'Start a long-running background daemon process or server (e.g., local dev server, vite dev, api daemon, database docker container). This tool starts the server asynchronously, probes for port listeners, and returns immediately without blocking. Restrict this exclusively to persistent processes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The server start command to execute.' },
+          terminal_name: {
+            type: 'string',
+            description: 'Optional name for the terminal panel (for reuse across turns).',
+          },
+        },
+        required: ['command'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'send_terminal_input',
       description: 'Send input text to a running terminal (e.g., to answer an interactive prompt).',
       parameters: {

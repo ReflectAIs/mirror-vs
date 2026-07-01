@@ -25,6 +25,8 @@ Available tools:
 - web_search: <web_search query="..." />
 - get_diagnostics: <get_diagnostics [path="..."] />
 ${browserEnabled ? `- browser_navigate / browser_click / browser_type / browser_screenshot / browser_evaluate_script\n` : ''}- run_command: <run_command command="..." />
+- run_script: <run_script command="..." />
+- run_server: <run_server command="..." />
 - list_terminals / read_terminal / send_terminal_input / close_terminal
 - figma_inspect: <figma_inspect url="..." />
 - wait: <wait [ms="..."] [seconds="..."] />
@@ -129,7 +131,11 @@ ${browserEnabled ? `10. BROWSER NAVIGATE: <browser_navigate url="http://localhos
     <analyze_impact path="src/file.ts" /> (Impact analysis)
     <graphify /> (Module index: per-file description, exports & import chains — use when you need to understand what each file does and how they connect)
 15. WAIT: <wait ms="3000" />
-${browserEnabled ? `16. BROWSER SCREENSHOT: <browser_screenshot />\n` : ''}17. RUN COMMAND: <run_command command="npm install" />
+${browserEnabled ? `16. BROWSER SCREENSHOT: <browser_screenshot />\n` : ''}17. RUN SCRIPT: <run_script command="npm run test" />
+    Execute a finite command/script (e.g. tests, builds, linting) that runs to completion. Blocks until exit and returns full output.
+17b. RUN SERVER: <run_server command="npm run dev" />
+    Start a persistent background daemon, dev server, or service. Returns immediately after checking port.
+17c. RUN COMMAND: <run_command command="npm install" />
 18. SEND TERMINAL INPUT: <send_terminal_input terminal_name="...">Ctrl+C</send_terminal_input>
 19. CLOSE TERMINAL: <close_terminal terminal_name="..." />
 20. READ TERMINAL: <read_terminal terminal_name="..." />
