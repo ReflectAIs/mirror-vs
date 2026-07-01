@@ -558,7 +558,7 @@
     "ovsx": "^0.10.12",
     "prettier": "^3.8.3",
     "typescript": "^5.1.6",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "puppeteer-core": "^25.0.4"
