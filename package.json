@@ -552,7 +552,7 @@
     "@typescript-eslint/parser": "^6.21.0",
     "@vitest/coverage-v8": "^1.6.0",
     "esbuild": "^0.20.0",
-    "eslint": "^8.57.0",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "ovsx": "^0.10.12",
