@@ -109,6 +109,28 @@ function findFuzzyMatchRange(fileContentLines: string[], searchLines: string[]):
   return null;
 }
 
+function calculateLexicalBraceSignature(payload: string): number {
+  let scalarValue = 0;
+  for (let i = 0; i < payload.length; i++) {
+    const element = payload[i];
+    if (element === '{' || element === '[' || element === '<') scalarValue++;
+    if (element === '}' || element === ']' || element === '>') scalarValue--;
+  }
+  return scalarValue;
+}
+
+function findFuzzyMatchRangeWithBraces(fileContentLines: string[], searchLines: string[]): { start: number; end: number } | null {
+  const matchRange = findFuzzyMatchRange(fileContentLines, searchLines);
+  if (!matchRange) return null;
+
+  const matchedBlock = fileContentLines.slice(matchRange.start, matchRange.end + 1).join('\n');
+  const searchBlock = searchLines.join('\n');
+  if (calculateLexicalBraceSignature(matchedBlock) === calculateLexicalBraceSignature(searchBlock)) {
+    return matchRange;
+  }
+  return null;
+}
+
 /**
  * Validates structural consistency between search and replace blocks.
  * Checks brace/bracket/paren balance and indentation consistency
@@ -447,7 +469,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           
           // Fallback 2: Full file fuzzy range matching
           if (!found) {
-            const matchRange = findFuzzyMatchRange(fileLines, tool.expected_search_content!.split(/\r?\n/));
+            const matchRange = findFuzzyMatchRangeWithBraces(fileLines, tool.expected_search_content!.split(/\r?\n/));
             if (matchRange) {
               start = matchRange.start + 1;
               end = matchRange.end + 1;
@@ -503,7 +525,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           fileContent = fileContent.replace(search, replace);
         } else {
           // Fuzzy match fallback
-          const matchRange = findFuzzyMatchRange(fileLines, search.split('\n'));
+          const matchRange = findFuzzyMatchRangeWithBraces(fileLines, search.split('\n'));
 
           if (!matchRange) {
             throw new Error(
@@ -600,7 +622,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
             
             // Fallback 2: Full file fuzzy range matching
             if (!found) {
-              const matchRange = findFuzzyMatchRange(fileLines, p.expected_search_content.split(/\r?\n/));
+              const matchRange = findFuzzyMatchRangeWithBraces(fileLines, p.expected_search_content.split(/\r?\n/));
               if (matchRange) {
                 start = matchRange.start + 1;
                 end = matchRange.end + 1;
@@ -706,6 +728,9 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
           );
         }
 
+        const virtualWorkspace = new Map<string, { safePath: string; proposedContent: string; added: number; subtracted: number; warnings: string[] }>();
+
+        // Phase 1: Dry Run Validation
         for (const fp of filePatches) {
           const safePath = getSafePath(fp.path);
           if (!fs.existsSync(safePath)) {
@@ -729,7 +754,7 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
               fileContent = fileContent.replace(search, replace);
             } else {
               const currentFileLines = fileContent.split('\n');
-              const matchRange = findFuzzyMatchRange(currentFileLines, search.split('\n'));
+              const matchRange = findFuzzyMatchRangeWithBraces(currentFileLines, search.split('\n'));
               if (!matchRange) {
                 throw new Error(
                   `SEARCH block #${i + 1} not found in file ${fp.path} (failed both exact and fuzzy matches).` +
@@ -755,18 +780,37 @@ export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) =
             }
           }
 
-          const { accepted, checkpointId } = await confirmChangesWithDiff(
+          const postPatchWarnings = verifyPostPatch(fp.path, fileContent);
+          fileWarnings.push(...postPatchWarnings);
+
+          const hasSevereError = fileWarnings.some(w => w.includes('Mismatched') || w.includes('Syntax Error'));
+          if (hasSevereError) {
+            throw new Error(`Transaction Aborted: Syntactic validation failed during lookahead memory evaluation for module: ${fp.path}. Core brace balances or token structures are corrupt. Details:\n${fileWarnings.join('\n')}`);
+          }
+
+          virtualWorkspace.set(fp.path, {
             safePath,
-            fileContent,
-            path.basename(fp.path),
+            proposedContent: fileContent,
+            added: addedLines,
+            subtracted: subtractedLines,
+            warnings: fileWarnings
+          });
+        }
+
+        // Phase 2: Commit Phase (only runs if Phase 1 completes with 0 failures)
+        for (const [filePath, data] of virtualWorkspace.entries()) {
+          const { accepted, checkpointId } = await confirmChangesWithDiff(
+            data.safePath,
+            data.proposedContent,
+            path.basename(filePath),
             'replace',
           );
           if (!accepted) {
-            throw new Error(`User rejected patch edits for ${fp.path}.`);
+            throw new Error(`User rejected patch edits for ${filePath}.`);
           }
-          let fileResult = `Patched ${fp.path} (${fp.patches.length} block(s) (+${addedLines}, -${subtractedLines}), Revert ID: ${checkpointId})`;
-          if (fileWarnings.length > 0) {
-            fileResult += `\n⚠️ SYNTAX WARNINGS:\n${fileWarnings.join('\n')}`;
+          let fileResult = `Patched ${filePath} (${data.subtracted} block(s) (+${data.added}, -${data.subtracted}), Revert ID: ${checkpointId})`;
+          if (data.warnings.length > 0) {
+            fileResult += `\n⚠️ SYNTAX WARNINGS:\n${data.warnings.join('\n')}`;
           }
           results.push(fileResult);
         }

@@ -353,6 +353,30 @@ describe('AgentParser', () => {
       expect((calls[0] as any).terminal_name).toBe('Term 1');
     });
 
+    it('should parse read_terminal when terminal_name is missing or empty', () => {
+      const parser = makeParser();
+      const calls = parser.parseToolCalls(selfClosing('read_terminal'));
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe('read_terminal');
+      expect((calls[0] as any).terminal_name).toBe('');
+    });
+
+    it('should parse run_script', () => {
+      const parser = makeParser();
+      const calls = parser.parseToolCalls(selfClosing('run_script', 'command="npm run test"'));
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe('run_script');
+      expect((calls[0] as any).command).toBe('npm run test');
+    });
+
+    it('should parse run_server', () => {
+      const parser = makeParser();
+      const calls = parser.parseToolCalls(selfClosing('run_server', 'command="npm run dev"'));
+      expect(calls).toHaveLength(1);
+      expect(calls[0].name).toBe('run_server');
+      expect((calls[0] as any).command).toBe('npm run dev');
+    });
+
     it('should parse read_terminal with sanitized long terminal names', () => {
       const parser = makeParser();
       const calls = parser.parseToolCalls(

@@ -118,7 +118,7 @@ export function buildStaticSystemPromptCore(
       'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
       'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
       'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
-      'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
+      'run_command', 'run_script', 'run_server', 'send_terminal_input', 'close_terminal', 'read_terminal',
       'list_terminals', 'figma_inspect', 'update_agent_memory',
     ]);
     const prunedToolsSet = getToolsForQuery(userRequest, activeToolsSet);
@@ -184,7 +184,7 @@ export function buildDynamicSystemContext(
         'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
         'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
         'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
-        'run_command', 'send_terminal_input', 'close_terminal', 'read_terminal',
+        'run_command', 'run_script', 'run_server', 'send_terminal_input', 'close_terminal', 'read_terminal',
         'list_terminals', 'figma_inspect', 'update_agent_memory'
       ];
     } else if (planCreated) {
@@ -192,7 +192,7 @@ export function buildDynamicSystemContext(
       allowedTools = [
         'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
         'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
-        'run_command', 'wait', 'update_agent_memory'
+        'run_command', 'run_script', 'run_server', 'wait', 'update_agent_memory'
       ];
     } else {
       currentPhase = 'PLANNING';
@@ -391,7 +391,7 @@ export function pruneToolSpecsText(specs: string, activeTools: Set<string>): str
             return activeTools.has('browser_navigate') || activeTools.has('browser_screenshot');
           }
           if (tool.includes('terminal')) {
-            return activeTools.has('run_command') || activeTools.has('read_terminal');
+            return activeTools.has('run_command') || activeTools.has('run_script') || activeTools.has('run_server') || activeTools.has('read_terminal');
           }
           return activeTools.has(tool);
         }

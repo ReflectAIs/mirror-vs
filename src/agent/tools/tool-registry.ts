@@ -35,6 +35,8 @@ export const ALL_REGISTERED_TOOLS = new Set([
   'browser_evaluate_script',
   'browser_screenshot',
   'run_command',
+  'run_script',
+  'run_server',
   'send_terminal_input',
   'close_terminal',
   'read_terminal',
@@ -151,6 +153,8 @@ export async function executeTool(
 
   if (
     name === 'run_command' ||
+    name === 'run_script' ||
+    name === 'run_server' ||
     name === 'send_terminal_input' ||
     name === 'close_terminal' ||
     name === 'read_terminal' ||

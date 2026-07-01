@@ -87,10 +87,10 @@ function containsBlockedGitCommand(cmd: string): boolean {
 export async function executeTerminalTool(tool: ToolCall): Promise<string> {
   const service = CommandService.getInstance();
 
-  // ---- run_command ----
-  if (tool.name === 'run_command') {
+  // ---- run_command / run_script / run_server ----
+  if (tool.name === 'run_command' || tool.name === 'run_script' || tool.name === 'run_server') {
     if (!tool.command) {
-      throw new Error('Missing "command" attribute for run_command.');
+      throw new Error(`Missing "command" attribute for ${tool.name}.`);
     }
 
     const command = tool.command.trim();
@@ -111,13 +111,17 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
       } else {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { MirrorVsSidebarProvider } = require('../../providers/sidebar-provider');
-        approved = await MirrorVsSidebarProvider.requestToolApproval('run_command', command);
+        approved = await MirrorVsSidebarProvider.requestToolApproval(tool.name, command);
       }
       if (!approved) {
         throw new Error(`Command execution denied by user: "${command}"`);
       }
     }
 
+    const forceType = tool.name === 'run_script' ? 'script' : tool.name === 'run_server' ? 'server' : undefined;
+    if (forceType) {
+      return await service.executeCommand(command, forceType);
+    }
     return await service.executeCommand(command);
   }
 
@@ -190,12 +194,16 @@ export async function executeTerminalTool(tool: ToolCall): Promise<string> {
 
   // ---- read_terminal ----
   if (tool.name === 'read_terminal') {
-    const termName = (tool as ToolCall).terminal_name || '';
+    let termName = (tool as ToolCall).terminal_name || '';
 
-    if (!termName) {
-      throw new Error(
-        'Missing "terminal_name" attribute for read_terminal. Use list_terminals first to see available terminal names.',
-      );
+    if (!termName || termName.trim() === '') {
+      const activeTerminals = service.getActiveTerminals();
+      if (activeTerminals.length > 0) {
+        // Autocomplete argument selection with the newest active process group channel
+        termName = activeTerminals[activeTerminals.length - 1].name;
+      } else {
+        throw new Error("Execution Error: terminal_name parameter is missing and no active terminals are registered.");
+      }
     }
 
     // Parse optional chars/lines parameter

@@ -37,6 +37,7 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
   private outputBuffer = '';
   private _exitCode: number | null = null;
   private _running = false;
+  public readonly spawnedPids = new Set<number>();
 
   /** Resolves when the process exits. */
   public readonly exitPromise: Promise<{ code: number | null; output: string }>;
@@ -87,7 +88,12 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
       shell: shellExecutable,
       cwd: this.cwd,
       env: { ...process.env, FORCE_COLOR: '1' },
+      detached: true,
     });
+
+    if (this.process.pid) {
+      this.spawnedPids.add(this.process.pid);
+    }
 
     this.process.stdout?.on('data', (data: Buffer) => {
       const str = data.toString();
@@ -122,7 +128,28 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
 
   close(): void {
     if (this.process && this._running) {
-      this.process.kill();
+      const pid = this.process.pid;
+      if (pid) {
+        if (process.platform === 'win32') {
+          // Taskkill /T recursively forces termination of the process tree, /F enforces hard kill
+          child_process.exec(`taskkill /pid ${pid} /T /F`, () => {
+            this._running = false;
+          });
+        } else {
+          try {
+            // Passing a negative number (-PID) sends the signal to the entire Process Group (PGID)
+            process.kill(-pid, 'SIGKILL');
+          } catch (e) {
+            try {
+              this.process.kill('SIGKILL');
+            } catch (_) {}
+          }
+          this._running = false;
+        }
+      } else {
+        this.process.kill();
+        this._running = false;
+      }
     }
   }
 
@@ -132,7 +159,16 @@ export class MirrorPseudoterminal implements vscode.Pseudoterminal {
     }
     // Ctrl+C
     if (data === '\x03') {
-      this.process.kill('SIGINT');
+      const pid = this.process.pid;
+      if (pid && process.platform !== 'win32') {
+        try {
+          process.kill(-pid, 'SIGINT');
+        } catch {
+          this.process.kill('SIGINT');
+        }
+      } else {
+        this.process.kill('SIGINT');
+      }
       return;
     }
     this.process.stdin?.write(data);
@@ -173,6 +209,7 @@ export class CommandService {
   private activePtys: Map<string, MirrorPseudoterminal> = new Map();
   /** Command metadata by terminal name. */
   private terminalCommandMap: Map<string, { command: string; isServer: boolean }> = new Map();
+  private isWindows = process.platform === 'win32';
 
   private constructor() {
     // Clean up on workspace change
@@ -324,6 +361,69 @@ export class CommandService {
     });
   }
 
+  /**
+   * Verifies port ownership by resolving the specific active PID and evaluating it against our active registry
+   */
+  public async verifyPortOwnership(port: number, expectedTargetName: string): Promise<{ active: boolean; matchesTarget: boolean; ownerPid?: number }> {
+    return new Promise((resolve) => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const net = require('net') as typeof import('net');
+      const client = new net.Socket();
+      
+      client.once('connect', () => {
+        client.destroy();
+        
+        // Port is active; query the OS to extract the exact PID mapping
+        const lookupCmd = this.isWindows 
+          ? `netstat -ano | findstr :${port} | findstr LISTENING`
+          : `lsof -t -i :${port}`;
+
+        child_process.exec(lookupCmd, (err, stdout) => {
+          if (err || !stdout.trim()) {
+            return resolve({ active: true, matchesTarget: false });
+          }
+
+          let resolvedPid: number | null = null;
+
+          if (this.isWindows) {
+            // netstat outputs lines matching format: TCP 0.0.0.0:8080 0.0.0.0:0 LISTENING 12345
+            const parts = stdout.trim().split(/\s+/);
+            const pidStr = parts[parts.length - 1];
+            resolvedPid = parseInt(pidStr, 10);
+          } else {
+            // lsof -t directly returns raw lists of matching PIDs line by line
+            const firstLine = stdout.trim().split('\n')[0];
+            resolvedPid = parseInt(firstLine, 10);
+          }
+
+          if (!resolvedPid || isNaN(resolvedPid)) {
+            return resolve({ active: true, matchesTarget: false });
+          }
+
+          const targetRegistry = this.activePtys.get(expectedTargetName);
+          if (targetRegistry) {
+            const isChildOrGrandchild = resolvedPid === (targetRegistry as any).process?.pid || targetRegistry.spawnedPids.has(resolvedPid);
+            
+            // Register this discovered PID to our tracked tree map to ensure future group drops intercept it
+            if (isChildOrGrandchild) {
+              targetRegistry.spawnedPids.add(resolvedPid);
+            }
+
+            return resolve({ active: true, matchesTarget: isChildOrGrandchild, ownerPid: resolvedPid });
+          }
+
+          return resolve({ active: true, matchesTarget: false, ownerPid: resolvedPid });
+        });
+      });
+
+      client.once('error', () => {
+        resolve({ active: false, matchesTarget: false });
+      });
+
+      client.connect({ port, host: '127.0.0.1' });
+    });
+  }
+
   // -----------------------------------------------------------------------
   // Terminal queries (used by tools & system prompt)
   // -----------------------------------------------------------------------
@@ -412,7 +512,7 @@ export class CommandService {
    * terminal via MirrorPseudoterminal. Server commands return immediately
    * after port probing; short commands wait for exit and return output.
    */
-  public async executeCommand(commandString: string): Promise<string> {
+  public async executeCommand(commandString: string, forceType?: 'script' | 'server'): Promise<string> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       throw new Error('No workspace folder is currently open.');
@@ -422,7 +522,7 @@ export class CommandService {
     const { cmd, cwd } = this.resolveCommandAndCwd(commandString, workspaceFolder);
     this.logToDebug(`Executing command: "${cmd}" (cwd: "${cwd}")`);
 
-    const isServer = this.isServerCommand(cmd);
+    const isServer = forceType === 'server' || (forceType !== 'script' && this.isServerCommand(cmd));
 
     if (isServer) {
       return this.executeServerCommand(cmd, cwd, commandString);
@@ -441,11 +541,15 @@ export class CommandService {
     // Pre-launch: check if the target port is already occupied
     const port = this.extractPort(cmd);
     if (port) {
-      const portOccupied = await this.probePort(port, 800);
-      if (portOccupied) {
-        this.logToDebug(`Port ${port} already occupied before launch — skipping new terminal.`);
+      const portOwnership = await this.verifyPortOwnership(port, terminalName);
+      if (portOwnership.active) {
+        if (portOwnership.matchesTarget) {
+          this.logToDebug(`Port ${port} already occupied by current target ${terminalName}.`);
+          return `Server is already running in background process "${terminalName}". Use browser_navigate to verify it is accessible.`;
+        }
+        this.logToDebug(`Port ${port} already occupied by PID ${portOwnership.ownerPid} before launch.`);
         return [
-          `⚠️ Port ${port} is already in use — a server is already running there.`,
+          `⚠️ Port ${port} is already in use by process PID ${portOwnership.ownerPid || '(unknown)'} — a server is already running there.`,
           `Do NOT start another server. Navigate directly to the existing one:`,
           `Use: browser_navigate url="http://localhost:${port}"`,
         ].join('\n');
