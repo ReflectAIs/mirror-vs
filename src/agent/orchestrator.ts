@@ -1304,13 +1304,16 @@ export class AgentOrchestrator {
             text
           );
           const runtimeCtx = `\n\n### 🎯 RUNTIME CONTEXT:\n${activeTaskPrompt}${loopWarningPrompt}${jobsPrompt}`+`\n\n### 📦 artifacts update:\nArtifacts "Implementation Plan" (plan_artifact) and "Task List" (tasks_artifact) have been automatically created/updated on disk by the orchestrator and rendered for the user. Do NOT write or edit these files manually.`;
-          const systemPromptContent = this._systemPromptCache + dynamicCtx + runtimeCtx;
-
           const payload: ChatMessage[] = [
             {
               role: 'system',
-              content: systemPromptContent,
+              content: this._systemPromptCache,
             },
+            {
+              role: 'system',
+              content: `## WORKSPACE CONTEXT & RUNTIME STATUS\n${dynamicCtx}${runtimeCtx}`,
+              _protected: true,
+            } as any,
             ...resolvedPayload,
           ];
 
