@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { ToolCall, ChatMessage } from '../types';
 import { executeFileTool } from './file-tools';
 import { executeSearchTool } from './search-tools';
@@ -76,6 +77,19 @@ export async function executeTool(
 ): Promise<string> {
   const name = tool.name;
 
+  if (name.startsWith('browser_')) {
+    let browserEnabled = true;
+    try {
+      const configObj = vscode.workspace.getConfiguration('mirror-vs');
+      browserEnabled = configObj.get('browserToolsEnabled', true);
+    } catch (e) {
+      browserEnabled = true;
+    }
+    if (!browserEnabled) {
+      return `[SYSTEM ERROR]: The tool "${name}" is permanently DISABLED in this workspace configuration. Do not attempt to use any browser or visual navigation tools. Pivot immediately to terminal execution or file reading tools to complete your current task.`;
+    }
+  }
+
   if (name === 'invalid_tool_mix') {
     throw new Error(tool.content || 'Invalid tool mix.');
   }
@@ -83,8 +97,7 @@ export async function executeTool(
   // Check plugin tools first (custom tools registered by extensions/users)
   const pluginService = PluginService.getInstance();
   if (pluginService.isPluginTool(name)) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const workspaceFolder = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     return pluginService.executePlugin(tool, {
       workspaceFolder,
       getSafePath,

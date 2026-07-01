@@ -53,7 +53,7 @@
   }
 
   // Helper: Append a message bubble to DOM
-  function appendMessageBubble(role, text, images, container = chatMessages) {
+  function appendMessageBubble(role, text, images, container = chatMessages, shouldAnimate = false) {
     if (role === 'system' || role === 'tool') {
       let innerText = text;
       const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
@@ -78,9 +78,10 @@
       if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
         const msgElement = document.createElement('div');
         msgElement.className = 'message system-context';
+        if (shouldAnimate) msgElement.classList.add('animate-in');
         
         const banner = document.createElement('div');
-        banner.className = 'system-context-banner';
+        banner.className = 'system-context-banner' + (shouldAnimate ? ' animate-in' : '');
         banner.innerHTML = `
           <div class="system-context-header">
             <span>🔄 Pair Programming Context Consolidated</span>
@@ -110,7 +111,7 @@
     }
 
     const msgElement = document.createElement('div');
-    msgElement.className = `message ${role}`;
+    msgElement.className = `message ${role}` + (shouldAnimate ? ' animate-in' : '');
 
     // Compute message index based on current chatHistory
     const msgIndex = chatHistory.findIndex(m => m.role === role && m.content === text);
@@ -462,6 +463,7 @@
             } else {
               ollamaModelSelect.value = message.models[0];
             }
+            if (typeof syncQuickModelSelect === 'function') syncQuickModelSelect();
           }
         } else {
           ollamaHostValidationIndicator.textContent = 'Offline';
@@ -488,6 +490,7 @@
         } else {
           ollamaModelSelect.innerHTML = '<option value="none">No models found</option>';
         }
+        if (typeof syncQuickModelSelect === 'function') syncQuickModelSelect();
         break;
       }
 
@@ -561,7 +564,7 @@
         }
 
         if (!currentStreamingBubble) {
-          const assistantBubble = appendMessageBubble('assistant', '');
+          const assistantBubble = appendMessageBubble('assistant', '', null, chatMessages, true);
           const typingIndicator = document.createElement('div');
           typingIndicator.className = 'typing-indicator';
           typingIndicator.innerHTML = '<span></span><span></span><span></span>';
@@ -918,7 +921,7 @@
           }
           currentStreamingBubble.innerHTML = `<div style="color: #ef4444; font-weight: 600;">Error: ${message.error}</div>`;
         } else {
-          const bubble = appendMessageBubble('assistant', '');
+          const bubble = appendMessageBubble('assistant', '', null, chatMessages, true);
           if (bubble) {
             bubble.innerHTML = `<div style="color: #ef4444; font-weight: 600;">Error: ${message.error}</div>`;
           }

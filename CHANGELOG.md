@@ -3,6 +3,21 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.4.2] - 2025-07-22
+
+### Added
+- **Browser Tools Config Gate**: Browser navigation tools are now conditionally available based on the `browserToolsEnabled` configuration flag. When disabled, tool schemas are stripped from the LLM's function declarations at the prompt level and intercepted at runtime with a clear system error, preventing wasted tokens and guiding the model toward alternative approaches (file/terminal tools).
+- **Abort Signal Support for Parallel Tool Execution**: Orchestrator's `_executeToolsInParallel` now uses `Promise.race` with an abort signal handler, allowing clean task cancellation when the user triggers a stop.
+- **Infinite Scroll End Detection**: The `history-loading-trigger` element is now removed once all chat history has been loaded, preventing unnecessary observer cycles.
+
+### Changed
+- **Orchestrator Action Count Accuracy**: The sidebar's worked-accordion action count now reads from actual DOM `.tool-card` elements via `querySelectorAll`, ensuring the count matches what's visually rendered rather than relying on a separate counter.
+- **Infinite Scroll Scroll-Protection**: A `preserveScroll` flag now disables smooth scroll behavior during history insertion to prevent jarring viewport jumps. A programmatic-scroll sentinel flag (`isProgrammaticScroll`) prevents recursive loading when `scrollTop` is set programmatically.
+- **Empty Assistant Response Handling**: When the orchestrator receives an empty assistant response, a system notice is now pushed to history reminding the model to either output a walkthrough summary (if done) or invoke a tool (if still working), along with an early save of the chat history before the continue loop resumes.
+
+### Fixed
+- **IntersectionObserver Registration Timing**: The history-loading observer is now registered with a 150ms delay after DOM rebuild, ensuring layout has fully stabilized before observing triggers.
+
 ## [0.4.1] - 2025-07-22
 
 ### Added

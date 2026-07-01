@@ -5,7 +5,12 @@ export const workspace = {
   },
   workspaceFolders: [{ uri: { fsPath: '/mock/workspace' } }],
   getConfiguration: () => ({
-    get: <T>(_key: string, defaultValue?: T) => defaultValue as T,
+    get: <T>(key: string, defaultValue?: T) => {
+      if ((global as any).__mockConfig && key in (global as any).__mockConfig) {
+        return (global as any).__mockConfig[key];
+      }
+      return defaultValue as T;
+    },
     update: () => Promise.resolve(),
   }),
   openTextDocument: () =>

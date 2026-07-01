@@ -1513,6 +1513,11 @@ export class AgentOrchestrator {
           }
 
           if (continueLoop && loopCount < maxLoops && assistantResponse === '') {
+            pushToHistory({
+              role: 'system',
+              content: '[System Notice]: Your previous response was empty. If you have completed the task, please output a final <walkthrough>...</walkthrough> summary. If you still need to run commands or read/write files, please invoke the correct tool.'
+            });
+            await this._saveChatHistory(currentMessages);
             continue;
           }
 
@@ -1693,7 +1698,14 @@ export class AgentOrchestrator {
                 )
               );
 
-              const resolvedResults = await Promise.all(promises);
+              const resolvedResults = await Promise.race([
+                Promise.all(promises),
+                new Promise<string[]>((_, reject) => {
+                  const abortHandler = () => reject(new Error('Task aborted by user'));
+                  if (signal.aborted) abortHandler();
+                  else signal.addEventListener('abort', abortHandler);
+                })
+              ]);
               for (const r of resolvedResults) {
                 if (r) toolResults.push(r);
               }
@@ -1713,26 +1725,33 @@ export class AgentOrchestrator {
                 const lastRewriteTelemetryWrapper = { val: lastRewriteTelemetry };
                 const consecutivePatchFailuresWrapper = { val: consecutivePatchFailures, lastFailedPath: lastPatchFailedPath };
 
-                const r = await this._executeSingleTool(
-                  tool,
-                  taskMode,
-                  activeMode,
-                  verifiedFiles,
-                  searchCountWrapper,
-                  maxSearchBudget,
-                  readRangesTracker,
-                  lastSearches,
-                  hasCommittedToPatch,
-                  agentState,
-                  blockedScopes,
-                  allowedScopes,
-                  featureOwner,
-                  activeWarnings,
-                  config,
-                  lastRewriteTelemetryWrapper,
-                  lastSymptom,
-                  consecutivePatchFailuresWrapper,
-                );
+                const r = await Promise.race([
+                  this._executeSingleTool(
+                    tool,
+                    taskMode,
+                    activeMode,
+                    verifiedFiles,
+                    searchCountWrapper,
+                    maxSearchBudget,
+                    readRangesTracker,
+                    lastSearches,
+                    hasCommittedToPatch,
+                    agentState,
+                    blockedScopes,
+                    allowedScopes,
+                    featureOwner,
+                    activeWarnings,
+                    config,
+                    lastRewriteTelemetryWrapper,
+                    lastSymptom,
+                    consecutivePatchFailuresWrapper,
+                  ),
+                  new Promise<string>((_, reject) => {
+                    const abortHandler = () => reject(new Error('Task aborted by user'));
+                    if (signal.aborted) abortHandler();
+                    else signal.addEventListener('abort', abortHandler);
+                  })
+                ]);
                 
                 toolResults.push(r);
 
@@ -1964,9 +1983,24 @@ export class AgentOrchestrator {
         }
         }
         this._sendAvatarState('idle');
+
+        let lastMsg = currentMessages[currentMessages.length - 1];
+        let isCompleted = lastMsg && lastMsg.role === 'assistant' && lastMsg.content && lastMsg.content.includes('<walkthrough>');
+
+        if (
+          !isCompleted &&
+          lastMsg &&
+          lastMsg.role === 'assistant' &&
+          lastMsg.content &&
+          (taskMode === TaskMode.IMPLEMENT || taskMode === TaskMode.DEBUG || taskMode === TaskMode.VERIFY)
+        ) {
+          lastMsg.content = `<walkthrough>\n${lastMsg.content.trim()}\n</walkthrough>`;
+          isCompleted = true;
+          this._syncPlanningFiles(lastMsg.content);
+          await this._saveChatHistory(currentMessages);
+        }
+
         this._postMessage({ type: 'updateChatHistory', history: currentMessages });
-        const lastMsg = currentMessages[currentMessages.length - 1];
-        const isCompleted = lastMsg && lastMsg.role === 'assistant' && lastMsg.content && lastMsg.content.includes('<walkthrough>');
         this._postMessage({ type: 'loopComplete', completed: !!isCompleted });
         try {
           EventBus.getInstance().fire('task_completed', {

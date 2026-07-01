@@ -157,29 +157,7 @@
   }
 
   function updateStickyVisibility() {
-    if (!chatScrollContainer || !chatMessages) return;
-    const userBubbles = chatMessages.querySelectorAll('.message.user.sticky-user-message');
-    if (userBubbles.length === 0) return;
-    const lastBubble = userBubbles[userBubbles.length - 1];
-    
-    // Detect if scrolled past the top (stuck at top)
-    const rect = lastBubble.getBoundingClientRect();
-    const containerRect = chatScrollContainer.getBoundingClientRect();
-    const isStuck = rect.top <= containerRect.top + 5;
-    
-    if (isStuck) {
-      lastBubble.classList.add('is-stuck');
-      lastBubble.style.background = 'var(--vscode-editorWidget-background, rgba(12,12,20,0.98))';
-      lastBubble.style.borderBottom = '1.5px solid rgba(99, 102, 241, 0.25)';
-      lastBubble.style.paddingBottom = '8px';
-      lastBubble.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.12), 0 1px 0 rgba(99, 102, 241, 0.2)';
-    } else {
-      lastBubble.classList.remove('is-stuck');
-      lastBubble.style.background = '';
-      lastBubble.style.borderBottom = '';
-      lastBubble.style.paddingBottom = '';
-      lastBubble.style.boxShadow = '';
-    }
+    // Rely on static CSS rules for sticky styling to avoid layout thrashing and scroll blink
   }
 
   function updatePinnedUserMessage() {
@@ -339,11 +317,11 @@
     
     // Build user display message — text already contains [filepath] markers inline from autocomplete
     let displayMsg = userDisplayMessage || text;
-    appendMessageBubble('user', displayMsg, images);
+    appendMessageBubble('user', displayMsg, images, chatMessages, true);
     updateStickyUserMessage();
     scrollChatToBottom(true);
 
-    const assistantBubble = appendMessageBubble('assistant', '');
+    const assistantBubble = appendMessageBubble('assistant', '', null, chatMessages, true);
     const typingIndicator = document.createElement('div');
     typingIndicator.className = 'typing-indicator';
     typingIndicator.innerHTML = '<span></span><span></span><span></span>';
@@ -3000,7 +2978,7 @@
   }
 
   // Helper: Append a message bubble to DOM
-  function appendMessageBubble(role, text, images, container = chatMessages) {
+  function appendMessageBubble(role, text, images, container = chatMessages, shouldAnimate = false) {
     if (role === 'system' || role === 'tool') {
       let innerText = text;
       const guardOpen = "<<<UNTRUSTED_SOURCE_DATA>>>";
@@ -3025,9 +3003,10 @@
       if (innerText.includes('[CONSOLIDATED CONTEXT SUMMARY]')) {
         const msgElement = document.createElement('div');
         msgElement.className = 'message system-context';
+        if (shouldAnimate) msgElement.classList.add('animate-in');
         
         const banner = document.createElement('div');
-        banner.className = 'system-context-banner';
+        banner.className = 'system-context-banner' + (shouldAnimate ? ' animate-in' : '');
         banner.innerHTML = `
           <div class="system-context-header">
             <span>🔄 Pair Programming Context Consolidated</span>
@@ -3057,7 +3036,7 @@
     }
 
     const msgElement = document.createElement('div');
-    msgElement.className = `message ${role}`;
+    msgElement.className = `message ${role}` + (shouldAnimate ? ' animate-in' : '');
 
     // Compute message index based on current chatHistory
     const msgIndex = chatHistory.findIndex(m => m.role === role && m.content === text);
@@ -3409,6 +3388,7 @@
             } else {
               ollamaModelSelect.value = message.models[0];
             }
+            if (typeof syncQuickModelSelect === 'function') syncQuickModelSelect();
           }
         } else {
           ollamaHostValidationIndicator.textContent = 'Offline';
@@ -3435,6 +3415,7 @@
         } else {
           ollamaModelSelect.innerHTML = '<option value="none">No models found</option>';
         }
+        if (typeof syncQuickModelSelect === 'function') syncQuickModelSelect();
         break;
       }
 
@@ -3508,7 +3489,7 @@
         }
 
         if (!currentStreamingBubble) {
-          const assistantBubble = appendMessageBubble('assistant', '');
+          const assistantBubble = appendMessageBubble('assistant', '', null, chatMessages, true);
           const typingIndicator = document.createElement('div');
           typingIndicator.className = 'typing-indicator';
           typingIndicator.innerHTML = '<span></span><span></span><span></span>';
@@ -3865,7 +3846,7 @@
           }
           currentStreamingBubble.innerHTML = `<div style="color: #ef4444; font-weight: 600;">Error: ${message.error}</div>`;
         } else {
-          const bubble = appendMessageBubble('assistant', '');
+          const bubble = appendMessageBubble('assistant', '', null, chatMessages, true);
           if (bubble) {
             bubble.innerHTML = `<div style="color: #ef4444; font-weight: 600;">Error: ${message.error}</div>`;
           }
@@ -5257,12 +5238,18 @@
   let userIsAtBottom = true;
   let isRebuildingDOM = false;
   let isEditingHistory = false;
+  let isProgrammaticScroll = false;
 
   function scrollChatToBottom(force = false) {
     const container = chatScrollContainer || chatMessages;
     if (force || userIsAtBottom) {
+      isProgrammaticScroll = true;
+      const originalScrollBehavior = container.style.scrollBehavior;
+      container.style.scrollBehavior = 'auto';
+      container.scrollTop = container.scrollHeight;
+      
       setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
+        container.style.scrollBehavior = originalScrollBehavior;
         userIsAtBottom = true;
         isRebuildingDOM = false;
       }, 50);
@@ -5370,9 +5357,6 @@
     const container = chatScrollContainer || chatMessages;
     const oldScrollHeight = container.scrollHeight;
     const oldScrollTop = container.scrollTop;
-
-    // Hide the container during rebuild to prevent flash/scroll jump from empty state
-    container.style.visibility = 'hidden';
     
     if (chatHistory.length === 0) {
       chatMessages.innerHTML = '';
@@ -5390,7 +5374,6 @@
         dash.classList.add('hidden');
       }
       updateStickyUserMessage();
-      container.style.visibility = '';
       isRebuildingDOM = false;
       return;
     }
@@ -5420,10 +5403,7 @@
     if (startIdx > 0) {
       const loadTrigger = document.createElement('div');
       loadTrigger.className = 'history-loading-trigger';
-      loadTrigger.innerHTML = '<span>💬</span> Load older messages...';
-      loadTrigger.addEventListener('click', () => {
-        loadMoreHistory();
-      });
+      loadTrigger.innerHTML = '<span>💬</span> Loading older messages...';
       fragment.appendChild(loadTrigger);
     }
 
@@ -5532,9 +5512,11 @@
 
           const label = activeAccordion.querySelector('.worked-accordion-label');
           if (label) {
+            const contentContainer = activeAccordion.querySelector('.worked-accordion-content');
+            const actualCards = contentContainer.querySelectorAll('.tool-card').length;
             const isFailed = msg.failed || activeAccordion.dataset.failed === 'true';
             const durText = msg.duration || activeAccordion.dataset.duration || '';
-            const actionText = `${actionCount} action${actionCount > 1 ? 's' : ''}`;
+            const actionText = `${actualCards} action${actualCards !== 1 ? 's' : ''}`;
             if (isFailed) {
               label.textContent = durText ? `Failed (${actionText}) after ${durText}s` : `Failed (${actionText})`;
             } else {
@@ -5598,25 +5580,38 @@
     // Atomic swap: replace all children in one paint cycle
     chatMessages.replaceChildren(fragment);
 
-    // Restore visibility now that all content is loaded
-    container.style.visibility = '';
+
 
     if (preserveScroll) {
-      // If user was at the top, stay at the top after loading older messages
-      if (oldScrollTop <= 5) {
-        container.scrollTop = 0;
-      } else {
-        // Maintain relative scroll position so content doesn't jump
-        container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
-      }
+      isProgrammaticScroll = true;
+      const originalScrollBehavior = container.style.scrollBehavior;
+      container.style.scrollBehavior = 'auto'; // Disable smooth scroll temporarily
+      // Maintain relative scroll position so content doesn't jump
+      container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
+      
       setTimeout(() => {
+        container.style.scrollBehavior = originalScrollBehavior;
         isRebuildingDOM = false;
-      }, 80);
+      }, 150);
     } else {
       scrollChatToBottom(true);
     }
 
-    // Update sticky user message status
+    // Register IntersectionObserver ONLY after layout has fully stabilized and isRebuildingDOM is false!
+    setTimeout(() => {
+      const trigger = chatMessages.querySelector('.history-loading-trigger');
+      if (trigger) {
+        const observer = new IntersectionObserver((entries) => {
+          if (entries[0].isIntersecting) {
+            observer.disconnect();
+            loadMoreHistory();
+          }
+        }, { root: container, rootMargin: '100px 0px 0px 0px', threshold: 0.1 });
+        observer.observe(trigger);
+      }
+    }, 150);
+
+    // Update sticky user message status synchronously to prevent layout shifts
     updateStickyUserMessage();
   }
 
@@ -5624,12 +5619,22 @@
     if (chatHistory.length > renderedLimit) {
       renderedLimit += 15;
       renderVisibleHistory(true);
+    } else {
+      // Remove loading trigger once end of history is reached
+      const trigger = document.querySelector('.history-loading-trigger');
+      if (trigger) {
+        trigger.remove();
+      }
     }
   }
 
-  // Sticky bar visibility only (no auto-load on scroll)
+  // Sticky bar visibility & infinite scroll
   if (chatScrollContainer) {
     chatScrollContainer.addEventListener('scroll', () => {
+      if (isProgrammaticScroll) {
+        isProgrammaticScroll = false;
+        return;
+      }
       if (isRebuildingDOM) return;
       const threshold = 15;
       userIsAtBottom = (chatScrollContainer.scrollHeight - chatScrollContainer.scrollTop - chatScrollContainer.clientHeight) <= threshold;

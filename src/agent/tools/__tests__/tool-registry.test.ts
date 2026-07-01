@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { workspace } from 'vscode';
 
 vi.mock('../file-tools', () => ({
   executeFileTool: vi.fn().mockResolvedValue('file tool result'),
@@ -56,12 +57,20 @@ describe('executeTool', () => {
     expect(result).toBe('search result');
   });
 
-  it('should route browser tools correctly', async () => {
+  it('should route browser tools correctly when enabled', async () => {
+    (global as any).__mockConfig = { browserToolsEnabled: true };
     const result = await executeTool({ name: 'browser_navigate', url: 'http://test.com' }, getSafePath);
     expect(result).toBe('browser result');
   });
 
-  it('should route browser_screenshot correctly', async () => {
+  it('should intercept and reject browser tools when disabled', async () => {
+    (global as any).__mockConfig = { browserToolsEnabled: false };
+    const result = await executeTool({ name: 'browser_navigate', url: 'http://test.com' }, getSafePath);
+    expect(result).toContain('[SYSTEM ERROR]: The tool "browser_navigate" is permanently DISABLED');
+  });
+
+  it('should route browser_screenshot correctly when enabled', async () => {
+    (global as any).__mockConfig = { browserToolsEnabled: true };
     const result = await executeTool({ name: 'browser_screenshot' }, getSafePath);
     expect(result).toBe('browser result');
   });

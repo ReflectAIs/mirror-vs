@@ -112,12 +112,13 @@ export function buildStaticSystemPromptCore(
     finalSpecs = '';
     guideOnlyPrompt = `\n\n${GUIDE_ONLY_DIRECTIVE}`;
   } else {
+    const browserEnabled = config.get<boolean>('browserToolsEnabled', true);
     const activeToolsSet = new Set([
       'read_file', 'create_file', 'write_file', 'patch_file', 'multi_patch_file',
       'list_dir', 'grep_search', 'semantic_search', 'web_search', 'get_diagnostics',
-      'browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script',
+      ...(browserEnabled ? ['browser_navigate', 'browser_click', 'browser_type', 'browser_evaluate_script', 'browser_screenshot'] : []),
       'analyze_project', 'analyze_dependencies', 'analyze_complexity', 'analyze_coverage',
-      'analyze_dead_code', 'analyze_impact', 'graphify', 'wait', 'browser_screenshot',
+      'analyze_dead_code', 'analyze_impact', 'graphify', 'wait',
       'run_command', 'run_script', 'run_server', 'send_terminal_input', 'close_terminal', 'read_terminal',
       'list_terminals', 'figma_inspect', 'update_agent_memory',
     ]);

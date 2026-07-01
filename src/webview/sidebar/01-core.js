@@ -157,29 +157,7 @@
   }
 
   function updateStickyVisibility() {
-    if (!chatScrollContainer || !chatMessages) return;
-    const userBubbles = chatMessages.querySelectorAll('.message.user.sticky-user-message');
-    if (userBubbles.length === 0) return;
-    const lastBubble = userBubbles[userBubbles.length - 1];
-    
-    // Detect if scrolled past the top (stuck at top)
-    const rect = lastBubble.getBoundingClientRect();
-    const containerRect = chatScrollContainer.getBoundingClientRect();
-    const isStuck = rect.top <= containerRect.top + 5;
-    
-    if (isStuck) {
-      lastBubble.classList.add('is-stuck');
-      lastBubble.style.background = 'var(--vscode-editorWidget-background, rgba(12,12,20,0.98))';
-      lastBubble.style.borderBottom = '1.5px solid rgba(99, 102, 241, 0.25)';
-      lastBubble.style.paddingBottom = '8px';
-      lastBubble.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.12), 0 1px 0 rgba(99, 102, 241, 0.2)';
-    } else {
-      lastBubble.classList.remove('is-stuck');
-      lastBubble.style.background = '';
-      lastBubble.style.borderBottom = '';
-      lastBubble.style.paddingBottom = '';
-      lastBubble.style.boxShadow = '';
-    }
+    // Rely on static CSS rules for sticky styling to avoid layout thrashing and scroll blink
   }
 
   function updatePinnedUserMessage() {
@@ -339,11 +317,11 @@
     
     // Build user display message — text already contains [filepath] markers inline from autocomplete
     let displayMsg = userDisplayMessage || text;
-    appendMessageBubble('user', displayMsg, images);
+    appendMessageBubble('user', displayMsg, images, chatMessages, true);
     updateStickyUserMessage();
     scrollChatToBottom(true);
 
-    const assistantBubble = appendMessageBubble('assistant', '');
+    const assistantBubble = appendMessageBubble('assistant', '', null, chatMessages, true);
     const typingIndicator = document.createElement('div');
     typingIndicator.className = 'typing-indicator';
     typingIndicator.innerHTML = '<span></span><span></span><span></span>';

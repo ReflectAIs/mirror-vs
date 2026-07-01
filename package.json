@@ -2,7 +2,7 @@
   "name": "mirror-vs",
   "displayName": "Mirror VS",
   "description": "An interactive, sidebar-based AI Pair Programmer for VS Code supporting local Ollama and DeepSeek APIs with streaming completions.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "icon": "mirror_logo.png",
   "publisher": "DipeshMajithia",
   "author": "Dipesh Majithia",

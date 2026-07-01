@@ -369,12 +369,18 @@
   let userIsAtBottom = true;
   let isRebuildingDOM = false;
   let isEditingHistory = false;
+  let isProgrammaticScroll = false;
 
   function scrollChatToBottom(force = false) {
     const container = chatScrollContainer || chatMessages;
     if (force || userIsAtBottom) {
+      isProgrammaticScroll = true;
+      const originalScrollBehavior = container.style.scrollBehavior;
+      container.style.scrollBehavior = 'auto';
+      container.scrollTop = container.scrollHeight;
+      
       setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
+        container.style.scrollBehavior = originalScrollBehavior;
         userIsAtBottom = true;
         isRebuildingDOM = false;
       }, 50);
@@ -482,9 +488,6 @@
     const container = chatScrollContainer || chatMessages;
     const oldScrollHeight = container.scrollHeight;
     const oldScrollTop = container.scrollTop;
-
-    // Hide the container during rebuild to prevent flash/scroll jump from empty state
-    container.style.visibility = 'hidden';
     
     if (chatHistory.length === 0) {
       chatMessages.innerHTML = '';
@@ -502,7 +505,6 @@
         dash.classList.add('hidden');
       }
       updateStickyUserMessage();
-      container.style.visibility = '';
       isRebuildingDOM = false;
       return;
     }
@@ -532,10 +534,7 @@
     if (startIdx > 0) {
       const loadTrigger = document.createElement('div');
       loadTrigger.className = 'history-loading-trigger';
-      loadTrigger.innerHTML = '<span>💬</span> Load older messages...';
-      loadTrigger.addEventListener('click', () => {
-        loadMoreHistory();
-      });
+      loadTrigger.innerHTML = '<span>💬</span> Loading older messages...';
       fragment.appendChild(loadTrigger);
     }
 
@@ -644,9 +643,11 @@
 
           const label = activeAccordion.querySelector('.worked-accordion-label');
           if (label) {
+            const contentContainer = activeAccordion.querySelector('.worked-accordion-content');
+            const actualCards = contentContainer.querySelectorAll('.tool-card').length;
             const isFailed = msg.failed || activeAccordion.dataset.failed === 'true';
             const durText = msg.duration || activeAccordion.dataset.duration || '';
-            const actionText = `${actionCount} action${actionCount > 1 ? 's' : ''}`;
+            const actionText = `${actualCards} action${actualCards !== 1 ? 's' : ''}`;
             if (isFailed) {
               label.textContent = durText ? `Failed (${actionText}) after ${durText}s` : `Failed (${actionText})`;
             } else {
@@ -710,25 +711,38 @@
     // Atomic swap: replace all children in one paint cycle
     chatMessages.replaceChildren(fragment);
 
-    // Restore visibility now that all content is loaded
-    container.style.visibility = '';
+
 
     if (preserveScroll) {
-      // If user was at the top, stay at the top after loading older messages
-      if (oldScrollTop <= 5) {
-        container.scrollTop = 0;
-      } else {
-        // Maintain relative scroll position so content doesn't jump
-        container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
-      }
+      isProgrammaticScroll = true;
+      const originalScrollBehavior = container.style.scrollBehavior;
+      container.style.scrollBehavior = 'auto'; // Disable smooth scroll temporarily
+      // Maintain relative scroll position so content doesn't jump
+      container.scrollTop = container.scrollHeight - oldScrollHeight + oldScrollTop;
+      
       setTimeout(() => {
+        container.style.scrollBehavior = originalScrollBehavior;
         isRebuildingDOM = false;
-      }, 80);
+      }, 150);
     } else {
       scrollChatToBottom(true);
     }
 
-    // Update sticky user message status
+    // Register IntersectionObserver ONLY after layout has fully stabilized and isRebuildingDOM is false!
+    setTimeout(() => {
+      const trigger = chatMessages.querySelector('.history-loading-trigger');
+      if (trigger) {
+        const observer = new IntersectionObserver((entries) => {
+          if (entries[0].isIntersecting) {
+            observer.disconnect();
+            loadMoreHistory();
+          }
+        }, { root: container, rootMargin: '100px 0px 0px 0px', threshold: 0.1 });
+        observer.observe(trigger);
+      }
+    }, 150);
+
+    // Update sticky user message status synchronously to prevent layout shifts
     updateStickyUserMessage();
   }
 
@@ -736,12 +750,22 @@
     if (chatHistory.length > renderedLimit) {
       renderedLimit += 15;
       renderVisibleHistory(true);
+    } else {
+      // Remove loading trigger once end of history is reached
+      const trigger = document.querySelector('.history-loading-trigger');
+      if (trigger) {
+        trigger.remove();
+      }
     }
   }
 
-  // Sticky bar visibility only (no auto-load on scroll)
+  // Sticky bar visibility & infinite scroll
   if (chatScrollContainer) {
     chatScrollContainer.addEventListener('scroll', () => {
+      if (isProgrammaticScroll) {
+        isProgrammaticScroll = false;
+        return;
+      }
       if (isRebuildingDOM) return;
       const threshold = 15;
       userIsAtBottom = (chatScrollContainer.scrollHeight - chatScrollContainer.scrollTop - chatScrollContainer.clientHeight) <= threshold;
