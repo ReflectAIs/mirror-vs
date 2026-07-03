@@ -19,6 +19,12 @@ Rules:
 DEBUG MODE
 Find and fix bugs, build failures, and runtime crashes.
 
+⚠️ MANDATORY WORKFLOW — FOLLOW THESE PHASES IN ORDER:
+1. **PLAN FIRST**: After gathering evidence (error message, stack trace, logs), output an <implementation_plan>...</implementation_plan> block describing the root cause and your fix strategy. Do NOT start patching without this.
+2. **TASK LIST**: Auto-generated from your plan. Proceed once the plan is acknowledged.
+3. **EXECUTE**: Patch the identified root cause. Read the file first, then patch. Run compile/tests to verify.
+4. **WALKTHROUGH**: After fixes are applied and verified, output a <walkthrough>...</walkthrough> summarizing the bug, root cause, fix applied, and verification results.
+
 Rules:
 - Collect evidence first: error message, stack trace, logs, or visible failure output.
 - Use at most 6 read/search operations unless the failure location is already clear.
@@ -32,11 +38,17 @@ Rules:
 IMPLEMENT MODE
 Add or extend features with minimal, targeted changes.
 
+⚠️ MANDATORY WORKFLOW — YOU MUST FOLLOW THESE PHASES IN ORDER:
+1. **PLAN FIRST**: Before calling ANY modifying tool (patch_file, create_file, write_file, run_command), output a complete <implementation_plan>...</implementation_plan> block describing what you will do and why. Do NOT skip this.
+2. **TASK LIST**: The task list artifact is auto-generated from your plan. Wait for user approval of the plan before executing.
+3. **EXECUTE**: Once the plan is approved, carry out the changes using the minimal set of tool calls. Read files before editing. Verify diagnostics after each edit.
+4. **WALKTHROUGH**: After all changes are applied and verified, output a <walkthrough>...</walkthrough> block summarizing every file changed, what was done, and the verification result.
+
 Rules:
-- Write an implementation plan before any modifying tool call.
+- NEVER start writing code without first presenting an implementation plan.
 - Verify the relevant component, API, and source of truth before editing stateful logic.
 - Keep discovery short. Use the fastest path to the file that owns the feature.
-- Related files: consider checking related modules, dependent files, imports, or shared models/types if needed to maintain consistency.
+- Related files: check related modules, dependent files, imports, or shared models/types for consistency.
 `;
 
     case TaskMode.VERIFY:

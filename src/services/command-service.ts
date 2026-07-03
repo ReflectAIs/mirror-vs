@@ -592,7 +592,6 @@ export class CommandService {
           `⚠️ Server launched but port ${port} is not responding yet after ${SERVER_BOOT_WAIT_MS / 1000}s.`,
           `Check terminal "${terminalName}" for errors.`,
           `You can read the terminal output with: <read_terminal terminal_name="${terminalName}" />`,
-          `If the server is still starting, use: browser_navigate url="http://localhost:${port}"`,
         ].join('\n');
       }
     }
@@ -838,6 +837,7 @@ export class CommandService {
     return false;
   }
 
+
   // -----------------------------------------------------------------------
   // Cleanup
   // -----------------------------------------------------------------------
@@ -856,4 +856,70 @@ export class CommandService {
     this.activePtys.clear();
     this.terminalCommandMap.clear();
   }
+
+  // -----------------------------------------------------------------------
+  // v2.0 — Anti-Zombie & BootstrapGraph Helpers
+  // -----------------------------------------------------------------------
+
+  /**
+   * Terminate the full process tree for a named terminal.
+   * Uses `taskkill /F /T` on Windows and `SIGKILL` on POSIX.
+   * Compatible with the UncloggedCommandService interface from the v2 spec.
+   *
+   * @param terminalName  The terminal name as returned by `getActiveTerminals()`.
+   * @returns true if a matching terminal was found and killed, false otherwise.
+   */
+  public async terminateActiveTree(terminalName: string): Promise<boolean> {
+    const pty = this.activePtys.get(terminalName);
+    if (!pty) return false;
+
+    const pid = (pty as any).process?.pid as number | undefined;
+    if (pid === undefined) {
+      pty.close();
+      this.activePtys.delete(terminalName);
+      this.terminalCommandMap.delete(terminalName);
+      return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      if (process.platform === 'win32') {
+        child_process.exec(`taskkill /F /T /PID ${pid}`, () => {
+          this.activePtys.delete(terminalName);
+          this.terminalCommandMap.delete(terminalName);
+          resolve(true);
+        });
+      } else {
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch {
+          try { pty.close(); } catch { /* ignore */ }
+        }
+        this.activePtys.delete(terminalName);
+        this.terminalCommandMap.delete(terminalName);
+        resolve(true);
+      }
+    });
+  }
+
+  /**
+   * Public wrapper around the private `probePort` for use by `BootstrapGraph`
+   * and any external caller that needs a lightweight TCP LISTEN check.
+   *
+   * @param port       Port number to probe.
+   * @param timeoutMs  Connection timeout in milliseconds (default 800).
+   * @returns Promise<boolean> — true if something is listening on the port.
+   */
+  public static async probePortPublic(port: number, timeoutMs = 800): Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const net = require('net') as typeof import('net');
+    return new Promise<boolean>((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(timeoutMs);
+      socket.once('connect', () => { socket.destroy(); resolve(true); });
+      socket.once('timeout', () => { socket.destroy(); resolve(false); });
+      socket.once('error', () => resolve(false));
+      socket.connect(port, '127.0.0.1');
+    });
+  }
 }
+

@@ -4,6 +4,8 @@ import * as vscode from 'vscode';
 import { ToolCall } from '../types';
 import { createCheckpoint } from '../../utils/editor-utils';
 import { ReviewManager } from '../../services/review-manager';
+import { TransactionalCommitPipeline } from '../../storage/TransactionalCommitPipeline';
+
 
 function normalizeLineEndings(str: string): string {
   return str.replace(/\r\n/g, '\n');
@@ -212,16 +214,26 @@ function verifyPostPatch(filePath: string, content: string): string[] {
   return warnings;
 }
 
-/**
- * Writes changes to the file instantly and silently, opening it in the active editor.
- * Returns accepted: true immediately so the model never blocks or halts.
- */
 async function confirmChangesWithDiff(
   originalPath: string,
   proposedContent: string,
   _fileName: string,
   checkpointAction: 'create' | 'replace',
 ): Promise<{ accepted: boolean; checkpointId: string | null }> {
+  const pipeline = new TransactionalCommitPipeline();
+
+
+
+  
+  // Dry-run brace-balance structural validation (Phase 1)
+  const auditResult = await pipeline.stageAndExecuteTransaction([
+    { workspaceAbsolutePath: originalPath, proposedFileBuffer: proposedContent }
+  ]);
+  
+  if (!auditResult.success) {
+    throw new Error(auditResult.errorLog || 'Transactional commit aborted: Structural verification failure.');
+  }
+
   const config = vscode.workspace.getConfiguration('mirror-vs');
   const autoApproveWrite = config.get<boolean>('autoApproveWrite', false);
   if (!autoApproveWrite) {
@@ -252,11 +264,15 @@ async function confirmChangesWithDiff(
   // Create checkpoint first so the user can easily revert if needed
   const checkpointId = await createCheckpoint(originalPath, checkpointAction);
 
+  // Phase 2: Flush to disk (already audited in Phase 1, but we run the physical write here to preserve checkpointing/Telemetry/Review flow)
+  fs.writeFileSync(originalPath, proposedContent, 'utf8');
+
   // Start the non-blocking background review, passing checkpoint ID
   ReviewManager.getInstance().startReview(originalPath, originalContent, proposedContent, checkpointId || undefined);
 
   return { accepted: true, checkpointId };
 }
+
 
 export async function executeFileTool(tool: ToolCall, getSafePath: (p: string) => string): Promise<string> {
   switch (tool.name) {

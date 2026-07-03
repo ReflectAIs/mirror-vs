@@ -88,6 +88,8 @@ describe('Agent Orchestrator Modular Components', () => {
       // CONVERSATIONAL Mode
       expect(determineTaskMode('how are you?', 'normal')).toBe(TaskMode.CONVERSATIONAL);
       expect(determineTaskMode('hi', 'normal')).toBe(TaskMode.CONVERSATIONAL);
+      expect(determineTaskMode('what more can be done in the project?', 'normal')).toBe(TaskMode.CONVERSATIONAL);
+      expect(determineTaskMode('explain how the router works', 'normal')).toBe(TaskMode.CONVERSATIONAL);
     });
   });
 

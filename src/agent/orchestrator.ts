@@ -25,6 +25,12 @@ import { getToolSchemas, supportsNativeToolCalling } from './tool-schemas';
 import { NativeToolCallParser } from './native-tool-call-parser';
 import * as crypto from 'crypto';
 import { generateUnifiedDiff } from '../utils/diff';
+import { BootstrapGraph } from '../orchestration/BootstrapGraph';
+import { ScoredPageCache } from '../utils/ContextManager';
+import { ActionPhysicsGuard } from '../orchestration/ActionPhysicsGuard';
+import { PreemptionManager } from '../orchestration/PreemptionManager';
+import { LspDiagnosticGate } from '../orchestration/LspDiagnosticGate';
+
 
 // Modular imports
 import { getContextLength, estimateTokens } from '../services/model-context';
@@ -118,6 +124,15 @@ export class AgentOrchestrator {
   private _lastToolStatus: { name: string; status: 'success' | 'failed' | 'running'; reason?: string } | null = null;
   private _learningEngine: LearningEngine | undefined;
   private _workspaceAdapter: WorkspaceAdapter | undefined;
+
+  // v2 Core Engine Components
+  private readonly _bootstrapGraph = new BootstrapGraph();
+  private readonly _scoredPageCache = new ScoredPageCache(12000); // 12K token ceiling (Q3 sync eviction)
+  private readonly _physicsGuard = new ActionPhysicsGuard();
+  private readonly _preemptionManager = new PreemptionManager();
+  private readonly _lspGate = new LspDiagnosticGate();
+  private _bootstrapSnapshotStr = '';
+
 
   constructor(
     private readonly _getSecret: (key: string) => Promise<string | undefined>,
@@ -321,7 +336,65 @@ export class AgentOrchestrator {
     try {
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const figmaKey = (await this._getSecret('figma_api_key')) || '';
-      let result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath, this._activeMessages);
+
+      // ActionPhysicsGuard Gate (Consecutive read checks — Q1 Hybrid gate)
+      if (tool.name === 'read_file' && tool.path) {
+        const safePath = this._getSafePath(tool.path);
+        const frictionCheck = await this._physicsGuard.evaluateFrictionGate(safePath);
+        if (!frictionCheck.allowed) {
+          // Reset FSM mode to PLAN and inject the Warning Message (Hybrid Approach)
+          await this._stateGraph.transitionTo(ExecutionState.Planning);
+          if (this._activeMessages && frictionCheck.warningMessage) {
+            this._activeMessages.push({
+              role: 'system',
+              content: frictionCheck.warningMessage
+            });
+          }
+          return `[Friction Gate Intercept]: ${frictionCheck.warningMessage}`;
+        }
+      }
+
+      // PreemptionManager Hook Registration for PATCH execution
+      const isPatch = tool.name === 'patch_file' || tool.name === 'multi_patch_file';
+      if (isPatch && tool.path && this._activeAbortController) {
+        const safePath = this._getSafePath(tool.path);
+        this._preemptionManager.registerPreemptionHook(
+          vscode.Uri.file(safePath),
+          this._activeAbortController,
+          () => {
+            // Callback: demote FSM back to PLANNING mode
+            this._stateGraph.transitionTo(ExecutionState.Planning).catch(() => {});
+          }
+        );
+      }
+
+      let result = '';
+      try {
+        result = await executeTool(tool, this._getSafePath, figmaKey, workspacePath, this._activeMessages);
+      } finally {
+        // Deactivate preemption watcher after tool execution ends
+        if (isPatch) {
+          this._preemptionManager.deactivate();
+        }
+      }
+
+      // ScoredPageCache decay/pin integration (Q3 Option A sync eviction)
+      if (tool.name === 'read_file' && tool.path) {
+        const safePath = this._getSafePath(tool.path);
+        // Pin this target document at Priority 100, decaying others by 25 points
+        this._scoredPageCache.decayAndPin(safePath);
+        // Put the read outcome in the page cache
+        this._scoredPageCache.push(safePath, result, 100);
+      } else if (tool.name === 'create_file' || tool.name === 'write_file' || tool.name === 'patch_file' || tool.name === 'multi_patch_file') {
+        if (tool.path) {
+          const safePath = this._getSafePath(tool.path);
+          // Reset ActionPhysicsGuard consecutive reads counter for this file
+          this._physicsGuard.recordWrite(safePath);
+          // Demote the cached score of the edited target
+          this._scoredPageCache.demote(safePath);
+        }
+      }
+
 
       const isModifying = [
         'create_file', 'write_file', 'patch_file', 'multi_patch_file', 'delete_file', 'rename_file'
@@ -810,7 +883,27 @@ export class AgentOrchestrator {
         this._sessionVerifiedBuild = false;
         this._sessionCompletedActions = [];
         this._lastToolStatus = null;
+
+        // Run BootstrapGraph pre-flight discovery at session start (zero orientation loop)
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (workspaceFolder) {
+          try {
+            const payload = await this._bootstrapGraph.runDiscovery(workspaceFolder);
+            this._bootstrapSnapshotStr = BootstrapGraph.formatPayloadForPrompt(payload);
+          } catch (err) {
+            console.error('[Orchestrator] BootstrapGraph discovery failed:', err);
+            this._bootstrapSnapshotStr = '';
+          }
+        } else {
+          this._bootstrapSnapshotStr = '';
+        }
+
+        // Reset v2 cache / physics states
+        this._scoredPageCache.clear();
+        this._physicsGuard.resetAll();
+        this._preemptionManager.deactivate();
       }
+
 
       currentMessages = injectRelevantSkills(currentMessages, text || '');
       let activeMessages = this._getOrCreateActiveMessages(currentMessages);
@@ -1380,13 +1473,19 @@ export class AgentOrchestrator {
           ].join('||');
 
           if (!this._systemPromptCache || this._systemPromptCacheKey !== staticCacheKey) {
-            this._systemPromptCache = buildStaticSystemPromptCore(isSubsequentForPrompt, text || '', useNativeTools);
+            this._systemPromptCache = buildStaticSystemPromptCore(
+              isSubsequentForPrompt,
+              text || '',
+              useNativeTools,
+              this._bootstrapSnapshotStr
+            );
             this._systemPromptCacheKey = staticCacheKey;
             console.log('[PromptCache] Static system prompt rebuilt (cache miss).');
           } else {
             console.log('[PromptCache] Static system prompt cache hit — reusing (~' +
               Math.round(estimateTokens([{ role: 'system', content: this._systemPromptCache }]) / 1000) + 'K tokens saved).');
           }
+
 
           let currentPhase = 'PLANNING';
           if (this._sessionVerifiedBuild && this._sessionModifiedFiles.size > 0) {

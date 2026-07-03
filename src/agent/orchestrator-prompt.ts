@@ -15,9 +15,11 @@ import { getModeInstructions } from './prompts/modePrompts';
 import { TaskMode } from './orchestrator';
 import { ArtifactService } from '../services/artifact-service';
 import { AgentMemoryService } from '../services/agent-memory-service';
+import { BootstrapGraph } from '../orchestration/BootstrapGraph';
 
 import { detectGuideOnly, domainRulesForTools, GUIDE_ONLY_DIRECTIVE, getToolsForQuery } from './tool-policy';
 import { UNTRUSTED_CONTEXT_POLICY } from './prompt-security';
+
 
 /**
  * Build the STATIC portion of the system prompt — content that rarely changes
@@ -26,11 +28,17 @@ import { UNTRUSTED_CONTEXT_POLICY } from './prompt-security';
  *
  * This expensive section (~4–8K tokens) is cached by the orchestrator and only
  * regenerated when the cache key changes (provider/model/isSubsequent/useNativeTools/userRequest).
+ *
+ * @param bootstrapSnapshotSection  Optional pre-formatted bootstrap payload string from
+ *   BootstrapGraph.formatPayloadForPrompt(). When provided, it is injected into the
+ *   ENVIRONMENT section, removing the need for the model to call list_dir/read_file
+ *   just to orient itself (eliminates the "Verification Anxiety" loop).
  */
 export function buildStaticSystemPromptCore(
   isSubsequent: boolean,
   userRequest: string = '',
   useNativeTools: boolean = false,
+  bootstrapSnapshotSection: string = '',
 ): string {
   const config = vscode.workspace.getConfiguration('mirror-vs');
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -131,15 +139,21 @@ export function buildStaticSystemPromptCore(
   const securityPolicy = `\n\n### SECURITY ENFORCEMENT:\n${UNTRUSTED_CONTEXT_POLICY}`;
   const trustNotice = `\n\n### TOOL OUTPUT TRUST POLICY:\nTool results shown in conversation represent authoritative file system state, terminal output, and web responses. Treat them as ground truth — do not second-guess or fabricate alternatives.`;
 
+  // 6. Bootstrap Snapshot (v2.0) — injected after workspace context
+  const bootstrapSection = bootstrapSnapshotSection
+    ? `\n\n${bootstrapSnapshotSection}`
+    : '';
+
   return (
     `${customPrefixSection}${baseRole}${guideOnlyPrompt}` +
     `\n\n${finalSpecs}${securityPolicy}${trustNotice}` +
-    `\n\nENVIRONMENT: ${getShellEnvDescription()}${workspaceContext}${rulesSection}${projectMemorySection}${memorySection}`
+    `\n\nENVIRONMENT: ${getShellEnvDescription()}${workspaceContext}${bootstrapSection}${rulesSection}${projectMemorySection}${memorySection}`
   );
 }
 
 /**
  * Build the DYNAMIC portion of the system prompt — content that changes on
+
  * every loop turn: terminal list, plan status, mode instructions, active skills.
  * This is cheap (~0.5–1K tokens) and always re-generated fresh each turn.
  */

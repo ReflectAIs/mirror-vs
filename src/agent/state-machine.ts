@@ -61,13 +61,18 @@ export function determineTaskMode(userMessage: string, configMode: string): Task
     return TaskMode.DEBUG;
   }
 
+  const isQuestionOrInfoRequest = (
+    /^(what|how|why|who|where|explain|describe|tell|can|could|would|show|is|are|does|should|any|suggest)\b/i.test(lower.trim()) ||
+    lower.trim().endsWith('?')
+  ) && !isWriteOrSetupAction && !lower.includes('fix') && !lower.includes('bug') && !lower.includes('error') && !lower.includes('test');
+
   const isConversational = [
     'hello', 'hi', 'hey', 'how are you', 'good morning', 'good afternoon', 'good evening',
     'who are you', 'what can you do', 'explain yourself', 'thank you', 'thanks', 'help'
   ].some((gnd) => new RegExp(`\\b${gnd}\\b`, 'i').test(lower)) || (
     lower.trim().split(/\s+/).length <= 4 &&
     !['run', 'wait', 'test', 'read', 'write', 'patch', 'check', 'do', 'git', 'list', 'grep', 'search', 'build', 'compile', 'eslint', 'vitest', 'typecheck', 'fix', 'bug', 'error'].some(verb => lower.includes(verb))
-  );
+  ) || isQuestionOrInfoRequest;
 
   if (isConversational) {
     return TaskMode.CONVERSATIONAL;
