@@ -1,6 +1,14 @@
 import { memo, useRef, useState, useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronUp, ChevronDown, HardDriveDownload, HardDriveUpload, FoldVertical, ArrowLeft, RotateCcw } from "lucide-react"
+import {
+	ChevronUp,
+	ChevronDown,
+	HardDriveDownload,
+	HardDriveUpload,
+	FoldVertical,
+	ArrowLeft,
+	RotateCcw,
+} from "lucide-react"
 import prettyBytes from "pretty-bytes"
 
 import type { MirrorMessage } from "@mirror-vs/types"
@@ -14,7 +22,6 @@ import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { useSelectedModel } from "@/components/ui/hooks/useSelectedModel"
 import { vscode } from "@src/utils/vscode"
 
-import MirrorHero from "@src/components/welcome/MirrorHero"
 import type { ModelActivity } from "@src/components/welcome/MirrorHero"
 import Thumbnails from "../common/Thumbnails"
 
@@ -57,7 +64,7 @@ const TaskHeader = ({
 	buttonsDisabled,
 	handleCondenseContext,
 	todos,
-	modelActivity = "idle",
+	modelActivity: _modelActivity = "idle",
 }: TaskHeaderProps) => {
 	const { t } = useTranslation()
 	const { apiConfiguration, currentTaskItem, mirrorMessages } = useExtensionState()
@@ -86,10 +93,10 @@ const TaskHeader = ({
 		() =>
 			model
 				? getModelMaxOutputTokens({
-					modelId,
-					model,
-					settings: apiConfiguration,
-				})
+						modelId,
+						model,
+						settings: apiConfiguration,
+					})
 				: 0,
 		[model, modelId, apiConfiguration],
 	)
@@ -336,7 +343,9 @@ const TaskHeader = ({
 						<div className="pt-3 mt-2 -mx-2.5 px-2.5 border-t border-vscode-sideBar-background/60">
 							<div className="flex items-center gap-2 mb-1.5">
 								<div className="h-px flex-1 bg-gradient-to-r from-transparent via-mirror-brand-via/30 to-transparent" />
-								<span className="text-[0.7rem] font-medium uppercase tracking-wider text-vscode-descriptionForeground/50">Stats</span>
+								<span className="text-[0.7rem] font-medium uppercase tracking-wider text-vscode-descriptionForeground/50">
+									Stats
+								</span>
 								<div className="h-px flex-1 bg-gradient-to-r from-transparent via-mirror-brand-via/30 to-transparent" />
 							</div>
 							<table className="w-full text-sm">
@@ -379,28 +388,28 @@ const TaskHeader = ({
 
 									{((typeof cacheReads === "number" && cacheReads > 0) ||
 										(typeof cacheWrites === "number" && cacheWrites > 0)) && (
-											<tr>
-												<th className="font-medium text-left align-top w-1 whitespace-nowrap pr-3 h-[24px]">
-													{t("chat:task.cache")}
-												</th>
-												<td className="font-light align-top">
-													<div className="flex items-center gap-1 flex-wrap">
-														{typeof cacheWrites === "number" && cacheWrites > 0 && (
-															<>
-																<HardDriveDownload className="size-2.5" />
-																<span>{formatLargeNumber(cacheWrites)}</span>
-															</>
-														)}
-														{typeof cacheReads === "number" && cacheReads > 0 && (
-															<>
-																<HardDriveUpload className="size-2.5" />
-																<span>{formatLargeNumber(cacheReads)}</span>
-															</>
-														)}
-													</div>
-												</td>
-											</tr>
-										)}
+										<tr>
+											<th className="font-medium text-left align-top w-1 whitespace-nowrap pr-3 h-[24px]">
+												{t("chat:task.cache")}
+											</th>
+											<td className="font-light align-top">
+												<div className="flex items-center gap-1 flex-wrap">
+													{typeof cacheWrites === "number" && cacheWrites > 0 && (
+														<>
+															<HardDriveDownload className="size-2.5" />
+															<span>{formatLargeNumber(cacheWrites)}</span>
+														</>
+													)}
+													{typeof cacheReads === "number" && cacheReads > 0 && (
+														<>
+															<HardDriveUpload className="size-2.5" />
+															<span>{formatLargeNumber(cacheReads)}</span>
+														</>
+													)}
+												</div>
+											</td>
+										</tr>
+									)}
 
 									{!!totalCost && (
 										<tr>

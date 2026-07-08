@@ -4,8 +4,6 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 import removeMd from "remove-markdown"
 import useSound from "use-sound"
 import { LRUCache } from "lru-cache"
-import { RotateCcw } from "lucide-react"
-
 
 import type { ModelActivity } from "@src/components/welcome/MirrorHero"
 
@@ -33,8 +31,6 @@ import { useSelectedModel } from "@src/components/ui/hooks/useSelectedModel"
 import MirrorHero from "@src/components/welcome/MirrorHero"
 import MirrorTips from "@src/components/welcome/MirrorTips"
 import { StandardTooltip, Button } from "@src/components/ui"
-import VersionIndicator from "../common/VersionIndicator"
-import HistoryPreview from "../history/HistoryPreview"
 import Announcement from "./Announcement"
 import ChatRow from "./ChatRow"
 import WarningRow from "./WarningRow"
@@ -559,7 +555,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		if (lastMsg?.partial && lastMsg.ask === "tool") {
 			try {
 				const tool = JSON.parse(lastMsg.text || "{}")
-				if (tool.tool === "readFile" || tool.tool === "listFilesTopLevel" || tool.tool === "listFilesRecursive") {
+				if (
+					tool.tool === "readFile" ||
+					tool.tool === "listFilesTopLevel" ||
+					tool.tool === "listFilesRecursive"
+				) {
 					return "reading"
 				}
 			} catch {
@@ -673,7 +673,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 					// Use mirrorAskRef.current
 					switch (
-					mirrorAskRef.current // Use mirrorAskRef.current
+						mirrorAskRef.current // Use mirrorAskRef.current
 					) {
 						case "followup":
 						case "tool":
@@ -1620,7 +1620,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				<div className="flex items-center gap-2">
 					<MirrorHero activity={modelActivity} size="small" />
 					<div className="flex flex-col">
-						<span className="font-bold text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent">Mirror VS</span>
+						<span className="font-bold text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent">
+							Mirror VS
+						</span>
 						<span className="text-[10px] text-vscode-descriptionForeground">AI Pair Programmer</span>
 					</div>
 				</div>
@@ -1677,9 +1679,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 						costBreakdown={
 							currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
 								? getCostBreakdownIfNeeded(aggregatedCostsMap.get(currentTaskItem.id)!, {
-									own: t("common:costs.own"),
-									subtasks: t("common:costs.subtasks"),
-								})
+										own: t("common:costs.own"),
+										subtasks: t("common:costs.subtasks"),
+									})
 								: undefined
 						}
 						contextTokens={apiMetrics.contextTokens}
@@ -1726,8 +1728,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					<FileChangesPanel mirrorMessages={messages} />
 					{areButtonsVisible && (
 						<div
-							className={`flex h-9 items-center mb-1 px-[15px] ${showScrollToBottom ? "opacity-100" : enableButtons ? "opacity-100" : "opacity-50"
-								}`}>
+							className={`flex h-9 items-center mb-1 px-[15px] ${
+								showScrollToBottom ? "opacity-100" : enableButtons ? "opacity-100" : "opacity-50"
+							}`}>
 							{showScrollToBottom ? (
 								<>
 									<StandardTooltip content={t("chat:scrollToBottom")}>
@@ -1766,10 +1769,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 																: primaryButtonText === t("chat:resumeTask.title")
 																	? t("chat:resumeTask.tooltip")
 																	: primaryButtonText ===
-																		t("chat:proceedAnyways.title")
+																		  t("chat:proceedAnyways.title")
 																		? t("chat:proceedAnyways.tooltip")
 																		: primaryButtonText ===
-																			t("chat:proceedWhileRunning.title")
+																			  t("chat:proceedWhileRunning.title")
 																			? t("chat:proceedWhileRunning.tooltip")
 																			: undefined
 											}>
