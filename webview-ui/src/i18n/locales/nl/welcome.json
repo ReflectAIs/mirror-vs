@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "Je geoptimaliseerde LLM-router",
+            "incentive": "1 dollar gratis tegoed"
+        },
+        "openrouter": {
+            "description": "Een geïntegreerde interface voor LLM's"
+        }
+    },
+    "landing": {
+        "greeting": "Welkom bij Mirror VS!",
+        "introduction": "Met een reeks ingebouwde en uitbreidbare Modi laat Mirror VS je plannen, ontwerpen, coderen, debuggen en je productiviteit verhogen als nooit tevoren.",
+        "getStarted": "Get Started"
+    },
+    "providerSignup": {
+        "heading": "Kies je provider",
+        "chooseProvider": "de assistent heeft een LLM-provider nodig om te werken. Kies er een om te beginnen, je kunt er later meer toevoegen.",
+        "learnMore": "Meer informatie",
+        "useAnotherProvider": "Provider van derden",
+        "useAnotherProviderDescription": "Voer een API-sleutel in en begin.",
+        "noApiKeys": "Wil je je niet bezighouden met API-sleutels en aparte accounts?",
+        "goBack": "Terug",
+        "finish": "Klaar"
+    },
+    "startRouter": "We raden aan een LLM-router te gebruiken:",
+    "startCustom": "Of je kunt je eigen API-sleutel meebrengen:",
+    "importSettings": "Instellingen importeren"
+}

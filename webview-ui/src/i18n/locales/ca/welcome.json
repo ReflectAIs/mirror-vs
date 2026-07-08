@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "El teu encaminador LLM optimitzat",
+            "incentive": "Crèdit gratuït de $1"
+        },
+        "openrouter": {
+            "description": "Una interfície unificada per als LLM"
+        }
+    },
+    "landing": {
+        "greeting": "Benvingut a Mirror VS!",
+        "introduction": "Amb una gamma de Modes integrats i ampliables, Mirror VS et permet planificar, arquitectar, codificar, depurar i augmentar la teva productivitat com mai abans.",
+        "getStarted": "Get Started"
+    },
+    "providerSignup": {
+        "heading": "Tria el teu proveïdor",
+        "chooseProvider": "l'assistent necessita un proveïdor de LLM per funcionar. Tria-ne un per començar, pots afegir-ne més tard.",
+        "learnMore": "Més informació",
+        "useAnotherProvider": "Proveïdor de tercers",
+        "useAnotherProviderDescription": "Entra una clau API i comença.",
+        "noApiKeys": "No vols tractar amb claus API i comptes separats?",
+        "goBack": "Enrere",
+        "finish": "Finalitza"
+    },
+    "startRouter": "Recomanem utilitzar un encaminador LLM:",
+    "startCustom": "O pots portar la teva pròpia clau API:",
+    "importSettings": "Importa la configuració"
+}

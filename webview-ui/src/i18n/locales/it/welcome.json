@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "Il tuo router LLM ottimizzato",
+            "incentive": "$1 di credito gratuito"
+        },
+        "openrouter": {
+            "description": "Un'interfaccia unificata per gli LLM"
+        }
+    },
+    "landing": {
+        "greeting": "Benvenuto in Mirror VS!",
+        "introduction": "Con una gamma di Modalità integrate ed estensibili, Mirror VS ti permette di pianificare, architettare, codificare, debuggare e aumentare la tua produttività come mai prima d'ora.",
+        "getStarted": "Get Started"
+    },
+    "providerSignup": {
+        "heading": "Scegli il tuo provider",
+        "chooseProvider": "l'assistente ha bisogno di un provider LLM per funzionare. Scegline uno per iniziare, puoi aggiungerne altri in seguito.",
+        "learnMore": "Scopri di più",
+        "useAnotherProvider": "Provider di terze parti",
+        "useAnotherProviderDescription": "Inserisci una chiave API e inizia.",
+        "noApiKeys": "Non vuoi affrontare le chiavi API e gli account separati?",
+        "goBack": "Indietro",
+        "finish": "Fine"
+    },
+    "startRouter": "Ti consigliamo di usare un router LLM:",
+    "startCustom": "Oppure puoi portare la tua chiave API:",
+    "importSettings": "Importa impostazioni"
+}

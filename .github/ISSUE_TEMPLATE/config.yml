@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+    - name: Leave a Review
+      url: https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs&ssr=false#review-details
+      about: Enjoying Mirror VS? Leave a review here!

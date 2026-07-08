@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "最適化されたLLMルーター",
+            "incentive": "無料の$1クレジット"
+        },
+        "openrouter": {
+            "description": "LLM向けの統一インターフェース"
+        }
+    },
+    "landing": {
+        "greeting": "Mirror VSへようこそ！",
+        "introduction": "組み込みおよび拡張可能なモードを備えたMirror VSは、計画、アーキテクチャ設計、コーディング、デバッグ、そして今までにない生産性向上を可能にします。",
+        "getStarted": "Get Started"
+    },
+    "providerSignup": {
+        "heading": "プロバイダーを選択",
+        "chooseProvider": "アシスタントが機能するにはLLMプロバイダーが必要です。始めるために1つを選択してください。後から追加することもできます。",
+        "learnMore": "詳細を見る",
+        "useAnotherProvider": "サードパーティプロバイダー",
+        "useAnotherProviderDescription": "APIキーを入力して開始します。",
+        "noApiKeys": "APIキーと別のアカウントを処理したくありませんか?",
+        "goBack": "戻る",
+        "finish": "完了"
+    },
+    "startRouter": "LLMルーターの使用をお勧めします:",
+    "startCustom": "または、独自のAPIキーを持ってくることもできます:",
+    "importSettings": "設定のインポート"
+}

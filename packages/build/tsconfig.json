@@ -1,0 +1,9 @@
+{
+	"extends": "@mirror-vs/config-typescript/base.json",
+	"compilerOptions": {
+		"types": ["vitest/globals"],
+		"outDir": "dist"
+	},
+	"include": ["src"],
+	"exclude": ["node_modules"]
+}

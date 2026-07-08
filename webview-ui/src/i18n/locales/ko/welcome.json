@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "최적화된 LLM 라우터",
+            "incentive": "무료 $1 크레딧"
+        },
+        "openrouter": {
+            "description": "LLM을 위한 통합 인터페이스"
+        }
+    },
+    "landing": {
+        "greeting": "Mirror VS에 오신 것을 환영합니다!",
+        "introduction": "내장 및 확장 가능한 다양한 모드를 통해 Mirror VS는 계획, 아키텍처 설계, 코딩, 디버깅 및 전례 없는 생산성 향상을 가능하게 합니다.",
+        "getStarted": "Get Started"
+    },
+    "providerSignup": {
+        "heading": "공급자 선택",
+        "chooseProvider": "어시스턴트가 작동하려면 LLM 공급자가 필요합니다. 시작하려면 하나를 선택하세요. 나중에 더 추가할 수 있습니다.",
+        "learnMore": "자세히 알아보기",
+        "useAnotherProvider": "타사 공급자",
+        "useAnotherProviderDescription": "API 키를 입력하고 시작하세요.",
+        "noApiKeys": "API 키와 별도의 계정을 다루고 싶지 않으신가요?",
+        "goBack": "뒤로",
+        "finish": "완료"
+    },
+    "startRouter": "LLM 라우터 사용을 권장합니다:",
+    "startCustom": "또는 자신의 API 키를 가져올 수 있습니다:",
+    "importSettings": "설정 가져오기"
+}

@@ -1,0 +1,91 @@
+import { render, screen } from "@/utils/test-utils"
+
+import { TranslationProvider } from "@/i18n/__mocks__/TranslationContext"
+
+import { About } from "../About"
+
+vi.mock("@/utils/vscode", () => ({
+	vscode: { postMessage: vi.fn() },
+}))
+
+vi.mock("@/i18n/TranslationContext", () => {
+	const actual = vi.importActual("@/i18n/TranslationContext")
+	return {
+		...actual,
+		useAppTranslation: () => ({
+			t: (key: string) => key,
+		}),
+	}
+})
+
+vi.mock("@shared/package", () => ({
+	Package: {
+		version: "1.0.0",
+		sha: "abc12345",
+	},
+}))
+
+describe("About", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it("renders the About section header", () => {
+		render(
+			<TranslationProvider>
+				<About />
+			</TranslationProvider>,
+		)
+		expect(screen.getByText("settings:sections.about")).toBeInTheDocument()
+	})
+
+	it("displays version information", () => {
+		render(
+			<TranslationProvider>
+				<About />
+			</TranslationProvider>,
+		)
+		expect(screen.getByText(/Version: 1\.0\.0/)).toBeInTheDocument()
+	})
+
+	it("renders the bug report section with label and link text", () => {
+		render(
+			<TranslationProvider>
+				<About />
+			</TranslationProvider>,
+		)
+		expect(screen.getByText("settings:about.bugReport.label")).toBeInTheDocument()
+		expect(screen.getByText("settings:about.bugReport.link")).toBeInTheDocument()
+	})
+
+	it("renders the security issue section with label and link text", () => {
+		render(
+			<TranslationProvider>
+				<About />
+			</TranslationProvider>,
+		)
+		expect(screen.getByText("settings:about.securityIssue.label")).toBeInTheDocument()
+		expect(screen.getByText("settings:about.securityIssue.link")).toBeInTheDocument()
+	})
+
+	it("does not render feature request copy", () => {
+		render(
+			<TranslationProvider>
+				<About />
+			</TranslationProvider>,
+		)
+
+		expect(screen.queryByText("settings:about.featureRequest.label")).not.toBeInTheDocument()
+	})
+
+	it("renders export, import, and reset buttons", () => {
+		render(
+			<TranslationProvider>
+				<About />
+			</TranslationProvider>,
+		)
+		expect(screen.getByText("settings:footer.settings.export")).toBeInTheDocument()
+		expect(screen.getByText("settings:footer.settings.import")).toBeInTheDocument()
+		expect(screen.getByText("settings:footer.settings.reset")).toBeInTheDocument()
+	})
+})

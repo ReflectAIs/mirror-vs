@@ -1,0 +1,19 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"extends": ["//"],
+	"tasks": {
+		"bundle": {
+			"dependsOn": ["^build", "@mirror-vs/vscode-webview#build"],
+			"outputs": ["dist/**"]
+		},
+		"vsix": {
+			"dependsOn": ["bundle"],
+			"inputs": ["dist/**"],
+			"outputs": ["../bin/**"]
+		},
+		"watch:bundle": {
+			"dependsOn": ["@mirror-vs/build#build", "@mirror-vs/types#build"],
+			"cache": false
+		}
+	}
+}

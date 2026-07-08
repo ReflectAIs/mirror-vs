@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "為您最佳化的 LLM 路由器",
+            "incentive": "$1 免費額度"
+        },
+        "openrouter": {
+            "description": "LLM 統一介面"
+        }
+    },
+    "landing": {
+        "greeting": "歡迎使用 Mirror VS！",
+        "introduction": "Mirror VS 提供一系列內建和可擴充的模式，讓您以前所未有的方式規劃專案、設計架構、編寫程式碼、除錯並提升工作效率。",
+        "getStarted": "Get Started"
+    },
+    "providerSignup": {
+        "heading": "選擇供應商",
+        "chooseProvider": "助手 需要 LLM 供應商才能運作。選擇一個以開始使用，您可以稍後新增更多。",
+        "learnMore": "了解更多",
+        "useAnotherProvider": "第三方供應商",
+        "useAnotherProviderDescription": "輸入 API 金鑰並開始使用。",
+        "noApiKeys": "不想處理 API 金鑰和個別帳戶嗎？",
+        "goBack": "返回",
+        "finish": "完成"
+    },
+    "startRouter": "我們建議使用 LLM 路由器：",
+    "startCustom": "或自行提供供應商 API 金鑰：",
+    "importSettings": "匯入設定"
+}

@@ -1,0 +1,29 @@
+{
+    "routers": {
+        "requesty": {
+            "description": "Router LLM yang dioptimalkan",
+            "incentive": "Kredit gratis $1"
+        },
+        "openrouter": {
+            "description": "Antarmuka terpadu untuk LLM"
+        }
+    },
+    "landing": {
+        "greeting": "Selamat datang di Mirror VS!",
+        "introduction": "Dengan berbagai Mode bawaan dan dapat diperluas, Mirror VS memungkinkan Anda merencanakan, merancang, coding, debug, dan meningkatkan produktivitas seperti yang belum pernah terjadi sebelumnya.",
+        "getStarted": "Buat Akun Mirror VS"
+    },
+    "providerSignup": {
+        "heading": "Pilih penyedia Anda",
+        "chooseProvider": "asisten memerlukan penyedia LLM untuk bekerja. Pilih satu untuk memulai, Anda dapat menambahkan lebih banyak nanti.",
+        "learnMore": "Pelajari lebih lanjut",
+        "useAnotherProvider": "Penyedia Pihak Ketiga",
+        "useAnotherProviderDescription": "Masukkan kunci API dan mulai.",
+        "noApiKeys": "Tidak ingin berurusan dengan kunci API dan akun terpisah?",
+        "goBack": "Kembali",
+        "finish": "Selesai"
+    },
+    "startRouter": "Kami merekomendasikan menggunakan router LLM:",
+    "startCustom": "Atau Anda dapat membawa kunci API Anda sendiri:",
+    "importSettings": "Impor Pengaturan"
+}

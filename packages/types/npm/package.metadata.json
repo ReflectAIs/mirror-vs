@@ -1,0 +1,28 @@
+{
+	"name": "@mirror-vs/types",
+	"version": "1.115.0",
+	"description": "TypeScript type definitions for Mirror VS.",
+	"publishConfig": {
+		"access": "public",
+		"name": "@mirror-vs/types",
+		"registry": "https://registry.npmjs.org/"
+	},
+	"author": "Mirror VS Team",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ReflectAIs/mirror-vs.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ReflectAIs/mirror-vs/issues"
+	},
+	"homepage": "https://mirrorvs.dev",
+	"keywords": [
+		"mirror-vs",
+		"ai",
+		"code"
+	],
+	"files": [
+		"dist"
+	]
+}

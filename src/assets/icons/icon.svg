@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="28" height="28">
+  <defs>
+    <linearGradient id="emeraldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="50%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <!-- Left Diamond (Mirror Outline) -->
+  <polygon points="50,15 22,50 50,85 78,50" fill="none" stroke="url(#emeraldGradient)" stroke-width="6" stroke-linejoin="round" />
+  <!-- Overlapping Diamond Offset (Translucent) -->
+  <polygon points="56,21 34,50 56,79 78,50" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="4,4" opacity="0.6" />
+  <!-- Glowing AI Node -->
+  <circle cx="50" cy="50" r="10" fill="url(#emeraldGradient)" />
+  <circle cx="50" cy="50" r="4" fill="#ffffff" />
+</svg>
