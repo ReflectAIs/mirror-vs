@@ -629,6 +629,16 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		return "writing"
 	}, [isStreaming, modifiedMessages])
 
+	// Sync sendingDisabled with streaming state to prevent the UI from getting
+	// stuck in a disabled state after idle time, webview suspension, or
+	// incomplete task termination. When streaming stops and there's no pending
+	// ask, the input should always be re-enabled.
+	useEffect(() => {
+		if (!isStreaming && mirrorAsk === undefined && messages.length > 0) {
+			setSendingDisabled(false)
+		}
+	}, [isStreaming, mirrorAsk, messages.length])
+
 	const markFollowUpAsAnswered = useCallback(() => {
 		const lastFollowUpMessage = messagesRef.current.findLast((msg: MirrorMessage) => msg.ask === "followup")
 		if (lastFollowUpMessage) {
@@ -798,20 +808,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				case "tool":
 				case "use_mcp_server":
 				case "mistake_limit_reached":
-					// Only send text/images if they exist
-					if (trimmedInput || (images && images.length > 0)) {
-						vscode.postMessage({
-							type: "askResponse",
-							askResponse: "yesButtonClicked",
-							text: trimmedInput,
-							images: images,
-						})
-						// Clear input state after sending
-						setInputValue("")
-						setSelectedImages([])
-					} else {
-						vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
-					}
+					// Send only the approval response — do NOT bundle input text.
+					// The text stays in the input box so the user can keep typing
+					// and send it later with Enter.
+					vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
 					break
 				case "resume_task":
 					// For non-completed subtasks, resume the task
@@ -821,20 +821,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							(msg) => msg.ask === "completion_result" || msg.say === "completion_result",
 						)
 					if (!isCompletedSubtaskForClick) {
-						// Only send text/images if they exist
-						if (trimmedInput || (images && images.length > 0)) {
-							vscode.postMessage({
-								type: "askResponse",
-								askResponse: "yesButtonClicked",
-								text: trimmedInput,
-								images: images,
-							})
-							// Clear input state after sending
-							setInputValue("")
-							setSelectedImages([])
-						} else {
-							vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
-						}
+						vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
 					}
 					break
 				case "completion_result":
@@ -877,21 +864,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				case "command":
 				case "tool":
 				case "use_mcp_server":
-					// Only send text/images if they exist
-					if (trimmedInput || (images && images.length > 0)) {
-						vscode.postMessage({
-							type: "askResponse",
-							askResponse: "noButtonClicked",
-							text: trimmedInput,
-							images: images,
-						})
-						// Clear input state after sending
-						setInputValue("")
-						setSelectedImages([])
-					} else {
-						// Responds to the API with a "This operation failed" and lets it try again
-						vscode.postMessage({ type: "askResponse", askResponse: "noButtonClicked" })
-					}
+					// Send only the rejection — do NOT bundle input text.
+					// The text stays in the input box so the user can keep typing
+					// and send it later with Enter.
+					vscode.postMessage({ type: "askResponse", askResponse: "noButtonClicked" })
 					break
 				case "command_output":
 					vscode.postMessage({ type: "terminalOperation", terminalOperation: "abort" })
@@ -1075,8 +1051,17 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				case "action":
 					switch (message.action!) {
 						case "didBecomeVisible":
-							if (!isHidden && !sendingDisabled && !enableButtons) {
-								textAreaRef.current?.focus()
+							if (!isHidden) {
+								// Belt-and-suspenders: if sendingDisabled got stuck at true but
+								// nothing is streaming and there's no pending ask, reset it.
+								// This handles the case where the webview was suspended/backgrounded
+								// and re-hydrated with stale state.
+								if (sendingDisabled && !isStreaming && mirrorAsk === undefined) {
+									setSendingDisabled(false)
+								}
+								if (!sendingDisabled && !enableButtons) {
+									textAreaRef.current?.focus()
+								}
 							}
 							break
 						case "focusInput":
@@ -1158,6 +1143,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			isHidden,
 			sendingDisabled,
 			enableButtons,
+			isStreaming,
+			mirrorAsk,
 			handleChatReset,
 			handleSendMessage,
 			handleSetChatBoxMessage,
