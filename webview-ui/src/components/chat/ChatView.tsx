@@ -12,10 +12,32 @@ import { appendImages } from "@src/utils/imageUtils"
 import { getCostBreakdownIfNeeded } from "@src/utils/costFormatting"
 import { batchConsecutive } from "@src/utils/batchConsecutive"
 
-import type { MirrorAsk, MirrorSayTool, MirrorMessage, ExtensionMessage, AudioType } from "@mirror-vs/types"
-import { isRetiredProvider } from "@mirror-vs/types"
+import type {
+	MirrorAsk,
+	MirrorSayTool,
+	MirrorMessage,
+	ExtensionMessage,
+	AudioType,
+	ProviderSettings,
+	ModelInfo,
+} from "@mirror-vs/types"
+import {
+	isRetiredProvider,
+	openRouterDefaultModelId,
+	requestyDefaultModelId,
+	unboundDefaultModelId,
+	litellmDefaultModelId,
+	vercelAiGatewayDefaultModelId,
+	poeDefaultModelId,
+	vscodeLlmModels,
+	vscodeLlmDefaultModelId,
+	customDefaultModelId,
+	customDefaultModelInfo,
+	type ProviderName,
+	type RouterModels,
+} from "@mirror-vs/types"
 
-import { findLast } from "@shared/array"
+import { findLast, findLastIndex } from "@shared/array"
 import { SuggestionItem } from "@mirror-vs/types"
 import { combineApiRequests } from "@shared/combineApiRequests"
 import { combineCommandSequences } from "@shared/combineCommandSequences"
@@ -31,10 +53,17 @@ import { useSelectedModel } from "@src/components/ui/hooks/useSelectedModel"
 import MirrorHero from "@src/components/welcome/MirrorHero"
 import MirrorTips from "@src/components/welcome/MirrorTips"
 import { StandardTooltip, Button } from "@src/components/ui"
+import {
+	getDefaultModelIdForProvider,
+	getProviderServiceConfig,
+	getStaticModelsForProvider,
+} from "../settings/utils/providerModelConfig"
+import { MODELS_BY_PROVIDER } from "../settings/constants"
 import Announcement from "./Announcement"
 import ChatRow from "./ChatRow"
 import WarningRow from "./WarningRow"
 import { ChatTextArea } from "./ChatTextArea"
+import { TodoListDisplay } from "./TodoListDisplay"
 import TaskHeader from "./TaskHeader"
 import ProfileViolationWarning from "./ProfileViolationWarning"
 import { CheckpointWarning } from "./CheckpointWarning"
@@ -42,6 +71,10 @@ import { QueuedMessages } from "./QueuedMessages"
 import { WorktreeSelector } from "./WorktreeSelector"
 import FileChangesPanel from "./FileChangesPanel"
 import { useScrollLifecycle } from "@src/hooks/useScrollLifecycle"
+import { FoldVertical, HardDriveDownload, HardDriveUpload, ListTodo } from "lucide-react"
+import { getModelMaxOutputTokens } from "@shared/api"
+import { formatLargeNumber } from "@src/utils/format"
+import { ContextWindowProgress } from "./ContextWindowProgress"
 
 export interface ChatViewProps {
 	isHidden: boolean
@@ -83,10 +116,14 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		soundVolume,
 		messageQueue = [],
 		showWorktreesInHomeScreen,
+		setApiConfiguration,
+		routerModels,
 	} = useExtensionState()
 
 	// Show a WarningRow when the user sends a message with a retired provider.
 	const [showRetiredProviderWarning, setShowRetiredProviderWarning] = useState(false)
+	const [activeHeaderPanel, setActiveHeaderPanel] = useState<"stats" | "todos" | "none">("none")
+	const [messageLimit, setMessageLimit] = useState(120)
 
 	// When the provider changes, clear the retired-provider warning.
 	const providerName = apiConfiguration?.apiProvider
@@ -121,7 +158,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		return getLatestTodo(messages)
 	}, [messages, currentTaskTodos])
 
-	const modifiedMessages = useMemo(() => combineApiRequests(combineCommandSequences(messages.slice(1))), [messages])
+	const modifiedMessages = useMemo(() => combineApiRequests(combineCommandSequences(messages)), [messages])
 
 	// Has to be after api_req_finished are all reduced into api_req_started messages.
 	const apiMetrics = useMemo(() => getApiMetrics(modifiedMessages), [modifiedMessages])
@@ -867,11 +904,168 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		[mirrorAsk, isStreaming, setDidClickCancel],
 	)
 
-	const { info: model } = useSelectedModel(apiConfiguration)
+	const { id: modelId, info: model } = useSelectedModel(apiConfiguration)
 
 	const selectImages = useCallback(() => vscode.postMessage({ type: "selectImages" }), [])
 
 	const shouldDisableImages = !model?.supportsImages || selectedImages.length >= MAX_IMAGES_PER_MESSAGE
+
+	const setApiConfigurationField = useCallback(
+		<K extends keyof ProviderSettings>(field: K, value: ProviderSettings[K]) => {
+			setApiConfiguration({ [field]: value } as Partial<ProviderSettings>)
+		},
+		[setApiConfiguration],
+	)
+
+	const provider = apiConfiguration?.apiProvider as ProviderName | undefined
+
+	const modelPickerConfig = useMemo<{
+		modelIdKey:
+			| "apiModelId"
+			| "openRouterModelId"
+			| "requestyModelId"
+			| "unboundModelId"
+			| "litellmModelId"
+			| "vercelAiGatewayModelId"
+			| "openAiModelId"
+			| "ollamaModelId"
+			| "lmStudioModelId"
+			| "vsCodeLmModelSelector"
+			| "customModelId"
+		models: Record<string, ModelInfo> | null
+		defaultModelId: string
+		serviceName: string
+		serviceUrl: string
+	} | null>(() => {
+		if (!provider || isRetiredProvider(provider)) return null
+
+		// Router-based providers (models fetched from the router API)
+		const routerModelConfigs: Record<
+			string,
+			{
+				modelIdKey:
+					| "openRouterModelId"
+					| "requestyModelId"
+					| "unboundModelId"
+					| "litellmModelId"
+					| "vercelAiGatewayModelId"
+				routerKey: string
+			}
+		> = {
+			openrouter: { modelIdKey: "openRouterModelId", routerKey: "openrouter" },
+			requesty: { modelIdKey: "requestyModelId", routerKey: "requesty" },
+			unbound: { modelIdKey: "unboundModelId", routerKey: "unbound" },
+			litellm: { modelIdKey: "litellmModelId", routerKey: "litellm" },
+			"vercel-ai-gateway": { modelIdKey: "vercelAiGatewayModelId", routerKey: "vercel-ai-gateway" },
+		}
+
+		if (provider in routerModelConfigs) {
+			const config = routerModelConfigs[provider]
+			const providerModels = (routerModels as RouterModels | undefined)?.[
+				config.routerKey as keyof RouterModels
+			] as Record<string, ModelInfo> | undefined
+			return {
+				modelIdKey: config.modelIdKey,
+				models: providerModels ?? null,
+				defaultModelId: getDefaultModelIdForProvider(provider),
+				serviceName: getProviderServiceConfig(provider).serviceName,
+				serviceUrl: getProviderServiceConfig(provider).serviceUrl,
+			}
+		}
+
+		if (provider === "poe") {
+			return {
+				modelIdKey: "apiModelId" as const,
+				models: (routerModels as RouterModels | undefined)?.poe ?? null,
+				defaultModelId: poeDefaultModelId,
+				serviceName: "Poe",
+				serviceUrl: "https://poe.com",
+			}
+		}
+
+		// vscode-lm: uses its own model record
+		if (provider === "vscode-lm") {
+			return {
+				modelIdKey: "vsCodeLmModelSelector" as const,
+				models: vscodeLlmModels as unknown as Record<string, ModelInfo>,
+				defaultModelId: vscodeLlmDefaultModelId,
+				serviceName: "VS Code LM",
+				serviceUrl: "https://code.visualstudio.com/api/extension-guides/language-model",
+			}
+		}
+
+		// Custom API: uses its own model info
+		if (provider === "custom") {
+			return {
+				modelIdKey: "customModelId" as const,
+				models: { [customDefaultModelId]: customDefaultModelInfo },
+				defaultModelId: customDefaultModelId,
+				serviceName: "Custom API",
+				serviceUrl: "",
+			}
+		}
+
+		// OpenAI Compatible: no model list, use apiModelId
+		if (provider === "openai") {
+			return {
+				modelIdKey: "openAiModelId",
+				models: null,
+				defaultModelId: "",
+				serviceName: "OpenAI Compatible",
+				serviceUrl: "",
+			}
+		}
+
+		// Static model providers (models defined in MODELS_BY_PROVIDER)
+		const staticModels = MODELS_BY_PROVIDER[provider]
+		if (staticModels) {
+			return {
+				modelIdKey: "apiModelId",
+				models: staticModels,
+				defaultModelId: getDefaultModelIdForProvider(provider, apiConfiguration),
+				serviceName: getProviderServiceConfig(provider).serviceName,
+				serviceUrl: getProviderServiceConfig(provider).serviceUrl,
+			}
+		}
+
+		return null
+	}, [provider, apiConfiguration, routerModels])
+
+	const modelOptions = useMemo(() => {
+		if (!modelPickerConfig?.models) return undefined
+		const builtIn = Object.keys(modelPickerConfig.models)
+		// Include custom models saved to localStorage by the old ModelPicker
+		let custom: string[] = []
+		try {
+			const saved = localStorage.getItem(
+				`custom_models_${apiConfiguration?.apiProvider}_${modelPickerConfig.modelIdKey}`,
+			)
+			if (saved) {
+				custom = JSON.parse(saved)
+			}
+		} catch {}
+		// Exclude default models the user deleted from the old ModelPicker
+		let deleted: string[] = []
+		try {
+			const saved = localStorage.getItem(
+				`deleted_models_${apiConfiguration?.apiProvider}_${modelPickerConfig.modelIdKey}`,
+			)
+			if (saved) {
+				deleted = JSON.parse(saved)
+			}
+		} catch {}
+		const allKeys = [...new Set([...builtIn, ...custom])].filter((key) => !deleted.includes(key))
+		return allKeys.map((key) => ({ value: key, label: key }))
+	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider])
+
+	const handleModelChange = useCallback(
+		(newModelId: string) => {
+			if (modelPickerConfig) {
+				setApiConfigurationField(modelPickerConfig.modelIdKey, newModelId)
+			}
+		},
+		[modelPickerConfig, setApiConfigurationField],
+	)
 
 	const handleMessage = useCallback(
 		(e: MessageEvent) => {
@@ -1291,15 +1485,96 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		return result
 	}, [isCondensing, visibleMessages])
 
-	const checkpointIndices = useMemo(() => {
+	const displayedMessages = useMemo(() => {
+		if (groupedMessages.length <= messageLimit) {
+			return groupedMessages
+		}
+		return groupedMessages.slice(groupedMessages.length - messageLimit)
+	}, [groupedMessages, messageLimit])
+
+	// Index of all user_feedback messages in displayedMessages; the latest
+	// (last) one is always kept sticky at the top of the viewport.
+	const userFeedbackIndices = useMemo(() => {
 		const indices: number[] = []
-		for (let i = 0; i < groupedMessages.length; i++) {
-			if (groupedMessages[i]?.say === "checkpoint_saved") {
+		for (let i = 0; i < displayedMessages.length; i++) {
+			if (displayedMessages[i]?.say === "user_feedback") {
 				indices.push(i)
 			}
 		}
 		return indices
-	}, [groupedMessages])
+	}, [displayedMessages])
+
+	// Always pinned to the latest (last) user_feedback message so the most
+	// recent user input stays visible at the top regardless of scroll position.
+	const [stickyUserIndex, setStickyUserIndex] = useState<number | null>(() => {
+		if (userFeedbackIndices.length > 0) {
+			return userFeedbackIndices[userFeedbackIndices.length - 1]
+		}
+		return null
+	})
+
+	// Refs so the permanent Virtuoso Item component always reads the latest values.
+	const stickyUserIndexRef = useRef(stickyUserIndex)
+	stickyUserIndexRef.current = stickyUserIndex
+	const displayedMessagesRef = useRef(displayedMessages)
+	displayedMessagesRef.current = displayedMessages
+
+	// Pin stickyUserIndex to the latest user_feedback when new messages arrive.
+	useEffect(() => {
+		if (userFeedbackIndices.length > 0) {
+			setStickyUserIndex(userFeedbackIndices[userFeedbackIndices.length - 1])
+		} else {
+			setStickyUserIndex(null)
+		}
+	}, [userFeedbackIndices])
+
+	// No-op on scroll — sticky is always pinned to the latest user_feedback.
+	const handleRangeChanged = useCallback((_range: { startIndex: number; endIndex: number }) => {
+		// Intentionally no-op
+	}, [])
+
+	// Stable Virtuoso Item component — reads data via refs so it never needs to
+	// be recreated on every render (which would break Virtuoso's internal
+	// reconciliation and cause items to lose sticky positioning).
+	const virtuosoComponents = useMemo(
+		() => ({
+			Item: ({ children, ...props }: any) => {
+				const index = props["data-index"]
+				const msgs = displayedMessagesRef.current
+				const msg = msgs[index]
+				const isStickyUser = msg?.say === "user_feedback" && index === stickyUserIndexRef.current
+
+				const customStyle = {
+					...props.style,
+					...(isStickyUser
+						? {
+								position: "sticky" as const,
+								top: 0,
+								zIndex: 1,
+								background: "var(--vscode-sideBar-background)",
+							}
+						: {}),
+				}
+
+				return (
+					<div {...props} style={customStyle}>
+						{children}
+					</div>
+				)
+			},
+		}),
+		[],
+	)
+
+	const checkpointIndices = useMemo(() => {
+		const indices: number[] = []
+		for (let i = 0; i < displayedMessages.length; i++) {
+			if (displayedMessages[i]?.say === "checkpoint_saved") {
+				indices.push(i)
+			}
+		}
+		return indices
+	}, [displayedMessages])
 
 	const hasLatestCheckpoint = checkpointIndices.length > 0
 	const checkpointJumpCursorRef = useRef<number | null>(null)
@@ -1464,10 +1739,37 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		})
 	}, [checkpointIndices, enterUserBrowsingHistory])
 
+	const handleNavigateToMessage = useCallback(
+		(ts: number) => {
+			const messageIndex = displayedMessages.findIndex((msg) => msg.ts === ts)
+			if (messageIndex >= 0) {
+				enterUserBrowsingHistory("keyboard-nav-up")
+				virtuosoRef.current?.scrollToIndex({
+					index: messageIndex,
+					align: "center",
+					behavior: "smooth",
+				})
+			}
+		},
+		[displayedMessages, enterUserBrowsingHistory],
+	)
+
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: MirrorMessage) => {
+			if (index === 0 && task) {
+				return (
+					<TaskHeader
+						task={task}
+						parentTaskId={currentTaskItem?.parentTaskId}
+						buttonsDisabled={sendingDisabled}
+					/>
+				)
+			}
+
 			const hasCheckpoint = modifiedMessages.some((message) => message.say === "checkpoint_saved")
-			const isSticky = latestUserMessage !== null && messageOrGroup.ts === latestUserMessage.ts
+			// Sync with Virtuoso Item component: the message that has CSS sticky
+			// positioning should also get the visual sticky treatment.
+			const isSticky = stickyUserIndex !== null && index === stickyUserIndex
 
 			// regular message
 			return (
@@ -1477,7 +1779,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					isExpanded={expandedRows[messageOrGroup.ts] || false}
 					onToggleExpand={toggleRowExpansion} // This was already stabilized
 					lastModifiedMessage={modifiedMessages.at(-1)} // Original direct access
-					isLast={index === groupedMessages.length - 1} // Original direct access
+					isLast={index === displayedMessages.length - 1} // Original direct access
 					onHeightChange={handleRowHeightChange}
 					isStreaming={isStreaming}
 					onSuggestionClick={handleSuggestionClickInRow} // This was already stabilized
@@ -1503,6 +1805,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					hasCheckpoint={hasCheckpoint}
 					onJumpToPreviousCheckpoint={handleScrollToLatestCheckpoint}
 					isSticky={isSticky}
+					onNavigateToMessage={handleNavigateToMessage}
 				/>
 			)
 		},
@@ -1510,7 +1813,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			expandedRows,
 			toggleRowExpansion,
 			modifiedMessages,
-			groupedMessages.length,
+			displayedMessages.length,
 			handleRowHeightChange,
 			isStreaming,
 			handleSuggestionClickInRow,
@@ -1521,7 +1824,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			enableButtons,
 			primaryButtonText,
 			handleScrollToLatestCheckpoint,
-			latestUserMessage,
+			stickyUserIndex,
+			handleNavigateToMessage,
 		],
 	)
 
@@ -1627,6 +1931,40 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					</div>
 				</div>
 				<div className="flex items-center gap-1.5">
+					{task && (
+						<button
+							onClick={() => setActiveHeaderPanel((prev) => (prev === "stats" ? "none" : "stats"))}
+							className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-vscode-button-background/10 text-vscode-button-background hover:bg-vscode-button-background/20 transition-colors border border-vscode-button-background/20 cursor-pointer mr-1"
+							title="View Session Statistics">
+							<span>⚡</span>
+							<span>
+								$
+								{(
+									(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
+										? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
+										: undefined) ?? apiMetrics.totalCost
+								).toFixed(3)}
+							</span>
+						</button>
+					)}
+					<Button
+						variant="ghost"
+						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
+						onClick={() => setActiveHeaderPanel((prev) => (prev === "todos" ? "none" : "todos"))}
+						title="View Task Todo List">
+						<ListTodo className="size-3.5 text-vscode-descriptionForeground hover:text-vscode-foreground" />
+					</Button>
+					{currentTaskItem?.parentTaskId && (
+						<Button
+							variant="ghost"
+							className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
+							onClick={() =>
+								vscode.postMessage({ type: "showTaskWithId", text: currentTaskItem.parentTaskId })
+							}
+							title="Back to Parent Task">
+							<span className="codicon codicon-arrow-left text-xs flex items-center justify-center" />
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
@@ -1654,45 +1992,160 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				</div>
 			</div>
 
+			{activeHeaderPanel !== "none" && (
+				<div className="shrink-0 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background px-4 py-3 flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-150">
+					<div className="flex items-center justify-between border-b border-vscode-editorGroup-border/50 pb-1.5">
+						<span className="font-bold text-[10px] uppercase tracking-wider text-vscode-descriptionForeground">
+							{activeHeaderPanel === "stats" ? "Session Statistics" : "Active Todo List"}
+						</span>
+						<div className="flex items-center gap-2">
+							{activeHeaderPanel === "stats" && task && (
+								<button
+									onClick={() => vscode.postMessage({ type: "exportCurrentTask" })}
+									className="text-vscode-descriptionForeground hover:text-vscode-foreground cursor-pointer p-0.5 rounded bg-transparent border-none transition-colors"
+									title="Export Session">
+									<span className="codicon codicon-cloud-download text-xs flex items-center justify-center" />
+								</button>
+							)}
+							<button
+								onClick={() => setActiveHeaderPanel("none")}
+								className="text-vscode-descriptionForeground hover:text-vscode-foreground cursor-pointer p-0.5 rounded bg-transparent border-none">
+								<span className="codicon codicon-close text-[10px]" />
+							</button>
+						</div>
+					</div>
+
+					{activeHeaderPanel === "stats" ? (
+						<div className="flex flex-col gap-3">
+							{model?.contextWindow && model.contextWindow > 0 && (
+								<div className="flex flex-col gap-1.5">
+									<div className="flex justify-between text-[11px] text-vscode-descriptionForeground font-medium">
+										<span>Context Window Limit</span>
+										<span className="font-mono">
+											{formatLargeNumber(apiMetrics.contextTokens || 0)} /{" "}
+											{formatLargeNumber(model.contextWindow)}
+										</span>
+									</div>
+									<div className="flex items-center gap-2">
+										<div className="grow">
+											<ContextWindowProgress
+												contextWindow={model.contextWindow}
+												contextTokens={apiMetrics.contextTokens || 0}
+												maxTokens={
+													model
+														? getModelMaxOutputTokens({
+																modelId,
+																model,
+																settings: apiConfiguration,
+															})
+														: 0
+												}
+											/>
+										</div>
+										<Button
+											variant="ghost"
+											className="p-1 h-auto hover:bg-vscode-list-hoverBackground text-vscode-descriptionForeground hover:text-vscode-foreground shrink-0"
+											title={t("chat:task.condenseContext")}
+											disabled={sendingDisabled}
+											onClick={() => {
+												if (currentTaskItem) {
+													handleCondenseContext(currentTaskItem.id)
+												}
+												setActiveHeaderPanel("none")
+											}}>
+											<FoldVertical className="size-3.5" />
+										</Button>
+									</div>
+								</div>
+							)}
+
+							<table className="w-full text-xs text-vscode-foreground border-collapse">
+								<tbody>
+									<tr className="border-b border-vscode-editorGroup-border/20">
+										<th className="py-2 text-left font-medium text-vscode-descriptionForeground w-1/3">
+											Tokens Used
+										</th>
+										<td className="py-2 text-right font-mono flex items-center justify-end gap-2.5">
+											{apiMetrics.totalTokensIn > 0 && (
+												<span>↑ {formatLargeNumber(apiMetrics.totalTokensIn)}</span>
+											)}
+											{apiMetrics.totalTokensOut > 0 && (
+												<span>↓ {formatLargeNumber(apiMetrics.totalTokensOut)}</span>
+											)}
+										</td>
+									</tr>
+
+									{((apiMetrics.totalCacheReads || 0) > 0 ||
+										(apiMetrics.totalCacheWrites || 0) > 0) && (
+										<tr className="border-b border-vscode-editorGroup-border/20">
+											<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
+												Cache Hits
+											</th>
+											<td className="py-2 text-right font-mono flex items-center justify-end gap-2.5">
+												{(apiMetrics.totalCacheWrites || 0) > 0 && (
+													<span className="flex items-center gap-1">
+														<HardDriveDownload className="size-2.5" />
+														{formatLargeNumber(apiMetrics.totalCacheWrites || 0)}
+													</span>
+												)}
+												{(apiMetrics.totalCacheReads || 0) > 0 && (
+													<span className="flex items-center gap-1">
+														<HardDriveUpload className="size-2.5" />
+														{formatLargeNumber(apiMetrics.totalCacheReads || 0)}
+													</span>
+												)}
+											</td>
+										</tr>
+									)}
+
+									<tr className="border-b border-vscode-editorGroup-border/20">
+										<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
+											API Cost
+										</th>
+										<td className="py-2 text-right font-mono font-semibold">
+											$
+											{(
+												(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
+													? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
+													: undefined) ?? apiMetrics.totalCost
+											).toFixed(4)}
+										</td>
+									</tr>
+
+									{currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id) && (
+										<tr>
+											<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
+												Cost Breakdown
+											</th>
+											<td className="py-2 text-right font-mono text-[10px] text-vscode-descriptionForeground whitespace-pre-wrap">
+												{getCostBreakdownIfNeeded(aggregatedCostsMap.get(currentTaskItem.id)!, {
+													own: t("common:costs.own"),
+													subtasks: t("common:costs.subtasks"),
+												})}
+											</td>
+										</tr>
+									)}
+								</tbody>
+							</table>
+						</div>
+					) : (
+						<div className="max-h-48 overflow-y-auto pr-1">
+							{latestTodos && latestTodos.length > 0 ? (
+								<TodoListDisplay todos={latestTodos} defaultExpanded={true} />
+							) : (
+								<div className="text-xs text-vscode-descriptionForeground py-4 text-center">
+									No active todos found for this session.
+								</div>
+							)}
+						</div>
+					)}
+				</div>
+			)}
+
 			{task ? (
 				<>
-					<TaskHeader
-						task={task}
-						tokensIn={apiMetrics.totalTokensIn}
-						tokensOut={apiMetrics.totalTokensOut}
-						cacheWrites={apiMetrics.totalCacheWrites}
-						cacheReads={apiMetrics.totalCacheReads}
-						totalCost={apiMetrics.totalCost}
-						aggregatedCost={
-							currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
-								? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
-								: undefined
-						}
-						hasSubtasks={
-							!!(
-								currentTaskItem?.id &&
-								aggregatedCostsMap.has(currentTaskItem.id) &&
-								aggregatedCostsMap.get(currentTaskItem.id)!.childrenCost > 0
-							)
-						}
-						parentTaskId={currentTaskItem?.parentTaskId}
-						costBreakdown={
-							currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
-								? getCostBreakdownIfNeeded(aggregatedCostsMap.get(currentTaskItem.id)!, {
-										own: t("common:costs.own"),
-										subtasks: t("common:costs.subtasks"),
-									})
-								: undefined
-						}
-						contextTokens={apiMetrics.contextTokens}
-						buttonsDisabled={sendingDisabled}
-						handleCondenseContext={handleCondenseContext}
-						todos={latestTodos}
-						modelActivity={modelActivity}
-					/>
-
 					{checkpointWarning && (
-						<div className="px-3">
+						<div className="px-3 shrink-0 mb-2">
 							<CheckpointWarning warning={checkpointWarning} />
 						</div>
 					)}
@@ -1712,23 +2165,27 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 			{task && (
 				<>
-					<div className="grow flex" ref={scrollContainerRef}>
+					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef}>
 						<Virtuoso
 							ref={virtuosoRef}
 							key={task.ts}
-							className="scrollable grow overflow-y-scroll mb-1"
+							className="grow mb-1"
+							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 3_000, bottom: 1000 }}
-							data={groupedMessages}
+							data={displayedMessages}
 							itemContent={itemContent}
 							followOutput={followOutputCallback}
 							atBottomStateChange={atBottomStateChangeCallback}
 							atBottomThreshold={10}
+							startReached={() => setMessageLimit((prev) => prev + 100)}
+							rangeChanged={handleRangeChanged}
+							components={virtuosoComponents}
 						/>
 					</div>
 					<FileChangesPanel mirrorMessages={messages} />
 					{areButtonsVisible && (
 						<div
-							className={`flex h-9 items-center mb-1 px-[15px] ${
+							className={`flex h-8 items-center mb-1.5 px-4 justify-end gap-2 ${
 								showScrollToBottom ? "opacity-100" : enableButtons ? "opacity-100" : "opacity-50"
 							}`}>
 							{showScrollToBottom ? (
@@ -1736,25 +2193,47 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 									<StandardTooltip content={t("chat:scrollToBottom")}>
 										<Button
 											variant="secondary"
-											className={hasLatestCheckpoint ? "flex-1 mr-[6px]" : "flex-[2]"}
+											className="h-7 px-2.5 rounded-md flex items-center justify-center gap-1 text-[11px]"
 											onClick={handleScrollToBottomAndResetCheckpointCursor}>
-											<span className="codicon codicon-chevron-down"></span>
+											<span className="codicon codicon-chevron-down text-xs"></span>
+											<span>To Bottom</span>
 										</Button>
 									</StandardTooltip>
 									{hasLatestCheckpoint && (
 										<StandardTooltip content={t("chat:scrollToLatestCheckpoint")}>
 											<Button
 												variant="secondary"
-												className="flex-1 ml-[6px]"
+												className="h-7 px-2.5 rounded-md flex items-center justify-center gap-1 text-[11px]"
 												onClick={handleScrollToLatestCheckpoint}
 												aria-label={t("chat:scrollToLatestCheckpoint")}>
-												<span className="codicon codicon-history"></span>
+												<span className="codicon codicon-history text-xs"></span>
+												<span>Checkpoint</span>
 											</Button>
 										</StandardTooltip>
 									)}
 								</>
 							) : (
 								<>
+									{secondaryButtonText && (
+										<StandardTooltip
+											content={
+												secondaryButtonText === t("chat:reject.title")
+													? t("chat:reject.tooltip")
+													: secondaryButtonText === t("chat:terminate.title")
+														? t("chat:terminate.tooltip")
+														: secondaryButtonText === t("chat:killCommand.title")
+															? t("chat:killCommand.tooltip")
+															: undefined
+											}>
+											<Button
+												variant="secondary"
+												disabled={!enableButtons}
+												className="h-7 px-3 rounded-md flex items-center justify-center text-[11px] font-medium"
+												onClick={() => handleSecondaryButtonClick(inputValue, selectedImages)}>
+												{secondaryButtonText}
+											</Button>
+										</StandardTooltip>
+									)}
 									{primaryButtonText && (
 										<StandardTooltip
 											content={
@@ -1779,29 +2258,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 											<Button
 												variant="primary"
 												disabled={!enableButtons}
-												className={secondaryButtonText ? "flex-1 mr-[6px]" : "flex-[2] mr-0"}
+												className="h-7 px-3.5 rounded-md flex items-center justify-center text-[11px] font-semibold"
 												onClick={() => handlePrimaryButtonClick(inputValue, selectedImages)}>
 												{primaryButtonText}
-											</Button>
-										</StandardTooltip>
-									)}
-									{secondaryButtonText && (
-										<StandardTooltip
-											content={
-												secondaryButtonText === t("chat:reject.title")
-													? t("chat:reject.tooltip")
-													: secondaryButtonText === t("chat:terminate.title")
-														? t("chat:terminate.tooltip")
-														: secondaryButtonText === t("chat:killCommand.title")
-															? t("chat:killCommand.tooltip")
-															: undefined
-											}>
-											<Button
-												variant="secondary"
-												disabled={!enableButtons}
-												className="flex-1 ml-[6px]"
-												onClick={() => handleSecondaryButtonClick(inputValue, selectedImages)}>
-												{secondaryButtonText}
 											</Button>
 										</StandardTooltip>
 									)}
@@ -1865,6 +2324,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				isStreaming={isStreaming}
 				onStop={handleStopTask}
 				onEnqueueMessage={handleEnqueueCurrentMessage}
+				modelId={modelPickerConfig ? modelId : undefined}
+				modelOptions={modelOptions}
+				onModelChange={handleModelChange}
 			/>
 
 			{isProfileDisabled && (

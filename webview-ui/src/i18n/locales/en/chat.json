@@ -448,6 +448,9 @@
 		"title": "Queued Messages",
 		"clickToEdit": "Click to edit message"
 	},
+	"stickyMessage": {
+		"clickToNavigate": "Click to jump to this message"
+	},
 	"contextMenu": {
 		"noResults": "No results",
 		"problems": "Problems",

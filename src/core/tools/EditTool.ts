@@ -233,9 +233,6 @@ export class EditTool extends BaseTool<"edit"> {
 			task.recordToolUsage("edit")
 			await task.diffViewProvider.reset()
 			this.resetPartialState()
-
-			// Process any queued messages after file edit completes
-			task.processQueuedMessages()
 		} catch (error) {
 			await handleError("edit", error as Error)
 			await task.diffViewProvider.reset()

@@ -61,12 +61,16 @@ vi.mock("react-virtuoso", () => ({
 	Virtuoso: function MockVirtuoso({
 		data,
 		itemContent,
+		components,
 	}: {
 		data: MirrorMessage[]
 		itemContent: (index: number, item: MirrorMessage) => React.ReactNode
+		components?: { Header?: React.ComponentType }
 	}) {
+		const Header = components?.Header
 		return (
 			<div data-testid="virtuoso-item-list">
+				{Header && <Header />}
 				{data.map((item, index) => (
 					<div key={item.ts} data-testid={`virtuoso-item-${index}`}>
 						{itemContent(index, item)}
@@ -159,7 +163,7 @@ vi.mock("react-i18next", () => ({
 	}),
 	initReactI18next: {
 		type: "3rdParty",
-		init: () => { },
+		init: () => {},
 	},
 	Trans: ({ i18nKey, children }: { i18nKey: string; children?: React.ReactNode }) => {
 		return <>{children || i18nKey}</>
@@ -286,7 +290,7 @@ const mockPostMessage = (state: Partial<ExtensionState>) => {
 const defaultProps: ChatViewProps = {
 	isHidden: false,
 	showAnnouncement: false,
-	hideAnnouncement: () => { },
+	hideAnnouncement: () => {},
 }
 
 const queryClient = new QueryClient()
@@ -511,7 +515,6 @@ describe("ChatView - Focus Grabbing Tests", () => {
 		expect(mockFocus).not.toHaveBeenCalled()
 	})
 })
-
 
 describe("ChatView - Welcome Content Display Tests", () => {
 	beforeEach(() => vi.clearAllMocks())

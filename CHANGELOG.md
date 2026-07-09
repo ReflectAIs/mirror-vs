@@ -2,6 +2,26 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.5.2] - 2026-07-09
+
+### Added
+
+- **Custom API Provider Model Resolution**: The `useSelectedModel` hook now properly resolves model ID and info for the custom API provider, enabling seamless UI integration for custom OpenAI-compatible providers.
+- **Custom API Key Secrecy**: `customApiKey` is now included in the secret state keys list, ensuring it's handled securely across all state persistence operations.
+- **Custom Provider Config Detection**: `checkExistApiConfig` now correctly detects `customBaseUrl` and `customModelId` as valid configuration values, preventing false "not configured" warnings.
+
+### Changed
+
+- **Simplified Task Header**: Heavily streamlined the task header component by removing the statistics panel, context window progress bar, cache metrics, cost breakdown, condensed context button, model activity indicator, and todo list display. The header now focuses on task metadata and navigation controls only.
+- **Model Selector in Chat Footer**: Replaced the full ModelPicker popover (with search, pricing, and custom model management) with a compact native `<select>` dropdown in the ChatTextArea footer bar, directly replacing the old ApiConfigSelector popup for quicker model switching.
+- **Todo Button Always Visible**: The todo list button in the header is now unconditionally rendered, giving users constant access to view active todos even when none have been set yet.
+- **Task Queue Drain Simplification**: Removed the automatic message queue draining during ask/tool approval states in `Task.ts`, simplifying the flow-control logic and preventing unintended auto-responses to queued messages.
+
+### Fixed
+
+- **Custom Models in Dropdown**: The model dropdown now reads both custom models and deleted default models from `localStorage` (keys used by the old ModelPicker), ensuring custom models appear and deleted models are correctly filtered out.
+- **Sticky Message Overlap**: Fixed overlapping sticky messages by implementing scroll-position-based tracking with a memoized Virtuoso Item component. Only one message can be sticky at a time, anchored to the last user message at the current scroll position.
+
 ## [0.5.1] - 2026-07-08
 
 ### Added

@@ -182,8 +182,6 @@ export class WriteToFileTool extends BaseTool<"write_to_file"> {
 			await task.diffViewProvider.reset()
 			this.resetPartialState()
 
-			task.processQueuedMessages()
-
 			return
 		} catch (error) {
 			await handleError("writing file", error as Error)

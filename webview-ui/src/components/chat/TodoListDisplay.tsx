@@ -16,8 +16,8 @@ function getTodoIcon(status: TodoStatus | null) {
 	}
 }
 
-export function TodoListDisplay({ todos }: { todos: any[] }) {
-	const [isCollapsed, setIsCollapsed] = useState(true)
+export function TodoListDisplay({ todos, defaultExpanded = false }: { todos: any[]; defaultExpanded?: boolean }) {
+	const [isCollapsed, setIsCollapsed] = useState(!defaultExpanded)
 	const ulRef = useRef<HTMLUListElement>(null)
 	const itemRefs = useRef<(HTMLLIElement | null)[]>([])
 	const scrollIndex = useMemo(() => {

@@ -54,20 +54,19 @@ import { ChatTextArea } from "./ChatTextArea"
 import { MAX_IMAGES_PER_MESSAGE } from "./ChatView"
 import { useSelectedModel } from "../ui/hooks/useSelectedModel"
 import {
-	Eye,
+	BookOpen,
 	FileDiff,
 	ListTree,
-	User,
+	CircleUser,
 	Edit,
 	Trash2,
 	RotateCcw,
 	MessageCircleQuestionMark,
 	SquareArrowOutUpRight,
-	FileCode2,
 	PocketKnife,
 	FolderTree,
 	TerminalSquare,
-	MessageCircle,
+	Sparkles,
 	Repeat2,
 	Split,
 	ArrowRight,
@@ -127,6 +126,7 @@ interface ChatRowProps {
 	hasCheckpoint?: boolean
 	onJumpToPreviousCheckpoint?: () => void
 	isSticky?: boolean
+	onNavigateToMessage?: (ts: number) => void
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -182,6 +182,7 @@ export const ChatRowContent = ({
 	isFollowUpAutoApprovalPaused,
 	onJumpToPreviousCheckpoint,
 	isSticky,
+	onNavigateToMessage,
 }: ChatRowContentProps) => {
 	const { t, i18n } = useTranslation()
 
@@ -569,7 +570,7 @@ export const ChatRowContent = ({
 					return (
 						<>
 							<div style={headerStyle}>
-								<Eye className="w-4 shrink-0" aria-label="View files icon" />
+								<BookOpen className="w-4 shrink-0" aria-label="View files icon" />
 								<span style={{ fontWeight: "bold" }}>
 									{t("chat:fileOperations.wantsToReadMultiple")}
 								</span>
@@ -589,7 +590,7 @@ export const ChatRowContent = ({
 				return (
 					<>
 						<div style={headerStyle}>
-							<FileCode2 className="w-4 shrink-0" aria-label="Read file icon" />
+							<BookOpen className="w-4 shrink-0" aria-label="Read file icon" />
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask"
 									? tool.isOutsideWorkspace
@@ -1186,7 +1187,10 @@ export const ChatRowContent = ({
 					return (
 						<div className="group">
 							<div style={headerStyle}>
-								<MessageCircle className="w-4 shrink-0" aria-label="Speech bubble icon" />
+								<Sparkles
+									className="w-4 shrink-0 text-vscode-button-background/80"
+									aria-label="Sparkles icon"
+								/>
 								<span style={{ fontWeight: "bold" }}>{t("chat:text.mirrorSaid")}</span>
 								<div style={{ flexGrow: 1 }} />
 								<OpenMarkdownPreviewButton markdown={message.text} />
@@ -1209,16 +1213,12 @@ export const ChatRowContent = ({
 							className={cn(
 								"group my-2 p-3 rounded-lg transition-all",
 								isSticky
-									? "sticky top-0 z-10"
+									? "border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03]"
 									: "border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03] hover:bg-vscode-button-background/[0.06] hover:border-vscode-button-background/25",
 							)}
 							style={
 								isSticky
 									? {
-											position: "sticky",
-											top: "-12px",
-											bottom: "0px",
-											zIndex: 10,
 											background:
 												"color-mix(in srgb, var(--vscode-sideBar-background) 90%, transparent)",
 											backdropFilter: "blur(12px)",
@@ -1233,7 +1233,7 @@ export const ChatRowContent = ({
 							}>
 							<div className="flex justify-between items-center ml-1 w-full">
 								<div style={headerStyle}>
-									<User
+									<CircleUser
 										className="w-3.5 h-3.5 shrink-0 text-vscode-button-background/80 group-hover:text-vscode-button-background"
 										aria-label="User icon"
 									/>
@@ -1304,11 +1304,17 @@ export const ChatRowContent = ({
 										)}
 										onClick={(e) => {
 											e.stopPropagation()
-											if (!isStreaming) {
+											if (isSticky && onNavigateToMessage) {
+												onNavigateToMessage(message.ts)
+											} else if (!isStreaming) {
 												handleEditClick()
 											}
 										}}
-										title={t("chat:queuedMessages.clickToEdit")}>
+										title={
+											isSticky
+												? t("chat:stickyMessage.clickToNavigate")
+												: t("chat:queuedMessages.clickToEdit")
+										}>
 										<Mention text={message.text} withShadow />
 									</div>
 								</div>
@@ -1551,7 +1557,7 @@ export const ChatRowContent = ({
 
 							return (
 								<div style={headerStyle}>
-									<FileCode2 className="w-4 shrink-0" aria-label="Read command output icon" />
+									<BookOpen className="w-4 shrink-0" aria-label="Read command output icon" />
 									<span style={{ fontWeight: "bold" }}>{t("chat:readCommandOutput.title")}</span>
 									{infoText && (
 										<span

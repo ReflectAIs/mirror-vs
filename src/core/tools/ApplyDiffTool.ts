@@ -94,14 +94,16 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 
 						const errorDetails = failPart.details ? JSON.stringify(failPart.details, null, 2) : ""
 
-						formattedError = `<error_details>\n${failPart.error
-							}${errorDetails ? `\n\nDetails:\n${errorDetails}` : ""}\n</error_details>`
+						formattedError = `<error_details>\n${
+							failPart.error
+						}${errorDetails ? `\n\nDetails:\n${errorDetails}` : ""}\n</error_details>`
 					}
 				} else {
 					const errorDetails = diffResult.details ? JSON.stringify(diffResult.details, null, 2) : ""
 
-					formattedError = `Unable to apply diff to file: ${absolutePath}\n\n<error_details>\n${diffResult.error
-						}${errorDetails ? `\n\nDetails:\n${errorDetails}` : ""}\n</error_details>`
+					formattedError = `Unable to apply diff to file: ${absolutePath}\n\n<error_details>\n${
+						diffResult.error
+					}${errorDetails ? `\n\nDetails:\n${errorDetails}` : ""}\n</error_details>`
 				}
 
 				if (currentCount >= 2) {
@@ -183,11 +185,7 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 
 				// Show green/red review decorations for the saved changes
 				try {
-					ReviewManager.getInstance().showReviewDecorations(
-						absolutePath,
-						originalContent,
-						diffResult.content,
-					)
+					ReviewManager.getInstance().showReviewDecorations(absolutePath, originalContent, diffResult.content)
 				} catch (e) {
 					// Non-blocking — decorations are visual polish
 					console.warn("[ApplyDiffTool] Failed to show review decorations:", e)
@@ -225,7 +223,6 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 
 				if (!didApprove) {
 					await task.diffViewProvider.revertChanges()
-					task.processQueuedMessages()
 					return
 				}
 
@@ -234,11 +231,7 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 
 				// Show green/red review decorations for the saved changes
 				try {
-					ReviewManager.getInstance().showReviewDecorations(
-						absolutePath,
-						originalContent,
-						diffResult.content,
-					)
+					ReviewManager.getInstance().showReviewDecorations(absolutePath, originalContent, diffResult.content)
 				} catch (e) {
 					// Non-blocking — decorations are visual polish
 					console.warn("[ApplyDiffTool] Failed to show review decorations:", e)
@@ -277,15 +270,11 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 			await task.diffViewProvider.reset()
 			this.resetPartialState()
 
-			// Process any queued messages after file edit completes
-			task.processQueuedMessages()
-
 			return
 		} catch (error) {
 			await handleError("applying diff", error as Error)
 			await task.diffViewProvider.reset()
 			this.resetPartialState()
-			task.processQueuedMessages()
 			return
 		}
 	}
@@ -315,7 +304,7 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 			return
 		}
 
-		await task.ask("tool", JSON.stringify(sharedMessageProps), block.partial, toolProgressStatus).catch(() => { })
+		await task.ask("tool", JSON.stringify(sharedMessageProps), block.partial, toolProgressStatus).catch(() => {})
 	}
 }
 

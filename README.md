@@ -1,10 +1,16 @@
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs"><img src="https://img.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace"></a>  
+  <a href="https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs"><img src="https://img.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace"></a>
 </p>
 
-# Mirror VS
+<h1 align="center">Mirror VS</h1>
 
-> Your AI-Powered Dev Team, Right in Your Editor
+<p align="center">
+  <strong>Your AI pair programmer.</strong>
+</p>
+
+<p align="center">
+  Code, architect, debug, and ask questions naturally. Mirror VS adapts to how <em>you</em> work.
+</p>
 
 <details>
   <summary>🌐 Available languages</summary>
@@ -28,36 +34,51 @@
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](locales/zh-TW/README.md)
 - ...
-    </details>
+  </details>
 
 ---
 
-## What Can Mirror VS Do For YOU?
+## What is Mirror VS?
 
-- Generate Code from natural language descriptions and specs
-- Adapt with Modes: Code, Architect, Ask, Debug, and Custom Modes
-- Refactor & Debug existing code
-- Write & Update documentation
-- Answer Questions about your codebase
-- Automate repetitive tasks
-- Utilize MCP Servers
+Mirror VS is your AI-powered development sidekick. Think of it as a brilliant collaborator who never sleeps — ready to write code, plan architectures, squish bugs, answer questions, or automate the boring stuff. All without leaving your editor.
 
-## Modes
+Whether you're spinning up a new project, refactoring a gnarly codebase, or trying to understand why that test won't pass, Mirror VS has your back.
 
-Mirror VS adapts to how you work:
+## What can it do?
 
-- Code Mode: everyday coding, edits, and file ops
-- Architect Mode: plan systems, specs, and migrations
-- Ask Mode: fast answers, explanations, and docs
-- Debug Mode: trace issues, add logs, isolate root causes
-- Custom Modes: build specialized modes for your team or workflow
+- **Write code** from plain English descriptions and specs
+- **Architect systems** — plan migrations, design APIs, document decisions
+- **Refactor and debug** existing code with surgical precision
+- **Answer questions** about your codebase instantly
+- **Automate repetitive tasks** so you can focus on what matters
+- **Connect to MCP servers** for extended superpowers
 
-Learn more: [Using Modes](https://docs.mirrorvs.dev/basic-usage/using-modes) • [Custom Modes](https://docs.mirrorvs.dev/advanced-usage/custom-modes)
+## Modes for every moment
+
+Mirror VS adjusts its behavior to match what you need:
+
+| Mode             | What it's for                                              |
+| ---------------- | ---------------------------------------------------------- |
+| **Code**         | Day-to-day coding, edits, file operations                  |
+| **Architect**    | Systems design, specs, migrations, planning                |
+| **Ask**          | Quick answers, explanations, documentation                 |
+| **Debug**        | Tracing issues, adding logs, finding root causes           |
+| **Custom Modes** | Build your own — tailor Mirror VS to your team or workflow |
+
+👉 [Learn about modes](https://docs.mirrorvs.dev/basic-usage/using-modes) · [Create custom modes](https://docs.mirrorvs.dev/advanced-usage/custom-modes)
+
+## Getting started
+
+1. Install [Mirror VS from the Marketplace](https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs)
+2. Open the command palette (`Cmd+Shift+P`) and run **Mirror VS: Start New Task**
+3. Tell it what you need — in your own words
+
+That's it. No config files to edit, no YAML to wrangle. Just start typing.
 
 ## Resources
 
-- **[Documentation](https://docs.mirrorvs.dev/):** The official guide to installing, configuring, and mastering Mirror VS.
-- **[GitHub Issues](https://github.com/ReflectAIs/mirror-vs/issues):** Report bugs and track development.
+- **[Documentation](https://docs.mirrorvs.dev/)** — the official guide to installing, configuring, and mastering Mirror VS
+- **[GitHub Issues](https://github.com/ReflectAIs/mirror-vs/issues)** — report bugs, request features, track development
 
 ---
 

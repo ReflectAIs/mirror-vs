@@ -1337,11 +1337,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// The state is mutable if the message is complete and the task will
 		// block (via the `pWaitFor`).
 		const isBlocking = !(this.askResponse !== undefined || this.lastMessageTs !== askTs)
-		const isMessageQueued = !this.messageQueueService.isEmpty()
-		// Keep queued user messages intact during command_output asks. Those asks
-		// are terminal flow-control, not conversational turns.
-		const shouldDrainQueuedMessageForAsk = type !== "command_output"
-		const isStatusMutable = !partial && isBlocking && !isMessageQueued && approval.decision === "ask"
+		const isStatusMutable = !partial && isBlocking && approval.decision === "ask"
 
 		if (isStatusMutable) {
 			const statusMutationTimeout = 2_000
@@ -1381,21 +1377,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					}, statusMutationTimeout),
 				)
 			}
-		} else if (isMessageQueued && shouldDrainQueuedMessageForAsk) {
-			const message = this.messageQueueService.dequeueMessage()
-
-			if (message) {
-				// Check if this is a tool approval ask that needs to be handled.
-				if (type === "tool" || type === "command" || type === "use_mcp_server") {
-					// For tool approvals, we need to approve first, then send
-					// the message if there's text/images.
-					this.handleWebviewAskResponse("yesButtonClicked", message.text, message.images)
-				} else {
-					// For other ask types (like followup or command_output), fulfill the ask
-					// directly.
-					this.handleWebviewAskResponse("messageResponse", message.text, message.images)
-				}
-			}
 		}
 
 		// Wait for askResponse to be set
@@ -1403,22 +1384,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			() => {
 				if (this.askResponse !== undefined || this.lastMessageTs !== askTs) {
 					return true
-				}
-
-				// If a queued message arrives while we're blocked on an ask (e.g. a follow-up
-				// suggestion click that was incorrectly queued due to UI state), consume it
-				// immediately so the task doesn't hang.
-				if (shouldDrainQueuedMessageForAsk && !this.messageQueueService.isEmpty()) {
-					const message = this.messageQueueService.dequeueMessage()
-					if (message) {
-						// If this is a tool approval ask, we need to approve first (yesButtonClicked)
-						// and include any queued text/images.
-						if (type === "tool" || type === "command" || type === "use_mcp_server") {
-							this.handleWebviewAskResponse("yesButtonClicked", message.text, message.images)
-						} else {
-							this.handleWebviewAskResponse("messageResponse", message.text, message.images)
-						}
-					}
 				}
 
 				return false
@@ -1453,7 +1418,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		return result
 	}
 
-	handleWebviewAskResponse(askResponse: MirrorAskResponse, text?: string, images?: string[]) {
+	public handleWebviewAskResponse(askResponse: MirrorAskResponse, text?: string, images?: string[]) {
 		// Clear any pending auto-approval timeout when user responds
 		this.cancelAutoApprovalTimeout()
 
@@ -1702,9 +1667,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			{ isNonInteractive: true } /* options */,
 			contextCondense,
 		)
-
-		// Process any queued messages after condensing completes
-		this.processQueuedMessages()
 	}
 
 	async say(
@@ -2449,6 +2411,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// as he can.
 
 			if (didEndLoop) {
+				// Process any queued messages after the task loop completes.
+				// Queued messages are held during the agentic loop and only
+				// released after the first task finishes, preventing interruptions
+				// mid-workflow.
+				this.processQueuedMessages()
+
 				// For now a task never 'completes'. This will only happen if
 				// the user hits max requests and denies resetting the count.
 				break
@@ -2477,7 +2445,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			const currentIncludeFileDetails = currentItem.includeFileDetails
 
 			if (this.abort) {
-				throw new Error(`[MirrorVS#recursivelyMakeMirrorRequests] task ${this.taskId}.${this.instanceId} aborted`)
+				throw new Error(
+					`[MirrorVS#recursivelyMakeMirrorRequests] task ${this.taskId}.${this.instanceId} aborted`,
+				)
 			}
 
 			if (this.consecutiveMistakeLimit > 0 && this.consecutiveMistakeCount >= this.consecutiveMistakeLimit) {
@@ -3148,7 +3118,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					// any function in the for loop throws due to this.abort).
 					if (!this.abandoned) {
 						// Determine cancellation reason
-						const cancelReason: MirrorApiReqCancelReason = this.abort ? "user_cancelled" : "streaming_failed"
+						const cancelReason: MirrorApiReqCancelReason = this.abort
+							? "user_cancelled"
+							: "streaming_failed"
 
 						const rawErrorMessage = error.message ?? JSON.stringify(serializeError(error), null, 2)
 						const streamingFailedMessage = this.abort
