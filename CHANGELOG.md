@@ -2,26 +2,13 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.5.4] - 2026-07-10
+## [0.5.3] - 2026-07-10
 
 ### Added
 
 - **Web Search Tool**: Added a new `web_search` native tool enabling the assistant to perform live web searches via DuckDuckGo HTML endpoint. The tool parses result snippets and returns the top 5 results with URLs, giving the assistant real-time web access during task execution. Includes a new `WebSearchTool` class, prompt registration under `native-tools`, proper tool-use type definitions, and integration with `MirrorProvider` and `webviewMessageHandler`.
 - **Web Search Type Definitions**: Added `web_search` to the shared tool types (`tools.ts`), `task.ts`, and `mode.ts` type systems to ensure proper tool routing and validation.
 - **modelChange Message Type**: Added a new `modelChange` message type to the `WebviewMessage` interface in `vscode-extension-host.ts`, with handler support in `webviewMessageHandler.ts` and `ChatView.tsx` for seamless model switching updates from the webview.
-
-### Changed
-
-- **Code Cleanup**: Minor cleanup across task services and webview message handling, removing unused `MessageQueueService` imports and streamlining type references.
-
-### Fixed
-
-- N/A
-
-## [0.5.3] - 2026-07-09
-
-### Added
-
 - **Cancel Button on Auto-Approve Countdown Timer**: Added a visible Cancel (XCircle icon) button on the follow-up auto-approve countdown timer bar in `FollowUpSuggest`. Users can now manually cancel the auto-approve countdown via click, which triggers `cancelAutoApprovalTimeout()` to clear the pending timeout. Includes i18n support with a `cancelTimer` translation key.
 - **Queued Message Auto-Processing After Task Completion**: Added automatic processing of queued messages after each task loop completes. When `didEndLoop` is detected in `initiateTaskLoop()`, one queued message is dequeued and submitted as user feedback wrapped in `<user_message>` tags, enabling sequential queue draining without blocking.
 - **Session Rename in Chat Header**: Added inline session rename directly in the ChatView header. Click the session name (or "Unnamed session") next to the Mirror VS branding to edit it inline — Enter to save, Escape to cancel.
@@ -38,6 +25,7 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **HistoryView Simplified**: Removed `useExtensionState`, `vscode`, `SessionGroup` type, and `SessionGroupItem` imports. Removed `handleRenameSession`, `sessionGroupsWithSelection`, and `toggleSessionExpand` logic. Tasks render directly via `TaskGroupItem` from `useGroupedTasks().groups`.
 - **useGroupedTasks Cleaned**: Removed `buildSessionGroups()`, `collectAllSubtasks()`, `expandedSessionIds` state, `sessionNames` parameter, and `toggleSessionExpand` callback.
 - `useGroupedTasks()` now returns only `{ groups, flatTasks, toggleExpand, isSearchMode }`.
+- **Code Cleanup**: Minor cleanup across task services and webview message handling, removing unused `MessageQueueService` imports and streamlining type references.
 
 ### Fixed
 

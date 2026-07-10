@@ -34,7 +34,7 @@
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](locales/zh-TW/README.md)
 - ...
-  </details>
+    </details>
 
 ---
 
@@ -65,8 +65,6 @@ Mirror VS adjusts its behavior to match what you need:
 | **Debug**        | Tracing issues, adding logs, finding root causes           |
 | **Custom Modes** | Build your own — tailor Mirror VS to your team or workflow |
 
-👉 [Learn about modes](https://docs.mirrorvs.dev/basic-usage/using-modes) · [Create custom modes](https://docs.mirrorvs.dev/advanced-usage/custom-modes)
-
 ## Getting started
 
 1. Install [Mirror VS from the Marketplace](https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs)
@@ -74,13 +72,6 @@ Mirror VS adjusts its behavior to match what you need:
 3. Tell it what you need — in your own words
 
 That's it. No config files to edit, no YAML to wrangle. Just start typing.
-
-## Resources
-
-- **[Documentation](https://docs.mirrorvs.dev/)** — the official guide to installing, configuring, and mastering Mirror VS
-- **[GitHub Issues](https://github.com/ReflectAIs/mirror-vs/issues)** — report bugs, request features, track development
-
----
 
 ## License
 
