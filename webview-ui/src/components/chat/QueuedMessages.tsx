@@ -13,9 +13,10 @@ interface QueuedMessagesProps {
 	queue: QueuedMessage[]
 	onRemove: (index: number) => void
 	onUpdate: (index: number, newText: string) => void
+	onForceSend?: (index: number) => void
 }
 
-export const QueuedMessages = ({ queue, onRemove, onUpdate }: QueuedMessagesProps) => {
+export const QueuedMessages = ({ queue, onRemove, onUpdate, onForceSend }: QueuedMessagesProps) => {
 	const { t } = useTranslation("chat")
 	const [editingStates, setEditingStates] = useState<Record<string, { isEditing: boolean; value: string }>>({})
 
@@ -89,7 +90,18 @@ export const QueuedMessages = ({ queue, onRemove, onUpdate }: QueuedMessagesProp
 										</div>
 									)}
 								</div>
-								<div className="flex">
+								<div className="flex gap-1">
+									<Button
+										variant="ghost"
+										size="icon"
+										className="shrink-0 hover:text-vscode-gitDecoration-addedResource"
+										title={t("chat:queuedMessages.forceSend")}
+										onClick={(e) => {
+											e.stopPropagation()
+											onForceSend?.(index)
+										}}>
+										<span className="codicon codicon-send" />
+									</Button>
 									<Button
 										variant="ghost"
 										size="icon"

@@ -131,6 +131,9 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 			const { response, text, images } = await task.ask("completion_result", "", false)
 
 			if (response === "yesButtonClicked") {
+				console.log(
+					`[AttemptCompletion] yesButtonClicked → emitTaskCompleted for task ${task.taskId}, queue size: ${task.messageQueueService?.messages?.length ?? 0}`,
+				)
 				this.emitTaskCompleted(task)
 				return
 			}

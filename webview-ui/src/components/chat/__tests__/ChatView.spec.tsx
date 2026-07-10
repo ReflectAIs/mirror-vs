@@ -114,10 +114,12 @@ vi.mock("../QueuedMessages", () => ({
 	QueuedMessages: function MockQueuedMessages({
 		queue = [],
 		onRemove,
+		onForceSend,
 	}: {
 		queue?: Array<{ id: string; text: string; images?: string[] }>
 		onRemove?: (index: number) => void
 		onUpdate?: (index: number, newText: string) => void
+		onForceSend?: (index: number) => void
 	}) {
 		if (!queue || queue.length === 0) {
 			return null
@@ -129,6 +131,9 @@ vi.mock("../QueuedMessages", () => ({
 						<span>{msg.text}</span>
 						<button aria-label="Remove message" onClick={() => onRemove?.(index)}>
 							Remove
+						</button>
+						<button aria-label="Force send" onClick={() => onForceSend?.(index)}>
+							Force Send
 						</button>
 					</div>
 				))}
@@ -965,6 +970,114 @@ describe("ChatView - Message Queueing Tests", () => {
 				type: "terminalOperation",
 			}),
 		)
+	})
+
+	it("sends follow-up answers directly instead of queueing when queue has items", async () => {
+		const { getByTestId } = renderChatView()
+
+		// Hydrate state with followup ask and items in messageQueue
+		mockPostMessage({
+			mirrorMessages: [
+				{
+					type: "say",
+					say: "task",
+					ts: Date.now() - 2000,
+					text: "Initial task",
+				},
+				{
+					type: "ask",
+					ask: "followup",
+					ts: Date.now(),
+					text: JSON.stringify({ question: "How are you?" }),
+					partial: false,
+				},
+			],
+			messageQueue: [{ id: "msg1", text: "queued message 1", images: [] }],
+		})
+
+		// Wait for state to be updated and rendered
+		await waitFor(() => {
+			expect(getByTestId("chat-textarea")).toBeInTheDocument()
+		})
+
+		// Allow React effects to complete (mirrorAsk -> mirrorAskRef sync)
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 50))
+		})
+
+		// Clear message calls before simulating user input
+		vi.mocked(vscode.postMessage).mockClear()
+
+		// Simulate user typing and sending a message
+		const chatTextArea = getByTestId("chat-textarea")
+		const input = chatTextArea.querySelector("input")! as HTMLInputElement
+
+		await act(async () => {
+			fireEvent.change(input, { target: { value: "I am fine" } })
+			fireEvent.keyDown(input, { key: "Enter", code: "Enter" })
+		})
+
+		// Verify that the message was sent as askResponse directly, not queued
+		await waitFor(() => {
+			expect(vscode.postMessage).toHaveBeenCalledWith({
+				type: "askResponse",
+				askResponse: "messageResponse",
+				text: "I am fine",
+				images: [],
+			})
+		})
+
+		// Verify it was NOT queued
+		expect(vscode.postMessage).not.toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "queueMessage",
+			}),
+		)
+	})
+
+	it("sends message immediately and removes it from queue when force send button is clicked", async () => {
+		const { getByTestId, getByRole } = renderChatView()
+
+		// Hydrate state with a queued message and an ongoing task
+		mockPostMessage({
+			mirrorMessages: [
+				{
+					type: "say",
+					say: "task",
+					ts: Date.now() - 2000,
+					text: "Initial task",
+				},
+			],
+			messageQueue: [{ id: "msg123", text: "this message should be force sent", images: [] }],
+		})
+
+		// Wait for state to be updated and the queued-messages component to render
+		await waitFor(() => {
+			expect(getByTestId("queued-messages")).toBeInTheDocument()
+		})
+
+		// Clear message calls before simulating user action
+		vi.mocked(vscode.postMessage).mockClear()
+
+		// Click the Force Send button in MockQueuedMessages
+		const forceSendBtn = getByRole("button", { name: "Force send" })
+		await act(async () => {
+			fireEvent.click(forceSendBtn)
+		})
+
+		// Verify it removed the message from the queue first
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "removeQueuedMessage",
+			text: "msg123",
+		})
+
+		// Verify it immediately sent it as askResponse (forceSend = true logic bypasses queue)
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "askResponse",
+			askResponse: "messageResponse",
+			text: "this message should be force sent",
+			images: [],
+		})
 	})
 })
 

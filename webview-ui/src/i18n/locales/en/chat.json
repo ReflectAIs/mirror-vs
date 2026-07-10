@@ -374,7 +374,8 @@
 	},
 	"followUpSuggest": {
 		"copyToInput": "Copy to input (same as shift + click)",
-		"timerPrefix": "Auto-approve enabled. Selecting in {{seconds}}s…"
+		"timerPrefix": "Auto-approve enabled. Selecting in {{seconds}}s…",
+		"cancelTimer": "Cancel"
 	},
 	"costs": {
 		"totalWithSubtasks": "Total Cost (including subtasks): ${{cost}}",
@@ -446,7 +447,8 @@
 	},
 	"queuedMessages": {
 		"title": "Queued Messages",
-		"clickToEdit": "Click to edit message"
+		"clickToEdit": "Click to edit message",
+		"forceSend": "Force send message"
 	},
 	"stickyMessage": {
 		"clickToNavigate": "Click to jump to this message"

@@ -672,7 +672,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	 * @param images - Array of image data URLs to send with the message
 	 */
 	const handleSendMessage = useCallback(
-		(text: string, images: string[]) => {
+		(text: string, images: string[], forceSend: boolean = false) => {
 			text = text.trim()
 
 			if (text || images.length > 0) {
@@ -688,11 +688,14 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				// - API request in progress (isStreaming)
 				// - Queue has items (preserve message order during drain)
 				// - Command is running (command_output) - user's message should be queued for AI, not sent to terminal
+				const isRespondingToAsk = mirrorAskRef.current && mirrorAskRef.current !== "command_output"
 				if (
-					sendingDisabled ||
-					isStreaming ||
-					messageQueue.length > 0 ||
-					mirrorAskRef.current === "command_output"
+					!forceSend &&
+					!isRespondingToAsk &&
+					(sendingDisabled ||
+						isStreaming ||
+						messageQueue.length > 0 ||
+						mirrorAskRef.current === "command_output")
 				) {
 					try {
 						console.log("queueMessage", text, images)
@@ -712,7 +715,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				userRespondedRef.current = true
 
 				if (messagesRef.current.length === 0) {
-					vscode.postMessage({ type: "newTask", text, images })
+					vscode.postMessage({ type: "newTask", text, images, sessionMode: "continueOrCreate" })
 				} else if (mirrorAskRef.current) {
 					if (mirrorAskRef.current === "followup") {
 						markFollowUpAsAnswered()
@@ -2271,6 +2274,15 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							type: "editQueuedMessage",
 							payload: { id: messageQueue[index].id, text: newText, images: messageQueue[index].images },
 						})
+					}
+				}}
+				onForceSend={(index) => {
+					if (messageQueue[index]) {
+						const msg = messageQueue[index]
+						// 1. Remove from queue first
+						vscode.postMessage({ type: "removeQueuedMessage", text: msg.id })
+						// 2. Send immediately
+						handleSendMessage(msg.text, msg.images || [], true)
 					}
 				}}
 			/>

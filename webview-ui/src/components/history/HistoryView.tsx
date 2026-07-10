@@ -1,4 +1,4 @@
-import React, { memo, useState, useMemo } from "react"
+import React, { memo, useState, useMemo, useCallback } from "react"
 import { ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DeleteTaskDialog } from "./DeleteTaskDialog"
@@ -45,16 +45,19 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 	} = useTaskSearch()
 	const { t } = useAppTranslation()
 
-	// Use grouped tasks hook
+	// Use grouped tasks hook — returns task groups directly (no session wrapping)
 	const { groups, flatTasks, toggleExpand, isSearchMode } = useGroupedTasks(tasks, searchQuery)
 
 	const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
 	const [deleteSubtaskCount, setDeleteSubtaskCount] = useState<number>(0)
 	const [isSelectionMode, setIsSelectionMode] = useState(false)
-	const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
 	const [showBatchDeleteDialog, setShowBatchDeleteDialog] = useState<boolean>(false)
 
-	// Get subtask count for a task (recursive total)
+	// Derive a selectedTaskIds Set from the array for O(1) lookups
+	const selectedTaskIdsSet = selectedTaskIds
+
+	// Get subtask count for a task (recursive total) — compute from all groups
 	const getSubtaskCount = useMemo(() => {
 		const countMap = new Map<string, number>()
 		for (const group of groups) {
@@ -64,43 +67,55 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 	}, [groups])
 
 	// Handle delete with subtask count
-	const handleDelete = (taskId: string) => {
-		setDeleteTaskId(taskId)
-		setDeleteSubtaskCount(getSubtaskCount(taskId))
-	}
+	const handleDelete = useCallback(
+		(taskId: string) => {
+			setDeleteTaskId(taskId)
+			setDeleteSubtaskCount(getSubtaskCount(taskId))
+		},
+		[getSubtaskCount],
+	)
 
 	// Toggle selection mode
-	const toggleSelectionMode = () => {
-		setIsSelectionMode(!isSelectionMode)
-		if (isSelectionMode) {
-			setSelectedTaskIds([])
-		}
-	}
+	const toggleSelectionMode = useCallback(() => {
+		setIsSelectionMode((prev) => {
+			if (prev) {
+				setSelectedTaskIds(new Set())
+			}
+			return !prev
+		})
+	}, [])
 
 	// Toggle selection for a single task
-	const toggleTaskSelection = (taskId: string, isSelected: boolean) => {
-		if (isSelected) {
-			setSelectedTaskIds((prev) => [...prev, taskId])
-		} else {
-			setSelectedTaskIds((prev) => prev.filter((id) => id !== taskId))
-		}
-	}
+	const toggleTaskSelection = useCallback((taskId: string, isSelected: boolean) => {
+		setSelectedTaskIds((prev) => {
+			const next = new Set(prev)
+			if (isSelected) {
+				next.add(taskId)
+			} else {
+				next.delete(taskId)
+			}
+			return next
+		})
+	}, [])
 
 	// Toggle select all tasks
-	const toggleSelectAll = (selectAll: boolean) => {
-		if (selectAll) {
-			setSelectedTaskIds(tasks.map((task) => task.id))
-		} else {
-			setSelectedTaskIds([])
-		}
-	}
+	const toggleSelectAll = useCallback(
+		(selectAll: boolean) => {
+			if (selectAll) {
+				setSelectedTaskIds(new Set(tasks.map((task) => task.id)))
+			} else {
+				setSelectedTaskIds(new Set())
+			}
+		},
+		[tasks],
+	)
 
 	// Handle batch delete button click
-	const handleBatchDelete = () => {
-		if (selectedTaskIds.length > 0) {
+	const handleBatchDelete = useCallback(() => {
+		if (selectedTaskIds.size > 0) {
 			setShowBatchDeleteDialog(true)
 		}
-	}
+	}, [selectedTaskIds])
 
 	return (
 		<Tab>
@@ -116,7 +131,9 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 							<span className="codicon codicon-arrow-left text-xs flex items-center justify-center" />
 							<span className="sr-only">{t("history:done")}</span>
 						</Button>
-						<h3 className="text-vscode-foreground font-semibold text-[13px] tracking-wide m-0">{t("history:history")}</h3>
+						<h3 className="text-vscode-foreground font-semibold text-[13px] tracking-wide m-0">
+							{t("history:history")}
+						</h3>
 					</div>
 					<StandardTooltip
 						content={
@@ -128,11 +145,13 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								"h-6 px-2 text-[10px] flex items-center gap-1 rounded-full border transition-all duration-150 font-medium",
 								isSelectionMode
 									? "bg-mirror-brand-via/15 text-vscode-foreground border-mirror-brand-via/40"
-									: "bg-vscode-sideBar-background/30 text-vscode-descriptionForeground border-vscode-panel-border/30 hover:border-mirror-brand-via/40 hover:text-vscode-foreground"
+									: "bg-vscode-sideBar-background/30 text-vscode-descriptionForeground border-vscode-panel-border/30 hover:border-mirror-brand-via/40 hover:text-vscode-foreground",
 							)}
 							onClick={toggleSelectionMode}
 							data-testid="toggle-selection-mode-button">
-							<span className={`codicon ${isSelectionMode ? "codicon-check-all" : "codicon-checklist"} text-[10px]`} />
+							<span
+								className={`codicon ${isSelectionMode ? "codicon-check-all" : "codicon-checklist"} text-[10px]`}
+							/>
 							<span>{isSelectionMode ? t("history:exitSelection") : t("history:selectionMode")}</span>
 						</Button>
 					</StandardTooltip>
@@ -238,18 +257,18 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 						<div className="flex items-center py-1">
 							<div className="flex items-center gap-2">
 								<Checkbox
-									checked={tasks.length > 0 && selectedTaskIds.length === tasks.length}
+									checked={tasks.length > 0 && selectedTaskIds.size === tasks.length}
 									onCheckedChange={(checked) => toggleSelectAll(checked === true)}
 									variant="description"
 								/>
 								<span className="text-vscode-foreground">
-									{selectedTaskIds.length === tasks.length
+									{selectedTaskIds.size === tasks.length
 										? t("history:deselectAll")
 										: t("history:selectAll")}
 								</span>
 								<span className="ml-auto text-vscode-descriptionForeground text-xs">
 									{t("history:selectedItems", {
-										selected: selectedTaskIds.length,
+										selected: selectedTaskIds.size,
 										total: tasks.length,
 									})}
 								</span>
@@ -279,7 +298,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								variant="full"
 								showWorkspace={showAllWorkspaces}
 								isSelectionMode={isSelectionMode}
-								isSelected={selectedTaskIds.includes(item.id)}
+								isSelected={selectedTaskIds.has(item.id)}
 								onToggleSelection={toggleTaskSelection}
 								onDelete={handleDelete}
 								className="m-2"
@@ -287,7 +306,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 						)}
 					/>
 				) : (
-					// Grouped mode: task groups with expandable subtasks
+					// Task-grouped mode: render TaskGroupItem directly (no session wrapping)
 					<Virtuoso
 						className="flex-1 overflow-y-scroll"
 						data={groups}
@@ -305,7 +324,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								variant="full"
 								showWorkspace={showAllWorkspaces}
 								isSelectionMode={isSelectionMode}
-								isSelected={selectedTaskIds.includes(group.parent.id)}
+								isSelected={selectedTaskIds.has(group.parent.id)}
 								onToggleSelection={toggleTaskSelection}
 								onDelete={handleDelete}
 								onToggleExpand={() => toggleExpand(group.parent.id)}
@@ -318,13 +337,13 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 			</TabContent>
 
 			{/* Fixed action bar at bottom - only shown in selection mode with selected items */}
-			{isSelectionMode && selectedTaskIds.length > 0 && (
+			{isSelectionMode && selectedTaskIds.size > 0 && (
 				<div className="fixed bottom-0 left-0 right-2 bg-vscode-editor-background border-t border-vscode-panel-border p-2 flex justify-between items-center">
 					<div className="text-vscode-foreground">
-						{t("history:selectedItems", { selected: selectedTaskIds.length, total: tasks.length })}
+						{t("history:selectedItems", { selected: selectedTaskIds.size, total: tasks.length })}
 					</div>
 					<div className="flex gap-2">
-						<Button variant="secondary" onClick={() => setSelectedTaskIds([])}>
+						<Button variant="secondary" onClick={() => setSelectedTaskIds(new Set())}>
 							{t("history:clearSelection")}
 						</Button>
 						<Button variant="primary" onClick={handleBatchDelete}>
@@ -352,12 +371,12 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 			{/* Batch delete dialog */}
 			{showBatchDeleteDialog && (
 				<BatchDeleteTaskDialog
-					taskIds={selectedTaskIds}
+					taskIds={Array.from(selectedTaskIds)}
 					open={showBatchDeleteDialog}
 					onOpenChange={(open) => {
 						if (!open) {
 							setShowBatchDeleteDialog(false)
-							setSelectedTaskIds([])
+							setSelectedTaskIds(new Set())
 							setIsSelectionMode(false)
 						}
 					}}

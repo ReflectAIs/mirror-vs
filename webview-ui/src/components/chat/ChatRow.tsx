@@ -1240,9 +1240,9 @@ export const ChatRowContent = ({
 									<span style={{ fontWeight: "bold" }}>{t("chat:feedback.youSaid")}</span>
 								</div>
 								{!isEditing && !isStreaming && (
-									<div className="flex gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-2">
+									<div className="flex gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-2 shrink-0">
 										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors"
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors shrink-0"
 											title="Revert chat to this message"
 											onClick={(e) => {
 												e.stopPropagation()
@@ -1255,7 +1255,7 @@ export const ChatRowContent = ({
 											<RotateCcw className="w-3.5 h-3.5" aria-label="Revert to here icon" />
 										</button>
 										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors"
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors shrink-0"
 											title="Edit message"
 											onClick={(e) => {
 												e.stopPropagation()
@@ -1264,7 +1264,7 @@ export const ChatRowContent = ({
 											<Edit className="w-3.5 h-3.5" aria-label="Edit message icon" />
 										</button>
 										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-0.5 rounded transition-colors"
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-0.5 rounded transition-colors shrink-0"
 											title="Delete message"
 											onClick={(e) => {
 												e.stopPropagation()

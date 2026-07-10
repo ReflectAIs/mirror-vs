@@ -4,14 +4,29 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.5.3] - 2026-07-09
 
-### Fixed
+### Added
 
-- **UI Grayed-Out After Idle/Inactive Time**: Fixed the model input area getting stuck in a disabled state after webview suspension or extended idle periods. `sendingDisabled` now resets via a sync `useEffect` when streaming stops (`isStreaming` → `false`) and via the `didBecomeVisible` handler on webview visibility restoration, ensuring the chat input reliably returns to an active state.
-- **Approve/Reject Buttons Sending Input Text**: Fixed Approve and Reject buttons no longer bundling the input box text with the button response. Button responses are now sent independently without touching the input buffer.
+- **Cancel Button on Auto-Approve Countdown Timer**: Added a visible Cancel (XCircle icon) button on the follow-up auto-approve countdown timer bar in `FollowUpSuggest`. Users can now manually cancel the auto-approve countdown via click, which triggers `cancelAutoApprovalTimeout()` to clear the pending timeout. Includes i18n support with a `cancelTimer` translation key.
+- **Queued Message Auto-Processing After Task Completion**: Added automatic processing of queued messages after each task loop completes. When `didEndLoop` is detected in `initiateTaskLoop()`, one queued message is dequeued and submitted as user feedback wrapped in `<user_message>` tags, enabling sequential queue draining without blocking.
+- **Session Rename in Chat Header**: Added inline session rename directly in the ChatView header. Click the session name (or "Unnamed session") next to the Mirror VS branding to edit it inline — Enter to save, Escape to cancel.
+- **i18n Keys for Session Rename**: Added `namePlaceholder`, `renameTooltip`, and `unnamed` translation keys under the `chat:task` namespace.
+
+### Removed
+
+- **Conversation Mode**: Removed the `💬 Conversation` mode definition from `packages/types/src/mode.ts`, the special `alwaysAvailable` bypass in `src/core/tools/validateToolUse.ts`, and all associated test cases from both `modes.spec.ts` and `validateToolUse.spec.ts`.
+- **Session Grouping from History View**: Removed `SessionGroupItem` and the `SessionGroup` abstraction entirely. History tasks are now rendered directly as `TaskGroupItem` lists without session wrapping, matching the correct architecture where sessions are individual entities containing sequential tasks.
 
 ### Changed
 
 - **Approve/Reject Preserve Input Text**: Approve and Reject buttons now preserve the user's input text in the text area after clicking, allowing users to continue editing and send it later via Enter or the Send button instead of losing their draft.
+- **HistoryView Simplified**: Removed `useExtensionState`, `vscode`, `SessionGroup` type, and `SessionGroupItem` imports. Removed `handleRenameSession`, `sessionGroupsWithSelection`, and `toggleSessionExpand` logic. Tasks render directly via `TaskGroupItem` from `useGroupedTasks().groups`.
+- **useGroupedTasks Cleaned**: Removed `buildSessionGroups()`, `collectAllSubtasks()`, `expandedSessionIds` state, `sessionNames` parameter, and `toggleSessionExpand` callback.
+- `useGroupedTasks()` now returns only `{ groups, flatTasks, toggleExpand, isSearchMode }`.
+
+### Fixed
+
+- **UI Grayed-Out After Idle/Inactive Time**: Fixed the model input area getting stuck in a disabled state after webview suspension or extended idle periods. `sendingDisabled` now resets via a sync `useEffect` when streaming stops (`isStreaming` → `false`) and via the `didBecomeVisible` handler on webview visibility restoration, ensuring the chat input reliably returns to an active state.
+- **Approve/Reject Buttons Sending Input Text**: Fixed Approve and Reject buttons no longer bundling the input box text with the button response. Button responses are now sent independently without touching the input buffer.
 
 ## [0.5.2] - 2026-07-09
 

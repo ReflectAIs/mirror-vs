@@ -605,13 +605,29 @@ export const webviewMessageHandler = async (provider: MirrorProvider, message: W
 			// task. This essentially creates a fresh slate for the new task.
 			try {
 				const resolved = await resolveIncomingImages({ text: message.text, images: message.images })
-				await provider.createTask(
-					resolved.text,
-					resolved.images,
-					undefined,
-					{ taskId: message.taskId },
-					message.taskConfiguration,
-				)
+
+				// Session-based routing: when sessionMode is "continueOrCreate",
+				// check if a session already exists and no task is currently active.
+				// If so, create a fresh task within the existing session rather than
+				// creating a completely new session.  This allows the user to send
+				// a completely different task description that the model will work
+				// on with clean context.
+				const currentTask = provider.getCurrentTask()
+				const hasActiveTask = currentTask !== undefined && !currentTask.abandoned && !currentTask.abort
+				const sessionId = provider.getCurrentSessionId()
+
+				if (message.sessionMode === "continueOrCreate" && sessionId && !hasActiveTask) {
+					await provider.startNewTaskInSession(resolved.text, resolved.images)
+				} else {
+					await provider.createTask(
+						resolved.text,
+						resolved.images,
+						undefined,
+						{ taskId: message.taskId },
+						message.taskConfiguration,
+					)
+				}
+
 				// Task created successfully - notify the UI to reset
 				await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 			} catch (error) {
@@ -621,6 +637,11 @@ export const webviewMessageHandler = async (provider: MirrorProvider, message: W
 				vscode.window.showErrorMessage(
 					`Failed to create task: ${error instanceof Error ? error.message : String(error)}`,
 				)
+			}
+			break
+		case "renameSession":
+			if (message.sessionId && message.sessionName !== undefined) {
+				await provider.renameSession(message.sessionId, message.sessionName)
 			}
 			break
 		case "customInstructions":
@@ -886,15 +907,15 @@ export const webviewMessageHandler = async (provider: MirrorProvider, message: W
 			const routerModels: Record<RouterName, ModelRecord> = providerFilter
 				? ({} as Record<RouterName, ModelRecord>)
 				: {
-					openrouter: {},
-					"vercel-ai-gateway": {},
-					litellm: {},
-					requesty: {},
-					unbound: {},
-					ollama: {},
-					lmstudio: {},
-					poe: {},
-				}
+						openrouter: {},
+						"vercel-ai-gateway": {},
+						litellm: {},
+						requesty: {},
+						unbound: {},
+						ollama: {},
+						lmstudio: {},
+						poe: {},
+					}
 
 			const safeGetModels = async (options: GetModelsOptions): Promise<ModelRecord> => {
 				try {
@@ -2409,13 +2430,13 @@ export const webviewMessageHandler = async (provider: MirrorProvider, message: W
 			const status = manager
 				? manager.getCurrentStatus()
 				: {
-					systemStatus: "Standby",
-					message: "No workspace folder open",
-					processedItems: 0,
-					totalItems: 0,
-					currentItemUnit: "items",
-					workspacePath: undefined,
-				}
+						systemStatus: "Standby",
+						message: "No workspace folder open",
+						processedItems: 0,
+						totalItems: 0,
+						currentItemUnit: "items",
+						workspacePath: undefined,
+					}
 
 			provider.postMessageToWebview({
 				type: "indexingStatusUpdate",
@@ -2833,7 +2854,11 @@ export const webviewMessageHandler = async (provider: MirrorProvider, message: W
 
 		case "queueMessage": {
 			const resolved = await resolveIncomingImages({ text: message.text, images: message.images })
-			provider.getCurrentTask()?.messageQueueService.addMessage(resolved.text, resolved.images)
+			const currentTask = provider.getCurrentTask()
+			console.log(
+				`[webviewMessageHandler] queueMessage: "${resolved.text?.slice(0, 60)}" → task ${currentTask?.taskId ?? "NONE"}`,
+			)
+			currentTask?.messageQueueService.addMessage(resolved.text, resolved.images)
 			break
 		}
 		case "removeQueuedMessage": {

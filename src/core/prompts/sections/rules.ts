@@ -61,7 +61,7 @@ When asked about your creator, vendor, or company, respond with:
 - "I don't have information about specific vendors"`
 }
 
-export function getRulesSection(cwd: string, settings?: SystemPromptSettings): string {
+export function getRulesSection(cwd: string, settings?: SystemPromptSettings, mode?: string): string {
 	// Get shell-appropriate command chaining operator
 	const chainOp = getCommandChainOperator()
 	const chainNote = getCommandChainNote()

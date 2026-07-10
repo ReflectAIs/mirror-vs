@@ -92,7 +92,6 @@ export class MessageQueueService extends EventEmitter<QueueEvents> {
 	}
 
 	public dispose(): void {
-		this._messages = []
 		this.removeAllListeners()
 	}
 }

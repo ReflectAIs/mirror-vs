@@ -162,6 +162,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	childTaskId?: string
 	pendingNewTaskToolCallId?: string
 
+	/** Session grouping key. Tasks sharing the same sessionId appear as one session in history. */
+	readonly sessionId?: string
+
 	readonly instanceId: string
 	readonly metadata: TaskMetadata
 
@@ -430,6 +433,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		initialTodos,
 		workspacePath,
 		initialStatus,
+		sessionId,
 	}: TaskOptions) {
 		super()
 
@@ -455,6 +459,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.rootTaskId = historyItem ? historyItem.rootTaskId : rootTask?.taskId
 		this.parentTaskId = historyItem ? historyItem.parentTaskId : parentTask?.taskId
 		this.childTaskId = undefined
+		this.sessionId = historyItem ? historyItem.sessionId : sessionId
 
 		this.metadata = {
 			task: historyItem ? historyItem.task : task,
@@ -500,6 +505,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			this.emit(MirrorVSEventName.TaskUserMessage, this.taskId)
 			this.emit(MirrorVSEventName.QueuedMessagesUpdated, this.taskId, this.messageQueueService.messages)
 			this.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
+
+			// Auto-drain: if a queued message arrives while the task is
+			// blocked on a text-accepting ask (e.g. followup, tool,
+			// completion_result, resume_task), consume it immediately
+			// instead of waiting for the user to respond.
+			this.tryDrainQueuedMessage()
 		}
 
 		this.messageQueueService.on("stateChanged", this.messageQueueStateChangedHandler)
@@ -1186,6 +1197,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				mode: this._taskMode || defaultModeSlug, // Use the task's own mode, not the current provider mode.
 				apiConfigName: this._taskApiConfigName, // Use the task's own provider profile, not the current provider profile.
 				initialStatus: this.initialStatus,
+				sessionId: this.sessionId, // Persist session grouping key
 			})
 
 			// Emit token/tool usage updates using debounced function
@@ -1379,6 +1391,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			}
 		}
 
+		// Attempt to drain any queued messages before blocking.
+		// Messages may have been queued while the previous API round was
+		// streaming (when the last mirror message is a "say", not an "ask"),
+		// so tryDrainQueuedMessage's guard would have failed at that time.
+		// Now that we've presented a new ask, try draining immediately so
+		// we don't block forever waiting for user input.
+		this.tryDrainQueuedMessage()
+
 		// Wait for askResponse to be set
 		await pWaitFor(
 			() => {
@@ -1476,6 +1496,48 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			clearTimeout(this.autoApprovalTimeoutRef)
 			this.autoApprovalTimeoutRef = undefined
 		}
+	}
+
+	/**
+	 * Attempt to drain one queued message if the task is blocked on a
+	 * text-accepting ask (followup, tool, completion_result, resume_task).
+	 * Returns true if a message was drained, false otherwise.
+	 */
+	public tryDrainQueuedMessage(): boolean {
+		console.log(
+			`[tryDrainQueuedMessage] enter — askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}`,
+		)
+		if (this.askResponse === undefined && !this.messageQueueService.isEmpty()) {
+			const lastMessage = this.mirrorMessages.at(-1)
+			const lastMsgType = lastMessage?.type
+			const lastMsgAsk = lastMessage?.type === "ask" ? lastMessage.ask : undefined
+			const lastMsgTs = lastMessage?.ts
+			console.log(
+				`[tryDrainQueuedMessage] lastMessage: type=${lastMsgType}, ask=${lastMsgAsk}, ts=${lastMsgTs}, lastMessageTs=${this.lastMessageTs}`,
+			)
+			if (
+				lastMessage?.type === "ask" &&
+				lastMessage.ask !== "command_output" &&
+				lastMessage.ts === this.lastMessageTs
+			) {
+				const queued = this.messageQueueService.dequeueMessage()
+				if (queued) {
+					console.log(`[tryDrainQueuedMessage] DRAINING: "${queued.text.slice(0, 60)}"`)
+					this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
+					return true
+				}
+				console.log(`[tryDrainQueuedMessage] dequeueMessage returned nothing`)
+			} else {
+				console.log(
+					`[tryDrainQueuedMessage] GUARD FAILED: type=${lastMsgType}, ask==="command_output"?=${lastMsgAsk === "command_output"}, tsMatch=${lastMsgTs === this.lastMessageTs}`,
+				)
+			}
+		} else {
+			console.log(
+				`[tryDrainQueuedMessage] SKIP: askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}`,
+			)
+		}
+		return false
 	}
 
 	public approveAsk({ text, images }: { text?: string; images?: string[] } = {}) {
@@ -2411,11 +2473,24 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// as he can.
 
 			if (didEndLoop) {
-				// Process any queued messages after the task loop completes.
-				// Queued messages are held during the agentic loop and only
-				// released after the first task finishes, preventing interruptions
-				// mid-workflow.
-				this.processQueuedMessages()
+				// Process one queued message at a time after each task loop
+				// completes. Instead of draining all messages at once, we take
+				// one, submit it as a new user message, and continue the loop.
+				// Subsequent queued messages are handled on the next iteration,
+				// preventing mid-workflow interruptions while ensuring all
+				// messages eventually get processed.
+				const queued = this.messageQueueService.dequeueMessage()
+				if (queued) {
+					await this.say("user_feedback", queued.text, queued.images)
+
+					const imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(queued.images)
+					nextUserContent = [
+						{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
+						...imageBlocks,
+					]
+					includeFileDetails = true
+					continue
+				}
 
 				// For now a task never 'completes'. This will only happen if
 				// the user hits max requests and denies resetting the count.
@@ -4563,29 +4638,5 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			this._messageManager = new MessageManager(this)
 		}
 		return this._messageManager
-	}
-
-	/**
-	 * Process any queued messages by dequeuing and submitting them.
-	 * This ensures that queued user messages are sent when appropriate,
-	 * preventing them from getting stuck in the queue.
-	 *
-	 * @param context - Context string for logging (e.g., the calling tool name)
-	 */
-	public processQueuedMessages(): void {
-		try {
-			if (!this.messageQueueService.isEmpty()) {
-				const queued = this.messageQueueService.dequeueMessage()
-				if (queued) {
-					setTimeout(() => {
-						this.submitUserMessage(queued.text, queued.images).catch((err) =>
-							console.error(`[Task] Failed to submit queued message:`, err),
-						)
-					}, 0)
-				}
-			}
-		} catch (e) {
-			console.error(`[Task] Queue processing error:`, e)
-		}
 	}
 }

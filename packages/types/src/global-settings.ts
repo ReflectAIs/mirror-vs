@@ -230,6 +230,18 @@ export const globalSettingsSchema = z.object({
 	 * Tools in this list will be excluded from prompt generation and rejected at execution time.
 	 */
 	disabledTools: z.array(toolNamesSchema).optional(),
+
+	/**
+	 * ID of the active session, persisted across restarts.
+	 * Tasks created during the same session share this ID for history grouping.
+	 */
+	currentSessionId: z.string().optional(),
+
+	/**
+	 * User-assigned or auto-generated names for sessions.
+	 * Keyed by sessionId UUID.
+	 */
+	sessionNames: z.record(z.string(), z.string()).optional(),
 })
 
 export type GlobalSettings = z.infer<typeof globalSettingsSchema>

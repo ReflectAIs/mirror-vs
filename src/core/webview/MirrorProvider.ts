@@ -111,7 +111,8 @@ interface PendingEditOperation {
 
 export class MirrorProvider
 	extends EventEmitter<TaskProviderEvents>
-	implements vscode.WebviewViewProvider, TaskProviderLike {
+	implements vscode.WebviewViewProvider, TaskProviderLike
+{
 	// Used in package.json as the view's id. This value cannot be changed due
 	// to how VSCode caches views based on their id, and updating the id would
 	// break existing instances of the extension.
@@ -145,6 +146,12 @@ export class MirrorProvider
 	 * Used by the frontend to reject stale state that arrives out-of-order.
 	 */
 	private mirrorMessagesSeq = 0
+
+	/**
+	 * The ID of the current session, persisted across VS Code restarts.
+	 * All tasks created during this session share this ID for history grouping.
+	 */
+	private currentSessionId?: string
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
@@ -208,8 +215,57 @@ export class MirrorProvider
 
 			// Create named listener functions so we can remove them later.
 			const onTaskStarted = () => this.emit(MirrorVSEventName.TaskStarted, instance.taskId)
-			const onTaskCompleted = (taskId: string, tokenUsage: TokenUsage, toolUsage: ToolUsage) =>
+			const onTaskCompleted = async (taskId: string, tokenUsage: TokenUsage, toolUsage: ToolUsage) => {
+				console.log(
+					`[MirrorProvider#onTaskCompleted] fired for task ${taskId}, queue size: ${instance.messageQueueService.messages.length}`,
+				)
 				this.emit(MirrorVSEventName.TaskCompleted, taskId, tokenUsage, toolUsage)
+
+				// After task completion, drain one queued message at a time.
+				// We take the first queued message and start a new task in the
+				// same session, so the user's queued messages are processed
+				// sequentially. The remaining messages are transferred to the
+				// new task's queue so they survive across task boundaries.
+				const queued = instance.messageQueueService.dequeueMessage()
+				console.log(
+					`[MirrorProvider#onTaskCompleted] dequeued: ${queued ? `"${queued.text.slice(0, 60)}"` : "nothing"}`,
+				)
+				if (queued) {
+					this.log(
+						`[onTaskCompleted] Draining queued message for task ${taskId}: "${queued.text.slice(0, 60)}"`,
+					)
+					try {
+						const newTask = await this.startNewTaskInSession(queued.text, queued.images)
+						console.log(`[MirrorProvider#onTaskCompleted] new task started: ${newTask.taskId}`)
+
+						// Re-read remaining messages from the old task's queue
+						// after startNewTaskInSession returns. The old task's
+						// dispose() no longer clears _messages, so any messages
+						// that arrived during the async gap (between dequeue
+						// above and disposal inside createTask) are preserved.
+						const remaining = [...instance.messageQueueService.messages]
+						console.log(`[MirrorProvider#onTaskCompleted] remaining after new task: ${remaining.length}`)
+
+						// Transfer any remaining queued messages to the new task so
+						// they are available when the new task eventually completes.
+						for (const msg of remaining) {
+							newTask.messageQueueService.addMessage(msg.text, msg.images)
+						}
+						console.log(
+							`[MirrorProvider#onTaskCompleted] transferred ${remaining.length} remaining messages to new task`,
+						)
+
+						await this.postMessageToWebview({ type: "invoke", invoke: "newChat" })
+					} catch (error) {
+						console.error(
+							`[MirrorProvider#onTaskCompleted] ERROR: ${error instanceof Error ? error.message : String(error)}`,
+						)
+						this.log(
+							`[onTaskCompleted] Failed to start next queued task: ${error instanceof Error ? error.message : String(error)}`,
+						)
+					}
+				}
+			}
 			const onTaskAborted = async () => {
 				this.emit(MirrorVSEventName.TaskAborted, instance.taskId)
 
@@ -233,7 +289,8 @@ export class MirrorProvider
 					}
 				} catch (error) {
 					this.log(
-						`[onTaskAborted] Failed to rehydrate after streaming failure: ${error instanceof Error ? error.message : String(error)
+						`[onTaskAborted] Failed to rehydrate after streaming failure: ${
+							error instanceof Error ? error.message : String(error)
 						}`,
 					)
 				}
@@ -294,6 +351,104 @@ export class MirrorProvider
 		} catch (error) {
 			console.error("Failed to subscribe to ReviewManager events:", error)
 		}
+	}
+
+	// ── Session management ──────────────────────────────────────────────────
+
+	/**
+	 * Returns the current session ID, if one exists.
+	 */
+	public getCurrentSessionId(): string | undefined {
+		return this.currentSessionId
+	}
+
+	/**
+	 * Creates a new session, persists it via contextProxy, and returns the id.
+	 */
+	public async createSession(): Promise<string> {
+		const sessionId = crypto.randomUUID()
+		this.currentSessionId = sessionId
+		await this.contextProxy.setValue("currentSessionId", sessionId)
+		this.log(`[createSession] Created new session ${sessionId}`)
+		return sessionId
+	}
+
+	/**
+	 * Returns the existing session if present, otherwise restores from
+	 * persisted state, or creates a brand-new one as a last resort.
+	 */
+	public async getOrCreateSession(): Promise<string> {
+		if (this.currentSessionId) {
+			return this.currentSessionId
+		}
+
+		const persistedSessionId = await this.contextProxy.getValue("currentSessionId")
+		if (persistedSessionId) {
+			this.currentSessionId = persistedSessionId
+			return persistedSessionId
+		}
+
+		return this.createSession()
+	}
+
+	/**
+	 * Clears the current session id from memory and persisted state.
+	 */
+	public async clearSession(): Promise<void> {
+		this.currentSessionId = undefined
+		await this.contextProxy.setValue("currentSessionId", undefined)
+		this.log("[clearSession] Session cleared")
+	}
+
+	/**
+	 * Returns the map of session IDs to their user-assigned or auto-generated names.
+	 */
+	public async getSessionNames(): Promise<Record<string, string>> {
+		return (await this.contextProxy.getValue("sessionNames")) || {}
+	}
+
+	/**
+	 * Sets a single session's name in the persisted sessionNames map.
+	 */
+	public async setSessionName(sessionId: string, name: string): Promise<void> {
+		const names = await this.getSessionNames()
+		names[sessionId] = name
+		await this.contextProxy.setValue("sessionNames", names)
+		this.log(`[setSessionName] Session ${sessionId} renamed to "${name}"`)
+	}
+
+	/**
+	 * Renames a session and broadcasts the updated state to the webview.
+	 */
+	public async renameSession(sessionId: string, name: string): Promise<void> {
+		await this.setSessionName(sessionId, name)
+		await this.postStateToWebview()
+	}
+
+	/**
+	 * Create a brand-new task within the current session.
+	 * Called when the user sends a message and no active task is running,
+	 * but a session already exists.  The new task gets a fresh conversation
+	 * history but shares the same sessionId.
+	 */
+	public async startNewTaskInSession(text: string, images?: string[]): Promise<Task> {
+		const sessionId = await this.getOrCreateSession()
+		const task = await this.createTask(text, images, undefined, {}, {})
+
+		// Auto-rename: if this session doesn't have a name yet, generate one
+		// from the first line of the task text (max 60 chars).
+		const names = await this.getSessionNames()
+		if (!names[sessionId]) {
+			const autoName = text.split("\n")[0].slice(0, 60).trim()
+			if (autoName) {
+				names[sessionId] = autoName
+				await this.contextProxy.setValue("sessionNames", names)
+				this.log(`[startNewTaskInSession] Auto-named session ${sessionId} to "${autoName}"`)
+			}
+		}
+
+		this.log(`[startNewTaskInSession] New task ${task.taskId} in session ${sessionId}`)
+		return task
 	}
 
 	/**
@@ -448,7 +603,8 @@ export class MirrorProvider
 				} catch (err) {
 					// Non-fatal: log but do not block the pop operation.
 					this.log(
-						`[MirrorProvider#removeMirrorFromStack] Failed to repair parent metadata for ${parentTaskId} (non-fatal): ${err instanceof Error ? err.message : String(err)
+						`[MirrorProvider#removeMirrorFromStack] Failed to repair parent metadata for ${parentTaskId} (non-fatal): ${
+							err instanceof Error ? err.message : String(err)
 						}`,
 					)
 				}
@@ -826,6 +982,12 @@ export class MirrorProvider
 		if (!currentTask || currentTask.abandoned || currentTask.abort) {
 			await this.removeMirrorFromStack()
 		}
+
+		// Restore the persisted session ID so tasks created during this
+		// session are grouped together even after VS Code restart.
+		this.getOrCreateSession().catch((error) => {
+			this.log(`[resolveWebviewView] Failed to restore session: ${error}`)
+		})
 	}
 
 	public async createTaskWithHistoryItem(
@@ -895,7 +1057,8 @@ export class MirrorProvider
 						} catch (error) {
 							// Log the error but continue with task restoration.
 							this.log(
-								`Failed to restore API configuration for mode '${historyItem.mode}': ${error instanceof Error ? error.message : String(error)
+								`Failed to restore API configuration for mode '${historyItem.mode}': ${
+									error instanceof Error ? error.message : String(error)
 								}. Continuing with default configuration.`,
 							)
 							// The task will continue with the current/default configuration.
@@ -923,7 +1086,8 @@ export class MirrorProvider
 				} catch (error) {
 					// Log the error but continue with task restoration.
 					this.log(
-						`Failed to restore API configuration '${historyItem.apiConfigName}' for task: ${error instanceof Error ? error.message : String(error)
+						`Failed to restore API configuration '${historyItem.apiConfigName}' for task: ${
+							error instanceof Error ? error.message : String(error)
 						}. Continuing with current configuration.`,
 					)
 				}
@@ -1273,7 +1437,7 @@ export class MirrorProvider
 				}
 
 				// Only update the task's mode after successful persistence.
-				; (task as any)._taskMode = newMode
+				;(task as any)._taskMode = newMode
 			} catch (error) {
 				// If persistence fails, log the error but don't update the in-memory state.
 				this.log(
@@ -1377,7 +1541,7 @@ export class MirrorProvider
 			task.updateApiConfiguration(providerSettings)
 		} else {
 			// No rebuild needed, just sync apiConfiguration
-			; (task as any).apiConfiguration = providerSettings
+			;(task as any).apiConfiguration = providerSettings
 		}
 	}
 
@@ -1492,7 +1656,8 @@ export class MirrorProvider
 		} catch (error) {
 			// If persistence fails, log the error but don't fail the profile switch.
 			this.log(
-				`Failed to persist provider profile switch for task ${task.taskId}: ${error instanceof Error ? error.message : String(error)
+				`Failed to persist provider profile switch for task ${task.taskId}: ${
+					error instanceof Error ? error.message : String(error)
 				}`,
 			)
 		}
@@ -2003,6 +2168,8 @@ export class MirrorProvider
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
 			lockApiConfigAcrossModes,
+			currentSessionId,
+			sessionNames,
 		} = await this.getState()
 
 		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
@@ -2126,6 +2293,8 @@ export class MirrorProvider
 					return false
 				}
 			})(),
+			currentSessionId,
+			sessionNames: sessionNames ?? {},
 			debug: vscode.workspace.getConfiguration(Package.name).get<boolean>("debug", false),
 		}
 	}
@@ -2263,6 +2432,8 @@ export class MirrorProvider
 			imageGenerationProvider: stateValues.imageGenerationProvider,
 			openRouterImageApiKey: stateValues.openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel: stateValues.openRouterImageGenerationSelectedModel,
+			currentSessionId: stateValues.currentSessionId,
+			sessionNames: stateValues.sessionNames ?? {},
 		}
 	}
 
@@ -2624,6 +2795,9 @@ export class MirrorProvider
 			taskNumber: this.mirrorStack.length + 1,
 			onCreated: this.taskCreationCallback,
 			initialTodos: options.initialTodos,
+			// Session grouping: top-level tasks inherit the session ID.
+			// Child tasks (delegation) inherit via parentTask.sessionId flow.
+			sessionId: this.currentSessionId,
 			// Ensure this task is present in mirrorStack before startTask() emits
 			// its initial state update, so state.currentTaskId is available ASAP.
 			startTask: false,
@@ -2842,7 +3016,8 @@ export class MirrorProvider
 			}
 		} catch (error) {
 			this.log(
-				`[delegateParentAndOpenChild] Error flushing pending tool results (non-fatal): ${error instanceof Error ? error.message : String(error)
+				`[delegateParentAndOpenChild] Error flushing pending tool results (non-fatal): ${
+					error instanceof Error ? error.message : String(error)
 				}`,
 			)
 		}
@@ -2854,7 +3029,8 @@ export class MirrorProvider
 			await this.removeMirrorFromStack({ skipDelegationRepair: true })
 		} catch (error) {
 			this.log(
-				`[delegateParentAndOpenChild] Error during parent disposal (non-fatal): ${error instanceof Error ? error.message : String(error)
+				`[delegateParentAndOpenChild] Error during parent disposal (non-fatal): ${
+					error instanceof Error ? error.message : String(error)
 				}`,
 			)
 			// Non-fatal: proceed with child creation even if parent cleanup had issues
@@ -2868,7 +3044,8 @@ export class MirrorProvider
 			await this.handleModeSwitch(mode as any)
 		} catch (e) {
 			this.log(
-				`[delegateParentAndOpenChild] handleModeSwitch failed for mode '${mode}': ${(e as Error)?.message ?? String(e)
+				`[delegateParentAndOpenChild] handleModeSwitch failed for mode '${mode}': ${
+					(e as Error)?.message ?? String(e)
 				}`,
 			)
 		}
@@ -2904,7 +3081,8 @@ export class MirrorProvider
 			await this.updateTaskHistory(updatedHistory)
 		} catch (err) {
 			this.log(
-				`[delegateParentAndOpenChild] Failed to persist parent metadata for ${parentTaskId} -> ${child.taskId}: ${(err as Error)?.message ?? String(err)
+				`[delegateParentAndOpenChild] Failed to persist parent metadata for ${parentTaskId} -> ${child.taskId}: ${
+					(err as Error)?.message ?? String(err)
 				}`,
 			)
 		}
@@ -3067,7 +3245,8 @@ export class MirrorProvider
 			})
 		} catch (err) {
 			this.log(
-				`[reopenParentFromDelegation] Failed to persist child completed status for ${childTaskId}: ${(err as Error)?.message ?? String(err)
+				`[reopenParentFromDelegation] Failed to persist child completed status for ${childTaskId}: ${
+					(err as Error)?.message ?? String(err)
 				}`,
 			)
 		}

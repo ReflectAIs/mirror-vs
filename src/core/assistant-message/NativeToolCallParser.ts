@@ -637,6 +637,14 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "web_search":
+				if (partialArgs.query !== undefined) {
+					nativeArgs = {
+						query: partialArgs.query,
+					}
+				}
+				break
+
 			default:
 				break
 		}
@@ -982,6 +990,14 @@ export class NativeToolCallParser {
 							mode: args.mode,
 							message: args.message,
 							todos: args.todos,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "web_search":
+					if (args.query !== undefined) {
+						nativeArgs = {
+							query: args.query,
 						} as NativeArgsFor<TName>
 					}
 					break
