@@ -2,6 +2,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.5.4] - 2026-07-10
+
+### Added
+
+- **Web Search Tool**: Added a new `web_search` native tool enabling the assistant to perform live web searches via DuckDuckGo HTML endpoint. The tool parses result snippets and returns the top 5 results with URLs, giving the assistant real-time web access during task execution. Includes a new `WebSearchTool` class, prompt registration under `native-tools`, proper tool-use type definitions, and integration with `MirrorProvider` and `webviewMessageHandler`.
+- **Web Search Type Definitions**: Added `web_search` to the shared tool types (`tools.ts`), `task.ts`, and `mode.ts` type systems to ensure proper tool routing and validation.
+- **modelChange Message Type**: Added a new `modelChange` message type to the `WebviewMessage` interface in `vscode-extension-host.ts`, with handler support in `webviewMessageHandler.ts` and `ChatView.tsx` for seamless model switching updates from the webview.
+
+### Changed
+
+- **Code Cleanup**: Minor cleanup across task services and webview message handling, removing unused `MessageQueueService` imports and streamlining type references.
+
+### Fixed
+
+- N/A
+
 ## [0.5.3] - 2026-07-09
 
 ### Added
