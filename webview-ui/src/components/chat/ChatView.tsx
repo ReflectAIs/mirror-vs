@@ -1041,9 +1041,18 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		(newModelId: string) => {
 			if (modelPickerConfig) {
 				setApiConfigurationField(modelPickerConfig.modelIdKey, newModelId)
+				// Propagate the model change to the backend immediately so the
+				// running task's API handler is rebuilt with the new model.
+				vscode.postMessage({
+					type: "modelChange",
+					apiConfiguration: {
+						...apiConfiguration,
+						[modelPickerConfig.modelIdKey]: newModelId,
+					},
+				})
 			}
 		},
-		[modelPickerConfig, setApiConfigurationField],
+		[modelPickerConfig, setApiConfigurationField, apiConfiguration],
 	)
 
 	const handleMessage = useCallback(

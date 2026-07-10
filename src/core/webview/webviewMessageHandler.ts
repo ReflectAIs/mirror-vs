@@ -1918,6 +1918,20 @@ export const webviewMessageHandler = async (provider: MirrorProvider, message: W
 			}
 			break
 
+		case "modelChange":
+			if (message.apiConfiguration) {
+				const currentTask = provider.getCurrentTask()
+				if (currentTask) {
+					currentTask.updateApiConfiguration(message.apiConfiguration)
+				}
+				// Persist to ContextProxy so subsequent state broadcasts from the
+				// extension don't revert the dropdown back to the old model.
+				if (provider.contextProxy) {
+					await provider.contextProxy.setProviderSettings(message.apiConfiguration)
+				}
+			}
+			break
+
 		case "updateMcpTimeout":
 			if (message.serverName && typeof message.timeout === "number") {
 				try {

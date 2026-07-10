@@ -536,6 +536,8 @@ export interface WebviewMessage {
 		| "acceptAllReviews"
 		// Session messages
 		| "renameSession"
+		// Model change messages
+		| "modelChange"
 	/** Session ID for session management operations */
 	sessionId?: string
 	/** New name for the session (for renameSession message) */

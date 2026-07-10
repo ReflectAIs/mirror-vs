@@ -1,3 +1,13 @@
+import * as os from "os"
+import * as path from "path"
+import * as vscode from "vscode"
+
+import type { GlobalState, ProviderSettings } from "@mirror-vs/types"
+
+import { Task } from "../Task"
+import { MirrorProvider } from "../../webview/MirrorProvider"
+import { ContextProxy } from "../../config/ContextProxy"
+
 describe("Queued message processing in initiateTaskLoop", () => {
 	function createProvider(): any {
 		const storageUri = { fsPath: path.join(os.tmpdir(), "test-storage") }
