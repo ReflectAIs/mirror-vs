@@ -502,6 +502,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.messageQueueService = new MessageQueueService()
 
 		this.messageQueueStateChangedHandler = () => {
+			console.log(
+				`[QUEUE stateChanged] ${this.taskId}.${this.instanceId} ` +
+					`queue=${this.messageQueueService.queueSnapshot}`,
+			)
 			this.emit(MirrorVSEventName.TaskUserMessage, this.taskId)
 			this.emit(MirrorVSEventName.QueuedMessagesUpdated, this.taskId, this.messageQueueService.messages)
 			this.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
@@ -1504,8 +1508,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 * Returns true if a message was drained, false otherwise.
 	 */
 	public tryDrainQueuedMessage(): boolean {
+		const queueBefore = this.messageQueueService.queueSnapshot
 		console.log(
-			`[tryDrainQueuedMessage] enter — askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}`,
+			`[PATH-C tryDrainQueuedMessage] ${this.taskId}.${this.instanceId} ` +
+				`askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}, ` +
+				`queue=${queueBefore}`,
 		)
 		if (this.askResponse === undefined && !this.messageQueueService.isEmpty()) {
 			const lastMessage = this.mirrorMessages.at(-1)
@@ -1513,28 +1520,48 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			const lastMsgAsk = lastMessage?.type === "ask" ? lastMessage.ask : undefined
 			const lastMsgTs = lastMessage?.ts
 			console.log(
-				`[tryDrainQueuedMessage] lastMessage: type=${lastMsgType}, ask=${lastMsgAsk}, ts=${lastMsgTs}, lastMessageTs=${this.lastMessageTs}`,
+				`[PATH-C tryDrainQueuedMessage] ${this.taskId}.${this.instanceId} ` +
+					`lastMessage: type=${lastMsgType}, ask=${lastMsgAsk}, ts=${lastMsgTs}, ` +
+					`lastMessageTs=${this.lastMessageTs}, tsMatch=${lastMsgTs === this.lastMessageTs}`,
 			)
-			if (
-				lastMessage?.type === "ask" &&
-				lastMessage.ask !== "command_output" &&
-				lastMessage.ts === this.lastMessageTs
-			) {
-				const queued = this.messageQueueService.dequeueMessage()
-				if (queued) {
-					console.log(`[tryDrainQueuedMessage] DRAINING: "${queued.text.slice(0, 60)}"`)
-					this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
-					return true
+			if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {
+				// Terminal/idle asks with queued messages: auto-complete the task
+				// to trigger onTaskCompleted (PATH-B), which will dequeue messages
+				// and create a new task for each queued message.
+				if (lastMessage.ask === "completion_result" || lastMessage.ask === "resume_completed_task") {
+					console.log(
+						`[PATH-C tryDrainQueuedMessage] AUTO-COMPLETING terminal ask ` +
+							`"${lastMessage.ask}" to drain queue=${queueBefore}`,
+					)
+					this.handleWebviewAskResponse("yesButtonClicked")
+					return false
 				}
-				console.log(`[tryDrainQueuedMessage] dequeueMessage returned nothing`)
+
+				// command_output asks should not drain queued messages as inline feedback
+				if (lastMessage.ask !== "command_output") {
+					const queued = this.messageQueueService.dequeueMessage()
+					if (queued) {
+						console.log(
+							`[PATH-C tryDrainQueuedMessage] *** DRAINING AS FEEDBACK *** ${this.taskId}.${this.instanceId}: ` +
+								`"${queued.text.slice(0, 60)}" id=${queued.id.slice(0, 8)} ` +
+								`into ask="${lastMsgAsk}"`,
+						)
+						this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
+						return true
+					}
+					console.log(`[PATH-C tryDrainQueuedMessage] dequeueMessage returned nothing`)
+				}
 			} else {
 				console.log(
-					`[tryDrainQueuedMessage] GUARD FAILED: type=${lastMsgType}, ask==="command_output"?=${lastMsgAsk === "command_output"}, tsMatch=${lastMsgTs === this.lastMessageTs}`,
+					`[PATH-C tryDrainQueuedMessage] GUARD FAILED: ${this.taskId}.${this.instanceId}: ` +
+						`type=${lastMsgType}, ask==="command_output"?=${lastMsgAsk === "command_output"}, ` +
+						`tsMatch=${lastMsgTs === this.lastMessageTs}`,
 				)
 			}
 		} else {
 			console.log(
-				`[tryDrainQueuedMessage] SKIP: askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}`,
+				`[PATH-C tryDrainQueuedMessage] SKIP: ${this.taskId}.${this.instanceId}: ` +
+					`askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}`,
 			)
 		}
 		return false
@@ -2479,7 +2506,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				// Subsequent queued messages are handled on the next iteration,
 				// preventing mid-workflow interruptions while ensuring all
 				// messages eventually get processed.
+				const queueBefore = this.messageQueueService.queueSnapshot
 				const queued = this.messageQueueService.dequeueMessage()
+				console.log(
+					`[PATH-A initiateTaskLoop] ${this.taskId}.${this.instanceId} didEndLoop=true, ` +
+						`dequeued=${queued ? `"${queued.text.slice(0, 60)}"` : "nothing"}, ` +
+						`queue_before=${queueBefore}`,
+				)
 				if (queued) {
 					await this.say("user_feedback", queued.text, queued.images)
 

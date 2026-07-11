@@ -216,8 +216,9 @@ export class MirrorProvider
 			// Create named listener functions so we can remove them later.
 			const onTaskStarted = () => this.emit(MirrorVSEventName.TaskStarted, instance.taskId)
 			const onTaskCompleted = async (taskId: string, tokenUsage: TokenUsage, toolUsage: ToolUsage) => {
+				const queueBefore = instance.messageQueueService.queueSnapshot
 				console.log(
-					`[MirrorProvider#onTaskCompleted] fired for task ${taskId}, queue size: ${instance.messageQueueService.messages.length}`,
+					`[PATH-B onTaskCompleted] ENTER ${taskId} | queue=${queueBefore} | instance=${instance.instanceId}`,
 				)
 				this.emit(MirrorVSEventName.TaskCompleted, taskId, tokenUsage, toolUsage)
 
@@ -228,42 +229,94 @@ export class MirrorProvider
 				// new task's queue so they survive across task boundaries.
 				const queued = instance.messageQueueService.dequeueMessage()
 				console.log(
-					`[MirrorProvider#onTaskCompleted] dequeued: ${queued ? `"${queued.text.slice(0, 60)}"` : "nothing"}`,
+					`[PATH-B onTaskCompleted] first_dequeue=${queued ? `"${queued.text.slice(0, 60)}" id=${queued.id.slice(0, 8)}` : "nothing"}`,
 				)
 				if (queued) {
 					this.log(
 						`[onTaskCompleted] Draining queued message for task ${taskId}: "${queued.text.slice(0, 60)}"`,
 					)
+					// CRITICAL: Save and drain remaining messages BEFORE the first async yield.
+					const remaining = [...instance.messageQueueService.messages]
+					console.log(
+						`[PATH-B onTaskCompleted] remaining_before_drain=${remaining.length} items: [${remaining.map((m) => `"${m.text.slice(0, 30)}"`).join(", ")}]`,
+					)
+					let drainCount = 0
+					while (instance.messageQueueService.dequeueMessage()) {
+						drainCount++
+					}
+					console.log(
+						`[PATH-B onTaskCompleted] drained_remaining=${drainCount} items, queue_after_drain=${instance.messageQueueService.queueSnapshot}`,
+					)
+
 					try {
-						const newTask = await this.startNewTaskInSession(queued.text, queued.images)
-						console.log(`[MirrorProvider#onTaskCompleted] new task started: ${newTask.taskId}`)
+						// Create the new task with startTask: false so we can populate
+						// its message queue before the API loop begins. This prevents
+						// tryDrainQueuedMessage (Task.ts:1506) from consuming queued
+						// messages as inline feedback during the new task's first
+						// ask(), which would cause them to appear to "vanish" from the
+						// user's perspective.
+						const sessionId = await this.getOrCreateSession()
+						const newTask = await this.createTask(
+							queued.text,
+							queued.images,
+							undefined,
+							{ startTask: false },
+							{},
+						)
 
-						// Re-read remaining messages from the old task's queue
-						// after startNewTaskInSession returns. The old task's
-						// dispose() no longer clears _messages, so any messages
-						// that arrived during the async gap (between dequeue
-						// above and disposal inside createTask) are preserved.
-						const remaining = [...instance.messageQueueService.messages]
-						console.log(`[MirrorProvider#onTaskCompleted] remaining after new task: ${remaining.length}`)
+						console.log(
+							`[PATH-B onTaskCompleted] task_created=${newTask.taskId}.${newTask.instanceId} | about_to_transfer_remaining=${remaining.length}`,
+						)
 
-						// Transfer any remaining queued messages to the new task so
-						// they are available when the new task eventually completes.
+						// Transfer saved remaining messages to the new task's queue
+						// BEFORE starting the task. Since no ask is in progress yet,
+						// tryDrainQueuedMessage will not consume them.
 						for (const msg of remaining) {
 							newTask.messageQueueService.addMessage(msg.text, msg.images)
+							console.log(
+								`[PATH-B onTaskCompleted] transferred_remaining id=${msg.id.slice(0, 8)} "${msg.text.slice(0, 60)}" -> ${newTask.taskId}.${newTask.instanceId}`,
+							)
 						}
 						console.log(
-							`[MirrorProvider#onTaskCompleted] transferred ${remaining.length} remaining messages to new task`,
+							`[PATH-B onTaskCompleted] remaining_transfer_complete | newTask_queue=${newTask.messageQueueService.queueSnapshot}`,
 						)
+
+						// Auto-name: if this session doesn't have a name yet,
+						// generate one from the first line of the task text.
+						const names = await this.getSessionNames()
+						if (!names[sessionId]) {
+							const autoName = queued.text.split("\n")[0].slice(0, 60).trim()
+							if (autoName) {
+								names[sessionId] = autoName
+								await this.contextProxy.setValue("sessionNames", names)
+								this.log(`[onTaskCompleted] Auto-named session ${sessionId} to "${autoName}"`)
+							}
+						}
+
+						// Now start the task — the API loop begins with the queue
+						// already pre-populated. When the first loop completes,
+						// Path A (initiateTaskLoop) will dequeue the next remaining
+						// message as a new loop iteration.
+						console.log(
+							`[PATH-B onTaskCompleted] about_to_start_task ${newTask.taskId}.${newTask.instanceId} | queue_before_start=${newTask.messageQueueService.queueSnapshot}`,
+						)
+						newTask.start()
+						console.log(
+							`[PATH-B onTaskCompleted] task_started ${newTask.taskId}.${newTask.instanceId} | queue_after_start=${newTask.messageQueueService.queueSnapshot}`,
+						)
+						this.log(`[onTaskCompleted] New task ${newTask.taskId} in session ${sessionId}`)
 
 						await this.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 					} catch (error) {
 						console.error(
-							`[MirrorProvider#onTaskCompleted] ERROR: ${error instanceof Error ? error.message : String(error)}`,
+							`[PATH-B onTaskCompleted] ERROR: ${error instanceof Error ? error.message : String(error)}`,
 						)
 						this.log(
 							`[onTaskCompleted] Failed to start next queued task: ${error instanceof Error ? error.message : String(error)}`,
 						)
 					}
+				} else {
+					console.log(`[PATH-B onTaskCompleted] EXIT (no queued message) ${taskId}`)
 				}
 			}
 			const onTaskAborted = async () => {
