@@ -1,5 +1,6 @@
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs"><img src="https://img.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=dipeshmajithia.mirror-vs"><img src="https://img.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace"></a>
+  <a href="https://open-vsx.org/extension/DipeshMajithia/mirror-vs"><img src="https://img.shields.io/badge/Open_VSX-9146FF?style=flat&logo=open-vsx&logoColor=white" alt="Open VSX"></a>
 </p>
 
 <h1 align="center">Mirror VS</h1>
@@ -34,7 +35,7 @@
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](locales/zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -67,7 +68,7 @@ Mirror VS adjusts its behavior to match what you need:
 
 ## Getting started
 
-1. Install [Mirror VS from the Marketplace](https://marketplace.visualstudio.com/items?itemName=ReflectAI.mirror-vs)
+1. Install [Mirror VS from the Marketplace](https://marketplace.visualstudio.com/items?itemName=dipeshmajithia.mirror-vs) or [Open VSX](https://open-vsx.org/extension/DipeshMajithia/mirror-vs)
 2. Open the command palette (`Cmd+Shift+P`) and run **Mirror VS: Start New Task**
 3. Tell it what you need — in your own words
 
