@@ -8,6 +8,11 @@ interface OpenFileOptions {
 	create?: boolean
 	content?: string
 	line?: number
+	/**
+	 * Whether to open the file in preview mode (single-click tab).
+	 * Defaults to false (pinned/kept-open).
+	 */
+	preview?: boolean
 }
 
 export async function openFile(filePath: string, options: OpenFileOptions = {}) {
@@ -140,7 +145,7 @@ export async function openFile(filePath: string, options: OpenFileOptions = {}) 
 				? new vscode.Selection(Math.max(options.line - 1, 0), 0, Math.max(options.line - 1, 0), 0)
 				: undefined
 		await vscode.window.showTextDocument(document, {
-			preview: false,
+			preview: options.preview ?? false,
 			selection,
 		})
 	} catch (error) {

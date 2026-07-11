@@ -21,7 +21,7 @@ export async function handleOpenFile(provider: MirrorProvider, message: WebviewM
 	if (!path.isAbsolute(filePath)) {
 		filePath = path.join(getCurrentCwd(provider), filePath)
 	}
-	openFile(filePath, message.values as { create?: boolean; content?: string; line?: number })
+	openFile(filePath, message.values as { create?: boolean; content?: string; line?: number; preview?: boolean })
 }
 
 /**

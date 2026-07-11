@@ -291,6 +291,10 @@ export const SECRET_STATE_KEYS = [
 	"vercelAiGatewayApiKey",
 	"basetenApiKey",
 	"customApiKey",
+	"codebaseIndexAnthropicApiKey",
+	"codebaseIndexCohereApiKey",
+	"codebaseIndexJinaApiKey",
+	"codebaseIndexVoyageApiKey",
 ] as const
 
 // Global secrets that are part of GlobalSettings (not ProviderSettings)

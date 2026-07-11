@@ -41,7 +41,11 @@ export const SessionArtifacts = ({ triggerClassName = "" }: SessionArtifactsProp
 	const totalCount = artifacts.length
 
 	const handleOpenFile = React.useCallback((path: string) => {
-		vscode.postMessage({ type: "openFile", text: path.startsWith("./") ? path : "./" + path })
+		vscode.postMessage({
+			type: "openFile",
+			text: path.startsWith("./") ? path : "./" + path,
+			values: { preview: true },
+		})
 	}, [])
 
 	return (
