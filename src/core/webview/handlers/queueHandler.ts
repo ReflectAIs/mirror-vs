@@ -9,15 +9,8 @@ import { resolveIncomingImages } from "./_helpers"
 export async function handleQueueMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
 	const currentTask = provider.getCurrentTask()
-	console.log(
-		`[QUEUE-ENTRY] handleQueueMessage: "${resolved.text?.slice(0, 60)}" → task ${currentTask?.taskId ?? "NONE"}`,
-	)
 	if (currentTask) {
-		console.log(
-			`[QUEUE-ENTRY] task_details: id=${currentTask.taskId} instance=${(currentTask as any).instanceId} | queue_before=${currentTask.messageQueueService.queueSnapshot}`,
-		)
 		currentTask.messageQueueService.addMessage(resolved.text, resolved.images)
-		console.log(`[QUEUE-ENTRY] queue_after_add=${currentTask.messageQueueService.queueSnapshot}`)
 	}
 }
 

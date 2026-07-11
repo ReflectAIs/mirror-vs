@@ -385,6 +385,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	didToolFailInCurrentTurn = false
 	didCompleteReadingStream = false
 	private _started = false
+	// Re-entrant guard for tryDrainQueuedMessage()
+	private _draining = false
 	// No streaming parser is required.
 	assistantMessageParser?: undefined
 	private providerProfileChangeListener?: (config: { name: string; provider?: string }) => void
@@ -502,10 +504,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.messageQueueService = new MessageQueueService()
 
 		this.messageQueueStateChangedHandler = () => {
-			console.log(
-				`[QUEUE stateChanged] ${this.taskId}.${this.instanceId} ` +
-					`queue=${this.messageQueueService.queueSnapshot}`,
-			)
 			this.emit(MirrorVSEventName.TaskUserMessage, this.taskId)
 			this.emit(MirrorVSEventName.QueuedMessagesUpdated, this.taskId, this.messageQueueService.messages)
 			this.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
@@ -1506,65 +1504,47 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 * Attempt to drain one queued message if the task is blocked on a
 	 * text-accepting ask (followup, tool, completion_result, resume_task).
 	 * Returns true if a message was drained, false otherwise.
+	 *
+	 * For completion_result / resume_completed_task (terminal asks):
+	 *   Dequeue one message at a time as messageResponse (user feedback).
+	 *   This lets AttemptCompletionTool push it as a tool_result to the API
+	 *   conversation, so the model sees it, processes it, and calls
+	 *   attempt_completion again.  Each subsequent completion_result
+	 *   drains the next queued message until the queue is empty.  Only
+	 *   then does yesButtonClicked fire, letting the task truly complete.
+	 *
+	 * Re-entrant guard: dequeueMessage() emits stateChanged synchronously,
+	 * which triggers the constructor's handler which calls this again.  We
+	 * use a boolean flag to prevent draining a second message before the
+	 * outer call sets askResponse.
 	 */
 	public tryDrainQueuedMessage(): boolean {
-		const queueBefore = this.messageQueueService.queueSnapshot
-		console.log(
-			`[PATH-C tryDrainQueuedMessage] ${this.taskId}.${this.instanceId} ` +
-				`askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}, ` +
-				`queue=${queueBefore}`,
-		)
-		if (this.askResponse === undefined && !this.messageQueueService.isEmpty()) {
-			const lastMessage = this.mirrorMessages.at(-1)
-			const lastMsgType = lastMessage?.type
-			const lastMsgAsk = lastMessage?.type === "ask" ? lastMessage.ask : undefined
-			const lastMsgTs = lastMessage?.ts
-			console.log(
-				`[PATH-C tryDrainQueuedMessage] ${this.taskId}.${this.instanceId} ` +
-					`lastMessage: type=${lastMsgType}, ask=${lastMsgAsk}, ts=${lastMsgTs}, ` +
-					`lastMessageTs=${this.lastMessageTs}, tsMatch=${lastMsgTs === this.lastMessageTs}`,
-			)
-			if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {
-				// Terminal/idle asks with queued messages: auto-complete the task
-				// to trigger onTaskCompleted (PATH-B), which will dequeue messages
-				// and create a new task for each queued message.
-				if (lastMessage.ask === "completion_result" || lastMessage.ask === "resume_completed_task") {
-					console.log(
-						`[PATH-C tryDrainQueuedMessage] AUTO-COMPLETING terminal ask ` +
-							`"${lastMessage.ask}" to drain queue=${queueBefore}`,
-					)
-					this.handleWebviewAskResponse("yesButtonClicked")
-					return false
-				}
+		if (this._draining) {
+			return false
+		}
+		this._draining = true
+		try {
+			if (this.askResponse === undefined && !this.messageQueueService.isEmpty()) {
+				const lastMessage = this.mirrorMessages.at(-1)
+				if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {
+					// command_output asks should not drain queued messages as inline feedback
+					if (lastMessage.ask === "command_output") {
+						return false
+					}
 
-				// command_output asks should not drain queued messages as inline feedback
-				if (lastMessage.ask !== "command_output") {
+					// All other asks (including completion_result, resume_completed_task,
+					// followup, tool, resume_task) drain one queued message as user feedback.
 					const queued = this.messageQueueService.dequeueMessage()
 					if (queued) {
-						console.log(
-							`[PATH-C tryDrainQueuedMessage] *** DRAINING AS FEEDBACK *** ${this.taskId}.${this.instanceId}: ` +
-								`"${queued.text.slice(0, 60)}" id=${queued.id.slice(0, 8)} ` +
-								`into ask="${lastMsgAsk}"`,
-						)
 						this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
 						return true
 					}
-					console.log(`[PATH-C tryDrainQueuedMessage] dequeueMessage returned nothing`)
 				}
-			} else {
-				console.log(
-					`[PATH-C tryDrainQueuedMessage] GUARD FAILED: ${this.taskId}.${this.instanceId}: ` +
-						`type=${lastMsgType}, ask==="command_output"?=${lastMsgAsk === "command_output"}, ` +
-						`tsMatch=${lastMsgTs === this.lastMessageTs}`,
-				)
 			}
-		} else {
-			console.log(
-				`[PATH-C tryDrainQueuedMessage] SKIP: ${this.taskId}.${this.instanceId}: ` +
-					`askResponse=${this.askResponse}, queueEmpty=${this.messageQueueService.isEmpty()}`,
-			)
+			return false
+		} finally {
+			this._draining = false
 		}
-		return false
 	}
 
 	public approveAsk({ text, images }: { text?: string; images?: string[] } = {}) {
@@ -2506,13 +2486,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				// Subsequent queued messages are handled on the next iteration,
 				// preventing mid-workflow interruptions while ensuring all
 				// messages eventually get processed.
-				const queueBefore = this.messageQueueService.queueSnapshot
 				const queued = this.messageQueueService.dequeueMessage()
-				console.log(
-					`[PATH-A initiateTaskLoop] ${this.taskId}.${this.instanceId} didEndLoop=true, ` +
-						`dequeued=${queued ? `"${queued.text.slice(0, 60)}"` : "nothing"}, ` +
-						`queue_before=${queueBefore}`,
-				)
 				if (queued) {
 					await this.say("user_feedback", queued.text, queued.images)
 

@@ -46,9 +46,6 @@ export class MessageQueueService extends EventEmitter<QueueEvents> {
 		}
 
 		this._messages.push(message)
-		console.log(
-			`[QUEUE] ADD | msg="${text?.slice(0, 60)}" id=${message.id.slice(0, 8)} | queue=[${this._messages.map((m) => `"${m.text?.slice(0, 30)}"`).join(", ")}]`,
-		)
 		this.emit("stateChanged", this._messages)
 
 		return message
@@ -58,16 +55,10 @@ export class MessageQueueService extends EventEmitter<QueueEvents> {
 		const { index, message } = this.findMessage(id)
 
 		if (!message) {
-			console.log(
-				`[QUEUE] REMOVE | id=${id.slice(0, 8)} NOT FOUND | queue=[${this._messages.map((m) => `"${m.text?.slice(0, 30)}"`).join(", ")}]`,
-			)
 			return false
 		}
 
 		this._messages.splice(index, 1)
-		console.log(
-			`[QUEUE] REMOVE | msg="${message.text?.slice(0, 60)}" id=${id.slice(0, 8)} | queue=[${this._messages.map((m) => `"${m.text?.slice(0, 30)}"`).join(", ")}]`,
-		)
 		this.emit("stateChanged", this._messages)
 		return true
 	}
@@ -88,9 +79,6 @@ export class MessageQueueService extends EventEmitter<QueueEvents> {
 
 	public dequeueMessage(): QueuedMessage | undefined {
 		const message = this._messages.shift()
-		console.log(
-			`[QUEUE] DEQUEUE | ${message ? `msg="${message.text?.slice(0, 60)}" id=${message.id.slice(0, 8)}` : "nothing"} | queue=[${this._messages.map((m) => `"${m.text?.slice(0, 30)}"`).join(", ")}]`,
-		)
 		this.emit("stateChanged", this._messages)
 		return message
 	}
@@ -99,16 +87,11 @@ export class MessageQueueService extends EventEmitter<QueueEvents> {
 		return this._messages
 	}
 
-	public get queueSnapshot(): string {
-		return `[${this._messages.map((m) => `"${m.text?.slice(0, 30)}"`).join(", ")}]`
-	}
-
 	public isEmpty(): boolean {
 		return this._messages.length === 0
 	}
 
 	public dispose(): void {
-		console.log(`[QUEUE] DISPOSE | queue=[${this._messages.map((m) => `"${m.text?.slice(0, 30)}"`).join(", ")}]`)
 		this.removeAllListeners()
 	}
 }

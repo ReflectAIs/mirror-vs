@@ -216,108 +216,20 @@ export class MirrorProvider
 			// Create named listener functions so we can remove them later.
 			const onTaskStarted = () => this.emit(MirrorVSEventName.TaskStarted, instance.taskId)
 			const onTaskCompleted = async (taskId: string, tokenUsage: TokenUsage, toolUsage: ToolUsage) => {
-				const queueBefore = instance.messageQueueService.queueSnapshot
 				console.log(
-					`[PATH-B onTaskCompleted] ENTER ${taskId} | queue=${queueBefore} | instance=${instance.instanceId}`,
+					`[SESSION-DBG] onTaskCompleted: task=${taskId} instance=${instance.instanceId} ` +
+						`currentSessionId=${this.currentSessionId}`,
 				)
 				this.emit(MirrorVSEventName.TaskCompleted, taskId, tokenUsage, toolUsage)
 
-				// After task completion, drain one queued message at a time.
-				// We take the first queued message and start a new task in the
-				// same session, so the user's queued messages are processed
-				// sequentially. The remaining messages are transferred to the
-				// new task's queue so they survive across task boundaries.
-				const queued = instance.messageQueueService.dequeueMessage()
-				console.log(
-					`[PATH-B onTaskCompleted] first_dequeue=${queued ? `"${queued.text.slice(0, 60)}" id=${queued.id.slice(0, 8)}` : "nothing"}`,
-				)
-				if (queued) {
-					this.log(
-						`[onTaskCompleted] Draining queued message for task ${taskId}: "${queued.text.slice(0, 60)}"`,
-					)
-					// CRITICAL: Save and drain remaining messages BEFORE the first async yield.
-					const remaining = [...instance.messageQueueService.messages]
-					console.log(
-						`[PATH-B onTaskCompleted] remaining_before_drain=${remaining.length} items: [${remaining.map((m) => `"${m.text.slice(0, 30)}"`).join(", ")}]`,
-					)
-					let drainCount = 0
-					while (instance.messageQueueService.dequeueMessage()) {
-						drainCount++
-					}
-					console.log(
-						`[PATH-B onTaskCompleted] drained_remaining=${drainCount} items, queue_after_drain=${instance.messageQueueService.queueSnapshot}`,
-					)
-
-					try {
-						// Create the new task with startTask: false so we can populate
-						// its message queue before the API loop begins. This prevents
-						// tryDrainQueuedMessage (Task.ts:1506) from consuming queued
-						// messages as inline feedback during the new task's first
-						// ask(), which would cause them to appear to "vanish" from the
-						// user's perspective.
-						const sessionId = await this.getOrCreateSession()
-						const newTask = await this.createTask(
-							queued.text,
-							queued.images,
-							undefined,
-							{ startTask: false },
-							{},
-						)
-
-						console.log(
-							`[PATH-B onTaskCompleted] task_created=${newTask.taskId}.${newTask.instanceId} | about_to_transfer_remaining=${remaining.length}`,
-						)
-
-						// Transfer saved remaining messages to the new task's queue
-						// BEFORE starting the task. Since no ask is in progress yet,
-						// tryDrainQueuedMessage will not consume them.
-						for (const msg of remaining) {
-							newTask.messageQueueService.addMessage(msg.text, msg.images)
-							console.log(
-								`[PATH-B onTaskCompleted] transferred_remaining id=${msg.id.slice(0, 8)} "${msg.text.slice(0, 60)}" -> ${newTask.taskId}.${newTask.instanceId}`,
-							)
-						}
-						console.log(
-							`[PATH-B onTaskCompleted] remaining_transfer_complete | newTask_queue=${newTask.messageQueueService.queueSnapshot}`,
-						)
-
-						// Auto-name: if this session doesn't have a name yet,
-						// generate one from the first line of the task text.
-						const names = await this.getSessionNames()
-						if (!names[sessionId]) {
-							const autoName = queued.text.split("\n")[0].slice(0, 60).trim()
-							if (autoName) {
-								names[sessionId] = autoName
-								await this.contextProxy.setValue("sessionNames", names)
-								this.log(`[onTaskCompleted] Auto-named session ${sessionId} to "${autoName}"`)
-							}
-						}
-
-						// Now start the task — the API loop begins with the queue
-						// already pre-populated. When the first loop completes,
-						// Path A (initiateTaskLoop) will dequeue the next remaining
-						// message as a new loop iteration.
-						console.log(
-							`[PATH-B onTaskCompleted] about_to_start_task ${newTask.taskId}.${newTask.instanceId} | queue_before_start=${newTask.messageQueueService.queueSnapshot}`,
-						)
-						newTask.start()
-						console.log(
-							`[PATH-B onTaskCompleted] task_started ${newTask.taskId}.${newTask.instanceId} | queue_after_start=${newTask.messageQueueService.queueSnapshot}`,
-						)
-						this.log(`[onTaskCompleted] New task ${newTask.taskId} in session ${sessionId}`)
-
-						await this.postMessageToWebview({ type: "invoke", invoke: "newChat" })
-					} catch (error) {
-						console.error(
-							`[PATH-B onTaskCompleted] ERROR: ${error instanceof Error ? error.message : String(error)}`,
-						)
-						this.log(
-							`[onTaskCompleted] Failed to start next queued task: ${error instanceof Error ? error.message : String(error)}`,
-						)
-					}
-				} else {
-					console.log(`[PATH-B onTaskCompleted] EXIT (no queued message) ${taskId}`)
-				}
+				// Queued messages are drained by PATH-A inside initiateTaskLoop
+				// (Task.ts:2473). After attempt_completion auto-completes via
+				// PATH-C, the existing task loop continues and dequeues the next
+				// message as user_feedback within the SAME task, preserving the
+				// taskId and avoiding the "new chat" frontend behaviour.
+				//
+				// Creating a new task here (PATH-B) was causing a cascade of
+				// new taskIds → each rendered as a separate chat in the frontend.
 			}
 			const onTaskAborted = async () => {
 				this.emit(MirrorVSEventName.TaskAborted, instance.taskId)
@@ -432,16 +344,20 @@ export class MirrorProvider
 	 */
 	public async getOrCreateSession(): Promise<string> {
 		if (this.currentSessionId) {
+			console.log(`[SESSION-DBG] getOrCreateSession: returning cached=${this.currentSessionId}`)
 			return this.currentSessionId
 		}
 
 		const persistedSessionId = await this.contextProxy.getValue("currentSessionId")
 		if (persistedSessionId) {
 			this.currentSessionId = persistedSessionId
+			console.log(`[SESSION-DBG] getOrCreateSession: restored persisted=${persistedSessionId}`)
 			return persistedSessionId
 		}
 
-		return this.createSession()
+		const newSessionId = await this.createSession()
+		console.log(`[SESSION-DBG] getOrCreateSession: created new=${newSessionId}`)
+		return newSessionId
 	}
 
 	/**
@@ -2857,6 +2773,11 @@ export class MirrorProvider
 			...options,
 		})
 
+		console.log(
+			`[SESSION-DBG] createTask: task=${task.taskId}.${task.instanceId} ` +
+				`sessionId=${task.sessionId} parentTaskId=${task.parentTaskId} ` +
+				`currentSessionId=${this.currentSessionId}`,
+		)
 		await this.addMirrorToStack(task)
 		task.start()
 
