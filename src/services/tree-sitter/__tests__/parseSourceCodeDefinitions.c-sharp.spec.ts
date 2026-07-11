@@ -1,10 +1,3 @@
-/*
-TODO: The following structures can be parsed by tree-sitter but lack query support:
-
-1. Using Directives:
-   (using_directive) - Can be parsed by tree-sitter but not appearing in output despite query pattern
-*/
-
 // Mocks must come first, before imports
 vi.mock("fs/promises")
 

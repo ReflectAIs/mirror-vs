@@ -41,4 +41,14 @@ export const scalaQuery = `
 ; Package declarations
 (package_clause
   name: (package_identifier) @name.definition) @definition.namespace
+
+; Match expressions
+(function_definition
+  body: (block
+    (match_expression))) @definition.match_expression
+
+; For comprehensions (WASM v13 doesn't support for_expression node type)
+; (function_definition
+;   body: (block
+;     (for_expression))) @definition.for_comprehension
 `

@@ -37,4 +37,18 @@ export const elispQuery = `
   . (symbol) @name.definition.advice) @_advice
   (#eq? @_def "defadvice")
   (#match? @name.definition.advice "^[^;]"))
+
+; Variable definitions (defvar) - match defvar specifically
+((list
+  . (symbol) @_def
+  . (symbol) @name.definition.variable) @_var
+  (#eq? @_def "defvar")
+  (#match? @name.definition.variable "^[^;]"))
+
+; Constant definitions (defconst) - match defconst specifically
+((list
+  . (symbol) @_def
+  . (symbol) @name.definition.constant) @_const
+  (#eq? @_def "defconst")
+  (#match? @name.definition.constant "^[^;]"))
 `
