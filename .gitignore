@@ -50,8 +50,12 @@ logs
 
 # Qdrant
 qdrant_storage/
+storage/
 
 # Architect plans
 plans/
 
 mirror-cli-*.tar.gz*
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat

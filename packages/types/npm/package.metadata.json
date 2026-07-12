@@ -16,7 +16,7 @@
 	"bugs": {
 		"url": "https://github.com/ReflectAIs/mirror-vs/issues"
 	},
-	"homepage": "https://mirrorvs.dev",
+	"homepage": "https://www.reflectai.in",
 	"keywords": ["mirror-vs", "ai", "code"],
 	"files": ["dist"]
 }

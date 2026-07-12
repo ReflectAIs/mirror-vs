@@ -35,7 +35,7 @@
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](locales/zh-TW/README.md)
 - ...
-  </details>
+      </details>
 
 ---
 
@@ -45,7 +45,7 @@ Mirror VS is your AI-powered development sidekick. Think of it as a brilliant co
 
 Whether you're spinning up a new project, refactoring a gnarly codebase, or trying to understand why that test won't pass, Mirror VS has your back.
 
-> 📖 Full documentation at **[mirrorvs.dev](https://mirrorvs.dev/)**
+> 📖 Full documentation at **[reflectai.in](https://www.reflectai.in/)**
 
 ---
 
