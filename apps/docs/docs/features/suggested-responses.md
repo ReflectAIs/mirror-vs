@@ -13,23 +13,23 @@ import Codicon from '@site/src/components/Codicon';
 
 # Suggested Responses
 
-When Mirror needs more information to complete a task, it uses the [`ask_followup_question` tool](/advanced-usage/available-tools/ask-followup-question). To make responding easier and faster, Mirror often provides suggested answers alongside the question.
+When Mirror VS needs more information to complete a task, it uses the [`ask_followup_question` tool](/advanced-usage/available-tools/ask-followup-question). To make responding easier and faster, Mirror VS often provides suggested answers alongside the question. Think of it as your AI finishing your sentences — in a helpful way, not a creepy one.
 
 ---
 
 ## Overview
 
-Suggested Responses appear as clickable buttons directly below Mirror's question in the chat interface. They offer pre-formulated answers relevant to the question, helping you provide input quickly.
+Suggested Responses appear as clickable buttons directly below Mirror VS's question in the chat interface. They offer pre-formulated answers relevant to the question, helping you provide input quickly.
 
-<img src="/img/suggested-responses/suggested-responses.png" alt="Example of Mirror asking a question with suggested response buttons below it" width="500" />
+<img src="/img/suggested-responses/suggested-responses.png" alt="Example of Mirror VS asking a question with suggested response buttons below it" width="500" />
 
 ---
 
 ## How It Works
 
-1.  **Question Appears**: Mirror asks a question using the `ask_followup_question` tool.
-2.  **Suggestions Displayed**: If suggestions are provided by Mirror, they appear as buttons below the question.
-3.  **Interaction**: You can interact with these suggestions in two ways.
+1.  **Question Appears**: Mirror VS asks a question using the `ask_followup_question` tool.
+2.  **Suggestions Displayed**: If suggestions are provided by Mirror VS, they appear as buttons below the question.
+3.  **Interaction**: You can interact with these suggestions in a few different ways.
 
 ---
 
@@ -40,7 +40,7 @@ You have three options for using suggested responses:
 1.  **Direct Selection**:
 
     - **Action**: Simply click the button containing the answer you want to provide.
-    - **Result**: The selected answer is immediately sent back to Mirror as your response. This is the quickest way to reply if one of the suggestions perfectly matches your intent.
+    - **Result**: The selected answer is immediately sent back to Mirror VS as your response. This is the quickest way to reply if one of the suggestions perfectly matches your intent.
 
 2.  **Keyboard Shortcut**:
 
@@ -61,7 +61,7 @@ You have three options for using suggested responses:
 ## Benefits
 
 - **Speed**: Quickly respond without typing full answers.
-- **Clarity**: Suggestions often clarify the type of information Mirror needs.
+- **Clarity**: Suggestions often clarify the type of information Mirror VS needs.
 - **Flexibility**: Edit suggestions to provide precise, customized answers when needed.
 
-This feature streamlines the interaction when Mirror requires clarification, allowing you to guide the task effectively with minimal effort.
+This feature streamlines the interaction when Mirror VS requires clarification, allowing you to guide the task effectively with minimal effort.

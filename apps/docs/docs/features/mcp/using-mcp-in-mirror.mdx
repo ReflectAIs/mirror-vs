@@ -14,7 +14,7 @@ sidebar_label: Using MCP in Mirror VS
 
 :::info Confused about MCP Servers?
 
-An MCP (Model Context Protocol) server acts as a bridge, giving Mirror VS access to a wider range of **tools** and external services like databases, APIs, or custom scripts. It uses a standard communication method, allowing Roo to leverage these external capabilities.
+An MCP (Model Context Protocol) server acts as a bridge, giving Mirror VS access to a wider range of **tools** and external services like databases, APIs, or custom scripts. It uses a standard communication method, allowing Mirror VS to leverage these external capabilities.
 
 For a deeper dive, check out [What is MCP?](/features/mcp/what-is-mcp).
 :::
@@ -28,7 +28,7 @@ Model Context Protocol (MCP) extends Mirror VS's capabilities by connecting to e
 MCP server configurations can be managed at two levels:
 
 1.  **Global Configuration**: Stored in the `mcp_settings.json` file, accessible via VS Code settings (see below). These settings apply across all your workspaces unless overridden by a project-level configuration.
-2.  **Project-level Configuration**: Defined in a `.roo/mcp.json` file within your project's root directory. This allows you to set up project-specific servers and share configurations with your team by committing the file to version control. Mirror VS automatically detects and loads this file if it exists.
+2.  **Project-level Configuration**: Defined in a `.mirror/mcp.json` file within your project's root directory. This allows you to set up project-specific servers and share configurations with your team by committing the file to version control. Mirror VS automatically detects and loads this file if it exists.
 
 **Precedence**: If a server name exists in both global and project configurations, the **project-level configuration takes precedence**.
 
@@ -38,14 +38,10 @@ You can edit both global and project-level MCP configuration files directly from
 
 1. Click the <Codicon name="server" /> icon in the top navigation of the Mirror VS pane.
 
-  <img src="/img/using-mcp-in-roo/using-mcp-in-roo-10.png" alt="MCP Servers interface in Mirror VS" width="400" />
-
 2. Scroll to the bottom of the MCP settings view.
 3. Click the appropriate button:
     *   **`Edit Global MCP`**: Opens the global `mcp_settings.json` file.
-    *   **`Edit Project MCP`**: Opens the project-specific `.roo/mcp.json` file. If this file doesn't exist, Mirror VS will create it for you.
-
-  <img src="/img/using-mcp-in-roo/using-mcp-in-roo-9.png" alt="Edit Global MCP and Edit Project MCP buttons" width="600" />
+    *   **`Edit Project MCP`**: Opens the project-specific `.mirror/mcp.json` file. If this file doesn't exist, Mirror VS will create it for you.
 
 Both files use a JSON format with a `mcpServers` object containing named server configurations:
 
@@ -229,8 +225,6 @@ Disabling your MCP Servers here will remove all MCP related logic and definition
 1. Click the <Codicon name="server" /> icon in the top navigation of the Mirror VS pane
 2. Check/Uncheck `Enable MCP Servers`
 
-  <img src="/img/using-mcp-in-roo/using-mcp-in-roo-2.png" alt="Enable MCP Servers toggle" width="400" />
-
 ---
 
 ## Enabling or Disabling MCP Server Creation
@@ -240,53 +234,46 @@ Disabling your MCP Server Creation here will just remove the instructions from y
 1. Click the <Codicon name="server" /> icon in the top navigation of the Mirror VS pane
 2. Check/Uncheck `Enable MCP Server Creation`
 
-  <img src="/img/using-mcp-in-roo/using-mcp-in-roo-3.png" alt="Enable MCP Server Creation toggle" width="400" />
-
 ---
 
-## How to Use Roo to Create an MCP Server
+## How to Use Mirror VS to Create an MCP Server
 
 If you need a specific tool or capability that isn't available through existing MCP servers, you can ask Mirror VS to build a new one for you.
 
-**Prerequisite:** Ensure the **[Enable MCP Server Creation](#enabling-or-disabling-mcp-server-creation)** setting is checked ON in the MCP settings panel. If this is disabled, Roo will not have the necessary instructions to build a server.
+**Prerequisite:** Ensure the **[Enable MCP Server Creation](#enabling-or-disabling-mcp-server-creation)** setting is checked ON in the MCP settings panel. If this is disabled, Mirror VS will not have the necessary instructions to build a server.
 
 **How to Initiate:**
 
-1.  **Make a Request:** Clearly ask Roo for the new tool or capability. For example:
+1.  **Make a Request:** Clearly ask Mirror VS for the new tool or capability. For example:
     *   "Create an MCP tool that gets the current price of Bitcoin."
     *   "I need a tool that connects to my company's internal user database via its API."
     *   "Build an MCP server to interact with the GitHub Gist API."
 
-2.  **Roo's Process (Simplified):** Once you make the request (and the setting is enabled), Roo will:
+2.  **Mirror VS's Process (Simplified):** Once you make the request (and the setting is enabled), Mirror VS will:
     *   Fetch internal instructions for server creation.
     *   Scaffold a basic server project (usually TypeScript) in the default MCP directory (e.g., `~/Documents/Cline/MCP` on macOS) unless you specify otherwise.
     *   Write the code to implement the requested tool, including handling necessary API calls.
-    *   **Handle Secrets:** If the tool requires API keys or other credentials, Roo will ask you for them using the [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question) tool to ensure they are configured securely as environment variables for the server.
-    *   **Configure:** Automatically add the new server's configuration to your global `mcp_settings.json` or project `.roo/mcp.json` file.
+    *   **Handle Secrets:** If the tool requires API keys or other credentials, Mirror VS will ask you for them using the [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question) tool to ensure they are configured securely as environment variables for the server.
+    *   **Configure:** Automatically add the new server's configuration to your global `mcp_settings.json` or project `.mirror/mcp.json` file.
     *   **Activate:** Attempt to connect to the newly configured server so its tools are immediately available.
 
-3.  **Outcome:** If successful, Roo will confirm the creation, and the new server and its tools will appear in your MCP server list, ready for use.
+3.  **Outcome:** If successful, Mirror VS will confirm the creation, and the new server and its tools will appear in your MCP server list, ready for use.
 
-This feature allows you to tailor Roo's capabilities by having it build the specific integrations you need directly from your requests. For a deeper look into the internal mechanics, see the [Tool Calling Mechanism](/advanced-usage/available-tools/tool-use-overview#tool-calling-mechanism).
+This feature allows you to tailor Mirror VS's capabilities by having it build the specific integrations you need directly from your requests. For a deeper look into the internal mechanics, see the [Tool Calling Mechanism](/advanced-usage/available-tools/tool-use-overview#tool-calling-mechanism).
 
 ---
 
 ## Managing Individual MCP Servers
 
-   <img src="/img/using-mcp-in-roo/using-mcp-in-roo-8.png" alt="Example of a configuration pane for a MCP Server" width="400" />
-
 Each MCP server has its own configuration panel where you can modify settings, manage tools, and control its operation. To access these settings:
 
 1. Click the <Codicon name="server" /> icon in the top navigation of the Mirror VS pane
 2. Locate the MCP server you want to manage in the list
-   <img src="/img/using-mcp-in-roo/using-mcp-in-roo-4.png" alt="List of MCP Servers" width="400" />
 
 ### Deleting a Server
 
 1. Press the <Codicon name="trash" /> next to the MCP server you would like to delete
 2. Press the `Delete` button on the confirmation box
-
-  <img src="/img/using-mcp-in-roo/using-mcp-in-roo-5.png" alt="Delete confirmation box" width="400" />
 
 ### Restarting a Server
 
@@ -302,8 +289,6 @@ To set the maximum time to wait for a response after a tool call to the MCP serv
 
 1. Click the `Network Timeout` pulldown at the bottom of the individual MCP server's config box and change the time. Default is 60 seconds (1 minute) but it can be set between 1 second and 3600 seconds (1 hour).
 
-<img src="/img/using-mcp-in-roo/using-mcp-in-roo-6.png" alt="Network Timeout pulldown" width="400" />
-
 ### Auto Approve Tools
 
 MCP tool auto-approval works on a per-tool basis and is disabled by default. To configure auto-approval:
@@ -311,8 +296,6 @@ MCP tool auto-approval works on a per-tool basis and is disabled by default. To 
 1. First enable the global "Use MCP servers" auto-approval option in [auto-approving-actions](/features/auto-approving-actions)
 2. In the MCP server settings, locate the specific tool you want to auto-approve
 3. Check the `Always allow` checkbox next to the tool name
-
-<img src="/img/using-mcp-in-roo/using-mcp-in-roo-7.png" alt="Always allow checkbox for MCP tools" width="120" />
 
 When enabled, Mirror VS will automatically approve this specific tool without prompting. Note that the global "Use MCP servers" setting takes precedence - if it's disabled, no MCP tools will be auto-approved.
 
@@ -322,7 +305,7 @@ When enabled, Mirror VS will automatically approve this specific tool without pr
 
 Mirror VS does not come with any pre-installed MCP servers. You'll need to find and install them separately.
 
-* **Ask Roo:** You can ask Mirror VS to help you find or even create MCP servers (when "[Enable MCP Server Creation](#enabling-or-disabling-mcp-server-creation)" is enabled)
+* **Ask Mirror VS:** You can ask Mirror VS to help you find or even create MCP servers (when "[Enable MCP Server Creation](#enabling-or-disabling-mcp-server-creation)" is enabled)
 * **Build Your Own:** Create custom MCP servers using the SDK to extend Mirror VS with your own tools
 
 For full SDK documentation, visit the [MCP GitHub repository](https://github.com/modelcontextprotocol/).
@@ -331,7 +314,7 @@ For full SDK documentation, visit the [MCP GitHub repository](https://github.com
 
 ## Using MCP Tools in Your Workflow
 
-After configuring an MCP server, Roo automatically detects its available tools and resources. Effectively leveraging these tools involves understanding the core interaction steps and, crucially, how Roo interprets the tools you provide.
+After configuring an MCP server, Mirror VS automatically detects its available tools and resources. Effectively leveraging these tools involves understanding the core interaction steps and, crucially, how Mirror VS interprets the tools you provide.
 
 ### Core Workflow Steps
 
@@ -340,20 +323,20 @@ Your interaction with MCP tools typically follows this sequence:
 #### 1. Initiate a Task
 Begin by typing your request in the Mirror VS chat interface.
 
-#### 2. Tool Identification by Roo
-Roo analyzes your request to determine if an available MCP tool can assist. This stage is highly dependent on the quality of your MCP tool definitions.
+#### 2. Tool Identification by Mirror VS
+Mirror VS analyzes your request to determine if an available MCP tool can assist. This stage is highly dependent on the quality of your MCP tool definitions.
 
 ##### The Critical Role of Descriptions
-Roo's ability to:
+Mirror VS's ability to:
 *   Identify the *correct* tool for the job,
 *   Understand how to structure the necessary parameters, and
 *   Avoid misinterpreting a tool's capabilities,
-all hinge on clear, concise, and informative descriptions for both the tools themselves and their parameters. Vague or missing information, especially for parameters, can significantly hinder Roo's ability to select or use a tool effectively.
+all hinge on clear, concise, and informative descriptions for both the tools themselves and their parameters. Vague or missing information, especially for parameters, can significantly hinder Mirror VS's ability to select or use a tool effectively.
 
-For instance, a request like "Analyze the performance of my API" might lead Roo to consider an MCP tool designed for API endpoint testing. Whether Roo successfully identifies and utilizes this tool as intended is directly influenced by the quality of its description.
+For instance, a request like "Analyze the performance of my API" might lead Mirror VS to consider an MCP tool designed for API endpoint testing. Whether Mirror VS successfully identifies and utilizes this tool as intended is directly influenced by the quality of its description.
 
 ##### Best Practices for Defining MCP Tools
-To ensure Roo can leverage your MCP tools efficiently, consider the following when defining them in your server:
+To ensure Mirror VS can leverage your MCP tools efficiently, consider the following when defining them in your server:
 
 *   **Tool Name:** Choose a descriptive and unambiguous name that clearly indicates the tool's primary function.
 *   **Tool Description:** Provide a comprehensive summary of what the tool does, its purpose, and any important context or prerequisites for its use. Explain the outcome or result of using the tool.
@@ -361,11 +344,11 @@ To ensure Roo can leverage your MCP tools efficiently, consider the following wh
     *   Clearly state its purpose and what kind of data it expects (e.g., "User ID for lookup," "File path to process," "Search query string").
     *   Specify any formatting requirements, constraints, or an example of a valid value if applicable.
     *   Indicate if the parameter is optional or required (though the MCP schema usually handles this, a note can be helpful).
-*   **Clarity for the AI:** Write descriptions as if you are explaining the tool to another developer (or an AI). The more context Roo has, the better it can integrate the tool into its problem-solving workflows. If a tool is intended to be used in a specific sequence or in conjunction with other tools, mentioning this can also be beneficial.
-*   **Augment with Custom Instructions:** Beyond the descriptions embedded in the MCP server, you can further guide Roo's usage of specific MCP tools by providing [Custom Instructions](/features/custom-instructions). This allows you to define preferred approaches, outline complex workflows involving multiple tools, or specify when a particular MCP tool should be prioritized or avoided.
+*   **Clarity for the AI:** Write descriptions as if you are explaining the tool to another developer (or an AI). The more context Mirror VS has, the better it can integrate the tool into its problem-solving workflows. If a tool is intended to be used in a specific sequence or in conjunction with other tools, mentioning this can also be beneficial.
+*   **Augment with Custom Instructions:** Beyond the descriptions embedded in the MCP server, you can further guide Mirror VS's usage of specific MCP tools by providing [Custom Instructions](/features/custom-instructions). This allows you to define preferred approaches, outline complex workflows involving multiple tools, or specify when a particular MCP tool should be prioritized or avoided.
 
 #### 3. Tool Invocation
-If Roo, guided by the tool descriptions, identifies a suitable tool, it will propose its use. You then approve this (unless [auto-approval](#auto-approve-tools) is configured for trusted tools).
+If Mirror VS, guided by the tool descriptions, identifies a suitable tool, it will propose its use. You then approve this (unless [auto-approval](#auto-approve-tools) is configured for trusted tools).
 
 ### Maximizing Synergy with MCP Servers
 By investing effort in crafting detailed descriptions and potentially augmenting them with custom instructions, you significantly improve the synergy between Mirror VS and your MCP servers. This unlocks their full potential for more reliable and efficient task completion.
@@ -377,7 +360,7 @@ By investing effort in crafting detailed descriptions and potentially augmenting
 Common issues and solutions:
 
 * **Server Not Responding:** Check if the server process is running and verify network connectivity
-* **Permission Errors:** Ensure proper API keys and credentials are configured in your `mcp_settings.json` (for global settings) or `.roo/mcp.json` (for project settings).
+* **Permission Errors:** Ensure proper API keys and credentials are configured in your `mcp_settings.json` (for global settings) or `.mirror/mcp.json` (for project settings).
 * **Tool Not Available:** Confirm the server is properly implementing the tool and it's not disabled in settings
 * **Slow Performance:** Try adjusting the network timeout value for the specific MCP server
 

@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS beradaptasi dengan cara Anda bekerja, bukan sebaliknya:
 - Mode Debug: melacak masalah, menambahkan log, mengisolasi akar penyebab
 - Mode Kustom: buat mode khusus untuk tim atau alur kerja Anda
 
-Pelajari lebih lanjut: [Menggunakan Mode](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Mode Kustom](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+Pelajari lebih lanjut: [Menggunakan Mode](https://www.reflectai.in/basic-usage/using-modes) • [Mode Kustom](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Sumber daya
 
-- **[Dokumentasi](https://mirrorvsinc.github.io/Roo-Code/):** Panduan resmi untuk menginstal, mengonfigurasi, dan menguasai Mirror VS.
+- **[Dokumentasi](https://www.reflectai.in/):** Panduan resmi untuk menginstal, mengonfigurasi, dan menguasai Mirror VS.
 - **[Masalah GitHub](https://github.com/ReflectAIs/mirror-vs/issues):** Laporkan bug dan lacak pengembangan.
 
 ---

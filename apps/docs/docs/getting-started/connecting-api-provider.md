@@ -15,15 +15,15 @@ import KangamirrorIcon from '@site/src/components/KangamirrorIcon';
 
 # Connecting Your First LLM Provider
 
-Mirror VS needs an inference provider to access the LLM models that make it work.
+Mirror VS needs an inference provider to access the LLM models that make it tick. No provider, no magic — it's that simple.
 
-A great model to start is **Claude Sonnet 4.5**, which offers a lot of power at a reasonable price point. To get it going, choose a provider:
+A great model to start with is **Claude Sonnet 4.5**, which offers plenty of power at a reasonable price point. To get it going, choose a provider:
 
 - **OpenRouter (Recommended):** Provides access to multiple AI models from different labs through a single API key. Great for flexibility and getting started reasonably fast. To get an API key, [follow these instructions <LucideIcon name="ArrowRight" />](/providers/openrouter#getting-an-api-key)
 
 - **Anthropic:** Direct access to the Claude family of models. Requires API access approval and may have [rate limits depending on your tier](https://docs.anthropic.com/en/api/rate-limits#requirements-to-advance-tier). To get an API key, [follow these instructions <LucideIcon name="ArrowRight" />](/providers/anthropic#getting-an-api-key)
 
-Mirror VS is compatible with [other providers](/providers) which offer Claude, and with a wide range of different models you can try.
+Mirror VS is compatible with [other providers](/providers) which offer Claude, and with a wide range of different models you can experiment with.
 
 :::info Model Selection Advice
 We recommend **Claude Sonnet 4.5** because it "just works" out of the box for most tasks. We use it internally a lot.
@@ -40,4 +40,4 @@ You can choose other models, but that introduces complexity. Different models va
 3. Paste the API key you copied from your provider into the right field and continue.
 4. Select your model (it should be called `claude-sonnet-4-5` or `anthropic/claude-sonnet-4-5`) and complete the process.
 
-Now you can start coding!
+Now you can start coding. Go build something cool.

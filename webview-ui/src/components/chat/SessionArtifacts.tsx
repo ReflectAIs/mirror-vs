@@ -135,11 +135,8 @@ const ArtifactRow = React.memo(
 							</span>
 						</div>
 						<div
-							className={cn(
-								"text-sm mt-0.5 break-words cursor-pointer",
-								hasBody && "hover:text-vscode-charts-blue",
-							)}
-							onClick={() => hasBody && setExpanded((v) => !v)}>
+							className={cn("text-sm mt-0.5 break-words cursor-pointer", "hover:text-vscode-charts-blue")}
+							onClick={() => onOpenFile(artifact.path)}>
 							{shortPath(artifact.path)}
 						</div>
 						<div className="text-[11px] text-vscode-descriptionForeground/60 truncate mt-0.5">

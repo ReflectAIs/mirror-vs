@@ -1,77 +1,79 @@
----
-description: Learn about context poisoning in AI coding assistants, its symptoms, causes, and effective recovery strategies to maintain accurate AI responses.
-keywords:
-    - context poisoning
-    - AI accuracy
-    - Mirror VS troubleshooting
-    - LLM context management
-    - session recovery
----
-
 # Context Poisoning
 
-:::info
-Context poisoning is a persistent issue within a given session. Once a chat session's context is compromised, treat that session as disposable. Starting fresh with a clean context is crucial for maintaining the accuracy and effectiveness of your Mirror VS agent.
-:::
+## What Is Context Poisoning?
 
-Context poisoning occurs when inaccurate or irrelevant data contaminates the language model's active context. This leads the model to draw incorrect conclusions, provide erroneous information to tools, and progressively deviate from the intended task with each interaction.
+Imagine you're having a conversation, and someone keeps whispering incorrect facts into your ear. Eventually, you start mixing up what's real and what's not. That's context poisoning.
 
----
+In Mirror VS terms, context poisoning happens when the AI's working memory (the conversation history) gets corrupted by bad data, leading to progressively worse outputs, weird tool choices, and decisions that make you question reality.
 
 ## Symptoms of Context Poisoning
 
-Identify context poisoning by observing these behaviors:
+How to tell if your Mirror VS session is suffering from a case of the junk-contexts:
 
-- **Degraded Output Quality:** Suggestions become nonsensical, repetitive, or irrelevant.
-- **Tool Misalignment:** Tool calls no longer correspond to the user's requests.
-- **Orchestration Failures:** Orchestrator chains may stall, loop indefinitely, or fail to complete.
-- **Temporary Fixes:** Re-applying a clean prompt or instructions offers only brief respite before issues resurface.
-- **Tool Usage Confusion:** The model struggles to correctly use or recall how to use tools defined in the system prompt.
+| Symptom                     | What It Looks Like                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| **Degraded Output Quality** | The AI starts producing code that looks like it was written by a sleep-deprived octopus |
+| **Tool Misalignment**       | It reaches for `write_to_file` when `apply_diff` was clearly the right call             |
+| **Orchestration Failures**  | Delegated subtasks come back with results that have nothing to do with what you asked   |
+| **Repetition Loops**        | The AI keeps re-reading the same files or re-running the same commands                  |
+| **Hallucinated Context**    | It starts referencing files, variables, or requirements that never existed              |
 
----
+If your AI assistant suddenly starts acting like it's been replaced by a glitchy version of itself, context poisoning is the likely culprit.
 
 ## Common Causes
 
-Context poisoning can be triggered by several factors:
+### 1. Hallucination Spiral
 
-- **Model Hallucination:** The model generates an incorrect piece of information and subsequently treats it as a factual part of the context.
-- **Code Comments:** Outdated, incorrect, or ambiguous comments in the codebase can be misinterpreted by the model, leading it down the wrong path.
-- **Contaminated User Input:** Copy-pasting logs or text containing hidden or rogue control characters.
-- **Context Window Overflow:** As a session grows, older, useful information may be pushed out of the model's limited context window, allowing "poisoned" data to have a greater relative impact.
+The AI makes a mistake. That mistake gets added to the conversation history. The AI reads its own mistake and builds on it. Congratulations — you've created a self-reinforcing loop of wrongness.
 
-Once bad data enters the context, it tends to persist. The model re-evaluates this tainted information in subsequent reasoning cycles, similar to a permanent flaw affecting its perception until the context is completely reset.
+### 2. Code Comment Contamination
 
----
+You left a comment like `// TODO: fix this terrible hack` in your code. The AI reads it and decides your whole codebase is a disaster zone that needs rewriting. Be careful what you write in comments — Mirror VS is paying attention.
+
+### 3. Contaminated Input
+
+Pasting large amounts of irrelevant or misleading content into the chat can clog the AI's context with noise, making it harder to find the signal. It's like trying to have a focused conversation in the middle of a heavy metal concert.
+
+### 4. Context Window Overflow
+
+When the conversation gets too long, the context window starts acting like a crowded elevator — everyone's squished together, things get uncomfortable, and the AI starts making poor decisions because it can't see the full picture anymore.
 
 ## Can a "Wake-Up Prompt" Resolve Context Poisoning?
 
-**Short Answer:** No.
+Short answer: **No, not reliably.**
 
-A corrective prompt might temporarily suppress symptoms, but the problematic data remains in the conversational buffer. The model will likely revert to the poisoned state as soon as the interaction deviates from the narrow scope of the corrective prompt.
+The "wake-up prompt" (sending messages like "remember you're an expert coding assistant" or "focus on the actual task") sounds like a good idea. It's not.
 
-**Detailed Explanation:**
+Here's why: these prompts get appended to an already-poisoned context. You're essentially adding a fresh coat of paint to a structurally compromised building. The bad data is still there, lurking in the history, ready to influence future responses.
 
-- Re-injecting the full set of tool definitions or core directives can sometimes mask the damage for one or some interactions following the initial context poisoning .
-- However, the underlying poisoned context remains. Any query or task outside the immediate "patch" will likely re-trigger the original issue.
-- This approach is unreliable, akin to placing a warning label on a leaking pipe instead of repairing it.
-
----
+Research and internal testing shows wake-up prompts provide at most a **temporary improvement** that degrades rapidly. They're a band-aid on a bullet wound.
 
 ## Effective Recovery Strategies
 
-To reliably recover from context poisoning:
+### Hard Reset (The Nuclear Option)
 
-- **Hard Reset the Session:** The most dependable solution is to start a new chat session. This clears the contaminated context entirely.
-- **Minimize Manual Data Dumps:** When pasting logs or other data, be selective. Only include the essential information the model requires.
-- **Manage Context Window Size:** For large or complex tasks, consider breaking them into smaller, focused chat sessions. This helps ensure that stale or irrelevant information ages out of the context window more quickly.
-- **Validate Tool Output:** If a tool returns nonsensical or clearly incorrect data, delete that message from the chat history before the model can process it and incorporate it into its context.
+1. **Start a new task** — this clears the conversation history
+2. **Review checkpoint files** — restore from a known-good state
+3. **Re-provide context** — but only what's necessary, not the firehose
 
----
+A hard reset is the only guaranteed fix. It's like rebooting your computer when things get weird — sure, you lose your session, but at least the weird noises stop.
+
+### Minimize Data Dumps
+
+When providing context to Mirror VS, be surgical. Ask yourself:
+
+- Does the AI need the entire file, or just the relevant function?
+- Does it need the whole conversation history, or just the current task?
+- Does it need your entire `node_modules` directory? (Spoiler: no. Never no.)
+
+### Validate Tool Output
+
+Keep an eye on what the AI is doing. If it starts making changes you didn't ask for, or editing files that aren't relevant, that's your cue to intervene early before the poisoning spreads.
 
 ## Addressing a Common Question: The "Magic Bullet" Prompt
 
-A frequent question from the community is:
+> "But what if I write a really good prompt that fixes everything?"
 
-> "Have you found a prompt that wakes it back up? Maybe a prompt that just has the tools instructions we can push back in manually?”
+We admire the optimism. But context poisoning isn't a prompt problem — it's a data integrity problem. No amount of clever phrasing will fix corrupted context any more than a sternly worded letter will fix a leaky roof.
 
-As explained, no single prompt offers a lasting fix. Any immediate improvement is superficial because the corrupted lines of text persist in the session's history, ready to cause further issues. The only robust solution is to discard the compromised session, initiate a new one, and provide it with a clean prompt and the correct tool definitions from the outset.
+The fix is always the same: **clear the slate and start fresh**. It's not glamorous, but it works. And after a few rounds of context poisoning, you'll learn to appreciate the clean feeling of a brand-new, untainted conversation.

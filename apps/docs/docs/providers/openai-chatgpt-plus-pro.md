@@ -12,6 +12,10 @@ keywords:
     - subscription
 ---
 
+# Using ChatGPT Plus/Pro With Mirror VS
+
+Have a ChatGPT Plus or Pro subscription? Good news — you can use Mirror VS with it, no API key required. Just sign in with OAuth and you're off to the races.
+
 ---
 
 ## Quickstart: Connect your subscription to Mirror VS
@@ -31,5 +35,5 @@ keywords:
 
 ## What you can't do (and why)
 
-- **You can't use arbitrary OpenAI API models.** This provider only exposes the models listed in Mirror's Codex model catalog.
-- **You can't export/migrate your sign-in state with settings export.** OAuth tokens are stored in VS Code SecretStorage, which isn't included in Mirror's settings export.
+- **You can't use arbitrary OpenAI API models.** This provider only exposes the models listed in Mirror VS's Codex model catalog.
+- **You can't export/migrate your sign-in state with settings export.** OAuth tokens are stored in VS Code SecretStorage, which isn't included in Mirror VS's settings export.

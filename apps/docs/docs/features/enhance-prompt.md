@@ -12,7 +12,7 @@ keywords:
 
 # Enhance Prompt
 
-The "Enhance Prompt" feature in Mirror VS helps you improve the quality and effectiveness of your prompts before sending them to the AI model. By clicking the wand icon in the chat input, you can automatically refine your initial request, making it clearer, more specific, and more likely to produce the desired results.
+The "Enhance Prompt" feature in Mirror VS helps you improve the quality and effectiveness of your prompts before sending them to the AI model. By clicking the wand icon in the chat input, you can automatically refine your initial request, making it clearer, more specific, and more likely to produce the desired results. It's like having a copy editor for your conversations with AI — minus the red ink.
 
 ---
 
@@ -22,7 +22,7 @@ The "Enhance Prompt" feature in Mirror VS helps you improve the quality and effe
 - **Added Context:** The enhancement process can add relevant context to your prompt, such as the current file path or selected code.
 - **Better Instructions:** Mirror VS can add instructions to guide the AI towards a more helpful response (e.g., requesting specific formatting or a particular level of detail).
 - **Reduced Ambiguity:** Enhance Prompt helps to eliminate ambiguity and ensure that Mirror VS understands your intent.
-- **Consistency**: Mirror will consistently format prompts the same way to the AI.
+- **Consistency**: Mirror VS will consistently format prompts the same way to the AI.
 - **Context-Aware Suggestions:** When enabled, uses your recent conversation history to generate more relevant and accurate enhancements.
 
 ---
@@ -30,7 +30,7 @@ The "Enhance Prompt" feature in Mirror VS helps you improve the quality and effe
 ## How to Use Enhance Prompt
 
 1.  **Type your initial prompt:** Enter your request in the Mirror VS chat input box as you normally would. This can be a simple question, a complex task description, or anything in between.
-2.  **Click the Wand Icon:** Instead of pressing Enter, click the wand icon located in the top right corner of the chat input box. While Mirror processes your enhancement request, the wand icon will spin to indicate it's working.
+2.  **Click the Wand Icon:** Instead of pressing Enter, click the wand icon located in the top right corner of the chat input box. While Mirror VS processes your enhancement request, the wand icon will spin to indicate it's working.
 3.  **Review the Enhanced Prompt:** Mirror VS will replace your original prompt with an enhanced version. Review the enhanced prompt to make sure it accurately reflects your intent. You can further refine the enhanced prompt before sending. Changed your mind? You can undo the enhancement using Ctrl+Z (Cmd+Z on Mac) to restore your original prompt.
 4.  **Send the Enhanced Prompt:** Press Enter or click the Send icon (<Codicon name="send" />) to send the enhanced prompt to Mirror VS.
 
@@ -40,7 +40,7 @@ The "Enhance Prompt" feature in Mirror VS helps you improve the quality and effe
 
 ### Empty Prompt Enhancement
 
-If you click the enhance button with an empty prompt, Mirror will show you a helpful message explaining how the feature works. This is a great way to learn about the enhancement feature if you're new to it.
+If you click the enhance button with an empty prompt, Mirror VS will show you a helpful message explaining how the feature works. This is a great way to learn about the enhancement feature if you're new to it.
 
 ### Message Queueing Support
 
@@ -130,7 +130,7 @@ When disabled, the enhancement will only consider your current prompt without an
 ### Loading State
 
 - While processing your enhancement request, the wand icon spins
-- This provides clear visual feedback that Mirror is working on your prompt
+- This provides clear visual feedback that Mirror VS is working on your prompt
 
 ### Tooltip
 

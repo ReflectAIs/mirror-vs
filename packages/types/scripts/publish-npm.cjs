@@ -6,7 +6,7 @@ const { execSync } = require("child_process")
 const readline = require("readline")
 
 const PACKAGE_NAME = "@mirror-vs/types"
-const BRANCH_NAME = "roo-code-types-v"
+const BRANCH_NAME = "mirror-vs-types-v"
 
 const rootDir = path.join(__dirname, "..")
 const npmDir = path.join(rootDir, "npm")

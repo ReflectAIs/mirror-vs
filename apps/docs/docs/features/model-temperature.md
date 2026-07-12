@@ -13,7 +13,7 @@ import KangamirrorIcon from '@site/src/components/KangamirrorIcon';
 
 # Model Temperature
 
-Temperature controls the randomness of AI model outputs. Adjusting this setting optimizes results for different tasks - from precise code generation to creative brainstorming. Temperature is one of the most powerful parameters for controlling AI behavior. A well-tuned temperature setting can dramatically improve the quality and appropriateness of responses for specific tasks.
+Temperature controls the randomness of AI model outputs. Adjusting this setting optimizes results for different tasks — from precise code generation to creative brainstorming. Temperature is one of the most powerful parameters for controlling AI behavior. A well-tuned temperature setting can dramatically improve the quality and appropriateness of responses for specific tasks. Think of it as the "how much coffee has your AI had" dial.
 
 <img src="/img/model-temperature/model-temperature.gif" alt="Animation showing temperature slider adjustment" width="100%" />
 
@@ -38,7 +38,7 @@ Temperature controls output randomness, not code quality or accuracy directly. K
 
 Mirror VS uses a default temperature of 0.0 for most models, optimizing for maximum determinism and precision in code generation. This applies to OpenAI models, Anthropic models (non-thinking variants), LM Studio models, and most other providers.
 
-Some models use higher default temperatures - DeepSeek R1 models and certain reasoning-focused models default to 0.3, providing a balance between determinism and creative exploration.
+Some models use higher default temperatures — DeepSeek R1 models and certain reasoning-focused models default to 0.3, providing a balance between determinism and creative exploration.
 
 Models with thinking capabilities (where the AI shows its reasoning process) require a fixed temperature of 1.0 which cannot be changed, as this setting ensures optimal performance of the thinking mechanism. This applies to any model with the ":thinking" flag enabled.
 
@@ -55,7 +55,7 @@ Here are some examples of temperature settings that might work well for differen
 - **Ask Mode (0.7-1.0):** For explanations or open-ended questions requiring diverse and insightful responses
 - **Debug Mode (0.0-0.3):** For troubleshooting bugs with consistent precision
 
-These are starting points – it's important to [experiment with different settings](#experimentation) to find what works best for your specific needs and preferences.
+These are starting points — it's important to [experiment with different settings](#experimentation) to find what works best for your specific needs and preferences.
 
 ---
 
@@ -83,7 +83,7 @@ Create multiple [API configuration profiles](/features/api-configuration-profile
 3. Switch between profiles using the dropdown in settings or chat interface
 4. Set different profiles as defaults for each mode for automatic switching when changing modes
 
-This approach optimizes model behavior for specific tasks without manual adjustments.
+This approach optimizes model behavior for specific tasks without manual adjustments. Set it and forget it — the programmer's favorite mantra.
 
 ---
 
@@ -105,11 +105,11 @@ Experimenting with different temperature settings is the most effective way to d
 
 ### Effective Temperature Testing
 
-1. **Start with defaults** - Begin with Mirror VS's preset values (0.0 for most tasks) as your baseline
-2. **Make incremental adjustments** - Change values in small steps (±0.1) to observe subtle differences
-3. **Test consistently** - Use the same prompt across different temperature settings for valid comparisons
-4. **Document results** - Note which values produce the best outcomes for specific types of tasks
-5. **Create profiles** - Save effective settings as [API configuration profiles](/features/api-configuration-profiles) for quick access
+1. **Start with defaults** — Begin with Mirror VS's preset values (0.0 for most tasks) as your baseline
+2. **Make incremental adjustments** — Change values in small steps (±0.1) to observe subtle differences
+3. **Test consistently** — Use the same prompt across different temperature settings for valid comparisons
+4. **Document results** — Note which values produce the best outcomes for specific types of tasks
+5. **Create profiles** — Save effective settings as [API configuration profiles](/features/api-configuration-profiles) for quick access
 
 Remember that different models may respond differently to the same temperature values, and thinking-enabled models always use a fixed temperature of 1.0 regardless of your settings.
 

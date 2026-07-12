@@ -1,197 +1,87 @@
 ---
-description: Learn how to configure auto-approval settings in Mirror VS to speed up repetitive tasks while maintaining control over sensitive operations.
+sidebar_label: Auto-Approving Actions
+title: Auto-Approving Actions
+description: Speed up your workflow by letting Mirror VS handle the approvals — responsibly.
 keywords:
+  - auto-approve
   - auto-approval
-  - Mirror VS automation
-  - workflow optimization
-  - auto-approve settings
-  - safe operations
+  - permissions
+  - automation
+  - trust
+  - but verify
 ---
 
 # Auto-Approving Actions
 
-> ⚠️ **SECURITY WARNING:** Auto-approve settings bypass confirmation prompts, giving Roo direct access to your system. This can result in **data loss, file corruption, or worse**. Command line access is particularly dangerous, as it can potentially execute harmful operations that could damage your system or compromise security. Only enable auto-approval for actions you fully trust.
+Let's be honest — clicking "Approve" every thirty seconds gets old fast. Auto-approving actions are here to save your mouse finger from repetitive strain injury while keeping your project safe.
 
-Auto-approve settings speed up your workflow by eliminating repetitive confirmation prompts, but they significantly increase security risks.
+## The Golden Rule
 
----
+Before you go trigger-happy on those auto-approve checkboxes, a word of caution:
 
-## Quick Start Guide
+> ⚠️ **With great power comes great responsibility.** Enabling auto-approval means Mirror VS can act without stopping to ask for permission. That's powerful. It's also how you accidentally `rm -rf` your entire project if you're not careful.
 
-1. Open the Auto-Approve dropdown next to the chat input
-2. Toggle "Enabled" at the bottom-right of the dropdown to activate or pause auto-approval
-3. Use the All/None chips to bulk-select or clear permissions, or select individual tiles; you can keep Enabled On with "None" selected
-4. (Optional) Click the gear icon to open Settings for deeper per-permission controls
-
-### Keyboard Shortcut and Command Palette
-
-**Default shortcut:** `Cmd+Alt+A` (macOS) / `Ctrl+Alt+A` (Windows/Linux)
-
-**Command Palette:** `mirror-vs.toggleAutoApprove`
-
-Quickly toggle auto-approve on/off without using the mouse. Both the keyboard shortcut and the Command Palette command toggle the global "Enabled" state while preserving your permission selections.
-
-**Via Command Palette:**
-1. Open the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
-2. Type "Toggle Auto-Approve" or search for `mirror-vs.toggleAutoApprove`
-3. Press Enter to toggle the auto-approve state
-
-**To customize the shortcut:**
-1. Open VS Code Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
-2. Search for "Preferences: Open Keyboard Shortcuts"
-3. Search for the command name (varies by language):
-   - English: "Toggle Auto-Approve"
-   - Other languages: Look for the localized equivalent
-4. Click the pencil icon next to the command
-5. Press your desired key combination
-6. Press Enter to save
-
-**Note:** The command name appears in your VS Code interface language. If you're using a non-English locale, the command will be translated accordingly.
+**Start conservative.** Approve only what you trust, and ramp up as you gain confidence. Your future self (and your git history) will thank you.
 
 ---
 
-## Auto-Approve Dropdown
+## Auto-Approvable Actions
 
-<img src="/img/auto-approving-actions/auto-approving-actions-20.png" alt="Auto-Approve dropdown with All/None chips and global Enabled toggle (bottom-right)" width="600" />
+Mirror VS can auto-approve several types of actions. Here's the full menu, organized by how much trust each one requires.
 
-The dropdown shows a grid of permission tiles. Controls:
-- Enabled (bottom-right): master pause/resume for auto-approval
-- All / None (bottom-left): bulk select or clear permissions without changing Enabled
-- Permission tiles: choose which actions can run without prompts; tiles disable only when Enabled is off. Some permissions take effect only if your model supports the capability.
+### File Read Operations
 
-### Available Permissions
+:::info Read Files (Risk: Low)
 
-| Permission | What it does | Risk level |
-|------------|--------------|------------|
-| **Read files and directories** | Lets Roo access files without asking | Medium |
-| **Edit files** | Lets Roo modify files without asking | **High** |
-| **Execute approved commands** | Runs whitelisted terminal commands automatically | **High** |
-| **Use the browser** | Allows headless browser interaction | Medium |
-| **Use MCP servers** | Lets Roo use configured MCP services | Medium-High |
-| **Switch modes** | Changes between Roo modes automatically | Low |
-| **Create & complete subtasks** | Manages subtasks without confirmation | Low |
-| **Answer follow-up questions** | Selects default answer for follow-up questions| Low |
+**Setting:** "Always approve read operations"
 
----
+**Description:** "Automatically read files and directories without requiring approval"
 
-## Global Enabled Switch
+**Risk level:** Low
 
-<img src="/img/auto-approving-actions/auto-approving-actions-21.png" alt="Auto-Approve dropdown; Enabled at bottom-right and All/None chips at bottom-left" width="600" />
+This allows Mirror VS to read files and list directories without pinging you for permission every time. Since reading doesn't change anything, it's the safest auto-approval to enable.
 
-How it works:
-- Enabled On — Auto-approval runs for the permissions you’ve selected
-- Enabled Off — Pauses all auto-approvals; your per-permission selections persist
-- All / None — Bulk adjust selections while Enabled remains unchanged
-- Note: Auto-approve only runs if Enabled is On and at least one permission is selected.
+**What gets auto-approved:**
+- Reading a single file
+- Reading multiple files at once
+- Listing directory contents
 
-When to toggle:
-- Sensitive or production work → Off
-- Rapid iteration and refactors → On
-- Switching between exploration and editing tasks
-
----
-
-## Advanced Settings Panel
-
-The settings panel provides detailed control with important security context:
-
-> **Allow Roo to automatically perform operations without requiring approval. Enable these settings only if you fully trust the AI and understand the associated security risks.**
-
-To access these settings:
-
-1. Click <Codicon name="gear" /> in the top-right of the dropdown
-2. Navigate to Auto-Approve Settings
-
-The settings panel mirrors the same permissions with additional context and safeguards.
-
-#### Important behaviors
-
-- Outside‑workspace reads/writes require the corresponding outside‑workspace flags in addition to the base permission.
-- Auto‑approve for MCP tools requires both the global "Always approve MCP tools" and each tool's "Always allow". Resource access honors only the global setting.
-- Mode switching is only auto‑approved when the mode-switch permission is enabled (covers switching to another mode and creating new modes).
-- After auto‑writes, Roo waits using the global write‑delay control under Settings → Context Management → Diagnostics.
-
-### Read Operations
-
-:::info Read Operations (Risk: Medium)
-
-<img src="/img/auto-approving-actions/auto-approving-actions-3.png" alt="Read-only operations setting" width="550" />
-
-**Setting:** "Always approve read-only operations"
-
-**Description:** "When enabled, Roo will automatically view directory contents and read files without requiring you to click the Approve button."
-
-**Additional option:**
-- **Include files outside workspace:** Allow Roo to read files outside the current workspace directory
-
-**Risk level:** Medium
-
-While this setting only allows reading files (not modifying them), it could potentially expose sensitive data. Still recommended as a starting point for most users, but be mindful of what files Roo can access.
-
-#### Workspace Boundary Protection
-
-By default, Roo can only read files within your current workspace directory. The "Include files outside workspace" option extends read access beyond the workspace boundary. Consider the security implications:
-
-- **Default (unchecked)**: Roo can only read files in your project directory
-- **Enabled**: Roo can read any file on your system that you have access to
-- **Recommendation**: Keep disabled unless you specifically need Roo to access external files
 :::
 
-### Write Operations
+### File Edit Operations
 
-:::caution Write Operations (Risk: High)
-<img src="/img/auto-approving-actions/auto-approving-actions-16.png" alt="Write operations setting with delay slider" width="550" />
+:::caution Edit Files (Risk: Medium)
 
 **Setting:** "Always approve write operations"
 
-**Description:** "Automatically create and edit files without requiring approval"
+**Description:** "Automatically write new or edited files without requiring approval"
 
-**Write delay control:** Configured under Settings → Context Management → Diagnostics. See [Diagnostics Integration](/features/diagnostics-integration).
+**Risk level:** Medium
 
-**Additional options:**
-- **Include files outside workspace:** Allow Roo to modify files outside the current workspace directory
-- **Include protected files:** Allow Roo to modify files protected by `.roo/` and `.rooignore` directory
+This lets Mirror VS create and modify files on its own. It's the heart of what makes Mirror VS useful — but also where things can go wrong if you're not careful.
 
-**Risk level:** High
+**What gets auto-approved:**
+- Writing new files
+- Editing existing files
+- Creating directories
 
-This setting allows Roo to modify your files without confirmation. The delay timer is crucial:
-- Higher values (2000ms+): Recommended for complex projects where diagnostics take longer
-- Default (1000ms): Suitable for most projects with active diagnostics
-- 0ms: No delay - use when speed is critical
-- Lower values: Use only when in a controlled environment
-
-#### Security Boundaries
-
-The write operations setting includes two important security controls:
-
-1. **Workspace Boundary Protection**: By default, Roo can only modify files within your current workspace. Enable "Include files outside workspace" with extreme caution.
-
-2. **Protected Files**: Roo blocks modification of:
-   - Files in the `.roo/` directory
-   - The `.rooignore` file
-   
-   The "Include protected files" option bypasses this protection - use only when you specifically need to modify these files.
-#### Write Delay & Problems Pane Integration
-
-<img src="/img/auto-approving-actions/auto-approving-actions-5.png" alt="VSCode Problems pane showing diagnostic information" width="600" />
-
-*VSCode Problems pane that Roo checks during the write delay*
-
-When you enable auto-approval for writing files, Roo uses the global write-delay configured under Settings → Context Management → Diagnostics. The delay timer works with VSCode's Problems pane:
-
-1. Roo makes a change to your file
-2. VSCode's diagnostic tools analyze the change
-3. The Problems pane updates with any errors or warnings
-4. Roo notices these issues before continuing
-
-This works like a human developer pausing to check for errors after changing code. You can adjust the delay time based on:
-
-- Project complexity
-- Language server speed
-- How important error detection is for your workflow
 :::
 
-### MCP Tools
+### Browser Operations
+
+:::info Browser (Risk: Low-Medium)
+
+**Setting:** "Always approve browser operations"
+
+**Description:** "Automatically use a browser without requiring approval"
+
+**Risk level:** Low-Medium
+
+Gives Mirror VS the green light to launch a browser for web interactions like clicking, form filling, and screenshotting. Useful for testing and data collection.
+
+:::
+
+### MCP Tool Operations
 
 :::caution MCP Tools (Risk: Medium-High)
 
@@ -201,10 +91,10 @@ This works like a human developer pausing to check for errors after changing cod
 
 **Risk level:** Medium-High (depends on configured MCP tools)
 
-This setting requires a two-step permission process for security:
+This setting requires a two-step permission dance for security:
 
-1. **Enable this global setting** - Acts as a master switch for all MCP tool auto-approval
-2. **Enable individual tool permissions** - In the MCP Servers view, check "Always allow" for specific tools
+1. **Enable this global setting** — Acts as the master switch for all MCP tool auto-approval
+2. **Enable individual tool permissions** — In the MCP Servers view, check "Always allow" for specific tools
 
 **Important:** Both permissions must be active for a tool to auto-approve. This dual-permission system ensures you maintain granular control over which MCP tools can execute without confirmation. Resource retrieval (`access_mcp_resource`) honors only the global setting.
 
@@ -228,7 +118,7 @@ Example workflow:
 
 **Risk level:** Low
 
-Allows Roo to change between different modes (Code, Architect, etc.) without asking for permission. This primarily affects the AI's behavior rather than system access. Auto-approval also covers switching between modes and creating new modes when this permission is enabled.
+Allows Mirror VS to change between different modes (Code, Architect, etc.) without asking for permission. This primarily affects the AI's behavior rather than system access. Auto-approval also covers switching between modes and creating new modes when this permission is enabled.
 :::
 
 ### Subtasks
@@ -241,12 +131,13 @@ Allows Roo to change between different modes (Code, Architect, etc.) without ask
 
 **Risk level:** Low
 
-Enables Roo to create and complete subtasks automatically. This relates to workflow organization rather than system access.
+Enables Mirror VS to create and complete subtasks automatically. This relates to workflow organization rather than system access.
 :::
 
 ### Command Execution
 
 :::caution Command Execution (Risk: High)
+
 <img src="/img/auto-approving-actions/auto-approving-actions-18.png" alt="Command execution setting with whitelist interface" width="550" />
 
 **Setting:** "Always approve allowed execute operations"
@@ -257,29 +148,32 @@ Enables Roo to create and complete subtasks automatically. This relates to workf
 
 **Risk level:** High
 
-This setting allows terminal command execution with controls. Use an allowlist and a denylist together for defense-in-depth.
+This is the big one. This setting allows terminal command execution with controls. Think of it as giving Mirror VS a skeleton key — you want to be very specific about which doors it can open.
 
-- Precedence: Deny rules take precedence when their matching prefix is equally or more specific than the allow match (longest-prefix wins).
-- High-risk commands to deny by default:
-  - Unix/macOS: rm, sudo, dd, mkfs, diskutil eraseDisk, shutdown, reboot, chmod -R, chown -R, kill -9, curl | sh, wget | sh
-  - Git/Package: git push, npm publish, yarn publish, pnpm publish
-  - Windows/PowerShell: Remove-Item, Format-Volume, Stop-Process, shutdown, Set-ExecutionPolicy
-- Production template:
-  - Deny all with "*" then allow specific safe prefixes like "git", "npm run", "echo".
-- Dangerous substitution guard: Even allowed prefixes won’t auto-approve if the command contains dangerous parameter or process substitutions (e.g., `${var@P}`, subshells inserted into here-strings, zsh process substitution `=(...)`, zsh glob qualifiers with `e:...:`).
+Use an allowlist and a denylist together for defense-in-depth.
 
-Configuration
-- UI (recommended): Settings → Auto‑Approve → Execute → use "Allowed Commands" and "Denied Commands" editors to add/remove prefixes.
-- Settings JSON (alternative):
-```json
-{
-  "mirror-vs.allowedCommands": ["git", "npm run", "echo"],
-  "mirror-vs.deniedCommands": ["git push", "npm publish", "rm", "sudo", "*"]
-}
-```
-With both lists defined, the longest‑prefix rule applies; if deny is equally or more specific, it wins.
+- **Precedence:** Deny rules take precedence when their matching prefix is equally or more specific than the allow match (longest-prefix wins).
+- **High-risk commands to deny by default:**
+  - Unix/macOS: `rm`, `sudo`, `dd`, `mkfs`, `diskutil eraseDisk`, `shutdown`, `reboot`, `chmod -R`, `chown -R`, `kill -9`, `curl | sh`, `wget | sh`
+  - Git/Package: `git push`, `npm publish`, `yarn publish`, `pnpm publish`
+  - Windows/PowerShell: `Remove-Item`, `Format-Volume`, `Stop-Process`, `shutdown`, `Set-ExecutionPolicy`
+- **Production template:**
+  - Deny all with `"*"` then allow specific safe prefixes like `"git"`, `"npm run"`, `"echo"`.
+- **Dangerous substitution guard:** Even allowed prefixes won't auto-approve if the command contains dangerous parameter or process substitutions (e.g., `${var@P}`, subshells inserted into here-strings, zsh process substitution `=(...)`, zsh glob qualifiers with `e:...:`).
 
-Examples of safe allow prefixes:
+**Configuration:**
+- **UI (recommended):** Settings → Auto-Approve → Execute → use "Allowed Commands" and "Denied Commands" editors to add/remove prefixes.
+- **Settings JSON (alternative):**
+  ```json
+  {
+    "mirror-vs.allowedCommands": ["git", "npm run", "echo"],
+    "mirror-vs.deniedCommands": ["git push", "npm publish", "rm", "sudo", "*"]
+  }
+  ```
+
+With both lists defined, the longest-prefix rule applies; if deny is equally or more specific, it wins.
+
+**Examples of safe allow prefixes:**
 - `git`
 - `npm run`
 - `python -m pytest`
@@ -289,17 +183,18 @@ Examples of safe allow prefixes:
 - `ls`
 - `cat`
 
-Security tip: Be specific with prefixes. Instead of allowing all `python` commands, limit to `python -m pytest` for test execution only.
+**Security tip:** Be specific with prefixes. Instead of allowing all `python` commands, limit to `python -m pytest` for test execution only.
 :::
 
 ### Follow-Up Questions
 
 :::info Follow-Up Questions (Risk: Low)
+
 <img src="/img/auto-approving-actions/auto-approving-actions-15.png" alt="Follow-up question operations setting with timeout slider" width="550" />
 
 **Setting:** `Always default answer for follow-up questions`
 
-**Description:** Automatically selects the first AI-suggested answer for a follow-up question after a configurable timeout. This speeds up your workflow by letting Roo proceed without manual intervention.
+**Description:** Automatically selects the first AI-suggested answer for a follow-up question after a configurable timeout. This speeds up your workflow by letting Mirror VS proceed without manual intervention.
 
 **Timeout slider:** Use the slider to set the wait time from 1 to 300 seconds (Default: 60 seconds)
 
@@ -315,7 +210,31 @@ Security tip: Be specific with prefixes. Instead of allowing all `python` comman
 **Risk level:** Low
 
 **Use cases:**
-- Overnight runs where you want Roo to continue working
+- Overnight runs where you want Mirror VS to continue working
 - Repetitive tasks where the default suggestions are usually correct
 - Testing workflows where interaction isn't critical
 :::
+
+---
+
+## Quick Reference Table
+
+| Action Type | Risk Level | Best For |
+|------------|-----------|----------|
+| Read Files | 🟢 Low | Everything safe |
+| Edit Files | 🟡 Medium | Active development |
+| Browser | 🟢 Low-Med | Web scraping & testing |
+| MCP Tools | 🟠 Medium-High | Trusted MCP servers |
+| Mode Switch | 🟢 Low | Multi-mode workflows |
+| Subtasks | 🟢 Low | Orchestrator workflows |
+| Commands | 🔴 High | CI/CD & trusted scripts |
+| Follow-ups | 🟢 Low | Overnight automation |
+
+---
+
+## Pro Tips
+
+1. **Start small.** Enable read operations first, see how it feels, then work your way up.
+2. **Use the denylist.** Command execution is powerful — pair it with a good denylist.
+3. **Review periodically.** Your trust level might change. Revisit these settings now and then.
+4. **Auto-approve for overnight runs.** Set up follow-up question auto-answers and let Mirror VS crunch through tasks while you sleep. That's what we call "lights-out coding."

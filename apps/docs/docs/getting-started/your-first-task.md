@@ -1,6 +1,6 @@
 ---
 sidebar_label: Your First Task
-description: Learn how to start your first task with Mirror VS AI assistant. Step-by-step guide for beginners to understand the approval workflow and iterative process.
+description: Time to make Mirror VS actually do something. A beginner-friendly walkthrough of your first interaction — approvals, iterations, and all.
 keywords:
     - Mirror VS tutorial
     - first task
@@ -13,75 +13,75 @@ import KangamirrorIcon from '@site/src/components/KangamirrorIcon';
 
 # Your first task
 
-Now that you've [configured your AI provider and model](/getting-started/connecting-api-provider), you're ready to start using Mirror VS! This guide walks you through your first interaction.
+You've [connected your AI provider](/getting-started/connecting-api-provider). Now let's make Mirror VS earn its keep.
 
 ---
 
 ## Step 1: Open the Mirror VS Panel
 
-Click the Mirror VS icon (<KangamirrorIcon />) in the VS Code Activity Bar (vertical bar on the side of the window) to open the chat interface. If you don't see the icon, verify the extension is installed and enabled.
+Spot the Mirror VS icon (<KangamirrorIcon />) in the Activity Bar (that vertical strip on the side of VS Code). Click it.
 
 <figure>
   <img src="/img/your-first-task/your-first-task.png" alt="Mirror VS icon in VS Code Activity Bar" width="600" />
-  <figcaption>The Mirror VS icon in the Activity Bar opens the chat interface. You can drag it to position Mirror elsewhere.</figcaption>
+  <figcaption>That little icon is your portal to AI-assisted development. Try not to abuse it. (Okay, you can abuse it.)</figcaption>
 </figure>
 
 ## Step 2: Type Your Task
 
-Type a clear, concise description of what you want Mirror VS to do in the chat box at the bottom of the panel. Examples of effective tasks:
+At the bottom of the panel, type what you want — plain English, no incantations required. Try something like:
 
 - "Create a file named `hello.txt` containing 'Hello, world!'."
 - "Write a Python function that adds two numbers."
 - "Create an HTML file for a simple website with the title 'Mirror test'"
 
-No special commands or syntax needed—just use plain English.
+No magic words. No `/commands` to memorize. Just... say it.
 
 <figure>
   <img src="/img/your-first-task/your-first-task-6.png" alt="Typing a task in the Mirror VS chat interface" width="400" />
-  <figcaption>Enter your task in natural language - no special syntax required.</figcaption>
+  <figcaption>See? You just type stuff. It's almost disappointingly simple.</figcaption>
 </figure>
 
-## Step 3: Send Your Task
+## Step 3: Send It
 
-Press Enter or click the Send icon (<Codicon name="send" />) to the right of the input box.
+Hit Enter or click the Send icon (<Codicon name="send" />). Watch the AI spring into action.
 
-## Step 4: Review and Approve Actions
+## Step 4: Review and Approve
 
-Mirror VS analyzes your request and proposes specific actions. These may include:
+Mirror VS will analyze your request and propose actions. Here's what you might see:
 
-- **Reading files:** Shows file contents it needs to access
-- **Writing to files:** Displays a diff with proposed changes (added lines in green, removed in red)
-- **Executing commands:** Shows the exact command to run in your terminal
-- **Using the Browser:** Outlines browser actions (click, type, etc.)
-- **Asking questions:** Requests clarification when needed to proceed
+- **Reading files:** It shows what it needs to peek at
+- **Writing to files:** A diff view — green for new stuff, red for bye-bye stuff
+- **Executing commands:** The exact terminal command it wants to run (no surprises)
+- **Using the Browser:** It'll outline what it's clicking and typing
+- **Asking questions:** Yep, it knows when it doesn't know
 
 <figure>
   <img src="/img/your-first-task/your-first-task-7.png" alt="Reviewing a proposed file creation action" width="800" />
-  <figcaption>Mirror VS shows exactly what action it wants to perform and waits for your approval.</figcaption>
+  <figcaption>Mirror VS shows you the plan before pulling the trigger. You're the boss.</figcaption>
 </figure>
 
-**Each action requires your explicit approval** (unless auto-approval is enabled):
+**Every action needs your OK** (unless you've turned on auto-approval, you rebel):
 
-- **Approve:** Click the "Approve" button to execute the proposed action
-- **Reject:** Click the "Reject" button and provide feedback if needed
+- **Approve:** Click the button. Let it cook.
+- **Reject:** Click reject and tell it why. It learns.
 
-## Step 5: Iterate
+## Step 5: Rinse and Repeat
 
-Mirror VS works iteratively. After each action, it waits for your feedback before proposing the next step. Continue this review-approve cycle until your task is complete.
+Mirror VS works iteratively. It does something, waits for your feedback, then does the next thing. Back and forth until the job's done.
 
 <figure>
   <img src="/img/your-first-task/your-first-task-8.png" alt="Final result of a completed task showing the iteration process" width="500" />
-  <figcaption>After completing the task, Mirror VS shows the final result and awaits your next instruction.</figcaption>
+  <figcaption>Task complete. Mirror VS awaits your next command. You're basically a manager now.</figcaption>
 </figure>
 
 ---
 
-## Conclusion
+## You Did It
 
-You've now completed your first task with Mirror VS! Through this process, you've learned:
+You've completed your first task with Mirror VS. Here's what you've learned:
 
-- How to interact with Mirror VS using natural language
-- The approval-based workflow that keeps you in control
-- The iterative approach Mirror VS uses to solve problems step-by-step
+- Natural language works — no syntax bootcamp required
+- You're always in the driver's seat with the approval workflow
+- Mirror VS solves problems one step at a time (no skipping ahead)
 
-This iterative, approval-based workflow is at the core of how Mirror VS works—letting AI handle the tedious parts of coding while you maintain complete oversight. Now that you understand the basics, you're ready to tackle more complex tasks, explore different [modes](/basic-usage/using-modes) for specialized workflows, or try the [auto-approval feature](/features/auto-approving-actions) to speed up repetitive tasks.
+Now go tackle something real. Explore different [modes](/basic-usage/using-modes) for specialized workflows, or enable [auto-approval](/features/auto-approving-actions) once you've built up enough trust. The IDE is yours.

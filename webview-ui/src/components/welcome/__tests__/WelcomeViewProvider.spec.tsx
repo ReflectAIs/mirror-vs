@@ -37,9 +37,22 @@ vi.mock("../MirrorHero", () => ({
 	default: () => <div data-testid="mirror-hero">Mirror Hero</div>,
 }))
 
+vi.mock("../MirrorTips", () => ({
+	default: () => <div data-testid="mirror-tips">Mirror Tips</div>,
+}))
+
+vi.mock("../WelcomeStepIndicator", () => ({
+	default: ({ steps, currentStep }: any) => (
+		<div data-testid="welcome-step-indicator" data-current-step={currentStep} data-step-count={steps?.length}>
+			Step Indicator
+		</div>
+	),
+}))
+
 vi.mock("lucide-react", () => ({
 	ArrowLeft: () => <span data-testid="arrow-left-icon">left</span>,
 	Brain: () => <span data-testid="brain-icon">brain</span>,
+	Sparkles: () => <span data-testid="sparkles-icon">sparkles</span>,
 }))
 
 vi.mock("@src/utils/vscode", () => ({
@@ -52,7 +65,7 @@ vi.mock("react-i18next", () => ({
 	Trans: ({ i18nKey, children }: any) => <span data-testid={`trans-${i18nKey}`}>{children || i18nKey}</span>,
 	initReactI18next: {
 		type: "3rdParty",
-		init: () => { },
+		init: () => {},
 	},
 }))
 
@@ -96,6 +109,15 @@ describe("WelcomeViewProvider", () => {
 		expect(screen.getByText(/welcome:importSettings/)).toBeInTheDocument()
 	})
 
+	it("shows the step indicator and mirror tips on the landing screen", () => {
+		renderWelcomeViewProvider()
+
+		expect(screen.getByTestId("welcome-step-indicator")).toBeInTheDocument()
+		expect(screen.getByTestId("welcome-step-indicator")).toHaveAttribute("data-current-step", "0")
+		expect(screen.getByTestId("mirror-tips")).toBeInTheDocument()
+		expect(screen.getByTestId("mirror-hero")).toBeInTheDocument()
+	})
+
 	it("opens provider setup when Get Started is clicked", () => {
 		const { setApiConfiguration } = renderWelcomeViewProvider()
 
@@ -110,6 +132,14 @@ describe("WelcomeViewProvider", () => {
 		})
 		expect(screen.getByTestId("trans-welcome:providerSignup.chooseProvider")).toBeInTheDocument()
 		expect(vscode.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "upsertApiConfiguration" }))
+	})
+
+	it("shows step indicator on provider setup step", () => {
+		renderWelcomeViewProvider()
+
+		fireEvent.click(screen.getByTestId("button-primary"))
+
+		expect(screen.getByTestId("welcome-step-indicator")).toHaveAttribute("data-current-step", "1")
 	})
 
 	it("treats the built-in Anthropic default as empty onboarding config", () => {
@@ -130,7 +160,7 @@ describe("WelcomeViewProvider", () => {
 		})
 	})
 
-	it("saves the configured provider from setup", () => {
+	it("saves the configured provider and transitions to completion step", () => {
 		renderWelcomeViewProvider({ apiConfiguration: { apiProvider: "openrouter" } })
 
 		fireEvent.click(screen.getByTestId("button-primary"))
@@ -143,6 +173,39 @@ describe("WelcomeViewProvider", () => {
 				apiProvider: "openrouter",
 			},
 		})
+	})
+
+	it("shows the completion screen after provider setup is saved", () => {
+		renderWelcomeViewProvider({ apiConfiguration: { apiProvider: "openrouter" } })
+
+		fireEvent.click(screen.getByTestId("button-primary"))
+		fireEvent.click(screen.getByText(/welcome:providerSignup.finish/))
+
+		expect(screen.getByText(/welcome:complete.heading/)).toBeInTheDocument()
+		expect(screen.getByTestId("trans-welcome:complete.description")).toBeInTheDocument()
+		expect(screen.getByText(/welcome:complete.startExploring/)).toBeInTheDocument()
+	})
+
+	it("shows the sparkles icon and step indicator on the completion screen", () => {
+		renderWelcomeViewProvider({ apiConfiguration: { apiProvider: "openrouter" } })
+
+		fireEvent.click(screen.getByTestId("button-primary"))
+		fireEvent.click(screen.getByText(/welcome:providerSignup.finish/))
+
+		expect(screen.getByTestId("sparkles-icon")).toBeInTheDocument()
+		expect(screen.getByTestId("welcome-step-indicator")).toHaveAttribute("data-current-step", "2")
+	})
+
+	it("navigates to chat when Start Exploring is clicked on completion screen", () => {
+		renderWelcomeViewProvider({ apiConfiguration: { apiProvider: "openrouter" } })
+
+		fireEvent.click(screen.getByTestId("button-primary"))
+		fireEvent.click(screen.getByText(/welcome:providerSignup.finish/))
+
+		const startExploringButton = screen.getByText(/welcome:complete.startExploring/)
+		fireEvent.click(startExploringButton)
+
+		expect(vscode.postMessage).toHaveBeenCalledWith({ type: "switchTab", tab: "chat" })
 	})
 
 	it("returns to landing from provider setup", () => {

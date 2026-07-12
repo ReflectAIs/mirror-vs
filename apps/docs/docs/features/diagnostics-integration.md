@@ -12,7 +12,7 @@ keywords:
 
 # Diagnostics Integration
 
-Mirror VS provides intelligent integration with VSCode's Problems panel, allowing the AI assistant to understand and help fix code errors, warnings, and other issues detected by language servers, linters, and other diagnostic providers.
+Mirror VS provides intelligent integration with VSCode's Problems panel, allowing the AI assistant to understand and help fix code errors, warnings, and other issues detected by language servers, linters, and other diagnostic providers. Think of it as having a code reviewer who actually reads the error messages before you do.
 
 ---
 
@@ -40,7 +40,7 @@ When Mirror VS makes edits to files, it automatically:
 - Detects new problems introduced by the changes
 - Only reports new errors (not pre-existing ones)
 
-This ensures you're immediately aware of any issues introduced by code changes, allowing for quick resolution.
+This ensures you're immediately aware of any issues introduced by code changes, allowing for quick resolution. No more discovering a bug three hours later and wondering "was that there before?"
 
 ### 2. Workspace Problems Mention
 
@@ -92,7 +92,7 @@ The diagnostics system recognizes four severity levels from VSCode:
 ### Why Different Filters?
 
 - **Workspace Problems (`@problems`)**: Includes both errors and warnings to give you a complete picture of code health when explicitly requested
-- **Automatic Detection**: Only includes errors to avoid interrupting your workflow with non-critical issues
+- **Automatic Detection**: Only includes errors to avoid interrupting your workflow with non-critical issues. Because nobody needs a popup about a trailing whitespace warning in the middle of debugging.
 
 ---
 
@@ -178,6 +178,6 @@ When Mirror VS edits files, any new errors introduced are automatically reported
 
 ## Related Features
 
-- [Context Mentions](/basic-usage/context-mentions) - Learn about all mention types including `@problems`
-- [Code Actions](/features/code-actions) - Discover how diagnostics integrate with quick fixes
-- [Codebase Search](/features/codebase-indexing) - Find code related to specific errors
+- [Context Mentions](/basic-usage/context-mentions) — Learn about all mention types including `@problems`
+- [Code Actions](/features/code-actions) — Discover how diagnostics integrate with quick fixes
+- [Codebase Search](/features/codebase-indexing) — Find code related to specific errors

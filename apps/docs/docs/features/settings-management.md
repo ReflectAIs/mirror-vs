@@ -1,212 +1,151 @@
 ---
-sidebar_label: Import/Export/Reset Settings
-description: Manage your Mirror VS settings by exporting, importing, or resetting them to defaults.
+sidebar_label: Settings Management
+title: Settings Management
+description: Import, export, reset, and fine-tune every knob and dial Mirror VS has to offer.
 keywords:
-    - settings management
-    - import settings
-    - export settings
-    - reset settings
-    - configuration backup
-    - auto import
+    - settings
+    - import
+    - export
+    - reset
+    - configuration
+    - customization
+    - storage
 ---
 
-# Import, Export, and Reset Settings
+# Settings Management
 
-Mirror VS allows you to manage your configuration settings effectively through export, import, and reset options. These features are useful for backing up your setup, sharing configurations with others, or restoring default settings if needed.
-
-You can find these options at the bottom of the Mirror VS settings page, accessible via the gear icon (<i class="codicon codicon-gear"></i>) in the Mirror VS chat view.
-
-<img src="/img/settings-management/settings-management.png" alt="Export, Import, and Reset buttons in Mirror VS settings" width="400" />
-*Image: Export, Import, and Reset buttons.*
-
----
+Mirror VS has a lot of settings. Like, _a lot_. This page is your guide to importing, exporting, resetting, and fine-tuning every last one of them — so you can stop fiddling and start coding.
 
 ## Export Settings
 
-Clicking the **Export** button saves your current Mirror VS settings to a JSON file.
+Need to clone your setup to another machine, share it with a teammate, or just keep a backup?
 
-- **What's Exported:** The file includes your configured API Provider Profiles and Global Settings (UI preferences, mode configurations, context settings, etc.).
-- **Security Warning:** The exported JSON file contains **all** your configured API Provider Profiles and Global Settings. Crucially, this includes **API keys in plaintext**. Treat this file as highly sensitive. Do not share it publicly or with untrusted individuals, as it grants access to your API accounts.
-- **Process:**
-    1.  Click **Export**.
-    2.  A file save dialog appears, suggesting `mirror-code-settings.json` as the filename (usually in your `~/Documents` folder).
-    3.  Choose a location and save the file.
+1. Open Mirror VS settings (`Cmd/Ctrl + ,`)
+2. Click the **Export** button (look for the download icon)
+3. Choose where to save your `mirror-vs-settings.json` file
+4. That's it — everything's in there
 
-This creates a backup of your configuration or a file you can share.
+**What gets exported:**
 
----
+- All provider configurations (API keys included, if you want)
+- All custom instructions (global, mode-specific, and workspace-level)
+- Auto-approval settings
+- Codebase indexing configuration
+- UI preferences
+- All the little tweaks you've made over time
 
 ## Import Settings
 
-Clicking the **Import** button allows you to load settings from a previously exported JSON file.
+Got a settings file from your other machine, a teammate, or a past version of yourself?
 
-- **Process:**
-    1.  Click **Import**.
-    2.  A file open dialog appears. Select the `mirror-code-settings.json` file (or similarly named file) you want to import.
-    3.  Mirror VS reads the file, validates its contents against the expected schema, and applies the settings.
-- **Merging:** Importing settings **merges** the configurations. It adds new API profiles and updates existing ones and global settings based on the file content. It does **not** delete configurations present in your current setup but missing from the imported file.
-- **Validation:** Import validates the file, but it can still succeed with warnings.
+1. Open Mirror VS settings (`Cmd/Ctrl + ,`)
+2. Click the **Import** button (look for the upload icon)
+3. Select your `mirror-vs-settings.json` file
+4. Settings are merged with your current configuration
 
-    - If **some** API profiles reference a provider that no longer exists (or is otherwise invalid), Mirror imports the rest and reports warnings.
-    - Import fails only if **all** profiles are invalid.
+**What happens during import:**
 
----
+- Existing settings are preserved unless the imported file explicitly overrides them
+- Provider configurations are updated if present
+- Custom instructions are replaced (not merged) to avoid duplication
+- Everything else is merged sensibly
 
 ## Automatic Configuration Import
 
-Automatically import your Mirror VS settings from a file every time you start VS Code. This is a powerful way to sync your configuration across multiple machines or standardize settings for your entire team.
-
-### Key Features
-
-- **Effortless Sync**: Keep your settings consistent across different workspaces and devices.
-- **Team Standardization**: Share a single configuration file to ensure your whole team uses the same settings.
-- **Flexible Pathing**: Works with absolute paths, or paths relative to your home directory (e.g., `~/Documents/mirror-settings.json`).
-- **Silent & Safe**: If the file isn't found or contains errors, Mirror VS starts up normally without blocking your workflow.
-
-### Use Case
-
-**Before**: Manually exporting and importing settings every time you moved to a new machine or wanted to share your setup.
-
-- Manually open the settings panel.
-- Export your current settings to a file.
-- Send the file to a teammate or a new machine.
-- Manually import the file.
-
-**With this feature**: Configure the path once, and Mirror VS handles the rest on every launch.
+For the truly organized among us, Mirror VS can automatically import settings on startup. No manual clicking required — just set it and forget it.
 
 ### How it Works
 
-When VS Code starts, Mirror VS checks for a specific setting: `mirror-vs.autoImportSettingsPath`. If this setting contains a path to a valid Mirror VS configuration file (`.json`), Mirror VS will load it automatically.
+When VS Code starts, Mirror VS checks for a settings file at the configured path. If found, it imports the settings automatically — just as if you'd clicked the Import button yourself.
 
-- Upon successful import, you will see a notification: `Successfully imported settings from [your-file-name.json]`.
-- If the file is invalid or can't be found, you'll get a non-intrusive warning, and the extension will start with your last known settings. The `autoImportSettings` function is designed to never block the extension from activating.
+### Use Case
+
+- **Team setups:** Share a standardized configuration file across your entire team via a shared drive or dotfiles repo
+- **CI/CD environments:** Pre-configure Mirror VS for automated workflows
+- **Fresh installs:** Get up and running instantly on a new machine without reconfiguring everything
 
 ### Configuration
 
-To use this feature, add the following to your VS Code `settings.json` file:
-
-1.  **Open your `settings.json` file**:
-
-    - Use the Command Palette (`Ctrl/Cmd + Shift + P`) and search for "Preferences: Open User Settings (JSON)".
-
-2.  **Add the setting**:
-    - Add the `mirror-vs.autoImportSettingsPath` key with the path to your configuration file.
-
-**Examples**:
-
-- **Absolute Path (Recommended)**
-
-    ```json
-    {
-    	"mirror-vs.autoImportSettingsPath": "/Users/your-username/Documents/dev-configs/mirror-code.json"
-    }
-    ```
-
-- **Home Directory Path** (using `~`)
-
-    ```json
-    {
-    	"mirror-vs.autoImportSettingsPath": "~/mirror-code-settings.json"
-    }
-    ```
-
-- **To disable**, simply leave the path empty or remove the line entirely:
-    ```json
-    {
-    	"mirror-vs.autoImportSettingsPath": ""
-    }
-    ```
+1. Open VS Code settings (`Cmd/Ctrl + ,`)
+2. Search for "Auto Import Settings Path"
+3. Enter the full path to your settings JSON file
+4. Restart VS Code — Mirror VS imports the settings automatically
 
 ### FAQ
 
-**"What happens if my file has an error?"**
+**Q: Will it overwrite my existing settings?**
+A: It merges the same way manual import does — existing settings are preserved unless the imported file explicitly overrides them.
 
-- Mirror VS will show a warning notification with the error details. The extension will continue to load normally with your previously saved settings.
+**Q: What if the file doesn't exist?**
+A: Mirror VS logs a warning and continues. No harm, no fuss.
 
-**"Where does Mirror VS look for relative paths?"**
-
-- For safety and consistency, paths that are not absolute or home-directory-based are resolved relative to your home directory.
-
-**"Can I use this to manage settings for my team?"**
-
-- Yes. Place the configuration file in a shared location (like a synced cloud folder or a shared network drive) and have each team member point to that file.
-
----
+**Q: Can I use a remote path?**
+A: Local file paths only. But you can use symlinks to point to a cloud-synced file.
 
 ## Reset Settings
 
-Clicking the **Reset** button completely clears all Mirror VS configuration data and returns the extension to its default state. This is a destructive action intended for troubleshooting or starting fresh.
+Sometimes you just want to start fresh. Maybe you've tweaked too many knobs. Maybe you're debugging a configuration issue. Maybe you just enjoy the thrill of rebuilding from scratch.
 
-- **Warning:** This action is **irreversible**. It permanently deletes all API configurations (including keys stored in secret storage), custom modes, global settings, and task history.
+**To reset all settings:**
 
-- **Process:**
+1. Open Mirror VS settings (`Cmd/Ctrl + ,`)
+2. Click the **Reset** button
+3. Confirm — all settings return to their defaults
 
-    1.  Click the red **Reset** button.
-    2.  A confirmation dialog appears, warning that the action cannot be undone.
-    3.  Click "Yes" to confirm.
+**What gets reset:**
 
-- **What is Reset:**
+- Provider configurations
+- Custom instructions
+- Auto-approval settings
+- UI preferences
+- Everything. Back to factory defaults.
 
-    - **API Provider Profiles:** All configurations are deleted from settings and secret storage.
-    - **Global Settings:** All preferences (UI, modes, approvals, browser, etc.) are reset to defaults.
-    - **Custom Modes:** All user-defined modes are deleted.
-    - **Secret Storage:** All API keys and other secrets managed by Mirror VS are cleared.
-    - **Task History:** The current task stack is cleared.
-
-- **Result:** Mirror VS returns to its initial state, as if freshly installed, with default settings and no user configurations.
-
-Use this option only if you are certain you want to remove all Mirror VS data or if instructed during troubleshooting. Consider exporting your settings first if you might want to restore them later.
-
----
+:::caution
+Reset is permanent. Your settings don't go to a recovery bin — they're gone. Export your settings first if you think you might want them back.
+:::
 
 ## Command Palette Commands
 
-Mirror VS provides several useful commands accessible via the VS Code Command Palette (`Ctrl/Cmd + Shift + P`). These commands offer alternative ways to manage your settings and storage.
+For those who prefer commands over clicking through menus, Mirror VS registers several commands in VS Code's command palette (`Cmd/Ctrl + Shift + P`).
 
 ### Set Custom Storage Path
 
-**Command:** `mirror-vs.setCustomStoragePath`
+**Command:** `Mirror VS: Set Custom Storage Path`
 
-Opens a dialog to set a custom storage directory for Mirror VS data. By default, Mirror VS stores task history, settings, and other data in the standard VS Code extension storage location. This command allows you to choose an alternative location.
+This command lets you change where Mirror VS stores its data — task history, settings, and other files.
 
-**Use cases:**
+**Why you might want this:**
 
-- **Team Collaboration**: Store Mirror VS data in a shared network folder so team members can access the same task history and settings
-- **Drive Management**: Keep data on a specific drive (e.g., a larger secondary drive instead of your primary SSD)
-- **Cloud Sync**: Store data in a cloud-synced folder (Dropbox, OneDrive, etc.) to sync across multiple machines
-- **Backup Strategy**: Place data in a location that's included in your regular backup routine
+- Keep Mirror VS data on a different drive
+- Sync storage across machines via cloud storage
+- Isolate data per-project
+- Free up space on your primary drive
 
-**To use:**
+**How to use it:**
 
-1. Open the Command Palette (`Ctrl/Cmd + Shift + P`)
-2. Type "Set Custom Storage Path" or search for `mirror-vs.setCustomStoragePath`
-3. Select the command
-4. Choose a directory in the file picker dialog
-5. Restart VS Code for the change to take effect
-
-**Note:** This setting can also be configured in VS Code settings as `mirror-vs.customStoragePath`. See the [VS Code Settings Reference](#vs-code-settings-reference) section below for details.
+1. Open the command palette (`Cmd/Ctrl + Shift + P`)
+2. Search for "Mirror VS: Set Custom Storage Path"
+3. Select or enter the new storage directory
+4. Mirror VS moves its data to the new location
 
 ### Import Settings from File
 
-**Command:** `mirror-vs.importSettings`
+**Command:** `Mirror VS: Import Settings from File`
 
-Imports Mirror VS settings from a JSON file via the Command Palette. This is an alternative to using the Import button in the settings UI.
+This command does exactly what it sounds like — imports settings from a JSON file without navigating the settings UI.
 
-**To use:**
+**How to use it:**
 
-1. Open the Command Palette (`Ctrl/Cmd + Shift + P`)
-2. Type "Import Settings" or search for `mirror-vs.importSettings`
-3. Select the command
-4. Choose your settings JSON file in the file picker dialog
-5. Settings will be imported and merged with your current configuration
-
-This command provides the same functionality as the Import button described in the [Import Settings](#import-settings) section above.
+1. Open the command palette (`Cmd/Ctrl + Shift + P`)
+2. Search for "Mirror VS: Import Settings from File"
+3. Select your settings JSON file in the file picker dialog
+4. Settings are imported and merged with your current configuration
 
 ---
 
-## UI Setting
+## UI Settings
 
-#### System Prompt Context Toggles
+### System Prompt Context Toggles
 
 Control what contextual information appears in the system prompt:
 
@@ -234,18 +173,18 @@ User time zone: America/Edmonton, UTC-6:00
 $0.14
 ```
 
-With both disabled, these sections are omitted, reducing token usage when you don't need this context.
+With both disabled, these sections are omitted, reducing token usage when you don't need this context. Every token saved is a penny earned.
 
-#### Collapse thinking messages by default
+### Collapse thinking messages by default
 
-- Location: Settings → UI
-- Default: Enabled (thinking messages are collapsed by default)
-- Behavior:
-    - Enabled (default): Thinking blocks remain collapsed until you expand them.
-    - Disabled: Thinking blocks are expanded by default.
-- Notes:
-    - Applies across conversations globally.
-    - Text is localized; labels may differ by language.
+- **Location:** Settings → UI
+- **Default:** Enabled (thinking messages are collapsed by default)
+- **Behavior:**
+    - Enabled (default): Thinking blocks remain collapsed until you expand them
+    - Disabled: Thinking blocks are expanded by default
+- **Notes:**
+    - Applies across conversations globally
+    - Text is localized; labels may differ by language
 
 ---
 
@@ -259,126 +198,126 @@ To configure these settings, open your VS Code settings (`Ctrl/Cmd + ,`) and sea
 
 #### `mirror-vs.allowedCommands`
 
-- **Type**: Array of strings
-- **Default**: `["git log", "git diff", "git show"]`
-- **Description**: Commands that can be auto-executed without approval. When Mirror VS requests to execute a command that matches an entry in this list, it will execute automatically without prompting for approval. This is useful for safe, read-only commands.
+- **Type:** Array of strings
+- **Default:** `["git log", "git diff", "git show"]`
+- **Description:** Commands that can be auto-executed without approval. When Mirror VS requests to execute a command that matches an entry in this list, it will execute automatically without prompting for approval. Useful for safe, read-only commands.
 
 #### `mirror-vs.deniedCommands`
 
-- **Type**: Array of strings
-- **Default**: `[]`
-- **Description**: Commands that are always blocked from execution. Mirror VS will refuse to execute any command that matches an entry in this list, providing a safety mechanism to prevent potentially dangerous operations.
+- **Type:** Array of strings
+- **Default:** `[]`
+- **Description:** Commands that are always blocked. Mirror VS will refuse to execute any command matching an entry in this list — a safety net for potentially dangerous operations.
 
 #### `mirror-vs.commandExecutionTimeout`
 
-- **Type**: Number (seconds)
-- **Default**: `0`
-- **Range**: 0-600
-- **Description**: Timeout in seconds for command execution. When set to a value greater than 0, commands running longer than this duration will be terminated. A value of 0 means no timeout (commands can run indefinitely). See also `commandTimeoutAllowlist` for exempting specific commands.
+- **Type:** Number (seconds)
+- **Default:** `0`
+- **Range:** 0-600
+- **Description:** Timeout for command execution. When set above 0, commands running longer than this duration are terminated. A value of `0` means no timeout. See `commandTimeoutAllowlist` for exempting specific commands.
 
 #### `mirror-vs.commandTimeoutAllowlist`
 
-- **Type**: Array of strings
-- **Default**: `[]`
-- **Description**: Commands exempt from execution timeout. Commands matching entries in this list will not be subject to the `commandExecutionTimeout` limit, allowing them to run without time restrictions. Useful for known long-running operations like build processes or deployment scripts.
+- **Type:** Array of strings
+- **Default:** `[]`
+- **Description:** Commands exempt from execution timeout. Commands matching entries in this list won't be subject to the `commandExecutionTimeout` limit. Handy for known long-running operations like build processes or deployment scripts.
 
 ### Task Management
 
 #### `mirror-vs.newTaskRequireTodos`
 
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: When enabled, requires a todo list when creating new tasks via boomerang/subtasks. This ensures structured planning for complex work by mandating that new tasks include a checklist of steps to complete.
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** When enabled, requires a todo list when creating new tasks via subtasks. Ensures structured planning for complex work.
 
 #### `mirror-vs.preventCompletionWithOpenTodos`
 
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Prevents task completion when there are uncompleted todo items. When enabled, Mirror VS will not allow you to mark a task as complete if the todo list still has pending items, ensuring all planned work is finished.
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Prevents task completion when there are uncompleted todo items. Mirror VS won't let you mark a task as complete if the todo list still has pending items. Accountability! (Or annoyance — you decide.)
 
 ### API & Network
 
 #### `mirror-vs.apiRequestTimeout`
 
-- **Type**: Number (seconds)
-- **Default**: `600`
-- **Range**: 0-3600
-- **Description**: Timeout in seconds for API requests. Determines how long Mirror VS will wait for a response from AI provider APIs before timing out. A value of 0 means no timeout.
+- **Type:** Number (seconds)
+- **Default:** `600`
+- **Range:** 0-3600
+- **Description:** Timeout for API requests. Determines how long Mirror VS waits for a response from AI provider APIs before timing out. `0` means no timeout.
 
 ### Storage & Import
 
 #### `mirror-vs.customStoragePath`
 
-- **Type**: String
-- **Default**: `""` (empty)
-- **Description**: Custom file path for Mirror VS's storage directory. By default, Mirror VS stores its data in the standard extension storage location. Use this setting to specify an alternative directory for storing task history, settings, and other data.
+- **Type:** String
+- **Default:** `""` (empty)
+- **Description:** Custom file path for Mirror VS's storage directory. By default, Mirror VS stores its data in the standard extension storage location. Use this to specify an alternative directory.
 
 #### `mirror-vs.autoImportSettingsPath`
 
-- **Type**: String
-- **Default**: `""` (empty)
-- **Description**: File path for automatic settings import on startup. When configured, Mirror VS will automatically import settings from the specified JSON file every time VS Code starts. See the [Automatic Configuration Import](#automatic-configuration-import) section above for detailed usage instructions.
+- **Type:** String
+- **Default:** `""` (empty)
+- **Description:** File path for automatic settings import on startup. When configured, Mirror VS automatically imports settings from the specified JSON file every time VS Code starts.
 
 ### Code Index
 
 #### `mirror-vs.maximumIndexedFilesForFileSearch`
 
-- **Type**: Number
-- **Default**: `10000`
-- **Range**: 5000-500000
-- **Description**: Maximum number of files indexed for file search. Controls the upper limit of files that Mirror VS will index for semantic search functionality. Higher values increase search coverage but may impact performance.
+- **Type:** Number
+- **Default:** `10000`
+- **Range:** 5000-500000
+- **Description:** Maximum number of files indexed for file search. Higher values increase search coverage but may impact performance.
 
 #### `mirror-vs.codeIndex.embeddingBatchSize`
 
-- **Type**: Number
-- **Default**: `60`
-- **Range**: 1-200
-- **Description**: Batch size for embedding operations during code indexing. Determines how many code chunks are processed together when generating embeddings for semantic search. Lower values reduce memory usage but increase processing time; higher values are faster but use more memory.
+- **Type:** Number
+- **Default:** `60`
+- **Range:** 1-200
+- **Description:** Batch size for embedding operations during code indexing. Lower values reduce memory usage but increase processing time; higher values are faster but use more memory. Find your sweet spot.
 
 ### Editor Integration
 
 #### `mirror-vs.enableCodeActions`
 
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Controls whether Mirror VS actions appear in the editor context menu and lightbulb. When enabled, you can right-click in the editor or use the lightbulb menu to quickly send code selections to Mirror VS with contextual prompts.
+- **Type:** Boolean
+- **Default:** `true`
+- **Description:** Controls whether Mirror VS actions appear in the editor context menu and lightbulb. When enabled, you can right-click or use the lightbulb menu to quickly send code selections to Mirror VS.
 
 #### `mirror-vs.vsCodeLmModelSelector`
 
-- **Type**: Object
-- **Default**: `{}`
-- **Description**: Configuration for VS Code Language Model API provider selection. Allows you to specify vendor and family properties to control which language model is used when the VS Code LM API provider is selected. See [VS Code LM API documentation](/providers/vscode-lm) for details.
+- **Type:** Object
+- **Default:** `{}`
+- **Description:** Configuration for VS Code Language Model API provider selection. Allows you to specify vendor and family properties to control which language model is used. See [VS Code LM API documentation](/providers/vscode-lm) for details.
 
 ### Rules & Instructions
 
 #### `mirror-vs.useAgentRules`
 
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Enable loading of AGENTS.md files for agent-specific instructions. When enabled, Mirror VS will look for and load `AGENTS.md` files in your project directories to provide context-specific guidance to the AI. Disable this if you want to prevent automatic loading of these instruction files.
+- **Type:** Boolean
+- **Default:** `true`
+- **Description:** Enable loading of AGENTS.md files for agent-specific instructions. When enabled, Mirror VS looks for and loads `AGENTS.md` files in your project directories. Disable if you don't want automatic loading.
 
 ### Debug
 
 #### `mirror-vs.debug`
 
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Enable debug mode for additional logging. When enabled, Mirror VS will output detailed debug information to the console, useful for troubleshooting issues or understanding internal behavior.
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Enable debug mode for additional logging. Mirror VS outputs detailed debug information to the console for troubleshooting.
 
 #### `mirror-vs.debugProxy.enabled`
 
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Enable debug proxy for intercepting API requests. When enabled, all API requests will be routed through a debug proxy server, allowing you to inspect and debug API communications.
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Enable debug proxy for intercepting API requests. All API requests are routed through a debug proxy server for inspection.
 
 #### `mirror-vs.debugProxy.serverUrl`
 
-- **Type**: String
-- **Default**: `"http://127.0.0.1:8888"`
-- **Description**: URL of the debug proxy server. Specifies the proxy server address used when `debugProxy.enabled` is true. Common debug proxy tools like mitmproxy or Charles Proxy typically run on this default address.
+- **Type:** String
+- **Default:** `"http://127.0.0.1:8888"`
+- **Description:** URL of the debug proxy server. Common tools like mitmproxy or Charles Proxy typically run on this default address.
 
 #### `mirror-vs.debugProxy.tlsInsecure`
 
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Allow insecure TLS connections through the debug proxy. When enabled, certificate validation errors will be ignored, which is necessary when using self-signed certificates with debug proxies. Only enable this in development environments.
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Allow insecure TLS connections through the debug proxy. Certificate validation errors are ignored. Only enable this in development environments — and maybe not even then.

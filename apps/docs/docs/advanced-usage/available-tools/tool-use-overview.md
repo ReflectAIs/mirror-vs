@@ -14,7 +14,7 @@ keywords:
 
 # Tool Use Overview
 
-Mirror VS implements a sophisticated tool system that allows AI models to interact with your development environment in a controlled and secure manner. This document explains how tools work, when they're called, and how they're managed.
+Mirror VS's tool system is how your AI assistant actually _does things_ — not just talks about doing them. Think of it as a toolkit filled with carefully designed instruments, each one responsible for a specific job, from reading files to running commands to switching modes.
 
 ---
 
@@ -22,28 +22,28 @@ Mirror VS implements a sophisticated tool system that allows AI models to intera
 
 ### Tool Groups
 
-Tools are organized into logical groups based on their functionality:
+Tools are sorted into squads based on what they do:
 
-| Category           | Purpose                             | Tools                                                                                                                                                                                                                                                                                                                                                                                            | Common Use                                                      |
-| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| **Read Group**     | File system reading and exploration | [read_file](/advanced-usage/available-tools/read-file), [list_files](/advanced-usage/available-tools/list-files), [read_command_output](/advanced-usage/available-tools/read-command-output)                                                                                                                                                                                                     | Code exploration and analysis                                   |
-| **Search Group**   | Pattern and semantic searching      | [search_files](/advanced-usage/available-tools/search-files), [codebase_search](/advanced-usage/available-tools/codebase-search)                                                                                                                                                                                                                                                                 | Finding code patterns and functionality                         |
-| **Edit Group**     | File system modifications           | [apply_diff](/advanced-usage/available-tools/apply-diff), [apply_patch](/advanced-usage/available-tools/apply-patch), [edit](/advanced-usage/available-tools/edit), [edit_file](/advanced-usage/available-tools/edit-file), [search_replace](/advanced-usage/available-tools/search-replace), [write_to_file](/advanced-usage/available-tools/write-to-file)                                     | Code changes and file manipulation                              |
-| **Image Group**    | AI image generation                 | [generate_image](/advanced-usage/available-tools/generate-image)                                                                                                                                                                                                                                                                                                                                 | Creating and editing images                                     |
-| **Command Group**  | System command execution            | [execute_command](/advanced-usage/available-tools/execute-command), [run_slash_command](/advanced-usage/available-tools/run-slash-command)\*                                                                                                                                                                                                                                                     | Running scripts, building projects, executing command templates |
-| **MCP Group**      | External tool integration           | [use_mcp_tool](/advanced-usage/available-tools/use-mcp-tool), [access_mcp_resource](/advanced-usage/available-tools/access-mcp-resource)                                                                                                                                                                                                                                                         | Specialized functionality through external servers              |
-| **Workflow Group** | Mode and task management            | [switch_mode](/advanced-usage/available-tools/switch-mode), [new_task](/advanced-usage/available-tools/new-task), [ask_followup_question](/advanced-usage/available-tools/ask-followup-question), [attempt_completion](/advanced-usage/available-tools/attempt-completion), [update_todo_list](/advanced-usage/available-tools/update-todo-list), [skill](/advanced-usage/available-tools/skill) | Context switching and task organization                         |
+| Category           | Purpose                           | Tools                                                                                                                                                                                                                                                                                                                                                                                                        | Common Use                            |
+| ------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| **Read Group**     | File system reading & exploration | [`read_file`](/advanced-usage/available-tools/read-file), [`list_files`](/advanced-usage/available-tools/list-files), [`read_command_output`](/advanced-usage/available-tools/read-command-output)                                                                                                                                                                                                           | Code exploration and analysis         |
+| **Search Group**   | Pattern & semantic searching      | [`search_files`](/advanced-usage/available-tools/search-files), [`codebase_search`](/advanced-usage/available-tools/codebase-search)                                                                                                                                                                                                                                                                         | Finding code patterns                 |
+| **Edit Group**     | File modifications                | [`apply_diff`](/advanced-usage/available-tools/apply-diff), [`apply_patch`](/advanced-usage/available-tools/apply-patch), [`edit`](/advanced-usage/available-tools/edit), [`edit_file`](/advanced-usage/available-tools/edit-file), [`search_replace`](/advanced-usage/available-tools/search-replace), [`write_to_file`](/advanced-usage/available-tools/write-to-file)                                     | Code changes                          |
+| **Image Group**    | AI image generation               | [`generate_image`](/advanced-usage/available-tools/generate-image)                                                                                                                                                                                                                                                                                                                                           | Creating images                       |
+| **Command Group**  | System command execution          | [`execute_command`](/advanced-usage/available-tools/execute-command), [`run_slash_command`](/advanced-usage/available-tools/run-slash-command)\*                                                                                                                                                                                                                                                             | Running scripts, builds               |
+| **MCP Group**      | External tool integration         | [`use_mcp_tool`](/advanced-usage/available-tools/use-mcp-tool), [`access_mcp_resource`](/advanced-usage/available-tools/access-mcp-resource)                                                                                                                                                                                                                                                                 | External server tools                 |
+| **Workflow Group** | Mode & task management            | [`switch_mode`](/advanced-usage/available-tools/switch-mode), [`new_task`](/advanced-usage/available-tools/new-task), [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question), [`attempt_completion`](/advanced-usage/available-tools/attempt-completion), [`update_todo_list`](/advanced-usage/available-tools/update-todo-list), [`skill`](/advanced-usage/available-tools/skill) | Context switching & task organization |
 
-\*_Experimental feature - requires explicit enablement in settings_
+\*_Experimental — requires explicit enablement in settings_
 
 ### Always Available Tools
 
-Certain tools are accessible regardless of the current mode:
+These tools work no matter what mode you're in. They're the emergency exits:
 
-- [ask_followup_question](/advanced-usage/available-tools/ask-followup-question): Gather additional information from users
-- [attempt_completion](/advanced-usage/available-tools/attempt-completion): Signal task completion
-- [switch_mode](/advanced-usage/available-tools/switch-mode): Change operational modes
-- [new_task](/advanced-usage/available-tools/new-task): Create subtasks
+- [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question) — When Mirror VS needs more info from you
+- [`attempt_completion`](/advanced-usage/available-tools/attempt-completion) — The "I'm done!" signal
+- [`switch_mode`](/advanced-usage/available-tools/switch-mode) — Change hats mid-conversation
+- [`new_task`](/advanced-usage/available-tools/new-task) — Spin off a subtask
 
 ---
 
@@ -51,60 +51,60 @@ Certain tools are accessible regardless of the current mode:
 
 ### Read Tools
 
-These tools help Mirror understand your code and project:
+These let Mirror VS peek at your code:
 
-- [read_file](/advanced-usage/available-tools/read-file) - Examines the contents of files
-- [list_files](/advanced-usage/available-tools/list-files) - Maps your project's file structure
-- [read_command_output](/advanced-usage/available-tools/read-command-output) - Retrieves full output from truncated commands
+- [`read_file`](/advanced-usage/available-tools/read-file) — Opens files and shows you what's inside
+- [`list_files`](/advanced-usage/available-tools/list-files) — Maps out your project structure
+- [`read_command_output`](/advanced-usage/available-tools/read-command-output) — Retrieves full output from commands that got truncated
 
 ### Search Tools
 
-These tools help Mirror find patterns and functionality across your codebase:
+Find stuff. Fast.
 
-- [search_files](/advanced-usage/available-tools/search-files) - Finds patterns across multiple files using regex
-- [codebase_search](/advanced-usage/available-tools/codebase-search) - Performs semantic searches across your indexed codebase
+- [`search_files`](/advanced-usage/available-tools/search-files) — Regex-powered search across your codebase
+- [`codebase_search`](/advanced-usage/available-tools/codebase-search) — Semantic search using your indexed codebase
 
 ### Edit Tools
 
-These tools help Mirror make changes to your code:
+Where the magic happens — changing your code:
 
-- [apply_diff](/advanced-usage/available-tools/apply-diff) - Makes precise, surgical changes to your code
-- [apply_patch](/advanced-usage/available-tools/apply-patch) - Applies multi-file unified diff patches
-- [edit](/advanced-usage/available-tools/edit) - Search-and-replace editing (first occurrence by default)
-- [edit_file](/advanced-usage/available-tools/edit-file) - Search-and-replace editing (all occurrences with count validation)
-- [search_replace](/advanced-usage/available-tools/search-replace) - Simple search-and-replace (all occurrences)
-- [write_to_file](/advanced-usage/available-tools/write-to-file) - Creates new files or completely rewrites existing ones
+- [`apply_diff`](/advanced-usage/available-tools/apply-diff) — Surgical, precise edits to existing code
+- [`apply_patch`](/advanced-usage/available-tools/apply-patch) — Multi-file unified diff patches
+- [`edit`](/advanced-usage/available-tools/edit) — Search-and-replace (first occurrence)
+- [`edit_file`](/advanced-usage/available-tools/edit-file) — Search-and-replace (all occurrences, with validation)
+- [`search_replace`](/advanced-usage/available-tools/search-replace) — Simple search-and-replace everywhere
+- [`write_to_file`](/advanced-usage/available-tools/write-to-file) — Create new files or blow away old ones
 
 ### Image Tools
 
-These tools help Mirror generate and edit images:
+One tool, one job:
 
-- [generate_image](/advanced-usage/available-tools/generate-image) - Generates AI-powered images from text prompts
+- [`generate_image`](/advanced-usage/available-tools/generate-image) — Turns text prompts into pictures
 
 ### Command Tools
 
-These tools help Mirror execute commands:
+Let Mirror VS run things:
 
-- [execute_command](/advanced-usage/available-tools/execute-command) - Runs system commands and programs
-- [run_slash_command](/advanced-usage/available-tools/run-slash-command) - Executes predefined slash commands for templated instructions _(Experimental - requires enablement)_
+- [`execute_command`](/advanced-usage/available-tools/execute-command) — Runs commands in your terminal
+- [`run_slash_command`](/advanced-usage/available-tools/run-slash-command) — Executes predefined slash commands _(Experimental)_
 
 ### MCP Tools
 
-These tools help Mirror connect with external services:
+Bridge to the outside world:
 
-- [use_mcp_tool](/advanced-usage/available-tools/use-mcp-tool) - Uses specialized external tools
-- [access_mcp_resource](/advanced-usage/available-tools/access-mcp-resource) - Accesses external data sources
+- [`use_mcp_tool`](/advanced-usage/available-tools/use-mcp-tool) — Calls external tools via MCP servers
+- [`access_mcp_resource`](/advanced-usage/available-tools/access-mcp-resource) — Reads data from external sources
 
 ### Workflow Tools
 
-These tools help manage the conversation and task flow:
+Keep things organized:
 
-- [ask_followup_question](/advanced-usage/available-tools/ask-followup-question) - Gets additional information from you
-- [attempt_completion](/advanced-usage/available-tools/attempt-completion) - Presents final results
-- [switch_mode](/advanced-usage/available-tools/switch-mode) - Changes to a different mode for specialized tasks
-- [new_task](/advanced-usage/available-tools/new-task) - Creates a new subtask
-- [update_todo_list](/advanced-usage/available-tools/update-todo-list) - Updates task checklist progress
-- [skill](/advanced-usage/available-tools/skill) - Loads and executes predefined skill instructions
+- [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question) — Asks you for more info
+- [`attempt_completion`](/advanced-usage/available-tools/attempt-completion) — Wraps up and presents results
+- [`switch_mode`](/advanced-usage/available-tools/switch-mode) — Changes the active mode
+- [`new_task`](/advanced-usage/available-tools/new-task) — Kicks off a new subtask
+- [`update_todo_list`](/advanced-usage/available-tools/update-todo-list) — Updates the running task checklist
+- [`skill`](/advanced-usage/available-tools/skill) — Loads and runs predefined skill instructions
 
 ---
 
@@ -112,66 +112,37 @@ These tools help manage the conversation and task flow:
 
 ### Handling Complex Tasks
 
-For certain complex operations that require multiple steps, Mirror doesn't just figure them out on the fly. Instead, it follows predefined, internal plans to ensure consistency and accuracy.
+Some operations are too complex for a single tool call. Creating an MCP server, for example, is a multi-step dance that involves running setup scripts, writing config files, and asking you for API keys.
 
-A prime example is creating a new MCP server, identified internally by `create_mcp_server`. **This identifier does not represent a tool you will see being called.** Rather, when you ask Mirror to create a server, it triggers this known, multi-step workflow.
+Mirror VS handles these by following internal workflows. When you ask to create an MCP server, it triggers a known multi-step plan that chains together standard tools like [`execute_command`](/advanced-usage/available-tools/execute-command), [`write_to_file`](/advanced-usage/available-tools/write-to-file), and [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question).
 
-This specific workflow is initiated by Mirror using its internal `fetch_instructions` tool (with the task `create_mcp_server`) to retrieve a detailed plan. This plan then guides Mirror to make calls to several standard, documented tools in sequence, such as:
-
-- [`execute_command`](/advanced-usage/available-tools/execute-command) for running setup scripts (e.g., `npx @modelcontextprotocol/create-server`).
-- [`write_to_file`](/advanced-usage/available-tools/write-to-file) or [`apply_diff`](/advanced-usage/available-tools/apply-diff) for creating or modifying server code and configuration files.
-- [`ask_followup_question`](/advanced-usage/available-tools/ask-followup-question) to gather necessary information like API keys from you.
-- Other standard tools as needed for steps like determining file locations or updating configuration entries.
-
-So, while the overall task (like `create_mcp_server`) is complex, it's ultimately accomplished by intelligently orchestrating the standard tools available in your environment. This approach allows Mirror to reliably perform complex operations by leveraging the tools documented here.
+You don't see the internal planning tool — you just see Mirror VS doing its thing, step by step, like a chef following a recipe.
 
 ### When Tools Are Called
 
-Tools are invoked under specific conditions:
+Tools get invoked in three scenarios:
 
-1. **Direct Task Requirements**
-
-    - When specific actions are needed to complete a task as decided by the LLM
-    - In response to user requests
-    - During automated workflows
-
-2. **Mode-Based Availability**
-
-    - Different modes enable different tool sets
-    - Mode switches can trigger tool availability changes
-    - Some tools are restricted to specific modes
-
-3. **Context-Dependent Calls**
-    - Based on the current state of the workspace
-    - In response to system events
-    - During error handling and recovery
+1. **Direct Task Requirements** — The AI needs to do something specific to complete your request
+2. **Mode-Based Availability** — Different modes have different tools available
+3. **Context-Dependent Calls** — Based on workspace state, system events, or error recovery
 
 ### Decision Process
 
-The system uses a multi-step process to determine tool availability:
+Before any tool is called, Mirror VS runs through a checklist:
 
-1. **Mode Validation**
+1. **Mode Validation** — Is this tool allowed in the current mode?
+2. **Requirement Checking** — Are all system and resource requirements met?
+3. **Parameter Validation** — Are the parameters correct and complete?
 
-    ```typescript
-    isToolAllowedForMode(
-        tool: string,
-        modeSlug: string,
-        customModes: ModeConfig[],
-        toolRequirements?: Record<string, boolean>,
-        toolParams?: Record<string, any>
-    )
-    ```
-
-2. **Requirement Checking**
-
-    - System capability verification
-    - Resource availability
-    - Permission validation
-
-3. **Parameter Validation**
-    - Required parameter presence
-    - Parameter type checking
-    - Value validation
+```typescript
+isToolAllowedForMode(
+    tool: string,
+    modeSlug: string,
+    customModes: ModeConfig[],
+    toolRequirements?: Record<string, boolean>,
+    toolParams?: Record<string, any>
+)
+```
 
 ---
 
@@ -179,40 +150,16 @@ The system uses a multi-step process to determine tool availability:
 
 ### Tool Call Processing
 
-1. **Initialization**
-
-    - Tool name and parameters are validated
-    - Mode compatibility is checked
-    - Requirements are verified
-
-2. **Execution**
-
-    ```typescript
-    const toolCall = {
-    	type: "tool_call",
-    	name: chunk.name,
-    	arguments: chunk.input,
-    	callId: chunk.callId,
-    }
-    ```
-
-3. **Result Handling**
-    - Success/failure determination
-    - Result formatting
-    - Error handling
+1. **Initialization** — Tool name and parameters are validated; mode compatibility is checked
+2. **Execution** — The tool runs with the given parameters
+3. **Result Handling** — Success or failure is determined, results are formatted, errors are handled
 
 ### Security and Permissions
 
-1. **Access Control**
+Tools don't have free rein. They're guarded by:
 
-    - File system restrictions
-    - Command execution limitations
-    - Network access controls
-
-2. **Validation Layers**
-    - Tool-specific validation
-    - Mode-based restrictions
-    - System-level checks
+- **Access Control** — File system restrictions, command execution limits, network access controls
+- **Validation Layers** — Tool-specific checks, mode-based restrictions, system-level safeguards
 
 ---
 
@@ -220,25 +167,16 @@ The system uses a multi-step process to determine tool availability:
 
 ### Mode-Based Tool Access
 
-Tools are made available based on the current mode:
+Different modes unlock different tool sets:
 
-- **Code Mode**: Full access to file system tools, code editing capabilities, command execution
-- **Ask Mode**: Limited to reading tools, information gathering capabilities, no file system modifications
-- **Architect Mode**: Design-focused tools, documentation capabilities, limited execution rights
-- **Custom Modes**: Can be configured with specific tool access for specialized workflows
+- **Code Mode**: Full access — read, write, execute, the works
+- **Ask Mode**: Read-only. Can look, can't touch.
+- **Architect Mode**: Design and documentation tools. Limited execution.
+- **Custom Modes**: You decide what tools are available.
 
 ### Mode Switching
 
-1. **Process**
-
-    - Current mode state preservation
-    - Tool availability updates
-    - Context switching
-
-2. **Impact on Tools**
-    - Tool set changes
-    - Permission adjustments
-    - Context preservation
+Switching modes preserves your current state but updates the available tool set. Think of it as changing your tool belt without leaving the construction site.
 
 ---
 
@@ -246,41 +184,31 @@ Tools are made available based on the current mode:
 
 ### Tool Usage Guidelines
 
-1. **Efficiency**
-
-    - Use the most specific tool for the task
-    - Avoid redundant tool calls
-    - Batch operations when possible
-
-2. **Security**
-
-    - Validate inputs before tool calls
-    - Use minimum required permissions
-    - Follow security best practices
-
-3. **Error Handling**
-    - Implement proper error checking
-    - Provide meaningful error messages
-    - Handle failures gracefully
+1. **Efficiency** — Use the most specific tool for the job. Don't use `write_to_file` when `apply_diff` will do.
+2. **Security** — Validate inputs, use minimum required permissions.
+3. **Error Handling** — Check for errors, provide meaningful messages, recover gracefully.
 
 ### Common Patterns
 
-1. **Information Gathering**
+Here are some typical tool workflows:
 
-    ```
-    [ask_followup_question](/advanced-usage/available-tools/ask-followup-question) → [read_file](/advanced-usage/available-tools/read-file) → [codebase_search](/advanced-usage/available-tools/codebase-search)
-    ```
+**Information Gathering:**
 
-2. **Code Modification**
+```
+[ask_followup_question] → [read_file] → [codebase_search]
+```
 
-    ```
-    [read_file](/advanced-usage/available-tools/read-file) → [apply_diff](/advanced-usage/available-tools/apply-diff) → [attempt_completion](/advanced-usage/available-tools/attempt-completion)
-    ```
+**Code Modification:**
 
-3. **Task Management**
-    ```
-    [new_task](/advanced-usage/available-tools/new-task) → [switch_mode](/advanced-usage/available-tools/switch-mode) → [execute_command](/advanced-usage/available-tools/execute-command)
-    ```
+```
+[read_file] → [apply_diff] → [attempt_completion]
+```
+
+**Task Management:**
+
+```
+[new_task] → [switch_mode] → [execute_command]
+```
 
 ---
 
@@ -288,32 +216,13 @@ Tools are made available based on the current mode:
 
 ### Error Types
 
-1. **Tool-Specific Errors**
-
-    - Parameter validation failures
-    - Execution errors
-    - Resource access issues
-
-2. **System Errors**
-
-    - Permission denied
-    - Resource unavailable
-    - Network failures
-
-3. **Context Errors**
-    - Invalid mode for tool
-    - Missing requirements
-    - State inconsistencies
+- **Tool-Specific Errors** — Bad parameters, execution failures, resource access issues
+- **System Errors** — Permission denied, resource unavailable, network failures
+- **Context Errors** — Wrong mode, missing requirements, state inconsistencies
 
 ### Recovery Strategies
 
-1. **Automatic Recovery**
+- **Automatic Recovery** — Retry mechanisms, fallback options, state restoration
+- **User Intervention** — Error notifications, recovery suggestions, manual override options
 
-    - Retry mechanisms
-    - Fallback options
-    - State restoration
-
-2. **User Intervention**
-    - Error notifications
-    - Recovery suggestions
-    - Manual intervention options
+When things go wrong, Mirror VS doesn't just give up — it tells you what happened and suggests a way forward. And if all else fails, you can always start a fresh task.

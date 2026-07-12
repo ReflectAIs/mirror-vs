@@ -1,91 +1,60 @@
 ---
-description: Replace a uniquely-identified occurrence of text in files using the edit_file search-and-replace tool in Mirror VS.
-keywords:
-    - edit_file
-    - search and replace
-    - file editing
-    - text replacement
-    - Mirror VS tools
-    - code modifications
+sidebar_position: 6
+title: edit_file
 ---
 
-# edit_file
+# `edit_file` — Search-and-Replace with Surgical Precision
 
-The `edit_file` tool performs targeted search-and-replace operations on files. By default it replaces **exactly one** uniquely-identified occurrence and errors if multiple matches are found. It also supports a special file-creation mode when `old_string` is empty.
+Think of [`edit_file`](edit-file.md) as the surgical replacement tool in Mirror VS's toolkit — it finds an exact string in a file and replaces it with something new. No guesswork, no ambiguity, just find-and-replace done right.
 
----
+> **Note**: This tool is currently disabled for new installations. Use [`apply_diff`](apply-diff.md) instead for most editing needs.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `file_path` (required): The path of the file to modify relative to the current working directory.
-- `old_string` (required): The exact text to search for and replace. Pass an empty string (`""`) to create a new file or append to an existing file.
-- `new_string` (required): The replacement text.
-- `expected_replacements` (optional): Expected number of replacements (defaults to 1). The operation fails if the actual count doesn't match. Use this only when intentionally replacing more than one occurrence.
-
----
+| Parameter               | Type     | Required | Description                                             |
+| ----------------------- | -------- | -------- | ------------------------------------------------------- |
+| `path`                  | `string` | ✅       | File path relative to workspace                         |
+| `old_string`            | `string` | ✅       | Exact content to find (must match uniquely)             |
+| `new_string`            | `string` | ✅       | Replacement content                                     |
+| `expected_replacements` | `number` | ❌       | Expected number of replacements (validates correctness) |
 
 ## What It Does
 
-This tool searches for an exact string in a file and replaces **exactly one** occurrence with new text. The search string must uniquely identify the target location. If multiple matches are found, the tool returns an error unless `expected_replacements` is explicitly set to match. When `old_string` is empty, the tool creates a new file or appends `new_string` to an existing file.
+[`edit_file`](edit-file.md) performs a single search-and-replace operation on a file. It finds the `old_string` exactly once (uniqueness is required), replaces it with `new_string`, and validates the result. When `old_string` is empty and `new_string` has content, it creates the file from scratch.
 
----
+## When Is It Used?
 
-## When is it used?
+For targeted edits where you know exactly what text to find and what to replace it with. It's particularly useful when:
 
-- When making a targeted change to a specific, uniquely identifiable location in a file
-- When updating a specific string literal or configuration value at a known location
-- When fixing a specific instance of a typo or outdated terminology
-- When replacing a uniquely-identified occurrence of a deprecated API or import path
-- When creating a new file or appending content to an existing file (`old_string=""`)
-- When you need to ensure exact match replacement without fuzzy logic
-
----
+- You need to change a single variable name or function call
+- Update a configuration value
+- Fix a specific line or small block of code
+- Create a new file (using the empty `old_string` trick)
 
 ## Key Features
 
-- Replaces **exactly one** uniquely-identified occurrence by default
-- Errors if multiple matches are found (unless `expected_replacements` is explicitly set)
-- `old_string=""` mode: creates a new file or appends content to an existing file
-- Exact string matching (no regex or fuzzy matching)
-- Optional `expected_replacements` for intentional multi-occurrence replacements
-- Shows preview of changes before applying
-- Fails safely if actual replacement count doesn't match `expected_replacements`
-- Preserves file formatting and structure
-
----
+- **Uniquely-identified replacement** — The `old_string` must match exactly one occurrence, preventing accidental multi-replace
+- **Validation via `expected_replacements`** — Set this to `1` (or whatever count you expect) to catch mismatches early
+- **File creation mode** — Empty `old_string` + non-empty `new_string` = file creation
+- **No regex needed** — Just plain text matching, no escaping special characters
 
 ## Limitations
 
-- Requires exact string matches (case-sensitive, whitespace-sensitive)
-- Errors if the search string matches more than one location (unless `expected_replacements` is set)
-- Cannot use regular expressions or patterns
-- Not suitable for context-dependent replacements
-- Less precise than [`apply_diff`](/advanced-usage/available-tools/apply-diff) for complex edits
-
----
+- **Currently disabled** — Not available for new installs (legacy feature)
+- **Single occurrence only** — The string must be unique in the file, or you specify `expected_replacements`
+- **Exact matching** — Whitespace matters. An extra space means no match.
+- **No regex support** — Unlike [`search_files`](search-files.md), this is plain-text only
 
 ## How It Works
 
-When the `edit_file` tool is invoked, it follows this process:
-
-1. **Parameter Validation**: Validates required `file_path`, `old_string`, and `new_string` parameters.
-2. **File Creation Mode**: If `old_string` is empty (`""`), creates the file with `new_string` as content (or appends if the file already exists), then stops.
-3. **File Loading**: Reads the target file content.
-4. **Uniqueness Check**: Counts occurrences of `old_string`. If the count doesn't match `expected_replacements` (default: 1), returns an error.
-5. **Replacement**: Replaces the matched occurrence(s) with `new_string`.
-6. **User Review**: Shows a preview of changes for user approval.
-7. **Application**: Applies changes to the file if approved.
-8. **Feedback**: Reports the number of replacements made.
-
----
+1. The AI identifies the exact `old_string` it wants to replace (including whitespace)
+2. It specifies the target file path and the `new_string` replacement
+3. Mirror VS locates the unique occurrence of `old_string` in the file
+4. It replaces it with `new_string` and validates the result
+5. If `expected_replacements` doesn't match, the operation fails (safety first!)
 
 ## Relation to Other Tools
 
-- `edit_file`: Replaces **exactly one** uniquely-identified occurrence by default; supports `old_string=""` file creation (this tool)
-- [`edit`](/advanced-usage/available-tools/edit): Replaces **first occurrence** only (unless `replace_all: true`)
-- [`search_replace`](/advanced-usage/available-tools/search-replace): Also replaces **exactly one** uniquely-identified occurrence
-- [`apply_diff`](/advanced-usage/available-tools/apply-diff): Use for precise, context-aware edits with fuzzy matching
+[`edit_file`](edit-file.md) is the simpler, more constrained cousin of [`apply_diff`](apply-diff.md). While [`apply_diff`](apply-diff.md) can handle multi-line context-aware replacements with fuzzy matching, [`edit_file`](edit-file.md) is strictly find-and-replace on exact text. Use [`apply_diff`](apply-diff.md) for complex edits and [`edit_file`](edit-file.md) for simple swaps.
 
-These are different implementations of search-and-replace with varying capabilities.
+For creating new files, [`write_to_file`](write-to-file.md) is the more explicit (and currently active) alternative.

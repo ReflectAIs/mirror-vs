@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS past zich aan jouw werkwijze aan, niet andersom:
 - Debug Modus: spoor problemen op, voeg logs toe, isoleer de oorzaak
 - Aangepaste Modi: bouw gespecialiseerde modi voor je team of workflow
 
-Meer info: [Modi gebruiken](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Aangepaste modi](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+Meer info: [Modi gebruiken](https://www.reflectai.in/basic-usage/using-modes) • [Aangepaste modi](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Hulpbronnen
 
-- **[Documentatie](https://mirrorvsinc.github.io/Roo-Code/):** De officiële gids voor het installeren, configureren en beheersen van Mirror VS.
+- **[Documentatie](https://www.reflectai.in/):** De officiële gids voor het installeren, configureren en beheersen van Mirror VS.
 - **[GitHub Issues](https://github.com/ReflectAIs/mirror-vs/issues):** Meld bugs en volg de ontwikkeling.
 
 ---

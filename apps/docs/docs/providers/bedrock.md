@@ -15,7 +15,7 @@ keywords:
 
 # Using AWS Bedrock With Mirror VS
 
-Mirror VS supports accessing models through Amazon Bedrock, a fully managed service that makes a selection of high-performing foundation models (FMs) from leading AI companies available via a single API.
+Mirror VS supports accessing models through Amazon Bedrock, a fully managed service that makes high-performing foundation models from leading AI companies available via a single API.
 
 **Website:** [https://aws.amazon.com/bedrock/](https://aws.amazon.com/bedrock/)
 
@@ -76,11 +76,9 @@ For the complete, up-to-date model list with IDs and capabilities, see [AWS Bedr
 
 ---
 
----
-
 ## Reasoning Budget for Claude Models
 
-Mirror VS supports using the reasoning budget (extended thinking) for Anthropic's Claude models on Bedrock. This allows the model to "think" more before responding, which can be useful for complex tasks.
+Mirror VS supports using the reasoning budget (extended thinking) for Anthropic's Claude models on Bedrock. This allows the model to "think" more before responding — useful for those brain-meltingly complex tasks.
 
 To enable the reasoning budget:
 

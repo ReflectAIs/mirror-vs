@@ -15,7 +15,7 @@ keywords:
 
 # Using Z AI With Mirror VS
 
-Z AI (Zhipu AI) provides advanced language models with the GLM family. The provider offers region-aware routing with separate endpoints for international users and China mainland users.
+Z AI (Zhipu AI) provides advanced language models with the GLM family. The provider offers region-aware routing with separate endpoints for international users and China mainland users — no matter where you are, there's an API endpoint for you.
 
 **Website:** [https://z.ai/model-api](https://z.ai/model-api) (International) | [https://open.bigmodel.cn/](https://open.bigmodel.cn/) (China)
 

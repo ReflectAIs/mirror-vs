@@ -10,20 +10,34 @@ keywords:
 
 # Tips & Tricks
 
-A collection of quick tips to help you get the most out of Mirror VS.
+A collection of hard-earned wisdom to help you get the most out of Mirror VS. Some of these will make you faster. Some will save your bacon. All of them are free.
 
-- Drag Mirror VS to the [Secondary Sidebar](https://code.visualstudio.com/api/ux-guidelines/sidebars#secondary-sidebar) so you can see the Explorer, Search, Source Control, etc.
-  <img src="/img/right-column-mirror.gif" alt="Put Mirror on the Right Column" width="900" />
-- Once you have Mirror VS in a separate sidebar from the file explorer, you can drag files from the explorer into the chat window (and even multiple at once). Just make sure to hold down the shift key after you start dragging the files.
-- If you're not using [MCP](/features/mcp/overview), turn it off in the <Codicon name="server" /> MCP Servers tab to significantly cut down the size of the system prompt.
-- To keep your [custom modes](/features/custom-modes) on track, limit the types of files that they're allowed to edit.
-- If you hit the dreaded `input length and max tokens exceed context limit` error, you can recover by deleting a message, rolling back to a previous checkpoint, or switching over to a model with a long context window like Gemini for a message.
-- In general, be thoughtful about your `Max Tokens` setting for thinking models. Every token you allocate to that takes away from space available to store conversation history. Consider only using high `Max Tokens` / `Max Thinking Tokens` settings with modes like Architect and Debug, and keeping Code mode at 16k max tokens or less.
-- If there's a real world job posting for something you want a custom mode to do, try asking Code mode to `Create a custom mode based on the job posting at @[url]`
-- If you want to really accelerate, check out multiple copies of your repository and run Mirror VS on all of them in parallel (using git to resolve any conflicts, same as with human devs).
-- When using Debug mode, ask Mirror to "start a new task in Debug mode with all of the necessary context needed to figure out X" so that the debugging process uses its own context window and doesn't pollute the main task
-- Add your own tips by clicking "Edit this page" below!
-- To manage large files and reduce context/resource usage, adjust the `File read auto-truncate threshold` setting. This setting controls the number of lines read from a file in one batch. Lower values can improve performance when working with very large files, but may require more read operations. You can find this setting in the Mirror VS settings under 'Advanced Settings'.
-- Set up a keyboard shortcut for the [`mirror.acceptInput` command](/features/keyboard-shortcuts) to accept suggestions or submit text input without using the mouse. Perfect for keyboard-focused workflows and reducing hand strain.
-- Use **Sticky Models** to assign specialized AI models to different modes (reasoning model for planning, non-reasoning model for coding). Mirror automatically switches to each mode's last-used model without manual selection.
-- Customize the [context reduction prompt](/features/intelligent-context-condensing#customizing-the-context-condensing-prompt) if you find that for your domain/use case it forgets particular things. You can instruct it to preserve specific types of information that are critical to your workflow.
+- **Drag Mirror VS to the [Secondary Sidebar](https://code.visualstudio.com/api/ux-guidelines/sidebars#secondary-sidebar)** so you can see the Explorer, Search, Source Control, etc., all at the same time. It's like having two monitors without the ergonomic guilt.
+
+    <img src="/img/right-column-mirror.gif" alt="Put Mirror on the Right Column" width="900" />
+
+- **Drag files from the explorer into the chat.** Once Mirror is in its own sidebar, you can drag files (even multiple at once) directly into the chat. Hold down the Shift key after you start dragging. Magic.
+
+- **Turn off MCP if you're not using it.** Go to the <Codicon name="server" /> MCP Servers tab and disable it. It significantly cuts down the system prompt size. Less clutter, more speed.
+
+- **Limit what your custom modes can edit.** To keep your [custom modes](/features/custom-modes) on the straight and narrow, restrict the file types they're allowed to touch. A documentation mode has no business editing your `.env` file.
+
+- **Survive context limit errors.** If you hit the dreaded `input length and max tokens exceed context limit` error, don't panic. Delete a message, roll back to a checkpoint, or switch to a model with a long context window like Gemini for one message. You've got options.
+
+- **Be smart about Max Tokens.** Every token you allocate to thinking takes away from conversation history storage. Use high `Max Tokens` / `Max Thinking Tokens` settings for Architect and Debug modes where deep thinking matters. Keep Code mode at 16k max tokens or less — it's got work to do.
+
+- **Turn job postings into custom modes.** Found a job listing for a role you want Mirror to play? Ask Code mode to `Create a custom mode based on the job posting at @[url]`. Free career-aligned AI, courtesy of corporate America.
+
+- **Run multiple copies in parallel.** Clone your repo multiple times and run Mirror VS on all of them simultaneously (use Git to resolve conflicts, the same way human devs do). The acceleration is real.
+
+- **Start Debug mode tasks separately.** When using Debug mode, ask Mirror to "start a new task in Debug mode with all of the necessary context needed to figure out X". This keeps the debugging process in its own context window and stops it from polluting your main task. Clean and mean.
+
+- **Add your own tips** by clicking "Edit this page" at the bottom. This is an open-source project — your wisdom belongs here.
+
+- **Adjust the file read auto-truncate threshold** for large files. Lower values improve performance with huge files but may require more read operations. Find it in Mirror VS settings under 'Advanced Settings'.
+
+- **Set up a keyboard shortcut** for the [`mirror.acceptInput` command](/features/keyboard-shortcuts) to submit text without touching your mouse. Your hands will thank you.
+
+- **Use Sticky Models** to assign specialized models to different modes. Reasoning model for planning, non-reasoning model for coding. Mirror automatically switches when you change modes.
+
+- **Customize the [context reduction prompt](/features/intelligent-context-condensing#customizing-the-context-condensing-prompt)** if Mirror keeps forgetting things specific to your domain. Teach it what matters to you.

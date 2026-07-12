@@ -18,7 +18,7 @@ sidebar_label: xAI (Grok)
 
 # Using xAI (Grok) With Mirror VS
 
-xAI is the company behind Grok, a large language model known for its conversational abilities and large context window. Grok models are designed to provide helpful, informative, and contextually relevant responses.
+xAI is the company behind Grok, a large language model known for its conversational abilities and large context window. Grok models are designed to provide helpful, informative, and contextually relevant responses — with a personality.
 
 **Website:** [https://x.ai/](https://x.ai/)
 
@@ -52,14 +52,14 @@ For the complete, up-to-date model list and capabilities, see [xAI's documentati
 
 ## Reasoning Capabilities
 
-Grok 3 Mini models feature specialized reasoning capabilities, allowing them to "think before responding" - particularly useful for complex problem-solving tasks.
+Grok 3 Mini models feature specialized reasoning capabilities, allowing them to "think before responding" — particularly useful for those complex problem-solving tasks where "just vibes" won't cut it.
 
 ### Reasoning-Enabled Models
 
 Several Grok models have reasoning capabilities. However, only the Grok 3 Mini models support configurable reasoning effort control:
 
-- `grok-3-mini` - Supports reasoning effort control
-- `grok-3-mini-fast` - Supports reasoning effort control
+- `grok-3-mini` — Supports reasoning effort control
+- `grok-3-mini-fast` — Supports reasoning effort control
 
 Other models (`grok-code-fast-1`, `grok-4.1-fast`, `grok-4`, `grok-3`, `grok-3-fast`) are reasoning-capable but don't expose the `reasoning_effort` parameter.
 

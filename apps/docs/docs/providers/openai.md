@@ -18,7 +18,7 @@ keywords:
 Mirror VS supports accessing models directly through the official OpenAI API, including the latest GPT-5 family with advanced features like reasoning effort control and verbosity settings.
 
 :::info Want to use a ChatGPT Plus/Pro subscription instead?
-Use the **OpenAI – ChatGPT Plus/Pro** provider to sign in via OAuth (no API key): [OpenAI – ChatGPT Plus/Pro](/providers/openai-chatgpt-plus-pro).
+Use the **OpenAI – ChatGPT Plus/Pro** provider to sign in via OAuth (no API key needed): [OpenAI – ChatGPT Plus/Pro](/providers/openai-chatgpt-plus-pro).
 :::
 
 **Website:** [https://openai.com/](https://openai.com/)
@@ -62,16 +62,16 @@ For models that support reasoning (GPT-5, o1, o3, o4 families), you can control 
 
 **GPT-5 Models:**
 
-- `minimal` - Fastest responses with basic reasoning
-- `low` - Quick responses with light reasoning
-- `medium` (default) - Balanced reasoning and response time
-- `high` - Deep reasoning for complex problems
+- `minimal` — Fastest responses with basic reasoning
+- `low` — Quick responses with light reasoning
+- `medium` (default) — Balanced reasoning and response time
+- `high` — Deep reasoning for complex problems
 
 **o1/o3/o4 Models:**
 
-- `low` - Minimal thinking time
-- `medium` - Balanced approach
-- `high` - Maximum thinking for complex problems
+- `low` — Minimal thinking time
+- `medium` — Balanced approach
+- `high` — Maximum thinking for complex problems
 
 Some models have preset reasoning levels that cannot be changed.
 
@@ -79,9 +79,9 @@ Some models have preset reasoning levels that cannot be changed.
 
 Available for GPT-5 models and select others, verbosity controls the detail level of responses:
 
-- `low` - Concise, direct responses
-- `medium` (default) - Balanced detail
-- `high` - Comprehensive, detailed responses
+- `low` — Concise, direct responses (short and sweet)
+- `medium` (default) — Balanced detail
+- `high` — Comprehensive, detailed responses (the full essay)
 
 ### Temperature Settings
 
@@ -93,7 +93,7 @@ Temperature controls output randomness (0.0 to 2.0):
 
 ### Conversation Continuity (GPT-5)
 
-GPT-5 models maintain conversation context efficiently through response IDs, reducing token usage while preserving context. This happens automatically - no configuration needed.
+GPT-5 models maintain conversation context efficiently through response IDs, reducing token usage while preserving context. This happens automatically — no configuration needed.
 
 ---
 

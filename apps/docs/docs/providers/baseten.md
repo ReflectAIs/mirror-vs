@@ -17,7 +17,7 @@ keywords:
 
 # Using Baseten With Mirror VS
 
-Baseten provides on-demand frontier model APIs designed for production applications, not just experimentation. Built on the Baseten Inference Stack, these APIs deliver optimized inference for leading open-source models from OpenAI, DeepSeek, Moonshot AI, and Alibaba Cloud.
+Baseten provides on-demand frontier model APIs designed for production applications, not just experiments. Built on the Baseten Inference Stack, these APIs deliver optimized inference for leading open-source models from OpenAI, DeepSeek, Moonshot AI, and Alibaba Cloud.
 
 **Website:** [https://www.baseten.co/products/model-apis/](https://www.baseten.co/products/model-apis/)
 

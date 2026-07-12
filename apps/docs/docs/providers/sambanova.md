@@ -14,7 +14,7 @@ keywords:
 
 # Using SambaNova With Mirror VS
 
-SambaNova specializes in providing high-speed inference for large language models, utilizing their Reconfigurable Dataflow Units (RDUs) through their SambaCloud portal. This delivers fast response times for supported models.
+SambaNova specializes in providing high-speed inference for large language models, utilizing their Reconfigurable Dataflow Units through their SambaCloud portal. Translation: it's fast — really fast.
 
 **Website:** [https://cloud.sambanova.ai/](https://cloud.sambanova.ai/)
 

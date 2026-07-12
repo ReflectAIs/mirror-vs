@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS 适应您的工作方式，而不是相反：
 - 调试模式：跟踪问题、添加日志、隔离根本原因
 - 自定义模式：为您的团队或工作流程构建专门的模式
 
-了解更多：[使用模式](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [自定义模式](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+了解更多：[使用模式](https://www.reflectai.in/basic-usage/using-modes) • [自定义模式](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## 资源
 
-- **[文档](https://mirrorvsinc.github.io/Roo-Code/):** 安装、配置和掌握 Mirror VS 的官方指南。
+- **[文档](https://www.reflectai.in/):** 安装、配置和掌握 Mirror VS 的官方指南。
 - **[GitHub 问题](https://github.com/ReflectAIs/mirror-vs/issues):** 报告错误并跟踪开发。
 
 ---

@@ -1,221 +1,187 @@
 ---
-description: Master keyboard navigation in Mirror VS with customizable shortcuts, command execution, and prompt history navigation for efficient coding workflows.
+sidebar_label: Keyboard Shortcuts
+title: Keyboard Shortcuts
+description: Keep your hands on the keyboard where they belong — every shortcut you need to fly through Mirror VS.
 keywords:
     - keyboard shortcuts
+    - keybindings
     - keyboard navigation
-    - mirror-vs.acceptInput
     - prompt history
     - accessibility
-    - vim compatibility
-sidebar_label: Keyboard Navigation
 ---
 
-# Keyboard Navigation
+# Keyboard Shortcuts
 
-The Mirror VS interface supports keyboard navigation and shortcuts to streamline your workflow and reduce dependence on mouse interactions.
-
----
+Mice are for mousing. Keyboards are for _shredding_. Mirror VS comes with a set of keyboard shortcuts and navigation features that'll have you zipping around like a terminal wizard — no trackpad required.
 
 ## Available Keyboard Commands
 
-Mirror VS offers keyboard commands to enhance your workflow. This page focuses on the `mirror-vs.acceptInput` command, but here's a quick reference to all keyboard commands:
+Mirror VS registers several VS Code commands that you can bind to keyboard shortcuts for rapid access:
 
-| Command                  | Description                                  | Default Shortcut                                 |
-| ------------------------ | -------------------------------------------- | ------------------------------------------------ |
-| `mirror-vs.acceptInput`  | Submit text or accept the primary suggestion | None (configurable)                              |
-| `mirror-vs.focusInput`   | Focus the Mirror input box                      | None (configurable)                              |
-| `mirror-vs.openInNewTab` | Open Mirror VS in a new editor tab            | None (via Command Palette)                       |
-| Add to Context           | Add selected code to Mirror's context           | macOS: Cmd+K Cmd+A; Windows/Linux: Ctrl+K Ctrl+A |
-| Arrow Up/Down            | Navigate through prompt history              | Built-in                                         |
+| Command ID                | What It Does                           | Default Binding |
+| ------------------------- | -------------------------------------- | :-------------: |
+| `mirror-vs.acceptInput`   | Submit the current prompt              | ⚡ Configurable |
+| `mirror-vs.fixWithAI`     | Run AI fix on selected code            | ⚡ Configurable |
+| `mirror-vs.explainWithAI` | Get AI explanation for selected code   | ⚡ Configurable |
+| `mirror-vs.addToContext`  | Add selection as context for Mirror VS | ⚡ Configurable |
 
 ### Key Benefits of Keyboard Commands
 
-- **Keyboard-Driven Interface**: Submit text or select the primary suggestion button without mouse interaction
-- **Improved Accessibility**: Essential for users with mobility limitations or those who experience discomfort with mouse usage
-- **Vim/Neovim Compatibility**: Supports seamless transitions for developers coming from keyboard-centric environments
-- **Workflow Efficiency**: Reduces context switching between keyboard and mouse during development tasks
-
----
+- **Speed** — Submit prompts and trigger actions without leaving the keyboard
+- **Flow** — Maintain your coding rhythm without context-switching to a mouse
+- **Accessibility** — Essential for users who prefer or require keyboard-based navigation
+- **Customization** — Bind to any key combination that works for you
 
 ## mirror-vs.acceptInput Command
 
-The `mirror-vs.acceptInput` command lets you submit text or accept suggestions with keyboard shortcuts instead of clicking buttons or pressing Enter in the input area.
+This is the big one. The `mirror-vs.acceptInput` command submits whatever you've typed in the chat input, just like clicking the send button — but with keyboard swagger.
 
 ### What It Does
 
-The `mirror-vs.acceptInput` command is a general-purpose input submission command. When triggered, it:
+- Submits the current prompt in the chat input
+- Works from anywhere in VS Code (not just the chat panel)
+- Respects the same validation as the send button
 
-- Submits your current text or image input when in the text input area (equivalent to pressing Enter)
-- Clicks the primary (first) button when action buttons are visible (such as confirm/cancel buttons or any other action buttons)
-
-### Detailed Setup Guide
+### Setting It Up
 
 #### Method 1: Using the VS Code UI
 
-1. Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac)
-2. Type "Preferences: Open Keyboard Shortcuts"
-3. In the search box, type "mirror-vs.acceptInput"
-4. Locate "Mirror: Accept Input/Suggestion" in the results
-5. Click the + icon to the left of the command
-6. Press your desired key combination (e.g., `Ctrl+Enter` or `Alt+Enter`)
-7. Press Enter to confirm
+1. Open VS Code
+2. Press `Cmd/Ctrl + K`, then `Cmd/Ctrl + S` to open Keyboard Shortcuts
+3. Search for "Mirror VS: Accept Input"
+4. Click the plus icon to add a keybinding
+5. Press your desired key combination (e.g., `Cmd+Enter`)
 
 #### Method 2: Editing keybindings.json directly
 
-1. Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac)
-2. Type "Preferences: Open Keyboard Shortcuts (JSON)"
-3. Add the following entry to the JSON array:
+For the control freaks (we see you), edit `keybindings.json`:
 
 ```json
-{
-	"key": "ctrl+enter", // or your preferred key combination
-	"command": "mirror-vs.acceptInput",
-	"when": "view == mirror-vs.SidebarProvider || activeWebviewPanelId == mirror-vs.TabPanelProvider"
-}
+[
+	{
+		"key": "cmd+enter",
+		"command": "mirror-vs.acceptInput",
+		"when": "view == mirror-vs.SidebarProvider || activeWebviewPanelId == mirror-vs.TabPanelProvider"
+	},
+	{
+		"key": "cmd+k cmd+a",
+		"command": "mirror-vs.addToContext",
+		"when": "editorTextFocus"
+	},
+	{
+		"key": "cmd+k cmd+f",
+		"command": "mirror-vs.fixWithAI",
+		"when": "editorTextFocus"
+	},
+	{
+		"key": "cmd+k cmd+e",
+		"command": "mirror-vs.explainWithAI",
+		"when": "editorTextFocus"
+	}
+]
 ```
 
-Scoped examples:
-
-- Sidebar Mirror view only:
-
-```json
-{
-	"key": "ctrl+enter",
-	"command": "mirror-vs.acceptInput",
-	"when": "view == mirror-vs.SidebarProvider"
-}
-```
-
-- Editor Mirror tab only:
-
-```json
-{
-	"key": "ctrl+enter",
-	"command": "mirror-vs.acceptInput",
-	"when": "activeWebviewPanelId == mirror-vs.TabPanelProvider"
-}
-```
+The `when` clause ensures the command only fires when Mirror VS is active. You can customize this to your liking.
 
 #### Recommended Key Combinations
 
-Choose a key combination that doesn't conflict with existing VS Code shortcuts:
-
-- `Alt+Enter` - Easy to press while typing
-- `Ctrl+Space` - Familiar for those who use autocomplete
-- `Ctrl+Enter` - Intuitive for command execution
-- `Alt+A` - Mnemonic for "Accept"
+| Key Combo     | Why It Works                  |
+| ------------- | ----------------------------- |
+| `Cmd+Enter`   | Easy to reach, feels natural  |
+| `Ctrl+Enter`  | Windows equivalent            |
+| `Alt+Enter`   | If Cmd/Ctrl is already taken  |
+| `Shift+Enter` | For multiline input workflows |
 
 ## Add to Context Shortcut
 
-- Default: macOS: Cmd+K Cmd+A; Windows/Linux: Ctrl+K Ctrl+A
-- Requires: when condition `editorTextFocus && editorHasSelection`
-- Focus does not change automatically. To continue typing immediately, use "Mirror: Focus Input" (`mirror-vs.focusInput`) or click into the Mirror panel.
+This shortcut adds your current code selection as context for Mirror VS — without leaving the editor.
 
-:::note Redo Shortcut Restored
-The standard Redo shortcut (macOS: Cmd+Y; Windows/Linux: Ctrl+Y) remains unchanged and is available for its usual function in VS Code.
-:::
+**Default binding:** `Cmd+K Cmd+A` (Mac) / `Ctrl+K Ctrl+A` (Windows/Linux)
 
-### Practical Use Cases
+### Quick Development Workflows
 
-#### Quick Development Workflows
+- Select a function, hit the shortcut — Mirror VS now has context on that function
+- Select an error message, hit the shortcut — Mirror VS can help debug it
+- Select a comment describing what you want, hit the shortcut — Mirror VS knows what to build
 
-- **Text Submission**: Send messages to Mirror without moving your hands from the keyboard
-- **Action Confirmations**: Accept operations like saving files, running commands, or applying diffs
-- **Multi-Step Processes**: Move quickly through steps that require confirmation or input
-- **Consecutive Tasks**: Chain multiple tasks together with minimal interruption
+### Keyboard-Centric Development
 
-#### Keyboard-Centric Development
+- Copy code → no need to switch to chat panel
+- Add context from anywhere → keeps you in the zone
+- No mouse required → ergonomics win
 
-- **Vim/Neovim Workflows**: If you're coming from a Vim/Neovim background, maintain your keyboard-focused workflow
-- **IDE Integration**: Use alongside other VS Code keyboard shortcuts for a seamless experience
-- **Code Reviews**: Quickly accept suggestions when reviewing code with Mirror
-- **Documentation Writing**: Submit text and accept formatting suggestions when generating documentation
+### Accessibility Use Cases
 
-#### Accessibility Use Cases
-
-- **Hand Mobility Limitations**: Essential for users who have difficulty using a mouse
-- **Repetitive Strain Prevention**: Reduce mouse usage to prevent or manage repetitive strain injuries
-- **Screen Reader Integration**: Works well with screen readers for visually impaired users
-- **Voice Control Compatibility**: Can be triggered via voice commands when using voice control software
+- **Reduced mobility:** Complete workflows without precise mouse movements
+- **Screen reader users:** Consistent, predictable keyboard interactions
+- **Power users:** Maximize efficiency with custom key combinations
 
 ### Accessibility Benefits
 
-The `mirror-vs.acceptInput` command was designed with accessibility in mind:
-
-- **Reduced Mouse Dependence**: Complete entire workflows without reaching for the mouse
-- **Reduced Physical Strain**: Helps users who experience discomfort or pain from mouse usage
-- **Alternative Input Method**: Supports users with mobility impairments who rely on keyboard navigation
-- **Workflow Optimization**: Particularly valuable for users coming from keyboard-centric environments like Vim/Neovim
+- **Predictable behavior:** Commands work reliably across sessions
+- **Redundant interaction:** Mouse-dependent features also available via keyboard
+- **Customizable:** Adapt keybindings to individual needs
 
 ### Keyboard-Centric Workflows
 
-Here are some complete workflow examples showing how to effectively use keyboard shortcuts with Mirror:
-
 #### Development Workflow Example
 
-1. Open VS Code and navigate to your project
-2. Open Mirror via the sidebar
-3. Type your request: "Create a REST API endpoint for user registration"
-4. When Mirror asks for framework preferences, use your `mirror-vs.acceptInput` shortcut to select the first suggestion
-5. Continue using the shortcut to accept code generation suggestions
-6. When Mirror offers to save the file, use the shortcut again to confirm
-7. Use VS Code's built-in shortcuts to navigate through the created files
+1. Select code in editor
+2. Press `Cmd+K Cmd+A` to add to context
+3. Switch to chat with `Ctrl+Tab` (or your panel shortcut)
+4. Type "refactor this" and press `Cmd+Enter` (your acceptInput binding)
+5. Watch Mirror VS work its magic
 
 #### Code Review Workflow
 
-1. Select code you want to review and use VS Code's "Copy" command
-2. Ask Mirror to review it: "Review this code for security issues"
-3. As Mirror asks clarifying questions about the code context, use your shortcut to accept suggestions
-4. When Mirror provides improvement recommendations, use the shortcut again to accept implementation suggestions
+1. Select a suspicious block of code
+2. Press `Cmd+K Cmd+F` to trigger AI fix
+3. Review the suggestion
+4. Accept or reject with a single keypress
 
 ### Troubleshooting
 
-| Issue                             | Solution                                                                                                                                             |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shortcut doesn't work             | Ensure Mirror is focused (click in the Mirror panel first)                                                                                                 |
-| Wrong suggestion selected         | The command always selects the first (primary) button; use mouse if you need a different option                                                      |
-| Conflicts with existing shortcuts | Try a different key combination in VS Code keyboard settings                                                                                         |
-| No visual feedback when used      | This is normal - the command silently activates the function without visual confirmation                                                             |
-| Shortcut works inconsistently     | Make sure the `when` clause is properly configured (use `view == mirror-vs.SidebarProvider` or `activeWebviewPanelId == mirror-vs.TabPanelProvider`) |
+**Command not firing?**
+
+- Check that the `when` clause matches your current context
+- Ensure no other extension is using the same keybinding
+- Try restarting VS Code
+
+**Want different keybindings?**
+
+- Open Keyboard Shortcuts (`Cmd/Ctrl + K, Cmd/Ctrl + S`)
+- Search for the Mirror VS command
+- Double-click to reassign
 
 ### Technical Implementation
 
-The `mirror-vs.acceptInput` command is implemented as follows:
-
-- Command registered as `mirror-vs.acceptInput` with display title "Mirror: Accept Input/Suggestion" in the command palette
-- When triggered, it sends an "acceptInput" message to the active Mirror webview
-- The webview determines the appropriate action based on the current UI state:
-    - Clicks the primary action button if action buttons are visible and enabled
-    - Sends the message if the text area is enabled and contains text/images
-- No default key binding - users assign their preferred shortcut
+The `acceptInput` command works by posting a message to the Mirror VS webview, which triggers the same submission logic as clicking the send button. It's not magic — it's just well-wired event handling.
 
 ### Limitations
 
-- Works only when the Mirror interface is active
-- Has no effect if no inputs or suggestions are currently available
-- Prioritizes the primary (first) button when multiple options are shown
+- The command only works when Mirror VS is active (that's what the `when` clause is for)
+- It respects all input validation — malformed prompts won't be submitted
+- Custom keybindings may conflict with other extensions
 
 ---
 
 ## Command Line Style Prompt History Navigation
 
+Remember when you could press Up Arrow in the terminal and your last command magically appeared? Mirror VS brings that same superpower to your chat input.
+
 Navigate your prompt history with a terminal-like experience using the arrow keys. This feature makes it easy to reuse and refine previous prompts, whether from your current conversation or past tasks.
 
 ### Key Features
 
-- **Up/Down Arrows**: Cycle through previous prompts.
-- **Context-Aware**: Switches between conversation and task history.
-- **Preserves Input**: Remembers what you were typing.
+- **Up/Down Arrows** — Cycle through previous prompts
+- **Context-Aware** — Switches between conversation and task history
+- **Preserves Input** — Remembers what you were typing
 
 ### Why This Matters
 
-**Before**: Reusing a prompt meant scrolling up, copying, and pasting.
+**Before:** Reusing a prompt meant scrolling up, copying, and pasting. Tedious, slow, and interruptive.
 
-- Tedious and slow
-- Easy to lose your place
-- Interrupted your workflow
-
-**With Prompt History Navigation**: Quickly access past prompts without leaving the keyboard.
+**With Prompt History Navigation:** Quickly access past prompts without leaving the keyboard. Your flow stays intact.
 
 ### How it Works
 
@@ -223,28 +189,28 @@ The navigation is designed to be intuitive and adapt to your current context.
 
 #### In an Active Conversation
 
-- **Arrow Up**: Shows the last prompt you sent. Keep pressing to go further back in the conversation.
-- **Arrow Down**: Moves forward through the conversation history, eventually returning to the text you were typing.
+- **Arrow Up** — Shows the last prompt you sent. Keep pressing to go further back.
+- **Arrow Down** — Moves forward through the conversation history, eventually returning to the text you were typing.
 
 #### Starting a New Chat
 
-- **Arrow Up**: Shows the most recent prompt from your task history in the current workspace.
-- **Arrow Down**: Moves forward through your task history.
+- **Arrow Up** — Shows the most recent prompt from your task history in the current workspace.
+- **Arrow Down** — Moves forward through your task history.
 
 #### Edge Cases
 
-- If you start typing while navigating, the history is dismissed, and your new text is preserved.
-- Navigation only works when your cursor is on the first or last line of the input box to avoid interfering with multi-line editing.
+- If you start typing while navigating, the history is dismissed and your new text is preserved.
+- Navigation only works when your cursor is on the first or last line of the input box — to avoid interfering with multi-line editing.
 
 ### Configuration
 
-This feature is enabled by default. There are no settings to configure.
+This feature is enabled by default. There's nothing to configure — just start pressing arrow keys.
 
 ### Benefits
 
-- **Faster Workflow**: Reuse prompts without using the mouse.
-- **Better Context**: Easily access and build upon previous interactions.
-- **Less Interruption**: Stay focused on the task at hand.
+- **Faster Workflow** — Reuse prompts without using the mouse
+- **Better Context** — Easily access and build upon previous interactions
+- **Less Interruption** — Stay focused on the task at hand
 
 ### Common Questions
 
@@ -257,3 +223,10 @@ This feature is enabled by default. There are no settings to configure.
 
 - **Conversation history** includes prompts from your current, active chat session.
 - **Task history** includes the initial prompts from all previous tasks in your current workspace.
+
+---
+
+## See Also
+
+- [The Chat Interface](/basic-usage/the-chat-interface) — Understanding the chat panel
+- [Typing Your Requests](/basic-usage/typing-your-requests) — Crafting effective prompts

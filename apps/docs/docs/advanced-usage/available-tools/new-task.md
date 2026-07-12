@@ -1,171 +1,104 @@
 ---
-description: Discover how the new_task tool enables complex workflow management by creating subtasks with different modes, maintaining parent-child relationships for organized development.
-keywords:
-    - new_task
-    - Mirror VS tools
-    - subtasks
-    - workflow management
-    - task hierarchy
-    - mode switching
-    - complex projects
-    - task organization
-    - VS Code AI
+sidebar_position: 19
+title: new_task
 ---
 
-# new_task
+# `new_task` — Delegate Like a Manager
 
-The `new_task` tool creates subtasks with specialized modes while maintaining a parent-child relationship. It breaks down complex projects into manageable pieces, each operating in the mode best suited for specific work.
-
----
+Ever wish you could clone yourself and have one version research while the other codes? [`new_task`](new-task.md) is the closest thing Mirror VS offers — it lets the AI spin off a completely separate conversation, in a different mode, to handle a subtask while keeping the main thread going.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `mode` (required): The slug of the mode to start the new task in (e.g., "code", "ask", "architect")
-- `message` (required): The initial user message or instructions for this new task
-- `todos` (optional): Initial todo list in markdown checklist format
-
----
+| Parameter | Type                | Required | Description                                                         |
+| --------- | ------------------- | -------- | ------------------------------------------------------------------- |
+| `mode`    | `string`            | ✅       | Mode slug to delegate to (e.g., `"code"`, `"architect"`, `"debug"`) |
+| `message` | `string`            | ✅       | Initial instructions for the subtask                                |
+| `todos`   | `string` (markdown) | ❌       | Initial todo checklist for the subtask (required by some modes)     |
 
 ## What It Does
 
-This tool creates a new task instance with a specified starting mode and initial message. It allows complex workflows to be divided into subtasks with their own conversation history. Parent tasks are paused during subtask execution and resumed when the subtask completes, with results transferred back to the parent.
+[`new_task`](new-task.md) creates a brand new, independent Mirror VS conversation — a **subtask** — in a specific mode, with specific instructions. The subtask has its own context, its own tools, and its own lifecycle. When it finishes, the results are handed back to the parent task.
 
----
+Think of it as "I need you to focus on this one thing, in this mode, with this context — go handle it."
 
-## When is it used?
+## When Is It Used?
 
-- When breaking down complex projects into separate, focused subtasks
-- When different aspects of a task require different specialized modes
-- When different phases of work benefit from context separation
-- When organizing multi-phase development workflows
+For **complex, multi-step tasks** that benefit from specialization:
 
----
+- An Architect mode task designs the system, then spawns a Code mode task to implement it
+- A task hits a bug and spawns a Debug mode subtask to investigate
+- You need to research something in Ask mode while continuing to code
+- A large refactor is split into independent parallel subtasks
 
 ## Key Features
 
-- Creates subtasks with their own conversation history and specialized mode
-- Pauses parent tasks for later resumption
-- Maintains hierarchical task relationships for navigation
-- Transfers results back to parent tasks upon completion
-- Supports workflow segregation for complex projects
-- Allows different parts of a project to use modes optimized for specific work
-- Requires explicit user approval for task creation
-- Provides clear task transition in the UI
-
----
+- **Mode specialization** — Each subtask runs in the most appropriate mode for its job
+- **Independent context** — Subtasks have their own conversation history, not cluttering the parent
+- **Todo list support** — Modes that require todos (`newTaskRequireTodos`) get structured checklists
+- **Result transfer** — When `finishSubTask()` is called, results flow back to the parent task
+- **Parallel potential** — Multiple subtasks can run concurrently (though the AI manages them sequentially)
 
 ## Limitations
 
-- Cannot create tasks with modes that don't exist
-- Requires user approval before creating each new task
-- Task interface may become complex with deeply nested subtasks
-- Subtasks inherit certain workspace and extension configurations from parents
-- May require re-establishing context when switching between deeply nested tasks
-- Task completion needs explicit signaling to properly return to parent tasks
-
----
+- **Sequential execution** — The AI typically handles one subtask at a time
+- **Context isolation** — The subtask doesn't automatically inherit all parent context
+- **Mode-dependent** — Some modes require a todo list, adding a step
+- **Cost** — Each subtask consumes tokens independently
 
 ## How It Works
 
-When the `new_task` tool is invoked, it follows this process:
-
-1. **Parameter Validation**:
-
-    - Validates the required `mode` and `message` parameters
-    - Verifies that the requested mode exists in the system
-
-2. **Task Stack Management**:
-
-    - Maintains a task stack that tracks all active and paused tasks
-    - Preserves the current mode for later resumption
-    - Sets the parent task to paused state
-
-3. **Task Context Management**:
-
-    - Creates a new task context with the provided message
-    - Assigns unique taskId and instanceId identifiers for state management
-    - Captures telemetry data on tool usage and task lifecycles
-
-4. **Mode Switching and Integration**:
-
-    - Switches to the specified mode with appropriate role and capabilities
-    - Initializes the new task with the provided message
-    - Integrates with VS Code's command palette and code actions
-
-5. **Task Completion and Result Transfer**:
-    - When subtask completes, result is passed back to parent task via `finishSubTask()`
-    - Parent task resumes in its original mode
-    - Task history and token usage metrics are updated
-    - The `taskCompleted` event is emitted with performance data
-
----
+1. The parent task identifies a self-contained piece of work that needs a different mode
+2. It calls [`new_task`](new-task.md) with the target mode, message, and optional todos
+3. Mirror VS creates a fresh conversation in the specified mode
+4. The subtask runs independently with its own tools and context
+5. When the subtask calls `finishSubTask()`, its results are transferred back to the parent
+6. The parent task picks up where it left off, with the subtask's output available
 
 ## Configuration
 
-Streamline hierarchical task planning with the optional todo list parameter for subtasks:
-
-- **Pass Todo Lists**: Include predefined todo lists when creating subtasks
-- **Maintain Context**: Pass along context to the subtask in the form of a todo list
-- **Optional Enforcement**: The "New Task Require Todos" setting in VS Code can enforce todo lists for all new subtasks if desired
-
-<img src="/img/v3.25.21/v3.25.21.png" alt="Subtask todo lists configuration in VS Code settings" width="600" />
-
-This feature works out of the box, and you can optionally configure VS Code settings to require todos for all new tasks.
-
----
-
-## Examples When Used
-
-- When a front-end developer needs to architect a new feature, implement the code, and document it, they can create separate tasks for each phase with results flowing from one phase to the next.
-- When debugging an issue before implementing a fix, the debugging task can document findings that are passed to the implementation task.
-- When developing a full-stack application, database schema designs from an architect-mode task inform implementation details in a subsequent code-mode task.
-- When documenting a system after implementation, the documentation task can reference the completed implementation while using documentation-specific features.
-
----
+| Setting                                    | Description                                            |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `mirror-vs.newTaskRequireTodos`            | Forces todos for all `new_task` calls                  |
+| `mirror-vs.preventCompletionWithOpenTodos` | Blocks `attempt_completion` if any todos are unchecked |
 
 ## Usage Examples
 
-Creating a new task in code mode:
+### Architect → Code Handoff
+
+The Architect designs a plan, then delegates implementation:
 
 ```
-<new_task>
-<mode>code</mode>
-<message>Implement a user authentication service with login, registration, and password reset functionality.</message>
-</new_task>
+new_task({
+  mode: "code",
+  message: "Implement the auth middleware as designed in the architecture above",
+  todos: "- [ ] Create auth middleware file\n- [ ] Add JWT verification\n- [ ] Add token refresh logic\n- [ ] Write tests"
+})
 ```
 
-Creating a documentation task after completing implementation:
+### Debugging Subtask
+
+While working on a feature, an issue is found. A debug subtask is spawned:
 
 ```
-<new_task>
-<mode>docs</mode>
-<message>Create comprehensive API documentation for the authentication service we just built.</message>
-</new_task>
+new_task({
+  mode: "debug",
+  message: "The login endpoint returns 500 when token is expired. Investigate the error handler in src/auth/middleware.ts"
+})
 ```
 
-Breaking down a complex feature into architectural planning and implementation:
+### Research Subtask
+
+Need to look up documentation while coding:
 
 ```
-<new_task>
-<mode>architect</mode>
-<message>Design the database schema and system architecture for our new e-commerce platform.</message>
-</new_task>
+new_task({
+  mode: "ask",
+  message: "Research the best approach for rate limiting in Express.js, considering Redis-based and in-memory approaches"
+})
 ```
 
-Creating a task with an initial todo list:
+## Relation to Other Tools
 
-```
-<new_task>
-<mode>code</mode>
-<message>Build a REST API for user management</message>
-<todos>
-[ ] Set up Express server
-[ ] Create user model
-[ ] Implement CRUD endpoints
-[ ] Add authentication middleware
-[ ] Write API tests
-</todos>
-</new_task>
-```
+[`new_task`](new-task.md) is the **delegation** tool. It's the reason Mirror VS can handle complex, multi-modal workflows without losing the plot. Combined with [`attempt_completion`](attempt-completion.md) (which finishes a subtask), it creates a powerful parent-child task hierarchy.
+
+For simpler context switches, consider [`switch_mode`](switch-mode.md) — but when you need genuine parallel thinking with mode-specific tool access, [`new_task`](new-task.md) is the answer.

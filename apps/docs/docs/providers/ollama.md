@@ -17,7 +17,7 @@ import KangamirrorIcon from '@site/src/components/KangamirrorIcon';
 
 # Using Ollama With Mirror VS
 
-Mirror VS supports running models locally using Ollama. This provides privacy, offline access, and potentially lower costs, but requires more setup and a powerful computer.
+Mirror VS supports running models locally using Ollama. This provides privacy, offline access, and potentially lower costs — but it requires more setup and a powerful computer. You know, the classic dev trade-off: convenience vs. control.
 
 **Website:** [https://ollama.com/](https://ollama.com/)
 
@@ -25,7 +25,7 @@ Mirror VS supports running models locally using Ollama. This provides privacy, o
 
 ## Setting up Ollama
 
-1.  **Download and Install Ollama:** Download the Ollama installer for your operating system from the [Ollama website](https://ollama.com/). Follow the installation instructions. Make sure Ollama is running
+1.  **Download and Install Ollama:** Download the Ollama installer for your operating system from the [Ollama website](https://ollama.com/). Follow the installation instructions. Make sure Ollama is running:
 
     ```bash
     ollama serve
@@ -46,7 +46,7 @@ Mirror VS supports running models locally using Ollama. This provides privacy, o
 3.  **Configure the Model:** Configure your model's context window in Ollama and save a copy.
 
     :::info Default Context Behavior
-    **Mirror VS automatically defers to the Modelfile's `num_ctx` setting by default.** When you use a model with Ollama, Mirror VS reads the model's configured context window and uses it automatically. You don't need to configure context size in Mirror VS settings - it respects what's defined in your Ollama model.
+    **Mirror VS automatically defers to the Modelfile's `num_ctx` setting by default.** When you use a model with Ollama, Mirror VS reads the model's configured context window and uses it automatically. You don't need to configure context size in Mirror VS settings — it respects what's defined in your Ollama model.
     :::
 
     **Option A: Interactive Configuration**
@@ -97,7 +97,7 @@ Mirror VS supports running models locally using Ollama. This provides privacy, o
     If you need to override the model's default context window:
 
     - **Permanently:** Save a new model version with your desired `num_ctx` using either method above
-    - **Mirror VS behavior:** Mirror automatically uses whatever `num_ctx` is configured in your Ollama model
+    - **Mirror VS behavior:** Mirror VS automatically uses whatever `num_ctx` is configured in your Ollama model
     - **Memory considerations:** Reducing `num_ctx` helps prevent out-of-memory errors on limited hardware
       :::
 
@@ -108,7 +108,7 @@ Mirror VS supports running models locally using Ollama. This provides privacy, o
     - Enter the model tag or saved name from the previous step (e.g., `your_model_name`).
     - (Optional) Configure the base URL if you're running Ollama on a different machine. The default is `http://localhost:11434`.
     - (Optional) Enter an API Key if your Ollama server requires authentication.
-    - (Advanced) Mirror uses Ollama's native API by default for the "ollama" provider. An OpenAI-compatible `/v1` handler also exists but isn't required for typical setups.
+    - (Advanced) Mirror VS uses Ollama's native API by default for the "ollama" provider. An OpenAI-compatible `/v1` handler also exists but isn't required for typical setups.
 
 ---
 
@@ -128,7 +128,7 @@ Mirror VS supports running models locally using Ollama. This provides privacy, o
 
 **Symptoms**
 
-- First request from Mirror fails with an out-of-memory error
+- First request from Mirror VS fails with an out-of-memory error
 - GPU/CPU memory usage spikes when the model first loads
 - Works after you manually start the model in Ollama
 
@@ -140,22 +140,22 @@ If no model instance is running, Ollama spins one up on demand. During that cold
 1. **Preload the model**
 
     ```bash
-    ollama run &lt;model-name&gt;
+    ollama run <model-name>
     ```
 
-    Keep it running, then issue the request from Mirror.
+    Keep it running, then issue the request from Mirror VS.
 
 2. **Pin the context window (`num_ctx`)**
 
     - Option A — interactive session, then save:
         ```bash
-        # inside `ollama run &lt;base-model&gt;`
+        # inside `ollama run <base-model>`
         /set parameter num_ctx 32768
-        /save &lt;your_model_name&gt;
+        /save <your_model_name>
         ```
     - Option B — Modelfile (recommended for reproducibility):
         ```dockerfile
-        FROM &lt;base-model&gt;
+        FROM <base-model>
         PARAMETER num_ctx 32768
         # Adjust based on your available memory:
         # 16384 for ~8GB VRAM
@@ -164,11 +164,11 @@ If no model instance is running, Ollama spins one up on demand. During that cold
         ```
         Then create the model:
         ```bash
-        ollama create &lt;your_model_name&gt; -f Modelfile
+        ollama create <your_model_name> -f Modelfile
         ```
 
 3. **Ensure the model's context window is pinned**
-   Save your Ollama model with an appropriate `num_ctx` (via `/set` + `/save`, or preferably a Modelfile). **Mirror VS automatically detects and uses the model's configured `num_ctx`** - there is no manual context size setting in Mirror VS for the Ollama provider.
+   Save your Ollama model with an appropriate `num_ctx` (via `/set` + `/save`, or preferably a Modelfile). **Mirror VS automatically detects and uses the model's configured `num_ctx`** — there is no manual context size setting in Mirror VS for the Ollama provider.
 
 4. **Use smaller variants**
    If GPU memory is limited, use a smaller quant (e.g., q4 instead of q5) or a smaller parameter size (e.g., 7B/13B instead of 32B).
@@ -176,13 +176,13 @@ If no model instance is running, Ollama spins one up on demand. During that cold
 5. **Restart after an OOM**
     ```bash
     ollama ps
-    ollama stop &lt;model-name&gt;
+    ollama stop <model-name>
     ```
 
 **Quick checklist**
 
-- Model is running before Mirror request
+- Model is running before Mirror VS request
 - `num_ctx` pinned (Modelfile or `/set` + `/save`)
-- Model saved with appropriate `num_ctx` (Mirror uses this automatically)
+- Model saved with appropriate `num_ctx` (Mirror VS uses this automatically)
 - Model fits available VRAM/RAM
 - No leftover Ollama processes

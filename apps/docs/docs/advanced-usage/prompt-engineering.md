@@ -1,115 +1,174 @@
----
-description: Master the art of writing effective prompts for Mirror VS. Learn principles, techniques, and examples to get better AI coding assistance results.
-keywords:
-    - prompt engineering
-    - AI prompts
-    - effective communication
-    - Mirror VS tips
-    - custom instructions
----
-
 # Prompt Engineering Tips
 
-Prompt engineering is the art of crafting effective instructions for AI models like Mirror VS. Well-written prompts lead to better results, fewer errors, and a more efficient workflow.
+## Talk to Your AI Like a Human
 
----
+Mirror VS is smart, but it's not a mind reader (that feature is coming in v2.0). The quality of what you get out depends heavily on what you put in. Here's how to craft prompts that get results.
 
 ## General Principles
 
-- **Be Clear and Specific:** Clearly state what you want Mirror VS to do. Avoid ambiguity.
+### 1. Be Clear, Not Clever
 
-    - **Bad:** Fix the code.
-    - **Good:** Fix the bug in the `calculateTotal` function that causes it to return incorrect results.
+You don't need to write poetry. You need to write instructions.
 
-- **Provide Context:** Use [Context Mentions](/basic-usage/context-mentions) to refer to specific files, folders, or problems.
+| Instead of This                                                                                                        | Try This                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| "Would you perhaps be so kind as to potentially consider the possibility of making the button slightly more blue-ish?" | "Change the button color to `#007bff`"                                      |
+| "I was wondering if we could maybe optimize the loop a tiny bit if it's not too much trouble?"                         | "Optimize this loop. It's O(n²) and the production dataset has 500K items." |
 
-    - **Good:** `@/src/utils.ts` Refactor the `calculateTotal` function to use async/await.
+Mirror VS respects politeness, but it responds better to clarity. Save the pleasantries for your human colleagues.
 
-- **Break Down Tasks:** Divide complex tasks into smaller, well-defined steps.
+### 2. Provide Context, But Not _All_ the Context
 
-- **Give Examples:** If you have a specific coding style or pattern in mind, provide examples.
+Good prompt: "Here's the `UserService` class. Add validation to the `createUser` method that checks for duplicate emails."
 
-- **Specify Output Format:** If you need the output in a particular format (e.g., JSON, Markdown), specify it in the prompt.
+Bad prompt: "Here's my entire 50,000-line codebase. Fix everything that's wrong with it."
 
-- **Iterate:** Don't be afraid to refine your prompt if the initial results aren't what you expect.
+Use [`@context mentions`](/basic-usage/context-mentions) to point Mirror VS at exactly the relevant files. If the AI needs to see three functions, mention three functions — not the entire module.
 
----
+### 3. Break Down Complex Tasks
+
+Mirror VS is better at completing ten small tasks perfectly than one massive task poorly.
+
+Instead of:
+
+```
+Build me a full-stack e-commerce platform with user auth,
+product management, shopping cart, payment processing,
+and admin dashboard.
+```
+
+Try:
+
+1. "Set up the project structure with Next.js and Prisma"
+2. "Create the User model and authentication endpoints"
+3. "Build the product listing API route"
+4. "Implement the shopping cart functionality"
+5. "Add Stripe payment integration"
+6. "Create the admin dashboard layout"
+
+Each step builds on the previous one, and Mirror VS can maintain focus throughout.
+
+### 4. Give Examples
+
+Sometimes showing is better than telling. If you want Mirror VS to follow a specific pattern, show it an example:
+
+```
+I need another function like this one, but for blog posts:
+
+function validateEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+Create: function validatePost(post: BlogPost): ValidationResult
+```
+
+Mirror VS is great at pattern matching. Give it a pattern, and it'll run with it.
 
 ## Thinking vs. Doing
 
-It's often helpful to guide Mirror VS through a "think-then-do" process:
+By default, Mirror VS thinks before it acts. This is usually a good thing — you want the AI to plan the architecture before writing 500 lines of code.
 
-1.  **Analyze:** Ask Mirror VS to analyze the current code, identify problems, or plan the approach.
-2.  **Plan:** Have Mirror VS outline the steps it will take to complete the task.
-3.  **Execute:** Instruct Mirror VS to implement the plan, one step at a time.
-4.  **Review:** Carefully review the results of each step before proceeding.
+But sometimes you just need a quick answer:
 
----
+- **Thinking mode**: "Should I use Redux or Zustand for this project?" — Let it reason
+- **Doing mode**: "Add loading states to these three components" — Just execute
+
+Mirror VS handles this automatically based on the [mode](/basic-usage/using-modes) you're in. Architect and Ask modes are more thoughtful. Code mode is more action-oriented.
 
 ## Using Custom Instructions
 
-You can provide custom instructions to further tailor Mirror VS's behavior. There are two types of custom instructions:
+[Custom instructions](/features/custom-instructions) let you set persistent rules that apply to every task. This is where you define:
 
-- **Global Custom Instructions:** Apply to all modes.
-- **Mode-Specific Custom Instructions:** Apply only to a specific mode (e.g., Code, Architect, Ask, Debug, or a custom mode).
+- Coding style preferences (tabs vs spaces — we're not judging, but tabs are correct)
+- Project conventions
+- Frameworks and libraries you prefer
+- Things Mirror VS should always (or never) do
 
-Custom instructions are added to the system prompt, providing persistent guidance to the AI model. You can use these to:
+For example:
 
-- Enforce coding style guidelines.
-- Specify preferred libraries or frameworks.
-- Define project-specific conventions.
-- Adjust Mirror VS's tone or personality.
+```markdown
+# Always
 
-See the [Custom Instructions](/features/custom-instructions) section for more details.
+- Use TypeScript strict mode
+- Write unit tests for new functions
+- Follow the existing project structure
 
----
+# Never
+
+- Use `any` type
+- Modify configuration files without asking
+- Delete code without explaining why
+```
+
+These instructions get injected into every prompt, so you don't have to repeat yourself. It's like having a permanent sticky note on Mirror VS's forehead.
 
 ## Handling Ambiguity
 
-If your request is ambiguous or lacks sufficient detail, Mirror VS might:
+When Mirror VS encounters an ambiguous request, it does something smart: it asks for clarification. This isn't a bug — it's a feature. Would you rather the AI guess wrong and write 200 lines of code you didn't want?
 
-- **Make Assumptions:** It might proceed based on its best guess, which may not be what you intended.
-- **Ask Follow-Up Questions:** It might use the `ask_followup_question` tool to clarify your request.
+If you want to reduce ambiguity:
 
-It's generally better to provide clear and specific instructions from the start to avoid unnecessary back-and-forth.
-
----
+- **Specify the output format**: "Return the result as JSON, not markdown"
+- **Set boundaries**: "Only modify files in the `/src` directory"
+- **Define success criteria**: "The function should pass these five test cases"
 
 ## Providing Feedback
 
-If Mirror VS doesn't produce the desired results, you can provide feedback by:
+Mirror VS learns from feedback within a conversation. If it does something wrong, tell it:
 
-- **Rejecting Actions:** Click the "Reject" button when Mirror VS proposes an action you don't want.
-- **Providing Explanations:** When rejecting, explain _why_ you're rejecting the action. This helps Mirror VS learn from its mistakes.
-- **Rewording Your Request:** Try rephrasing your initial task or providing more specific instructions.
-- **Manually Correcting:** If there are a few small issues, you can also directly modify the code before accepting the changes.
+- "That's not what I meant. The `save` function should return the ID, not the whole object."
+- "Close, but use `map` instead of `forEach` here."
+- "Perfect, now do the same thing for the `delete` endpoint."
 
----
+Constructive feedback works better than vague complaints. Mirror VS has feelings too. (Not really. It's ones and zeros. But still.)
 
 ## Examples
 
-**Good Prompt:**
+### Good Prompt
 
-> `@/src/components/Button.tsx` Refactor the `Button` component to use the `useState` hook instead of the `useReducer` hook.
+```
+I'm working on a NestJS project with Prisma ORM.
+I need to add a `findByEmail` method to the `UserService`.
 
-**Bad Prompt:**
+Here's the current service: @UserService
+Here's the Prisma schema: @schema.prisma
 
-> Fix the button.
+The method should:
+1. Accept an email string
+2. Query the database for a user with that email
+3. Throw `NotFoundException` if not found
+4. Return the user without the password field
 
-**Good Prompt:**
+Here's an existing method for reference: @existing-method
+```
 
-> Create a new file named `utils.py` and add a function called `calculate_average` that takes a list of numbers and returns their average.
+Why this works: context, specificity, examples, clear requirements.
 
-**Bad Prompt:**
+### Bad Prompt
 
-> Write some Python code.
+```
+Add user search or something idk
+```
 
-**Good Prompt:**
+Why this doesn't work: literally everything about it.
 
-> `@problems` Address all errors and warnings in the current file.
+### Great Prompt
 
-**Bad Prompt:**
+```
+Fix this bug:
 
-> Fix everything.
+@buggy-component.tsx
 
-By following these tips, you can write effective prompts that get the most out of Mirror VS's capabilities.
+The issue: When the user types in the search field,
+the dropdown shows results from the previous search
+for ~300ms before updating. This is a race condition.
+
+The fix should:
+1. Cancel the previous request when a new one starts
+2. Show a loading state in the dropdown
+3. Handle the edge case where results arrive out of order
+
+Use AbortController for cancellation.
+```
+
+This prompt gives Mirror VS: the buggy code, a clear description of the problem, specific requirements for the fix, and even suggests the approach. The AI will thank you (metaphorically) and deliver better code.

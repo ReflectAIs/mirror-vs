@@ -12,140 +12,65 @@ keywords:
     - VS Code AI
 ---
 
-# use_mcp_tool
+# `use_mcp_tool` — Plug Into the MCP Ecosystem
 
-The `use_mcp_tool` tool enables interaction with external tools provided by connected Model Context Protocol (MCP) servers. It extends Mirror's capabilities with domain-specific functionality through a standardized protocol.
-
----
+Think of [`use_mcp_tool`](use-mcp-tool.md) as Mirror VS's universal adapter — it lets the AI call specialized tools hosted on external MCP servers. Weather data, code analysis, image generation, database queries — if an MCP server exposes it as a tool, this is how you call it.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `server_name` (required): The name of the MCP server providing the tool
-- `tool_name` (required): The name of the tool to execute
-- `arguments` (required/optional): A JSON object containing the tool's input parameters, following the tool's input schema. May be optional for tools that require no input.
-
----
+| Parameter     | Type            | Required | Description                                                                       |
+| ------------- | --------------- | -------- | --------------------------------------------------------------------------------- |
+| `server_name` | `string`        | ✅       | Name of the MCP server providing the tool                                         |
+| `tool_name`   | `string`        | ✅       | Name of the tool to execute                                                       |
+| `arguments`   | `object` (JSON) | ✅/❌    | Input parameters following the tool's schema (may be optional for no-input tools) |
 
 ## What It Does
 
-This tool allows Mirror to access specialized functionality provided by external MCP servers. Each MCP server can offer multiple tools with unique capabilities, extending Mirror beyond its built-in functionality. The system validates arguments against schemas, manages server connections, and processes responses of various content types (text, image, resource).
+[`use_mcp_tool`](use-mcp-tool.md) allows Mirror VS to access specialized functionality provided by external MCP servers. Each MCP server can offer multiple tools with unique capabilities, extending Mirror VS far beyond its built-in functionality. Arguments are validated against schemas, server connections are managed, and responses are processed for multiple content types.
 
----
-
-## When is it used?
+## When Is It Used?
 
 - When specialized functionality not available in core tools is needed
 - When domain-specific operations are required
 - When integration with external systems or services is needed
-- When working with data that requires specific processing or analysis
 - When accessing proprietary tools through a standardized interface
-
----
+- When working with data that requires specific processing or analysis
 
 ## Key Features
 
-- Uses the standardized MCP protocol via the `@modelcontextprotocol/sdk` library
-- Supports multiple transport mechanisms (StdioClientTransport, StreamableHTTPClientTransport and SSEClientTransport)
-- Validates arguments using Zod schema validation on both client and server sides
-- Processes multiple response content types: text, image, and resource references
-- Manages server lifecycle with automatic restarts when server code changes
-- Provides an "always allow" mechanism to bypass approval for trusted tools
-- Works with the companion `access_mcp_resource` tool for resource retrieval
-- Maintains proper error tracking and handling for failed operations
-- Supports configurable timeouts (1-3600 seconds, default: 60 seconds)
-- Allows file watchers to automatically detect and reload server changes
-
----
+- **Standardized MCP protocol** — Uses the `@modelcontextprotocol/sdk` library for reliable communication
+- **Multiple transport mechanisms** — Supports STDIO, Streamable HTTP, and SSE (legacy) transports
+- **Schema validation** — Arguments are validated using Zod schemas on both client and server sides
+- **Multiple response types** — Handles text, image, and resource reference responses
+- **Server lifecycle management** — Automatic restarts when server code changes
+- **"Always allow" list** — Bypass approval for trusted tools
+- **Configurable timeouts** — 1–3600 seconds (default: 60s)
 
 ## Limitations
 
 - Depends on external MCP servers being available and connected
 - Limited to the tools provided by connected servers
 - Tool capabilities vary between different MCP servers
-- Network issues can affect reliability and performance
-- Requires user approval before execution (unless in the "always allow" list)
+- Network issues can affect reliability
+- Requires user approval (unless in the "always allow" list)
 - Cannot execute multiple MCP tool operations simultaneously
-
----
 
 ## Server Configuration
 
-MCP servers can be configured globally or at the project level:
+MCP servers can be configured at two levels:
 
-- **Global Configuration**: Managed through the Mirror VS extension settings in VS Code. These apply across all projects unless overridden.
-- **Project-level Configuration**: Defined in a `.mirror/mcp.json` file within your project's mirrort directory.
-- This allows project-specific server setups.
-- Project-level servers take precedence over global servers if they share the same name.
-- Since `.mirror/mcp.json` can be committed to version control, it simplifies sharing configurations with your team.
+**Global Configuration**: Managed through Mirror VS extension settings in VS Code. Applies across all projects unless overridden.
 
----
+**Project-level Configuration**: Defined in `.mirror/mcp.json` within your project's root. Project-level servers take precedence over global servers with the same name. Since `mcp.json` can be committed to version control, it simplifies team sharing.
 
 ## How It Works
 
-When the `use_mcp_tool` tool is invoked, it follows this process:
-
-1. **Initialization and Validation**:
-
-    - The system verifies that the MCP hub is available
-    - Confirms the specified server exists and is connected
-    - Validates the requested tool exists on the server
-    - Arguments are validated against the tool's schema definition
-    - Timeout settings are extracted from server configuration (default: 60 seconds)
-
-2. **Execution and Communication**:
-
-    - The system selects the appropriate transport mechanism:
-        - `StdioClientTransport`: For communicating with local processes via standard I/O
-        - `SSEClientTransport`: For communicating with HTTP servers via Server-Sent Events
-        - `StreamableHTTPClientTransport`: For communicating with HTTP servers via Streamable HTTP Events
-    - A request is sent with validated server name, tool name, and arguments
-    - Communication uses the `@modelcontextprotocol/sdk` library for standardized interactions
-    - Request execution is tracked with timeout handling to prevent hanging operations
-
-3. **Response Processing**:
-
-    - Responses can include multiple content types:
-        - Text content: Plain text responses
-        - Image content: Binary image data with MIME type information
-        - Resource references: URIs to access server resources (works with `access_mcp_resource`)
-    - The system checks the `isError` flag to determine if error handling is needed
-    - Results are formatted for display in the Mirror interface
-
-4. **Resource and Error Handling**:
-    - The system uses WeakRef patterns to prevent memory leaks
-    - A consecutive mistake counter tracks and manages errors
-    - File watchers monitor for server code changes and trigger automatic restarts
-    - The security model requires approval for tool execution unless in the "always allow" list
-
----
-
-## Security and Permissions
-
-The MCP architecture provides several security features:
-
-- Users must approve tool usage before execution (by default)
-- Specific tools can be marked for automatic approval in the "always allow" list
-- Server configurations are validated with Zod schemas for integrity
-- Configurable timeouts prevent hanging operations (1-3600 seconds)
-- Server connections can be enabled or disabled through the UI
-
----
-
-## Examples When Used
-
-- Analyzing specialized data formats using server-side processing tools
-- Generating images or other media through AI models hosted on external servers
-- Executing complex domain-specific calculations without local implementation
-- Accessing proprietary APIs or services through a controlled interface
-- Retrieving data from specialized databases or data sources
-
----
+1. **Initialization & Validation** — Verifies the MCP hub is available, server exists and is connected, tool exists on the server, and arguments match the tool's schema
+2. **Execution** — Selects the appropriate transport (STDIO for local, Streamable HTTP or SSE for remote), sends the request with validated parameters, and handles timeouts
+3. **Response Processing** — Handles multiple content types: text, image (binary with MIME type), and resource references (URIs for use with `access_mcp_resource`)
+4. **Error Handling** — Checks the `isError` flag, uses WeakRef patterns to prevent memory leaks, tracks consecutive mistakes
 
 ## Usage Examples
-
-Requesting weather forecast data with text response:
 
 ```
 <use_mcp_tool>
@@ -160,8 +85,6 @@ Requesting weather forecast data with text response:
 </arguments>
 </use_mcp_tool>
 ```
-
-Analyzing source code with a specialized tool that returns JSON:
 
 ```
 <use_mcp_tool>
@@ -178,54 +101,14 @@ Analyzing source code with a specialized tool that returns JSON:
 </use_mcp_tool>
 ```
 
-Generating an image with specific parameters:
+## Security and Permissions
 
-```
-<use_mcp_tool>
-<server_name>image-generation</server_name>
-<tool_name>create_image</tool_name>
-<arguments>
-{
-  "prompt": "A futuristic city with flying cars",
-  "style": "photorealistic",
-  "dimensions": {
-    "width": 1024,
-    "height": 768
-  },
-  "format": "webp"
-}
-</arguments>
-</use_mcp_tool>
-```
+- Users must approve tool usage by default
+- Specific tools can be marked for automatic approval ("always allow" list)
+- Server configurations validated with Zod schemas for integrity
+- Configurable timeouts prevent hanging operations
+- Server connections can be enabled/disabled through the UI
 
-Accessing a resource through a tool that returns a resource reference:
+## Relation to Other Tools
 
-```
-<use_mcp_tool>
-<server_name>database-connector</server_name>
-<tool_name>query_and_store</tool_name>
-<arguments>
-{
-  "database": "users",
-  "type": "select",
-  "fields": ["name", "email", "last_login"],
-  "where": {
-    "status": "active"
-  },
-  "store_as": "active_users"
-}
-</arguments>
-</use_mcp_tool>
-```
-
-Tool with no required arguments:
-
-```
-<use_mcp_tool>
-<server_name>system-monitor</server_name>
-<tool_name>get_current_status</tool_name>
-<arguments>
-{}
-</arguments>
-</use_mcp_tool>
-```
+[`use_mcp_tool`](use-mcp-tool.md) and [`access_mcp_resource`](access-mcp-resource.md) are Mirror VS's MCP gateway tools — one executes actions, the other fetches data. They're how Mirror VS transcends its built-in capabilities and hooks into the broader MCP ecosystem.

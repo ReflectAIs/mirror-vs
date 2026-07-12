@@ -1,64 +1,83 @@
----
-description: Learn strategies for effectively using Mirror VS with large codebases. Manage context limits, optimize token usage, and handle complex refactoring tasks.
-keywords:
-    - large projects
-    - context management
-    - token optimization
-    - codebase refactoring
-    - Mirror VS scalability
----
-
 # Working with Large Projects
 
-Mirror VS can be used with projects of any size, but large projects require some extra care to manage context effectively. Here are some tips for working with large codebases:
+## The Context Window: Your AI's Working Memory
 
----
+Mirror VS is powerful, but even the best AI has a finite attention span. The **context window** is how much information the model can hold in its "working memory" at once. Think of it as a whiteboard — once it fills up, something has to get erased before anything new can be written.
+
+For large projects, this matters. A lot.
 
 ## Understanding Context Limits
 
-Mirror VS uses large language models (LLMs) that have a limited "context window." This is the maximum amount of text (measured in tokens) that the model can process at once. If the context is too large, the model may not be able to understand your request or generate accurate responses.
+Every AI model has a maximum context window. Here's roughly what you're working with:
 
-The context window includes:
+| Model             | Context Window | What That Means for You    |
+| ----------------- | -------------- | -------------------------- |
+| Claude 3.5 Sonnet | ~200K tokens   | A novel's worth of context |
+| GPT-4o            | ~128K tokens   | A decent-sized novella     |
+| DeepSeek V3       | ~128K tokens   | Same ballpark              |
+| Gemini 1.5 Pro    | ~2M tokens     | Basically "yes"            |
 
-- The system prompt (instructions for Mirror VS).
-- The conversation history.
-- The content of any files you mention using `@`.
-- The output of any commands or tools Mirror VS uses.
-
----
+But here's the thing: just because the model _can_ hold 200K tokens doesn't mean you _should_ fill it up. Performance degrades as context grows, and costs go up. It's like stuffing your suitcase to the breaking point — technically possible, but you're going to have a bad time.
 
 ## Strategies for Managing Context
 
-1.  **Be Specific:** When referring to files or code, use specific file paths and function names. Avoid vague references like "the main file."
+### 1. Work Incrementally
 
-2.  **Use Context Mentions Effectively:** Use `@/path/to/file.ts` to include specific files. Use `@problems` to include current errors and warnings. Use `@` followed by a commit hash to reference specific Git commits.
+Don't ask Mirror VS to refactor your entire monorepo in one go. Break work into smaller, focused tasks:
 
-3.  **Break Down Tasks:** Divide large tasks into smaller, more manageable sub-tasks. This helps keep the context focused.
+- **Good**: "Refactor the authentication module"
+- **Bad**: "Refactor every file in the entire project, optimize the database schema, rewrite the frontend in a different framework, and also write documentation"
 
-4.  **Summarize:** If you need to refer to a large amount of code, consider summarizing the relevant parts in your prompt instead of including the entire code.
+One step at a time. Your AI's context window will thank you.
 
-5.  **Prioritize Recent History:** Mirror VS automatically truncates older messages in the conversation history to stay within the context window. Be mindful of this, and re-include important context if needed.
+### 2. Use the Right Mode
 
-6.  **Use Prompt Caching (if available):** Some API providers like Anthropic, OpenAI, OpenRouter and Requesty support "prompt caching". This caches your prompts for use in future tasks and helps reduce the cost and latency of requests.
+- **Architect mode**: For planning and design — uses less context because it's not holding all your source files in memory
+- **Code mode**: For implementation — more context-hungry, but more focused on execution
+- **Ask mode**: For questions — lightweight, perfect for quick queries without loading the whole project
 
----
+### 3. Leverage .mirrorignore
+
+Use a [`.mirrorignore`](/features/mirrorignore) file to exclude files that Mirror VS doesn't need to see. Your `node_modules`, `.git`, and `dist` directories aren't helping the AI make better decisions — they're just taking up valuable mental real estate.
+
+### 4. Be Surgical with Context Mentions
+
+Instead of mentioning entire folders, mention specific files. Instead of pasting the entire error log, paste the relevant section. Context mentions are a laser scalpel, not a flamethrower.
+
+### 5. Use Checkpoints
+
+Mirror VS's [checkpoint system](/features/checkpoints) lets you save and restore project states. If you hit a context limit mid-task, you can save your progress, start a fresh task, and restore the checkpoint. It's like saving your game before entering a boss fight.
 
 ## Example: Refactoring a Large File
 
-Let's say you need to refactor a large TypeScript file (`src/components/MyComponent.tsx`). Here's a possible approach:
+Let's say you have a 2000-line TypeScript file that needs refactoring. Here's what _not_ to do:
 
-1.  **Initial Overview:**
+```
+Refactor this entire file, extract all the utilities,
+fix the error handling, add types, and make it clean.
+```
 
-    ```
-    @/src/components/MyComponent.tsx List the functions and classes in this file.
-    ```
+Instead, try this approach:
 
-2.  **Target Specific Functions:**
+**Step 1**: Ask Mirror VS to analyze the file and suggest a plan
+**Step 2**: Refactor one section at a time
+**Step 3**: After each section, verify the changes
+**Step 4**: Start a new task for the next section
 
-    ```
-    @/src/components/MyComponent.tsx Refactor the `processData` function to use `async/await` instead of Promises.
-    ```
+```mermaid
+flowchart LR
+    A[Analyze File] --> B[Plan Refactoring]
+    B --> C[Refactor Section 1]
+    C --> D[Verify & Test]
+    D --> E[New Task: Section 2]
+    E --> F[Refactor Section 2]
+    F --> G[Verify & Test]
+```
 
-3.  **Iterative Changes:** Make small, incremental changes, reviewing and approving each step.
+This approach keeps context fresh, reduces errors, and makes it easier to track what changed. Plus, if something goes wrong in section 3, you don't lose the work from sections 1 and 2.
 
-By breaking down the task and providing specific context, you can work effectively with large files even with a limited context window.
+## When Size Matters
+
+Large projects aren't a problem for Mirror VS — they're just a challenge that requires a bit of strategy. Think of it like packing for a long trip: you wouldn't throw everything you own into a single suitcase and hope for the best. You'd pack strategically, use multiple bags, and accept that you might need to do laundry along the way.
+
+Mirror VS works the same way. Be strategic, work incrementally, and you'll get through even the largest codebases without breaking a sweat.

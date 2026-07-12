@@ -1,126 +1,83 @@
 ---
-description: Retrieve full command output that was truncated in execute_command using the read_command_output tool in Mirror VS.
-keywords:
-    - read_command_output
-    - command output
-    - truncated output
-    - CLI output
-    - terminal output
-    - Mirror VS tools
-    - artifact retrieval
+sidebar_position: 9
+title: read_command_output
 ---
 
-# read_command_output
+# `read_command_output` — Command Output, Retrieved
 
-The `read_command_output` tool retrieves the full output from commands executed via [`execute_command`](/advanced-usage/available-tools/execute-command) when the output was too large and got truncated. It provides access to stored command output artifacts with advanced filtering and pagination capabilities.
-
----
+Ever run a command that produced so much output it got cut off? That's where [`read_command_output`](read-command-output.md) comes in — it's the "show me the rest of that" button for command execution.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `artifact_id` (required): The artifact filename from the truncated output message (e.g., `cmd-1706119234567.txt`).
-- `search` (optional): Pattern to filter lines (supports regex or literal strings). Case-insensitive. Similar to `grep`. **Omit entirely if not needed** (do not pass null or empty string).
-- `offset` (optional): Byte offset to start reading from for pagination. Default: 0.
-- `limit` (optional): Maximum bytes to return. Default: 40KB (40960 bytes).
-
----
+| Parameter     | Type     | Required | Description                                                                       |
+| ------------- | -------- | -------- | --------------------------------------------------------------------------------- |
+| `artifact_id` | `string` | ✅       | The artifact filename from the truncated output (e.g., `"cmd-1706119234567.txt"`) |
+| `search`      | `string` | ❌       | Regex or literal pattern to filter lines (like grep, case-insensitive)            |
+| `offset`      | `number` | ❌       | Byte offset to start reading from (default: 0)                                    |
+| `limit`       | `number` | ❌       | Maximum bytes to return (default: 40KB)                                           |
 
 ## What It Does
 
-When [`execute_command`](/advanced-usage/available-tools/execute-command) produces very large output, it gets truncated and saved to an artifact file. This tool retrieves the full output from those artifacts, with support for searching specific patterns (like grep) and paginating through large results.
+[`read_command_output`](read-command-output.md) retrieves the full output from a command that was truncated in the initial result. Think of it as a scroll-back buffer for terminal commands — the full output is saved as an artifact, and this tool lets you page through it, search it, or grep through it.
 
----
+## When Is It Used?
 
-## When is it used?
+Whenever a command produces more output than fits in the initial response:
 
-- When [`execute_command`](/advanced-usage/available-tools/execute-command) output includes the message: `[OUTPUT TRUNCATED - Full output saved to artifact: cmd-XXXX.txt]`
-- When you need to search for specific errors or patterns in large command output
-- When analyzing verbose build logs, test results, or compilation output
-- When paginating through command output that's too large to view at once
-- When filtering command output to find relevant lines without reading everything
-
----
+- **Build logs** — `npm run build` outputs 10,000 lines; the last 40 get shown, the rest is saved
+- **Test output** — `npx vitest run` produces hundreds of test results
+- **Search results** — `grep -r` across a large codebase
+- **Linter output** — Running ESLint on a large project
 
 ## Key Features
 
-- **Read mode**: Access full output with pagination using `offset` and `limit`
-- **Search mode**: Filter lines matching a regex or literal pattern (case-insensitive)
-- Handles very large command outputs efficiently
-- Similar to `grep` for filtering output
-- Byte-level pagination for precise control
-- Access to complete untruncated command output
-
----
+- **Pagination** — Read output in chunks using `offset` and `limit`
+- **Search mode** — Filter lines by regex or literal strings (case-insensitive grep)
+- **Artifact persistence** — Full output is saved as an artifact, not lost
+- **40KB default chunks** — Manageable slices for reading context
 
 ## Limitations
 
-- Only works with artifacts created by [`execute_command`](/advanced-usage/available-tools/execute-command)
-- Artifacts may be cleaned up after a certain time period
-- Search patterns are case-insensitive only
-- Returns content as bytes with limits (not entire files at once for very large outputs)
-- Requires the exact artifact ID from the truncation message
-
----
+- **Requires artifact ID** — You need the artifact filename from the original truncated output
+- **Text only** — Binary command output won't work
+- **Memory-bound** — Very large outputs consume memory to store as artifacts
 
 ## How It Works
 
-When the `read_command_output` tool is invoked, it follows this process:
-
-1. **Artifact Lookup**: Locates the stored command output artifact by ID.
-2. **Mode Selection**:
-    - If `search` parameter is provided: operates in **search mode** (filter lines)
-    - Otherwise: operates in **read mode** (return raw content with offset/limit)
-3. **Search Mode** (if `search` provided):
-    - Applies regex or literal pattern matching to each line
-    - Returns only lines that match the pattern
-    - Case-insensitive matching
-4. **Read Mode** (if no `search`):
-    - Reads from `offset` byte position
-    - Returns up to `limit` bytes
-    - Supports pagination through large files
-5. **Result Return**: Returns filtered or paginated content.
-
----
+1. A command is executed (e.g., `npm run build`) and produces more output than fits the initial preview
+2. The full output is saved as a text artifact (e.g., `cmd-1706119234567.txt`)
+3. The truncated preview shows: `[OUTPUT TRUNCATED - Full output saved to artifact: cmd-1706119234567.txt]`
+4. The AI can then use [`read_command_output`](read-command-output.md) to:
+    - Read from the beginning with `{ artifact_id: "cmd-1706119234567.txt", offset: 0, limit: 40960 }`
+    - Search for specific patterns with `{ artifact_id: "cmd-1706119234567.txt", search: "error|Error|FAIL" }`
+    - Page through output by incrementing `offset`
 
 ## Usage Examples
 
-Reading truncated output:
+### Reading Full Output
 
 ```
-When execute_command shows:
-"[OUTPUT TRUNCATED - Full output saved to artifact: cmd-1706119234567.txt]"
-
-Use:
-<read_command_output>
-  <artifact_id>cmd-1706119234567.txt</artifact_id>
-</read_command_output>
+Let me see the full build output from that last command
 ```
 
-Searching for errors:
+This triggers [`read_command_output`](read-command-output.md) with the artifact ID from the truncated response and default offset/limit.
+
+### Searching for Errors
 
 ```
-<read_command_output>
-  <artifact_id>cmd-1706119234567.txt</artifact_id>
-  <search>error|failed|Error</search>
-</read_command_output>
+Search the command output for any errors or failures
 ```
 
-Paginating through output (reading next chunk):
+This triggers [`read_command_output`](read-command-output.md) with `search: "error|failed|Error|FAIL"` — just like grepping through terminal history.
+
+### Paginating Through Output
 
 ```
-<read_command_output>
-  <artifact_id>cmd-1706119234567.txt</artifact_id>
-  <offset>40960</offset>
-  <limit>40960</limit>
-</read_command_output>
+Show me the next chunk of output
 ```
 
----
+Increment `offset` by 40960 (40KB) to read the next chunk.
 
 ## Relation to Other Tools
 
-- [`execute_command`](/advanced-usage/available-tools/execute-command): Creates the artifacts that this tool reads
-- [`search_files`](/advanced-usage/available-tools/search-files): Use for searching project files with regex
-- `read_command_output`: Use for searching command output artifacts
+[`read_command_output`](read-command-output.md) is the companion to [`execute_command`](execute-command.md). While [`execute_command`](execute-command.md) runs commands and shows a preview, [`read_command_output`](read-command-output.md) lets you dig into the full output. Together, they form Mirror VS's terminal reading capability.

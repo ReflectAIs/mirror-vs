@@ -10,89 +10,59 @@ keywords:
     - workflows
 ---
 
-# skill
+# `skill` — Expert Instructions on Demand
 
-The `skill` tool loads and injects specialized skill instructions into the conversation context. Skills provide detailed, step-by-step guidance for specific tasks like creating MCP servers, custom modes, or following standardized workflows.
-
----
+Think of [`skill`](skill.md) as Mirror VS's "downloadable expertise" — pre-written instruction sets that guide the AI through specific tasks like creating MCP servers, building custom modes, or following standardized workflows.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `skill` (required): The name of the skill to load (e.g., `create-mcp-server`, `create-mode`). Must match a skill name from the available skills list.
-- `args` (optional): Additional context or arguments to pass to the skill for customization.
-
----
+| Parameter | Type     | Required | Description                                                          |
+| --------- | -------- | -------- | -------------------------------------------------------------------- |
+| `skill`   | `string` | ✅       | Name of the skill to load (e.g., `create-mcp-server`, `create-mode`) |
+| `args`    | `string` | ❌       | Additional context to pass to the skill                              |
 
 ## What It Does
 
-This tool retrieves skill instructions from the skills directory and loads them into the active conversation. Skills are pre-written instruction sets that guide Mirror through complex, multi-step procedures. The tool is mode-aware, loading skills specific to the current mode when available.
+[`skill`](skill.md) retrieves skill instructions from the skills directory and injects them into the active conversation. Skills are pre-written, step-by-step guides that walk Mirror VS through complex, multi-step procedures. It's mode-aware too — it loads mode-specific skills when available.
 
----
+## When Is It Used?
 
-## When is it used?
-
-- When executing specialized procedures that have standardized workflows
+- When executing specialized procedures with standardized workflows
 - When creating MCP servers, custom modes, or other structured artifacts
 - When following documented best practices for specific task types
-- When you need to invoke expert knowledge for a particular domain
-- When the task matches a known skill pattern available in the system
-
----
+- When you need expert guidance for a particular domain
 
 ## Key Features
 
-- Mode-aware skill resolution (loads mode-specific skills when available)
-- Supports project-level skill overrides (take precedence over global skills)
-- Progressive disclosure: linked files are not auto-loaded (explicit reads required)
-- Optional arguments for skill customization
-- Skills persist in context for the duration of the conversation
-- Provides structured, step-by-step guidance for complex tasks
-
----
+- **Mode-aware resolution** — Loads mode-specific skills when available (e.g., `skills-code/` for Code mode)
+- **Project-level overrides** — Project skills take precedence over global skills
+- **Progressive disclosure** — Linked files aren't auto-loaded; the AI must explicitly read them
+- **Customizable with arguments** — Pass context to tailor skill execution
+- **Persistent context** — Skills remain available for the conversation's duration
 
 ## How It Works
 
-When the `skill` tool is invoked, it follows this process:
+1. **Skill Resolution** — Searches in priority order:
+    - Project `.mirror/skills-code/` (mode-specific)
+    - Project `.mirror/skills/` (generic)
+    - Project `.agents/skills-code/` (mode-specific)
+    - Project `.agents/skills/` (generic)
+    - Global equivalents in `~/.mirror/` and `~/.agents/`
+2. **Skill Loading** — Loads the skill's main instruction file (typically `SKILL.md`)
+3. **Context Injection** — Injects the instructions into the conversation
+4. **Execution** — Mirror VS follows the skill's instructions to complete the task
 
-1. **Skill Resolution**: Searches for the named skill in the following locations (highest priority first):
-    - Project `.mirror` mode-specific (e.g., `.mirror/skills-code/`)
-    - Project `.mirror` generic (`.mirror/skills/`)
-    - Project `.agents` mode-specific (e.g., `.agents/skills-code/`)
-    - Project `.agents` generic (`.agents/skills/`)
-    - Global `.mirror` mode-specific (e.g., `~/.mirror/skills-code/`)
-    - Global `.mirror` generic (`~/.mirror/skills/`)
-    - Global `.agents` mode-specific (e.g., `~/.agents/skills-code/`)
-    - Global `.agents` generic (`~/.agents/skills/`)
-2. **Skill Loading**: Loads the skill's main instruction file (typically `SKILL.md`).
-3. **Context Injection**: Injects skill instructions into conversation context.
-4. **Linked Files**: Files referenced in the skill are **not** automatically loaded; Mirror must explicitly read them if needed.
-5. **Execution**: Mirror follows the skill's instructions to complete the task.
+### Available Skills
 
----
+Common skills include:
 
-## Available Skills
+- `create-mcp-server` — Guide for creating Model Context Protocol servers
+- `create-mode` — Guide for creating custom Mirror VS modes
+- `find-skills` — Helps discover and install agent skills
 
-Skills are dynamically loaded based on the current mode and project configuration. Common skills include:
+To see available skills, ask Mirror VS "what skills are available?" or check the skills list in the system prompt.
 
-- `create-mcp-server`: Guide for creating Model Context Protocol servers
-- `create-mode`: Guide for creating custom Mirror VS modes
-- `find-skills`: Helps discover and install agent skills
-
-To see available skills, check the skills list in the system prompt or ask Mirror "what skills are available?"
-
----
-
-## Relation to Features
-
-The `skill` tool is the programmatic interface to the [Skills](/features/skills) feature. For comprehensive documentation on how skills work, how to create custom skills, and the skills system architecture, see the [Skills feature documentation](/features/skills).
-
----
-
-## Example Usage
-
-Loading a skill to create an MCP server:
+## Usage Examples
 
 ```
 <skill>
@@ -101,10 +71,12 @@ Loading a skill to create an MCP server:
 </skill>
 ```
 
-Loading a skill without additional context:
-
 ```
 <skill>
   <skill>create-mode</skill>
 </skill>
 ```
+
+## Relation to Features
+
+The [`skill`](skill.md) tool is the programmatic interface to the [Skills](/features/skills) feature. For comprehensive documentation on how skills work, creating custom skills, and the skills system architecture, see the [Skills feature documentation](/features/skills).
