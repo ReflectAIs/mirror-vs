@@ -48,7 +48,7 @@ The Error Details modal offers two buttons, each serving different needs:
 
 After copying error information:
 
-- **Email**: Send to [support@mirrorvs.dev](mailto:support@mirrorvs.dev)
+- **Email**: Send to [support@reflectai.in](mailto:support@reflectai.in)
 - **GitHub Issues**: File at [github.com/ReflectAIs/mirror-vs/issues](https://github.com/ReflectAIs/mirror-vs/issues)
 
 Include a brief description of what you were trying to do when the error occurred. The exported diagnostics handle the technical heavy lifting — you just need to tell the story.

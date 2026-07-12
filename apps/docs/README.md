@@ -1,6 +1,6 @@
 # Mirror VS Docs
 
-This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator, and lives at https://mirrorvs.dev/
+This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator, and lives at https://www.reflectai.in/
 
 ### Installation
 

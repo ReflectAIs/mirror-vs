@@ -50,6 +50,7 @@ logs
 
 # Qdrant
 qdrant_storage/
+storage/
 
 # Architect plans
 plans/

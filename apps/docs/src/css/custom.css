@@ -134,7 +134,7 @@
 	z-index: 1;
 }
 
-/* Exact utility classes from mirrorvs.dev */
+/* Exact utility classes from reflectai.in */
 .mirror-gradient-heading {
 	background: linear-gradient(to bottom, hsl(var(--foreground)), hsl(var(--foreground) / 0.7));
 	background-clip: text;
@@ -233,7 +233,7 @@
 	}
 }
 
-/* Exact animations from mirrorvs.dev */
+/* Exact animations from reflectai.in */
 @keyframes fade-in {
 	from {
 		opacity: 0;
@@ -388,7 +388,7 @@ pre {
 	--ifm-container-width: 1400px;
 }
 
-/* Exact navbar styling from mirrorvs.dev */
+/* Exact navbar styling from reflectai.in */
 .navbar {
 	position: sticky !important;
 	top: 0 !important;
@@ -451,7 +451,7 @@ pre {
 	background-color: transparent !important;
 }
 
-/* Match mirrorvs.dev's container system */
+/* Match reflectai.in's container system */
 .navbar__inner {
 	max-width: 1400px; /* Match the container width */
 	margin: 0 auto;
@@ -550,7 +550,7 @@ pre {
 	min-height: 100vh;
 }
 
-/* Clean sidebar like mirrorvs.dev */
+/* Clean sidebar like reflectai.in */
 .theme-doc-sidebar-container {
 	backdrop-filter: blur(20px);
 	border-right: 1px solid hsl(var(--border)) !important;
@@ -614,7 +614,7 @@ html[data-theme="light"] {
 	--ifm-heading-color: hsl(var(--foreground));
 }
 
-/* Set default theme to dark to match mirrorvs.dev */
+/* Set default theme to dark to match reflectai.in */
 html {
 	--ifm-background-color: hsl(var(--background));
 	--ifm-font-color-base: hsl(var(--foreground));
@@ -1390,7 +1390,7 @@ body {
 	font-size: 0.875rem !important;
 }
 
-/* DocSearch button keys - styled to match mirrorvs.dev */
+/* DocSearch button keys - styled to match reflectai.in */
 .DocSearch-Button-Keys {
 	display: flex !important;
 	align-items: center;
@@ -1601,12 +1601,12 @@ main[class*="docMainContainer"] {
 	font-weight: 500;
 }
 
-/* Paragraph spacing - match mirrorvs.dev */
+/* Paragraph spacing - match reflectai.in */
 .theme-doc-markdown p {
 	font-size: var(--p-size);
 	line-height: var(--p-line-height);
 	letter-spacing: var(--p-letter-spacing);
-	color: hsl(var(--foreground) / 0.9); /* 90% brightness like mirrorvs.dev */
+	color: hsl(var(--foreground) / 0.9); /* 90% brightness like reflectai.in */
 	margin-bottom: 1rem;
 	font-weight: 400; /* Ensure normal weight */
 }
@@ -1655,7 +1655,7 @@ main[class*="docMainContainer"] {
 	margin-bottom: 0.5rem;
 }
 
-/* Code blocks with mirrorvs.dev styling */
+/* Code blocks with reflectai.in styling */
 .theme-code-block {
 	margin: var(--figure-margin) 0;
 	border-radius: calc(var(--radius)) !important;
@@ -1705,7 +1705,7 @@ main[class*="docMainContainer"] {
 	color: hsl(var(--muted-foreground));
 }
 
-/* Admonitions (alerts) with mirrorvs.dev style */
+/* Admonitions (alerts) with reflectai.in style */
 .theme-admonition {
 	margin: var(--block-spacing) 0 !important;
 	padding: calc(var(--block-spacing) * 0.5) calc(var(--block-spacing) * 0.5) calc(var(--block-spacing) * 0.25) !important;
@@ -1740,7 +1740,7 @@ main[class*="docMainContainer"] {
   fill: rgb(var(--accent)); */
 }
 
-/* Tables with mirrorvs.dev styling */
+/* Tables with reflectai.in styling */
 .theme-doc-markdown table {
 	width: 100%;
 	margin: var(--figure-margin) 0;
@@ -2196,7 +2196,7 @@ a.breadcrumbs__link:hover {
    FOOTER LAYOUT - ROOCODE.COM STYLE
    ============================================ */
 
-/* Footer Layout - mirrorvs.dev style */
+/* Footer Layout - reflectai.in style */
 .footer__main {
 	display: flex;
 	gap: 4rem;

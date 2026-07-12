@@ -6,7 +6,7 @@ We actively patch only the most recent minor release of Mirror VS. Older version
 
 ## Reporting a Vulnerability
 
-Email security@mirrorvs.dev with:
+Email security@reflectai.in with:
 
 - A short summary of the issue
 - Steps to reproduce or a proof of concept
