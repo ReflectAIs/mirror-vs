@@ -26,8 +26,51 @@ export function buildSubtree(
 }
 
 /**
+ * Builds task groups from a list of tasks based on parent-child relationships.
+ * Exported for testing.
+ */
+export function buildTaskGroups(
+	tasks: HistoryItem[],
+	taskMap: Map<string, HistoryItem>,
+	expandedIds: Set<string>,
+): TaskGroup[] {
+	// Build children map: parentId -> direct children[]
+	const childrenMap = new Map<string, HistoryItem[]>()
+
+	for (const task of tasks) {
+		if (task.parentTaskId && taskMap.has(task.parentTaskId)) {
+			const siblings = childrenMap.get(task.parentTaskId) || []
+			siblings.push(task)
+			childrenMap.set(task.parentTaskId, siblings)
+		}
+	}
+
+	// Identify root tasks - tasks that either:
+	// 1. Have no parentTaskId
+	// 2. Have a parentTaskId that doesn't exist in our task list (orphans promoted to root)
+	const rootTasks = tasks.filter((task) => !task.parentTaskId || !taskMap.has(task.parentTaskId))
+
+	// Build groups from root tasks with recursively nested subtask trees
+	const taskGroups: TaskGroup[] = rootTasks.map((parent) => {
+		const directChildren = (childrenMap.get(parent.id) || []).slice().sort((a, b) => b.ts - a.ts)
+
+		return {
+			parent: parent as DisplayHistoryItem,
+			subtasks: directChildren.map((child) => buildSubtree(child, childrenMap, expandedIds)),
+			isExpanded: expandedIds.has(parent.id),
+		}
+	})
+
+	// Sort groups by parent timestamp (newest first)
+	taskGroups.sort((a, b) => b.parent.ts - a.parent.ts)
+
+	return taskGroups
+}
+
+/**
  * Hook to transform a flat task list into grouped structure based on parent-child relationships.
  * In search mode, returns a flat list with isSubtask flag for each item.
+ * In normal mode, returns task groups directly (no session grouping).
  *
  * @param tasks - The list of tasks to group
  * @param searchQuery - Current search query (empty string means not searching)
@@ -54,37 +97,7 @@ export function useGroupedTasks(tasks: HistoryItem[], searchQuery: string): Grou
 			return []
 		}
 
-		// Build children map: parentId -> direct children[]
-		const childrenMap = new Map<string, HistoryItem[]>()
-
-		for (const task of tasks) {
-			if (task.parentTaskId && taskMap.has(task.parentTaskId)) {
-				const siblings = childrenMap.get(task.parentTaskId) || []
-				siblings.push(task)
-				childrenMap.set(task.parentTaskId, siblings)
-			}
-		}
-
-		// Identify root tasks - tasks that either:
-		// 1. Have no parentTaskId
-		// 2. Have a parentTaskId that doesn't exist in our task list (orphans promoted to root)
-		const rootTasks = tasks.filter((task) => !task.parentTaskId || !taskMap.has(task.parentTaskId))
-
-		// Build groups from root tasks with recursively nested subtask trees
-		const taskGroups: TaskGroup[] = rootTasks.map((parent) => {
-			const directChildren = (childrenMap.get(parent.id) || []).slice().sort((a, b) => b.ts - a.ts)
-
-			return {
-				parent: parent as DisplayHistoryItem,
-				subtasks: directChildren.map((child) => buildSubtree(child, childrenMap, expandedIds)),
-				isExpanded: expandedIds.has(parent.id),
-			}
-		})
-
-		// Sort groups by parent timestamp (newest first)
-		taskGroups.sort((a, b) => b.parent.ts - a.parent.ts)
-
-		return taskGroups
+		return buildTaskGroups(tasks, taskMap, expandedIds)
 	}, [tasks, taskMap, isSearchMode, expandedIds])
 
 	// Flatten tasks for search mode with isSubtask flag
@@ -99,7 +112,7 @@ export function useGroupedTasks(tasks: HistoryItem[], searchQuery: string): Grou
 		})) as DisplayHistoryItem[]
 	}, [tasks, taskMap, isSearchMode])
 
-	// Toggle expand/collapse for a group
+	// Toggle expand/collapse for a task group
 	const toggleExpand = useCallback((taskId: string) => {
 		setExpandedIds((prev) => {
 			const newSet = new Set(prev)

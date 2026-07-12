@@ -53,7 +53,7 @@ By default, Mirror VS selects a stable Pro model with a temperature of **1.0** w
 
 ### URL Context
 
-Gemini models can now access and analyze web content directly through URL context. This feature allows Mirror to:
+Gemini models can now access and analyze web content directly through URL context. This feature allows Mirror VS to:
 
 - Read and understand web pages in real-time
 - Analyze documentation from URLs

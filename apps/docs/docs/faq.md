@@ -14,7 +14,7 @@ import KangamirrorIcon from '@site/src/components/KangamirrorIcon';
 
 # Frequently Asked Questions
 
-This page answers some common questions about Mirror VS.
+Welcome to the FAQ page — where your questions go to find answers. If you don't see yours here, check the rest of the docs or just ask Mirror VS itself. (Meta, we know.)
 
 ---
 
@@ -22,46 +22,43 @@ This page answers some common questions about Mirror VS.
 
 ### What is Mirror VS?
 
-Mirror VS is an open-source AI coding agent for VS Code designed to take full advantage of advanced large-language models.
+Mirror VS is an open-source AI coding agent for VS Code. It's designed to take full advantage of advanced large-language models so you can stop typing boilerplate and start building.
 
 ### How does Mirror VS work?
 
-Mirror VS uses large language models (LLMs) to understand your requests and translate them into actions. It can:
+Mirror VS uses large language models (LLMs) to understand your requests and turn them into actions. Specifically, it can:
 
 - Read and write files in your project
 - Execute shell commands
 - Perform web browsing (if enabled)
 - Use external tools via the Model Context Protocol (MCP)
 
-You interact with Mirror VS through a chat interface in the extension.
+You interact with it through a chat interface in the extension. That's it. You talk, it does.
 
 ### What can Mirror VS do?
 
-Mirror VS can help with a variety of coding tasks, including:
+Glad you asked. Mirror VS can help with:
 
-- Generating code from natural language descriptions.
-- Refactoring existing code.
-- Fixing bugs.
-- Writing documentation.
-- Explaining code.
-- Answering questions about your codebase.
-- Automating repetitive tasks.
-- Creating new files and projects.
+- Generating code from natural language descriptions
+- Refactoring existing code (because that function you wrote at 2 AM needs work)
+- Fixing bugs (the ones you know about, and the ones you don't)
+- Writing documentation (the part everyone loves to skip)
+- Explaining code (your own or someone else's)
+- Answering questions about your codebase
+- Automating repetitive tasks
+- Creating new files and projects
 
 ### Is Mirror VS free to use?
 
-The Mirror VS extension is free and [open-source](https://github.com/ReflectAIs/mirror-vs/).
-
-Mirror VS relies on external LLM inference providers (like [Anthropic](providers/anthropic), [OpenAI](providers/openai), [OpenRouter](providers/openrouter), [Requesty](providers/requesty), etc.) for its AI capabilities.
-These providers typically charge for API usage based on the number of tokens processed. You will need to create an account and obtain an API key from your chosen provider. Learn more [about providers and how to set them up](/providers/) for details.
+The Mirror VS extension itself is free and [open-source](https://github.com/ReflectAIs/mirror-vs/). However, Mirror VS relies on external LLM inference providers (like [Anthropic](providers/anthropic), [OpenAI](providers/openai), [OpenRouter](providers/openrouter), [Requesty](providers/requesty), etc.) for its AI brain. These providers typically charge for API usage based on tokens processed. You'll need an account and an API key from your chosen provider. See [about providers](/providers/) for details.
 
 ### What are the risks of using Mirror VS?
 
-Mirror VS is a powerful tool, and it's important to use it responsibly. Here are some things to keep in mind:
+Mirror VS is a powerful tool. Use it responsibly. Keep these in mind:
 
-- **Mirror VS can make mistakes.** Always review Mirror VS's proposed changes carefully before approving them.
-- **Mirror VS can execute commands.** Be very cautious about allowing Mirror VS to run commands, especially if you're using auto-approval.
-- **Mirror VS can access the internet.** If you're using a provider that supports web browsing, be aware that Mirror VS could potentially access sensitive information.
+- **Mirror VS can make mistakes.** Always review proposed changes before approving them.
+- **Mirror VS can execute commands.** Be cautious about allowing command execution, especially with auto-approval enabled.
+- **Mirror VS can access the internet.** If your provider supports web browsing, Mirror could potentially access sensitive information if you're not careful.
 
 ---
 
@@ -69,19 +66,19 @@ Mirror VS is a powerful tool, and it's important to use it responsibly. Here are
 
 ### How do I install Mirror VS?
 
-See the [Installation Guide](/getting-started/installing) for detailed instructions.
+See the [Installation Guide](/getting-started/installing) for detailed instructions. Takes about two minutes, including the coffee break.
 
 ### Which API providers are supported?
 
-See the [full list here](/providers/).
+See the [full list here](/providers/). Spoiler: most of the major ones.
 
 ### How do I get an API key?
 
-Each API provider has its own process for obtaining an API key. See the [Setting Up Your First AI Provider](/getting-started/connecting-api-provider) for links to the relevant documentation for each provider.
+Each provider has its own process. See [Setting Up Your First AI Provider](/getting-started/connecting-api-provider) for links to the relevant docs.
 
 ### Can I use Mirror VS with local models?
 
-Yes, Mirror VS supports running models locally using [Ollama](/providers/ollama) and [LM Studio](/providers/lmstudio). See [Using Local Models](/advanced-usage/local-models) for instructions.
+Yes! Mirror VS supports running models locally using [Ollama](/providers/ollama) and [LM Studio](/providers/lmstudio). See [Using Local Models](/advanced-usage/local-models) for instructions. No internet required. No API bills. Just you and your GPU.
 
 ---
 
@@ -89,54 +86,56 @@ Yes, Mirror VS supports running models locally using [Ollama](/providers/ollama)
 
 ### How do I start a new task?
 
-Open the Mirror VS panel (<KangamirrorIcon />) and type your task in the chat box. Be clear and specific about what you want Mirror VS to do. See [Typing Your Requests](/basic-usage/typing-your-requests) for best practices.
+Open the Mirror VS panel (<KangamirrorIcon />) and type your task in the chat box. Be clear and specific. See [Typing Your Requests](/basic-usage/typing-your-requests) for best practices.
 
 ### What are modes in Mirror VS?
 
-[Modes](/basic-usage/using-modes) are different personas that Mirror VS can adopt, each with a specific focus and set of capabilities. The built-in modes are:
+[Modes](/basic-usage/using-modes) are different personas Mirror VS can adopt, each with a specific focus and set of capabilities. The built-in modes are:
 
-- **Code:** For general-purpose coding tasks.
-- **Architect:** For planning and technical leadership.
-- **Ask:** For answering questions and providing information.
-- **Debug:** For systematic problem diagnosis.
-  You can also create [Custom Modes](/features/custom-modes).
+- **Code:** For general-purpose coding
+- **Architect:** For planning and technical leadership
+- **Ask:** For answering questions and providing information
+- **Debug:** For systematic problem diagnosis
+- **Orchestrator:** For coordinating multi-step workflows
+
+You can also create [Custom Modes](/features/custom-modes) to suit your specific needs.
 
 ### How do I switch between modes?
 
-Use the dropdown menu in the chat input area to select a different mode, or use the `/` command to switch to a specific mode.
+Use the dropdown menu in the chat input area, type a slash command like `/architect`, or use the keyboard shortcut (`⌘+.` on Mac, `Ctrl+.` on Windows/Linux).
 
 ### What are tools and how do I use them?
 
-[Tools](/basic-usage/how-tools-work) are how Mirror VS interacts with your system. Mirror VS automatically selects and uses the appropriate tools to complete your tasks. You don't need to call tools directly. You will be prompted to approve or reject each tool use.
+[Tools](/basic-usage/how-tools-work) are how Mirror VS interacts with your system. Mirror automatically selects and uses the appropriate tools to complete your tasks. You don't call tools directly — you just approve or reject them.
 
 ### What are context mentions?
 
-[Context mentions](/basic-usage/context-mentions) are a way to provide Mirror VS with specific information about your project, such as files, folders, or problems. Use the "@" symbol followed by the item you want to mention (e.g., `@/src/file.ts`, `@problems`).
+[Context mentions](/basic-usage/context-mentions) are a way to feed Mirror VS specific information about your project. Use `@` followed by a file, folder, problem, or Git reference (e.g., `@/src/file.ts`, `@problems`, `@git-changes`).
 
 ### Can Mirror VS access the internet?
 
-Yes, if you are using a provider with a model that support web browsing. Be mindful of the security implications of allowing this.
+Yes, if you're using a provider with a model that supports web browsing. Be mindful of the security implications.
 
 ### Can Mirror VS run commands in my terminal?
 
-Yes, Mirror VS can execute commands in your VS Code terminal. You will be prompted to approve each command before it's executed, unless you've enabled auto-approval for commands. Be extremely cautious about auto-approving commands. If you're experiencing issues with terminal commands, see the [Shell Integration Guide](/features/shell-integration) for troubleshooting.
+Yes. You'll be prompted to approve each command before execution, unless auto-approval is enabled. Be extremely cautious about auto-approving commands. See the [Shell Integration Guide](/features/shell-integration) for troubleshooting.
 
 ### How do I provide feedback to Mirror VS?
 
-You can provide feedback by approving or rejecting Mirror VS's proposed actions. You can provide additional feedback by using the feedback field.
+Approve or reject Mirror's proposed actions. You can also use the feedback field at the bottom of each response. Mirror learns from both.
 
 ### Can I customize Mirror VS's behavior?
 
-Yes, you can customize Mirror VS in several ways:
+Yes, several ways:
 
-- **Custom Instructions:** Provide general instructions that apply to all modes, or mode-specific instructions.
-- **Custom Modes:** Create your own modes with tailored prompts and some tool permissions.
-- **`.mirrorrules` Files:** Create `.mirrorrules` files in your project to provide additional guidelines.
-- **Settings:** Adjust various settings, such as auto-approval, diff editing, and more.
+- **Custom Instructions:** General instructions that apply to all modes
+- **Custom Modes:** Create your own modes with tailored prompts and tool permissions
+- **`.mirrorrules` Files:** Project-level guidelines in `.mirrorrules` files
+- **Settings:** Adjust auto-approval, diff editing, and more
 
-### Does Mirror VS have any auto approval settings?
+### Does Mirror VS have auto approval settings?
 
-Yes, Mirror VS has a few settings that when enabled will automatically approve actions. Find out more [here](/features/auto-approving-actions).
+Yes. Mirror VS has settings that, when enabled, automatically approve certain actions. Find out more [here](/features/auto-approving-actions). Use with caution. With great power comes great responsibility.
 
 ---
 
@@ -144,23 +143,23 @@ Yes, Mirror VS has a few settings that when enabled will automatically approve a
 
 ### Can I use Mirror offline?
 
-Yes, if you use a [local model](/advanced-usage/local-models).
+Yes, if you use a [local model](/advanced-usage/local-models). Perfect for planes, trains, and places where the internet goes to die.
 
 ### What is MCP (Model Context Protocol)?
 
-[MCP](/features/mcp/overview) is a protocol that allows Mirror VS to communicate with external servers, extending its capabilities with custom tools and resources.
+[MCP](/features/mcp/overview) is a protocol that lets Mirror VS communicate with external servers, extending its capabilities with custom tools and resources. Think of it as giving Mirror superpowers.
 
 ### Can I create my own MCP servers?
 
-Yes, you can create your own MCP servers to add custom functionality to Mirror VS. See the [MCP documentation](https://github.com/modelcontextprotocol) for details.
+Yes. You can build your own MCP servers to add custom functionality. See the [MCP documentation](https://github.com/modelcontextprotocol) for details.
 
 ### What is Codebase Indexing?
 
-[Codebase Indexing](/features/codebase-indexing) creates a semantic search index of your project using AI embeddings. This enables Mirror VS to better understand and navigate large codebases by finding relevant code based on meaning rather than just keywords.
+[Codebase Indexing](/features/codebase-indexing) creates a semantic search index of your project using AI embeddings. It lets Mirror VS find code based on meaning, not just keywords. It's like Google for your codebase.
 
 ### How much does Codebase Indexing cost?
 
-Codebase Indexing requires an OpenAI API key for generating embeddings and a Qdrant vector database for storage. Costs depend on your project size and the embedding model used. Initial indexing is the most expensive part; subsequent updates are incremental and much cheaper.
+It requires an OpenAI API key for generating embeddings and a Qdrant vector database for storage. Costs depend on your project size and the embedding model. Initial indexing is the most expensive part. Subsequent updates are incremental and much cheaper.
 
 ---
 
@@ -168,20 +167,20 @@ Codebase Indexing requires an OpenAI API key for generating embeddings and a Qdr
 
 ### Mirror VS isn't responding. What should I do?
 
-- Make sure your API key is correct and hasn't expired.
-- Check your internet connection.
-- Check the status of your chosen API provider.
-- Try restarting VS Code.
+Before you throw your laptop out the window:
 
-### I'm seeing an error message. What does it mean?
+- Make sure your API key is correct and hasn't expired
+- Check your internet connection
+- Check the status of your chosen API provider
+- Try restarting VS Code (the IT classic)
 
 ### Mirror VS made changes I didn't want. How do I undo them?
 
-Mirror VS uses VS Code's built-in file editing capabilities. You can use the standard "Undo" command (Ctrl/Cmd + Z) to revert changes. Also, if experimental checkpoints are enabled, Mirror can revert changes made to a file.
+Use the standard "Undo" command (`Ctrl/Cmd + Z`). If experimental checkpoints are enabled, Mirror can also revert changes made to a file.
 
 ### Mirror VS can't write to markdown files. What's wrong?
 
-If Mirror VS fails to write to `.md` files with errors like "Failed to open diff editor" or "write_to_file tool failed", this is typically caused by VS Code extensions or settings that interfere with file editing:
+If Mirror VS fails to write to `.md` files with errors like "Failed to open diff editor" or "write_to_file tool failed", it's typically caused by VS Code extensions or settings that interfere with file editing:
 
 **Common causes:**
 
@@ -199,7 +198,3 @@ If Mirror VS fails to write to `.md` files with errors like "Failed to open diff
       "*.md": "vscode.markdown.preview.editor"
     }
     ```
-- Temporarily disable markdown-related extensions to test if they're causing the issue
-- Restart VS Code after making these changes
-
-### How do I report a bug or suggest a feature?

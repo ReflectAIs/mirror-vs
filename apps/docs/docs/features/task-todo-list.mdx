@@ -10,14 +10,14 @@ keywords:
 
 # Task Todo List
 
-Keep your tasks on track with integrated todo management that helps you stay organized and focused on your development goals. Task Todo Lists provide interactive, persistent checklists that track your progress through complex, multi-step workflows directly within the chat interface.
+Keep your tasks on track with integrated todo management that helps you stay organized and focused on your development goals. Task Todo Lists provide interactive, persistent checklists that track your progress through complex, multi-step workflows directly within the chat interface. Think of it as a to-do list that actually does something.
 
 <img src="/img/task-todo-list/task-todo-list-3.png" alt="Task Todo List overview showing interactive checklist in Mirror VS" width="600" />
 
 :::tip Todo List Triggers
-Todo lists are automatically created for complex tasks, multi-step workflows, or when using Architect mode. You can also manually trigger them by asking Roo to "use the update_todo_list tool" or "create a todo list".
+Todo lists are automatically created for complex tasks, multi-step workflows, or when using Architect mode. You can also manually trigger them by asking Mirror VS to "use the update_todo_list tool" or "create a todo list".
 
-See [When Roo Creates Todo Lists](#when-roo-creates-todo-lists) for detailed information about automatic and manual triggers.
+See [When Mirror VS Creates Todo Lists](#when-mirror-vs-creates-todo-lists) for detailed information about automatic and manual triggers.
 :::
 
 ---
@@ -26,7 +26,7 @@ See [When Roo Creates Todo Lists](#when-roo-creates-todo-lists) for detailed inf
 
 **Before**: Manually tracking steps for a complex task in your head or a separate notes file, making it easy to lose track of progress and next steps.
 
-**With Task Todo Lists**: Mirror VS automatically creates and manages a structured checklist embedded in the conversation. You can see the status of each item, watch as the AI marks items complete, and provide feedback when Roo presents updates for approval.
+**With Task Todo Lists**: Mirror VS automatically creates and manages a structured checklist embedded in the conversation. You can see the status of each item, watch as the AI marks items complete, and provide feedback when Mirror VS presents updates for approval. It's project management without the standup meetings.
 
 ---
 
@@ -34,15 +34,15 @@ See [When Roo Creates Todo Lists](#when-roo-creates-todo-lists) for detailed inf
 
 The Task Todo List feature is powered by the [`update_todo_list`](/advanced-usage/available-tools/update-todo-list) tool, which enables dynamic task management within the chat interface.
 
-### When Roo Creates Todo Lists
+### When Mirror VS Creates Todo Lists
 
-Roo creates todo lists through both automatic detection and manual requests:
+Mirror VS creates todo lists through both automatic detection and manual requests:
 
 - **Task complexity detected** - Multiple steps, phases, or dependencies identified in your request
 - **Working in Architect mode** - Always creates todo lists as the primary planning tool for structuring work
 - **Direct tool request** - Say "use the update_todo_list tool" or "please use update_todo_list"
 
-Remember: Even when manually triggered, Roo maintains control over the todo list content and workflow. You provide feedback during approval dialogs, but Roo manages the list based on task needs.
+Remember: Even when manually triggered, Mirror VS maintains control over the todo list content and workflow. You provide feedback during approval dialogs, but Mirror VS manages the list based on task needs.
 
 ### Display and Interaction
 
@@ -59,8 +59,8 @@ Todo lists appear in multiple places:
      - Change task status using dropdown selectors
      - Delete tasks with the × button
      - Add new tasks with the "+ Add Todo" button
-   - Stage changes that are applied when Roo next updates the list
-   - View the progression as Roo manages the todo workflow
+   - Stage changes that are applied when Mirror VS next updates the list
+   - View the progression as Mirror VS manages the todo workflow
 
    <img src="/img/task-todo-list/task-todo-list-2.png" alt="Interactive todo list tool block in chat" width="600" />
 
@@ -90,7 +90,7 @@ Mirror VS automatically manages status progression based on task progress. Each 
 
 ### Editing Todo Lists During Approval
 
-When Roo presents a todo list update for approval, you have full control through the Edit mode:
+When Mirror VS presents a todo list update for approval, you have full control through the Edit mode:
 
 1. **Click "Edit"** to enter edit mode
 2. **Make your changes**:
@@ -101,20 +101,20 @@ When Roo presents a todo list update for approval, you have full control through
 3. **Save or Cancel** your changes
 4. **Approve or Reject** the overall update
 
-Note: Your edits are staged and only applied when Roo processes the next todo list update. This maintains Roo's control over the workflow while giving you input on task details.
+Note: Your edits are staged and only applied when Mirror VS processes the next todo list update. This maintains Mirror VS's control over the workflow while giving you input on task details.
 
 ---
 
 ## FAQ
 
 **"Can I create my own todo lists?"**
-Yes, you can manually trigger todo list creation by asking Roo to "use the update_todo_list tool" or "create a todo list". However, Roo maintains control over the todo list content and workflow - you provide feedback during approval dialogs, but Roo manages the list based on task needs.
+Yes, you can manually trigger todo list creation by asking Mirror VS to "use the update_todo_list tool" or "create a todo list". However, Mirror VS maintains control over the todo list content and workflow — you provide feedback during approval dialogs, but Mirror VS manages the list based on task needs.
 
 **"Can I use todo lists for simple tasks?"**
-Mirror VS typically only creates todo lists for complex, multi-step tasks where they provide clear value. For simple tasks, the overhead of list management isn't necessary.
+Mirror VS typically only creates todo lists for complex, multi-step tasks where they provide clear value. For simple tasks, the overhead of list management isn't necessary. No one needs a Gantt chart to delete a file.
 
 **"Why can't I directly control the todo list?"**
-This is an architectural design decision where Mirror VS maintains authority over task management. You provide guidance and feedback, but Roo controls the workflow to ensure consistent task progression and accurate status tracking.
+This is an architectural design decision where Mirror VS maintains authority over task management. You provide guidance and feedback, but Mirror VS controls the workflow to ensure consistent task progression and accurate status tracking. Think of it as the project manager that actually follows up.
 
 ---
 
@@ -157,6 +157,6 @@ When enabled, this setting prevents task completion when there are uncompleted t
 ### Disabling Todo Lists
 
 You can disable todo lists entirely through the `todoListEnabled` setting. When disabled:
-- Roo will not create todo lists for any tasks
+- Mirror VS will not create todo lists for any tasks
 - The REMINDERS section will not appear in environment details
 - Existing todo lists will remain visible but won't be updated

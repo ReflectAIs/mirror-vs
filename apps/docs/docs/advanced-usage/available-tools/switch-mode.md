@@ -13,156 +13,66 @@ keywords:
     - VS Code AI
 ---
 
-# switch_mode
+# `switch_mode` — Changing Hats Mid-Conversation
 
-The `switch_mode` tool enables Mirror to change between different operational modes, each with specialized capabilities for specific types of tasks. This allows seamless transitions between modes like Code, Architect, Ask, or Debug when the current task requires different expertise.
-
----
+Think of [`switch_mode`](switch-mode.md) as Mirror VS's way of saying "I need to switch hats for this next part." It enables seamless transitions between operational modes — Code, Architect, Ask, Debug, or custom modes — each with specialized tools and capabilities.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `mode_slug` (required): The slug of the mode to switch to (e.g., "code", "ask", "architect")
-- `reason` (optional): The reason for switching modes, providing context for the user
-
----
+| Parameter   | Type     | Required | Description                                                            |
+| ----------- | -------- | -------- | ---------------------------------------------------------------------- |
+| `mode_slug` | `string` | ✅       | Slug of the mode to switch to (e.g., `"code"`, `"ask"`, `"architect"`) |
+| `reason`    | `string` | ❌       | Explanation for why the mode switch is needed                          |
 
 ## What It Does
 
-This tool requests a mode change when the current task would be better handled by another mode's capabilities. It maintains context while shifting Mirror's focus and available toolsets to match the requirements of the new task phase.
+[`switch_mode`](switch-mode.md) requests a mode change when the current task would be better handled by another mode's capabilities. It maintains conversation context while shifting Mirror VS's focus and available toolset to match the new task phase.
 
----
+## When Is It Used?
 
-## When is it used?
-
-- When transitioning from information gathering to code implementation
-- When shifting from coding to architecture or design
-- When the current task requires capabilities only available in a different mode
+- Transitioning from information gathering (Ask) to code implementation (Code)
+- Shifting from coding to architecture or design (Architect)
+- Encountering bugs during development and switching to systematic troubleshooting (Debug)
 - When specialized expertise is needed for a particular phase of a complex project
-
----
 
 ## Key Features
 
-- Maintains context continuity across mode transitions
-- Provides clear reasoning for mode switch recommendations
-- Requires user approval for all mode changes
-- Enforces tool group restrictions specific to each mode
-- Seamlessly adapts tool availability based on the selected mode
-- Works with both standard and custom modes
-- Displays the mode switch and reasoning in the UI
-- Uses XML-style formatting for parameter specification
-- Handles file type restrictions specific to certain modes
-
----
+- **Context continuity** — Conversation history is preserved across mode transitions
+- **Clear reasoning** — Provides explanation for why the switch is recommended
+- **User approval required** — You always get a say before the mode changes
+- **Tool group enforcement** — Each mode has appropriate tools enabled/restricted
+- **Custom mode support** — Works with both standard and user-defined custom modes
+- **Always available** — This tool is in the "always available" list, accessible from any mode
 
 ## Limitations
 
-- Cannot switch to modes that don't exist in the system
-- Requires explicit user approval for each mode transition
-- Cannot use tools specific to a mode until the switch is complete
-- Applies a 500ms delay after mode switching to allow the change to take effect
-- Some modes have file type restrictions (e.g., Architect mode can only edit markdown files)
-- Mode preservation for resumption applies only to the `new_task` functionality, not general mode switching
-
----
+- Cannot switch to modes that don't exist
+- Requires explicit user approval for each transition
+- Cannot use mode-specific tools until the switch completes
+- Some modes have file type restrictions (e.g., Architect mode can only edit `.md` files)
+- 500ms delay after switching to allow the change to take effect
 
 ## How It Works
 
-When the `switch_mode` tool is invoked, it follows this process:
+1. **Validation** — Checks the requested mode exists and you're not already in it
+2. **Approval** — Presents the mode change request with the reason for your approval
+3. **Activation** — Updates the UI, adjusts available tools, applies mode-specific prompt/behavior
+4. **Continuation** — Proceeds with the task using the new mode's capabilities, retaining relevant context
 
-1. **Request Validation**:
+### Mode Capabilities
 
-    - Validates that the requested mode exists in the system
-    - Checks that the `mode_slug` parameter is provided and valid
-    - Verifies the user isn't already in the requested mode
-    - Ensures the `reason` parameter (if provided) is properly formatted
+| Mode          | Best For                                   | File Restrictions         |
+| ------------- | ------------------------------------------ | ------------------------- |
+| **Code**      | Implementing features, writing code        | None                      |
+| **Architect** | System design, architecture planning       | Can only edit `.md` files |
+| **Ask**       | Answering questions, providing information | Read-only                 |
+| **Debug**     | Systematic problem diagnosis               | None                      |
 
-2. **Mode Transition Preparation**:
+### Custom Modes
 
-    - Packages the mode change request with the provided reason
-    - Presents the change request to the user for approval
-
-3. **Mode Activation (Upon User Approval)**:
-
-    - Updates the UI to reflect the new mode
-    - Adjusts available tools based on the mode's tool group configuration
-    - Applies the mode-specific prompt and behavior
-    - Applies a 500ms delay to allow the change to take effect before executing next tool
-    - Enforces any file restrictions specific to the mode
-
-4. **Continuation**:
-    - Proceeds with the task using the capabilities of the new mode
-    - Retains relevant context from the previous interaction
-
----
-
-## Tool Group Association
-
-The `switch_mode` tool belongs to the "modes" tool group but is also included in the "always available" tools list. This means:
-
-- It can be used in any mode regardless of the mode's configured tool groups
-- It's available alongside other core tools like `ask_followup_question` and `attempt_completion`
-- It allows mode transitions at any point in a workflow when task requirements change
-
----
-
-## Mode Structure
-
-Each mode in the system has a specific structure:
-
-- `slug`: Unique identifier for the mode (e.g., "code", "ask")
-- `name`: Display name for the mode (e.g., "Code", "Ask")
-- `roleDefinition`: The specialized role and capabilities of the mode
-- `customInstructions`: Optional mode-specific instructions that guide behavior
-- `groups`: Tool groups available to the mode with optional restrictions
-
----
-
-## Mode Capabilities
-
-The core modes provide these specialized capabilities:
-
-- **Code Mode**: Focused on coding tasks with full access to code editing tools
-- **Architect Mode**: Specialized for system design and architecture planning, limited to editing markdown files only
-- **Ask Mode**: Optimized for answering questions and providing information
-- **Debug Mode**: Equipped for systematic problem diagnosis and resolution
-
----
-
-## Custom Modes
-
-Beyond the core modes, the system supports custom project-specific modes:
-
-- Custom modes can be defined with specific tool groups enabled
-- They can specify custom role definitions and instructions
-- The system checks custom modes first before falling back to core modes
-- Custom mode definitions take precedence over core modes with the same slug
-
----
-
-## File Restrictions
-
-Different modes may have specific file type restrictions:
-
-- **Architect Mode**: Can only edit files matching the `.md` extension
-- Attempting to edit restricted file types results in a `FileRestrictionError`
-- These restrictions help enforce proper separation of concerns between modes
-
----
-
-## Examples When Used
-
-- When discussing a new feature, Mirror switches from Ask mode to Architect mode to help design the system structure.
-- After completing architecture planning in Architect mode, Mirror switches to Code mode to implement the designed features.
-- When encountering bugs during development, Mirror switches from Code mode to Debug mode for systematic troubleshooting.
-
----
+Beyond core modes, you can define custom project-specific modes with custom role definitions, instructions, and tool group configurations. Custom modes are checked first before falling back to core modes.
 
 ## Usage Examples
-
-Switching to Code mode for implementation:
 
 ```
 <switch_mode>
@@ -171,16 +81,12 @@ Switching to Code mode for implementation:
 </switch_mode>
 ```
 
-Switching to Architect mode for design:
-
 ```
 <switch_mode>
 <mode_slug>architect</mode_slug>
 <reason>Need to design the system architecture before implementation</reason>
 </switch_mode>
 ```
-
-Switching to Debug mode for troubleshooting:
 
 ```
 <switch_mode>
@@ -189,11 +95,6 @@ Switching to Debug mode for troubleshooting:
 </switch_mode>
 ```
 
-Switching to Ask mode for information:
+## Relation to Other Tools
 
-```
-<switch_mode>
-<mode_slug>ask</mode_slug>
-<reason>Need to answer questions about the implemented feature</reason>
-</switch_mode>
-```
+[`switch_mode`](switch-mode.md) handles within-conversation mode changes. For spawning entirely new conversations in different modes (with independent context), use [`new_task`](new-task.md). Think of [`switch_mode`](switch-mode.md) as changing your own hat, and [`new_task`](new-task.md) as sending a clone to handle a specialized task.

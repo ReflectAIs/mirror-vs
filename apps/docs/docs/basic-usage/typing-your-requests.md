@@ -11,7 +11,7 @@ keywords:
 
 # Typing Your Requests
 
-Mirror VS is designed to understand natural language. You don't need to use any special commands or syntax to communicate with it. Just type your request in plain English, as if you were talking to a human developer.
+Here's the best part about Mirror VS: **you don't need to learn a language to talk to it.** No special syntax. No cryptic commands. No arcane incantations. Just type what you want in plain English (or your language of choice), as if you were asking a colleague for help.
 
 <img src="/img/typing-your-requests/naturally.gif" alt="Example of typing a request in Mirror VS" width="600" />
 
@@ -19,7 +19,7 @@ Mirror VS is designed to understand natural language. You don't need to use any 
 
 ## Effective Request Strategies
 
-Clearly state what you want Mirror VS to do. Avoid vague or ambiguous language.
+Being clear about what you want gets you better results. It's the same with humans, really.
 
 | Strategy             | Implementation                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------ |
@@ -31,6 +31,8 @@ Clearly state what you want Mirror VS to do. Avoid vague or ambiguous language.
 ---
 
 ## Example Requests
+
+Here are some real-world requests that actually work:
 
 ```
 create a new file named `utils.py` and add a function called `add` that takes two numbers as arguments and returns their sum
@@ -55,6 +57,8 @@ explain the function `calculateTotal` in @/src/utils.ts
 ```
 @problems address all detected problems
 ```
+
+See? You just... type stuff. It's almost disappointingly simple.
 
 ---
 

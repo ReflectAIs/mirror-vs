@@ -15,7 +15,7 @@ sidebar_label: Vercel AI Gateway
 
 # Using Vercel AI Gateway With Mirror VS
 
-The AI Gateway provides a unified API to access hundreds of models through a single endpoint. It gives you the ability to set budgets, monitor usage, load-balance requests, and manage fallbacks.
+The AI Gateway provides a unified API to access hundreds of models through a single endpoint. It gives you the ability to set budgets, monitor usage, load-balance requests, and manage fallbacks — everything a control freak could want.
 
 Useful links:
 

@@ -22,7 +22,7 @@ keywords:
 
 # Using Fireworks AI With Mirror VS
 
-Fireworks AI is a high-performance platform for running AI models, offering fast, cost-effective access to a wide range of state-of-the-art open-source language models. Built for speed and reliability, Fireworks AI provides serverless deployment options with OpenAI-compatible APIs and context windows up to 256,000 tokens.
+Fireworks AI is a high-performance platform for running AI models, offering fast, cost-effective access to a wide range of state-of-the-art open-source language models. Built for speed and reliability, it provides serverless deployment options with OpenAI-compatible APIs and context windows up to 256,000 tokens. Fast doesn't begin to cover it.
 
 **Website:** [https://fireworks.ai/](https://fireworks.ai/)
 

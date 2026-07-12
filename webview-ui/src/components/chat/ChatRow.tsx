@@ -54,20 +54,19 @@ import { ChatTextArea } from "./ChatTextArea"
 import { MAX_IMAGES_PER_MESSAGE } from "./ChatView"
 import { useSelectedModel } from "../ui/hooks/useSelectedModel"
 import {
-	Eye,
+	BookOpen,
 	FileDiff,
 	ListTree,
-	User,
+	CircleUser,
 	Edit,
 	Trash2,
 	RotateCcw,
 	MessageCircleQuestionMark,
 	SquareArrowOutUpRight,
-	FileCode2,
 	PocketKnife,
 	FolderTree,
 	TerminalSquare,
-	MessageCircle,
+	Sparkles,
 	Repeat2,
 	Split,
 	ArrowRight,
@@ -127,10 +126,11 @@ interface ChatRowProps {
 	hasCheckpoint?: boolean
 	onJumpToPreviousCheckpoint?: () => void
 	isSticky?: boolean
+	onNavigateToMessage?: (ts: number) => void
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> { }
+interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
 
 const ChatRow = memo(
 	(props: ChatRowProps) => {
@@ -182,6 +182,7 @@ export const ChatRowContent = ({
 	isFollowUpAutoApprovalPaused,
 	onJumpToPreviousCheckpoint,
 	isSticky,
+	onNavigateToMessage,
 }: ChatRowContentProps) => {
 	const { t, i18n } = useTranslation()
 
@@ -514,8 +515,8 @@ export const ChatRowContent = ({
 										: tool.lineNumber === 0
 											? t("chat:fileOperations.wantsToInsertAtEnd")
 											: t("chat:fileOperations.wantsToInsertWithLineNumber", {
-												lineNumber: tool.lineNumber,
-											})}
+													lineNumber: tool.lineNumber,
+												})}
 							</span>
 						</div>
 						<div className="pl-6">
@@ -569,7 +570,7 @@ export const ChatRowContent = ({
 					return (
 						<>
 							<div style={headerStyle}>
-								<Eye className="w-4 shrink-0" aria-label="View files icon" />
+								<BookOpen className="w-4 shrink-0" aria-label="View files icon" />
 								<span style={{ fontWeight: "bold" }}>
 									{t("chat:fileOperations.wantsToReadMultiple")}
 								</span>
@@ -589,15 +590,15 @@ export const ChatRowContent = ({
 				return (
 					<>
 						<div style={headerStyle}>
-							<FileCode2 className="w-4 shrink-0" aria-label="Read file icon" />
+							<BookOpen className="w-4 shrink-0" aria-label="Read file icon" />
 							<span style={{ fontWeight: "bold" }}>
 								{message.type === "ask"
 									? tool.isOutsideWorkspace
 										? t("chat:fileOperations.wantsToReadOutsideWorkspace")
 										: tool.additionalFileCount && tool.additionalFileCount > 0
 											? t("chat:fileOperations.wantsToReadAndXMore", {
-												count: tool.additionalFileCount,
-											})
+													count: tool.additionalFileCount,
+												})
 											: t("chat:fileOperations.wantsToRead")
 									: t("chat:fileOperations.didRead")}
 							</span>
@@ -1062,13 +1063,14 @@ export const ChatRowContent = ({
 					return (
 						<>
 							<div
-								className={`group text-sm transition-opacity ${isApiRequestInProgress ? "opacity-100" : "opacity-40 hover:opacity-100"
-									}`}
+								className={`group text-sm transition-opacity ${
+									isApiRequestInProgress ? "opacity-100" : "opacity-40 hover:opacity-100"
+								}`}
 								style={{
 									...headerStyle,
 									marginBottom:
 										((cost === null || cost === undefined) && apiRequestFailedMessage) ||
-											apiReqStreamingFailedMessage
+										apiReqStreamingFailedMessage
 											? 10
 											: 0,
 									justifyContent: "space-between",
@@ -1085,17 +1087,17 @@ export const ChatRowContent = ({
 							</div>
 							{(((cost === null || cost === undefined) && apiRequestFailedMessage) ||
 								apiReqStreamingFailedMessage) && (
-									<ErrorRow
-										type="api_failure"
-										message={apiRequestFailedMessage || apiReqStreamingFailedMessage || ""}
-										docsURL={
-											apiRequestFailedMessage?.toLowerCase().includes("powershell")
-												? "https://github.com/mirror/mirror/wiki/TroubleShooting-%E2%80%90-%22PowerShell-is-not-recognized-as-an-internal-or-external-command%22"
-												: undefined
-										}
-										errorDetails={apiReqStreamingFailedMessage}
-									/>
-								)}
+								<ErrorRow
+									type="api_failure"
+									message={apiRequestFailedMessage || apiReqStreamingFailedMessage || ""}
+									docsURL={
+										apiRequestFailedMessage?.toLowerCase().includes("powershell")
+											? "https://github.com/mirror/mirror/wiki/TroubleShooting-%E2%80%90-%22PowerShell-is-not-recognized-as-an-internal-or-external-command%22"
+											: undefined
+									}
+									errorDetails={apiReqStreamingFailedMessage}
+								/>
+							)}
 						</>
 					)
 				case "api_req_retry_delayed":
@@ -1185,7 +1187,10 @@ export const ChatRowContent = ({
 					return (
 						<div className="group">
 							<div style={headerStyle}>
-								<MessageCircle className="w-4 shrink-0" aria-label="Speech bubble icon" />
+								<Sparkles
+									className="w-4 shrink-0 text-vscode-button-background/80"
+									aria-label="Sparkles icon"
+								/>
 								<span style={{ fontWeight: "bold" }}>{t("chat:text.mirrorSaid")}</span>
 								<div style={{ flexGrow: 1 }} />
 								<OpenMarkdownPreviewButton markdown={message.text} />
@@ -1205,110 +1210,118 @@ export const ChatRowContent = ({
 				case "user_feedback":
 					return (
 						<div
-							className={cn("group", isSticky && "sticky top-0 z-10")}
+							className={cn(
+								"group my-2 p-3 rounded-lg transition-all",
+								isSticky
+									? "border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03]"
+									: "border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03] hover:bg-vscode-button-background/[0.06] hover:border-vscode-button-background/25",
+							)}
 							style={
 								isSticky
 									? {
-										position: "sticky",
-										top: "-12px",
-										bottom: "0px",
-										zIndex: 10,
-										background: "color-mix(in srgb, var(--vscode-sideBar-background) 85%, transparent)",
-										backdropFilter: "blur(12px)",
-										WebkitBackdropFilter: "blur(12px)",
-										border: "1px solid color-mix(in srgb, var(--vscode-button-background) 25%, transparent)",
-										borderBottom: "2px solid color-mix(in srgb, var(--vscode-button-background) 40%, transparent)",
-										paddingBottom: "8px",
-										paddingTop: "6px",
-										boxShadow: "0 8px 24px rgba(0,0,0,0.25), 0 2px 8px color-mix(in srgb, var(--vscode-button-background) 8%, transparent)",
-										borderRadius: "8px",
-										margin: "8px 4px",
-										paddingLeft: "8px",
-										paddingRight: "8px",
-									}
+											background:
+												"color-mix(in srgb, var(--vscode-sideBar-background) 90%, transparent)",
+											backdropFilter: "blur(12px)",
+											WebkitBackdropFilter: "blur(12px)",
+											border: "1px solid color-mix(in srgb, var(--vscode-button-background) 20%, transparent)",
+											borderBottom:
+												"2px solid color-mix(in srgb, var(--vscode-button-background) 35%, transparent)",
+											boxShadow:
+												"0 8px 24px rgba(0,0,0,0.2), 0 2px 8px color-mix(in srgb, var(--vscode-button-background) 5%, transparent)",
+										}
 									: undefined
 							}>
-							<div style={headerStyle} className={cn(isSticky && "ml-2")}>
-								<User className="w-4 shrink-0 text-vscode-button-background" aria-label="User icon" />
-								<span style={{ fontWeight: "bold" }}>{t("chat:feedback.youSaid")}</span>
-							</div>
-							<div
-								className={cn(
-									"ml-6 border border-dashed border-vscode-button-background/20 rounded-lg whitespace-pre-wrap transition-all",
-									isEditing
-										? "bg-vscode-editor-background text-vscode-editor-foreground"
-										: "cursor-text p-2.5 bg-vscode-button-background/5 text-vscode-foreground hover:bg-vscode-button-background/8 hover:border-vscode-button-background/30",
-									isSticky ? "max-h-[4.5em] overflow-y-auto" : "overflow-hidden",
-								)}>
-								{isEditing ? (
-									<div className="flex flex-col gap-2">
-										<ChatTextArea
-											inputValue={editedContent}
-											setInputValue={setEditedContent}
-											sendingDisabled={false}
-											selectApiConfigDisabled={true}
-											placeholderText={t("chat:editMessage.placeholder")}
-											selectedImages={editImages}
-											setSelectedImages={setEditImages}
-											onSend={handleSaveEdit}
-											onSelectImages={handleSelectImages}
-											shouldDisableImages={!model?.supportsImages}
-											mode={editMode}
-											setMode={setEditMode}
-											modeShortcutText=""
-											isEditMode={true}
-											onCancel={handleCancelEdit}
-										/>
-									</div>
-								) : (
-									<div className="flex justify-between">
-										<div
-											className="flex-grow px-2 py-1 wrap-anywhere rounded-lg transition-colors"
+							<div className="flex justify-between items-center ml-1 w-full">
+								<div style={headerStyle}>
+									<CircleUser
+										className="w-3.5 h-3.5 shrink-0 text-vscode-button-background/80 group-hover:text-vscode-button-background"
+										aria-label="User icon"
+									/>
+									<span style={{ fontWeight: "bold" }}>{t("chat:feedback.youSaid")}</span>
+								</div>
+								{!isEditing && !isStreaming && (
+									<div className="flex gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-2 shrink-0">
+										<button
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors shrink-0"
+											title="Revert chat to this message"
 											onClick={(e) => {
 												e.stopPropagation()
-												if (!isStreaming) {
-													handleEditClick()
-												}
-											}}
-											title={t("chat:queuedMessages.clickToEdit")}>
-											<Mention text={message.text} withShadow />
-										</div>
-										<div className="flex gap-2 pr-1">
-											<div
-												className="cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-												style={{ visibility: isStreaming ? "hidden" : "visible" }}
-												title="Revert chat to this message"
-												onClick={(e) => {
-													e.stopPropagation()
-													vscode.postMessage({ type: "revertHistory", messageTs: message.ts, inclusive: false })
-												}}>
-												<RotateCcw className="w-4 shrink-0" aria-label="Revert to here icon" />
-											</div>
-											<div
-												className="cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-												style={{ visibility: isStreaming ? "hidden" : "visible" }}
-												onClick={(e) => {
-													e.stopPropagation()
-													handleEditClick()
-												}}>
-												<Edit className="w-4 shrink-0" aria-label="Edit message icon" />
-											</div>
-											<div
-												className="cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-												style={{ visibility: isStreaming ? "hidden" : "visible" }}
-												onClick={(e) => {
-													e.stopPropagation()
-													vscode.postMessage({ type: "deleteMessage", value: message.ts })
-												}}>
-												<Trash2 className="w-4 shrink-0" aria-label="Delete message icon" />
-											</div>
-										</div>
+												vscode.postMessage({
+													type: "revertHistory",
+													messageTs: message.ts,
+													inclusive: false,
+												})
+											}}>
+											<RotateCcw className="w-3.5 h-3.5" aria-label="Revert to here icon" />
+										</button>
+										<button
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors shrink-0"
+											title="Edit message"
+											onClick={(e) => {
+												e.stopPropagation()
+												handleEditClick()
+											}}>
+											<Edit className="w-3.5 h-3.5" aria-label="Edit message icon" />
+										</button>
+										<button
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-0.5 rounded transition-colors shrink-0"
+											title="Delete message"
+											onClick={(e) => {
+												e.stopPropagation()
+												vscode.postMessage({ type: "deleteMessage", value: message.ts })
+											}}>
+											<Trash2 className="w-3.5 h-3.5" aria-label="Delete message icon" />
+										</button>
 									</div>
 								)}
-								{!isEditing && message.images && message.images.length > 0 && (
-									<Thumbnails images={message.images} style={{ marginTop: "8px" }} />
-								)}
 							</div>
+							{isEditing ? (
+								<div className="flex flex-col gap-2 ml-1 mt-1">
+									<ChatTextArea
+										inputValue={editedContent}
+										setInputValue={setEditedContent}
+										sendingDisabled={false}
+										selectApiConfigDisabled={true}
+										placeholderText={t("chat:editMessage.placeholder")}
+										selectedImages={editImages}
+										setSelectedImages={setEditImages}
+										onSend={handleSaveEdit}
+										onSelectImages={handleSelectImages}
+										shouldDisableImages={!model?.supportsImages}
+										mode={editMode}
+										setMode={setEditMode}
+										modeShortcutText=""
+										isEditMode={true}
+										onCancel={handleCancelEdit}
+									/>
+								</div>
+							) : (
+								<div className="flex justify-between items-start ml-1 mt-1">
+									<div
+										className={cn(
+											"flex-grow wrap-anywhere cursor-text text-vscode-foreground whitespace-pre-wrap",
+											isSticky ? "max-h-[4.5em] overflow-y-auto pr-1" : "",
+										)}
+										onClick={(e) => {
+											e.stopPropagation()
+											if (isSticky && onNavigateToMessage) {
+												onNavigateToMessage(message.ts)
+											} else if (!isStreaming) {
+												handleEditClick()
+											}
+										}}
+										title={
+											isSticky
+												? t("chat:stickyMessage.clickToNavigate")
+												: t("chat:queuedMessages.clickToEdit")
+										}>
+										<Mention text={message.text} withShadow />
+									</div>
+								</div>
+							)}
+							{!isEditing && message.images && message.images.length > 0 && (
+								<Thumbnails images={message.images} style={{ marginTop: "8px" }} />
+							)}
 						</div>
 					)
 				case "user_feedback_diff":
@@ -1434,7 +1447,7 @@ export const ChatRowContent = ({
 
 					return <CodebaseSearchResultsDisplay results={results} />
 				case "user_edit_todos":
-					return <UpdateTodoListToolBlock userEdited onChange={() => { }} />
+					return <UpdateTodoListToolBlock userEdited onChange={() => {}} />
 				case "tool" as any:
 					// Handle say tool messages
 					const sayTool = safeJsonParse<MirrorSayTool>(message.text)
@@ -1544,7 +1557,7 @@ export const ChatRowContent = ({
 
 							return (
 								<div style={headerStyle}>
-									<FileCode2 className="w-4 shrink-0" aria-label="Read command output icon" />
+									<BookOpen className="w-4 shrink-0" aria-label="Read command output icon" />
 									<span style={{ fontWeight: "bold" }}>{t("chat:readCommandOutput.title")}</span>
 									{infoText && (
 										<span

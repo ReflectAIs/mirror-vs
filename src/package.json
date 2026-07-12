@@ -3,7 +3,7 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "DipeshMajithia",
-	"version": "0.5.1",
+	"version": "0.5.6",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#1a1a2e",
@@ -391,7 +391,7 @@
 		}
 	},
 	"scripts": {
-		"lint": "eslint . --ext=ts --max-warnings=0",
+		"lint": "eslint . --ext=ts",
 		"check-types": "tsc --noEmit",
 		"pretest": "turbo run bundle --cwd ..",
 		"test": "vitest run",

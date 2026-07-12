@@ -6,6 +6,7 @@ import { z } from "zod"
 
 export const historyItemSchema = z.object({
 	id: z.string(),
+	sessionId: z.string().optional(), // Session grouping key
 	rootTaskId: z.string().optional(),
 	parentTaskId: z.string().optional(),
 	number: z.number(),

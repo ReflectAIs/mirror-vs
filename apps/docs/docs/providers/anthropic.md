@@ -16,7 +16,7 @@ keywords:
 
 # Using Anthropic With Mirror VS
 
-Anthropic is an AI safety and research company that builds reliable, interpretable, and steerable AI systems. Their Claude models are known for their strong reasoning abilities, helpfulness, and honesty.
+Anthropic is an AI safety and research company that builds reliable, interpretable, and steerable AI systems. Their Claude models are known for strong reasoning abilities, helpfulness, and honesty — which is more than you can say for most things on the internet.
 
 **Website:** [https://www.anthropic.com/](https://www.anthropic.com/)
 
@@ -27,7 +27,7 @@ Anthropic is an AI safety and research company that builds reliable, interpretab
 1.  **Sign Up/Sign In:** Go to the [Anthropic Console](https://console.anthropic.com/). Create an account or sign in.
 2.  **Navigate to API Keys:** Go to the [API keys](https://console.anthropic.com/settings/keys) section.
 3.  **Create a Key:** Click "Create Key". Give your key a descriptive name (e.g., "Mirror VS").
-4.  **Copy the Key:** **Important:** Copy the API key _immediately_. You will not be able to see it again. Store it securely.
+4.  **Copy the Key:** **Important:** Copy the API key _immediately_. You will not be able to see it again. Store it securely. This is the one time "I'll do it later" will bite you.
 
 ---
 
@@ -51,7 +51,7 @@ For the complete, up-to-date model list and capabilities, see [Anthropic's model
 
 ## Tips and Notes
 
-- **Prompt Caching:** Claude models support [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching), which can significantly reduce costs and latency for repeated prompts.
+- **Prompt Caching:** Claude models support [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching), which can significantly reduce costs and latency for repeated prompts. If you find yourself sending the same context over and over, caching is your friend.
 - **Context Window:** Claude models have large context windows (200,000 tokens), allowing you to include a significant amount of code and context in your prompts.
 - **Pricing:** Refer to the [Anthropic Pricing](https://www.anthropic.com/pricing) page for the latest pricing information.
 - **Rate Limits:** Anthropic has strict rate limits based on [usage tiers](https://docs.anthropic.com/en/api/rate-limits#requirements-to-advance-tier). If you're repeatedly hitting rate limits, consider contacting Anthropic sales or accessing Claude through a different provider like [OpenRouter](/providers/openrouter) or [Requesty](/providers/requesty).

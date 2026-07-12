@@ -14,7 +14,7 @@ sidebar_label: Requesty
 
 # Using Requesty With Mirror VS
 
-Mirror VS supports accessing models through the [Requesty](https://www.requesty.ai/) AI platform. Requesty provides an easy and optimized API for interacting with 150+ large language models (LLMs).
+Mirror VS supports accessing models through the [Requesty](https://www.requesty.ai/) AI platform. Requesty provides an easy and optimized API for interacting with 150+ LLMs — think of it as a router with a built-in cost optimizer and a very detailed receipt.
 
 **Website:** [https://www.requesty.ai/](https://www.requesty.ai/)
 
@@ -46,12 +46,10 @@ For the complete, up-to-date model list with pricing, see [Requesty's model list
 
 ## Tips and Notes
 
-- **Optimizations**: Requesty offers range of in-flight cost optimizations to lower your costs.
+- **Optimizations**: Requesty offers a range of in-flight cost optimizations to lower your costs.
 - **Unified and simplified billing**: Unrestricted access to all providers and models, automatic balance top ups and more via a single [API key](https://app.requesty.ai/manage-api).
-- **Cost tracking**: Track cost per model, coding language, changed file, and more via the [Cost dashboard](https://app.requesty.ai/cost-management) or the [Requesty VS.code extension](https://marketplace.visualstudio.com/items?itemName=Requesty.requesty).
+- **Cost tracking**: Track cost per model, coding language, changed file, and more via the [Cost dashboard](https://app.requesty.ai/cost-management) or the [Requesty VS Code extension](https://marketplace.visualstudio.com/items?itemName=Requesty.requesty).
 - **Stats and logs**: See your [coding stats dashboard](https://app.requesty.ai/usage-stats) or go through your [LLM interaction logs](https://app.requesty.ai/logs).
-- **Fallback policies**: Keep your LLM working for you with fallback policies when providers are down.
+- **Fallback policies**: Keep your LLM working with fallback policies when providers are down.
 
-* **Prompt Caching:** Some providers support prompt caching. [Search models with caching](https://app.requesty.ai/router/list).
-
----
+- **Prompt Caching:** Some providers support prompt caching. [Search models with caching](https://app.requesty.ai/router/list).

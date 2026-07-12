@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS адаптируется к вашему стилю работы, а �
 - Режим Отладка: отслеживание проблем, добавление логов, изоляция первопричин
 - Пользовательские режимы: создавайте специализированные режимы для вашей команды или рабочего процесса
 
-Подробнее: [Использование режимов](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Пользовательские режимы](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+Подробнее: [Использование режимов](https://www.reflectai.in/basic-usage/using-modes) • [Пользовательские режимы](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Ресурсы
 
-- **[Документация](https://mirrorvsinc.github.io/Roo-Code/):** Официальное руководство по установке, настройке и освоению Mirror VS.
+- **[Документация](https://www.reflectai.in/):** Официальное руководство по установке, настройке и освоению Mirror VS.
 - **[Проблемы на GitHub](https://github.com/ReflectAIs/mirror-vs/issues):** Сообщайте об ошибках и отслеживайте разработку.
 
 ---

@@ -26,8 +26,8 @@ import { StandardTooltip } from "@src/components/ui"
 
 import Thumbnails from "../common/Thumbnails"
 import { ModeSelector } from "./ModeSelector"
-import { ApiConfigSelector } from "./ApiConfigSelector"
 import { AutoApproveDropdown } from "./AutoApproveDropdown"
+import { SessionArtifacts } from "./SessionArtifacts"
 import { MAX_IMAGES_PER_MESSAGE } from "./ChatView"
 import ContextMenu from "./ContextMenu"
 import { IndexingStatusBadge } from "./IndexingStatusBadge"
@@ -55,6 +55,10 @@ interface ChatTextAreaProps {
 	isStreaming?: boolean
 	onStop?: () => void
 	onEnqueueMessage?: () => void
+	// Model selection props
+	modelId?: string
+	modelOptions?: Array<{ value: string; label: string }>
+	onModelChange?: (modelId: string) => void
 }
 
 export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
@@ -78,6 +82,9 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			isStreaming = false,
 			onStop,
 			onEnqueueMessage,
+			modelId,
+			modelOptions,
+			onModelChange,
 		},
 		ref,
 	) => {
@@ -1305,20 +1312,27 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							customModes={customModes}
 							customModePrompts={customModePrompts}
 						/>
-						<ApiConfigSelector
-							value={currentConfigId}
-							displayName={displayName}
-							disabled={selectApiConfigDisabled}
-							title={t("chat:selectApiConfig")}
-							onChange={handleApiConfigChange}
-							triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink"
-							listApiConfigMeta={listApiConfigMeta || []}
-							pinnedApiConfigs={pinnedApiConfigs}
-							togglePinnedApiConfig={togglePinnedApiConfig}
-							lockApiConfigAcrossModes={!!lockApiConfigAcrossModes}
-							onToggleLockApiConfig={handleToggleLockApiConfig}
-						/>
+						{modelOptions && modelOptions.length > 0 && modelId !== undefined && onModelChange && (
+							<select
+								value={modelId}
+								onChange={(e) => onModelChange(e.target.value)}
+								className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
+								style={{
+									backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+									backgroundPosition: "right 4px center",
+									backgroundRepeat: "no-repeat",
+									backgroundSize: "14px 14px",
+									paddingRight: "20px",
+								}}>
+								{modelOptions.map((opt) => (
+									<option key={opt.value} value={opt.value}>
+										{opt.label}
+									</option>
+								))}
+							</select>
+						)}
 						<AutoApproveDropdown triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
+						<SessionArtifacts triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
 					</div>
 					<div className={cn("flex flex-shrink-0 items-center gap-0.5 h-5 leading-none", "pr-2")}>
 						{isTtsPlaying && (

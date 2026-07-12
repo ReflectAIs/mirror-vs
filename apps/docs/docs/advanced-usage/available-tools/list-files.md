@@ -1,168 +1,101 @@
 ---
-description: Learn how the list_files tool helps Mirror VS explore project structures, list directories, and navigate codebases with recursive and filtered listing capabilities.
-keywords:
-    - list_files
-    - Mirror VS tools
-    - directory listing
-    - file exploration
-    - project structure
-    - recursive listing
-    - codebase navigation
-    - VS Code AI
+sidebar_position: 2
+title: list_files
 ---
 
-# list_files
+# `list_files` — Your Project Map
 
-The `list_files` tool displays the files and directories within a specified location. It helps Mirror understand your project structure and navigate your codebase effectively.
-
----
+Think of [`list_files`](list-files.md) as the "where am I?" button for Mirror VS. It lists the contents of any directory in your project, giving the AI a bird's-eye view of your codebase's structure.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `path` (required): The path of the directory to list contents for, relative to the current working directory
-- `recursive` (optional): Whether to list files recursively. Use `true` for recursive listing, `false` or omit for top-level only.
-
----
+| Parameter   | Type      | Required | Description                                                   |
+| ----------- | --------- | -------- | ------------------------------------------------------------- |
+| `path`      | `string`  | ✅       | Directory path to list (relative to workspace)                |
+| `recursive` | `boolean` | ✅       | `true` for full recursive listing, `false` for top-level only |
 
 ## What It Does
 
-This tool lists all files and directories in a specified location, providing a clear overview of your project structure. It can either show just the top-level contents or recursively explore subdirectories.
+[`list_files`](list-files.md) shows the AI what files and folders exist in a given directory. It's how Mirror VS explores your project structure before deciding which files to read or edit. Think of it as `ls` on steroids — with `.gitignore` awareness and a 200-file safety cap.
 
----
+## When Is It Used?
 
-## When is it used?
+Whenever the AI needs to understand your project's structure:
 
-- When Mirror needs to understand your project structure
-- When Mirror explores what files are available before reading specific ones
-- When Mirror maps a codebase to better understand its organization
-- Before using more targeted tools like `read_file` or `search_files`
-- When Mirror needs to check for specific file types (like configuration files) across a project
-
----
+- **Initial project exploration**: "What's in this project?" → recursive listing of root
+- **Finding the right file**: "Where do you keep your API routes?" → explore `src/api/`
+- **Before reading**: "Let me see what's in this directory before diving in"
+- **Confirming structure**: "Did that file end up in the right place?"
 
 ## Key Features
 
-- Lists both files and directories with directories clearly marked
-- Offers both recursive and non-recursive listing modes
-- Intelligently ignores common large directories like `node_modules` and `.git` in recursive mode
-- Respects `.gitignore` rules when in recursive mode
-- Marks files ignored by `.mirrorignore` with a lock symbol (🔒) when `showMirrorIgnoredFiles` is enabled
-- Optimizes file listing performance by leveraging the `ripgrep` tool.
-- Sorts results to show directories before their contents, maintaining a logical hierarchy
-- Presents results in a clean, organized format
-- Automatically creates a mental map of your project structure
-
----
+- **Recursive mode** — See the full directory tree with one call
+- **`.gitignore` & `.mirrorignore` aware** — Ignores files you don't want to see
+- **200-file cap** — Safety limit prevents overwhelming context windows
+- **Ripgrep-based** — Uses the same fast engine as VS Code's file explorer
+- **Lock symbol** — Files blocked by `.mirrorignore` show a 🔒 indicator
 
 ## Limitations
 
-- File listing is capped at about 200 files by default to prevent performance issues
-- The underlying `ripgrep` file listing process has a 10-second timeout; if exceeded, partial results may be returned.
-- When the file limit is hit, it adds a note suggesting to use `list_files` on specific subdirectories
-- Not designed for confirming the existence of files you've just created
-- May have reduced performance in very large directory structures
-- Cannot list files in mirrort or home directories for security reasons
-
----
+- **200 file limit** — Directories with more entries truncate results
+- **No file contents** — Just names and paths, not what's _inside_ the files
+- **Respects ignore files** — Hidden and gitignored files won't appear (usually a feature, not a bug)
 
 ## How It Works
 
-When the `list_files` tool is invoked, it follows this process:
+1. The AI requests a listing for a specific directory path
+2. Mirror VS scans the directory using ripgrep-based file discovery
+3. It filters results through `.gitignore` and `.mirrorignore` rules
+4. Results are returned as a structured list with paths and indicators
+5. If recursive, it walks the full subtree (up to the 200-file limit)
 
-1. **Parameter Validation**: Validates the required `path` parameter and optional `recursive` parameter
-2. **Path Resolution**: Resolves the relative path to an absolute path
-3. **Security Checks**: Prevents listing files in sensitive locations like mirrort or home directories
-4. **Directory/File Scanning**:
-    - Uses the `ripgrep` tool to efficiently list files, applying a 10-second timeout.
-    - Uses Node.js `fs` module to list directories.
-    - Applies different filtering logic for recursive vs. non-recursive modes.
-5. **Result Filtering**:
-    - In recursive mode, skips common large directories like `node_modules`, `.git`, etc.
-    - Respects `.gitignore` rules when in recursive mode
-    - Handles `.mirrorignore` patterns, either hiding files or marking them with a lock symbol
-6. **Formatting**:
-    - Marks directories with a trailing slash (`/`)
-    - Sorts results to show directories before their contents for logical hierarchy
-    - Marks ignored files with a lock symbol (🔒) when `showMirrorIgnoredFiles` is enabled
-    - Caps results at 200 files by default with a note about using subdirectories
-    - Organizes results for readability
-
----
-
-## File Listing Format
-
-The file listing results include:
-
-- Each file path is displayed on its own line
-- Directories are marked with a trailing slash (`/`)
-- Files ignored by `.mirrorignore` are marked with a lock symbol (🔒) when `showMirrorIgnoredFiles` is enabled
-- Results are sorted logically with directories appearing before their contents
-- When the file limit is reached, a message appears suggesting to use `list_files` on specific subdirectories
-
-Example output format:
+### File Listing Format
 
 ```
 src/
-src/components/
-src/components/Button.tsx
-src/components/Header.tsx
-src/utils/
-src/utils/helpers.ts
-src/index.ts
-...
-File listing truncated (showing 200 of 543 files). Use list_files on specific subdirectories for more details.
+├── api/
+│   ├── routes.ts
+│   └── middleware.ts
+├── components/
+│   ├── Button.tsx
+│   └── Header.tsx
+├── utils/
+│   └── helpers.ts
+└── index.ts
 ```
 
-When `.mirrorignore` files are used and `showMirrorIgnoredFiles` is enabled:
-
-```
-src/
-src/components/
-src/components/Button.tsx
-src/components/Header.tsx
-🔒 src/secrets.json
-src/utils/
-src/utils/helpers.ts
-src/index.ts
-```
-
----
+Files blocked by `.mirrorignore` show a 🔒 padlock, so you know they exist but are off-limits.
 
 ## Examples When Used
 
-- When starting a new task, Mirror may list the project files to understand its structure before diving into specific code.
-- When asked to find specific types of files (like all JavaScript files), Mirror first lists directories to know where to look.
-- When providing recommendations for code organization, Mirror examines the current project structure first.
-- When setting up a new feature, Mirror lists related directories to understand the project conventions.
+**Project onboarding**: "List the root directory recursively" → gets the full project structure in seconds.
 
----
+**Finding the right subdirectory**: "List only `src/components/`" → sees what components exist without the noise.
+
+**Confirming creation**: After creating a new file, the AI may list the directory to confirm it landed in the right spot.
 
 ## Usage Examples
 
-Listing top-level files in the current directory:
+### Exploring the Project Root
 
 ```
-<list_files>
-<path>.</path>
-</list_files>
+What's in this project?
 ```
 
-Recursively listing all files in a source directory:
+This triggers [`list_files`](list-files.md) with `{ path: ".", recursive: true }`, returning the full directory structure.
+
+### Checking a Specific Directory
 
 ```
-<list_files>
-<path>src</path>
-<recursive>true</recursive>
-</list_files>
+List only the top-level files in src/styles/
 ```
 
-Examining a specific project subdirectory:
+This triggers [`list_files`](list-files.md) with `{ path: "src/styles", recursive: false }`.
+
+### Understanding Component Structure
 
 ```
-<list_files>
-<path>src/components</path>
-<recursive>false</recursive>
-</list_files>
+Show me the component directory structure
 ```
+
+List `src/components` recursively to see all component files at once.

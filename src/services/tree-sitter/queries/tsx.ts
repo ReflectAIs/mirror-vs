@@ -84,4 +84,38 @@ export default `${typescriptQuery}
 (function_declaration
   name: (identifier) @name
   type_parameters: (type_parameters)) @definition.generic_component
+
+; React hooks (useState, useEffect, useRef, useCallback, useMemo)
+(expression_statement
+  (assignment_expression
+    left: (identifier) @name
+    right: (call_expression
+      function: (member_expression
+        object: (identifier)
+        property: (property_identifier) @name)))) @definition.react_hook
+
+; Direct hook calls (without React. prefix)
+(expression_statement
+  (assignment_expression
+    left: (identifier) @name
+    right: (call_expression
+      function: (identifier) @name))) @definition.react_hook
+
+; useEffect / useCallback direct calls (not assignments)
+(expression_statement
+  (call_expression
+    function: (identifier) @name)) @definition.react_hook_effect
+
+; React Context Provider/Consumer
+(jsx_element
+  open_tag: (jsx_opening_element
+    name: (member_expression) @name)) @definition.context_component
+
+; React event handler assignments (onClick, onChange, onSubmit etc.)
+(jsx_element
+  (jsx_opening_element
+    (jsx_attribute
+      (property_identifier) @name
+      (jsx_expression
+        (arrow_function)))) @definition.event_handler_prop)
 `

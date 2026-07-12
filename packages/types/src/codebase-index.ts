@@ -31,6 +31,10 @@ export const codebaseIndexConfigSchema = z.object({
 			"vercel-ai-gateway",
 			"bedrock",
 			"openrouter",
+			"anthropic",
+			"cohere",
+			"jina",
+			"voyage",
 		])
 		.optional(),
 	codebaseIndexEmbedderBaseUrl: z.string().optional(),
@@ -67,6 +71,10 @@ export const codebaseIndexModelsSchema = z.object({
 	"vercel-ai-gateway": z.record(z.string(), z.object({ dimension: z.number() })).optional(),
 	openrouter: z.record(z.string(), z.object({ dimension: z.number() })).optional(),
 	bedrock: z.record(z.string(), z.object({ dimension: z.number() })).optional(),
+	anthropic: z.record(z.string(), z.object({ dimension: z.number() })).optional(),
+	cohere: z.record(z.string(), z.object({ dimension: z.number() })).optional(),
+	jina: z.record(z.string(), z.object({ dimension: z.number() })).optional(),
+	voyage: z.record(z.string(), z.object({ dimension: z.number() })).optional(),
 })
 
 export type CodebaseIndexModels = z.infer<typeof codebaseIndexModelsSchema>
@@ -85,6 +93,10 @@ export const codebaseIndexProviderSchema = z.object({
 	codebaseIndexMistralApiKey: z.string().optional(),
 	codebaseIndexVercelAiGatewayApiKey: z.string().optional(),
 	codebaseIndexOpenRouterApiKey: z.string().optional(),
+	codebaseIndexAnthropicApiKey: z.string().optional(),
+	codebaseIndexCohereApiKey: z.string().optional(),
+	codebaseIndexJinaApiKey: z.string().optional(),
+	codebaseIndexVoyageApiKey: z.string().optional(),
 })
 
 export type CodebaseIndexProvider = z.infer<typeof codebaseIndexProviderSchema>

@@ -2,22 +2,6 @@ import { javaQuery } from "../queries"
 import { testParseSourceCodeDefinitions } from "./helpers"
 import sampleJavaContent from "./fixtures/sample-java"
 
-/*
-TODO: The following structures can be parsed by tree-sitter but lack query support:
-
-1. Import Declarations:
-   (import_declaration (scoped_identifier))
-   - Tree-sitter successfully parses import statements but no query pattern exists
-   - Example from inspect output: 'import java.util.List;'
-   - Would enable capturing package dependencies and API usage
-
-2. Field Declarations:
-   (field_declaration (modifiers) type: (type_identifier) declarator: (variable_declarator))
-   - Current query pattern needs enhancement to fully capture modifier information
-   - Example from inspect output: 'private static final int count = 0;'
-   - Would improve field visibility and mutability analysis
-*/
-
 // Java test options
 const testOptions = {
 	language: "java",

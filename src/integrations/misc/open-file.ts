@@ -8,6 +8,11 @@ interface OpenFileOptions {
 	create?: boolean
 	content?: string
 	line?: number
+	/**
+	 * Whether to open the file in preview mode (single-click tab).
+	 * Defaults to false (pinned/kept-open).
+	 */
+	preview?: boolean
 }
 
 export async function openFile(filePath: string, options: OpenFileOptions = {}) {
@@ -134,15 +139,20 @@ export async function openFile(filePath: string, options: OpenFileOptions = {}) 
 			}
 		} catch {} // not essential, sometimes tab operations fail
 
-		const document = await vscode.workspace.openTextDocument(uriToProcess)
-		const selection =
-			options.line !== undefined
-				? new vscode.Selection(Math.max(options.line - 1, 0), 0, Math.max(options.line - 1, 0), 0)
-				: undefined
-		await vscode.window.showTextDocument(document, {
-			preview: false,
-			selection,
-		})
+		// Open markdown files in preview mode for a rendered view
+		if (uriToProcess.fsPath.endsWith(".md")) {
+			await vscode.commands.executeCommand("markdown.showPreview", uriToProcess)
+		} else {
+			const document = await vscode.workspace.openTextDocument(uriToProcess)
+			const selection =
+				options.line !== undefined
+					? new vscode.Selection(Math.max(options.line - 1, 0), 0, Math.max(options.line - 1, 0), 0)
+					: undefined
+			await vscode.window.showTextDocument(document, {
+				preview: options.preview ?? false,
+				selection,
+			})
+		}
 	} catch (error) {
 		if (error instanceof Error) {
 			vscode.window.showErrorMessage(t("common:errors.could_not_open_file", { errorMessage: error.message }))

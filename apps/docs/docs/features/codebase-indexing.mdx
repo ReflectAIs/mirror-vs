@@ -1,209 +1,114 @@
 ---
-description: Learn how Codebase Indexing helps Mirror VS understand large projects using AI embeddings and semantic search. Setup guide for OpenAI and Qdrant integration.
+sidebar_label: Codebase Indexing
+title: Codebase Indexing & Semantic Search
+description: Give Mirror VS a photographic memory of your codebase — semantic search powered by AI embeddings.
 keywords:
   - codebase indexing
   - semantic search
-  - AI embeddings
-  - OpenAI
-  - Qdrant
-  - large projects
+  - embeddings
+  - qdrant
+  - vector database
   - code search
 ---
 
-import Codicon from '@site/src/components/Codicon';
+# Codebase Indexing & Semantic Search
 
-# Codebase Indexing
+Remember that function you wrote three months ago? The one with the clever name you can't quite recall? Codebase indexing gives Mirror VS a photographic memory of your entire project — so instead of guessing filenames, you can just describe what you're looking for.
 
-Codebase Indexing transforms how Mirror VS understands your project by creating a semantic search index using AI embeddings. Instead of searching for exact text matches, it understands the *meaning* of your queries, helping Roo find relevant code even when you don't know specific function names or file locations.
+## What Is Codebase Indexing?
 
----
+Codebase indexing is Mirror VS's way of building a searchable brain for your code. It converts your source files into **embeddings** (mathematical representations of meaning) and stores them in a vector database. When you ask a question, it finds the most relevant code by meaning, not just by keyword matching.
 
-## What It Does
+**Keyword search:** "Find `getUserById`" — works if you remember the name.
+**Semantic search:** "Find the function that fetches a user from the database" — works even when your memory fails you.
 
-When enabled, the indexing system:
+## How It Works
 
-1. **Parses your code** using Tree-sitter to identify semantic blocks (functions, classes, methods)
-2. **Creates embeddings** of each code block using AI models
-3. **Stores vectors** in a Qdrant database for fast similarity search
-4. **Provides the [`codebase_search`](/advanced-usage/available-tools/codebase-search) tool** to Roo for intelligent code discovery
+```
+Your Codebase
+     │
+     ▼
+Parsing (Tree-sitter AST)
+     │
+     ▼
+Chunking (100-1000 char blocks)
+     │
+     ▼
+Embedding (AI model converts to vectors)
+     │
+     ▼
+Qdrant Vector DB (stores & indexes vectors)
+     │
+     ▼
+Semantic Search (query → vector → nearest matches)
+```
 
-This enables natural language queries like "user authentication logic" or "database connection handling" to find relevant code across your entire project.
+## Getting Started
 
----
+### What You'll Need
 
-## Quick Start Guide
+To use codebase indexing, you need two things:
 
-:::tip 💰 Completely Free Setup Available
-You can set up codebase indexing at **zero cost** by using:
-- **Qdrant Cloud** (free tier) or **Docker Qdrant** (completely free)
-- **Google Gemini** (currently free)
+1. **An embedding provider** — Converts your code chunks into vector embeddings
+2. **Qdrant** — A vector database that stores and searches those embeddings
 
-This gives you professional-grade semantic search without any subscription fees!
-:::
+### Setting Up an Embedding Provider
 
-### Step 1: Choose Your Setup
+Mirror VS supports several embedding providers:
 
-Before enabling codebase indexing, you'll need two components:
+| Provider | Setup Difficulty | Pricing | Notes |
+|----------|:---------------:|:-------:|-------|
+| Google Gemini | 🟢 Easy | Free tier available | Currently recommended — free tier is generous |
+| Ollama | 🟢 Easy | Free (local) | 100% offline, 0% data leaving your machine |
+| OpenAI | 🟡 Medium | Pay-per-token | Reliable, well-documented |
+| Jina | 🟡 Medium | Pay-per-token | Specialized for code embeddings |
+| Mistral | 🟡 Medium | Pay-per-token | Good multilingual support |
+| OpenRouter | 🟡 Medium | Pay-per-token | Access to multiple models |
+| Openai-compatible | 🔵 Flexible | Varies | Bring your own compatible provider |
 
-1. **An Embedding Provider** - to convert code into searchable vectors
-2. **A Vector Database** - to store and search those vectors
+### Configuring Your Provider
 
-### Step 2: Set Up Qdrant (Vector Database)
+1. Open Mirror VS settings (`Cmd/Ctrl + ,`)
+2. Search for "Codebase Indexing"
+3. Select your embedding provider from the dropdown
+4. Enter your API key (if required)
+5. Click "Initialize Index"
 
-#### Option A: Cloud Setup (Recommended for Getting Started) - **FREE**
+### Setting Up Qdrant
 
-1. Sign up at [Qdrant Cloud](https://cloud.qdrant.io/) (free tier available)
-2. Create a cluster
-3. Copy your URL and API key
+Qdrant is the vector database that stores your embeddings. You have two options:
 
-#### Option B: Local Setup - **FREE**
-
-Using Docker:
+**Option 1: Docker (recommended)**
 ```bash
-docker run -d \
-  --name qdrant \
-  --restart unless-stopped \
-  -p 6333:6333 \
-  -v qdrant_data:/qdrant/storage \
-  qdrant/qdrant
+docker run -p 6333:6333 qdrant/qdrant
 ```
 
-Using Docker Compose:
-```yaml
-services:
-  qdrant:
-    image: qdrant/qdrant
-    ports:
-      - "6333:6333"
-    volumes:
-      - qdrant_storage:/qdrant/storage
-volumes:
-  qdrant_storage:
-```
+**Option 2: Cloud** — Use [Qdrant Cloud](https://qdrant.tech/) for a managed instance
 
-### Step 3: Set Up an Embedding Provider
+Then configure the Qdrant URL in Mirror VS settings (default: `http://localhost:6333`).
 
-#### Google Gemini Setup (Recommended) - **FREE**
+## Status Indicators
 
-1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey) (currently free)
-2. In Mirror VS settings:
-   - Provider: **Google Gemini**
-   - API Key: Your Google AI Studio key
+Once indexing is running, you'll see a status indicator showing what's happening:
 
-:::info Other Providers Available
-While this guide focuses on Google Gemini since it's currently free, Mirror VS also supports OpenAI, Ollama, OpenAI-compatible, Mistral, Vercel AI Gateway, Bedrock, and OpenRouter providers. You can explore these options in the configuration dropdown.
-:::
+| Icon | Status | Meaning |
+|:----:|--------|---------|
+| 🟢 | Indexed | All files are indexed and ready |
+| 🟡 | Indexing | Actively processing files |
+| 🔴 | Error | Something went wrong |
+| ⚪ | Standby | Waiting for files to index |
 
-### Step 4: Save
+## How Indexing Works Under the Hood
 
-1. Click **Save** and **Start Indexing**
+### Intelligent Parsing
 
-The status indicator will show:
-- **Yellow (Indexing)**: Currently processing files
-- **Green (Indexed)**: Ready for searches
-- **Red (Error)**: Check troubleshooting section
+The system uses a layered parsing strategy:
 
----
+1. **Tree-sitter First** — For supported languages, it uses AST parsing to identify semantic code blocks (functions, classes, methods)
+2. **Markdown Support** — Indexes Markdown files by treating headers as semantic entry points
+3. **Intelligent Fallback** — For unsupported file types, it falls back to line-based chunking
 
-## Managing and Configuring the Indexer
-
-You can monitor the status and manage all configuration for the codebase indexer directly from the Mirror VS chat interface.
-
-### The Status Icon
-
-At the bottom-right corner of the chat input, you'll find the **Codebase Indexing status icon**. This icon provides a quick, at-a-glance overview of the indexer's current state.
-
-<img src="/img/codebase-indexing/codebase-indexing-1.png" alt="Codebase Indexing Status Icon" />
-
-The color of the icon indicates the state:
-
-- 🟢 **Green**: **Indexed**. The index is up-to-date and ready for search.
-- 🟡 **Yellow**: **Indexing**. The system is actively processing files. Searches can still be performed, but results may be incomplete.
-- 🔴 **Red**: **Error**. An issue has occurred (e.g., failed to connect to Qdrant or the embedding provider). See the Troubleshooting section for help.
-- ⚪ **Gray**: **Standby**. The indexer is waiting for configuration or has been disabled.
-
-**Multi-Folder Workspaces**: In multi-folder workspaces, each folder maintains its own indexing status and configuration. The status icon reflects the combined state of all workspace folders.
-
-### The Configuration Popover
-
-Clicking the status icon opens the main configuration popover. Here, you can view the detailed status and manage all settings.
-
-<img src="/img/codebase-indexing/codebase-indexing-2.png" alt="Codebase Indexing Popover" />
-
-- **Status**: A detailed message showing the current state, such as "Indexed - File watcher started" or the progress of an ongoing scan.
-- **Setup**: Contains the primary fields for connecting to your embedding provider and vector database.
-- **Advanced Configuration**: Allows you to fine-tune search parameters like the similarity threshold.
-- **Clear Index Data**: Deletes all data from the Qdrant collection and clears the local file cache. Use this when you want to re-index your entire project from scratch. **This action cannot be undone.**
-- **Save**: Applies your configuration changes. If a critical setting (like an API key or a model) is changed, the indexer will automatically restart.
-
-### Detailed Configuration Fields
-
-This guide explains each setting available in the configuration popover.
-
-<img src="/img/codebase-indexing/codebase-indexing-3.png" alt="Codebase Indexing Configuration Details" />
-
-#### **Setup Fields**
-
-- **Embedder Provider**
-  - **Purpose**: To select your source for generating AI embeddings.
-  - **Behavior**: This dropdown menu determines which configuration fields are shown. Your options are **OpenAI**, **Google Gemini**, **Ollama**, **OpenAI Compatible**, **Mistral**, **Vercel AI Gateway**, **Bedrock**, and **OpenRouter**.
-
-- **API Key** (for OpenAI, Gemini, OpenAI Compatible)
-  - **Purpose**: The secret key to authenticate with your chosen provider.
-  - **Behavior**: This input is required for all cloud-based providers and is stored securely in your VS Code secret storage.
-
-- **Base URL** (for Ollama, OpenAI Compatible)
-  - **Purpose**: The endpoint for connecting to the provider's API.
-  - **Behavior**: For **Ollama**, this is typically `http://localhost:11434`. For **OpenAI Compatible** providers like Azure, this is the full deployment URL.
-
-- **Model**
-  - **Purpose**: To select the specific embedding model you want to use.
-  - **Behavior**: The list of available models changes based on the selected provider. The model's vector dimension (e.g., `1536 dimensions`) is displayed, as changing dimensions requires a full re-index.
-
-- **Qdrant URL**
-  - **Purpose**: The connection endpoint for your Qdrant vector database.
-  - **Behavior**: This must be a valid URL pointing to your local or cloud-based Qdrant instance (e.g., `http://localhost:6333`).
-
-- **Qdrant API Key**
-  - **Purpose**: The authentication key for a secured Qdrant instance.
-  - **Behavior**: This field is optional and should only be used if your Qdrant deployment requires an API key.
-
-#### **Advanced Configuration Fields**
-
-- **Search Score Threshold**
-  - **Purpose**: Controls the minimum similarity score required for a code snippet to be considered a match.
-  - **Behavior**: Use the slider to set a value between 0.0 and 1.0. A lower value returns more (but potentially less relevant) results, while a higher value returns fewer, more precise results.
-  - **Recommended Settings**:
-    - **Low (0.15-0.3)**: Broader results, good for exploration
-    - **Medium (0.4-0.5)**: Balanced precision and recall (default: 0.4)
-    - **High (0.6-0.8)**: Precise matches only
-
-- **Maximum Search Results**
-  - **Purpose**: Sets the maximum number of code snippets returned by a single `codebase_search`.
-  - **Behavior**: Use the slider to adjust the limit. This helps control the amount of context provided to the AI.
-
----
-
-## Key Benefits
-
-- **Semantic Search**: Find code by meaning, not just keywords
-- **Enhanced AI Understanding**: Roo can better comprehend and work with your codebase
-- **Cross-Project Discovery**: Search across all files, not just what's open
-- **Pattern Recognition**: Locate similar implementations and code patterns
-
----
-
-## How Files Are Processed
-
-### Smart Code Parsing
-
-The system uses a sophisticated parsing strategy:
-
-1. **Tree-sitter First**: For supported languages, it uses AST parsing to identify semantic code blocks (functions, classes, methods)
-2. **Markdown Support**: Indexes Markdown files by treating headers as semantic entry points
-3. **Intelligent Fallback**: For unsupported file types, it falls back to line-based chunking
-
-**Block Sizing**:
+**Block Sizing:**
 - Minimum: 100 characters
 - Maximum: 1,000 characters
 - Large functions are split intelligently at logical boundaries
@@ -212,43 +117,40 @@ The system uses a sophisticated parsing strategy:
 
 The indexer respects your project's ignore patterns:
 - Files matching `.gitignore` patterns
-- Files matching `.rooignore` patterns
+- Files matching `.mirrorignore` patterns
 - Binary files and images
 - Files larger than 1MB
 
-**Important**: Ensure your `.gitignore` includes common dependency folders like `node_modules`, `vendor`, `target`, etc., as the system relies exclusively on these patterns for filtering.
+**Important:** Make sure your `.gitignore` includes common dependency folders like `node_modules`, `vendor`, `target`, etc. The system relies on these patterns to know what to skip.
 
 ### Incremental Updates
 
-- **File Watching**: Monitors your workspace for changes in real-time
-- **Smart Updates**: Only reprocesses modified files
-- **Branch Aware**: Automatically handles Git branch switches
-- **Hash-based Caching**: Avoids reprocessing unchanged content
-- **Multi-Folder Workspaces**: Each folder in a multi-folder workspace maintains its own index with separate settings and status
-
----
+- **File Watching** — Monitors your workspace for changes in real-time
+- **Smart Updates** — Only reprocesses modified files
+- **Branch Aware** — Automatically handles Git branch switches
+- **Hash-based Caching** — Avoids reprocessing unchanged content
+- **Multi-Folder Workspaces** — Each folder in a multi-folder workspace maintains its own index with separate settings and status
 
 ## Best Practices
 
 ### Writing Effective Queries
 
-Instead of searching for exact syntax:
+Instead of searching for exact syntax, describe what you want:
+
 - ❌ `const getUser`
 - ✅ `function to fetch user from database`
 
-Use natural language descriptions:
+Use natural language:
 - "authentication middleware"
 - "error handling for API requests"
 - "database connection setup"
 
 ### Security Considerations
 
-- **API Keys**: Stored securely in VS Code's encrypted storage
-- **Code Privacy**: Only small code snippets sent for embedding
-- **Local Processing**: All parsing happens locally
-- **Access Control**: Respects file permissions and ignore patterns
-
----
+- **API Keys** — Stored securely in VS Code's encrypted storage
+- **Code Privacy** — Only small code snippets are sent for embedding
+- **Local Processing** — All parsing happens locally on your machine
+- **Access Control** — Respects file permissions and ignore patterns
 
 ## Troubleshooting
 
@@ -265,14 +167,14 @@ Use natural language descriptions:
 - Ensure the key has necessary permissions
 - For Ollama, verify the service is running
 
-### API Key Format Errors (“ByteString conversion”)
+### API Key Format Errors ("ByteString conversion")
 
-- Symptom: Error mentions "ByteString conversion" during indexing or when saving settings
-- Likely cause: Your embedding provider API key contains invalid/special characters or hidden whitespace
-- Fix:
+- **Symptom:** Error mentions "ByteString conversion" during indexing or when saving settings
+- **Likely cause:** Your embedding provider API key contains invalid/special characters or hidden whitespace
+- **Fix:**
   - Regenerate a fresh API key from your provider dashboard
-  - Paste the key again, ensuring no leading/trailing spaces or hidden characters
-  - Roo will display a clear validation message if the key is invalid
+  - Paste it again, ensuring no leading/trailing spaces or hidden characters
+  - Mirror VS will display a clear validation message if the key is invalid
 
 ### Model Issues
 
@@ -290,15 +192,15 @@ Use natural language descriptions:
 **"Indexing Taking Too Long"**
 - Normal for large codebases (10k+ files)
 - Check `.gitignore` includes large directories
-- Consider adding patterns to `.rooignore`
+- Consider adding patterns to `.mirrorignore`
 
 ---
 
 ## Using the Search Feature
 
-Once indexed, Roo can use the [`codebase_search`](/advanced-usage/available-tools/codebase-search) tool:
+Once indexed, Mirror VS can use the [`codebase_search`](/advanced-usage/available-tools/codebase-search) tool to find relevant code semantically.
 
-**Example Natural Language Queries**:
+**Example Natural Language Queries:**
 - "How is user authentication handled?"
 - "Database connection setup"
 - "Error handling patterns"
@@ -315,24 +217,24 @@ The tool provides:
 
 ## Privacy & Data Security
 
-**Your code stays private**:
-- Only small code chunks (100-1000 chars) sent for embedding
-- Embeddings are one-way mathematical representations
+**Your code stays private:**
+- Only small code chunks (100-1000 chars) are sent for embedding
+- Embeddings are one-way mathematical representations — you can't reconstruct code from them
 - Local parsing means full files never leave your machine
 - Use Ollama for completely offline operation
 
-**Data Storage**:
+**Data Storage:**
 - Vectors stored in your chosen Qdrant instance
-- You control where data lives (local/cloud)
+- You control where data lives (local or cloud)
 - Easy to delete: just clear the index
 
 ---
 
 ## Current Limitations
 
-- **File Size**: 1MB maximum per file
-- **External Dependencies**: Requires embedding provider + Qdrant
-- **Language Support**: Best results with Tree-sitter supported languages
+- **File Size** — 1MB maximum per file
+- **External Dependencies** — Requires embedding provider + Qdrant
+- **Language Support** — Best results with Tree-sitter supported languages
 
 ---
 
@@ -345,3 +247,10 @@ Planned improvements:
 - Team collaboration features
 - VS Code native search integration
 - Incremental re-indexing optimizations
+
+---
+
+## See Also
+
+- [Auto-Approving Actions](/features/auto-approving-actions) — Configure automatic approvals
+- [Custom Instructions](/features/custom-instructions) — Set rules for how Mirror VS behaves

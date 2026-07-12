@@ -117,6 +117,7 @@ export type NativeToolArgs = {
 	search_files: { path: string; regex: string; file_pattern?: string | null }
 	switch_mode: { mode_slug: string; reason: string }
 	update_todo_list: { todos: string }
+	web_search: { query: string }
 	use_mcp_tool: { server_name: string; tool_name: string; arguments?: Record<string, unknown> }
 	write_to_file: { path: string; content: string }
 	// Add more tools as they are migrated to native protocol
@@ -298,13 +299,14 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	browser_type: "type text in browser",
 	browser_screenshot: "take browser screenshot",
 	browser_evaluate_script: "execute browser script",
+	web_search: "search the web",
 	render_preview: "render web preview",
 } as const
 
 // Define available tool groups.
 export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 	read: {
-		tools: ["read_file", "search_files", "list_files", "codebase_search"],
+		tools: ["read_file", "search_files", "list_files", "codebase_search", "web_search"],
 	},
 	edit: {
 		tools: ["apply_diff", "write_to_file", "generate_image"],
@@ -321,7 +323,14 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 		alwaysAvailable: true,
 	},
 	browser: {
-		tools: ["browser_navigate", "browser_click", "browser_type", "browser_screenshot", "browser_evaluate_script", "render_preview"],
+		tools: [
+			"browser_navigate",
+			"browser_click",
+			"browser_type",
+			"browser_screenshot",
+			"browser_evaluate_script",
+			"render_preview",
+		],
 	},
 }
 
@@ -354,17 +363,17 @@ export const TOOL_ALIASES: Record<string, ToolName> = {
 export type DiffResult =
 	| { success: true; content: string; failParts?: DiffResult[] }
 	| ({
-		success: false
-		error?: string
-		details?: {
-			similarity?: number
-			threshold?: number
-			matchedRange?: { start: number; end: number }
-			searchContent?: string
-			bestMatch?: string
-		}
-		failParts?: DiffResult[]
-	} & ({ error: string } | { failParts: DiffResult[] }))
+			success: false
+			error?: string
+			details?: {
+				similarity?: number
+				threshold?: number
+				matchedRange?: { start: number; end: number }
+				searchContent?: string
+				bestMatch?: string
+			}
+			failParts?: DiffResult[]
+	  } & ({ error: string } | { failParts: DiffResult[] }))
 
 export interface DiffItem {
 	content: string

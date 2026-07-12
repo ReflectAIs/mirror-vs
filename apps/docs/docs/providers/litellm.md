@@ -15,7 +15,7 @@ keywords:
 
 # Using LiteLLM With Mirror VS
 
-LiteLLM is a versatile tool that provides a unified interface to over 100 Large Language Models (LLMs) by offering an OpenAI-compatible API. This allows you to run a local server that can proxy requests to various model providers or serve local models, all accessible through a consistent API endpoint.
+LiteLLM is a versatile tool that provides a unified interface to over 100 Large Language Models by offering an OpenAI-compatible API. Think of it as the universal adapter for AI — run a local server that proxies requests to various model providers or serves local models, all accessible through a consistent API endpoint.
 
 **Website:** [https://litellm.ai/](https://litellm.ai/) (Main project) & [https://docs.litellm.ai/](https://docs.litellm.ai/) (Documentation)
 
@@ -23,7 +23,7 @@ LiteLLM is a versatile tool that provides a unified interface to over 100 Large 
 
 ## Key Benefits
 
-- **Unified API:** Access a wide range of LLMs (from OpenAI, Anthropic, Cohere, HuggingFace, etc.) through a single, OpenAI-compatible API.
+- **Unified API:** Access a wide range of LLMs (OpenAI, Anthropic, Cohere, HuggingFace, etc.) through a single, OpenAI-compatible API.
 - **Local Deployment:** Run your own LiteLLM server locally, giving you more control over model access and potentially reducing latency.
 - **Simplified Configuration:** Manage credentials and model configurations in one place (your LiteLLM server) and let Mirror VS connect to it.
 - **Cost Management:** LiteLLM offers features for tracking costs across different models and providers.
@@ -44,6 +44,7 @@ To use LiteLLM with Mirror VS, you first need to set up and run a LiteLLM server
 ### Configuration
 
 2. Create a configuration file (`config.yaml`) to define your models and providers:
+
     ```yaml
     model_list:
         # Configure Anthropic models

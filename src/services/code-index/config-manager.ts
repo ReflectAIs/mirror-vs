@@ -22,6 +22,10 @@ export class CodeIndexConfigManager {
 	private vercelAiGatewayOptions?: { apiKey: string }
 	private bedrockOptions?: { region: string; profile?: string }
 	private openRouterOptions?: { apiKey: string; specificProvider?: string }
+	private anthropicOptions?: { apiKey: string }
+	private cohereOptions?: { apiKey: string }
+	private jinaOptions?: { apiKey: string }
+	private voyageOptions?: { apiKey: string }
 	private qdrantUrl?: string = "http://localhost:6333"
 	private qdrantApiKey?: string
 	private searchMinScore?: number
@@ -105,7 +109,7 @@ export class CodeIndexConfigManager {
 
 		this.openAiOptions = { openAiNativeApiKey: openAiKey }
 
-		// Set embedder provider with support for openai-compatible
+		// Set embedder provider with support for all providers
 		if (codebaseIndexEmbedderProvider === "ollama") {
 			this.embedderProvider = "ollama"
 		} else if (codebaseIndexEmbedderProvider === "openai-compatible") {
@@ -120,6 +124,14 @@ export class CodeIndexConfigManager {
 			this.embedderProvider = "bedrock"
 		} else if (codebaseIndexEmbedderProvider === "openrouter") {
 			this.embedderProvider = "openrouter"
+		} else if (codebaseIndexEmbedderProvider === "anthropic") {
+			this.embedderProvider = "anthropic"
+		} else if (codebaseIndexEmbedderProvider === "cohere") {
+			this.embedderProvider = "cohere"
+		} else if (codebaseIndexEmbedderProvider === "jina") {
+			this.embedderProvider = "jina"
+		} else if (codebaseIndexEmbedderProvider === "voyage") {
+			this.embedderProvider = "voyage"
 		} else {
 			this.embedderProvider = "openai"
 		}
@@ -148,6 +160,17 @@ export class CodeIndexConfigManager {
 		this.bedrockOptions = bedrockRegion
 			? { region: bedrockRegion, profile: bedrockProfile || undefined }
 			: undefined
+
+		// Read API keys for new providers
+		const anthropicApiKey = this.contextProxy?.getSecret("codebaseIndexAnthropicApiKey") ?? ""
+		const cohereApiKey = this.contextProxy?.getSecret("codebaseIndexCohereApiKey") ?? ""
+		const jinaApiKey = this.contextProxy?.getSecret("codebaseIndexJinaApiKey") ?? ""
+		const voyageApiKey = this.contextProxy?.getSecret("codebaseIndexVoyageApiKey") ?? ""
+
+		this.anthropicOptions = anthropicApiKey ? { apiKey: anthropicApiKey } : undefined
+		this.cohereOptions = cohereApiKey ? { apiKey: cohereApiKey } : undefined
+		this.jinaOptions = jinaApiKey ? { apiKey: jinaApiKey } : undefined
+		this.voyageOptions = voyageApiKey ? { apiKey: voyageApiKey } : undefined
 	}
 
 	/**
@@ -192,6 +215,10 @@ export class CodeIndexConfigManager {
 			bedrockProfile: this.bedrockOptions?.profile ?? "",
 			openRouterApiKey: this.openRouterOptions?.apiKey ?? "",
 			openRouterSpecificProvider: this.openRouterOptions?.specificProvider ?? "",
+			anthropicApiKey: this.anthropicOptions?.apiKey ?? "",
+			cohereApiKey: this.cohereOptions?.apiKey ?? "",
+			jinaApiKey: this.jinaOptions?.apiKey ?? "",
+			voyageApiKey: this.voyageOptions?.apiKey ?? "",
 			qdrantUrl: this.qdrantUrl ?? "",
 			qdrantApiKey: this.qdrantApiKey ?? "",
 		}
@@ -272,6 +299,22 @@ export class CodeIndexConfigManager {
 			const qdrantUrl = this.qdrantUrl
 			const isConfigured = !!(apiKey && qdrantUrl)
 			return isConfigured
+		} else if (this.embedderProvider === "anthropic") {
+			const apiKey = this.anthropicOptions?.apiKey
+			const qdrantUrl = this.qdrantUrl
+			return !!(apiKey && qdrantUrl)
+		} else if (this.embedderProvider === "cohere") {
+			const apiKey = this.cohereOptions?.apiKey
+			const qdrantUrl = this.qdrantUrl
+			return !!(apiKey && qdrantUrl)
+		} else if (this.embedderProvider === "jina") {
+			const apiKey = this.jinaOptions?.apiKey
+			const qdrantUrl = this.qdrantUrl
+			return !!(apiKey && qdrantUrl)
+		} else if (this.embedderProvider === "voyage") {
+			const apiKey = this.voyageOptions?.apiKey
+			const qdrantUrl = this.qdrantUrl
+			return !!(apiKey && qdrantUrl)
 		}
 		return false // Should not happen if embedderProvider is always set correctly
 	}
@@ -311,6 +354,10 @@ export class CodeIndexConfigManager {
 		const prevBedrockProfile = prev?.bedrockProfile ?? ""
 		const prevOpenRouterApiKey = prev?.openRouterApiKey ?? ""
 		const prevOpenRouterSpecificProvider = prev?.openRouterSpecificProvider ?? ""
+		const prevAnthropicApiKey = prev?.anthropicApiKey ?? ""
+		const prevCohereApiKey = prev?.cohereApiKey ?? ""
+		const prevJinaApiKey = prev?.jinaApiKey ?? ""
+		const prevVoyageApiKey = prev?.voyageApiKey ?? ""
 		const prevQdrantUrl = prev?.qdrantUrl ?? ""
 		const prevQdrantApiKey = prev?.qdrantApiKey ?? ""
 
@@ -353,6 +400,10 @@ export class CodeIndexConfigManager {
 		const currentBedrockProfile = this.bedrockOptions?.profile ?? ""
 		const currentOpenRouterApiKey = this.openRouterOptions?.apiKey ?? ""
 		const currentOpenRouterSpecificProvider = this.openRouterOptions?.specificProvider ?? ""
+		const currentAnthropicApiKey = this.anthropicOptions?.apiKey ?? ""
+		const currentCohereApiKey = this.cohereOptions?.apiKey ?? ""
+		const currentJinaApiKey = this.jinaOptions?.apiKey ?? ""
+		const currentVoyageApiKey = this.voyageOptions?.apiKey ?? ""
 		const currentQdrantUrl = this.qdrantUrl ?? ""
 		const currentQdrantApiKey = this.qdrantApiKey ?? ""
 
@@ -393,6 +444,19 @@ export class CodeIndexConfigManager {
 
 		// OpenRouter specific provider change
 		if (prevOpenRouterSpecificProvider !== currentOpenRouterSpecificProvider) {
+			return true
+		}
+
+		if (prevAnthropicApiKey !== currentAnthropicApiKey) {
+			return true
+		}
+		if (prevCohereApiKey !== currentCohereApiKey) {
+			return true
+		}
+		if (prevJinaApiKey !== currentJinaApiKey) {
+			return true
+		}
+		if (prevVoyageApiKey !== currentVoyageApiKey) {
 			return true
 		}
 
@@ -460,6 +524,42 @@ export class CodeIndexConfigManager {
 			qdrantApiKey: this.qdrantApiKey,
 			searchMinScore: this.currentSearchMinScore,
 			searchMaxResults: this.currentSearchMaxResults,
+		}
+	}
+
+	/**
+	 * Gets the anthropic options
+	 */
+	public get anthropicConfig(): { apiKey?: string } {
+		return {
+			apiKey: this.anthropicOptions?.apiKey,
+		}
+	}
+
+	/**
+	 * Gets the cohere options
+	 */
+	public get cohereConfig(): { apiKey?: string } {
+		return {
+			apiKey: this.cohereOptions?.apiKey,
+		}
+	}
+
+	/**
+	 * Gets the jina options
+	 */
+	public get jinaConfig(): { apiKey?: string } {
+		return {
+			apiKey: this.jinaOptions?.apiKey,
+		}
+	}
+
+	/**
+	 * Gets the voyage options
+	 */
+	public get voyageConfig(): { apiKey?: string } {
+		return {
+			apiKey: this.voyageOptions?.apiKey,
 		}
 	}
 

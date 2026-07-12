@@ -1,5 +1,5 @@
 ---
-description: Define TypeScript/JavaScript tools that extend Mirror's capabilities beyond built-in tools, with npm dependency support and per-tool environment variables.
+description: Define TypeScript/JavaScript tools that extend Mirror VS's capabilities beyond built-in tools, with npm dependency support and per-tool environment variables.
 keywords:
     - experimental features
     - custom tools
@@ -14,17 +14,17 @@ keywords:
 
 # Custom Tools
 
-Define TypeScript or JavaScript tools that Mirror can call like built-in tools—standardize team workflows instead of re-prompting the same steps every task.
+Define TypeScript or JavaScript tools that Mirror VS can call like built-in tools — standardize team workflows instead of re-prompting the same steps every task. It's like teaching Mirror VS a few new tricks that only your team knows.
 
 :::warning Experimental Feature
-Custom tools is an experimental feature. Custom tools are **automatically approved** when enabled—Mirror won't ask for permission before running them. Only enable this feature if you trust your tool code.
+Custom tools is an experimental feature. Custom tools are **automatically approved** when enabled — Mirror VS won't ask for permission before running them. Only enable this feature if you trust your tool code. With great power comes great responsibility (and no pop-ups).
 :::
 
 ---
 
 ## What it does
 
-Custom tools let you codify project-specific actions into TypeScript/JavaScript files that Mirror calls like [`read_file()`](/basic-usage/how-tools-work) or [`execute_command()`](/basic-usage/how-tools-work). Ship tool schemas alongside your repo so teammates don't need to keep re-explaining the same workflow steps. Tools are validated with Zod and automatically transpiled from TypeScript.
+Custom tools let you codify project-specific actions into TypeScript/JavaScript files that Mirror VS calls like [`read_file()`](/basic-usage/how-tools-work) or [`execute_command()`](/basic-usage/how-tools-work). Ship tool schemas alongside your repo so teammates don't need to keep re-explaining the same workflow steps. Tools are validated with Zod and automatically transpiled from TypeScript.
 
 ---
 
@@ -54,12 +54,12 @@ export default defineCustomTool({
 
 #### What you define
 
-- **`name`**: Tool name Mirror sees in its available tools list
+- **`name`**: Tool name Mirror VS sees in its available tools list
 - **`description`**: Shown to the AI so it knows when to call the tool
 - **`parameters`**: Zod schema converted to JSON Schema for validation
-- **`execute`**: Async function returning a string result to Mirror
+- **`execute`**: Async function returning a string result to Mirror VS
 
-Tools are dynamically loaded and transpiled with esbuild. Automatic reload on file changes isn't reliable—use the **Refresh Custom Tools** command to pick up changes immediately.
+Tools are dynamically loaded and transpiled with esbuild. Automatic reload on file changes isn't reliable — use the **Refresh Custom Tools** command to pick up changes immediately.
 
 ---
 
@@ -71,7 +71,7 @@ Tools are dynamically loaded and transpiled with esbuild. Automatic reload on fi
 
 <img src="/img/custom-tools/custom-tools.png" alt="Enable custom tools toggle in experimental settings" width="400" />
 
-**Critical:** When enabled, custom tools are **auto-approved**—Mirror runs them without asking. Disable if you don't trust the tool code.
+**Critical:** When enabled, custom tools are **auto-approved** — Mirror VS runs them without asking. Disable if you don't trust the tool code. Really, we mean it — read the warning again.
 
 ---
 
@@ -118,7 +118,7 @@ export default defineCustomTool({
 
 ## Per-Tool Environment Variables
 
-Mirror copies `.env` and `.env.*` files from your tool directory into the tool's cache folder so your tool can load them at runtime. **Mirror does not automatically inject these variables into `process.env`**—your tool must load them itself.
+Mirror VS copies `.env` and `.env.*` files from your tool directory into the tool's cache folder so your tool can load them at runtime. **Mirror VS does not automatically inject these variables into `process.env`** — your tool must load them itself.
 
 **Setup:**
 
@@ -172,7 +172,7 @@ Mirror copies `.env` and `.env.*` files from your tool directory into the tool's
     })
     ```
 
-**Why `__dirname`?** Mirror copies your `.env` files into a cache directory alongside the transpiled tool. Using `__dirname` ensures your tool finds the `.env` in the correct location regardless of where the tool was originally defined.
+**Why `__dirname`?** Mirror VS copies your `.env` files into a cache directory alongside the transpiled tool. Using `__dirname` ensures your tool finds the `.env` in the correct location regardless of where the tool was originally defined.
 
 **Security:** Ensure your `.env` file is ignored by version control to keep secrets safe.
 
@@ -180,8 +180,8 @@ Mirror copies `.env` and `.env.*` files from your tool directory into the tool's
 
 ## Limits
 
-- **No approval prompts**: Tools are auto-approved when the feature is enabled—security trade-off for convenience
-- **String-only results**: Tools must return strings (Mirror's protocol constraint)
+- **No approval prompts**: Tools are auto-approved when the feature is enabled — security trade-off for convenience
+- **String-only results**: Tools must return strings (Mirror VS's protocol constraint)
 - **No interactive input**: Tools can't prompt the user mid-execution
 - **Cache invalidation**: Tool updates may require reloading the window
 

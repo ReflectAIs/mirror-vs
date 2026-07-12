@@ -14,7 +14,7 @@ keywords:
 
 # Qwen Code CLI Provider
 
-Access Alibaba's Qwen3 Coder models through OAuth authentication with automatic token refresh. Features massive 1M token context windows optimized for large codebases.
+Access Alibaba's Qwen3 Coder models through OAuth authentication with automatic token refresh. Features massive 1M token context windows optimized for large codebases — that's enough to fit your entire project in a single conversation.
 
 :::info Setup Required
 

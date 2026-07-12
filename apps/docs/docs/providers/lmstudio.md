@@ -15,7 +15,7 @@ keywords:
 
 # Using LM Studio With Mirror VS
 
-Mirror VS supports running models locally using LM Studio. LM Studio provides a user-friendly interface for downloading, configuring, and running local language models. It also includes a built-in local inference server that emulates the OpenAI API, making it easy to integrate with Mirror VS.
+Mirror VS supports running models locally using LM Studio. LM Studio provides a user-friendly interface for downloading, configuring, and running local language models. It also includes a built-in local inference server that emulates the OpenAI API — making it easy to integrate with Mirror VS without any custom wiring.
 
 **Website:** [https://lmstudio.ai/](https://lmstudio.ai/)
 

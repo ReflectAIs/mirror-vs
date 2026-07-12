@@ -1,236 +1,144 @@
 ---
-description: Learn how to use custom instructions to tailor Mirror VS's behavior to your preferences, coding style, and project requirements.
+sidebar_label: Custom Instructions
+title: Custom Instructions
+description: Teach Mirror VS your preferences, standards, and workflows so it doesn't have to guess.
 keywords:
     - custom instructions
-    - personalization
-    - AI customization
-    - coding preferences
-    - project rules
+    - rules
+    - global rules
+    - workspace rules
+    - mode-specific instructions
+    - AGENTS.md
+    - .mirrorrules
 ---
 
 # Custom Instructions
 
-Custom Instructions allow you to personalize how Mirror behaves, providing specific guidance that shapes responses, coding style, and decision-making processes.
-
-:::info Instruction File Locations
-You can provide custom instructions using global rules (applied across all projects), workspace rules (project-specific), or through the Prompts tab interface.
-
-**Global Rules Directory:** Apply to all projects automatically.
-
-- **Linux/macOS:** `~/.mirror/rules/` and `~/.mirror/rules-{modeSlug}/`
-- **Windows:** `%USERPROFILE%\.mirror\rules\` and `%USERPROFILE%\.mirror\rules-{modeSlug}\`
-
-**Workspace Rules:** Apply only to the current project and take precedence over global rules when they conflict.
-
-- **Preferred Method: Directory (`.mirror/rules/`)**
-    ```
-    .
-    ├── .mirror/
-    │   └── rules/          # Workspace-wide rules
-    │       ├── 01-general.md
-    │       └── 02-coding-style.txt
-    └── ... (other project files)
-    ```
-- **Fallback Method: Single File (`.mirrorrules`)**
-    ```
-    .
-    ├── .mirrorrules           # Workspace-wide rules (single file)
-    └── ... (other project files)
-    ```
-
-**Mode-Specific Instructions:** Apply only to a specific mode (e.g., `code`).
-
-- **Preferred Method: Directory (`.mirror/rules-{modeSlug}/`)**
-    ```
-    .
-    ├── .mirror/
-    │   └── rules-code/     # Rules for "code" mode
-    │       ├── 01-js-style.md
-    │       └── 02-ts-style.md
-    └── ... (other project files)
-    ```
-- **Fallback Method: Single File (`.mirrorrules-{modeSlug}`)**
-    ```
-    .
-    ├── .mirrorrules-code      # Rules for "code" mode (single file)
-    └── ... (other project files)
-    ```
-
-Rules are loaded in order: Global rules first, then workspace rules. If there's a conflict, workspace rules take precedence. See [Global Rules Directory](#global-rules-directory) for details.
-:::
-
----
+Mirror VS is smart, but it's not a mind reader (yet). Custom instructions are how you tell it exactly how you want things done — your coding style, your standards, your pet peeves. Think of it as the difference between "write some code" and "write code that passes our code review on the first try."
 
 ## What Are Custom Instructions?
 
-Custom Instructions define specific behaviors, preferences, and constraints beyond Mirror's basic role definition. Examples include coding style, documentation standards, testing requirements, and workflow guidelines.
+Custom instructions are rules and guidelines you define that Mirror VS follows automatically. They can be:
 
----
+- **Global** — Apply to every project, every mode, everywhere
+- **Workspace-specific** — Apply only to the current project
+- **Mode-specific** — Apply only when using a particular mode (Code, Architect, Debug, etc.)
+- **Agent-level** — Apply via `AGENTS.md` for standardized AI behavior across teams
 
-## Setting Custom Instructions
+## Setting Up Custom Instructions
 
 ### Global Custom Instructions
 
-These instructions apply across all workspaces and maintain your preferences regardless of which project you're working on.
+Global instructions apply everywhere, all the time. Set them once, and Mirror VS carries them across every project you work on.
 
 **How to set them:**
 
-<img src="/img/custom-instructions/custom-instructions.png" alt="Mirror VS Prompts tab showing global custom instructions interface" width="600" />
-1.  **Open Prompts Tab:** Click the <Codicon name="notebook" /> icon in the Mirror VS top menu bar
-2.  **Find Section:** Find the "Custom Instructions for All Modes" section
-3.  **Enter Instructions:** Enter your instructions in the text area
-4.  **Save Changes:** Click "Done" to save your changes
+1. Open Mirror VS settings (`Cmd/Ctrl + ,`)
+2. Navigate to the "Custom Instructions" section
+3. Enter your global instructions in the text area
 
 ### Global Rules Directory
 
-The Global Rules Directory feature provides reusable rules and custom instructions that automatically apply across all your projects. This system supports both global configurations and project-specific overrides.
+For a more organized approach, use the global rules directory:
+
+**Location:** `~/.mirror/rules/` and `~/.mirror/rules-{modeSlug}/`
+
+```
+~/.mirror/
+├── rules/
+│   ├── 00-general-standards.md
+│   ├── 10-testing-requirements.md
+│   └── 20-security-practices.md
+├── rules-code/
+│   └── typescript-style-guide.md
+├── rules-architect/
+│   └── architecture-documentation.md
+└── rules-debug/
+    └── debugging-protocol.md
+```
 
 #### Key Benefits
 
-**Without Global Rules**: You had to maintain separate rule files in each project:
-
-- Copy the same rules to every new project
-- Update rules manually across multiple projects
-- No consistency between projects
-
-**With Global Rules**: Create rules once and use them everywhere:
-
-- Set up your preferred coding standards globally
-- Customize specific rules per project when needed
-- Maintain consistency across all your work
-- Easy to update rules for all projects at once
-
-#### Directory Structure
-
-The global rules directory location is fixed and cannot be customized:
-
-**Linux/macOS:**
-
-```
-~/.mirror/                           # Your global Mirror configuration
-├── rules/                        # General rules applied to all projects
-│   ├── coding-standards.md
-│   ├── formatting-rules.md
-│   └── security-guidelines.md
-├── rules-code/                   # Rules specific to Code mode
-│   ├── typescript-rules.md
-│   └── testing-requirements.md
-├── rules-docs-extractor/         # Rules for documentation extraction
-│   └── documentation-style.md
-└── rules-{mode}/                 # Rules for other specific modes
-    └── mode-specific-rules.md
-```
-
-**Windows:**
-
-```
-%USERPROFILE%\.mirror\               # Your global Mirror configuration
-├── rules\                        # General rules applied to all projects
-│   ├── coding-standards.md
-│   ├── formatting-rules.md
-│   └── security-guidelines.md
-├── rules-code\                   # Rules specific to Code mode
-│   ├── typescript-rules.md
-│   └── testing-requirements.md
-└── rules-{mode}\                 # Rules for other specific modes
-    └── mode-specific-rules.md
-```
+- **Organized** — Separate concerns into different files instead of one giant wall of text
+- **Versioned** — Keep your rules in a separate dotfiles repo if you want
+- **Mode-specific** — Different modes get different rules
+- **Alphabetical loading** — Files are loaded in alphabetical order, so prefix them to control priority
 
 #### Setting Up Global Rules
 
-1. **Create Global Rules Directory:**
+1. Create the directory structure:
 
     ```bash
-    # Linux/macOS
     mkdir -p ~/.mirror/rules
-
-    # Windows
-    mkdir %USERPROFILE%\.mirror\rules
+    mkdir -p ~/.mirror/rules-code
+    mkdir -p ~/.mirror/rules-architect
     ```
 
-2. **Add General Rules** (`~/.mirror/rules/coding-standards.md`):
+2. Add your rule files:
 
-    ```markdown
-    # Global Coding Standards
-
-    1. Always use TypeScript for new projects
-    2. Write unit tests for all new functions
-    3. Use descriptive variable names
-    4. Add JSDoc comments for public APIs
+    ```bash
+    echo "Always use TypeScript strict mode" > ~/.mirror/rules/00-typescript-strict.md
+    echo "Write unit tests for all new functions" > ~/.mirror/rules/10-test-requirements.md
     ```
 
-3. **Add Mode-Specific Rules** (`~/.mirror/rules-code/typescript-rules.md`):
-
-    ```markdown
-    # TypeScript Code Mode Rules
-
-    1. Use strict mode in tsconfig.json
-    2. Prefer interfaces over type aliases for object shapes
-    3. Always specify return types for functions
-    ```
-
-#### Available Rule Directories
-
-| Directory               | Purpose                             |
-| ----------------------- | ----------------------------------- |
-| `rules/`                | General rules applied to all modes  |
-| `rules-code/`           | Rules specific to Code mode         |
-| `rules-docs-extractor/` | Rules for documentation extraction  |
-| `rules-architect/`      | Rules for system architecture tasks |
-| `rules-debug/`          | Rules for debugging workflows       |
-| `rules-{mode}/`         | Rules for any custom mode           |
+3. That's it. Mirror VS picks them up automatically.
 
 #### Rule Loading Order
 
-Rules are loaded in this order:
+Rules are loaded in a specific order to ensure predictable behavior:
 
-1. **Global Rules** (from `~/.mirror/`)
-2. **Project Rules** (from `project/.mirror/`) - take precedence over global rules when they conflict
-3. [Generic only] **Legacy Files** (workspace mirrort `.mirrorrules`, `.mirrorrules`) - used only if no generic rules directory content was loaded
+1. **Global rules** (`~/.mirror/rules/`) — Apply to all modes, all projects
+2. **Global mode-specific rules** (`~/.mirror/rules-{modeSlug}/`) — Apply to a specific mode globally
+3. **Workspace rules** (`.mirror/rules/`) — Apply to the current project
+4. **Workspace mode-specific rules** (`.mirror/rules-{modeSlug}/`) — Apply to a specific mode in the current project
 
-Within each level, mode-specific rules are loaded before general rules.
+Later rules add to (not replace) earlier ones. So global rules + workspace rules = both apply.
 
 ### Workspace-Level Instructions
 
-These instructions only apply within your current workspace, allowing you to customize Mirror VS's behavior for specific projects.
+Workspace instructions apply only to the current project. Perfect for project-specific conventions and team standards.
 
 #### Workspace-Wide Instructions via Files/Directories
 
-Workspace-wide instructions apply to all modes within the current project and can be defined using files:
-
 - **Preferred Method: Directory-Based (`.mirror/rules/`)**
-    - Create a directory named `.mirror/rules/` in your workspace mirrort.
-    - Place instruction files (e.g., `.md`, `.txt`) inside. Mirror VS reads files recursively (including subdirectories), appending their content to the system prompt in **alphabetical order** based on filename.
+
+    - Create a directory named `.mirror/rules/` in your workspace root.
+    - Place instruction files (`.md`, `.txt`) inside. Mirror VS reads files recursively, appending their content to the system prompt in **alphabetical order** based on filename.
     - When this directory exists and contains files, its contents are loaded along with any global rules directories.
     - Note: If the `.mirror/rules/` directory exists but is empty, Mirror VS will fall back to using the `.mirrorrules` file instead.
+
 - **Fallback Method: File-Based (`.mirrorrules`)**
-    - If `.mirror/rules/` doesn't exist or is empty, Mirror VS looks for a single `.mirrorrules` file in the workspace mirrort.
+    - If `.mirror/rules/` doesn't exist or is empty, Mirror VS looks for a single `.mirrorrules` file in the workspace root.
     - If found, its content is loaded.
 
 #### Mode-Specific Instructions
 
-Mode-specific instructions can be set in two independent ways that can be used simultaneously:
+Mode-specific instructions can be set in two independent ways:
 
-1.  **Using the Prompts Tab:**
+**1. Using the Prompts Tab:**
 
-    <img src="/img/custom-instructions/custom-instructions-2.png" alt="Mirror VS Prompts tab showing mode-specific custom instructions interface" width="600" />
-    * **Open Tab:** Click the <Codicon name="notebook" /> icon in the Mirror VS top menu bar
-    * **Select Mode:** Under the Modes heading, click the button for the mode you want to customize
-    * **Enter Instructions:** Enter your instructions in the text area under "Mode-specific Custom Instructions (optional)"
-    * **Save Changes:** Click "Done" to save your changes
+<img src="/img/custom-instructions/custom-instructions-2.png" alt="Mirror VS Prompts tab showing mode-specific custom instructions interface" width="600" />
 
-        :::info Global Mode Rules
-        If the mode itself is global (not workspace-specific), any custom instructions you set for it will also apply globally for that mode across all workspaces.
-        :::
+- **Open Tab:** Click the <Codicon name="notebook" /> icon in the Mirror VS top menu bar
+- **Select Mode:** Under the Modes heading, click the button for the mode you want to customize
+- **Enter Instructions:** Type your instructions in the text area under "Mode-specific Custom Instructions (optional)"
+- **Save Changes:** Click "Done" to save
 
-2.  **Using Rule Files/Directories:** Provide mode-specific instructions via files:
-    - **Preferred Method: Directory-Based (`.mirror/rules-{modeSlug}/`)**
-        - Create a directory named `.mirror/rules-{modeSlug}/` (e.g., `.mirror/rules-docs-writer/`) in your workspace mirrort.
-        - Place instruction files inside (recursive loading, including subdirectories). Files are read and appended to the system prompt in **alphabetical order** by filename.
-        - This method takes precedence over the fallback file method for the specific mode if the directory exists and contains files.
-    - **Fallback Method: File-Based (`.mirrorrules-{modeSlug}`)**
-        - If `.mirror/rules-{modeSlug}/` doesn't exist or is empty, Mirror VS looks for a single `.mirrorrules-{modeSlug}` file (e.g., `.mirrorrules-code`) in the workspace mirrort.
-        - If found, its content is loaded for that mode.
+:::info Global Mode Rules
+If the mode itself is global (not workspace-specific), any custom instructions you set for it will also apply globally for that mode across all workspaces.
+:::
+
+**2. Using Rule Files/Directories:**
+
+- **Preferred Method: Directory-Based (`.mirror/rules-{modeSlug}/`)**
+
+    - Create a directory named `.mirror/rules-{modeSlug}/` (e.g., `.mirror/rules-docs-writer/`) in your workspace root.
+    - Place instruction files inside (recursive loading, including subdirectories). Files are read and appended to the system prompt in **alphabetical order** by filename.
+    - This method takes precedence over the fallback file method for the specific mode if the directory exists and contains files.
+
+- **Fallback Method: File-Based (`.mirrorrules-{modeSlug}`)**
+    - If `.mirror/rules-{modeSlug}/` doesn't exist or is empty, Mirror VS looks for a single `.mirrorrules-{modeSlug}` file (e.g., `.mirrorrules-code`) in the workspace root.
+    - If found, its content is loaded for that mode.
 
 Instructions from the Prompts tab, global rules, workspace rules, and mode-specific rules are all combined. See the section below for the exact order.
 
@@ -267,7 +175,7 @@ Rules:
 [.mirrorignore-related instructions if applicable]
 
 # Agent Rules Standard (AGENTS.md):
-[Contents of AGENTS.md or AGENT.md from workspace mirrort if present and enabled]
+[Contents of AGENTS.md or AGENT.md from workspace root if present and enabled]
 
 # Rules from rules directories:
 [Contents of ALL files from ~/.mirror/rules/ AND .mirror/rules/ if they exist]
@@ -282,9 +190,9 @@ _Note: The system loads rules from ALL applicable directories (both global `~/.m
 
 ---
 
-## Rules about .rules files
+## Rules about .rules Files
 
-- **File Location:** The preferred method uses directories within `.mirror/` (`.mirror/rules/` and `.mirror/rules-{modeSlug}/`). The fallback method uses single files (`.mirrorrules` and `.mirrorrules-{modeSlug}`) located directly in the workspace mirrort.
+- **File Location:** The preferred method uses directories within `.mirror/` (`.mirror/rules/` and `.mirror/rules-{modeSlug}/`). The fallback method uses single files (`.mirrorrules` and `.mirrorrules-{modeSlug}`) located directly in the workspace root.
 - **Recursive Reading:** Rules directories are read recursively, including all files in subdirectories
 - **File Filtering:** System automatically excludes cache and temporary files (`.DS_Store`, `*.bak`, `*.cache`, `*.log`, `*.tmp`, `Thumbs.db`, etc.)
 - **Empty Files:** Empty or missing rule files are silently skipped
@@ -299,23 +207,25 @@ _Note: The system loads rules from ALL applicable directories (both global `~/.m
 
 ## AGENTS.md Support
 
-Mirror VS also supports loading rules from an `AGENTS.md` (or `AGENT.md` as fallback) file in your workspace mirrort:
+Mirror VS also supports loading rules from an `AGENTS.md` (or `AGENT.md` as fallback) file in your workspace root:
 
 - **Purpose:** Provides agent-specific rules and guidelines for AI behavior
-- **Location:** Must be in the workspace mirrort directory
-- **Loading:** Automatically loaded by default. To disable AGENTS.md loading, set `"mirror-vs.useAgentRules": false` in your VSCode settings
-- **Setting:** `mirror-vs.useAgentRules` (default: true)
+- **Location:** Must be in the workspace root directory
+- **Loading:** Automatically loaded by default. To disable, set `"mirror-vs.useAgentRules": false` in your VS Code settings
+- **Setting:** `mirror-vs.useAgentRules` (default: `true`)
 - **Preference:** If both exist, `AGENTS.md` is preferred over `AGENT.md`
 - **Priority:** Loaded after mode-specific rules and `.mirrorignore`, before generic rules from both `~/.mirror/rules` and `.mirror/rules`
 - **Header:** Added to system prompt with header `# Agent Rules Standard (AGENTS.md):` or `(AGENT.md):` accordingly
 - **Empty Files:** Empty or whitespace-only `AGENTS.md` is ignored
 - **Symbolic Links:** Symbolic links to files or directories are resolved before reading
 
-This feature allows teams to maintain standardized AI agent behavior rules that can be version-controlled alongside the project code.
+This feature allows teams to maintain standardized AI agent behavior rules that can be version-controlled alongside the project code. No more "but that's how we've always done it" conversations — just commit the rules and let Mirror VS handle the rest.
 
 ---
 
 ## Examples of Custom Instructions
+
+Here's some inspiration for what you might want to tell Mirror VS:
 
 - "Always use spaces for indentation, with a width of 4 spaces"
 - "Use camelCase for variable names"
@@ -326,13 +236,14 @@ This feature allows teams to maintain standardized AI agent behavior rules that 
 - "When adding new features to websites, ensure they are responsive and accessible"
 
 :::tip Pro Tip: Team Standardization
+
 For team environments, consider these approaches:
 
-**Project Standards**: Use workspace `.mirror/rules/` directories under version control to standardize Mirror's behavior for specific projects. This ensures consistent code style and development workflows across team members.
+**Project Standards:** Use workspace `.mirror/rules/` directories under version control to standardize Mirror VS's behavior for specific projects. This ensures consistent code style and development workflows across team members.
 
-**Organization Standards**: Use global rules (`~/.mirror/rules/`) to establish organization-wide coding standards that apply to all projects. Team members can set up identical global rules for consistency across all work.
+**Organization Standards:** Use global rules (`~/.mirror/rules/`) to establish organization-wide coding standards that apply to all projects. Team members can set up identical global rules for consistency across all work.
 
-**Hybrid Approach**: Combine global rules for organization standards with project-specific workspace rules for project-specific requirements. When rules conflict, workspace rules take precedence.
+**Hybrid Approach:** Combine global rules for organization standards with project-specific workspace rules for project-specific requirements. When rules conflict, workspace rules take precedence.
 
 The directory-based approach offers better organization than single `.mirrorrules` files and supports both global and project-level customization.
 :::
@@ -341,4 +252,4 @@ The directory-based approach offers better organization than single `.mirrorrule
 
 ## Combining with Custom Modes
 
-For advanced customization, combine with [Custom Modes](/features/custom-modes) to create specialized environments with specific tool access, file restrictions, and tailored instructions.
+For advanced customization, combine with [Custom Modes](/features/custom-modes) to create specialized environments with specific tool access, file restrictions, and tailored instructions. Think of it as giving each mode its own personalized handbook.

@@ -11,13 +11,13 @@ import Codicon from '@site/src/components/Codicon';
 
 # Terminal Shell Integration
 
-Terminal Shell Integration is a key feature that enables Mirror VS to execute commands in your terminal and intelligently process their output. This bidirectional communication between the AI and your development environment unlocks powerful automation capabilities.
+Terminal Shell Integration is the secret sauce that lets Mirror VS run commands in your terminal and actually understand what comes back. Think of it as a walkie-talkie between your AI and your development environment — except nobody's yelling "over" at the end.
 
 ---
 
 ## What is Shell Integration?
 
-Shell integration is automatically enabled in Mirror VS and connects directly to your terminal's command execution lifecycle without requiring any setup from you. This built-in feature allows Roo to:
+Shell integration is automatically enabled in Mirror VS and connects directly to your terminal's command execution lifecycle without any setup from you. This built-in feature allows Mirror VS to:
 
 - Execute commands on your behalf through the [`execute_command`](/advanced-usage/available-tools/execute-command) tool
 - Read command output in real-time without manual copy-pasting
@@ -29,10 +29,9 @@ Shell integration is automatically enabled in Mirror VS and connects directly to
 
 <img src="/img/v3.15/v3.15.png" alt="Stop Command Button in Chat UI" width="600" />
 
-When you ask Roo to perform tasks like installing dependencies, starting a development server, or analyzing build errors, shell integration works behind the scenes to make these interactions smooth and effective.
+When you ask Mirror VS to do things like install dependencies, start a dev server, or analyze why your build is screaming at you, shell integration works behind the scenes to make it happen smoothly.
 
 ---
- 
 
 ## Terminal Integration Settings
 
@@ -78,15 +77,15 @@ This example sets a 5-minute timeout but exempts build and test commands from th
 
 #### Terminal Output Limit
 <img src="/img/shell-integration/shell-integration-13.png" alt="Terminal output limit slider set to 500" width="600" />
-Truncates by lines. Roo keeps the beginning and end and drops the middle with an "[...N lines omitted...]" marker to stay under the limit. Mechanism: keeps approximately 20% of the head and 80% of the tail of the allowed line budget and inserts an omission marker, preserving a blank line before the tail for readability. Use when commands print many lines (e.g., long logs) and you mostly care about headers and final results. Avoid when important details are in the middle. Default: 500 lines.
+Truncates by lines. Mirror VS keeps the beginning and end and drops the middle with an "[...N lines omitted...]" marker to stay under the limit. Mechanism: keeps approximately 20% of the head and 80% of the tail of the allowed line budget and inserts an omission marker, preserving a blank line before the tail for readability. Use when commands print many lines (e.g., long logs) and you mostly care about headers and final results. Avoid when important details are in the middle. Default: 500 lines.
 
 #### Terminal Character Limit
 <img src="/img/shell-integration/shell-integration-15.png" alt="Terminal character limit setting" width="600" />
-Hard cap on total output size (characters). Roo keeps the beginning and end and omits the middle with an "[...N characters omitted...]" marker. Mechanism: takes precedence over the line limit; keeps ~20% of the head and ~80% of the tail of the character budget, overriding the line limit to prevent memory issues from very long lines. Use when commands print extremely long lines or massive blobs. Avoid when you need the exact full content.
+Hard cap on total output size (characters). Mirror VS keeps the beginning and end and omits the middle with an "[...N characters omitted...]" marker. Mechanism: takes precedence over the line limit; keeps ~20% of the head and ~80% of the tail of the character budget, overriding the line limit to prevent memory issues from very long lines. Use when commands print extremely long lines or massive blobs. Avoid when you need the exact full content.
 
 #### Compress progress bar output
 <img src="/img/shell-integration/shell-integration-14.png" alt="Compress progress bar output checkbox" width="600" />
-ON: Collapses progress bars/spinners by processing carriage returns (\r) and backspaces (\b) so only the final state is kept, then applies run-length encoding to collapse repeated lines. OFF: Keeps every update exactly as printed. Use when you don’t need intermediate spinner states (recommended ON). Disable only if you’re debugging step-by-step progress behavior.
+ON: Collapses progress bars/spinners by processing carriage returns (\r) and backspaces (\b) so only the final state is kept, then applies run-length encoding to collapse repeated lines. OFF: Keeps every update exactly as printed. Use when you don't need intermediate spinner states (recommended ON). Disable only if you're debugging step-by-step progress behavior.
 
 ### Advanced Settings
 
@@ -109,12 +108,12 @@ Always restart all open terminals after changing any of these settings.
 <img src="/img/shell-integration/shell-integration-16.png" alt="Use Inline Terminal (recommended) switch" width="600" />
 Controls how Mirror VS executes terminal commands.
 
-- ON (Use Inline Terminal): Runs commands with the Inline Terminal (in chat), bypassing shell profiles and VS Code shell integration for reliability and faster starts. Mechanism: uses a background “execa” provider and streams output directly (no VS Code OSC 633/133 markers).
+- ON (Use Inline Terminal): Runs commands with the Inline Terminal (in chat), bypassing shell profiles and VS Code shell integration for reliability and faster starts. Mechanism: uses a background "execa" provider and streams output directly (no VS Code OSC 633/133 markers).
 
     <img src="/img/shell-integration/shell-integration-12.png" alt="Mirror VS Inline Terminal when 'Use Inline Terminal (recommended)' is ON" width="600" />
     *Inline Terminal active (Use Inline Terminal is ON).*
 
-- OFF (Use VS Code terminal): Uses the VS Code integrated terminal and your shell profile; may require shell integration and is more likely to hit “Shell Integration Unavailable” issues. Use this only when you specifically need terminal UI features or interactive profile behavior.
+- OFF (Use VS Code terminal): Uses the VS Code integrated terminal and your shell profile; may require shell integration and is more likely to hit "Shell Integration Unavailable" issues. Use this only when you specifically need terminal UI features or interactive profile behavior.
 
 #### Decision guide: Inline Terminal ON vs OFF
 - Use ON when you want reliability, faster starts, or your shell profile causes issues.
@@ -135,11 +134,11 @@ The following advanced settings apply only when this is OFF (i.e., when using th
 
 #### Inherit environment variables
 <img src="/img/shell-integration/shell-integration-17.png" alt="Inherit environment variables checkbox" width="600" />
-VS Code terminal only. Controls whether VS Code integrated terminals inherit environment variables from the parent VS Code process. Mirrors the VS Code setting [`terminal.integrated.inheritEnv`](https://code.visualstudio.com/docs/editor/integrated-terminal#_inherit-environment-variables). Note: Inline Terminal (“Use Inline Terminal (recommended)” ON) runs as a background process and always uses the extension’s Node process environment; this setting doesn’t affect it. Keep enabled (VS Code default) if you rely on PATH/proxy/auth variables provided by VS Code. Disable only for clean, reproducible integrated terminal sessions or when debugging environment conflicts.
+VS Code terminal only. Controls whether VS Code integrated terminals inherit environment variables from the parent VS Code process. Mirrors the VS Code setting [`terminal.integrated.inheritEnv`](https://code.visualstudio.com/docs/editor/integrated-terminal#_inherit-environment-variables). Note: Inline Terminal ("Use Inline Terminal (recommended)" ON) runs as a background process and always uses the extension's Node process environment; this setting doesn't affect it. Keep enabled (VS Code default) if you rely on PATH/proxy/auth variables provided by VS Code. Disable only for clean, reproducible integrated terminal sessions or when debugging environment conflicts.
 
 #### Terminal shell integration timeout
 <img src="/img/shell-integration/shell-integration-18.png" alt="Terminal shell integration timeout slider set to 15s" width="600" />
-How long Roo waits for VS Code shell integration to initialize and for the integration stream to start. If not ready within the timeout, a “no shell integration” event is emitted and execution will fall back to the Inline Terminal when retried. Use when your shell/profile has long startup times or you see “Shell Integration Unavailable” errors. Avoid increasing if you’re using the Inline Terminal (not applicable there). Default: 15s. Applies only when using the VS Code terminal.
+How long Mirror VS waits for VS Code shell integration to initialize and for the integration stream to start. If not ready within the timeout, a "no shell integration" event is emitted and execution will fall back to the Inline Terminal when retried. Use when your shell/profile has long startup times or you see "Shell Integration Unavailable" errors. Avoid increasing if you're using the Inline Terminal (not applicable there). Default: 15s. Applies only when using the VS Code terminal.
 
 #### Terminal command delay
 <img src="/img/shell-integration/shell-integration-19.png" alt="Terminal command delay slider set to 0ms" width="600" />
@@ -147,11 +146,11 @@ Adds a small delay after each command to help VS Code terminals flush all output
 
 #### Enable PowerShell counter workaround
 <img src="/img/shell-integration/shell-integration-20.png" alt="Enable PowerShell counter workaround checkbox" width="600" />
-ON: Appends `; "(Roo/PS Workaround: N)" > $null` to each command to force a reliable post-execution signal and avoid missing or duplicated output on some setups. Use when using Windows PowerShell and output is incomplete or repeats, or when running the same command twice in a row fails. OFF: Runs PowerShell commands unchanged.
+ON: Appends `; "(Mirror VS/PS Workaround: N)" > $null` to each command to force a reliable post-execution signal and avoid missing or duplicated output on some setups. Use when using Windows PowerShell and output is incomplete or repeats, or when running the same command twice in a row fails. OFF: Runs PowerShell commands unchanged.
 
 #### Clear ZSH EOL mark
 <img src="/img/shell-integration/shell-integration-21.png" alt="Clear ZSH EOL mark checkbox" width="600" />
-ON: Omits Zsh’s end-of-line mark (%) so output is parsed correctly. Mechanism: sets `PROMPT_EOL_MARK=""`. Use when captured output ends with a stray % or parsing looks off. OFF: Leaves the default EOL mark (may confuse parsing on some setups).
+ON: Omits Zsh's end-of-line mark (%) so output is parsed correctly. Mechanism: sets `PROMPT_EOL_MARK=""`. Use when captured output ends with a stray % or parsing looks off. OFF: Leaves the default EOL mark (may confuse parsing on some setups).
 
 #### Enable Oh My Zsh integration
 <img src="/img/shell-integration/shell-integration-22.png" alt="Enable Oh My Zsh integration checkbox" width="600" />
@@ -163,13 +162,13 @@ For users of the Powerlevel10k theme for Zsh. Enable this if your Powerlevel10k 
 
 #### Enable ZDOTDIR handling
 <img src="/img/shell-integration/shell-integration-24.png" alt="Enable ZDOTDIR handling checkbox" width="600" />
-ON: Uses a temporary ZDOTDIR so VS Code shell integration works with zsh while preserving your config. Mechanism: creates a temp dir with a `.zshrc` that sources VS Code’s shell integration script, then re-sources your original zsh files and resets ZDOTDIR; the temp dir is cleaned up after initialization. Use when zsh shell integration fails or conflicts with your dotfiles. OFF: Uses your normal ZDOTDIR.
+ON: Uses a temporary ZDOTDIR so VS Code shell integration works with zsh while preserving your config. Mechanism: creates a temp dir with a `.zshrc` that sources VS Code's shell integration script, then re-sources your original zsh files and resets ZDOTDIR; the temp dir is cleaned up after initialization. Use when zsh shell integration fails or conflicts with your dotfiles. OFF: Uses your normal ZDOTDIR.
 
 ---
 
 ## How Shell Integration Works
 
-Shell integration connects Roo to your terminal's command execution process in real-time:
+Shell integration connects Mirror VS to your terminal's command execution process in real-time:
 
 1. **Connection**: When you open a terminal, VS Code establishes a special connection with your shell.
 
@@ -180,9 +179,9 @@ Shell integration connects Roo to your terminal's command execution process in r
    - When the command finishes (and whether it succeeded or failed)
    - What directory you're currently in
 
-3. **Different Shells, Same Result**: Each shell type (Bash, Zsh, PowerShell, Fish) implements this slightly differently behind the scenes, but they all provide the same functionality to Roo.
+3. **Different Shells, Same Result**: Each shell type (Bash, Zsh, PowerShell, Fish) implements this slightly differently behind the scenes, but they all provide the same functionality to Mirror VS.
 
-4. **Information Gathering**: Roo can see what commands are running, where they're running, how long they take, whether they succeed, and their complete output - all without you having to copy and paste anything.
+4. **Information Gathering**: Mirror VS can see what commands are running, where they're running, how long they take, whether they succeed, and their complete output — all without you having to copy and paste anything.
 
 ---
 
@@ -190,7 +189,7 @@ Shell integration connects Roo to your terminal's command execution process in r
 
 #### Quick fixes
 1. Update VS Code/Cursor to the latest version (VS Code 1.93+ required).
-2. Command Palette (Ctrl+Shift+P / Cmd+Shift+P) → “Terminal: Select Default Profile” → choose bash, zsh, PowerShell, or fish.
+2. Command Palette (Ctrl+Shift+P / Cmd+Shift+P) → "Terminal: Select Default Profile" → choose bash, zsh, PowerShell, or fish.
 3. Windows PowerShell: run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`, then restart VS Code.
 4. WSL (bash): add `. "$(code --locate-shell-integration-path bash)"` to `~/.bashrc`.
 
@@ -429,19 +428,19 @@ This setup works reliably on Windows systems using Cygwin, Fish, and the Starshi
 
 #### Ctrl+C Behavior
 
-**Issue**: If text is already typed in the terminal when Roo tries to run a command, Roo will press Ctrl+C first to clear the line, which can interrupt running processes.
+**Issue**: If text is already typed in the terminal when Mirror VS tries to run a command, it will press Ctrl+C first to clear the line, which can interrupt running processes.
 
-**Workaround**: Make sure your terminal prompt is empty (no partial commands typed) before asking Roo to execute terminal commands.
+**Workaround**: Make sure your terminal prompt is empty (no partial commands typed) before asking Mirror VS to execute terminal commands.
 
 #### Multi-line Command Issues
 
-**Issue**: Commands that span multiple lines can confuse Roo and may show output from previous commands mixed in with current output.
+**Issue**: Commands that span multiple lines can confuse Mirror VS and may show output from previous commands mixed in with current output.
 
-**Workaround**: Instead of multi-line commands, use command chaining with `&amp;&amp;` to keep everything on one line (e.g., `echo a &amp;&amp; echo b` instead of typing each command on a separate line).
+**Workaround**: Instead of multi-line commands, use command chaining with `&&` to keep everything on one line (e.g., `echo a && echo b` instead of typing each command on a separate line).
 
 #### PowerShell-Specific Issues
 
-1. **Premature Completion**: PowerShell sometimes tells Roo a command is finished before all the output has been shown.
+1. **Premature Completion**: PowerShell sometimes tells Mirror VS a command is finished before all the output has been shown.
 2. **Repeated Commands**: PowerShell may refuse to run the same command twice in a row.
 
 **Workaround**: Enable the "PowerShell counter workaround" setting and set a terminal command delay of 150ms in the settings to give commands more time to complete.
@@ -454,7 +453,7 @@ This setup works reliably on Windows systems using Cygwin, Fish, and the Starshi
 
 #### Python Virtual Environment (venv) Issues
 
-**Issue**: Disabling shell integration will disable venv; venv is VS Code–managed, Roo does not know anything about it because disabling shell integration uses a completely different mechanism for running commands (execa).
+**Issue**: Disabling shell integration will disable venv; venv is VS Code–managed, Mirror VS does not know anything about it because disabling shell integration uses a completely different mechanism for running commands (execa).
 
 **Workaround**: If you need to use Python virtual environments with Mirror VS, you might be able to:
 
@@ -464,7 +463,7 @@ killall code # closes all VS Code windows!
 code
 ```
 
-This way the environment is configured before code launches so Roo should inherit it.
+This way the environment is configured before code launches so Mirror VS should inherit it.
 
 #### Checking Debug Logs
 When shell integration issues occur, check the debug logs:
@@ -502,18 +501,12 @@ The [VS Code Terminal Integration Test Extension](https://github.com/KJ7LNW/vsce
 
 ## FAQ
 
-- Why does Roo press Ctrl+C first?
-  - To clear any partially typed command so it can run reliably without interrupting your process.
+- **Why does Mirror VS press Ctrl+C first?** — To clear any partially typed command so it can run reliably without interrupting your process. Think of it as knocking before entering.
 
-- Can I run multi-line commands?
-  - Prefer chaining with && to avoid mixed output (e.g., `echo a && echo b`).
+- **Can I run multi-line commands?** — Prefer chaining with `&&` to avoid mixed output (e.g., `echo a && echo b`). Mirror VS handles one-liners better than Shakespearean verse.
 
-- How do I use Python venv with Inline Terminal?
-  - Close VS Code, activate the venv in a shell, then launch VS Code so Roo inherits it.
+- **How do I use Python venv with Inline Terminal?** — Close VS Code, activate the venv in a shell, then launch VS Code so Mirror VS inherits it. The ol' "start it up right" approach.
 
 <a id="command-execution-fallback"></a>
-- What does “Command Execution Fallback” mean?
-  - Roo ran the command without full shell integration. How it works: if VS Code terminal integration can’t connect, Roo runs the command in a background process.
-  - What you’ll see: a chat notice that real-time streaming and exit‑code detection may be limited.
-  - Fix: turn ON [Use Inline Terminal (recommended)](#use-inline-terminal-recommended) or follow the Troubleshooting steps above to restore VS Code shell integration.
-  <img src="/img/v3.15.0/v3.15.0.png" alt="Command execution fallback notification example" width="600" />
+- **What does "Command Execution Fallback" mean?** — Mirror VS ran the command without full shell integration. How it works: if VS Code terminal integration can't connect, Mirror VS runs the command in a background process. What you'll see: a chat notice that real-time streaming and exit‑code detection may be limited. Fix: turn ON [Use Inline Terminal (recommended)](#use-inline-terminal-recommended) or follow the Troubleshooting steps above to restore VS Code shell integration.
+<img src="/img/v3.15.0/v3.15.0.png" alt="Command execution fallback notification example" width="600" />

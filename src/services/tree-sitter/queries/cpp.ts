@@ -93,4 +93,40 @@ export default `
 
 ; Using declarations
 (using_declaration) @definition.using
+
+; Virtual method declarations
+(field_declaration
+  (virtual)
+  type: (_)
+  declarator: (function_declarator
+    declarator: (identifier) @name.definition.virtual_method)) @definition.virtual_method
+
+; Pure virtual method declarations (= 0)
+(field_declaration
+  (virtual)
+  type: (_)
+  declarator: (function_declarator
+    declarator: (identifier) @name.definition.pure_virtual_method)) @definition.pure_virtual_method
+
+; Type alias declarations (using T = type)
+(alias_declaration
+  name: (type_identifier) @name.definition.type_alias) @definition.type_alias
+
+; Base class clauses in class definitions
+(class_specifier
+  name: (type_identifier) @name.definition.class
+  (base_class_clause
+    (type_identifier) @name.definition.base_class)) @definition.base_class
+
+; Field initializer lists in constructors
+(function_definition
+  declarator: (function_declarator
+    declarator: (identifier) @name.definition.constructor)
+  (field_initializer_list)) @definition.field_initializer_list
+
+
+; Defaulted methods (= default)
+(declaration
+  declarator: (function_declarator
+    declarator: (identifier) @name.definition.defaulted)) @definition.defaulted
 `

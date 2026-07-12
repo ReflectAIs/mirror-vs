@@ -18,7 +18,7 @@ Mirror VS includes _experimental_ support for the [VS Code Language Model API](h
 - **GitHub Copilot:** If you have a Copilot subscription and the extension installed.
 - **Other VS Code Extensions:** Any extension that implements the Language Model API.
 
-**Important:** This integration is highly experimental and may not work as expected. It is dependent on other extensions correctly implementing the VS Code Language Model API.
+**Important:** This integration is highly experimental and may not work as expected. It is dependent on other extensions correctly implementing the VS Code Language Model API. Consider this the "cutting edge" — in both the good and the sharp-tooth sense.
 
 ---
 

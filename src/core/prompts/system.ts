@@ -94,11 +94,11 @@ ${getCapabilitiesSection(cwd, shouldIncludeMcp ? mcpHub : undefined)}
 
 ${modesSection}
 ${skillsSection ? `\n${skillsSection}` : ""}
-${getRulesSection(cwd, settings)}
-
-${getSystemInfoSection(cwd)}
+${getRulesSection(cwd, settings, mode)}
 
 ${getObjectiveSection()}
+
+${getSystemInfoSection(cwd)}
 
 ${await addCustomInstructions(baseInstructions, globalCustomInstructions || "", cwd, mode, {
 	language: language ?? formatLanguage(vscode.env.language),

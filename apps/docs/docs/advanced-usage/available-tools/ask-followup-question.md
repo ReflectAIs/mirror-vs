@@ -11,198 +11,89 @@ keywords:
 
 # ask_followup_question
 
-The `ask_followup_question` tool enables interactive communication by asking specific questions to gather additional information needed to complete tasks effectively.
+The `ask_followup_question` tool is how Mirror VS says "hey, I need a little more info before I can do this right." It's the AI's way of asking for clarification instead of guessing — which, trust us, you prefer.
 
 ---
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `question` (required): The specific question to ask the user
-- `follow_up` (optional): A list of 2-4 suggested answers that help guide user responses, each within `<suggest>` tags
+- `question` (required): The specific question to ask
+- `follow_up` (optional): 2-4 suggested answers within `<suggest>` tags to guide your response
 
 ---
 
 ## What It Does
 
-This tool creates a conversational interface between Mirror and the user, allowing for gathering clarification, additional details, or user preferences when facing ambiguities or decision points. Each question can include suggested responses to streamline the interaction.
+Creates an interactive question-and-answer moment between Mirror VS and you. When the AI hits something ambiguous or needs a decision, it uses this tool to ask, complete with suggested answers you can click with one tap.
 
 ---
 
-## When is it used?
+## When Is It Used?
 
-- When critical information is missing from the original request
-- When Mirror needs to choose between multiple valid implementation approaches
-- When technical details or preferences are required to proceed
-- When Mirror encounters ambiguities that need resolution
-- When additional context would significantly improve the solution quality
+- When critical information is missing from your request
+- When Mirror VS needs to choose between valid approaches
+- When preferences are needed to proceed
+- When encountering ambiguity that needs resolution
+- When more context would improve the solution
 
 ---
 
 ## Key Features
 
-- Provides a structured way to gather specific information without breaking workflow
-- Includes suggested answers to reduce user typing and guide responses
-- Maintains conversation history and context across interactions
-- Supports responses containing images and code snippets
-- Available in all modes as part of the "always available" tool set
-- Enables direct user guidance on implementation decisions
-- Formats responses with `<answer>` tags to distinguish them from regular conversation
-- Resets consecutive error counter when used successfully
+- Structured information gathering without breaking workflow
+- Suggested answers reduce typing and guide responses
+- Preserves conversation history across interactions
+- Supports responses with images and code snippets
+- Available in all modes — it's always there when needed
+- Wraps responses in `<answer>` tags for clarity
+- Resets consecutive error counter on success
 
 ---
 
 ## Limitations
 
-- Limited to asking one specific question per tool use
-- Presents suggestions as selectable options in the UI
-- Cannot force structured responses – users can still respond freely
-- Excessive use can slow down task completion and create a fragmented experience
-- Suggested answers must be complete, with no placeholders requiring user edits
-- No built-in validation for user responses
-- Contains no mechanism to enforce specific answer formats
+- One question per use — no survey marathons
+- Can't enforce structured responses (you can still answer freely)
+- Overuse can make conversations feel fragmented
+- Suggestions must be complete — no fill-in-the-blank
 
 ---
 
 ## How It Works
 
-When the `ask_followup_question` tool is invoked, it follows this process:
-
-1. **Parameter Validation**: Validates the required `question` parameter and checks for optional suggestions
-
-    - Ensures question text is provided
-    - Parses any suggested answers from the `follow_up` parameter using the `fast-xml-parser` library
-    - Normalizes suggestions into an array format even if there's only one suggestion
-
-2. **JSON Transformation**: Converts the XML structure into a standardized JSON format for UI display
-
-    ```typescript
-    {
-      question: "User's question here",
-      suggest: [
-        { answer: "Suggestion 1" },
-        { answer: "Suggestion 2" }
-      ]
-    }
-    ```
-
-3. **UI Integration**:
-
-    - Passes the JSON structure to the UI layer via the `ask("followup", ...)` method
-    - Displays selectable suggestion buttons to the user in the interface
-    - Creates an interactive experience for selecting or typing a response
-
-4. **Response Collection and Processing**:
-
-    - Captures user text input and any images included in the response
-    - Wraps user responses in `<answer>` tags when returning to the assistant
-    - Preserves any images included in the user's response
-    - Maintains the conversational context by adding the response to the history
-    - Resets the consecutive error counter when the tool is used successfully
-
-5. **Error Handling**:
-    - Tracks consecutive mistakes using a counter
-    - Resets the counter when the tool is used successfully
-    - Provides specific error messages:
-        - For missing parameters: "Missing required parameter 'question'"
-        - For XML parsing: "Failed to parse operations: [error message]"
-        - For invalid format: "Invalid operations xml format"
-    - Contains safeguards to prevent tool execution when required parameters are missing
-    - Increments consecutive mistake count when errors occur
-
----
-
-## Workflow Sequence
-
-The question-answer cycle follows this sequence:
-
-1. **Information Gap Recognition**: Mirror identifies missing information needed to proceed
-2. **Specific Question Creation**: Mirror formulates a clear, targeted question
-3. **Suggestion Development**: Mirror creates relevant suggested answers (optional but recommended)
-4. **Tool Invocation**: Assistant invokes the tool with question and optional suggestions
-5. **UI Presentation**: Question and suggestions are displayed to the user as interactive elements
-6. **User Response**: The user selects a suggestion or provides a custom answer
-7. **Message Handling**: System handles both partial and complete messages
-    - For streaming responses, processes chunks as they arrive
-    - For complete messages, processes the entire response at once
-    - Maintains state consistency regardless of message chunking
-8. **Response Processing**: System wraps the response in `<answer>` tags and preserves images
-9. **Context Integration**: Response is added to the conversation history
-10. **Task Continuation**: Mirror proceeds with the task using the new information
-
----
-
-## Examples When Used
-
-- When developing a web application, Mirror might ask about preferred styling frameworks (Bootstrap, Tailwind, custom CSS)
-- When creating an API, Mirror might ask about authentication methods (JWT, OAuth, API keys)
-- When refactoring code, Mirror might ask about prioritizing performance vs. readability
-- When setting up a database, Mirror might ask about specific schema design preferences
-- When creating a custom feature, Mirror might ask about specific behavior expectations
-- When troubleshooting errors, Mirror might ask about specific environment details
-
----
-
-## Response Format
-
-When a user responds to a question, the response is formatted with `<answer>` tags for clarity and consistency. This format helps clearly separate the user's answer from other conversation elements.
-
-Example response format:
-
-```
-<answer>
-Use Tailwind CSS for utility-first styling with maximum flexibility
-</answer>
-```
-
-Key characteristics of the response format:
-
-- Surrounded by `<answer>` tags
-- Preserves formatting of the original response
-- Maintains images if included in the response
-- Returns the complete text, even for long responses
+1. **Validates** the question and optional suggestions
+2. **Transforms** XML into JSON for UI display
+3. **Shows** selectable suggestion buttons in the interface
+4. **Captures** your response (text + any images)
+5. **Wraps** it in `<answer>` tags and returns to the AI
+6. **Continues** the task with your new information
 
 ---
 
 ## Usage Examples
 
-Asking about implementation preferences:
+Asking about styling preferences:
 
-```
+```xml
 <ask_followup_question>
-<question>Which styling approach would you prefer for this web application?</question>
+<question>Which styling approach would you prefer?</question>
 <follow_up>
-<suggest>Use Bootstrap for rapid development with consistent components</suggest>
-<suggest>Use Tailwind CSS for utility-first styling with maximum flexibility</suggest>
-<suggest>Use vanilla CSS with custom styling for complete control and minimal dependencies</suggest>
+<suggest>Bootstrap for rapid development</suggest>
+<suggest>Tailwind CSS for utility-first flexibility</suggest>
+<suggest>Vanilla CSS for complete control</suggest>
 </follow_up>
 </ask_followup_question>
 ```
 
-Requesting technical clarification:
+Asking about authentication:
 
-```
+```xml
 <ask_followup_question>
-<question>What database should this application use for storing user data?</question>
+<question>How should we handle user authentication?</question>
 <follow_up>
-<suggest>MongoDB for flexible schema and document-based storage</suggest>
-<suggest>PostgreSQL for relational data with strong consistency guarantees</suggest>
-<suggest>Firebase for real-time updates and simplified backend management</suggest>
-<suggest>SQLite for lightweight local storage without external dependencies</suggest>
-</follow_up>
-</ask_followup_question>
-```
-
-Addressing ambiguity in requirements:
-
-```
-<ask_followup_question>
-<question>How should the application handle user authentication?</question>
-<follow_up>
-<suggest>Implement email/password authentication with account verification</suggest>
-<suggest>Use social login providers (Google, GitHub, etc.) for quick signup</suggest>
-<suggest>Implement both email/password and social login options</suggest>
+<suggest>Email/password with account verification</suggest>
+<suggest>Social login (Google, GitHub, etc.)</suggest>
+<suggest>Both email/password and social login</suggest>
 </follow_up>
 </ask_followup_question>
 ```

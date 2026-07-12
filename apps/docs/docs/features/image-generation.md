@@ -17,7 +17,7 @@ keywords:
 
 # Image Generation
 
-Generate new images from text prompts or edit existing images in your workspace. Save results to your project with preview in chat. This experimental feature requires an OpenRouter API key.
+Generate new images from text prompts or edit existing images in your workspace. Save results to your project with preview in chat. This experimental feature requires an OpenRouter API key — yes, even Mirror VS needs fuel for its creative side.
 
 :::warning Experimental Feature
 Image Generation is an experimental feature that requires enabling in settings and configuring an OpenRouter API key.
@@ -29,7 +29,7 @@ Image Generation is an experimental feature that requires enabling in settings a
 
 - Create new images from text prompts using natural language
 - Edit and transform existing images in your workspace
-- Saves to your workspace at a path you choose; appropriate extension (.png or .jpg) is auto-added if missing
+- Saves to your workspace at a path you choose; appropriate extension (`.png` or `.jpg`) is auto-added if missing — because nobody wants a file named `masterpiece.` with no extension
 - Shows a preview of the generated/edited image in the conversation
 - Currently uses Gemini 2.5 Flash Image Preview models via OpenRouter
 - Simple on/off toggle under Experimental settings
@@ -40,21 +40,21 @@ Image Generation is an experimental feature that requires enabling in settings a
 
 ### Image Generation
 
-**Before:** You had to copy prompts to an external site, download the result, then move it into your workspace.
+**Before:** You had to copy prompts to an external site, download the result, then move it into your workspace. Ugh.
 
-**With this feature:** Ask Mirror to generate an image, approve, pick a save location, and continue editing with the image already in your project.
+**With this feature:** Ask Mirror VS to generate an image, approve, pick a save location, and continue editing with the image already in your project. Ahh.
 
 ### Image Editing
 
-**Before:** Export image, upload to external editor, make changes, download, import back to project.
+**Before:** Export image, upload to external editor, make changes, download, import back to project. Triple ugh.
 
-**With this feature:** Ask Mirror to transform your existing image directly - it reads the file, applies your edits, and saves the result in your project.
+**With this feature:** Ask Mirror VS to transform your existing image directly — it reads the file, applies your edits, and saves the result in your project.
 
 ---
 
 ## How It Works
 
-When enabled, Mirror sends your prompt (and optionally an existing image) to an image-capable model through OpenRouter. The generated or edited image returned by OpenRouter is saved to the path you specify inside your current workspace. Mirror shows a preview in the chat and the file appears in your file explorer.
+When enabled, Mirror VS sends your prompt (and optionally an existing image) to an image-capable model through OpenRouter. The generated or edited image returned by OpenRouter is saved to the path you specify inside your current workspace. Mirror VS shows a preview in the chat and the file appears in your file explorer.
 
 ---
 
@@ -70,14 +70,14 @@ When enabled, Mirror sends your prompt (and optionally an existing image) to an 
 
 ### 1. Enable Image Generation (Experimental)
 
-- **Purpose:** Turns the feature on so Mirror can create images on request
+- **Purpose:** Turns the feature on so Mirror VS can create images on request
 - **Default:** Off
 - **Location:** Settings > Experimental
 
 ### 2. OpenRouter API Key
 
 - **Purpose:** Authorizes image generation requests
-- **Default:** Empty (required)
+- **Default:** Empty (required — no key, no art)
 - **Get your key:** [https://openrouter.ai/keys](https://openrouter.ai/keys)
 
 ### 3. Image Generation Model
@@ -90,20 +90,20 @@ When enabled, Mirror sends your prompt (and optionally an existing image) to an 
 
 ## Using Image Generation
 
-1. In chat, ask Mirror to generate an image and describe what you want (subject, style, lighting, composition).
-2. Confirm the action when prompted. Mirror may ask you to choose a save path (for example: `images/sunset.png`).
-3. Mirror generates the image and saves it. If you don't include an extension, the appropriate extension (.png or .jpg) is added based on the output format.
+1. In chat, ask Mirror VS to generate an image and describe what you want (subject, style, lighting, composition). The more specific, the better.
+2. Confirm the action when prompted. Mirror VS may ask you to choose a save path (for example: `images/sunset.png`).
+3. Mirror VS generates the image and saves it. If you don't include an extension, the appropriate extension (`.png` or `.jpg`) is added based on the output format.
 4. See the image preview in the chat and locate the file in your workspace.
 
 ---
 
 ## Editing Existing Images
 
-Mirror can also transform and edit existing images in your workspace:
+Mirror VS can also transform and edit existing images in your workspace:
 
-1. Ask Mirror to edit an image, describing the transformation you want
+1. Ask Mirror VS to edit an image, describing the transformation you want
 2. Specify both the input image path and where to save the result
-3. Mirror will apply your requested edits to the existing image
+3. Mirror VS will apply your requested edits to the existing image
 
 **Supported Input Formats**: PNG, JPG, JPEG, GIF, WEBP
 

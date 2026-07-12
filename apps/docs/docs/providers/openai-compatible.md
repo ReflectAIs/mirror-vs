@@ -14,7 +14,9 @@ keywords:
 
 # Using OpenAI Compatible Providers With Mirror VS
 
-Mirror VS supports a wide range of AI model providers that offer APIs compatible with the OpenAI API standard. This means you can use models from providers _other than_ OpenAI, while still using a familiar API interface. This includes providers like:
+Mirror VS supports a wide range of AI model providers that offer APIs compatible with the OpenAI API standard. This means you can use models from providers _other than_ OpenAI, while still using a familiar API interface. If it speaks OpenAI, Mirror VS speaks it too.
+
+This includes providers like:
 
 - **Local models** running through tools like Ollama and LM Studio (covered in separate sections).
 - **Cloud providers** like Perplexity, Together AI, Anyscale, and others.
@@ -50,7 +52,7 @@ You'll find these settings in the Mirror VS settings panel (click the <Codicon n
 
 ## Native Tool Calling
 
-Mirror VS uses **native tool calling** exclusively. This is the only supported tool protocol -- there is no XML-based fallback.
+Mirror VS uses **native tool calling** exclusively. This is the only supported tool protocol — there is no XML-based fallback.
 
 At a high level:
 

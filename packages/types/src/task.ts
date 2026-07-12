@@ -94,6 +94,9 @@ export interface CreateTaskOptions {
 	/** Whether to start the task loop immediately (default: true).
 	 *  When false, the caller must invoke `task.start()` manually. */
 	startTask?: boolean
+	/** Session grouping key. Tasks with the same sessionId are grouped together
+	 *  in history view and share a common session lifecycle. */
+	sessionId?: string
 }
 
 export enum TaskStatus {

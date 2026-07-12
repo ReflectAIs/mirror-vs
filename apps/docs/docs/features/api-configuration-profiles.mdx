@@ -10,10 +10,10 @@ keywords:
 
 # API Configuration Profiles
 
-API Configuration Profiles allow you to create and switch between different sets of AI settings. Each profile can have different configurations for each mode, letting you optimize your experience based on the task at hand.
+API Configuration Profiles let you create and switch between different sets of AI settings. Each profile can have different configurations for each mode, so you can optimize your experience based on the task at hand — without re-entering API keys every five minutes.
 
 :::info
-Having multiple configuration profiles lets you quickly switch between different AI providers, models, and settings without reconfiguring everything each time you want to change your setup.
+Having multiple configuration profiles lets you quickly switch between different AI providers, models, and settings without reconfiguring everything each time you want to change your setup. It's like having a wardrobe of AI personalities — pick the one that fits the occasion.
 :::
 
 ---
@@ -74,7 +74,7 @@ Switch profiles in two ways:
    <img src="/img/api-configuration-profiles/api-configuration-profiles-6.png" alt="API Configuration dropdown in chat interface" width="550" />
 ### Pinning and Sorting Profiles
 
-The API configuration dropdown now supports pinning your favorite profiles for quicker access:
+The API configuration dropdown supports pinning your favorite profiles for quicker access:
 
 1. Hover over any profile in the dropdown to reveal the pin icon
 2. Click the pin icon to add the profile to your pinned list
@@ -91,12 +91,14 @@ This feature makes it easier to navigate between commonly used profiles, especia
 <img src="/img/api-configuration-profiles/api-configuration-profiles-10.png" alt="Profile editing interface" width="550" />
 - Select the profile in Settings to modify any settings
 - Click the pencil icon to rename a profile
-- Click the trash icon to delete a profile (you cannot delete the only remaining profile)
+- Click the trash icon to delete a profile (you cannot delete the only remaining profile — Mirror VS won't let you paint yourself into that corner)
 
 ---
 
 ## Linking Profiles to Modes
+
 In the <Codicon name="notebook" /> Prompts tab, you can explicitly associate a specific Configuration Profile with each Mode. The system also automatically remembers which profile you last used with each mode, making your workflow more efficient.
+
 <img src="/img/api-configuration-profiles/api-configuration-profiles-11.png" alt="Profile-Mode association interface in Prompts tab" width="550" />
 
 ---
@@ -105,17 +107,17 @@ In the <Codicon name="notebook" /> Prompts tab, you can explicitly associate a s
 
 Each task remembers which profile it started with. This "sticky" behavior means:
 
-- **Reopening from history**: When you resume a task from history, it uses the same profile it had originally—even if you've since changed the global selection.
+- **Reopening from history**: When you resume a task from history, it uses the same profile it had originally — even if you've since changed the global selection.
 - **Multi-workspace consistency**: If you switch profiles in another workspace window, existing tasks in the first window keep their original profile.
 - **Orchestrator subtasks**: Child tasks created by the orchestrator inherit the parent's profile and retain it for their lifetime.
 
-This prevents unexpected model switches mid-task and keeps your conversation context consistent with the model that generated it.
+This prevents unexpected model switches mid-task and keeps your conversation context consistent with the model that generated it. No model identity crises here.
 
 ---
 
 ## Security Note
 
-API keys are stored securely in VSCode's Secret Storage and are never exposed in plain text.
+API keys are stored securely in VSCode's Secret Storage and are never exposed in plain text. Your secrets stay secret.
 
 ---
 

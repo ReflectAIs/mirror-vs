@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ O Mirror VS se adapta à sua maneira de trabalhar, e não o contrário:
 - Modo Depuração: rastreie problemas, adicione logs, isole as causas raiz
 - Modos Personalizados: crie modos especializados para sua equipe ou fluxo de trabalho
 
-Saiba mais: [Usar Modos](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Modos personalizados](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+Saiba mais: [Usar Modos](https://www.reflectai.in/basic-usage/using-modes) • [Modos personalizados](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Recursos
 
-- **[Documentação](https://mirrorvsinc.github.io/Roo-Code/):** O guia oficial para instalar, configurar e dominar o Mirror VS.
+- **[Documentação](https://www.reflectai.in/):** O guia oficial para instalar, configurar e dominar o Mirror VS.
 - **[Issues do GitHub](https://github.com/ReflectAIs/mirror-vs/issues):** Relate bugs e acompanhe o desenvolvimento.
 
 ---

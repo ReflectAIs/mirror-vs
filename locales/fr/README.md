@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS s'adapte à votre façon de travailler, pas l'inverse :
 - Mode Débogage : tracer les problèmes, ajouter des journaux, isoler les causes profondes
 - Modes Personnalisés : créez des modes spécialisés pour votre équipe ou votre flux de travail
 
-En savoir plus : [Utiliser les Modes](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Modes personnalisés](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+En savoir plus : [Utiliser les Modes](https://www.reflectai.in/basic-usage/using-modes) • [Modes personnalisés](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Ressources
 
-- **[Documentation](https://mirrorvsinc.github.io/Roo-Code/):** Le guide officiel pour installer, configurer et maîtriser Mirror VS.
+- **[Documentation](https://www.reflectai.in/):** Le guide officiel pour installer, configurer et maîtriser Mirror VS.
 - **[Problèmes GitHub](https://github.com/ReflectAIs/mirror-vs/issues):** Signalez des bugs et suivez le développement.
 
 ---

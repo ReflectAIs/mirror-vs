@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
 
 import { arePathsEqual } from "../../utils/path"
+import { ErrorHandler } from "../../utils/error-handler"
 
 import { MirrorTerminal, MirrorTerminalProvider } from "./types"
 import { TerminalProcess } from "./TerminalProcess"
@@ -92,6 +93,39 @@ export class TerminalRegistry {
 						)
 
 						return
+					}
+
+					// — Terminal Error Auto-Fix Detection —
+					// When a command fails (non-zero exit code) for a user-initiated command
+					// (one that Mirror VS didn't start directly, i.e. terminal.running is false),
+					// offer an AI-powered auto-fix suggestion.
+					if (exitDetails.exitCode !== undefined && exitDetails.exitCode !== 0 && !terminal.running) {
+						const commandLine = e.execution?.commandLine?.value ?? ""
+						const output = terminal.getUnretrievedOutput() || ""
+
+						ErrorHandler.report(`Command exited with code ${exitDetails.exitCode}`, {
+							source: "terminal",
+							severity: "error",
+							suggestions: [
+								ErrorHandler.suggestion("🔧 Auto-fix with AI", async () => {
+									try {
+										const { MirrorProvider } = await import("../../core/webview/MirrorProvider")
+										const provider = await MirrorProvider.getInstance()
+										if (provider) {
+											const autoFixPrompt = `The terminal command \`${commandLine}\` failed with exit code ${exitDetails.exitCode}. Here is the output:\n\n\`\`\`\n${output.slice(0, 2000)}\n\`\`\`\n\nPlease analyze the error and suggest a fix.`
+											await provider.createTask(autoFixPrompt)
+										}
+									} catch {
+										// Silently handle — the auto-fix is a convenience, not critical
+									}
+								}),
+							],
+							context: {
+								command: commandLine,
+								exitCode: exitDetails.exitCode,
+								outputPreview: output.slice(0, 500),
+							},
+						})
 					}
 
 					if (!terminal.running) {

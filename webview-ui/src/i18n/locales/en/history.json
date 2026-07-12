@@ -47,5 +47,12 @@
 	"subtaskTag": "Subtask",
 	"deleteWithSubtasks": "This will also delete {{count}} subtask(s). Are you sure?",
 	"expandSubtasks": "Expand subtasks",
-	"collapseSubtasks": "Collapse subtasks"
+	"collapseSubtasks": "Collapse subtasks",
+	"session": "Session",
+	"renameSession": "Rename session",
+	"renameSave": "Save",
+	"renameCancel": "Cancel",
+	"tasks_one": "{{count}} task",
+	"tasks_other": "{{count}} tasks",
+	"tokens": "tokens"
 }

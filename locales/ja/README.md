@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VSは、あなたの働き方に合わせるように適応します。
 - デバッグモード：問題の追跡、ログの追加、根本原因の特定
 - カスタムモード：チームやワークフローに特化したモードの構築
 
-詳しくは: [モードの使い方](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [カスタムモード](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+詳しくは: [モードの使い方](https://www.reflectai.in/basic-usage/using-modes) • [カスタムモード](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## リソース
 
-- **[ドキュメント](https://mirrorvsinc.github.io/Roo-Code/):** Mirror VSのインストール、設定、習熟のための公式ガイド。
+- **[ドキュメント](https://www.reflectai.in/):** Mirror VSのインストール、設定、習熟のための公式ガイド。
 - **[GitHub Issues](https://github.com/ReflectAIs/mirror-vs/issues):** バグを報告し、開発を追跡します。
 
 ---

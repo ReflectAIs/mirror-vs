@@ -23,6 +23,11 @@
 		"goBack": "Back",
 		"finish": "Finish"
 	},
+	"complete": {
+		"heading": "You're all set!",
+		"description": "Your provider is configured and Mirror VS is ready to help you plan, architect, code, and debug smarter.",
+		"startExploring": "Start Exploring"
+	},
 	"startRouter": "We recommend using an LLM Router:",
 	"startCustom": "Or you can bring your provider API key:",
 	"importSettings": "Import Settings"

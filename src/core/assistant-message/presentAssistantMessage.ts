@@ -43,6 +43,7 @@ import {
 	browserEvaluateScriptTool,
 	renderPreviewTool,
 } from "../tools/BrowserTools"
+import { webSearchTool } from "../tools/WebSearchTool"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
@@ -867,6 +868,13 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "render_preview":
 					await renderPreviewTool.handle(mirror, block as ToolUse<"render_preview">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "web_search":
+					await webSearchTool.handle(mirror, block as ToolUse<"web_search">, {
 						askApproval,
 						handleError,
 						pushToolResult,

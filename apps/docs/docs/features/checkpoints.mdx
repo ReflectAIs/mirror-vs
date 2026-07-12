@@ -1,273 +1,187 @@
 ---
-description: Learn how to use checkpoints in Mirror VS to save your progress, revert changes, and manage your coding workflow with confidence.
+sidebar_label: Checkpoints
+title: Checkpoints
+description: Automatic Git snapshots — because Ctrl+Z can only save you so many times.
 keywords:
   - checkpoints
-  - save progress
-  - version control
-  - undo changes
-  - restore state
-  - workflow management
+  - git
+  - snapshots
+  - undo
+  - restore
+  - versioning
+  - shadow git
 ---
 
 # Checkpoints
 
-Checkpoints automatically version your workspace files during Mirror VS tasks, enabling non-destructive exploration of AI suggestions and easy recovery from unwanted changes.
+Mistakes happen. Bad ones. The kind where you stare at your editor and whisper, "What have I done?" Checkpoints are Mirror VS's way of giving you a time machine — automatic Git snapshots that let you rewind when things go sideways.
 
-Checkpoints let you:
-- Safely experiment with AI-suggested changes
-- Easily recover from undesired modifications
-- Compare different implementation approaches
-- Revert to previous project states without losing work
+## What Are Checkpoints?
 
-<div style={{ marginTop: '20px' }}></div>
+Every time Mirror VS takes a significant action (editing a file, running a command, creating something new), it automatically creates a Git checkpoint. Think of them as save points in a video game — except instead of respawning at the last castle, you're restoring your codebase to a working state.
 
-:::info Important Notes
-- **Checkpoints are enabled by default.**
-- **Git must be installed** for checkpoints to function - [see installation instructions](#git-installation)
-- No GitHub account or repository is required
-- No Git personal information configuration is needed
-- The shadow Git repository operates independently from your project's existing Git configuration
-:::
+### How It Works
 
----
+Mirror VS uses a **shadow Git repository** — a hidden Git repo that lives alongside your project. It doesn't touch your existing Git history, branches, or remotes. It's like having a secret parallel universe where everything is versioned.
 
-## Configuration Options
+```
+Your Project          Shadow Git Repo
+┌─────────────┐      ┌─────────────┐
+│ main branch  │      │ checkpoint  │
+│ your commits │      │ snapshots   │
+│ .git/        │      │ .git/       │
+└─────────────┘      └─────────────┘
+  (untouched)         (auto-managed)
+```
 
-Access checkpoint settings in Mirror VS settings under the "Checkpoints" section:
+## Why Checkpoints Exist
 
-1. Open Settings by clicking the gear icon <Codicon name="gear" /> → Checkpoints
-2. Configure checkpoint behavior:
-   - Check or uncheck the "Enable automatic checkpoints" checkbox
-   - Adjust the "Checkpoint initialization timeout" (10-60 seconds, default: 30s)
+- **Disaster recovery:** AI made a mess? Restore to before the chaos began.
+- **Experiment freely:** Let Mirror VS try things. If it doesn't work, roll back. No harm, no foul.
+- **Compare changes:** See what happened between checkpoints to understand what changed.
+- **Zero guilt experimentation:** That refactor you've been nervous about? Try it. Checkpoints have your back.
 
-   <img src="/img/checkpoints/checkpoints.png" alt="Checkpoint settings in Mirror VS configuration" width="500" />
+## Using Checkpoints
 
-#### Checkpoint Initialization Timeout
+### Automatic Snapshots
 
-Controls how long the system waits for checkpoint initialization to complete before showing a warning. If your project has many files or is on slower storage, increasing this timeout can prevent premature warnings.
+Checkpoints are created automatically during a task whenever Mirror VS:
 
-- **Range**: 10-60 seconds
-- **Default**: 30 seconds
-- **When to increase**: Large projects, slow disk I/O, or network-mounted directories
-- **Location**: Settings → Checkpoints → "Checkpoint initialization timeout"
+- Edits one or more files
+- Creates new files or directories
+- Runs terminal commands
+- Completes significant subtasks
 
----
+You don't need to do anything — they just happen. Like magic, but with more Git plumbing under the hood.
 
-## How Checkpoints Work
+### Restoring from a Checkpoint
 
-Mirror VS captures snapshots of your project's state using a shadow Git repository, separate from your main version control system. These snapshots, called checkpoints, are automatically created **before** file modifications occur, ensuring you can always undo unwanted changes. Checkpoints are recorded when tasks begin and before file modifications. They are not automatically created before command execution.
+When you need to undo, you have two options:
 
-Checkpoints are stored as Git commits in the shadow repository, capturing:
+#### 1. Restore Files Only
 
-- File content changes
-- New files added
-- Deleted files
-- Renamed files
-- Binary file changes
+This reverts your working directory to the state it was in at the selected checkpoint. Your task continues as if nothing happened — because as far as the files are concerned, nothing did.
 
----
+**Use this when:** You want to keep the task going but undo the file changes.
 
-## Working with Checkpoints
+#### 2. Restore Files & Task
 
-Checkpoints are integrated directly into your workflow through the chat interface.
+This reverts your files *and* rewinds the task conversation. It takes you back to the exact moment the checkpoint was created — files, chat history, and all.
 
-Checkpoints appear directly in your chat history:
+**Use this when:** You want a complete do-over from that point.
 
-- **Task checkpoint** marks your starting project state
-   <img src="/img/checkpoints/checkpoints-1.png" alt="Task checkpoint indicator in chat" width="500" />
+### Viewing Checkpoints
 
-- **Regular checkpoints** are created before file modifications, allowing easy undo of any changes
-   <img src="/img/checkpoints/checkpoints-2.png" alt="Regular checkpoint indicator in chat" width="500" />
+Checkpoints appear in the chat interface as you work. You'll see them as timeline markers you can click to view options. Each checkpoint shows:
+- When it was created
+- What triggered it
+- Options to restore
 
-Each checkpoint provides two primary functions that are always available in both the chat history and checkpoint menu:
+## Technical Details
 
-### Viewing Differences
+### How the Shadow Git Works
 
-To compare your current workspace with a previous checkpoint:
+The shadow repository is initialized in your project's `.git` directory (or a side directory if your project isn't Git-tracked). It's completely separate from your project's own Git history — no branch conflicts, no merge nightmares, no accidental force-pushes.
 
-1. Locate the checkpoint in your chat history or open the checkpoint menu
-2. Click the checkpoint's `View Differences` button
+```
+Your Project Root
+├── .git/              ← Your real Git repo (untouched)
+├── src/
+├── .mirror/
+│   └── checkpoints/   ← Shadow Git data (if needed)
+└── README.md
+```
 
-   <img src="/img/checkpoints/checkpoints-6.png" alt="View Differences button interface" width="100" />
+### What Gets Checkpointed
 
-3. Review the differences in the comparison view:
-   - Added lines are highlighted in green
-   - Removed lines are highlighted in red
-   - Modified files are listed with detailed changes
-   - Renames may not always be detected; diffs reflect per-file changes between commits
-   - New or deleted files are clearly marked
+The shadow repo tracks only the files in your workspace — everything Mirror VS can see and modify. It respects:
 
-<img src="/img/checkpoints/checkpoints-3.png" alt="View differences option for checkpoints" width="800" />
+- **`.gitignore` patterns** — Files you don't track, Mirror VS doesn't either
+- **Built-in exclusions** — `node_modules`, `dist`, `build`, and other noisy directories
+- **Binary files** — Skipped to keep snapshots lean
 
-### Restoring Checkpoints
+### Nested Git Repositories
 
-Restore options are always visible in checkpoint buttons and dialogs, regardless of whether changes are detected. This ensures you can always revert to any checkpoint state.
-
-To restore a project to a previous checkpoint state:
-
-1. Locate the checkpoint in your chat history or checkpoint menu
-2. Click the checkpoint's `Restore Checkpoint` button (always visible)
-   <img src="/img/checkpoints/checkpoints-7.png" alt="Restore checkpoint button interface" width="100" />
-3. Choose one of these restoration options:
-   
-   <img src="/img/checkpoints/checkpoints-4.png" alt="Restore checkpoint option" width="300" />
-
-   - **Restore Files Only** - Reverts only workspace files to checkpoint state without modifying conversation history. Ideal for comparing alternative implementations while maintaining chat context, allowing you to seamlessly switch between different project states. This option does not require confirmation and lets you quickly switch between different implementations.
-   
-   - **Restore Files & Task** - Reverts both workspace files AND removes all subsequent conversation messages. Use when you want to completely reset both your code and conversation back to the checkpoint's point in time. This option requires confirmation in a dialog as it cannot be undone.
-
-      <img src="/img/checkpoints/checkpoints-9.png" alt="Confirmation dialog for restoring checkpoint with files & task" width="300" />
-
-### Limitations and Considerations
-
-- **Scope**: Checkpoints only capture changes made during active Mirror VS tasks
-- **External changes**: Modifications made outside of tasks (manual edits, other tools) aren't included
-- **Large files**: Very large binary files may impact performance
-- **Unsaved work**: Restoration will overwrite any unsaved changes in your workspace
-- **Timing**: Checkpoints are created before changes are applied, providing a safety net for all modifications
-
----
-
-## Technical Implementation
-
-### Checkpoint Architecture
-
-The checkpoint system consists of:
-
-1. **Shadow Git Repository**: A separate Git repository created specifically for checkpoint tracking that functions as the persistent storage mechanism for checkpoint state.
-
-2. **Checkpoint Service**: Handles Git operations and state management through:
-   - Repository initialization
-   - Checkpoint creation and storage
-   - Diff computation
-   - State restoration
-
-3. **UI Components**: Interface elements displayed in the chat that enable interaction with checkpoints.
-
-### Restoration Process
-
-When restoration executes, Mirror VS:
-- Performs a hard reset to the specified checkpoint commit
-- Copies all files from the shadow repository to your workspace
-- Updates internal checkpoint tracking state
-
-### Storage Type
-
-Checkpoints are task-scoped, meaning they are specific to a single task.
-
-### Diff Computation
-
-Checkpoint comparison uses Git's underlying diff capabilities to produce structured file differences:
-- Modified files show line-by-line changes
-- Binary files are properly detected and handled
-- Rename detection may be limited; diffs focus on file content changes between checkpoints
-- File creation and deletion are clearly identified
-
-### File Exclusion and Ignore Patterns
-
-The checkpoint system uses intelligent file exclusion to track only relevant files:
-
-#### Built-in Exclusions
-
-The system has comprehensive built-in exclusion patterns that automatically ignore:
-- Build artifacts and dependency directories (`node_modules/`, `dist/`, `build/`)
-- Media files and binary assets (images, videos, audio)
-- Cache and temporary files (`.cache/`, `.tmp/`, `.bak`)
-- Configuration files with sensitive information (`.env`)
-- Large data files (archives, executables, binaries)
-- Database files and logs
-
-These patterns are written to the shadow repository's `.git/info/exclude` file during initialization.
-
-#### .gitignore Support
-
-The checkpoint system respects `.gitignore` patterns in your workspace:
-- Files excluded by `.gitignore` won't trigger checkpoint creation
-- Excluded files won't appear in checkpoint diffs
-- Standard Git ignore rules apply when staging file changes
-
-#### Git LFS Patterns
-
-Patterns defined in your workspace's `.gitattributes` for Git LFS are read and added to checkpoint exclusions. This helps avoid tracking large LFS-managed assets in the shadow repository.
-
-#### .rooignore Behavior
-
-The `.rooignore` file (which controls AI access to files) is separate from checkpoint tracking:
-- Files excluded by `.rooignore` but not by `.gitignore` will still be checkpointed
-- Changes to AI-inaccessible files can still be restored through checkpoints
-
-This separation is intentional, as `.rooignore` limits which files the AI can access, not which files should be tracked for version history.
-
-#### Nested Git Repositories
-
-If nested Git repositories are detected in your workspace, checkpoints are disabled. You'll receive a clear notification when checkpoint initialization fails due to nested repositories. Remove or relocate nested repositories to enable checkpoints.
+If nested Git repositories are detected in your workspace, checkpoints are disabled. You'll receive a clear notification when checkpoint initialization fails due to nested repositories. Remove or relocate nested repos to enable checkpoints.
 
 ### Concurrency Control
 
-The extension prevents duplicate checkpointing within a single streaming operation. There is no dedicated Git operation queue.
+The extension prevents duplicate checkpointing within a single streaming operation. No need to worry about race conditions — Mirror VS has that handled.
 
 ---
 
 ## Git Installation
 
-Checkpoints require Git to be installed on your system. The implementation uses the `simple-git` library, which relies on Git command-line tools to create and manage shadow repositories.
+Checkpoints need Git. Here's how to make sure you've got it.
 
 ### macOS
 
-1. **Install with Homebrew (recommended)**:
-   ```
-   brew install git
-   ```
+**Option 1: Homebrew (recommended)**
+```bash
+brew install git
+```
 
-2. **Alternative: Install with Xcode Command Line Tools**:
-   ```
-   xcode-select --install
-   ```
+**Option 2: Xcode Command Line Tools**
+```bash
+xcode-select --install
+```
 
-3. **Verify installation**:
-   - Open Terminal
-   - Type `git --version`
-   - You should see a version number like `git version 2.40.0`
+**Verify:**
+```bash
+git --version
+# Should show something like: git version 2.40.0
+```
 
 ### Windows
 
-1. **Download Git for Windows**:
-   - Visit https://git-scm.com/download/win
-   - The download should start automatically
-
-2. **Run the installer**:
-   - Accept the license agreement
-   - Choose installation location (default is recommended)
-   - Select components (default options are typically sufficient)
-   - Choose the default editor
-   - Choose how to use Git from the command line (recommended: Git from the command line and also from 3rd-party software)
-   - Configure line ending conversions (recommended: Checkout Windows-style, commit Unix-style)
-   - Complete the installation
-
-3. **Verify installation**:
-   - Open Command Prompt or PowerShell
-   - Type `git --version`
-   - You should see a version number like `git version 2.40.0.windows.1`
+1. Download Git for Windows from [git-scm.com](https://git-scm.com/download/win)
+2. Run the installer (default options are fine)
+3. Verify in Command Prompt:
+   ```cmd
+   git --version
+   ```
 
 ### Linux
 
-**Debian/Ubuntu**:
-```
-sudo apt update
-sudo apt install git
+**Debian/Ubuntu:**
+```bash
+sudo apt update && sudo apt install git
 ```
 
-**Fedora**:
-```
+**Fedora:**
+```bash
 sudo dnf install git
 ```
 
-**Arch Linux**:
-```
+**Arch Linux:**
+```bash
 sudo pacman -S git
 ```
 
-**Verify installation**:
-- Open Terminal
-- Type `git --version`
-- You should see a version number
+**Verify:**
+```bash
+git --version
+```
+
+---
+
+## FAQs
+
+**Q: Will checkpoints mess with my existing Git repo?**
+A: Nope. Shadow repos are completely separate. Your branches, remotes, and commits are safe.
+
+**Q: Can I manually create checkpoints?**
+A: Checkpoints are automatic during tasks. You don't need to — and can't — manually trigger them.
+
+**Q: Do checkpoints take up a lot of space?**
+A: They use Git's delta compression, so they're surprisingly efficient. But if you run a hundred checkpoints on a massive codebase, yes, it'll add up.
+
+**Q: What happens to checkpoints when a task ends?**
+A: Checkpoints are tied to the task session. When the task ends or is cleared, the associated checkpoints are cleaned up.
+
+---
+
+## See Also
+
+- [How Tools Work](/basic-usage/how-tools-work) — Understanding Mirror VS's tool system
+- [Auto-Approving Actions](/features/auto-approving-actions) — Configure automatic approvals

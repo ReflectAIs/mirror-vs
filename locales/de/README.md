@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS passt sich an deine Arbeitsweise an, nicht umgekehrt:
 - Debug-Modus: Probleme aufspüren, Protokolle hinzufügen, Ursachen isolieren
 - Benutzerdefinierte Modi: erstelle spezialisierte Modi für dein Team oder deinen Workflow
 
-Mehr erfahren: [Modi verwenden](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Benutzerdefinierte Modi](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+Mehr erfahren: [Modi verwenden](https://www.reflectai.in/basic-usage/using-modes) • [Benutzerdefinierte Modi](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Ressourcen
 
-- **[Dokumentation](https://mirrorvsinc.github.io/Roo-Code/):** Die offizielle Anleitung zur Installation, Konfiguration und Beherrschung von Mirror VS.
+- **[Dokumentation](https://www.reflectai.in/):** Die offizielle Anleitung zur Installation, Konfiguration und Beherrschung von Mirror VS.
 - **[GitHub Issues](https://github.com/ReflectAIs/mirror-vs/issues):** Melde Fehler und verfolge die Entwicklung.
 
 ---

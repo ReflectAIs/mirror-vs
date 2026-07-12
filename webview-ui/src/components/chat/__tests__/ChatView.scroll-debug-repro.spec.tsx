@@ -65,7 +65,7 @@ const harness = vi.hoisted<VirtuosoHarnessState>(() => ({
 	delayedGrowthMs: null,
 	initialTopMostItemIndex: undefined,
 	followOutput: undefined,
-	emitAtBottom: () => { },
+	emitAtBottom: () => {},
 }))
 
 function nullDefaultModule() {
@@ -107,7 +107,7 @@ vi.mock("../ChatTextArea", () => {
 		},
 		ref: React.ForwardedRef<{ focus: () => void }>,
 	) {
-		useImperativeHandle(ref, () => ({ focus: () => { } }))
+		useImperativeHandle(ref, () => ({ focus: () => {} }))
 
 		return (
 			<input
@@ -197,7 +197,7 @@ vi.mock("react-virtuoso", () => {
 const props: ChatViewProps = {
 	isHidden: false,
 	showAnnouncement: false,
-	hideAnnouncement: () => { },
+	hideAnnouncement: () => {},
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
@@ -275,7 +275,7 @@ const hydrate = async (atBottomAfterCalls: number, mirrorMessages = buildMessage
 	await waitFor(() => {
 		const list = document.querySelector("[data-testid='virtuoso-item-list']")
 		expect(list).toBeTruthy()
-		expect(list?.getAttribute("data-count")).toBe(String(Math.max(0, mirrorMessages.length - 1)))
+		expect(list?.getAttribute("data-count")).toBe(String(mirrorMessages.length))
 	})
 }
 
@@ -345,7 +345,7 @@ describe("ChatView scroll behavior regression coverage", () => {
 		harness.delayedGrowthMs = null
 		harness.initialTopMostItemIndex = undefined
 		harness.followOutput = undefined
-		harness.emitAtBottom = () => { }
+		harness.emitAtBottom = () => {}
 	})
 
 	it("existing-task entry does not set a top-most initial anchor", async () => {
@@ -542,12 +542,12 @@ describe("ChatView scroll behavior regression coverage", () => {
 		const callsBeforeClick = harness.scrollCalls
 
 		await act(async () => {
-			; (checkpointButton as HTMLButtonElement).click()
+			;(checkpointButton as HTMLButtonElement).click()
 		})
 
 		expect(harness.scrollCalls).toBe(callsBeforeClick + 1)
 		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({
-			index: 1,
+			index: 2,
 			align: "center",
 			behavior: "smooth",
 		})
@@ -569,24 +569,24 @@ describe("ChatView scroll behavior regression coverage", () => {
 		const checkpointButton = getScrollToCheckpointButton()
 
 		await act(async () => {
-			; (checkpointButton as HTMLButtonElement).click()
+			;(checkpointButton as HTMLButtonElement).click()
 		})
-		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 4, align: "center", behavior: "smooth" })
+		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 5, align: "center", behavior: "smooth" })
 
 		await act(async () => {
-			; (checkpointButton as HTMLButtonElement).click()
+			;(checkpointButton as HTMLButtonElement).click()
 		})
-		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 2, align: "center", behavior: "smooth" })
+		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 3, align: "center", behavior: "smooth" })
 
 		await act(async () => {
-			; (checkpointButton as HTMLButtonElement).click()
+			;(checkpointButton as HTMLButtonElement).click()
 		})
-		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 0, align: "center", behavior: "smooth" })
+		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 1, align: "center", behavior: "smooth" })
 
 		// Once at the oldest checkpoint, additional clicks keep targeting it.
 		await act(async () => {
-			; (checkpointButton as HTMLButtonElement).click()
+			;(checkpointButton as HTMLButtonElement).click()
 		})
-		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 0, align: "center", behavior: "smooth" })
+		expect(harness.scrollToIndexArgs.at(-1)).toMatchObject({ index: 1, align: "center", behavior: "smooth" })
 	})
 })

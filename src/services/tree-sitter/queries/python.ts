@@ -70,4 +70,25 @@ export default `
   (assignment
     left: (identifier) @name.definition.type
     type: (type))) @definition.type_annotation
+
+; F-string interpolation
+(string
+  (interpolation
+    (expression) @name.definition.interpolation)) @definition.interpolation
+
+; Pattern matching with as-patterns
+(function_definition
+  body: (block
+    (match_statement))) @definition.match_case
+
+; Multiple context managers in with statements
+(with_statement
+  (with_clause
+    (with_item) @name.definition.context_manager)) @definition.context_manager
+
+; Nested function definitions with scope modifiers
+(function_definition
+  body: (block
+    (function_definition
+      name: (identifier) @name.definition.nested_function))) @definition.nested_function
 `

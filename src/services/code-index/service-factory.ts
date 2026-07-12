@@ -18,6 +18,10 @@ import { MistralEmbedder } from "./embedders/mistral"
 import { VercelAiGatewayEmbedder } from "./embedders/vercel-ai-gateway"
 import { BedrockEmbedder } from "./embedders/bedrock"
 import { OpenRouterEmbedder } from "./embedders/openrouter"
+import { AnthropicEmbedder } from "./embedders/anthropic"
+import { CohereEmbedder } from "./embedders/cohere"
+import { JinaEmbedder } from "./embedders/jina"
+import { VoyageEmbedder } from "./embedders/voyage"
 import { QdrantVectorStore } from "./vector-store/qdrant-client"
 import { codeParser, DirectoryScanner, FileWatcher } from "./processors"
 import { ICodeParser, IEmbedder, IFileWatcher, IVectorStore } from "./interfaces"
@@ -101,6 +105,26 @@ export class CodeIndexServiceFactory {
 				undefined, // maxItemTokens
 				config.openRouterOptions.specificProvider,
 			)
+		} else if (provider === "anthropic") {
+			if (!config.anthropicOptions?.apiKey) {
+				throw new Error(t("embeddings:serviceFactory.anthropicConfigMissing"))
+			}
+			return new AnthropicEmbedder(config.anthropicOptions.apiKey, config.modelId)
+		} else if (provider === "cohere") {
+			if (!config.cohereOptions?.apiKey) {
+				throw new Error(t("embeddings:serviceFactory.cohereConfigMissing"))
+			}
+			return new CohereEmbedder(config.cohereOptions.apiKey, config.modelId)
+		} else if (provider === "jina") {
+			if (!config.jinaOptions?.apiKey) {
+				throw new Error(t("embeddings:serviceFactory.jinaConfigMissing"))
+			}
+			return new JinaEmbedder(config.jinaOptions.apiKey, config.modelId)
+		} else if (provider === "voyage") {
+			if (!config.voyageOptions?.apiKey) {
+				throw new Error(t("embeddings:serviceFactory.voyageConfigMissing"))
+			}
+			return new VoyageEmbedder(config.voyageOptions.apiKey, config.modelId)
 		}
 
 		throw new Error(

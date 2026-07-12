@@ -1,99 +1,120 @@
 ---
-description: Learn how to use Boomerang Tasks (Orchestrator mode) to automate complex workflows by delegating subtasks to specialized modes.
+sidebar_label: Boomerang Tasks (Subtasks)
+title: Boomerang Tasks (Subtasks)
+description: Throw a task, it comes back — Mirror VS's Orchestrator mode delegates work to specialized modes and collects the results.
 keywords:
-  - Boomerang Tasks
-  - Orchestrator mode
-  - workflow automation
-  - task delegation
-  - automated workflows
-sidebar_label: 'Boomerang Tasks'
+  - boomerang tasks
+  - subtasks
+  - orchestration
+  - delegation
+  - mode switching
 ---
 
-# Boomerang Tasks: Orchestrate Complex Workflows
+# Boomerang Tasks (Subtasks)
 
-Boomerang Tasks (also known as subtasks or task orchestration) allow you to break down complex projects into smaller, manageable pieces using the built-in **`🪃 Orchestrator` Mode (aka Boomerang Mode)**. Think of it like delegating parts of your work to specialized assistants. Each subtask runs in its own context, often using a different Mirror VS mode tailored for that specific job (like [`💻 Code`](/basic-usage/using-modes#code-mode-default), [`🏗️ Architect`](/basic-usage/using-modes#architect-mode), or [`🪲 Debug`](/basic-usage/using-modes#debug-mode)). The Orchestrator mode manages this process.
+Ever wished you could clone yourself? Boomerang tasks are the next best thing. They let Mirror VS's Orchestrator mode throw tasks to specialized modes, wait for them to come back, and weave everything together. Like a boomerang, but for code.
 
-:::info Orchestrator Mode is Built-In
-The `🪃 Orchestrator` mode (previously achieved via a custom "Boomerang Mode") is now a built-in mode specifically designed to orchestrate workflows by breaking down tasks and delegating them to other modes. You no longer need to create a custom mode for this functionality.
+## What Are Boomerang Tasks?
 
-Learn more about [Built-in Modes](/basic-usage/using-modes#built-in-modes).
-:::
+Boomerang tasks (also called subtasks) are a way for Mirror VS to delegate work. The Orchestrator mode can spin off a subtask to, say, Code mode, let it do its thing, and then pick up the result when it's done.
 
----
+Think of it like being the project manager who actually knows how to code:
+- **You (or Orchestrator)** define *what* needs to happen
+- **The subtask mode** figures out *how* to do it
+- **The result** comes back to you, ready to integrate
 
-## Why Use Boomerang Tasks?
+### Why Would You Want This?
 
--   **Tackle Complexity:** Break large, multi-step projects (e.g., building a full feature) into focused subtasks (e.g., design, implementation, documentation).
--   **Use Specialized Modes:** Automatically delegate subtasks to the mode best suited for that specific piece of work, leveraging specialized capabilities for optimal results.
--   **Maintain Focus & Efficiency:** Each subtask operates in its own isolated context with a separate conversation history. This prevents the parent (orchestrator) task from becoming cluttered with the detailed execution steps (like code diffs or file analysis results), allowing it to focus efficiently on the high-level workflow and manage the overall process based on concise summaries from completed subtasks.
--   **Streamline Workflows:** Results from one subtask can be automatically passed to the next, creating a smooth flow (e.g., architectural decisions feeding into the coding task).
-
----
+- **Different problems, different tools.** Architect mode plans, Code mode builds, Debug mode fixes bugs. Let each mode do what it does best.
+- **Parallel-ish work.** Okay, it's not true parallelism, but it sure beats context-switching manually.
+- **Separation of concerns.** Each subtask gets its own fresh context, so there's no cross-contamination between wildly different tasks.
+- **Focused attention.** Each mode gets a clean slate — no baggage from whatever you were doing before.
+- **Modular results.** Subtask outputs are discrete, making them easier to review and integrate.
 
 ## How It Works
 
-1.  When in the [`🪃 Orchestrator`](/basic-usage/using-modes#orchestrator-mode-aka-boomerang-mode) mode (aka Boomerang Mode), Roo analyzes a complex task and suggests breaking it down into a subtask[^1].
+### The Flow
 
-2.  The parent task (in Orchestrator mode) pauses, and the new subtask begins in a different, specialized mode[^2].
-3.  When the subtask's goal is achieved, Roo signals completion.
-4.  The parent task resumes with only the summary[^3] of the subtask. The parent uses this summary to continue the main workflow.
+1. **Orchestrator identifies** a piece of work that's better handled by a specialized mode
+2. **Orchestrator creates a subtask** with clear instructions and assigns it to the appropriate mode
+3. **The specialized mode** takes over, does the work, and completes the subtask
+4. **Orchestrator picks up** the result and continues with the bigger picture
 
----
+```
+Orchestrator says: "I need a database schema. Code mode, you're up."
+Code mode: *designs schema, writes migrations, reports back*
+Orchestrator: "Excellent. Now, back to the architecture..."
+```
 
-## Key Considerations
+### Mode Compatibility
 
--   **Approval Required:** By default, you must approve the creation and completion of each subtask. This can be automated via the [Auto-Approving Actions](/features/auto-approving-actions#subtasks) settings if desired.
--   **Context Isolation and Transfer:** Each subtask operates in complete isolation with its own conversation history. It does not automatically inherit the parent's context. Information must be explicitly passed:
-    *   **Down:** Via the initial instructions provided when the subtask is created.
-    *   **Up:** Via the final summary provided when the subtask finishes. Be mindful that only this summary returns to the parent.
--   **Navigation:** Roo's interface helps you see the hierarchy of tasks (which task is the parent, which are children). You can typically navigate between active and paused tasks.
+Boomerang tasks work best when the target mode has the right tools for the job. Here's who pairs well with what:
 
-Boomerang Tasks provide a powerful way to manage complex development workflows directly within Mirror VS, leveraging specialized modes for maximum efficiency.
+| Mode | Best For | Has Tool Access? |
+|------|----------|:---:|
+| Code Mode | Implementation, refactoring | ✅ Full |
+| Architect Mode | Planning, design, diagrams | ✅ Full (no code exec) |
+| Debug Mode | Bug fixing, investigation | ✅ Full |
+| Ask Mode | Research, questions | ✅ Read-only |
 
-:::tip Keep Tasks Focused
-Use subtasks (delegated via Orchestrator mode) to maintain clarity. If a request significantly shifts focus or requires a different expertise (mode), consider creating a subtask rather than overloading the current one.
+:::tip
+The Orchestrator mode is intentionally limited to focus on high-level workflow management. It relies on boomerang tasks to do the actual heavy lifting — which is exactly the point.
 :::
 
----
+## Configuration
 
-## Frequently Asked Questions
+### Enabling Subtask Features
 
-### Why can't Orchestrator mode read files, write files, call MCPs, or run commands?
+Subtasks respect the same [auto-approval settings](/features/auto-approving-actions) as the rest of Mirror VS. You can configure:
 
-The Orchestrator mode is intentionally limited to focus on high-level workflow management. Giving it the ability to read files by default causes the context to become filled with file reads, hampering its ability to remain focused on orchestration. The design philosophy is that subtasks should handle the detailed work and return only the necessary information (via their completion summaries) for the orchestrator to delegate further tasks effectively.
+- **Auto-approve subtask creation** — Let Orchestrator spin off tasks without asking
+- **Auto-approve subtask completion** — Let results flow back without manual intervention
 
-This limitation helps prevent [context poisoning](/advanced-usage/context-poisoning), where irrelevant or excessive information contaminates the model's active context, leading to degraded performance and task deviation.
+### JSON Override for Orchestrator Mode
 
-### How can I override Orchestrator mode's limitations?
-
-You can [customize the Orchestrator mode](/features/custom-modes) to add capabilities like file reading by following the [configuration precedence](/features/custom-modes#configuration-precedence) system:
-
-1. Open the Command Palette and select **"Edit Global Modes"**
-2. Copy and paste this configuration:
+Want to give Orchestrator mode some extra capabilities? You can override its tool access via custom mode configuration:
 
 ```json
 {
-  "customModes": [
-    {
-      "slug": "orchestrator",
-      "name": "🪃 Orchestrator",
-      "roleDefinition": "You are Roo, a strategic workflow orchestrator who coordinates complex tasks by delegating them to appropriate specialized modes. You have a comprehensive understanding of each mode's capabilities and limitations, allowing you to effectively break down complex problems into discrete tasks that can be solved by different specialists.",
-      "customInstructions": "Your role is to coordinate complex workflows by delegating tasks to specialized modes. As an orchestrator, you should:\n\n1. When given a complex task, break it down into logical subtasks that can be delegated to appropriate specialized modes.\n\n2. For each subtask, use the `new_task` tool to delegate. Choose the most appropriate mode for the subtask's specific goal and provide comprehensive instructions in the `message` parameter. These instructions must include:\n    *   All necessary context from the parent task or previous subtasks required to complete the work.\n    *   A clearly defined scope, specifying exactly what the subtask should accomplish.\n    *   An explicit statement that the subtask should *only* perform the work outlined in these instructions and not deviate.\n    *   An instruction for the subtask to signal completion by using the `attempt_completion` tool, providing a concise yet thorough summary of the outcome in the `result` parameter, keeping in mind that this summary will be the source of truth used to keep track of what was completed on this project. \n    *   A statement that these specific instructions supersede any conflicting general instructions the subtask's mode might have.\n\n3. Track and manage the progress of all subtasks. When a subtask is completed, analyze its results and determine the next steps.\n\n4. Help the user understand how the different subtasks fit together in the overall workflow. Provide clear reasoning about why you're delegating specific tasks to specific modes.\n\n5. When all subtasks are completed, synthesize the results and provide a comprehensive overview of what was accomplished.\n\n6. Ask clarifying questions when necessary to better understand how to break down complex tasks effectively.\n\n7. Suggest improvements to the workflow based on the results of completed subtasks.\n\nUse subtasks to maintain clarity. If a request significantly shifts focus or requires a different expertise (mode), consider creating a subtask rather than overloading the current one.",
-      "groups": [
-        "read"
-      ],
-      "source": "global"
-    }
+  "slug": "orchestrator",
+  "name": "Orchestrator",
+  "roleDefinition": "You are an expert project orchestrator...",
+  "groups": [
+    "read",
+    ["edit", { "fileRegex": "" }],
+    "command",
+    "mcp"
   ]
 }
 ```
 
-3. Save the file. Your global Orchestrator mode will now have read capabilities.
+## Best Practices
 
-:::warning
-Adding capabilities to the Orchestrator mode should be done thoughtfully. The limited default capabilities help maintain focus on orchestration rather than implementation details.
-:::
+### Writing Good Subtask Instructions
 
-[^1]: This context is passed via the `message` parameter of the [`new_task`](/advanced-usage/available-tools/new-task) tool when the Orchestrator mode delegates the task.
-[^2]: The mode for the subtask is specified via the `mode` parameter of the [`new_task`](/advanced-usage/available-tools/new-task) tool during initiation by the Orchestrator mode.
-[^3]: This summary is passed via the `result` parameter of the [`attempt_completion`](/advanced-usage/available-tools/attempt-completion) tool when the subtask finishes.
+A good subtask instruction is like a well-written ticket — clear, specific, and actionable:
+
+- **State the goal clearly:** "Create a REST API endpoint for user registration"
+- **Provide context:** Reference relevant files or decisions already made
+- **Set boundaries:** "Don't modify the database schema — that's handled separately"
+- **Specify the mode:** "This should be done in Code mode"
+
+### When to Use Boomerang Tasks
+
+- **Complex multi-step features** — Architecture → Backend → Frontend → Review
+- **Investigating bugs** — Let Debug mode investigate while you (or Orchestrator) plan the fix
+- **Research tasks** — Have Ask mode research API docs while you keep coding
+- **Documentation generation** — Spin off docs generation to keep the main task focused
+
+## Limitations
+
+- Boomerang tasks run sequentially, not in parallel. One subtask completes before the next starts.
+- Each subtask starts with a clean context — it doesn't inherit the parent's conversation history.
+- The Orchestrator must wait for subtask completion before proceeding.
+- Subtask depth is limited to prevent infinite delegation loops (yes, that's a thing that could happen).
+
+## See Also
+
+- [Modes Overview](/basic-usage/using-modes) — Understanding all available modes
+- [Auto-Approving Actions](/features/auto-approving-actions) — Configure which actions can auto-approve
+- [Custom Modes](/features/custom-modes) — Create specialized modes for specific tasks

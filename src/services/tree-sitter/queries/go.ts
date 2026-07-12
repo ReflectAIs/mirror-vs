@@ -23,4 +23,29 @@ export default `
 
 ; Import declarations - capture the entire import block
 (import_declaration) @name.definition.import
+
+; Anonymous function literals assigned to variables
+(var_spec
+  name: (identifier) @name.definition.func_literal
+  value: (expression_list
+    (func_literal))) @definition.func_literal
+
+; Function literals in short variable declarations
+(short_var_declaration
+  left: (expression_list
+    (identifier) @name.definition.func_literal)
+  right: (expression_list
+    (func_literal))) @definition.func_literal
+
+; Map type definitions
+(type_declaration
+  (type_spec
+    name: (type_identifier) @name.definition.map_type
+    type: (map_type))) @definition.map_type
+
+; Pointer type definitions
+(type_declaration
+  (type_spec
+    name: (type_identifier) @name.definition.pointer_type
+    type: (pointer_type))) @definition.pointer_type
 `

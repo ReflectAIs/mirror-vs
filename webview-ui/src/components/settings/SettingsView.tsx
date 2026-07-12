@@ -88,7 +88,8 @@ export const settingsTabList =
 	"flex-shrink-0 flex flex-row overflow-x-auto overflow-y-hidden border-b border-vscode-editorGroup-border/50 bg-vscode-sideBar-background/40 backdrop-blur-md py-1.5 px-2 gap-1.5 w-full scrollbar-none [&_.tab-label]:hidden"
 export const settingsTabTrigger =
 	"whitespace-nowrap overflow-hidden h-8 w-8 rounded-md flex items-center justify-center text-vscode-foreground opacity-70 hover:opacity-100 hover:bg-vscode-list-hoverBackground transition-all duration-150 cursor-pointer"
-export const settingsTabTriggerActive = "opacity-100 font-semibold bg-gradient-to-b from-mirror-brand-from/15 to-mirror-brand-to/5 border-b-2 border-mirror-brand-via shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
+export const settingsTabTriggerActive =
+	"opacity-100 font-semibold bg-gradient-to-b from-mirror-brand-from/15 to-mirror-brand-to/5 border-b-2 border-mirror-brand-via shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
 
 export interface SettingsViewRef {
 	checkUnsaveChanges: (then: () => void) => void
@@ -425,6 +426,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 
 	const checkUnsaveChanges = useCallback(
 		(then: () => void) => {
+			console.warn("[TRACE] checkUnsaveChanges called, isChangeDetected:", isChangeDetected)
 			if (isChangeDetected) {
 				confirmDialogHandler.current = then
 				setDiscardDialogShow(true)

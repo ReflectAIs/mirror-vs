@@ -39,6 +39,7 @@ type ModelIdKey = keyof Pick<
 	| "lmStudioModelId"
 	| "lmStudioDraftModelId"
 	| "vsCodeLmModelSelector"
+	| "customModelId"
 >
 
 interface ModelPickerProps {
@@ -180,17 +181,25 @@ export const ModelPicker = ({
 			if (deletedDefaultModels.includes(modelId)) {
 				setDeletedDefaultModels((prev) => {
 					const next = prev.filter((m) => m !== modelId)
-					localStorage.setItem(`deleted_models_${apiConfiguration.apiProvider}_${modelIdKey}`, JSON.stringify(next))
+					localStorage.setItem(
+						`deleted_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+						JSON.stringify(next),
+					)
 					return next
 				})
 			} else {
 				// If it's a new custom model, save it to the persistent list
-				const isDefault = Object.keys(filterModels(models, activeProvider, organizationAllowList) ?? {}).includes(modelId)
+				const isDefault = Object.keys(
+					filterModels(models, activeProvider, organizationAllowList) ?? {},
+				).includes(modelId)
 				if (!isDefault && modelId.trim()) {
 					setSavedCustomModels((prev) => {
 						if (prev.includes(modelId)) return prev
 						const next = [...prev, modelId]
-						localStorage.setItem(`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`, JSON.stringify(next))
+						localStorage.setItem(
+							`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+							JSON.stringify(next),
+						)
 						return next
 					})
 				}
@@ -211,7 +220,16 @@ export const ModelPicker = ({
 			// Delay to ensure the popover is closed before setting the search value.
 			selectTimeoutRef.current = setTimeout(() => setSearchValue(""), 100)
 		},
-		[modelIdKey, setApiConfigurationField, valueTransform, onModelChange, models, activeProvider, organizationAllowList, deletedDefaultModels],
+		[
+			modelIdKey,
+			setApiConfigurationField,
+			valueTransform,
+			onModelChange,
+			models,
+			activeProvider,
+			organizationAllowList,
+			deletedDefaultModels,
+		],
 	)
 
 	const onOpenChange = useCallback((open: boolean) => {
@@ -331,7 +349,9 @@ export const ModelPicker = ({
 			{/* Saved custom models list manager */}
 			<div className="mt-2 space-y-2 border border-vscode-panel-border/30 rounded-md p-2.5 bg-vscode-sideBar-background/15">
 				<div className="flex justify-between items-center">
-					<label className="text-[11px] font-bold tracking-wide uppercase text-vscode-foreground opacity-90">Custom Model Manager</label>
+					<label className="text-[11px] font-bold tracking-wide uppercase text-vscode-foreground opacity-90">
+						Custom Model Manager
+					</label>
 				</div>
 				<div className="flex gap-2">
 					<input
@@ -346,7 +366,10 @@ export const ModelPicker = ({
 								if (val && !modelIds.includes(val)) {
 									setSavedCustomModels((prev) => {
 										const next = [...prev, val]
-										localStorage.setItem(`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`, JSON.stringify(next))
+										localStorage.setItem(
+											`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+											JSON.stringify(next),
+										)
 										return next
 									})
 									onSelect(val)
@@ -360,12 +383,17 @@ export const ModelPicker = ({
 						size="sm"
 						className="h-7 text-xs px-2.5"
 						onClick={() => {
-							const input = document.getElementById(`new-custom-model-input-${modelIdKey}`) as HTMLInputElement
+							const input = document.getElementById(
+								`new-custom-model-input-${modelIdKey}`,
+							) as HTMLInputElement
 							const val = input?.value.trim()
 							if (val && !modelIds.includes(val)) {
 								setSavedCustomModels((prev) => {
 									const next = [...prev, val]
-									localStorage.setItem(`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`, JSON.stringify(next))
+									localStorage.setItem(
+										`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+										JSON.stringify(next),
+									)
 									return next
 								})
 								onSelect(val)
@@ -387,7 +415,7 @@ export const ModelPicker = ({
 										"inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] border transition-all cursor-pointer",
 										isSelected
 											? "bg-mirror-brand-via/10 text-vscode-foreground border-mirror-brand-via/30 font-medium"
-											: "bg-vscode-badge-background/50 text-vscode-badge-foreground border-vscode-panel-border/30 hover:bg-vscode-badge-background"
+											: "bg-vscode-badge-background/50 text-vscode-badge-foreground border-vscode-panel-border/30 hover:bg-vscode-badge-background",
 									)}
 									onClick={() => onSelect(model)}>
 									<span>{model}</span>
@@ -398,13 +426,19 @@ export const ModelPicker = ({
 											if (isCustom) {
 												setSavedCustomModels((prev) => {
 													const next = prev.filter((m) => m !== model)
-													localStorage.setItem(`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`, JSON.stringify(next))
+													localStorage.setItem(
+														`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+														JSON.stringify(next),
+													)
 													return next
 												})
 											} else {
 												setDeletedDefaultModels((prev) => {
 													const next = [...prev, model]
-													localStorage.setItem(`deleted_models_${apiConfiguration.apiProvider}_${modelIdKey}`, JSON.stringify(next))
+													localStorage.setItem(
+														`deleted_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+														JSON.stringify(next),
+													)
 													return next
 												})
 											}

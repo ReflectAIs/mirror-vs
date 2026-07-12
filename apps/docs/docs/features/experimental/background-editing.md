@@ -11,7 +11,7 @@ keywords:
 
 # Background Editing
 
-Work without interruption while Mirror VS edits files in the background—no more losing focus from automatic diff views.
+Work without interruption while Mirror VS edits files in the background — no more losing your flow from automatic diff views popping up like uninvited party guests.
 
 :::warning Experimental Feature
 This is an experimental feature that changes how file edits are displayed. While it can significantly improve workflow, you'll need to manually review changes through source control or file history.
@@ -21,30 +21,28 @@ This is an experimental feature that changes how file edits are displayed. While
 
 ## Overview
 
-The "Background Editing" setting is an experimental feature that disables automatic diff view displays when Mirror VS edits files. Instead of switching your editor focus to show diffs, Mirror works silently in the background, allowing you to continue coding without interruption. This feature affects all file editing operations including write, apply diff, search/replace, insert content, and multi-file apply diff tools.
+The "Background Editing" setting is an experimental feature that disables automatic diff view displays when Mirror VS edits files. Instead of switching your editor focus to show diffs, Mirror VS works silently in the background, allowing you to continue coding without interruption. This feature affects all file editing operations including write, apply diff, search/replace, insert content, and multi-file apply diff tools.
 
 ### Key Benefits
 
-- **Uninterrupted Focus**: Stay in your current file while Mirror makes changes
-- **Smoother Workflow**: No context switching between files
-- **Background Processing**: File edits happen silently
-- **Reduced Distractions**: Maintain your coding flow
-- **Performance**: Faster file operations without UI updates
-- **Batch Operations**: Ideal for large refactoring or multiple file updates
+- **Uninterrupted Focus** — Stay in your current file while Mirror VS makes changes
+- **Smoother Workflow** — No context switching between files
+- **Background Processing** — File edits happen silently
+- **Reduced Distractions** — Maintain your coding flow
+- **Performance** — Faster file operations without UI updates
+- **Batch Operations** — Ideal for large refactoring or multiple file updates
 
 ### Trade-offs
 
-- **No Visual Confirmation**: You won't see diffs as changes are made
-- **Manual Review Required**: Check changes through Git or file history
-- **Less Immediate Feedback**: Changes aren't immediately visible
-- **Silent Changes**: Files change without visual notification - check Git status regularly
-- **Limited Environment Context**: Mirror won't see recently edited files as open tabs in its environment details since they're not visually opened
+- **No Visual Confirmation** — You won't see diffs as changes are made
+- **Manual Review Required** — Check changes through Git or file history
+- **Less Immediate Feedback** — Changes aren't immediately visible
+- **Silent Changes** — Files change without visual notification — check Git status regularly
+- **Limited Environment Context** — Mirror VS won't see recently edited files as open tabs since they're not visually opened
 
 ---
 
 ## Enabling the Feature
-
-To enable Background Editing:
 
 1. Open Mirror VS settings (gear icon in the top right)
 2. Navigate to the "Experimental" tab
@@ -59,7 +57,7 @@ To enable Background Editing:
 
 ### Default Behavior (Feature Disabled)
 
-Without this feature, when Mirror edits a file:
+Without this feature, when Mirror VS edits a file:
 
 1. The file opens in your editor
 2. A diff view appears showing changes
@@ -68,7 +66,7 @@ Without this feature, when Mirror edits a file:
 
 ### With Feature Enabled
 
-When enabled, Mirror's file edits:
+When enabled, Mirror VS's file edits:
 
 1. Happen silently in the background
 2. Don't open new editor tabs
@@ -83,7 +81,7 @@ Even with the feature enabled:
 - Files are still modified on disk
 - Changes appear in source control
 - File watchers and build tools detect changes
-- Mirror's chat shows what files were edited
+- Mirror VS's chat shows what files were edited
 - Error detection and diagnostics continue to work normally
 - Files are opened in memory for diagnostic purposes (not visible in editor)
 - Write delays for diagnostic detection are still respected
@@ -92,38 +90,36 @@ Even with the feature enabled:
 
 ## Best Use Cases
 
-This feature is particularly beneficial for:
+This feature is particularly useful for:
 
-- **Large Refactoring Operations**: When Mirror needs to update many files
-- **Batch File Updates**: Making similar changes across multiple files
-- **Performance-Sensitive Tasks**: When UI updates would slow down operations
-- **Focused Coding Sessions**: When you want to avoid context switches
-- **Automated Workflows**: Running multiple file operations in sequence
+- **Large Refactoring Operations** — When Mirror VS needs to update many files
+- **Batch File Updates** — Making similar changes across multiple files
+- **Performance-Sensitive Tasks** — When UI updates would slow down operations
+- **Focused Coding Sessions** — When you want to avoid context switches
+- **Automated Workflows** — Running multiple file operations in sequence
 
 ---
 
 ## Best Practices
 
-When using this feature:
-
-1. **Use Version Control**: Regularly check Git status to track changes
-2. **Review Periodically**: Don't let too many changes accumulate without review
-3. **Enable Selectively**: Consider enabling for specific task types
-4. **Monitor Chat**: Pay attention to Mirror's messages about file modifications
-5. **Check Diagnostics**: Ensure your editor's problems panel stays visible
+1. **Use Version Control** — Regularly check Git status to track changes
+2. **Review Periodically** — Don't let too many changes accumulate without review
+3. **Enable Selectively** — Consider enabling for specific task types
+4. **Monitor Chat** — Pay attention to Mirror VS's messages about file modifications
+5. **Check Diagnostics** — Ensure your editor's problems panel stays visible
 
 ---
 
 ## FAQ
 
-**Q: Can I still see what files Mirror edited?**
-A: Yes, Mirror's chat messages list all modified files, and changes appear in source control.
+**Q: Can I still see what files Mirror VS edited?**
+A: Yes, Mirror VS's chat messages list all modified files, and changes appear in source control.
 
 **Q: What if I need to see a specific change immediately?**
 A: You can manually open the file and use source control to view the diff.
 
-**Q: Does this affect Mirror's ability to edit files?**
-A: No, Mirror can still make all the same edits; only the display behavior changes. All file editing tools (write, apply diff, search/replace, insert content, and multi-file apply diff) respect this setting.
+**Q: Does this affect Mirror VS's ability to edit files?**
+A: No, Mirror VS can still make all the same edits; only the display behavior changes.
 
 **Q: Can I enable this for specific projects only?**
 A: Currently, this is a global setting that affects all projects.
@@ -133,6 +129,3 @@ A: File edit approvals still appear if you haven't auto-approved them; only the 
 
 **Q: Do diagnostics and error detection still work?**
 A: Yes, files are opened in memory for diagnostic detection, so error checking continues to function normally even though files aren't displayed.
-
-**Q: How does this feature appear in the settings?**
-A: In the Experimental tab, it's labeled as "Background editing" with a description about preventing editor focus disruption.

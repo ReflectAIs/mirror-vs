@@ -53,12 +53,12 @@ For the complete, up-to-date model list and IDs, see [Vertex AI's models documen
     2. **Google Cloud Key File Path:** If provided and no JSON credentials, this is used
     3. **Application Default Credentials (ADC):** Used as fallback when neither above is provided
 
-    **Option 1 - Using ADC (Simplest):**
+    **Option 1 — Using ADC (Simplest):**
 
     - Install the Google Cloud CLI and run `gcloud auth application-default login`
     - No further configuration needed in Mirror VS
 
-    **Option 2 - Using Service Account Key:**
+    **Option 2 — Using Service Account Key:**
 
     - Either paste the JSON content directly into **Google Cloud Credentials** field
     - Or provide the file path in **Google Cloud Key File Path** field
@@ -77,7 +77,7 @@ When using Gemini models through Vertex AI, additional grounding features become
 
 #### URL Context
 
-Enable URL context to allow Gemini models to access and analyze web content directly. This feature allows Mirror to:
+Enable URL context to allow Gemini models to access and analyze web content directly. This feature allows Mirror VS to:
 
 - Read and understand web pages in real-time
 - Analyze documentation from URLs

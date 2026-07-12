@@ -10,124 +10,62 @@ keywords:
     - API integration
 ---
 
-# access_mcp_resource
+# `access_mcp_resource` — Fetching Data from MCP Servers
 
-The `access_mcp_resource` tool retrieves data from resources exposed by connected Model Context Protocol (MCP) servers. It allows Mirror to access files, API responses, documentation, or system information that provides additional context for tasks.
-
----
+Think of [`access_mcp_resource`](access-mcp-resource.md) as Mirror VS's library card for MCP servers. When the AI needs data from an external system — API docs, database schemas, weather data, you name it — this tool reaches out to connected MCP servers and brings back exactly what's needed.
 
 ## Parameters
 
-The tool accepts these parameters:
-
-- `server_name` (required): The name of the MCP server providing the resource
-- `uri` (required): The URI identifying the specific resource to access
-
----
+| Parameter     | Type     | Required | Description                                     |
+| ------------- | -------- | -------- | ----------------------------------------------- |
+| `server_name` | `string` | ✅       | Name of the MCP server providing the resource   |
+| `uri`         | `string` | ✅       | URI identifying the specific resource to access |
 
 ## What It Does
 
-This tool connects to MCP servers and fetches data from their exposed resources. Unlike `use_mcp_tool` which executes actions, this tool specifically retrieves information that serves as context for tasks.
+This tool connects to MCP servers and fetches data from their exposed resources. Unlike [`use_mcp_tool`](use-mcp-tool.md) which executes actions, this tool specifically retrieves **information** — think of it as reading vs. writing. Files, API responses, documentation, system info — if an MCP server exposes it as a resource, this tool can fetch it.
 
----
+## When Is It Used?
 
-## When is it used?
-
-- When Mirror needs additional context from external systems
-- When Mirror needs to access domain-specific data from specialized MCP servers
-- When Mirror needs to retrieve reference documentation hosted by MCP servers
-- When Mirror needs to integrate real-time data from external APIs via MCP
-
----
+- When Mirror VS needs additional context from external systems
+- When accessing domain-specific data from specialized MCP servers
+- When retrieving reference documentation hosted by MCP servers
+- When integrating real-time data from external APIs via MCP
 
 ## Key Features
 
-- Retrieves both text and image data from MCP resources
-- Requires user approval before executing resource access
-- Uses URI-based addressing to precisely identify resources
-- Integrates with the Model Context Protocol SDK
-- Displays resource content appropriately based on content type
-- Supports timeouts for reliable network operations
-- Handles server connection states (connected, connecting, disconnected)
-- Discovers available resources from connected servers
-- Processes structured response data with metadata
-- Handles image content special rendering
-
----
+- **Text & image retrieval** — Can fetch both text content and image data
+- **URI-based addressing** — Pinpoint exactly what you need with specific URIs
+- **User approval** — Every resource access requires your okay before proceeding
+- **Timeout support** — Configurable timeouts for reliable network operations
+- **Server state handling** — Gracefully handles connected, connecting, and disconnected servers
+- **Resource discovery** — Can discover what resources are available from connected servers
 
 ## Limitations
 
 - Depends on external MCP servers being available and connected
 - Limited to the resources provided by connected servers
 - Cannot access resources from disabled servers
-- Network issues can affect reliability and performance
-- Resource access subject to configured timeouts
+- Network issues can affect reliability
 - URI formats are determined by the specific MCP server implementation
-- No offline or cached resource access capabilities
-
----
+- No offline or cached resource access
 
 ## How It Works
 
-When the `access_mcp_resource` tool is invoked, it follows this process:
+1. **Connection Validation** — Verifies the MCP hub is available, the named server exists, and it's not disabled
+2. **User Approval** — Presents the resource access request (server name + URI) for your approval
+3. **Resource Request** — Sends a `resources/read` request to the server through the MCP hub using the Model Context Protocol SDK
+4. **Response Processing** — Receives structured response with metadata and content arrays, processes text and image data appropriately
 
-1. **Connection Validation**:
+### Resource Types
 
-    - Verifies that an MCP hub is available and initialized
-    - Confirms the specified server exists in the connection list
-    - Checks if the server is disabled (returns an error if it is)
+MCP servers provide two types of resources:
 
-2. **User Approval**:
+**Standard Resources**: Fixed resources with specific URIs — static data, real-time information, or well-known endpoints. Direct access without parameters.
 
-    - Presents the resource access request to the user for approval
-    - Provides server name and resource URI for user verification
-    - Proceeds only if the user approves the resource access
-
-3. **Resource Request**:
-
-    - Uses the Model Context Protocol SDK to communicate with servers
-    - Makes a `resources/read` request to the server through the MCP hub
-    - Applies configured timeouts to prevent hanging on unresponsive servers
-
-4. **Response Processing**:
-    - Receives a structured response with metadata and content arrays
-    - Processes text content for display to the user
-    - Handles image data specially for appropriate display
-    - Returns the processed resource data to Mirror for use in the current task
-
----
-
-## Resource Types
-
-MCP servers can provide two main types of resources:
-
-1. **Standard Resources**:
-
-    - Fixed resources with specific URIs
-    - Defined name, description, and MIME type
-    - Direct access without parameters
-    - Typically represent static data or real-time information
-
-2. **Resource Templates**:
-    - Parameterized resources with placeholder values in URIs
-    - Allow dynamic resource generation based on provided parameters
-    - Can represent queries or filtered views of data
-    - More flexible but require additional URI formatting
-
----
-
-## Examples When Used
-
-- When helping with API development, Mirror retrieves endpoint specifications from MCP resources to ensure correct implementation.
-- When assisting with data visualization, Mirror accesses current data samples from connected MCP servers.
-- When working in specialized domains, Mirror retrieves technical documentation to provide accurate guidance.
-- When generating industry-specific code, Mirror references compliance requirements from documentation resources.
-
----
+**Resource Templates**: Parameterized resources with placeholder values in URIs — think "query endpoints" that accept parameters for dynamic results. More flexible, but require proper URI formatting.
 
 ## Usage Examples
-
-Accessing current weather data:
 
 ```
 <access_mcp_resource>
@@ -136,16 +74,12 @@ Accessing current weather data:
 </access_mcp_resource>
 ```
 
-Retrieving API documentation:
-
 ```
 <access_mcp_resource>
 <server_name>api-docs</server_name>
 <uri>docs://payment-service/endpoints</uri>
 </access_mcp_resource>
 ```
-
-Accessing domain-specific knowledge:
 
 ```
 <access_mcp_resource>
@@ -154,11 +88,6 @@ Accessing domain-specific knowledge:
 </access_mcp_resource>
 ```
 
-Fetching system configuration:
+## Relation to Other Tools
 
-```
-<access_mcp_resource>
-<server_name>infra-monitor</server_name>
-<uri>config://production/database</uri>
-</access_mcp_resource>
-```
+[`access_mcp_resource`](access-mcp-resource.md) is the "read" counterpart to [`use_mcp_tool`](use-mcp-tool.md)'s "write" — one fetches data, the other executes actions. Both extend Mirror VS's capabilities through MCP servers.

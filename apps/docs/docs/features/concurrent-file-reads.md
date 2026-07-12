@@ -12,7 +12,7 @@ sidebar_label: "Multi-File Reads"
 
 # Concurrent File Reads (AKA Multi-File Reads)
 
-The Concurrent File Reads feature allows Mirror to read multiple files from your workspace in a single step. This significantly improves efficiency when working on tasks that require context from several files, as Mirror can gather all the necessary information at once instead of reading files one by one.
+The Concurrent File Reads feature allows Mirror VS to read multiple files from your workspace in a single step. This is like upgrading from a single-lane road to a multi-lane highway — it significantly improves efficiency when working on tasks that require context from several files, because Mirror VS can gather all the necessary information at once instead of asking for each file one at a time like a toddler asking "why" on repeat.
 
 ### Key Features
 
@@ -24,35 +24,35 @@ The Concurrent File Reads feature allows Mirror to read multiple files from your
 
 ## Benefits
 
-- **Increased Speed**: Reduces the time it takes for Mirror to understand your code by minimizing the number of back-and-forth steps.
-- **Better Context**: Allows Mirror to build a more complete mental model of your code, leading to more accurate and relevant responses.
+- **Increased Speed**: Reduces the time it takes for Mirror VS to understand your code by minimizing the number of back-and-forth steps.
+- **Better Context**: Allows Mirror VS to build a more complete mental model of your code, leading to more accurate and relevant responses.
 - **Improved Workflow**: Streamlines tasks that require information from multiple files, making you more productive.
 
 ---
 
 ## Why This Matters
 
-**Faster Context Building**: Previously, when Mirror needed to understand your project, you'd see multiple requests like:
+**Faster Context Building**: Previously, when Mirror VS needed to understand your project, you'd see multiple requests like:
 
 - "Can I read `src/app.js`?" → You approve
 - "Now can I read `src/utils.js`?" → You approve
 - "And can I read `src/config.json`?" → You approve
 
-**With concurrent file reads**: Mirror asks once to read all related files together, getting the full picture immediately and providing better assistance faster.
+**With concurrent file reads**: Mirror VS asks once to read all related files together, getting the full picture immediately and providing better assistance faster. It's the difference between assembling IKEA furniture with the manual in one hand versus having all the instructions spread out in front of you.
 
 ---
 
 ## How it Works
 
-When you ask Mirror to perform a task that involves multiple files, it will automatically identify the relevant files and read them together. This is especially useful for:
+When you ask Mirror VS to perform a task that involves multiple files, it will automatically identify the relevant files and read them together. This is especially useful for:
 
 - Understanding the overall structure of a component that is split across multiple files.
 - Refactoring code that has dependencies in other parts of the codebase.
 - Answering questions that require a broad understanding of your project.
 
-Mirror is instructed to use this feature efficiently by prioritizing the most critical files and reading them in a single batch. The [`read_file`](/advanced-usage/available-tools/read-file) tool automatically accepts multiple files in a single request.
+Mirror VS is instructed to use this feature efficiently by prioritizing the most critical files and reading them in a single batch. The [`read_file`](/advanced-usage/available-tools/read-file) tool automatically accepts multiple files in a single request.
 
-When Mirror requests to read multiple files, you'll see a batch approval interface that displays:
+When Mirror VS requests to read multiple files, you'll see a batch approval interface that displays:
 
 - List of all files to be read
 - File paths with line range indicators (if specified)
@@ -71,8 +71,8 @@ You can configure the Multi-File Read feature by clicking the <Codicon name="gea
 
 1.  **Concurrent File Reads Limit**:
     - **Setting**: `Concurrent file reads limit`
-    - **Description**: This setting determines the maximum number of files that Mirror can read in a single request. The default is 5, with a range of 1-100 files. Higher values can speed up tasks involving many small files but may use more memory. Setting the value to 1 effectively disables concurrent reads, reverting to single-file reads.
+    - **Description**: This setting determines the maximum number of files that Mirror VS can read in a single request. The default is 5, with a range of 1-100 files. Higher values can speed up tasks involving many small files but may use more memory. Setting the value to 1 effectively disables concurrent reads, reverting to single-file reads.
 
 :::note
-The per‑request file limit is configured in the UI (default 5, up to 100). The backend [`read_file`](/advanced-usage/available-tools/read-file) tool doesn’t hard‑enforce a cap; actual behavior may also depend on the selected model/tool.
+The per‑request file limit is configured in the UI (default 5, up to 100). The backend [`read_file`](/advanced-usage/available-tools/read-file) tool doesn't hard‑enforce a cap; actual behavior may also depend on the selected model/tool.
 :::

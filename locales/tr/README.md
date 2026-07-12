@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
@@ -52,11 +52,11 @@ Mirror VS, sizin çalışma şeklinize uyum sağlar, tam tersi değil:
 - Hata Ayıklama Modu: sorunları izleyin, günlükler ekleyin, kök nedenleri izole edin
 - Özel Modlar: ekibiniz veya iş akışınız için özel modlar oluşturun
 
-Daha fazla: [Modları kullanma](https://mirrorvsinc.github.io/Roo-Code/basic-usage/using-modes) • [Özel modlar](https://mirrorvsinc.github.io/Roo-Code/advanced-usage/custom-modes)
+Daha fazla: [Modları kullanma](https://www.reflectai.in/basic-usage/using-modes) • [Özel modlar](https://www.reflectai.in/advanced-usage/custom-modes)
 
 ## Kaynaklar
 
-- **[Dokümantasyon](https://mirrorvsinc.github.io/Roo-Code/):** Mirror VS'u yükleme, yapılandırma ve ustalaşma konusundaki resmi kılavuz.
+- **[Dokümantasyon](https://www.reflectai.in/):** Mirror VS'u yükleme, yapılandırma ve ustalaşma konusundaki resmi kılavuz.
 - **[GitHub Sorunları](https://github.com/ReflectAIs/mirror-vs/issues):** Hataları bildirin ve gelişimi takip edin.
 
 ---

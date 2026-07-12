@@ -26,4 +26,22 @@ export const vueQuery = `
 (style_element) @style.definition
 (style_element
   (raw_text) @style.content.definition)
+
+; Interpolation expressions ({{ }})
+(interpolation
+  (raw_text) @interpolation.expression.definition) @interpolation.definition
+
+; Element attributes
+(element
+  (start_tag
+    (attribute
+      (attribute_name) @attribute.name.definition
+      (quoted_attribute_value
+        (attribute_value) @attribute.value.definition))) @attribute.definition)
+
+; Directive attributes (v-bind, v-if, v-for, etc.)
+(element
+  (start_tag
+    (directive_attribute
+      (directive_name) @directive.name.definition))) @directive.definition
 `

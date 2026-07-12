@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { ClipboardCopy, Timer } from "lucide-react"
+import { ClipboardCopy, Timer, XCircle } from "lucide-react"
 
 import { Button, StandardTooltip } from "@/components/ui"
 
@@ -28,7 +28,8 @@ export const FollowUpSuggest = ({
 	isAnswered = false,
 	isFollowUpAutoApprovalPaused = false,
 }: FollowUpSuggestProps) => {
-	const { autoApprovalEnabled, alwaysAllowFollowupQuestions, followupAutoApproveTimeoutMs, mode } = useExtensionState()
+	const { autoApprovalEnabled, alwaysAllowFollowupQuestions, followupAutoApproveTimeoutMs, mode } =
+		useExtensionState()
 	const [countdown, setCountdown] = useState<number | null>(null)
 	const [suggestionSelected, setSuggestionSelected] = useState(false)
 	const { t } = useAppTranslation()
@@ -131,10 +132,24 @@ export const FollowUpSuggest = ({
 							{suggestion.answer}
 						</Button>
 						{isFirstSuggestion && countdown !== null && !suggestionSelected && !isAnswered && (
-							<p className="rounded-b-xl border-1 border-t-0 border-vscode-foreground/60 text-vscode-descriptionForeground text-xs m-0 mt-1 px-3 pt-2 pb-2">
-								<Timer className="size-3 inline-block -mt-0.5 mr-1 animate-pulse" />
-								{t("chat:followUpSuggest.timerPrefix", { seconds: countdown })}
-							</p>
+							<div className="rounded-b-xl border-1 border-t-0 border-vscode-foreground/60 text-vscode-descriptionForeground text-xs m-0 mt-1 px-3 pt-2 pb-2 flex items-center gap-2">
+								<StandardTooltip content={t("chat:followUpSuggest.cancelTimer")}>
+									<button
+										className="flex items-center justify-center rounded p-0.5 hover:bg-vscode-toolbar-hoverBackground transition-colors cursor-pointer border-none text-vscode-descriptionForeground hover:text-vscode-foreground shrink-0"
+										onClick={(e) => {
+											e.stopPropagation()
+											setSuggestionSelected(true)
+											onCancelAutoApproval?.()
+										}}
+										aria-label={t("chat:followUpSuggest.cancelTimer")}>
+										<XCircle className="size-3.5" />
+									</button>
+								</StandardTooltip>
+								<span>
+									<Timer className="size-3 inline-block -mt-0.5 mr-1 animate-pulse" />
+									{t("chat:followUpSuggest.timerPrefix", { seconds: countdown })}
+								</span>
+							</div>
 						)}
 						{suggestion.mode && (
 							<div className="absolute bottom-0 right-0 text-[10px] text-vscode-badge-foreground pl-1 pr-2.5 pt-0.5 pb-1.5 flex items-center gap-0.5 bg-transparent rounded-xl">

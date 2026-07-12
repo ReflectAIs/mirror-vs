@@ -87,6 +87,23 @@ export const EMBEDDING_MODEL_PROFILES: EmbeddingModelProfiles = {
 		"qwen/qwen3-embedding-4b": { dimension: 2560, scoreThreshold: 0.4 },
 		"qwen/qwen3-embedding-8b": { dimension: 4096, scoreThreshold: 0.4 },
 	},
+	anthropic: {
+		"voyage-code-2": { dimension: 1536, scoreThreshold: 0.4 },
+	},
+	cohere: {
+		"embed-english-v3.0": { dimension: 1024, scoreThreshold: 0.4 },
+		"embed-multilingual-v3.0": { dimension: 1024, scoreThreshold: 0.4 },
+		"embed-english-light-v3.0": { dimension: 384, scoreThreshold: 0.4 },
+		"embed-multilingual-light-v3.0": { dimension: 384, scoreThreshold: 0.4 },
+	},
+	jina: {
+		"jina-embeddings-v3": { dimension: 1024, scoreThreshold: 0.4 },
+	},
+	voyage: {
+		"voyage-3": { dimension: 1024, scoreThreshold: 0.4 },
+		"voyage-3-lite": { dimension: 512, scoreThreshold: 0.4 },
+		"voyage-code-2": { dimension: 1536, scoreThreshold: 0.4 },
+	},
 }
 
 /**
@@ -185,6 +202,14 @@ export function getDefaultModelId(provider: EmbedderProvider): string {
 		case "openrouter":
 			return "openai/text-embedding-3-large"
 
+		case "anthropic":
+			return "voyage-code-2"
+		case "cohere":
+			return "embed-english-v3.0"
+		case "jina":
+			return "jina-embeddings-v3"
+		case "voyage":
+			return "voyage-3"
 		default:
 			// Fallback for unknown providers
 			console.warn(`Unknown provider for default model ID: ${provider}. Falling back to OpenAI default.`)

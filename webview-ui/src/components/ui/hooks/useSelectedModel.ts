@@ -26,6 +26,8 @@ import {
 	qwenCodeModels,
 	litellmDefaultModelInfo,
 	lMStudioDefaultModelInfo,
+	customDefaultModelId,
+	customDefaultModelInfo,
 	BEDROCK_1M_CONTEXT_MODEL_IDS,
 	VERTEX_1M_CONTEXT_MODEL_IDS,
 	isDynamicProvider,
@@ -78,9 +80,9 @@ export const useSelectedModel = (apiConfiguration?: ProviderSettings) => {
 	const hasValidRouterData =
 		needRouterModels && dynamicProvider
 			? routerModels.data &&
-			routerModels.data[dynamicProvider] !== undefined &&
-			typeof routerModels.data[dynamicProvider] === "object" &&
-			!routerModels.isLoading
+				routerModels.data[dynamicProvider] !== undefined &&
+				typeof routerModels.data[dynamicProvider] === "object" &&
+				!routerModels.isLoading
 			: true
 
 	const isReady =
@@ -92,13 +94,13 @@ export const useSelectedModel = (apiConfiguration?: ProviderSettings) => {
 	const { id, info } =
 		apiConfiguration && isReady && activeProvider
 			? getSelectedModel({
-				provider: activeProvider,
-				apiConfiguration,
-				routerModels: (routerModels.data || {}) as RouterModels,
-				openRouterModelProviders: (openRouterModelProviders.data || {}) as Record<string, ModelInfo>,
-				lmStudioModels: (lmStudioModels.data || undefined) as ModelRecord | undefined,
-				ollamaModels: (ollamaModels.data || undefined) as ModelRecord | undefined,
-			})
+					provider: activeProvider,
+					apiConfiguration,
+					routerModels: (routerModels.data || {}) as RouterModels,
+					openRouterModelProviders: (openRouterModelProviders.data || {}) as Record<string, ModelInfo>,
+					lmStudioModels: (lmStudioModels.data || undefined) as ModelRecord | undefined,
+					ollamaModels: (ollamaModels.data || undefined) as ModelRecord | undefined,
+				})
 			: { id: getProviderDefaultModelId(activeProvider ?? "openrouter"), info: undefined }
 
 	return {
@@ -276,8 +278,8 @@ function getSelectedModel({
 
 			const adjustedInfo =
 				info?.contextWindow &&
-					apiConfiguration?.ollamaNumCtx &&
-					apiConfiguration.ollamaNumCtx < info.contextWindow
+				apiConfiguration?.ollamaNumCtx &&
+				apiConfiguration.ollamaNumCtx < info.contextWindow
 					? { ...info, contextWindow: apiConfiguration.ollamaNumCtx }
 					: info
 
@@ -336,10 +338,15 @@ function getSelectedModel({
 			const info = routerModels["vercel-ai-gateway"]?.[id]
 			return { id, info }
 		}
+		case "custom": {
+			const id = apiConfiguration.customModelId ?? customDefaultModelId
+			const info = apiConfiguration.customModelInfo ?? customDefaultModelInfo
+			return { id, info }
+		}
 		// case "anthropic":
 		// case "fake-ai":
 		default: {
-			provider satisfies "anthropic" | "gemini-cli" | "fake-ai" | "custom"
+			provider satisfies "anthropic" | "gemini-cli" | "fake-ai"
 			const id = apiConfiguration.apiModelId ?? defaultModelId
 			const baseInfo = anthropicModels[id as keyof typeof anthropicModels]
 
