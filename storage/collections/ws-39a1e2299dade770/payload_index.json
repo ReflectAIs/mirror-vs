@@ -1,0 +1,10 @@
+{
+	"schema": {
+		"pathSegments.3": "keyword",
+		"pathSegments.0": "keyword",
+		"pathSegments.1": "keyword",
+		"pathSegments.2": "keyword",
+		"type": "keyword",
+		"pathSegments.4": "keyword"
+	}
+}
