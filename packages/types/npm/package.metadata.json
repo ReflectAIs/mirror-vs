@@ -1,6 +1,6 @@
 {
 	"name": "@mirror-vs/types",
-	"version": "1.115.0",
+	"version": "1.116.0",
 	"description": "TypeScript type definitions for Mirror VS.",
 	"publishConfig": {
 		"access": "public",
@@ -17,12 +17,6 @@
 		"url": "https://github.com/ReflectAIs/mirror-vs/issues"
 	},
 	"homepage": "https://mirrorvs.dev",
-	"keywords": [
-		"mirror-vs",
-		"ai",
-		"code"
-	],
-	"files": [
-		"dist"
-	]
+	"keywords": ["mirror-vs", "ai", "code"],
+	"files": ["dist"]
 }

@@ -2,6 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.5.6] - 2026-07-12
+
+### Changed
+
+- **Documentation Tone Overhaul**: Rewrote all provider and available-tools documentation with a friendlier, more approachable tone — balancing clarity with personality.
+- **Branding Consistency**: Updated naming and references across documentation, locale README files, test snapshots, and internal scripts for consistent branding.
+- **Publish Script Branch Naming**: Updated branch name prefix in the types package publish script to match current naming conventions.
+
+### Removed
+
+- **Deprecated Image Assets**: Removed stale image files and references from the MCP documentation that were no longer in use.
+
 ## [0.5.3] - 2026-07-10
 
 ### Added
