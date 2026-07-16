@@ -18,7 +18,14 @@ describe("experiments", () => {
 		it("returns false when experiment is not enabled", () => {
 			const experiments: Record<ExperimentId, boolean> = {
 				preventFocusDisruption: false,
-				imageGeneration: false,
+				txt2img: false,
+				img2img: false,
+				inpaint: false,
+				outpaint: false,
+				upscale: false,
+				"remove-bg": false,
+				txt2audio: false,
+				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
 			}
@@ -28,7 +35,14 @@ describe("experiments", () => {
 		it("returns true when experiment is enabled", () => {
 			const experiments: Record<ExperimentId, boolean> = {
 				preventFocusDisruption: true,
-				imageGeneration: false,
+				txt2img: false,
+				img2img: false,
+				inpaint: false,
+				outpaint: false,
+				upscale: false,
+				"remove-bg": false,
+				txt2audio: false,
+				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
 			}
@@ -38,7 +52,14 @@ describe("experiments", () => {
 		it("returns false when experiment is not present", () => {
 			const experiments: Record<ExperimentId, boolean> = {
 				preventFocusDisruption: false,
-				imageGeneration: false,
+				txt2img: false,
+				img2img: false,
+				inpaint: false,
+				outpaint: false,
+				upscale: false,
+				"remove-bg": false,
+				txt2audio: false,
+				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
 			}

@@ -22,7 +22,9 @@ const TestComponent = () => {
 			<button data-testid="update-button" onClick={() => setAllowedCommands(["npm install", "git status"])}>
 				Update Commands
 			</button>
-			<button data-testid="toggle-mirrorignore-button" onClick={() => setShowMirrorIgnoredFiles(!showMirrorIgnoredFiles)}>
+			<button
+				data-testid="toggle-mirrorignore-button"
+				onClick={() => setShowMirrorIgnoredFiles(!showMirrorIgnoredFiles)}>
 				Update Commands
 			</button>
 		</div>
@@ -109,7 +111,7 @@ describe("ExtensionStateContext", () => {
 	it("throws error when used outside provider", () => {
 		// Suppress console.error for this test since we expect an error
 		const consoleSpy = vi.spyOn(console, "error")
-		consoleSpy.mockImplementation(() => { })
+		consoleSpy.mockImplementation(() => {})
 
 		expect(() => {
 			render(<TestComponent />)
@@ -211,6 +213,8 @@ describe("mergeExtensionState", () => {
 			maxTotalImageSize: 20,
 			checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS, // Add the checkpoint timeout property
 			maxReadFileLine: -1,
+			activeTerminalCount: 0,
+			activeTerminals: [],
 		}
 
 		const prevState: ExtensionState = {
@@ -225,7 +229,14 @@ describe("mergeExtensionState", () => {
 			apiConfiguration: { modelMaxThinkingTokens: 456, modelTemperature: 0.3 },
 			experiments: {
 				preventFocusDisruption: false,
-				imageGeneration: false,
+				txt2img: false,
+				img2img: false,
+				inpaint: false,
+				outpaint: false,
+				upscale: false,
+				"remove-bg": false,
+				txt2audio: false,
+				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
 			} as Record<ExperimentId, boolean>,
@@ -241,7 +252,14 @@ describe("mergeExtensionState", () => {
 
 		expect(result.experiments).toEqual({
 			preventFocusDisruption: false,
-			imageGeneration: false,
+			txt2img: false,
+			img2img: false,
+			inpaint: false,
+			outpaint: false,
+			upscale: false,
+			"remove-bg": false,
+			txt2audio: false,
+			txt2video: false,
 			runSlashCommand: false,
 			customTools: false,
 		})
@@ -274,6 +292,8 @@ describe("mergeExtensionState", () => {
 			maxTotalImageSize: 20,
 			checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 			maxReadFileLine: -1,
+			activeTerminalCount: 0,
+			activeTerminals: [],
 		}
 
 		const makeMessage = (ts: number, text: string): MirrorMessage =>

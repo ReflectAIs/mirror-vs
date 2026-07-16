@@ -81,8 +81,8 @@ vi.mock("@modelcontextprotocol/sdk/types.js", () => ({
 
 const mockAddCustomInstructions = vi.fn().mockResolvedValue("Combined instructions")
 
-	; (vi.mocked(await import("../../prompts/sections/custom-instructions")) as any).addCustomInstructions =
-		mockAddCustomInstructions
+;(vi.mocked(await import("../../prompts/sections/custom-instructions")) as any).addCustomInstructions =
+	mockAddCustomInstructions
 
 vi.mock("delay", () => {
 	const delayFn = (_ms: number) => Promise.resolve()
@@ -454,7 +454,7 @@ describe("MirrorProvider", () => {
 			"sidebar",
 			new ContextProxy(mockContext),
 		)
-			; (axios.get as any).mockRejectedValueOnce(new Error("Network error"))
+		;(axios.get as any).mockRejectedValueOnce(new Error("Network error"))
 
 		await provider.resolveWebviewView(mockWebviewView)
 
@@ -529,6 +529,8 @@ describe("MirrorProvider", () => {
 			openRouterImageApiKey: undefined,
 			openRouterImageGenerationSelectedModel: undefined,
 			checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
+			activeTerminalCount: 0,
+			activeTerminals: [],
 		}
 
 		const message: ExtensionMessage = {
@@ -645,9 +647,9 @@ describe("MirrorProvider", () => {
 			const parentTask = new Task(defaultTaskOptions)
 			const childTask = new Task(defaultTaskOptions)
 
-				// Set up parent-child relationship
-				; (childTask as any).parentTask = parentTask
-				; (childTask as any).rootTask = parentTask
+			// Set up parent-child relationship
+			;(childTask as any).parentTask = parentTask
+			;(childTask as any).rootTask = parentTask
 
 			// Mock the provider methods
 			const clearTaskSpy = vi.spyOn(provider, "clearTask").mockResolvedValue(undefined)
@@ -747,7 +749,7 @@ describe("MirrorProvider", () => {
 
 	test("language is set to VSCode language", async () => {
 		// Mock VSCode language as Spanish
-		; (vscode.env as any).language = "pt-BR"
+		;(vscode.env as any).language = "pt-BR"
 
 		const state = await provider.getState()
 		expect(state.language).toBe("pt-BR")
@@ -755,7 +757,7 @@ describe("MirrorProvider", () => {
 
 	test("writeDelayMs defaults to 1000ms", async () => {
 		// Mock globalState.get to return undefined for writeDelayMs
-		; (mockContext.globalState.get as any).mockImplementation((key: string) =>
+		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
 			key === "writeDelayMs" ? undefined : null,
 		)
 
@@ -806,7 +808,7 @@ describe("MirrorProvider", () => {
 
 	test("autoCondenseContext defaults to true", async () => {
 		// Mock globalState.get to return undefined for autoCondenseContext
-		; (mockContext.globalState.get as any).mockImplementation((key: string) =>
+		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
 			key === "autoCondenseContext" ? undefined : null,
 		)
 		const state = await provider.getState()
@@ -824,7 +826,7 @@ describe("MirrorProvider", () => {
 
 	test("autoCondenseContextPercent defaults to 100", async () => {
 		// Mock globalState.get to return undefined for autoCondenseContextPercent
-		; (mockContext.globalState.get as any).mockImplementation((key: string) =>
+		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
 			key === "autoCondenseContextPercent" ? undefined : null,
 		)
 
@@ -849,13 +851,13 @@ describe("MirrorProvider", () => {
 
 		const profile: ProviderSettingsEntry = { name: "test-config", id: "test-id", apiProvider: "anthropic" }
 
-			; (provider as any).providerSettingsManager = {
-				getModeConfigId: vi.fn().mockResolvedValue("test-id"),
-				listConfig: vi.fn().mockResolvedValue([profile]),
-				activateProfile: vi.fn().mockResolvedValue(profile),
-				setModeConfig: vi.fn(),
-				getProfile: vi.fn().mockResolvedValue(profile),
-			} as any
+		;(provider as any).providerSettingsManager = {
+			getModeConfigId: vi.fn().mockResolvedValue("test-id"),
+			listConfig: vi.fn().mockResolvedValue([profile]),
+			activateProfile: vi.fn().mockResolvedValue(profile),
+			setModeConfig: vi.fn(),
+			getProfile: vi.fn().mockResolvedValue(profile),
+		} as any
 
 		// Switch to architect mode
 		await messageHandler({ type: "mode", text: "architect" })
@@ -870,13 +872,13 @@ describe("MirrorProvider", () => {
 		await provider.resolveWebviewView(mockWebviewView)
 		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-			; (provider as any).providerSettingsManager = {
-				getModeConfigId: vi.fn().mockResolvedValue(undefined),
-				listConfig: vi
-					.fn()
-					.mockResolvedValue([{ name: "current-config", id: "current-id", apiProvider: "anthropic" }]),
-				setModeConfig: vi.fn(),
-			} as any
+		;(provider as any).providerSettingsManager = {
+			getModeConfigId: vi.fn().mockResolvedValue(undefined),
+			listConfig: vi
+				.fn()
+				.mockResolvedValue([{ name: "current-config", id: "current-id", apiProvider: "anthropic" }]),
+			setModeConfig: vi.fn(),
+		} as any
 
 		provider.setValue("currentApiConfigName", "current-config")
 
@@ -893,12 +895,12 @@ describe("MirrorProvider", () => {
 
 		const profile: ProviderSettingsEntry = { apiProvider: "anthropic", id: "new-id", name: "new-config" }
 
-			; (provider as any).providerSettingsManager = {
-				activateProfile: vi.fn().mockResolvedValue(profile),
-				listConfig: vi.fn().mockResolvedValue([profile]),
-				setModeConfig: vi.fn(),
-				getModeConfigId: vi.fn().mockResolvedValue(undefined),
-			} as any
+		;(provider as any).providerSettingsManager = {
+			activateProfile: vi.fn().mockResolvedValue(profile),
+			listConfig: vi.fn().mockResolvedValue([profile]),
+			setModeConfig: vi.fn(),
+			getModeConfigId: vi.fn().mockResolvedValue(undefined),
+		} as any
 
 		// First set the mode
 		await messageHandler({ type: "mode", text: "architect" })
@@ -920,12 +922,12 @@ describe("MirrorProvider", () => {
 			apiProvider: "anthropic",
 		}
 
-			; (provider as any).providerSettingsManager = {
-				activateProfile: vi.fn().mockResolvedValue(profile),
-				listConfig: vi.fn().mockResolvedValue([profile]),
-				setModeConfig: vi.fn(),
-				getModeConfigId: vi.fn().mockResolvedValue(undefined),
-			} as any
+		;(provider as any).providerSettingsManager = {
+			activateProfile: vi.fn().mockResolvedValue(profile),
+			listConfig: vi.fn().mockResolvedValue([profile]),
+			setModeConfig: vi.fn(),
+			getModeConfigId: vi.fn().mockResolvedValue(undefined),
+		} as any
 
 		// First set the mode
 		await messageHandler({ type: "mode", text: "architect" })
@@ -977,6 +979,7 @@ describe("MirrorProvider", () => {
 		}
 
 		provider.setValue("customModePrompts", existingPrompts)
+		updateGlobalStateSpy.mockClear()
 
 		// Test updating a prompt
 		await messageHandler({
@@ -986,8 +989,11 @@ describe("MirrorProvider", () => {
 		})
 
 		// Verify state was updated correctly
-		expect(mockContext.globalState.update).toHaveBeenCalledWith("customModePrompts", {
-			...existingPrompts,
+		expect(updateGlobalStateSpy).toHaveBeenCalledWith("customModePrompts", {
+			architect: {
+				customInstructions: "existing architect prompt",
+				roleDefinition: "existing architect role",
+			},
 			code: "new code prompt",
 		})
 
@@ -1007,7 +1013,7 @@ describe("MirrorProvider", () => {
 
 	test("customModePrompts defaults to empty object", async () => {
 		// Mock globalState.get to return undefined for customModePrompts
-		; (mockContext.globalState.get as any).mockImplementation((key: string) => {
+		;(mockContext.globalState.get as any).mockImplementation((key: string) => {
 			if (key === "customModePrompts") {
 				return undefined
 			}
@@ -1040,12 +1046,8 @@ describe("MirrorProvider", () => {
 				customInstructions: "Old instructions",
 			},
 		}
-		mockContext.globalState.get = vi.fn((key: string) => {
-			if (key === "customModePrompts") {
-				return existingPrompts
-			}
-			return undefined
-		})
+		provider.setValue("customModePrompts", existingPrompts)
+		updateGlobalStateSpy.mockClear()
 
 		// Update custom instructions for code mode
 		await messageHandler({
@@ -1058,7 +1060,7 @@ describe("MirrorProvider", () => {
 		})
 
 		// Verify state was updated correctly
-		expect(mockContext.globalState.update).toHaveBeenCalledWith("customModePrompts", {
+		expect(updateGlobalStateSpy).toHaveBeenCalledWith("customModePrompts", {
 			code: {
 				roleDefinition: "Code role",
 				customInstructions: "New instructions",
@@ -1090,11 +1092,11 @@ describe("MirrorProvider", () => {
 		await provider.resolveWebviewView(mockWebviewView)
 		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-			; (provider as any).providerSettingsManager = {
-				listConfig: vi.fn().mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
-				saveConfig: vi.fn().mockResolvedValue("test-id"),
-				setModeConfig: vi.fn(),
-			} as any
+		;(provider as any).providerSettingsManager = {
+			listConfig: vi.fn().mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
+			saveConfig: vi.fn().mockResolvedValue("test-id"),
+			setModeConfig: vi.fn(),
+		} as any
 
 		// Update API configuration
 		await messageHandler({
@@ -1144,13 +1146,13 @@ describe("MirrorProvider", () => {
 			mockMirror.apiConversationHistory = mockApiHistory // Set API history
 			await provider.addMirrorToStack(mockMirror) // Add the mocked instance to the stack
 
-				// Mock getTaskWithId
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			// Mock getTaskWithId
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
-				// Mock createTaskWithHistoryItem
-				; (provider as any).createTaskWithHistoryItem = vi.fn()
+			// Mock createTaskWithHistoryItem
+			;(provider as any).createTaskWithHistoryItem = vi.fn()
 
 			// Trigger message deletion
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
@@ -1186,7 +1188,7 @@ describe("MirrorProvider", () => {
 
 		test("handles case when no current task exists", async () => {
 			// Clear the mirror stack
-			; (provider as any).mirrorStack = []
+			;(provider as any).mirrorStack = []
 
 			// Trigger message deletion
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
@@ -1238,10 +1240,10 @@ describe("MirrorProvider", () => {
 
 			await provider.addMirrorToStack(mockMirror) // Add the mocked instance to the stack
 
-				// Mock getTaskWithId
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			// Mock getTaskWithId
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			// Trigger message edit
 			// Get the message handler function that was registered with the webview
@@ -1436,13 +1438,13 @@ describe("MirrorProvider", () => {
 				apiProvider: "anthropic",
 			}
 
-				; (provider as any).providerSettingsManager = {
-					getModeConfigId: vi.fn().mockResolvedValue("saved-config-id"),
-					listConfig: vi.fn().mockResolvedValue([profile]),
-					activateProfile: vi.fn().mockResolvedValue(profile),
-					setModeConfig: vi.fn(),
-					getProfile: vi.fn().mockResolvedValue(profile),
-				} as any
+			;(provider as any).providerSettingsManager = {
+				getModeConfigId: vi.fn().mockResolvedValue("saved-config-id"),
+				listConfig: vi.fn().mockResolvedValue([profile]),
+				activateProfile: vi.fn().mockResolvedValue(profile),
+				setModeConfig: vi.fn(),
+				getProfile: vi.fn().mockResolvedValue(profile),
+			} as any
 
 			// Switch to architect mode
 			await provider.handleModeSwitch("architect")
@@ -1460,7 +1462,7 @@ describe("MirrorProvider", () => {
 		})
 
 		test("saves current config when switching to mode without config", async () => {
-			; (provider as any).providerSettingsManager = {
+			;(provider as any).providerSettingsManager = {
 				getModeConfigId: vi.fn().mockResolvedValue(undefined),
 				listConfig: vi
 					.fn()
@@ -1506,7 +1508,7 @@ describe("MirrorProvider", () => {
 				]),
 				dispose: vi.fn(),
 			}
-				; (provider as any).customModesManager = mockCustomModesManager
+			;(provider as any).customModesManager = mockCustomModesManager
 
 			// Mock getModeBySlug to return undefined for non-existent mode
 			const { getModeBySlug } = await import("../../../shared/modes")
@@ -1519,11 +1521,11 @@ describe("MirrorProvider", () => {
 					groups: ["read", "edit"],
 				}) // Subsequent calls return default mode
 
-				// Mock provider settings manager
-				; (provider as any).providerSettingsManager = {
-					getModeConfigId: vi.fn().mockResolvedValue(undefined),
-					listConfig: vi.fn().mockResolvedValue([]),
-				}
+			// Mock provider settings manager
+			;(provider as any).providerSettingsManager = {
+				getModeConfigId: vi.fn().mockResolvedValue(undefined),
+				listConfig: vi.fn().mockResolvedValue([]),
+			}
 
 			// Spy on log method to verify warning was logged
 			const logSpy = vi.spyOn(provider, "log")
@@ -1572,7 +1574,7 @@ describe("MirrorProvider", () => {
 				]),
 				dispose: vi.fn(),
 			}
-				; (provider as any).customModesManager = mockCustomModesManager
+			;(provider as any).customModesManager = mockCustomModesManager
 
 			// Mock getModeBySlug to return the custom mode
 			const { getModeBySlug } = await import("../../../shared/modes")
@@ -1583,16 +1585,16 @@ describe("MirrorProvider", () => {
 				groups: ["read", "edit"],
 			})
 
-				// Mock provider settings manager
-				; (provider as any).providerSettingsManager = {
-					getModeConfigId: vi.fn().mockResolvedValue("config-id"),
-					listConfig: vi
-						.fn()
-						.mockResolvedValue([{ name: "test-config", id: "config-id", apiProvider: "anthropic" }]),
-					activateProfile: vi
-						.fn()
-						.mockResolvedValue({ name: "test-config", id: "config-id", apiProvider: "anthropic" }),
-				}
+			// Mock provider settings manager
+			;(provider as any).providerSettingsManager = {
+				getModeConfigId: vi.fn().mockResolvedValue("config-id"),
+				listConfig: vi
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "config-id", apiProvider: "anthropic" }]),
+				activateProfile: vi
+					.fn()
+					.mockResolvedValue({ name: "test-config", id: "config-id", apiProvider: "anthropic" }),
+			}
 
 			// Spy on log method to verify no warning was logged
 			const logSpy = vi.spyOn(provider, "log")
@@ -1632,7 +1634,7 @@ describe("MirrorProvider", () => {
 				getCustomModes: vi.fn().mockResolvedValue([]),
 				dispose: vi.fn(),
 			}
-				; (provider as any).customModesManager = mockCustomModesManager
+			;(provider as any).customModesManager = mockCustomModesManager
 
 			// Mock getModeBySlug to return built-in architect mode
 			const { getModeBySlug } = await import("../../../shared/modes")
@@ -1643,11 +1645,11 @@ describe("MirrorProvider", () => {
 				groups: ["read", "edit"],
 			})
 
-				// Mock provider settings manager
-				; (provider as any).providerSettingsManager = {
-					getModeConfigId: vi.fn().mockResolvedValue(undefined),
-					listConfig: vi.fn().mockResolvedValue([]),
-				}
+			// Mock provider settings manager
+			;(provider as any).providerSettingsManager = {
+				getModeConfigId: vi.fn().mockResolvedValue(undefined),
+				listConfig: vi.fn().mockResolvedValue([]),
+			}
 
 			// Create history item with built-in mode
 			const historyItem = {
@@ -1674,11 +1676,11 @@ describe("MirrorProvider", () => {
 		test("handles history items without mode property", async () => {
 			await provider.resolveWebviewView(mockWebviewView)
 
-				// Mock provider settings manager
-				; (provider as any).providerSettingsManager = {
-					getModeConfigId: vi.fn().mockResolvedValue(undefined),
-					listConfig: vi.fn().mockResolvedValue([]),
-				}
+			// Mock provider settings manager
+			;(provider as any).providerSettingsManager = {
+				getModeConfigId: vi.fn().mockResolvedValue(undefined),
+				listConfig: vi.fn().mockResolvedValue([]),
+			}
 
 			// Create history item without mode
 			const historyItem = {
@@ -1707,7 +1709,7 @@ describe("MirrorProvider", () => {
 				getCustomModes: vi.fn().mockResolvedValue([]),
 				dispose: vi.fn(),
 			}
-				; (provider as any).customModesManager = mockCustomModesManager
+			;(provider as any).customModesManager = mockCustomModesManager
 
 			// Mock getModeBySlug to return built-in mode
 			const { getModeBySlug } = await import("../../../shared/modes")
@@ -1718,14 +1720,14 @@ describe("MirrorProvider", () => {
 				groups: ["read", "edit"],
 			})
 
-				// Mock provider settings manager to throw error
-				; (provider as any).providerSettingsManager = {
-					getModeConfigId: vi.fn().mockResolvedValue("config-id"),
-					listConfig: vi
-						.fn()
-						.mockResolvedValue([{ name: "test-config", id: "config-id", apiProvider: "anthropic" }]),
-					activateProfile: vi.fn().mockRejectedValue(new Error("Failed to load config")),
-				}
+			// Mock provider settings manager to throw error
+			;(provider as any).providerSettingsManager = {
+				getModeConfigId: vi.fn().mockResolvedValue("config-id"),
+				listConfig: vi
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "config-id", apiProvider: "anthropic" }]),
+				activateProfile: vi.fn().mockRejectedValue(new Error("Failed to load config")),
+			}
 
 			// Spy on log method
 			const logSpy = vi.spyOn(provider, "log")
@@ -1757,19 +1759,19 @@ describe("MirrorProvider", () => {
 			await provider.resolveWebviewView(mockWebviewView)
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-				// Mock CustomModesManager methods
-				; (provider as any).customModesManager = {
-					updateCustomMode: vi.fn().mockResolvedValue(undefined),
-					getCustomModes: vi.fn().mockResolvedValue([
-						{
-							slug: "test-mode",
-							name: "Test Mode",
-							roleDefinition: "Updated role definition",
-							groups: ["read"] as const,
-						},
-					]),
-					dispose: vi.fn(),
-				} as any
+			// Mock CustomModesManager methods
+			;(provider as any).customModesManager = {
+				updateCustomMode: vi.fn().mockResolvedValue(undefined),
+				getCustomModes: vi.fn().mockResolvedValue([
+					{
+						slug: "test-mode",
+						name: "Test Mode",
+						roleDefinition: "Updated role definition",
+						groups: ["read"] as const,
+					},
+				]),
+				dispose: vi.fn(),
+			} as any
 
 			// Test updating a custom mode
 			await messageHandler({
@@ -1819,12 +1821,12 @@ describe("MirrorProvider", () => {
 			await provider.resolveWebviewView(mockWebviewView)
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-				; (provider as any).providerSettingsManager = {
-					setModeConfig: vi.fn().mockRejectedValue(new Error("Failed to update mode config")),
-					listConfig: vi
-						.fn()
-						.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
-				} as any
+			;(provider as any).providerSettingsManager = {
+				setModeConfig: vi.fn().mockRejectedValue(new Error("Failed to update mode config")),
+				listConfig: vi
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
+			} as any
 
 			// Mock getState to provide necessary data
 			vi.spyOn(provider, "getState").mockResolvedValue({
@@ -1850,13 +1852,13 @@ describe("MirrorProvider", () => {
 			await provider.resolveWebviewView(mockWebviewView)
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-				; (provider as any).providerSettingsManager = {
-					setModeConfig: vi.fn(),
-					saveConfig: vi.fn().mockResolvedValue(undefined),
-					listConfig: vi
-						.fn()
-						.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
-				} as any
+			;(provider as any).providerSettingsManager = {
+				setModeConfig: vi.fn(),
+				saveConfig: vi.fn().mockResolvedValue(undefined),
+				listConfig: vi
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
+			} as any
 
 			const testApiConfig = {
 				apiProvider: "anthropic" as const,
@@ -1890,16 +1892,16 @@ describe("MirrorProvider", () => {
 			// Mock buildApiHandler to throw an error
 			const { buildApiHandler } = await import("../../../api")
 
-				; (buildApiHandler as any).mockImplementationOnce(() => {
-					throw new Error("API handler error")
-				})
-				; (provider as any).providerSettingsManager = {
-					setModeConfig: vi.fn(),
-					saveConfig: vi.fn().mockResolvedValue(undefined),
-					listConfig: vi
-						.fn()
-						.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
-				} as any
+			;(buildApiHandler as any).mockImplementationOnce(() => {
+				throw new Error("API handler error")
+			})
+			;(provider as any).providerSettingsManager = {
+				setModeConfig: vi.fn(),
+				saveConfig: vi.fn().mockResolvedValue(undefined),
+				listConfig: vi
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
+			} as any
 
 			// Setup Task instance with auto-mock from the top of the file
 			const mockMirror = new Task(defaultTaskOptions) // Create a new mocked instance
@@ -1934,13 +1936,13 @@ describe("MirrorProvider", () => {
 			await provider.resolveWebviewView(mockWebviewView)
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-				; (provider as any).providerSettingsManager = {
-					setModeConfig: vi.fn(),
-					saveConfig: vi.fn().mockResolvedValue(undefined),
-					listConfig: vi
-						.fn()
-						.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
-				} as any
+			;(provider as any).providerSettingsManager = {
+				setModeConfig: vi.fn(),
+				saveConfig: vi.fn().mockResolvedValue(undefined),
+				listConfig: vi
+					.fn()
+					.mockResolvedValue([{ name: "test-config", id: "test-id", apiProvider: "anthropic" }]),
+			} as any
 
 			const testApiConfig = {
 				apiProvider: "anthropic" as const,
@@ -2031,7 +2033,7 @@ describe("Project MCP Settings", () => {
 
 	test.skip("handles openProjectMcpSettings message", async () => {
 		// Mock workspace folders first
-		; (vscode.workspace as any).workspaceFolders = [{ uri: { fsPath: "/test/workspace" } }]
+		;(vscode.workspace as any).workspaceFolders = [{ uri: { fsPath: "/test/workspace" } }]
 
 		// Mock fs functions
 		const fs = await import("fs/promises")
@@ -2076,8 +2078,8 @@ describe("Project MCP Settings", () => {
 		await provider.resolveWebviewView(mockWebviewView)
 		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-			// Mock no workspace folders
-			; (vscode.workspace as any).workspaceFolders = []
+		// Mock no workspace folders
+		;(vscode.workspace as any).workspaceFolders = []
 
 		// Trigger openProjectMcpSettings
 		await messageHandler({ type: "openProjectMcpSettings" })
@@ -2090,8 +2092,8 @@ describe("Project MCP Settings", () => {
 		await provider.resolveWebviewView(mockWebviewView)
 		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
-			// Mock workspace folders
-			; (vscode.workspace as any).workspaceFolders = [{ uri: { fsPath: "/test/workspace" } }]
+		// Mock workspace folders
+		;(vscode.workspace as any).workspaceFolders = [{ uri: { fsPath: "/test/workspace" } }]
 
 		// Mock fs functions to fail
 		const fs = require("fs/promises")
@@ -2585,9 +2587,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			mockMirror.submitUserMessage = vi.fn()
 
 			await provider.addMirrorToStack(mockMirror)
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 			await messageHandler({
@@ -2641,9 +2643,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			mockMirror.submitUserMessage = vi.fn()
 
 			await provider.addMirrorToStack(mockMirror)
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 			await messageHandler({
@@ -2675,7 +2677,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 	describe("Network Failure Scenarios", () => {
 		beforeEach(async () => {
-			; (vscode.window.showInformationMessage as any) = vi.fn()
+			;(vscode.window.showInformationMessage as any) = vi.fn()
 			await provider.resolveWebviewView(mockWebviewView)
 		})
 
@@ -2691,9 +2693,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			mockMirror.handleWebviewAskResponse = vi.fn().mockRejectedValue(new Error("Network timeout"))
 
 			await provider.addMirrorToStack(mockMirror)
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -2733,9 +2735,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			mockMirror.handleWebviewAskResponse = vi.fn()
 
 			await provider.addMirrorToStack(mockMirror)
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -2767,7 +2769,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 	describe("Concurrent Edit Operations", () => {
 		beforeEach(async () => {
-			; (vscode.window.showInformationMessage as any) = vi.fn()
+			;(vscode.window.showInformationMessage as any) = vi.fn()
 			await provider.resolveWebviewView(mockWebviewView)
 		})
 
@@ -2785,9 +2787,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			mockMirror.handleWebviewAskResponse = vi.fn()
 
 			await provider.addMirrorToStack(mockMirror)
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -2833,7 +2835,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 	describe("Edit Permissions and Authorization", () => {
 		beforeEach(async () => {
-			; (vscode.window.showInformationMessage as any) = vi.fn()
+			;(vscode.window.showInformationMessage as any) = vi.fn()
 			await provider.resolveWebviewView(mockWebviewView)
 		})
 
@@ -2865,9 +2867,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			mockMirror.handleWebviewAskResponse = vi.fn()
 
 			await provider.addMirrorToStack(mockMirror)
-				; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-					historyItem: { id: "test-task-id" },
-				})
+			;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+				historyItem: { id: "test-task-id" },
+			})
 
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -2940,7 +2942,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 			})
 
 			test("handles invalid timestamp values", async () => {
-				; (vscode.window.showInformationMessage as any) = vi.fn()
+				;(vscode.window.showInformationMessage as any) = vi.fn()
 
 				const mockMirror = new Task(defaultTaskOptions)
 				mockMirror.mirrorMessages = [
@@ -2972,7 +2974,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 		describe("Operations on Deleted or Non-existent Messages", () => {
 			beforeEach(async () => {
-				; (vscode.window.showInformationMessage as any) = vi.fn()
+				;(vscode.window.showInformationMessage as any) = vi.fn()
 				await provider.resolveWebviewView(mockWebviewView)
 			})
 
@@ -2987,9 +2989,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.handleWebviewAskResponse = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3031,9 +3033,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.overwriteApiConversationHistory = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3060,7 +3062,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 		describe("Resource Cleanup During Failed Operations", () => {
 			beforeEach(async () => {
-				; (vscode.window.showInformationMessage as any) = vi.fn()
+				;(vscode.window.showInformationMessage as any) = vi.fn()
 				await provider.resolveWebviewView(mockWebviewView)
 			})
 
@@ -3082,9 +3084,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.handleWebviewAskResponse = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3128,9 +3130,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.overwriteApiConversationHistory = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3154,7 +3156,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 		describe("Large Message Payloads", () => {
 			beforeEach(async () => {
-				; (vscode.window.showInformationMessage as any) = vi.fn()
+				;(vscode.window.showInformationMessage as any) = vi.fn()
 				await provider.resolveWebviewView(mockWebviewView)
 			})
 
@@ -3174,9 +3176,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.submitUserMessage = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3220,9 +3222,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.overwriteApiConversationHistory = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3262,10 +3264,10 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.overwriteApiConversationHistory = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
-					; (provider as any).createTaskWithHistoryItem = vi.fn()
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
+				;(provider as any).createTaskWithHistoryItem = vi.fn()
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3320,7 +3322,7 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 
 		describe("Edge Cases with Message Timestamps", () => {
 			beforeEach(async () => {
-				; (vscode.window.showInformationMessage as any) = vi.fn()
+				;(vscode.window.showInformationMessage as any) = vi.fn()
 				await provider.resolveWebviewView(mockWebviewView)
 			})
 
@@ -3337,9 +3339,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.overwriteApiConversationHistory = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 
@@ -3383,9 +3385,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				mockMirror.submitUserMessage = vi.fn()
 
 				await provider.addMirrorToStack(mockMirror)
-					; (provider as any).getTaskWithId = vi.fn().mockResolvedValue({
-						historyItem: { id: "test-task-id" },
-					})
+				;(provider as any).getTaskWithId = vi.fn().mockResolvedValue({
+					historyItem: { id: "test-task-id" },
+				})
 
 				const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
 

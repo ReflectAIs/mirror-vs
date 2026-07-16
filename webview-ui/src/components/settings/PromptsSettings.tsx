@@ -94,7 +94,7 @@ const PromptsSettings = ({
 
 		setIsEnhancing(true)
 		vscode.postMessage({
-			type: "enhancePrompt",
+			type: activeSupportOption === "ENHANCE_IMAGE" ? "enhanceImagePrompt" : "enhancePrompt",
 			text: testPrompt,
 		})
 	}
@@ -157,7 +157,7 @@ const PromptsSettings = ({
 						className="w-full"
 					/>
 
-					{activeSupportOption === "ENHANCE" && (
+					{(activeSupportOption === "ENHANCE" || activeSupportOption === "ENHANCE_IMAGE") && (
 						<div className="mt-4 flex flex-col gap-3 pl-3 border-l-2 border-vscode-button-background">
 							<div>
 								<label className="block font-medium mb-1">

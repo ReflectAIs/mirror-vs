@@ -88,9 +88,12 @@ export const globalSettingsSchema = z.object({
 	dismissedUpsells: z.array(z.string()).optional(),
 
 	// Image generation settings (experimental) - flattened for simplicity
-	imageGenerationProvider: z.enum(["openrouter"]).optional(),
+	imageGenerationProvider: z.enum(["openrouter", "comfyui", "comfy_cloud", "atlas_cloud"]).optional(),
 	openRouterImageApiKey: z.string().optional(),
 	openRouterImageGenerationSelectedModel: z.string().optional(),
+	comfyuiAutoSetup: z.boolean().optional(),
+	comfyuiPort: z.number().optional(),
+	comfyuiModel: z.string().optional(),
 
 	customCondensingPrompt: z.string().optional(),
 
@@ -242,6 +245,87 @@ export const globalSettingsSchema = z.object({
 	 * Keyed by sessionId UUID.
 	 */
 	sessionNames: z.record(z.string(), z.string()).optional(),
+	activeSearchProvider: z.string().optional(),
+	userBraveApiKey: z.string().optional(),
+
+	/**
+	 * Per-type active pipeline slug override for ComfyUI.
+	 * Keys are pipeline types (e.g. "txt2img", "img2img", "txt2audio", "txt2video").
+	 * Values are pipeline slugs (e.g. "txt2img-flash").
+	 */
+	comfyuiDefaultPipelines: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * Pipeline slugs the user has hidden (soft-deleted) from the UI and
+	 * auto-selection. Built-in pipelines that the user wants to "remove"
+	 * are added to this list so they no longer appear in dropdowns or
+	 * get selected by `autoSelect()`.
+	 */
+	hiddenPipelines: z.array(z.string()).optional(),
+
+	/**
+	 * Cached hardware profile summary string (e.g. "apple-m2-32gb", "nvidia-rtx4090-24gb").
+	 * Populated after the first hardware detection run.
+	 */
+	comfyuiHardwareProfile: z.string().optional(),
+
+	/**
+	 * HuggingFace API token for downloading gated models (e.g. FLUX, Stable Audio Open).
+	 */
+	huggingFaceApiToken: z.string().optional(),
+
+	/**
+	 * Per-pipeline-type provider selection.
+	 * Maps pipeline type (e.g. "txt2img", "txt2audio") to the active runtime:
+	 * - "comfyui": local ComfyUI generation
+	 * - "openrouter": cloud dispatch via OpenRouter
+	 * Falls back to "comfyui" for any unlisted type.
+	 */
+	generationProviders: z
+		.record(z.string(), z.enum(["comfyui", "openrouter", "comfy_cloud", "atlas_cloud"]))
+		.optional(),
+
+	/**
+	 * Per-pipeline-type OpenRouter model overrides.
+	 * Maps pipeline type (e.g. "txt2img", "txt2audio") to an OpenRouter model slug
+	 * (e.g. "stabilityai/stable-diffusion-3").
+	 * Only meaningful when generationProviders[type] === "openrouter".
+	 */
+	openRouterModels: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * Per-pipeline-type Atlas Cloud model identifier overrides.
+	 * Maps pipeline type (e.g. "txt2img", "txt2audio") to an Atlas Cloud model slug
+	 * (e.g. "wan-2.7", "seedance-2.0").
+	 * Only meaningful when generationProviders[type] === "atlas_cloud".
+	 */
+	atlasCloudModels: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * Comfy Cloud API token for authenticating with cloud.comfy.org.
+	 * Stored in SecretStorage via GLOBAL_SECRET_KEYS.
+	 */
+	comfyCloudApiToken: z.string().optional(),
+
+	/**
+	 * Atlas Cloud API token for authenticating with Atlas Cloud API.
+	 * Stored in SecretStorage via GLOBAL_SECRET_KEYS.
+	 */
+	atlasCloudApiToken: z.string().optional(),
+
+	/**
+	 * Global pipeline allowlist. When set, only these pipeline slugs
+	 * are available to the LLM for image generation. null/empty = all
+	 * pipelines allowed (backward compatible).
+	 */
+	allowedPipelines: z.array(z.string()).optional().nullable(),
+
+	/**
+	 * Per-model pipeline assignments.
+	 * Key = model identifier (e.g. "sd_xl_turbo"), Value = allowed pipeline slugs.
+	 * null/empty = model uses global allowlist only.
+	 */
+	modelPipelineAllowlist: z.record(z.string(), z.array(z.string())).optional().nullable(),
 })
 
 export type GlobalSettings = z.infer<typeof globalSettingsSchema>
@@ -300,6 +384,10 @@ export const SECRET_STATE_KEYS = [
 // Global secrets that are part of GlobalSettings (not ProviderSettings)
 export const GLOBAL_SECRET_KEYS = [
 	"openRouterImageApiKey", // For image generation
+	"mirror_hf_api_token", // HuggingFace API token (stored in SecretStorage)
+	"mirror_openrouter_api_token", // OpenRouter API token for generation runtime
+	"mirror_comfy_cloud_api_token", // Comfy Cloud API token
+	"mirror_atlas_cloud_api_token", // Atlas Cloud API token
 ] as const
 
 // Type for the actual secret storage keys

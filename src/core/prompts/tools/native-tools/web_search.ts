@@ -1,9 +1,9 @@
 import type OpenAI from "openai"
 
-const WEB_SEARCH_DESCRIPTION = `Request to perform a web search using DuckDuckGo to find information on the internet. Use this tool to search for current information, documentation, troubleshooting guides, code examples, or any other information that may not be available in your training data or the local codebase.
+const WEB_SEARCH_DESCRIPTION = `Request to perform a web search to find information on the internet. Use this tool to search for current information, documentation, troubleshooting guides, code examples, or any other information that may not be available in your training data or the local codebase. The search is powered by a configurable search provider (default: DuckDuckGo) and automatically routes through the best available provider.
 
 Parameters:
-- query: (required) The search query string to send to the web search engine. This should be a concise, well-formed search query similar to what you would type into a search engine like Google or DuckDuckGo. For best results, use specific keywords and phrases relevant to what you're looking for.
+- query: (required) The search query string to search the web for. This should be a concise, well-formed search query similar to what you would type into a search engine. For best results, use specific keywords and phrases relevant to what you're looking for.
 
 Example: Searching for a documentation topic
 { "query": "React useState hook documentation" }

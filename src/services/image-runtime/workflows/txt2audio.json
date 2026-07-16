@@ -1,0 +1,45 @@
+{
+	"1": {
+		"inputs": {
+			"model_name": "facebook/musicgen-small"
+		},
+		"class_type": "MusicGenLoader",
+		"_meta": {
+			"title": "MusicGen Loader"
+		}
+	},
+	"2": {
+		"inputs": {
+			"text": "A relaxing ambient melody with gentle piano and soft strings",
+			"clip": ["1", 1]
+		},
+		"class_type": "CLIPTextEncode",
+		"_meta": {
+			"title": "Positive Prompt"
+		}
+	},
+	"3": {
+		"inputs": {
+			"duration": 10.0,
+			"seed": 42,
+			"top_k": 250,
+			"model": ["1", 0],
+			"conditioning": ["2", 0]
+		},
+		"class_type": "MusicGenGenerate",
+		"_meta": {
+			"title": "MusicGen Generate"
+		}
+	},
+	"4": {
+		"inputs": {
+			"filename_prefix": "mirror_audio_output",
+			"format": "wav",
+			"audio": ["3", 0]
+		},
+		"class_type": "SaveAudio",
+		"_meta": {
+			"title": "Save Audio"
+		}
+	}
+}

@@ -1,0 +1,58 @@
+{
+	"1": {
+		"inputs": {
+			"model_name": "wan2.1_t2v_1.3B_bf16.safetensors"
+		},
+		"class_type": "WanVideoModelLoader",
+		"_meta": {
+			"title": "Video Model Loader"
+		}
+	},
+	"2": {
+		"inputs": {
+			"text": "A gentle stream flowing through a mossy forest glade, dappled sunlight filtering through the canopy, cinematic quality",
+			"clip": ["1", 1]
+		},
+		"class_type": "CLIPTextEncode",
+		"_meta": {
+			"title": "Positive Prompt"
+		}
+	},
+	"3": {
+		"inputs": {
+			"text": "blurry, low quality, watermark, text, logo, distorted, flickering",
+			"clip": ["1", 2]
+		},
+		"class_type": "CLIPTextEncode",
+		"_meta": {
+			"title": "Negative Prompt"
+		}
+	},
+	"4": {
+		"inputs": {
+			"seed": 42,
+			"steps": 20,
+			"cfg": 7.0,
+			"num_frames": 16,
+			"model": ["1", 0],
+			"positive": ["2", 0],
+			"negative": ["3", 0]
+		},
+		"class_type": "WanVideoSampler",
+		"_meta": {
+			"title": "Wan2.1 Sampler"
+		}
+	},
+	"5": {
+		"inputs": {
+			"frame_rate": 8,
+			"filename_prefix": "mirror_video_output",
+			"format": "video/h264-mp4",
+			"images": ["4", 0]
+		},
+		"class_type": "VHS_VideoCombine",
+		"_meta": {
+			"title": "Video Combine"
+		}
+	}
+}

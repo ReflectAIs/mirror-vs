@@ -34,8 +34,8 @@ import {
 import {
 	type ProviderSettings,
 	type ExperimentId,
-	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 	ImageGenerationProvider,
+	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 } from "@mirror-vs/types"
 
 import { vscode } from "@src/utils/vscode"
@@ -198,11 +198,19 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		imageGenerationProvider,
 		openRouterImageApiKey,
 		openRouterImageGenerationSelectedModel,
+		comfyuiAutoSetup,
+		generationProviders,
+		openRouterModels,
+		comfyuiDefaultPipelines,
+		comfyuiHardwareProfile,
+		atlasCloudModels,
 		reasoningBlockCollapsed,
 		enterBehavior,
 		includeCurrentTime,
 		includeCurrentCost,
 		maxGitStatusFiles,
+		activeSearchProvider,
+		userBraveApiKey,
 	} = cachedState
 
 	const apiConfiguration = useMemo(() => cachedState.apiConfiguration ?? {}, [cachedState.apiConfiguration])
@@ -331,6 +339,54 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		})
 	}, [])
 
+	const updateGenerationProvider = useCallback((type: string, provider: ImageGenerationProvider) => {
+		setCachedState((prevState) => {
+			const current = prevState.generationProviders ?? ({} as Record<string, ImageGenerationProvider>)
+			if (current[type] === provider) return prevState
+			setChangeDetected(true)
+			return {
+				...prevState,
+				generationProviders: { ...current, [type]: provider },
+			}
+		})
+	}, [])
+
+	const updateOpenRouterModel = useCallback((type: string, model: string) => {
+		setCachedState((prevState) => {
+			const current = prevState.openRouterModels ?? {}
+			if (current[type] === model) return prevState
+			setChangeDetected(true)
+			return {
+				...prevState,
+				openRouterModels: { ...current, [type]: model },
+			}
+		})
+	}, [])
+
+	const setComfyuiDefaultPipeline = useCallback((type: string, slug: string) => {
+		setCachedState((prevState) => {
+			const current = prevState.comfyuiDefaultPipelines ?? {}
+			if (current[type] === slug) return prevState
+			setChangeDetected(true)
+			return {
+				...prevState,
+				comfyuiDefaultPipelines: { ...current, [type]: slug },
+			}
+		})
+	}, [])
+
+	const updateAtlasCloudModel = useCallback((type: string, model: string) => {
+		setCachedState((prevState) => {
+			const current = prevState.atlasCloudModels ?? {}
+			if (current[type] === model) return prevState
+			setChangeDetected(true)
+			return {
+				...prevState,
+				atlasCloudModels: { ...current, [type]: model },
+			}
+		})
+	}, [])
+
 	const setCustomSupportPromptsField = useCallback((prompts: Record<string, string | undefined>) => {
 		setCachedState((prevState) => {
 			const previousStr = JSON.stringify(prevState.customSupportPrompts)
@@ -410,8 +466,14 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					imageGenerationProvider,
 					openRouterImageApiKey,
 					openRouterImageGenerationSelectedModel,
+					generationProviders: generationProviders ?? undefined,
+					openRouterModels: openRouterModels ?? undefined,
+					comfyuiDefaultPipelines: comfyuiDefaultPipelines ?? undefined,
+					atlasCloudModels: atlasCloudModels ?? undefined,
 					experiments,
 					customSupportPrompts,
+					activeSearchProvider: cachedState.activeSearchProvider,
+					userBraveApiKey: cachedState.userBraveApiKey,
 				},
 			})
 
@@ -763,6 +825,49 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 										errorMessage={errorMessage}
 										setErrorMessage={setErrorMessage}
 									/>
+
+									<div className="mt-6 pt-6 border-t border-vscode-settings-headerBorder">
+										<h4 className="text-sm font-semibold mb-3">Web Search Configuration</h4>
+										<div className="space-y-4">
+											<div>
+												<label className="block text-sm font-medium mb-1">
+													Active Search Provider
+												</label>
+												<select
+													value={activeSearchProvider || "duckduckgo"}
+													onChange={(e) =>
+														setCachedStateField("activeSearchProvider", e.target.value)
+													}
+													className="w-full bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-vscode-dropdown-border rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-vscode-focusBorder">
+													<option value="duckduckgo">DuckDuckGo (Free, HTML Scraping)</option>
+													<option value="brave">Brave Search (Requires API Key)</option>
+													<option value="internal">
+														Internal Search (Local Files, Offline)
+													</option>
+												</select>
+												<p className="text-vscode-descriptionForeground text-xs mt-1">
+													Choose how search operations resolve external queries.
+												</p>
+											</div>
+
+											{activeSearchProvider === "brave" && (
+												<div>
+													<label className="block text-sm font-medium mb-1">
+														Brave Search API Key
+													</label>
+													<input
+														type="password"
+														value={userBraveApiKey || ""}
+														onChange={(e) =>
+															setCachedStateField("userBraveApiKey", e.target.value)
+														}
+														placeholder="Enter your Brave Search API key..."
+														className="w-full bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-vscode-focusBorder"
+													/>
+												</div>
+											)}
+										</div>
+									</div>
 								</Section>
 							</div>
 						)}
@@ -892,16 +997,16 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 							<ExperimentalSettings
 								setExperimentEnabled={setExperimentEnabled}
 								experiments={experiments}
-								apiConfiguration={apiConfiguration}
-								setApiConfigurationField={setApiConfigurationField}
-								imageGenerationProvider={imageGenerationProvider}
-								openRouterImageApiKey={openRouterImageApiKey as string | undefined}
-								openRouterImageGenerationSelectedModel={
-									openRouterImageGenerationSelectedModel as string | undefined
-								}
-								setImageGenerationProvider={setImageGenerationProvider}
-								setOpenRouterImageApiKey={setOpenRouterImageApiKey}
-								setImageGenerationSelectedModel={setImageGenerationSelectedModel}
+								generationProviders={generationProviders}
+								updateGenerationProvider={updateGenerationProvider}
+								openRouterModels={openRouterModels}
+								updateOpenRouterModel={updateOpenRouterModel}
+								comfyuiDefaultPipelines={comfyuiDefaultPipelines}
+								setComfyuiDefaultPipeline={setComfyuiDefaultPipeline}
+								comfyuiHardwareProfile={comfyuiHardwareProfile}
+								atlasCloudModels={atlasCloudModels}
+								updateAtlasCloudModel={updateAtlasCloudModel}
+								comfyuiAutoSetup={comfyuiAutoSetup}
 							/>
 						)}
 

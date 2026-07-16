@@ -281,8 +281,17 @@ export function filterNativeToolsForMode(
 		allowedToolNames.delete("update_todo_list")
 	}
 
-	// Conditionally exclude generate_image if experiment is not enabled
-	if (!experiments?.imageGeneration) {
+	// Conditionally exclude generate_image if no image pipeline experiment is enabled
+	const anyImagePipelineEnabled =
+		experiments?.txt2img ||
+		experiments?.img2img ||
+		experiments?.inpaint ||
+		experiments?.outpaint ||
+		experiments?.upscale ||
+		experiments?.["remove-bg"] ||
+		experiments?.txt2audio ||
+		experiments?.txt2video
+	if (!anyImagePipelineEnabled) {
 		allowedToolNames.delete("generate_image")
 	}
 
@@ -374,7 +383,16 @@ export function isToolAllowedInMode(
 			return settings?.todoListEnabled !== false
 		}
 		if (toolName === "generate_image") {
-			return experiments?.imageGeneration === true
+			return !!(
+				experiments?.txt2img ||
+				experiments?.img2img ||
+				experiments?.inpaint ||
+				experiments?.outpaint ||
+				experiments?.upscale ||
+				experiments?.["remove-bg"] ||
+				experiments?.txt2audio ||
+				experiments?.txt2video
+			)
 		}
 		if (toolName === "run_slash_command") {
 			return experiments?.runSlashCommand === true

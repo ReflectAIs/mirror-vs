@@ -1,0 +1,31 @@
+{
+	"10": {
+		"class_type": "LoadImage",
+		"inputs": {
+			"image": "",
+			"type": "input"
+		},
+		"_meta": {
+			"title": "Load Image"
+		}
+	},
+	"15": {
+		"class_type": "ImageRemoveBackground",
+		"inputs": {
+			"image": ["10", 0]
+		},
+		"_meta": {
+			"title": "Remove Background"
+		}
+	},
+	"9": {
+		"class_type": "SaveImage",
+		"inputs": {
+			"filename_prefix": "mirror-vs-nobg",
+			"images": ["15", 0]
+		},
+		"_meta": {
+			"title": "Save Image"
+		}
+	}
+}

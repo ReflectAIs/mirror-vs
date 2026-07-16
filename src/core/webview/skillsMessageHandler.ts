@@ -9,12 +9,16 @@ import { t } from "../../i18n"
 type SkillSource = SkillMetadata["source"]
 
 /**
- * Handles the requestSkills message - returns all skills metadata
+ * Handles the requestSkills message - returns all skills metadata.
+ * Re-discovers skills from the filesystem before returning, so that
+ * skills added manually (e.g. outside of VSCode, or via another tool)
+ * are picked up even if the file watcher did not fire.
  */
 export async function handleRequestSkills(provider: MirrorProvider): Promise<SkillMetadata[]> {
 	try {
 		const skillsManager = provider.getSkillsManager()
 		if (skillsManager) {
+			await skillsManager.discoverSkills()
 			const skills = skillsManager.getSkillsMetadata()
 			await provider.postMessageToWebview({ type: "skills", skills })
 			return skills

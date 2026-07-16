@@ -28,6 +28,7 @@ import Thumbnails from "../common/Thumbnails"
 import { ModeSelector } from "./ModeSelector"
 import { AutoApproveDropdown } from "./AutoApproveDropdown"
 import { SessionArtifacts } from "./SessionArtifacts"
+import { TerminalStatusBadge } from "./TerminalStatusBadge"
 import { MAX_IMAGES_PER_MESSAGE } from "./ChatView"
 import ContextMenu from "./ContextMenu"
 import { IndexingStatusBadge } from "./IndexingStatusBadge"
@@ -55,6 +56,9 @@ interface ChatTextAreaProps {
 	isStreaming?: boolean
 	onStop?: () => void
 	onEnqueueMessage?: () => void
+	// When true, the user's message won't be sent directly but will be queued.
+	// The queue button will be shown so users have a clear visual indicator.
+	messageWillQueue?: boolean
 	// Model selection props
 	modelId?: string
 	modelOptions?: Array<{ value: string; label: string }>
@@ -80,6 +84,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			isEditMode = false,
 			onCancel,
 			isStreaming = false,
+			messageWillQueue = false,
 			onStop,
 			onEnqueueMessage,
 			modelId,
@@ -254,11 +259,20 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 			if (trimmedInput) {
 				setIsEnhancingPrompt(true)
-				vscode.postMessage({ type: "enhancePrompt" as const, text: trimmedInput })
+				const isImageMode =
+					mode &&
+					(mode.toLowerCase().includes("image") ||
+						mode.toLowerCase().includes("designer") ||
+						mode.toLowerCase().includes("generator"))
+				if (isImageMode) {
+					vscode.postMessage({ type: "enhanceImagePrompt" as const, text: trimmedInput })
+				} else {
+					vscode.postMessage({ type: "enhancePrompt" as const, text: trimmedInput })
+				}
 			} else {
 				setInputValue(t("chat:enhancePromptDescription"))
 			}
-		}, [inputValue, setInputValue, t])
+		}, [inputValue, setInputValue, t, mode])
 
 		const allModes = useMemo(() => getAllModes(customModes), [customModes])
 
@@ -1201,29 +1215,32 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 										</button>
 									</StandardTooltip>
 								)}
-								{/* Queue button - shown when streaming and user has typed content */}
-								{!isEditMode && isStreaming && hasInputContent && onEnqueueMessage && (
-									<StandardTooltip content={t("chat:enqueueMessage")}>
-										<button
-											aria-label={t("chat:enqueueMessage")}
-											disabled={false}
-											onClick={onEnqueueMessage}
-											className={cn(
-												"relative inline-flex items-center justify-center",
-												"bg-transparent border-none p-1.5",
-												"rounded-md min-w-[28px] min-h-[28px]",
-												"text-vscode-descriptionForeground hover:text-vscode-foreground",
-												"transition-all duration-200",
-												"opacity-100 hover:opacity-100 pointer-events-auto",
-												"hover:bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.15)]",
-												"focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
-												"active:bg-[rgba(255,255,255,0.1)]",
-												"cursor-pointer",
-											)}>
-											<ListEnd className="w-4 h-4" />
-										</button>
-									</StandardTooltip>
-								)}
+								{/* Queue button - shown when message will be queued (streaming or terminal running) */}
+								{!isEditMode &&
+									hasInputContent &&
+									onEnqueueMessage &&
+									(isStreaming || messageWillQueue) && (
+										<StandardTooltip content={t("chat:enqueueMessage")}>
+											<button
+												aria-label={t("chat:enqueueMessage")}
+												disabled={false}
+												onClick={onEnqueueMessage}
+												className={cn(
+													"relative inline-flex items-center justify-center",
+													"bg-transparent border-none p-1.5",
+													"rounded-md min-w-[28px] min-h-[28px]",
+													"text-vscode-descriptionForeground hover:text-vscode-foreground",
+													"transition-all duration-200",
+													"opacity-100 hover:opacity-100 pointer-events-auto",
+													"hover:bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.15)]",
+													"focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
+													"active:bg-[rgba(255,255,255,0.1)]",
+													"cursor-pointer",
+												)}>
+												<ListEnd className="w-4 h-4" />
+											</button>
+										</StandardTooltip>
+									)}
 								{/* Send/Stop button - morphs based on streaming state, always visible in edit mode */}
 								<StandardTooltip
 									content={
@@ -1332,6 +1349,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							</select>
 						)}
 						<AutoApproveDropdown triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
+						<TerminalStatusBadge />
 						<SessionArtifacts triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
 					</div>
 					<div className={cn("flex flex-shrink-0 items-center gap-0.5 h-5 leading-none", "pr-2")}>

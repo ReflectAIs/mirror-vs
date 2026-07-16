@@ -312,7 +312,7 @@ export async function handleModeSwitch(provider: MirrorProvider, mode?: string):
 /**
  * Handles the enhancePrompt message.
  */
-export async function handleEnhancePrompt(provider: MirrorProvider, text?: string): Promise<void> {
+export async function handleEnhancePrompt(provider: MirrorProvider, text?: string, isImage?: boolean): Promise<void> {
 	if (text) {
 		try {
 			const { MessageEnhancer } = await import("../messageEnhancer")
@@ -337,6 +337,7 @@ export async function handleEnhancePrompt(provider: MirrorProvider, text?: strin
 				includeTaskHistoryInEnhance,
 				currentMirrorMessages: currentMirror?.mirrorMessages,
 				providerSettingsManager: provider.providerSettingsManager,
+				isImage,
 			})
 
 			if (result.success && result.enhancedText) {
@@ -394,10 +395,10 @@ export async function handleCopySystemPrompt(provider: MirrorProvider, message: 
 export async function handleUpdatePrompt(
 	provider: MirrorProvider,
 	promptMode?: string,
-	customPrompt?: string,
+	customPrompt?: any,
 ): Promise<void> {
 	if (promptMode && customPrompt !== undefined) {
-		const existingPrompts = (provider.contextProxy.getValue("customModePrompts") ?? {}) as Record<string, string>
+		const existingPrompts = (provider.contextProxy.getValue("customModePrompts") ?? {}) as Record<string, unknown>
 		const updatedPrompts = { ...existingPrompts, [promptMode]: customPrompt }
 		await provider.contextProxy.setValue("customModePrompts", updatedPrompts as any)
 		const currentState = await provider.getStateToPostToWebview()

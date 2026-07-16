@@ -84,8 +84,7 @@
 
 	--color-vscode-input-foreground: var(--vscode-input-foreground);
 	--color-vscode-input-background: var(--vscode-input-background);
-	--color-vscode-input-border: var(--vscode-input-border,
-			transparent);
+	--color-vscode-input-border: var(--vscode-input-border, transparent);
 	/* Some themes don't have a border color, so we can fallback to transparent */
 
 	--color-vscode-focusBorder: var(--vscode-focusBorder);
@@ -200,7 +199,6 @@
 }
 
 @layer components {
-
 	/* Border Styles */
 	.border,
 	.border-r,
@@ -290,7 +288,6 @@
 
 	/* Diamond float animation (idle state) */
 	@keyframes mirror-float {
-
 		0%,
 		100% {
 			transform: translateY(0);
@@ -303,7 +300,6 @@
 
 	/* Diamond bounce (hover) */
 	@keyframes mirror-bounce {
-
 		0%,
 		100% {
 			transform: translateY(0);
@@ -328,7 +324,6 @@
 
 	/* Reading state - scanning beam */
 	@keyframes mirror-read {
-
 		0%,
 		100% {
 			transform: translateY(0) scaleX(1);
@@ -353,7 +348,6 @@
 
 	/* Thinking state - gentle rotation */
 	@keyframes mirror-think {
-
 		0%,
 		100% {
 			transform: rotate(0deg) scale(1);
@@ -374,7 +368,6 @@
 
 	/* Writing state - rapid pulse */
 	@keyframes mirror-write {
-
 		0%,
 		100% {
 			transform: scale(1);
@@ -404,7 +397,6 @@
 
 	/* Glow pulse */
 	@keyframes mirror-glow-pulse {
-
 		0%,
 		100% {
 			opacity: 0.3;
@@ -419,7 +411,6 @@
 
 	/* Activity glow ring */
 	@keyframes mirror-activity-glow {
-
 		0%,
 		100% {
 			transform: translateX(200px);
@@ -433,7 +424,6 @@
 
 	/* Sparkle orbit for thinking state - opacity only, position via inline */
 	@keyframes mirror-sparkle-thinking {
-
 		0%,
 		100% {
 			opacity: 0.6;
@@ -446,7 +436,6 @@
 
 	/* Sparkle burst for writing state - opacity only */
 	@keyframes mirror-sparkle-writing {
-
 		0%,
 		100% {
 			opacity: 0.7;
@@ -638,16 +627,18 @@ body:focus-within .code-block-scrollable {
 
 /* Fix dropdown double scrollbar overflow */
 
-#api-provider>div>ul {
+#api-provider > div > ul {
 	overflow: unset;
 }
 
-/* Fix scrollbar in dropdown */
+/* Fix scrollbar and scrolling in dropdown listbox */
 
 vscode-dropdown::part(listbox) {
 	border-color: var(--vscode-scrollbarSlider-background);
 	transition: none;
 	scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+	max-height: 300px;
+	overflow-y: auto;
 }
 
 /* Faded icon buttons in textfields */
@@ -697,7 +688,7 @@ vscode-dropdown::part(listbox) {
  * vscrui Overrides / Hacks
  */
 
-.vscrui-checkbox__listbox>ul {
+.vscrui-checkbox__listbox > ul {
 	max-height: unset !important;
 }
 
@@ -718,7 +709,7 @@ input[cmdk-input]:focus {
  * Markdown
  */
 
-.custom-markdown>pre {
+.custom-markdown > pre {
 	background-color: transparent !important;
 }
 
@@ -763,7 +754,6 @@ input[cmdk-input]:focus {
 }
 
 @keyframes pulse {
-
 	0%,
 	100% {
 		opacity: 1;
@@ -870,13 +860,17 @@ input[cmdk-input]:focus {
 	border: 1px solid color-mix(in srgb, var(--vscode-editorGroup-border) 40%, transparent);
 	backdrop-filter: blur(12px);
 	border-radius: 8px;
-	box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.15), 0 0 1px 0 rgba(255, 255, 255, 0.1);
+	box-shadow:
+		0 4px 20px -2px rgba(0, 0, 0, 0.15),
+		0 0 1px 0 rgba(255, 255, 255, 0.1);
 	transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mirror-glass-card:hover {
 	border-color: var(--mirror-brand-via);
-	box-shadow: 0 8px 30px -4px rgba(16, 185, 129, 0.12), 0 0 1px 0 rgba(255, 255, 255, 0.15);
+	box-shadow:
+		0 8px 30px -4px rgba(16, 185, 129, 0.12),
+		0 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .mirror-setting-row {

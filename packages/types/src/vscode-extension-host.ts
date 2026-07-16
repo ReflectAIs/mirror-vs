@@ -20,6 +20,12 @@ import type { WorktreeIncludeStatus } from "./worktree.js"
  * ExtensionMessage
  * Extension -> Webview | CLI
  */
+export interface ImageProviderModelInfo {
+	id: string
+	name: string
+	provider: string
+}
+
 export interface ExtensionMessage {
 	type:
 		| "action"
@@ -92,6 +98,24 @@ export interface ExtensionMessage {
 		| "folderSelected"
 		| "skills"
 		| "fileContent"
+		| "imageAutoSetupResult"
+		| "imageProviderModels"
+		// Pipeline response types
+		| "pipelines"
+		| "importPipelineResult"
+		| "deletePipelineResult"
+		| "setDefaultPipelineResult"
+		| "hidePipelineResult"
+		| "unhidePipelineResult"
+		| "comfyuiHardwareProfileResult"
+		| "saveSecureTokensResult"
+		| "saveSettingsResult"
+		| "requestAllowlists"
+		| "updateAllowlists"
+		| "scanComfyuiWorkflowsResult"
+		| "importComfyuiWorkflows"
+		| "importComfyuiWorkflowsResult"
+		| "deleteComfyuiWorkflowResult"
 	text?: string
 	/** For fileContent: { path, content, error? } */
 	fileContent?: { path: string; content: string | null; error?: string }
@@ -130,6 +154,8 @@ export interface ExtensionMessage {
 	}>
 	mirrorMessage?: MirrorMessage
 	routerModels?: RouterModels
+	/** Dynamic model list from local image generation providers (ComfyUI) */
+	imageProviderModels?: Record<string, ImageProviderModelInfo[]>
 	openAiModels?: string[]
 	ollamaModels?: ModelRecord
 	lmStudioModels?: ModelRecord
@@ -140,6 +166,8 @@ export interface ExtensionMessage {
 	mode?: string
 	customMode?: ModeConfig
 	slug?: string
+	/** Array of slugs (e.g. imported workflow slugs) */
+	slugs?: string[]
 	success?: boolean
 	/** Generic payload for extension messages that use `values` */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,6 +195,26 @@ export interface ExtensionMessage {
 	tools?: SerializedCustomToolDefinition[] // For customToolsResult
 	skills?: SkillMetadata[] // For skills response
 	modes?: { slug: string; name: string }[] // For modes response
+	/** Pipeline list response */
+	pipelines?: Array<{
+		slug: string
+		name: string
+		description: string
+		type: string
+		tags: string[]
+		source: string
+		isDefault: boolean
+	}>
+	/** Pipeline type for setDefaultPipelineResult */
+	pipelineType?: string
+	/** Global pipeline allowlist (requestAllowlists response) */
+	allowedPipelines?: string[] | null
+	/** Per-model pipeline allowlist (requestAllowlists response) */
+	modelPipelineAllowlist?: Record<string, string[]> | null
+	/** Workflow scan results (scanComfyuiWorkflowsResult response) */
+	workflows?: Array<{ name: string; filename: string }>
+	/** Directory scanned for workflows (scanComfyuiWorkflowsResult response) */
+	workflowDir?: string
 	aggregatedCosts?: {
 		// For taskWithAggregatedCosts response
 		totalCost: number
@@ -188,6 +236,9 @@ export interface ExtensionMessage {
 		isLocked: boolean
 		lockReason?: string
 	}>
+	step?: string
+	/** 0-100 progress percentage for image auto-setup */
+	progress?: number
 	isGitRepo?: boolean
 	isMultiRoot?: boolean
 	isSubfolder?: boolean
@@ -230,6 +281,13 @@ export interface OpenAiCodexRateLimitsMessage {
 	type: "openAiCodexRateLimits"
 	values?: OpenAiCodexRateLimitInfo
 	error?: string
+}
+
+export interface TerminalInfo {
+	id: number
+	command: string
+	cwd: string
+	taskId?: string
 }
 
 export type ExtensionState = Pick<
@@ -295,6 +353,19 @@ export type ExtensionState = Pick<
 	| "requestDelaySeconds"
 	| "showWorktreesInHomeScreen"
 	| "disabledTools"
+	| "comfyuiAutoSetup"
+	| "activeSearchProvider"
+	| "userBraveApiKey"
+	| "comfyuiDefaultPipelines"
+	| "comfyuiHardwareProfile"
+	| "allowedPipelines"
+	| "modelPipelineAllowlist"
+	| "huggingFaceApiToken"
+	| "generationProviders"
+	| "openRouterModels"
+	| "atlasCloudModels"
+	| "comfyCloudApiToken"
+	| "atlasCloudApiToken"
 > & {
 	lockApiConfigAcrossModes?: boolean
 	version: string
@@ -355,6 +426,8 @@ export type ExtensionState = Pick<
 	 */
 	mirrorMessagesSeq?: number
 	hasActiveReviews?: boolean
+	activeTerminalCount: number
+	activeTerminals: TerminalInfo[]
 }
 
 export interface Command {
@@ -440,6 +513,7 @@ export interface WebviewMessage {
 		| "toggleMcpServer"
 		| "updateMcpTimeout"
 		| "enhancePrompt"
+		| "enhanceImagePrompt"
 		| "enhancedPrompt"
 		| "draggedImages"
 		| "deleteMessage"
@@ -496,6 +570,8 @@ export interface WebviewMessage {
 		| "createCommand"
 		| "insertTextIntoTextarea"
 		| "imageGenerationSettings"
+		| "imageAutoSetup"
+		| "requestImageProviderModels"
 		| "queueMessage"
 		| "removeQueuedMessage"
 		| "editQueuedMessage"
@@ -534,6 +610,27 @@ export interface WebviewMessage {
 		| "updateSkillModes"
 		| "openSkillFile"
 		| "acceptAllReviews"
+		// Pipeline messages
+		| "requestPipelines"
+		| "importPipeline"
+		| "deletePipeline"
+		| "setDefaultPipeline"
+		| "setComfyuiDefaultPipeline"
+		| "hidePipeline"
+		| "unhidePipeline"
+		| "requestHardwareProfile"
+		| "saveSecureTokens"
+		| "saveSettings"
+		| "comfyuiHardwareProfileResult"
+		// Allowlist messages
+		| "requestAllowlists"
+		| "updateAllowlists"
+		// ComfyUI workflow scanning messages
+		| "scanComfyuiWorkflows"
+		| "scanComfyuiWorkflowsResult"
+		| "importComfyuiWorkflows"
+		| "importComfyuiWorkflowsResult"
+		| "deleteComfyuiWorkflow"
 		// Session messages
 		| "renameSession"
 		// Model change messages
@@ -787,6 +884,9 @@ export interface MirrorSayTool {
 	}>
 	question?: string
 	imageData?: string // Base64 encoded image data for generated images
+	inputImage?: string // Path to input image for generateImage edits
+	pipeline?: string // Generic pipeline type for display (e.g. "txt2img", "img2img")
+	pipelineName?: string // Human-readable pipeline name (e.g. "SDXL Turbo Flash", "Standard Quality")
 	// Properties for runSlashCommand tool
 	command?: string
 	args?: string

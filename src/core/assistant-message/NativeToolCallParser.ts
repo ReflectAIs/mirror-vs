@@ -645,6 +645,47 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "github_search":
+				if (partialArgs.query !== undefined) {
+					nativeArgs = {
+						query: partialArgs.query,
+						type: partialArgs.type,
+						maxResults: partialArgs.maxResults,
+					}
+				}
+				break
+
+			case "docs_search":
+				if (partialArgs.query !== undefined) {
+					nativeArgs = {
+						query: partialArgs.query,
+						docKey: partialArgs.docKey,
+						maxResults: partialArgs.maxResults,
+					}
+				}
+				break
+
+			case "package_search":
+				if (partialArgs.query !== undefined) {
+					nativeArgs = {
+						query: partialArgs.query,
+						registry: partialArgs.registry,
+						details: partialArgs.details,
+						maxResults: partialArgs.maxResults,
+					}
+				}
+				break
+
+			case "read_url":
+				if (partialArgs.url !== undefined) {
+					nativeArgs = {
+						url: partialArgs.url,
+						maxLength: partialArgs.maxLength,
+						plainTextOnly: partialArgs.plainTextOnly,
+					}
+				}
+				break
+
 			default:
 				break
 		}
@@ -850,6 +891,7 @@ export class NativeToolCallParser {
 							prompt: args.prompt,
 							path: args.path,
 							image: args.image,
+							pipeline: args.pipeline,
 						} as NativeArgsFor<TName>
 					}
 					break
@@ -998,6 +1040,47 @@ export class NativeToolCallParser {
 					if (args.query !== undefined) {
 						nativeArgs = {
 							query: args.query,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "github_search":
+					if (args.query !== undefined) {
+						nativeArgs = {
+							query: args.query,
+							type: args.type,
+							maxResults: args.maxResults,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "docs_search":
+					if (args.query !== undefined) {
+						nativeArgs = {
+							query: args.query,
+							docKey: args.docKey,
+							maxResults: args.maxResults,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "package_search":
+					if (args.query !== undefined) {
+						nativeArgs = {
+							query: args.query,
+							registry: args.registry,
+							details: args.details,
+							maxResults: args.maxResults,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "read_url":
+					if (args.url !== undefined) {
+						nativeArgs = {
+							url: args.url,
+							maxLength: args.maxLength,
+							plainTextOnly: args.plainTextOnly,
 						} as NativeArgsFor<TName>
 					}
 					break

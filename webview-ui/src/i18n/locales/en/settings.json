@@ -39,8 +39,10 @@
 		"slashCommands": "Slash Commands",
 		"prompts": "Prompts",
 		"ui": "UI",
+		"imageGeneration": "Image Generation",
 		"experimental": "Experimental",
 		"language": "Language",
+		"pipelines": "Pipelines",
 		"about": "About Mirror VS"
 	},
 	"about": {
@@ -863,6 +865,38 @@
 			"warningMissingKey": "⚠️ OpenRouter API key is required for OpenRouter image generation. Please configure it above.",
 			"successConfigured": "✓ Image generation is configured and ready to use"
 		},
+		"TXT2IMG": {
+			"name": "Text-to-Image (txt2img)",
+			"description": "When enabled, the assistant can generate images from text descriptions using this pipeline type."
+		},
+		"IMG2IMG": {
+			"name": "Image-to-Image (img2img)",
+			"description": "When enabled, the assistant can transform existing images using text-guided edits."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "When enabled, the assistant can replace or repair specific regions of an image."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "When enabled, the assistant can extend an image beyond its original boundaries."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "When enabled, the assistant can increase the resolution of an image."
+		},
+		"REMOVE_BG": {
+			"name": "Remove Background",
+			"description": "When enabled, the assistant can remove the background from an image."
+		},
+		"TXT2AUDIO": {
+			"name": "Text-to-Audio (txt2audio)",
+			"description": "When enabled, the assistant can generate music and audio clips from text descriptions."
+		},
+		"TXT2VIDEO": {
+			"name": "Text-to-Video (txt2video)",
+			"description": "When enabled, the assistant can generate short video clips from text descriptions."
+		},
 		"RUN_SLASH_COMMAND": {
 			"name": "Enable model-initiated slash commands",
 			"description": "When enabled, the assistant can run your slash commands to execute workflows."
@@ -877,6 +911,36 @@
 			"refreshSuccess": "Tools refreshed successfully",
 			"refreshError": "Failed to refresh tools",
 			"toolParameters": "Parameters"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "How Image Generation Works",
+		"guideDescription": "Each generation type (txt2img, img2img, etc.) uses a pipeline — a ComfyUI workflow that defines how the model processes inputs. Enable a type, choose a provider (Local ComfyUI or Cloud OpenRouter), then select a pipeline or model.",
+		"imagePipelines": "Image Pipelines",
+		"imagePipelinesDescription": "Generate, edit, and transform images using ComfyUI workflows or OpenRouter models.",
+		"mediaPipelines": "Media Pipelines",
+		"mediaPipelinesDescription": "Generate audio and video content using dedicated pipelines.",
+		"pipelineSettings": "Pipeline Settings",
+		"pipelineSettingsDescription": "Manage ComfyUI workflow pipelines for image generation. Upload custom workflows or set defaults per task type.",
+		"pipelineSummary": "{{count}} pipeline(s) discovered",
+		"importPipeline": "Import Pipeline",
+		"inlineImportTooltip": "Import a ComfyUI workflow JSON for this pipeline type",
+		"noPipelinesFound": "No pipelines found. Import a ComfyUI workflow JSON to get started.",
+		"alreadyDefault": "Already set as default for this type",
+		"setAsDefault": "Set as default for this type",
+		"deletePipeline": "Delete pipeline",
+		"deleteDialog": {
+			"title": "Delete Pipeline",
+			"description": "Are you sure you want to delete the pipeline \"{{name}}\"? This action cannot be undone.",
+			"confirm": "Delete",
+			"cancel": "Cancel"
+		},
+		"importDialog": {
+			"title": "Import Pipeline",
+			"description": "Paste a ComfyUI workflow JSON to import as a new pipeline.",
+			"confirm": "Import",
+			"cancel": "Cancel",
+			"importing": "Importing..."
 		}
 	},
 	"promptCaching": {

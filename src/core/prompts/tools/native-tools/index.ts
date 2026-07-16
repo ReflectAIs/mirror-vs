@@ -5,13 +5,17 @@ import applyPatch from "./apply_patch"
 import askFollowupQuestion from "./ask_followup_question"
 import attemptCompletion from "./attempt_completion"
 import codebaseSearch from "./codebase_search"
+import docsSearch from "./docs_search"
 import editTool from "./edit"
 import executeCommand from "./execute_command"
-import generateImage from "./generate_image"
+import { createGenerateImageTool } from "./generate_image"
+import githubSearch from "./github_search"
 import listFiles from "./list_files"
 import newTask from "./new_task"
+import packageSearch from "./package_search"
 import readCommandOutput from "./read_command_output"
 import { createReadFileTool, type ReadFileToolOptions } from "./read_file"
+import readUrl from "./read_url"
 import runSlashCommand from "./run_slash_command"
 import skill from "./skill"
 import searchReplace from "./search_replace"
@@ -32,6 +36,8 @@ export type { ReadFileToolOptions } from "./read_file"
 export interface NativeToolsOptions {
 	/** Whether the model supports image processing (default: false) */
 	supportsImages?: boolean
+	/** Names of all available pipeline slugs (built-in + user-imported) for dynamic tool description */
+	pipelineNames?: string[]
 }
 
 /**
@@ -41,7 +47,7 @@ export interface NativeToolsOptions {
  * @returns Array of native tool definitions
  */
 export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.ChatCompletionTool[] {
-	const { supportsImages = false } = options
+	const { supportsImages = false, pipelineNames } = options
 
 	const readFileOptions: ReadFileToolOptions = {
 		supportsImages,
@@ -54,12 +60,16 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		askFollowupQuestion,
 		attemptCompletion,
 		codebaseSearch,
+		docsSearch,
 		executeCommand,
-		generateImage,
+		createGenerateImageTool({ pipelineNames }),
+		githubSearch,
 		listFiles,
 		newTask,
+		packageSearch,
 		readCommandOutput,
 		createReadFileTool(readFileOptions),
+		readUrl,
 		runSlashCommand,
 		skill,
 		searchReplace,

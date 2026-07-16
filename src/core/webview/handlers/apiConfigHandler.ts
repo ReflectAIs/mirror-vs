@@ -147,6 +147,15 @@ export async function handleGetListApiConfiguration(provider: MirrorProvider): P
 
 /**
  * Handles the modelChange message.
+ *
+ * IMPORTANT: This handler intentionally does NOT call postStateToWebview().
+ * The webview already updates its local state (via setApiConfigurationField)
+ * before sending this message. Pushing state back causes a race condition:
+ * setProviderSettings() clears all non-secret ProviderSettings keys to
+ * undefined first, then applies only the partial fields from the modelChange
+ * message. When that partial state reaches mergeExtensionState(), it replaces
+ * the webview's complete apiConfiguration, causing useSelectedModel() to
+ * recompute and potentially snap the dropdown back to a different model.
  */
 export async function handleModelChange(provider: MirrorProvider, apiConfiguration?: any): Promise<void> {
 	if (apiConfiguration) {

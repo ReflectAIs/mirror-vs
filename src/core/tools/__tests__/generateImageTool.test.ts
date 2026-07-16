@@ -7,14 +7,15 @@ import * as pathUtils from "../../../utils/pathUtils"
 import * as fileUtils from "../../../utils/fs"
 import { formatResponse } from "../../prompts/responses"
 import { EXPERIMENT_IDS } from "../../../shared/experiments"
-import { OpenRouterHandler } from "../../../api/providers/openrouter"
+import { ImageProviderRegistry } from "../../../api/image/registry"
+import { setActiveProviderSelector } from "../../../api/image/router"
+import type { ImageProvider } from "../../../api/image/provider"
 
 // Mock dependencies
 vi.mock("fs/promises")
 vi.mock("../../../utils/pathUtils")
 vi.mock("../../../utils/fs")
 vi.mock("../../../utils/safeWriteJson")
-vi.mock("../../../api/providers/openrouter")
 
 describe("generateImageTool", () => {
 	let mockMirror: any
@@ -32,7 +33,7 @@ describe("generateImageTool", () => {
 			recordToolError: vi.fn(),
 			recordToolUsage: vi.fn(),
 			sayAndCreateMissingParamError: vi.fn().mockResolvedValue("Missing parameter error"),
-			say: vi.fn(),
+			say: vi.fn().mockResolvedValue(undefined),
 			mirrorIgnoreController: {
 				validateAccess: vi.fn().mockReturnValue(true),
 			},
@@ -43,11 +44,14 @@ describe("generateImageTool", () => {
 				deref: vi.fn().mockReturnValue({
 					getState: vi.fn().mockResolvedValue({
 						experiments: {
-							[EXPERIMENT_IDS.IMAGE_GENERATION]: true,
+							[EXPERIMENT_IDS.TXT2IMG]: true,
 						},
 						openRouterImageApiKey: "test-api-key",
 						openRouterImageGenerationSelectedModel: "google/gemini-2.5-flash-image",
 					}),
+					convertToWebviewUri: vi
+						.fn()
+						.mockImplementation((path) => `https://file+.vscode-resource.vscode-cdn.net${path}`),
 				}),
 			},
 			fileContextTracker: {
@@ -59,6 +63,32 @@ describe("generateImageTool", () => {
 		mockAskApproval = vi.fn().mockResolvedValue(true)
 		mockHandleError = vi.fn()
 		mockPushToolResult = vi.fn()
+
+		// Clear and re-register a mock image provider so
+		// ImageProviderRouter.getActiveProvider() returns a real provider.
+		// ImageProviderRegistry is a singleton — clear previous test registrations first.
+		ImageProviderRegistry.clear()
+		const mockGenerateImage = vi.fn().mockResolvedValue({
+			success: true,
+			imageData: "data:image/png;base64,fakebase64data",
+		})
+		const mockProvider: ImageProvider = {
+			name: "openrouter",
+			health: vi.fn().mockResolvedValue({ alive: true }),
+			listModels: vi.fn().mockResolvedValue([]),
+			generate: mockGenerateImage,
+			edit: vi.fn(),
+			inpaint: vi.fn(),
+			outpaint: vi.fn(),
+			upscale: vi.fn(),
+			removeBackground: vi.fn(),
+			interrupt: vi.fn(),
+			getProgress: vi.fn().mockReturnValue({ status: "idle" }),
+			getCapabilities: vi.fn().mockReturnValue({}),
+		}
+		ImageProviderRegistry.register("openrouter", mockProvider)
+		setActiveProviderSelector(() => "openrouter")
+		mockMirror._mockGenerateImage = mockGenerateImage
 
 		// Mock file system operations
 		vi.mocked(fileUtils.fileExistsAtPath).mockResolvedValue(true)
@@ -141,19 +171,6 @@ describe("generateImageTool", () => {
 				partial: false,
 			}
 
-			// Mock the OpenRouterHandler generateImage method
-			const mockGenerateImage = vi.fn().mockResolvedValue({
-				success: true,
-				imageData: "data:image/png;base64,fakebase64data",
-			})
-
-			vi.mocked(OpenRouterHandler).mockImplementation(
-				() =>
-					({
-						generateImage: mockGenerateImage,
-					}) as any,
-			)
-
 			await generateImageTool.handle(mockMirror as Task, completeBlock as ToolUse<"generate_image">, {
 				askApproval: mockAskApproval,
 				handleError: mockHandleError,
@@ -162,7 +179,7 @@ describe("generateImageTool", () => {
 
 			// Should process the complete block
 			expect(mockAskApproval).toHaveBeenCalled()
-			expect(mockGenerateImage).toHaveBeenCalled()
+			expect(mockMirror._mockGenerateImage).toHaveBeenCalled()
 			expect(mockPushToolResult).toHaveBeenCalled()
 		})
 
@@ -183,20 +200,7 @@ describe("generateImageTool", () => {
 
 			// Mock convertToWebviewUri to return a test URI
 			const mockWebviewUri = "https://file+.vscode-resource.vscode-cdn.net/test/workspace/test-image.png"
-			mockMirror.providerRef.deref().convertToWebviewUri = vi.fn().mockReturnValue(mockWebviewUri)
-
-			// Mock the OpenRouterHandler generateImage method
-			const mockGenerateImage = vi.fn().mockResolvedValue({
-				success: true,
-				imageData: "data:image/png;base64,fakebase64data",
-			})
-
-			vi.mocked(OpenRouterHandler).mockImplementation(
-				() =>
-					({
-						generateImage: mockGenerateImage,
-					}) as any,
-			)
+			mockMirror.providerRef.deref().convertToWebviewUri.mockReturnValue(mockWebviewUri)
 
 			await generateImageTool.handle(mockMirror as Task, completeBlock as ToolUse<"generate_image">, {
 				askApproval: mockAskApproval,
@@ -275,11 +279,18 @@ describe("generateImageTool", () => {
 	})
 
 	describe("experiment validation", () => {
-		it("should error when image generation experiment is disabled", async () => {
-			// Disable the experiment
+		it("should error when all 8 image pipeline experiments are disabled", async () => {
+			// Disable ALL experiments
 			mockMirror.providerRef.deref().getState.mockResolvedValue({
 				experiments: {
-					[EXPERIMENT_IDS.IMAGE_GENERATION]: false,
+					[EXPERIMENT_IDS.TXT2IMG]: false,
+					[EXPERIMENT_IDS.IMG2IMG]: false,
+					[EXPERIMENT_IDS.INPAINT]: false,
+					[EXPERIMENT_IDS.OUTPAINT]: false,
+					[EXPERIMENT_IDS.UPSCALE]: false,
+					[EXPERIMENT_IDS.REMOVE_BG]: false,
+					[EXPERIMENT_IDS.TXT2AUDIO]: false,
+					[EXPERIMENT_IDS.TXT2VIDEO]: false,
 				},
 			})
 
@@ -308,6 +319,153 @@ describe("generateImageTool", () => {
 					"Image generation is an experimental feature that must be enabled in settings. Please enable 'Image Generation' in the Experimental Settings section.",
 				),
 			)
+		})
+
+		it("should succeed when only TXT2IMG is enabled (default test setup)", async () => {
+			// TXT2IMG is already enabled in beforeEach
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Generate a test image",
+					path: "test-image.png",
+				},
+				nativeArgs: {
+					prompt: "Generate a test image",
+					path: "test-image.png",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			// The tool should proceed past experiment check
+			expect(mockAskApproval).toHaveBeenCalled()
+		})
+
+		it("should succeed when only IMG2IMG is enabled (not just TXT2IMG)", async () => {
+			// Enable only IMG2IMG, disable all others including TXT2IMG
+			mockMirror.providerRef.deref().getState.mockResolvedValue({
+				experiments: {
+					[EXPERIMENT_IDS.TXT2IMG]: false,
+					[EXPERIMENT_IDS.IMG2IMG]: true,
+					[EXPERIMENT_IDS.INPAINT]: false,
+					[EXPERIMENT_IDS.OUTPAINT]: false,
+					[EXPERIMENT_IDS.UPSCALE]: false,
+					[EXPERIMENT_IDS.REMOVE_BG]: false,
+					[EXPERIMENT_IDS.TXT2AUDIO]: false,
+					[EXPERIMENT_IDS.TXT2VIDEO]: false,
+				},
+				openRouterImageApiKey: "test-api-key",
+				openRouterImageGenerationSelectedModel: "google/gemini-2.5-flash-image",
+			})
+
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Edit an image",
+					path: "edited-image.png",
+					image: "source.png",
+				},
+				nativeArgs: {
+					prompt: "Edit an image",
+					path: "edited-image.png",
+					image: "source.png",
+				} as any,
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			// Should proceed past experiment check despite TXT2IMG being disabled
+			expect(mockAskApproval).toHaveBeenCalled()
+		})
+
+		it("should succeed when only TXT2AUDIO is enabled", async () => {
+			mockMirror.providerRef.deref().getState.mockResolvedValue({
+				experiments: {
+					[EXPERIMENT_IDS.TXT2IMG]: false,
+					[EXPERIMENT_IDS.IMG2IMG]: false,
+					[EXPERIMENT_IDS.INPAINT]: false,
+					[EXPERIMENT_IDS.OUTPAINT]: false,
+					[EXPERIMENT_IDS.UPSCALE]: false,
+					[EXPERIMENT_IDS.REMOVE_BG]: false,
+					[EXPERIMENT_IDS.TXT2AUDIO]: true,
+					[EXPERIMENT_IDS.TXT2VIDEO]: false,
+				},
+				openRouterImageApiKey: "test-api-key",
+				openRouterImageGenerationSelectedModel: "google/gemini-2.5-flash-image",
+			})
+
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Generate audio of rain sounds",
+					path: "audio/rain.wav",
+				},
+				nativeArgs: {
+					prompt: "Generate audio of rain sounds",
+					path: "audio/rain.wav",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			expect(mockAskApproval).toHaveBeenCalled()
+		})
+
+		it("should succeed when only TXT2VIDEO is enabled", async () => {
+			mockMirror.providerRef.deref().getState.mockResolvedValue({
+				experiments: {
+					[EXPERIMENT_IDS.TXT2IMG]: false,
+					[EXPERIMENT_IDS.IMG2IMG]: false,
+					[EXPERIMENT_IDS.INPAINT]: false,
+					[EXPERIMENT_IDS.OUTPAINT]: false,
+					[EXPERIMENT_IDS.UPSCALE]: false,
+					[EXPERIMENT_IDS.REMOVE_BG]: false,
+					[EXPERIMENT_IDS.TXT2AUDIO]: false,
+					[EXPERIMENT_IDS.TXT2VIDEO]: true,
+				},
+				openRouterImageApiKey: "test-api-key",
+				openRouterImageGenerationSelectedModel: "google/gemini-2.5-flash-image",
+			})
+
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Generate a short video of a cat",
+					path: "videos/cat.mp4",
+				},
+				nativeArgs: {
+					prompt: "Generate a short video of a cat",
+					path: "videos/cat.mp4",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			expect(mockAskApproval).toHaveBeenCalled()
 		})
 	})
 

@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest"
 import { webSearchTool } from "../WebSearchTool"
 import { Task } from "../../task/Task"
 import type { ToolUse } from "../../../shared/tools"
+import { SearchProviderRegistry } from "../../../api/search/registry"
+import { DuckDuckGoProvider } from "../../../api/search/providers/duckduckgo"
 
 describe("webSearchTool", () => {
 	let mockTask: any
@@ -21,6 +23,11 @@ describe("webSearchTool", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 
+		// Register the DuckDuckGo provider so SearchProviderRouter can find it
+		if (!SearchProviderRegistry.isRegistered("duckduckgo")) {
+			SearchProviderRegistry.register("duckduckgo", new DuckDuckGoProvider())
+		}
+
 		mockTask = {
 			consecutiveMistakeCount: 0,
 			recordToolError: vi.fn(),
@@ -35,6 +42,10 @@ describe("webSearchTool", () => {
 
 		// Mock global fetch
 		global.fetch = vi.fn()
+	})
+
+	afterAll(() => {
+		SearchProviderRegistry.unregister("duckduckgo")
 	})
 
 	it("should handle missing query parameter", async () => {
@@ -57,6 +68,7 @@ describe("webSearchTool", () => {
 	it("should perform a successful web search", async () => {
 		;(global.fetch as any).mockResolvedValue({
 			ok: true,
+			status: 200,
 			text: vi.fn().mockResolvedValue(mockHtmlResults),
 		})
 
@@ -73,11 +85,14 @@ describe("webSearchTool", () => {
 		await webSearchTool.handle(mockTask as Task, block, mockCallbacks)
 
 		expect(global.fetch).toHaveBeenCalledWith(
-			"https://html.duckduckgo.com/html/?q=test%20search",
+			"https://html.duckduckgo.com/html/",
 			expect.objectContaining({
+				method: "POST",
 				headers: expect.objectContaining({
 					"User-Agent": expect.stringContaining("Mozilla"),
+					"Content-Type": "application/x-www-form-urlencoded",
 				}),
+				body: "q=test+search",
 			}),
 		)
 
@@ -91,6 +106,7 @@ describe("webSearchTool", () => {
 	it("should decode DuckDuckGo redirect URLs", async () => {
 		;(global.fetch as any).mockResolvedValue({
 			ok: true,
+			status: 200,
 			text: vi.fn().mockResolvedValue(mockHtmlResults),
 		})
 
@@ -114,6 +130,7 @@ describe("webSearchTool", () => {
 	it("should handle no results found", async () => {
 		;(global.fetch as any).mockResolvedValue({
 			ok: true,
+			status: 200,
 			text: vi.fn().mockResolvedValue("<html><body>No results</body></html>"),
 		})
 
@@ -151,7 +168,9 @@ describe("webSearchTool", () => {
 
 		await webSearchTool.handle(mockTask as Task, block, mockCallbacks)
 
-		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith("Web search failed: HTTP 503 Service Unavailable")
+		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith(
+			expect.stringContaining("HTTP 503 Service Unavailable"),
+		)
 	})
 
 	it("should handle fetch exceptions", async () => {
@@ -188,6 +207,7 @@ describe("webSearchTool", () => {
 
 		;(global.fetch as any).mockResolvedValue({
 			ok: true,
+			status: 200,
 			text: vi.fn().mockResolvedValue(`<html><body>${manyResultsHtml}</body></html>`),
 		})
 

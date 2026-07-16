@@ -13,6 +13,7 @@ export interface MessageEnhancerOptions {
 	includeTaskHistoryInEnhance?: boolean
 	currentMirrorMessages?: MirrorMessage[]
 	providerSettingsManager: ProviderSettingsManager
+	isImage?: boolean
 }
 
 export interface MessageEnhancerResult {
@@ -70,7 +71,7 @@ export class MessageEnhancer {
 
 			// Create the enhancement prompt using the support prompt system
 			const enhancementPrompt = supportPrompt.create(
-				"ENHANCE",
+				options.isImage ? "ENHANCE_IMAGE" : "ENHANCE",
 				{ userInput: promptToEnhance },
 				customSupportPrompts,
 			)

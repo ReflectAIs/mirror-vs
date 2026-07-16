@@ -1,11 +1,12 @@
-import { HTMLAttributes } from "react"
+import { HTMLAttributes, useCallback, useEffect, useState } from "react"
 
 import type { Experiments, ImageGenerationProvider } from "@mirror-vs/types"
 
 import { EXPERIMENT_IDS, experimentConfigsMap } from "@shared/experiments"
 
-import { useAppTranslation } from "@src/i18n/TranslationContext"
-import { cn } from "@src/lib/utils"
+import { useAppTranslation } from "@/i18n/TranslationContext"
+import { cn } from "@/lib/utils"
+import { vscode } from "@/utils/vscode"
 
 import { SetExperimentEnabled } from "./types"
 import { SectionHeader } from "./SectionHeader"
@@ -18,108 +19,201 @@ import { CustomToolsSettings } from "./CustomToolsSettings"
 type ExperimentalSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	experiments: Experiments
 	setExperimentEnabled: SetExperimentEnabled
-	apiConfiguration?: any
-	setApiConfigurationField?: any
-	imageGenerationProvider?: ImageGenerationProvider
-	openRouterImageApiKey?: string
-	openRouterImageGenerationSelectedModel?: string
-	setImageGenerationProvider?: (provider: ImageGenerationProvider) => void
-	setOpenRouterImageApiKey?: (apiKey: string) => void
-	setImageGenerationSelectedModel?: (model: string) => void
+
+	// Per-type provider / model selection
+	generationProviders?: Record<string, ImageGenerationProvider>
+	updateGenerationProvider?: (type: string, provider: ImageGenerationProvider) => void
+	openRouterModels?: Record<string, string>
+	updateOpenRouterModel?: (type: string, model: string) => void
+
+	// ComfyUI pipeline defaults
+	comfyuiDefaultPipelines?: Record<string, string>
+	setComfyuiDefaultPipeline?: (type: string, slug: string) => void
+	comfyuiHardwareProfile?: string
+
+	// Atlas Cloud model mapping
+	atlasCloudModels?: Record<string, string>
+	updateAtlasCloudModel?: (type: string, model: string) => void
+
+	// Auto-setup
+	comfyuiAutoSetup?: boolean
 }
+
+/** Experiment keys that are rendered inside ImageGenerationSettings (all 8 pipeline types) */
+const PIPELINE_EXPERIMENT_KEYS = new Set([
+	"TXT2IMG",
+	"IMG2IMG",
+	"INPAINT",
+	"OUTPAINT",
+	"UPSCALE",
+	"REMOVE_BG",
+	"TXT2AUDIO",
+	"TXT2VIDEO",
+])
 
 export const ExperimentalSettings = ({
 	experiments,
 	setExperimentEnabled,
-	apiConfiguration,
-	setApiConfigurationField,
-	imageGenerationProvider,
-	openRouterImageApiKey,
-	openRouterImageGenerationSelectedModel,
-	setImageGenerationProvider,
-	setOpenRouterImageApiKey,
-	setImageGenerationSelectedModel,
+	generationProviders,
+	updateGenerationProvider,
+	openRouterModels,
+	updateOpenRouterModel,
+	comfyuiDefaultPipelines,
+	setComfyuiDefaultPipeline,
+	comfyuiHardwareProfile,
+	atlasCloudModels,
+	updateAtlasCloudModel,
+	comfyuiAutoSetup,
 	className,
 	...props
 }: ExperimentalSettingsProps) => {
 	const { t } = useAppTranslation()
 
+	// Auto-setup state
+	const [autoSetupRunning, setAutoSetupRunning] = useState(false)
+	const [autoSetupStatus, setAutoSetupStatus] = useState<string | undefined>(undefined)
+	const [autoSetupProgress, setAutoSetupProgress] = useState<number>(0)
+	/** Tracks which local providers have been successfully set up this session */
+	const [configuredProviders, setConfiguredProviders] = useState<Set<"comfyui">>(() => {
+		const initial = new Set<"comfyui">()
+		if (comfyuiAutoSetup) initial.add("comfyui")
+		return initial
+	})
+
+	// Listen for image auto-setup results
+	const handleMessage = useCallback((event: MessageEvent) => {
+		const message = event.data
+		if (message.type === "imageAutoSetupResult") {
+			if (message.progress !== undefined) {
+				setAutoSetupProgress(message.progress)
+			}
+			if (message.step === "complete" || message.step === "error") {
+				setAutoSetupRunning(false)
+				if (message.step === "complete") {
+					setAutoSetupStatus("Setup complete")
+				} else {
+					setAutoSetupStatus(message.text || "Setup failed")
+				}
+			} else {
+				setAutoSetupStatus(message.text || message.step || "Working...")
+			}
+			if (
+				message.step === "complete" &&
+				(message.text === "ComfyUI is ready" || message.text === "ComfyUI is already running")
+			) {
+				setConfiguredProviders((prev) => new Set(prev).add("comfyui"))
+			}
+		}
+	}, [])
+
+	useEffect(() => {
+		window.addEventListener("message", handleMessage)
+		return () => {
+			window.removeEventListener("message", handleMessage)
+		}
+	}, [handleMessage])
+
+	const handleAutoSetup = useCallback((provider: "comfyui") => {
+		setAutoSetupRunning(true)
+		setAutoSetupStatus("Starting...")
+		setAutoSetupProgress(0)
+		vscode.postMessage({ type: "imageAutoSetup", text: provider })
+	}, [])
+
+	// Filter entries — pipeline keys are rendered inside ImageGenerationSettings
+	const entries = Object.entries(experimentConfigsMap)
+	const nonPipelineEntries = entries.filter(([key]) => !PIPELINE_EXPERIMENT_KEYS.has(key))
+
+	// The first pipeline entry that has all required callbacks renders ImageGenerationSettings
+	// (which handles all 8 pipeline types internally)
+	const pipelineEntry = entries.find(
+		([key]) =>
+			PIPELINE_EXPERIMENT_KEYS.has(key) &&
+			updateGenerationProvider &&
+			updateOpenRouterModel &&
+			setComfyuiDefaultPipeline,
+	)
+
 	return (
 		<div className={cn("flex flex-col gap-2", className)} {...props}>
-			<SectionHeader>{t("settings:sections.experimental")}</SectionHeader>
-
+			{/* ─── Image Generation / ComfyUI section ─── */}
+			<SectionHeader>{t("settings:sections.imageGeneration")}</SectionHeader>
 			<Section>
-				{Object.entries(experimentConfigsMap)
-					.filter(([key]) => key in EXPERIMENT_IDS)
-					.map((config) => {
-						// Use the same translation key pattern as ExperimentalFeature
-						const experimentKey = config[0]
+				{pipelineEntry &&
+					(() => {
+						const [experimentKey] = pipelineEntry
 						const label = t(`settings:experimental.${experimentKey}.name`)
-
-						if (
-							config[0] === "IMAGE_GENERATION" &&
-							setImageGenerationProvider &&
-							setOpenRouterImageApiKey &&
-							setImageGenerationSelectedModel
-						) {
-							return (
-								<SearchableSetting
-									key={config[0]}
-									settingId={`experimental-${config[0].toLowerCase()}`}
-									section="experimental"
-									label={label}>
-									<ImageGenerationSettings
-										enabled={experiments[EXPERIMENT_IDS.IMAGE_GENERATION] ?? false}
-										onChange={(enabled) =>
-											setExperimentEnabled(EXPERIMENT_IDS.IMAGE_GENERATION, enabled)
-										}
-										imageGenerationProvider={imageGenerationProvider}
-										openRouterImageApiKey={openRouterImageApiKey}
-										openRouterImageGenerationSelectedModel={openRouterImageGenerationSelectedModel}
-										setImageGenerationProvider={setImageGenerationProvider}
-										setOpenRouterImageApiKey={setOpenRouterImageApiKey}
-										setImageGenerationSelectedModel={setImageGenerationSelectedModel}
-									/>
-								</SearchableSetting>
-							)
-						}
-						if (config[0] === "CUSTOM_TOOLS") {
-							return (
-								<SearchableSetting
-									key={config[0]}
-									settingId={`experimental-${config[0].toLowerCase()}`}
-									section="experimental"
-									label={label}>
-									<CustomToolsSettings
-										enabled={experiments[EXPERIMENT_IDS.CUSTOM_TOOLS] ?? false}
-										onChange={(enabled) =>
-											setExperimentEnabled(EXPERIMENT_IDS.CUSTOM_TOOLS, enabled)
-										}
-									/>
-								</SearchableSetting>
-							)
-						}
 						return (
 							<SearchableSetting
-								key={config[0]}
-								settingId={`experimental-${config[0].toLowerCase()}`}
+								key={experimentKey}
+								settingId={`experimental-${experimentKey.toLowerCase()}`}
 								section="experimental"
 								label={label}>
-								<ExperimentalFeature
-									experimentKey={config[0]}
-									enabled={
-										experiments[EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS]] ?? false
-									}
-									onChange={(enabled) =>
-										setExperimentEnabled(
-											EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS],
-											enabled,
-										)
-									}
+								<ImageGenerationSettings
+									experiments={experiments}
+									setExperimentEnabled={setExperimentEnabled}
+									generationProviders={generationProviders}
+									updateGenerationProvider={updateGenerationProvider}
+									openRouterModels={openRouterModels}
+									updateOpenRouterModel={updateOpenRouterModel}
+									comfyuiDefaultPipelines={comfyuiDefaultPipelines}
+									setComfyuiDefaultPipeline={setComfyuiDefaultPipeline}
+									comfyuiHardwareProfile={comfyuiHardwareProfile}
+									atlasCloudModels={atlasCloudModels}
+									updateAtlasCloudModel={updateAtlasCloudModel}
+									onAutoSetup={handleAutoSetup}
+									autoSetupRunning={autoSetupRunning}
+									autoSetupStatus={autoSetupStatus}
+									autoSetupProgress={autoSetupProgress}
+									configuredProviders={configuredProviders}
 								/>
 							</SearchableSetting>
 						)
-					})}
+					})()}
+			</Section>
+
+			{/* ─── Other experimental features section ─── */}
+			<SectionHeader>{t("settings:sections.experimental")}</SectionHeader>
+			<Section>
+				{nonPipelineEntries.map((config) => {
+					const [experimentKey] = config
+					const label = t(`settings:experimental.${experimentKey}.name`)
+
+					if (experimentKey === "CUSTOM_TOOLS") {
+						return (
+							<SearchableSetting
+								key={experimentKey}
+								settingId={`experimental-${experimentKey.toLowerCase()}`}
+								section="experimental"
+								label={label}>
+								<CustomToolsSettings
+									enabled={experiments["customTools"] ?? false}
+									onChange={(enabled) => setExperimentEnabled("customTools", enabled)}
+								/>
+							</SearchableSetting>
+						)
+					}
+					return (
+						<SearchableSetting
+							key={experimentKey}
+							settingId={`experimental-${experimentKey.toLowerCase()}`}
+							section="experimental"
+							label={label}>
+							<ExperimentalFeature
+								experimentKey={experimentKey}
+								enabled={
+									experiments[EXPERIMENT_IDS[experimentKey as keyof typeof EXPERIMENT_IDS]] ?? false
+								}
+								onChange={(enabled) =>
+									setExperimentEnabled(
+										EXPERIMENT_IDS[experimentKey as keyof typeof EXPERIMENT_IDS],
+										enabled,
+									)
+								}
+							/>
+						</SearchableSetting>
+					)
+				})}
 			</Section>
 		</div>
 	)

@@ -8,6 +8,7 @@ import { changeLanguage, t } from "../../../i18n"
 import { Package } from "../../../shared/package"
 import { Terminal } from "../../../integrations/terminal/Terminal"
 import { setTtsEnabled, setTtsSpeed, playTts, stopTts } from "../../../utils/tts"
+import { ensureProviderRegistered } from "../../../services/image-runtime"
 
 const ALLOWED_VSCODE_SETTINGS = new Set(["terminal.integrated.inheritEnv"])
 
@@ -109,6 +110,15 @@ export async function handleUpdateSettings(
 			if (!value) {
 				continue
 			}
+		} else if (key === "imageGenerationProvider") {
+			// When the user switches image generation providers (e.g.,
+			// "openrouter" → "comfyui"), register the target provider so the
+			// ImageProviderRouter can find it.  This is how a provider selected
+			// from the dropdown (without running auto-setup) becomes available.
+			ensureProviderRegistered(value as string)
+		} else if (key === "activeSearchProvider") {
+			const { connectSearchProviderSelector } = require("../../../services/search")
+			connectSearchProviderSelector(() => ({ activeProvider: value }))
 		}
 
 		await provider.contextProxy.setValue(key as keyof MirrorVSSettings, newValue)

@@ -20,6 +20,7 @@ import type {
 	AudioType,
 	ProviderSettings,
 	ModelInfo,
+	QueuedMessage,
 } from "@mirror-vs/types"
 import {
 	isRetiredProvider,
@@ -119,6 +120,31 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		setApiConfiguration,
 		routerModels,
 	} = useExtensionState()
+
+	// Optimistic local queue for instant UI feedback when messages are enqueued.
+	// The authoritative messageQueue arrives from the extension backend with a
+	// small delay; this local state fills the gap so the QueuedMessages panel
+	// updates immediately.
+	const [optimisticQueue, setOptimisticQueue] = useState<QueuedMessage[]>([])
+
+	// Merge authoritative backend queue with optimistic local additions.
+	// When the backend broadcasts an updated queue, we replace our local copy
+	// (the backend state is the source of truth) and drop stale optimistics.
+	const effectiveQueue = useMemo(() => {
+		if (messageQueue.length > 0) {
+			// Backend has caught up — use the real queue.
+			return messageQueue
+		}
+		return optimisticQueue
+	}, [messageQueue, optimisticQueue])
+
+	// When the backend broadcasts an updated queue, clear our optimistic state
+	// so the optimistics don't pile up after the backend has confirmed them.
+	useEffect(() => {
+		if (messageQueue.length > 0) {
+			setOptimisticQueue([])
+		}
+	}, [messageQueue])
 
 	// Show a WarningRow when the user sends a message with a retired provider.
 	const [showRetiredProviderWarning, setShowRetiredProviderWarning] = useState(false)
@@ -582,6 +608,18 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		return false
 	}, [modifiedMessages, mirrorAsk, enableButtons, primaryButtonText])
 
+	// Whether a newly typed message would be queued instead of sent immediately.
+	const messageWillQueue = useMemo(() => {
+		if (!(inputValue.trim() || selectedImages.length > 0)) {
+			return false
+		}
+		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command_output"
+		if (isRespondingToAsk) {
+			return false
+		}
+		return sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAsk === "command_output"
+	}, [inputValue, selectedImages, mirrorAsk, sendingDisabled, isStreaming, messageQueue.length])
+
 	const modelActivity = useMemo((): ModelActivity => {
 		if (!isStreaming) {
 			return "idle"
@@ -661,6 +699,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		setSelectedImages([])
 		setMirrorAsk(undefined)
 		setEnableButtons(false)
+		setOptimisticQueue([])
 		// Do not reset mode here as it should persist.
 		// setPrimaryButtonText(undefined)
 		// setSecondaryButtonText(undefined)
@@ -700,6 +739,18 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					try {
 						console.log("queueMessage", text, images)
 						vscode.postMessage({ type: "queueMessage", text, images })
+
+						// Optimistic local update so the UI responds instantly.
+						setOptimisticQueue((prev) => [
+							...prev,
+							{
+								timestamp: Date.now(),
+								id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+								text,
+								images: images.length > 0 ? images : undefined,
+							},
+						])
+
 						setInputValue("")
 						setSelectedImages([])
 					} catch (error) {
@@ -790,6 +841,18 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				text,
 				images: selectedImages,
 			})
+
+			// Optimistic local update so the UI responds instantly.
+			setOptimisticQueue((prev) => [
+				...prev,
+				{
+					timestamp: Date.now(),
+					id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+					text,
+					images: selectedImages.length > 0 ? selectedImages : undefined,
+				},
+			])
+
 			setInputValue("")
 			setSelectedImages([])
 		}
@@ -833,6 +896,29 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					break
 				case "command_output":
 					vscode.postMessage({ type: "terminalOperation", terminalOperation: "continue" })
+					// Queue any text the user typed alongside the proceed action so it
+					// isn't silently discarded when the state resets below.
+					if (trimmedInput || (images && images.length > 0)) {
+						vscode.postMessage({
+							type: "queueMessage",
+							text: trimmedInput || "",
+							images: images || [],
+						})
+
+						// Optimistic local update for instant UI feedback.
+						setOptimisticQueue((prev) => [
+							...prev,
+							{
+								timestamp: Date.now(),
+								id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+								text: trimmedInput || "",
+								images: images && images.length > 0 ? images : undefined,
+							},
+						])
+
+						setInputValue("")
+						setSelectedImages([])
+					}
 					break
 			}
 
@@ -2271,23 +2357,27 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			)}
 
 			<QueuedMessages
-				queue={messageQueue}
+				queue={effectiveQueue}
 				onRemove={(index) => {
-					if (messageQueue[index]) {
-						vscode.postMessage({ type: "removeQueuedMessage", text: messageQueue[index].id })
+					if (effectiveQueue[index]) {
+						vscode.postMessage({ type: "removeQueuedMessage", text: effectiveQueue[index].id })
 					}
 				}}
 				onUpdate={(index, newText) => {
-					if (messageQueue[index]) {
+					if (effectiveQueue[index]) {
 						vscode.postMessage({
 							type: "editQueuedMessage",
-							payload: { id: messageQueue[index].id, text: newText, images: messageQueue[index].images },
+							payload: {
+								id: effectiveQueue[index].id,
+								text: newText,
+								images: effectiveQueue[index].images,
+							},
 						})
 					}
 				}}
 				onForceSend={(index) => {
-					if (messageQueue[index]) {
-						const msg = messageQueue[index]
+					if (effectiveQueue[index]) {
+						const msg = effectiveQueue[index]
 						// 1. Remove from queue first
 						vscode.postMessage({ type: "removeQueuedMessage", text: msg.id })
 						// 2. Send immediately
@@ -2330,6 +2420,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				setMode={setMode}
 				modeShortcutText={modeShortcutText}
 				isStreaming={isStreaming}
+				messageWillQueue={messageWillQueue}
 				onStop={handleStopTask}
 				onEnqueueMessage={handleEnqueueCurrentMessage}
 				modelId={modelPickerConfig ? modelId : undefined}

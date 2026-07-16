@@ -53,6 +53,11 @@ export const toolNames = [
 	"browser_screenshot",
 	"browser_evaluate_script",
 	"render_preview",
+	// Research / specialized search tools
+	"github_search",
+	"docs_search",
+	"package_search",
+	"read_url",
 ] as const
 
 export const toolNamesSchema = z.enum(toolNames)

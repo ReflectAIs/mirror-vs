@@ -1,0 +1,65 @@
+{
+	"txt2img": {
+		"name": "Standard Quality",
+		"description": "High-quality text-to-image generation using KSampler. Best for detailed, photorealistic images.",
+		"type": "generate",
+		"tags": ["quality", "detailed", "photorealistic", "standard"],
+		"isDefault": true
+	},
+	"txt2img-flash": {
+		"name": "SDXL Turbo Flash",
+		"description": "Ultra-fast generation using SDXL Turbo with SamplerCustom. Ideal for logos, icons, and quick drafts.",
+		"type": "generate",
+		"tags": ["fast", "logo", "icon", "quick", "draft", "turbo"],
+		"isDefault": false
+	},
+	"img2img": {
+		"name": "Image-to-Image",
+		"description": "Edit an existing image guided by a text prompt.",
+		"type": "edit",
+		"tags": ["edit", "image-to-image"],
+		"isDefault": true
+	},
+	"inpaint": {
+		"name": "Inpainting",
+		"description": "Fill masked regions of an image based on a text prompt.",
+		"type": "inpaint",
+		"tags": ["inpaint", "mask", "fill"],
+		"isDefault": true
+	},
+	"outpaint": {
+		"name": "Outpainting",
+		"description": "Extend an image beyond its original boundaries.",
+		"type": "outpaint",
+		"tags": ["outpaint", "expand", "extend"],
+		"isDefault": true
+	},
+	"upscale": {
+		"name": "Upscaling",
+		"description": "Increase image resolution while preserving detail.",
+		"type": "upscale",
+		"tags": ["upscale", "enhance", "high-res"],
+		"isDefault": true
+	},
+	"remove-bg": {
+		"name": "Remove Background",
+		"description": "Remove the background from an image, returning an RGBA result with transparency.",
+		"type": "remove-bg",
+		"tags": ["remove-bg", "background", "transparent"],
+		"isDefault": true
+	},
+	"txt2audio": {
+		"name": "Text-to-Audio (MusicGen)",
+		"description": "Generate music and audio from a text description using MusicGen.",
+		"type": "audio",
+		"tags": ["audio", "music", "musicgen"],
+		"isDefault": true
+	},
+	"txt2video": {
+		"name": "Text-to-Video (Wan2.1)",
+		"description": "Generate short video clips from a text description using Wan2.1 T2V.",
+		"type": "video",
+		"tags": ["video", "animation", "wan2"],
+		"isDefault": true
+	}
+}

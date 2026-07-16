@@ -26,7 +26,9 @@
 			"read": "Read Files",
 			"edit": "Edit Files",
 			"command": "Run Commands",
-			"mcp": "Use MCP"
+			"mcp": "Use MCP",
+			"browser": "Web Browser",
+			"modes": "Switch Modes"
 		},
 		"noTools": "None"
 	},
@@ -102,6 +104,10 @@
 			"ENHANCE": {
 				"label": "Enhance Prompt",
 				"description": "Use prompt enhancement to get tailored suggestions or improvements for your inputs. This ensures the assistant understands your intent and provides the best possible responses. Available via the ✨ icon in chat."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Enhance Image Prompt",
+				"description": "Enhances your image prompts with details, lighting elements, colors, and descriptors suitable for text-to-image generators like Stable Diffusion and FLUX. Used automatically in Designer mode when you click ✨."
 			},
 			"CONDENSE": {
 				"label": "Context Condensing",

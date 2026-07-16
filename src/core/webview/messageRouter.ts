@@ -173,6 +173,25 @@ import {
 	handleOpenSkillFile,
 } from "./skillsMessageHandler"
 
+// ── Pipeline handlers ──────────────────────────────────────────
+import {
+	handleRequestPipelines,
+	handleImportPipeline,
+	handleDeletePipeline,
+	handleSetDefaultPipeline,
+	handleSetComfyuiDefaultPipeline,
+	handleHidePipeline,
+	handleUnhidePipeline,
+	handleRequestHardwareProfile,
+	handleSaveSecureTokens,
+	handleSaveSettings,
+	handleRequestAllowlists,
+	handleUpdateAllowlists,
+	handleScanComfyuiWorkflows,
+	handleImportComfyuiWorkflows,
+	handleDeleteComfyuiWorkflow,
+} from "./handlers/pipelineMessageHandler"
+
 // ── Worktree handlers ──────────────────────────────────────────
 import {
 	handleListWorktrees,
@@ -254,6 +273,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "enhancePrompt":
 			await handleEnhancePrompt(provider, message.text)
 			break
+		case "enhanceImagePrompt":
+			await handleEnhancePrompt(provider, message.text, true)
+			break
 		case "getSystemPrompt":
 			await handleGetSystemPrompt(provider, message)
 			break
@@ -261,7 +283,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleCopySystemPrompt(provider, message)
 			break
 		case "updatePrompt":
-			await handleUpdatePrompt(provider, message.text)
+			await handleUpdatePrompt(provider, message.promptMode, message.customPrompt)
 			break
 		case "hasOpenedModeSelector":
 			await handleHasOpenedModeSelector(provider, message.bool)
@@ -583,6 +605,64 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "openSkillFile":
 			await handleOpenSkillFile(provider, message)
 			break
+
+		// ── Pipelines ───────────────────────────────────────
+		case "requestPipelines":
+			await handleRequestPipelines(provider)
+			break
+		case "importPipeline":
+			await handleImportPipeline(provider, message)
+			break
+		case "deletePipeline":
+			await handleDeletePipeline(provider, message)
+			break
+		case "setDefaultPipeline":
+			await handleSetDefaultPipeline(provider, message)
+			break
+
+		case "setComfyuiDefaultPipeline":
+			await handleSetComfyuiDefaultPipeline(provider, message)
+			break
+
+		case "hidePipeline":
+			await handleHidePipeline(provider, message)
+			break
+		case "unhidePipeline":
+			await handleUnhidePipeline(provider, message)
+			break
+
+		case "requestHardwareProfile":
+			await handleRequestHardwareProfile(provider)
+			break
+
+		case "saveSecureTokens":
+			await handleSaveSecureTokens(provider, message)
+			break
+
+		case "saveSettings":
+			await handleSaveSettings(provider, message)
+			break
+
+		case "requestAllowlists":
+			await handleRequestAllowlists(provider)
+			break
+
+		case "updateAllowlists":
+			await handleUpdateAllowlists(provider, message)
+			break
+
+		case "scanComfyuiWorkflows":
+			await handleScanComfyuiWorkflows(provider)
+			break
+
+		case "importComfyuiWorkflows":
+			await handleImportComfyuiWorkflows(provider, message)
+			break
+
+		case "deleteComfyuiWorkflow":
+			await handleDeleteComfyuiWorkflow(provider, message)
+			break
+
 		case "openCommandFile":
 			await handleOpenCommandFile(provider, message)
 			break
@@ -982,6 +1062,98 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 				const errorMessage = error instanceof Error ? error.message : String(error)
 				provider.log(`Error opening folder picker: ${errorMessage}`)
 			}
+			break
+		}
+
+		// ── Image Generation Auto-Setup ─────────────────────
+		case "requestImageProviderModels": {
+			// Webview requests dynamic model list from a local image provider (e.g. comfyui)
+			// Query the running server and return only actually-installed models.
+			const providerKey = message.text as string
+			console.log(`[messageRouter] requestImageProviderModels for "${providerKey}"`)
+			if (providerKey) {
+				try {
+					const { ImageProviderRegistry } = await import("../../api/image/registry")
+					const imgProvider = ImageProviderRegistry.get(providerKey)
+					if (imgProvider) {
+						const models = await imgProvider.listModels()
+						console.log(`[messageRouter]   ${providerKey} listModels returned ${models.length} models`)
+						await provider.postMessageToWebview({
+							type: "imageProviderModels",
+							imageProviderModels: { [providerKey]: models },
+						})
+					} else {
+						console.log(`[messageRouter]   provider "${providerKey}" not registered`)
+						await provider.postMessageToWebview({
+							type: "imageProviderModels",
+							imageProviderModels: { [providerKey]: [] },
+						})
+					}
+				} catch (err: any) {
+					console.log(`[messageRouter]   error: ${err.message}`)
+					await provider.postMessageToWebview({
+						type: "imageProviderModels",
+						imageProviderModels: { [providerKey]: [] },
+					})
+				}
+			}
+			break
+		}
+
+		case "imageAutoSetup": {
+			const { autoSetupComfyUI } = await import("../../services/image-runtime")
+
+			const imageProvider = message.text as string | undefined
+			if (imageProvider !== "comfyui") {
+				await provider.postMessageToWebview({
+					type: "imageAutoSetupResult",
+					success: false,
+					text: "Invalid provider. Use 'comfyui'.",
+				})
+				break
+			}
+
+			// Run setup without blocking other messages
+			;(async () => {
+				try {
+					await autoSetupComfyUI((step, msg, progress) => {
+						provider.postMessageToWebview({
+							type: "imageAutoSetupResult",
+							success: true,
+							text: msg || step,
+							step,
+							progress,
+						})
+					})
+
+					// Signal completion
+					await provider.postMessageToWebview({
+						type: "imageAutoSetupResult",
+						success: true,
+						text: "Setup complete",
+						step: "complete",
+						progress: 100,
+					})
+					// Persist auto-setup flag so it survives webview/extension restarts
+					try {
+						await provider.contextProxy.setValue("comfyuiAutoSetup", true)
+					} catch (persistError) {
+						provider.log(
+							`Failed to persist auto-setup flag: ${persistError instanceof Error ? persistError.message : String(persistError)}`,
+						)
+					}
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : String(error)
+					provider.log(`Image auto-setup failed: ${errorMessage}`)
+					await provider.postMessageToWebview({
+						type: "imageAutoSetupResult",
+						success: false,
+						text: errorMessage,
+						step: "error",
+					})
+				}
+			})()
+
 			break
 		}
 

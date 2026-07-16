@@ -42,6 +42,7 @@ import { FollowUpSuggest } from "./FollowUpSuggest"
 import { BatchFilePermission } from "./BatchFilePermission"
 import { BatchDiffApproval } from "./BatchDiffApproval"
 import { ProgressIndicator } from "./ProgressIndicator"
+import { ImageProgressRow } from "./ImageProgressRow"
 import { Markdown } from "./Markdown"
 import { CommandExecution } from "./CommandExecution"
 import { CommandExecutionError } from "./CommandExecutionError"
@@ -972,6 +973,22 @@ export const ChatRowContent = ({
 				)
 			}
 			case "generateImage":
+				console.log(
+					`[ChatRow] === generateImage tool object received ===`,
+					JSON.stringify(
+						{
+							pipeline: tool.pipeline,
+							pipelineName: tool.pipelineName,
+							content: (tool.content as string)?.slice(0, 60),
+							path: tool.path,
+						},
+						null,
+						2,
+					),
+				)
+				console.log(`[ChatRow] tool.pipeline = "${tool.pipeline}" (type: ${typeof tool.pipeline})`)
+				console.log(`[ChatRow] tool.pipelineName = "${tool.pipelineName}" (type: ${typeof tool.pipelineName})`)
+				console.log(`[ChatRow] message.type = "${message.type}"`)
 				return (
 					<>
 						<div style={headerStyle}>
@@ -997,12 +1014,47 @@ export const ChatRowContent = ({
 							<div className="pl-6">
 								<ToolUseBlock>
 									<div className="p-2">
-										<div className="mb-2 break-words">{tool.content}</div>
-										<div className="flex items-center gap-1 text-xs text-vscode-descriptionForeground">
-											{tool.path}
+										<div
+											className="mb-2 break-words"
+											style={{ maxHeight: "200px", overflowY: "auto" }}>
+											{tool.content}
+										</div>
+										<div className="flex items-center gap-2 text-xs text-vscode-descriptionForeground mt-1">
+											<code className="text-[10px] px-1 py-0.5 bg-vscode-badge-background text-vscode-badge-foreground rounded">
+												{tool.pipelineName
+													? `${tool.pipeline || "auto"} · ${tool.pipelineName}`
+													: tool.pipeline || "auto"}
+											</code>
+											<span>{tool.path}</span>
+											{tool.inputImage && (
+												<>
+													<span className="text-vscode-descriptionForeground/50">→</span>
+													<span className="text-vscode-descriptionForeground/70">
+														edit: {tool.inputImage}
+													</span>
+												</>
+											)}
 										</div>
 									</div>
 								</ToolUseBlock>
+							</div>
+						)}
+						{message.type !== "ask" && tool.pipeline && (
+							<div className="pl-6">
+								<div className="flex items-center gap-2 text-xs text-vscode-descriptionForeground mt-1">
+									<code className="text-[10px] px-1 py-0.5 bg-vscode-badge-background text-vscode-badge-foreground rounded">
+										{tool.pipelineName ? `${tool.pipeline} · ${tool.pipelineName}` : tool.pipeline}
+									</code>
+									<span>{tool.path}</span>
+									{tool.inputImage && (
+										<>
+											<span className="text-vscode-descriptionForeground/50">→</span>
+											<span className="text-vscode-descriptionForeground/70">
+												edit: {tool.inputImage}
+											</span>
+										</>
+									)}
+								</div>
 							</div>
 						)}
 					</>
@@ -1610,6 +1662,8 @@ export const ChatRowContent = ({
 						/>
 					)
 				}
+				case "progress":
+					return <ImageProgressRow text={message.text} partial={message.partial} />
 				default:
 					return (
 						<>

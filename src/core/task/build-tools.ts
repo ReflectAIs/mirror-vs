@@ -9,6 +9,7 @@ import type { MirrorProvider } from "../webview/MirrorProvider"
 import { getMirrorDirectoriesForCwd } from "../../services/mirror-config/index.js"
 
 import { getNativeTools, getMcpServerTools } from "../prompts/tools/native-tools"
+import { PipelineRegistry } from "../../api/image/pipeline-registry"
 import {
 	filterNativeToolsForMode,
 	filterMcpToolsForMode,
@@ -108,9 +109,16 @@ export async function buildNativeToolsArrayWithRestrictions(options: BuildToolsO
 	// Check if the model supports images for read_file tool description.
 	const supportsImages = modelInfo?.supportsImages ?? false
 
+	// Gather ALL pipeline slugs (built-in + user-imported) for dynamic generate_image tool description.
+	// The LLM must always pass a pipeline slug, so it needs to know about all available pipelines.
+	const pipelineNames: string[] = PipelineRegistry.isInitialized()
+		? PipelineRegistry.listAll().map((p) => p.slug)
+		: []
+
 	// Build native tools with dynamic read_file tool based on settings.
 	const nativeTools = getNativeTools({
 		supportsImages,
+		pipelineNames,
 	})
 
 	// Filter native tools based on mode restrictions.

@@ -2,6 +2,69 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.0] - 2026-07-16
+
+### Added
+
+- **Pipeline System for ComfyUI Workflows**: Introduced a full pipeline architecture for image generation. Pipelines are discoverable from built-in, global (`~/.mirror/pipelines/`), and project (`.mirror/pipelines/`) sources via a new `PipelineRegistry`. Supports 7 pipeline types: txt2img, txt2img-flash, img2img, inpaint, outpaint, upscale, and remove-bg. Includes auto-selection with user override through `GenerateImageParams.pipeline`.
+- **Pipeline Settings UI**: New `PipelineSettings` component in Settings > Experimental > Image Generation for browsing, importing, deleting, and setting default pipelines.
+- **Workflow Format Normalization**: `WorkflowEngine.normalizeWorkflow()` handles both legacy (array-based) and modern (object-based) ComfyUI workflow formats with format-aware prompt injection.
+- **WorkflowEngine Refactoring**: All 6 task methods (`generate`, `img2img`, `inpaint`, `outpaint`, `upscale`, `removeBg`) use `PipelineRegistry.resolve()` instead of hardcoded `loadWorkflowSync()`.
+- **Pipeline Webview Handlers**: New `pipelineMessageHandler` with `requestPipelines`, `importPipeline`, `deletePipeline`, `setDefaultPipeline` operations, wired into the message router.
+- **Audio & Video Workflow Support**: Added `txt2audio.json` and `txt2video.json` built-in workflows. Updated `pipeline-meta.json` with audio and video pipeline definitions. Extended `HardwareDetector` with audio/video hardware requirements and detection logic.
+- **Per-Pipeline Experiments**: Added 8 new experiment types (`TXT2IMG`, `IMG2IMG`, `INPAINT`, `OUTPAINT`, `UPSCALE`, `REMOVE_BG`, `TXT2AUDIO`, `TXT2VIDEO`) replacing the single `IMAGE_GENERATION` toggle. Each pipeline type can be independently enabled/disabled via the experiment system.
+- **OpenRouter Cloud Generation**: New `OpenRouterRuntime` class supporting cloud-based generation for all pipeline types (txt2img, img2img, inpaint, outpaint, upscale, remove-bg, txt2audio, txt2video). Integrated into the message router with secure API key storage.
+- **Per-Type Provider Selection**: Each pipeline channel now has its own provider dropdown (Local ComfyUI / Cloud OpenRouter) and model/pipeline selector, enabling mixed configurations (e.g., txt2img via OpenRouter, img2img via ComfyUI).
+
+### Changed
+
+- **ImageGenerationSettings UI Redesign**: Overhauled the settings page with an info guide section, logical grouping into Image Pipelines (6 types) and Media Pipelines (2 types), inline pipeline import dialog (AlertDialog with Textarea), and per-channel descriptions for clearer understanding. Each channel card now has an "Import" link and button, eliminating the need to switch to the Pipelines tab.
+- **Translation System Update**: Added 13 new i18n keys for guide text, pipeline group labels, and import dialog. Updated locale file structure with new `imageGeneration` and `experimental.*` entries.
+
+### Fixed
+
+- **Connection-Based Prompt Injection for ComfyUI Workflows**: Fixed the "hands" bug where image generation always produced hand-related artifacts regardless of the prompt. [`injectPrompt`](src/services/image-runtime/workflows/engine.ts:438) and [`injectNegativePrompt`](src/services/image-runtime/workflows/engine.ts:482) now trace KSampler/SamplerCustom `positive`/`negative` connections instead of relying on `_meta.title` labels. User-imported pipelines from ComfyUI may have CLIPTextEncode node titles that don't match their wiring — this caused the negative prompt text (`"deformed, extra fingers"`) to be used as positive conditioning, making the model generate hand artifacts. Connection-based lookup follows the actual data flow, matching how ComfyUI processes prompts.
+
+- **Missing Experiment Translation Keys**: Added 8 missing translation entries (`TXT2IMG` through `TXT2VIDEO`) with `name` and `description` fields to the English locale. Previously, the `ExperimentalFeature` component rendered raw translation keys as UI text because these keys were absent from all 18 locale files.
+
+- **LLM Model Picker Snap-Back**: Fixed the native `<select>` dropdown for DeepSeek/Claude/Ollama models near the chat input jumping back to the previous selection immediately after choosing a new model. The root cause was `handleModelChange` calling `postStateToWebview()`, which pushed the full extension state back to the webview. `setProviderSettings()` cleared all non-secret ProviderSettings keys first, then applied only the partial modelChange fields — `mergeExtensionState()` replaced the webview's complete `apiConfiguration` with this partial version, causing `useSelectedModel()` to recompute and the controlled `<select>` to snap back. Fix: removed the `postStateToWebview()` call since the webview already has the correct local value.
+
+- **VSCodeDropdown Race Condition in Image Gen Settings**: Fixed a FAST web component race condition where the image generation model dropdown would sometimes reset to a stale value. Applied a local buffer state + key remount pattern to isolate the dropdown from live prop updates.
+
+- **Text-to-Audio Pipeline Not Exposed to LLM**: Fixed the `generate_image` tool definition and capabilities section omitting audio generation from the LLM's tool schema. The tool description now explicitly mentions "generate audio clips from text descriptions", with a `"txt2audio"` pipeline example. `capabilities.ts` updated to mention audio generation alongside image generation.
+
+- **ComfyUI Audio Output Handling**: Fixed `ComfyUIProvider.pollForResult()` only reading `output.images` but not `output.audio` from ComfyUI history responses. `SaveAudio` nodes return audio under `output.audio` with `{ filename, subfolder, type }`. The poller now iterates audio outputs, fetches via `/view` endpoint, and returns `data:audio/wav;base64,...` data URLs.
+
+- **GenerateImageTool Audio Support**: Fixed `GenerateImageTool.ts` rejecting `data:audio/...` data URLs. Added `audioMatch` regex alongside `imageMatch`, proper audio file extension handling (`.wav`, `.mp3`, `.flac`, `.ogg`, `.aac`, `.m4a`, `.webm`), and text-based reporting for audio results (since audio can't be rendered in an image viewer).
+
+- **Generate-then-Edit Model Confusion**: Fixed the LLM creating a completely new image instead of editing the previously-generated one when the user asks to modify it (e.g. "make it a sketch"). Added a `CRITICAL` section to the `generate_image` tool description with explicit instructions and 3 concrete examples demonstrating the generate → edit chaining pattern. Updated `capabilities.ts` with a bold callout about requiring the `image` parameter for edits, and added `"img2img"` to the listed available pipelines.
+
+- **Pipeline Badge in Frontend Chat Messages**: Added `pipeline` and `inputImage` fields to the `MirrorSayTool` interface in `vscode-extension-host.ts`. The `GenerateImageTool` approval message now includes `pipeline: pipelineType` (with value `"img2img"`, `"txt2img"`, etc.) and `inputImage` path when editing. `ChatRow.tsx` renders a styled pipeline badge and input image indicator in both the approval prompt and the completed/done message.
+
+- **ComfyUI Error Categorization**: Added `prompt_outputs_failed_validation` error pattern to `comfyui-errors.ts` with `workflow_validation` category and actionable suggestion. Fixed JSON error parser to handle flat `{type, message}` error objects from ComfyUI (previously only handled nested `{error: ...}` responses).
+
+- **False-Positive SIGTERM Error Suppression**: Fixed `RuntimeManager` emitting "Process exited with code null (signal SIGTERM)" errors on every intentional ComfyUI shutdown. Changed exit code check from `code !== 0` to `code !== null && code !== 0`, so signal-based kills (clean shutdown) no longer trigger error events.
+
+- **Failed Pipeline Model Identification**: When a pipeline fails during image generation, the error message and structured LLM payload now include the pipeline slug and model name (e.g. `Pipeline "txt2img-flash" with model "sd_xl_turbo" failed: ...`), so users know exactly which pipeline configuration to fix in ComfyUI.
+
+- **Model-Aware Pipeline Auto-Select for Turbo Models**: Fixed `PipelineRegistry.autoSelect()` only checking prompt keywords (e.g. "fast") when auto-selecting a pipeline, completely ignoring the model name. When a turbo model (e.g. `sd_xl_turbo`, `sdxl_turbo`) is selected, the system now automatically picks a compatible pipeline (e.g. `txt2img-flash` with SamplerCustom + SDTurboScheduler) instead of the standard `txt2img` pipeline (KSampler), preventing `prompt_outputs_failed_validation` errors. Threaded the model name through `resolveWorkflow()` in both `ComfyUIProvider` and `ComfyCloudProvider`.
+
+### Removed
+
+- **Global Pipeline Allowlist**: Removed the global pipeline allowlist UI section, security tokens section, and per-model pipeline assignment from experimental settings. Users now import pipelines per-channel and manage them independently.
+
+- **Builtin Pipelines**: Removed all default (builtin) pipeline discovery (`discoverBuiltin()` no longer loads from workflows directory). Pipelines must be explicitly imported by the user. Updated `pipeline-registry` tests to reflect zero builtins on initialization.
+
+### Added
+
+- **Active Terminal Popover**: The terminal status badge next to session artifacts is now clickable and opens a popover listing all actively running terminals, showing terminal ID, current command, working directory, and task association. Added `TerminalInfo` interface and `activeTerminals` state to `ExtensionState`.
+
+- **Per-Pipeline Delete Buttons**: Added delete button per pipeline in each channel section of `ImageGenerationSettings`, allowing users to remove imported pipelines directly from the channel card without switching to the Pipelines tab.
+
+### Changed
+
+- **PipelineImport Behavior**: `importPipeline()` no longer auto-selects the imported pipeline as the user default. The user must explicitly set a default per channel if desired.
+
 ## [0.5.6] - 2026-07-12
 
 ### Changed

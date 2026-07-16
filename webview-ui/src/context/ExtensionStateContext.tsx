@@ -129,6 +129,10 @@ export interface ExtensionStateContextType extends ExtensionState {
 	showWorktreesInHomeScreen: boolean
 	setShowWorktreesInHomeScreen: (value: boolean) => void
 	skills?: SkillMetadata[]
+	activeSearchProvider?: string
+	setActiveSearchProvider: (value: string) => void
+	userBraveApiKey?: string
+	setUserBraveApiKey: (value: string) => void
 }
 
 export const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
@@ -240,6 +244,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		includeCurrentTime: true,
 		includeCurrentCost: true,
 		lockApiConfigAcrossModes: false,
+		activeTerminalCount: 0,
+		activeTerminals: [],
 	})
 
 	const [didHydrateState, setDidHydrateState] = useState(false)
@@ -318,7 +324,10 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 						setState((prevState) => {
 							const newValue = !(prevState.autonomousMode ?? false)
 							// Also send the update to the extension via updateSettings
-							vscode.postMessage({ type: "updateSettings", updatedSettings: { autonomousMode: newValue } })
+							vscode.postMessage({
+								type: "updateSettings",
+								updatedSettings: { autonomousMode: newValue },
+							})
 							return { ...prevState, autonomousMode: newValue }
 						})
 					}
@@ -358,7 +367,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 						// does, it signals a state synchronization issue worth investigating.
 						console.warn(
 							`[messageUpdated] Received update for unknown message ts=${mirrorMessage.ts}, dropping. ` +
-							`Frontend has ${prevState.mirrorMessages.length} messages.`,
+								`Frontend has ${prevState.mirrorMessages.length} messages.`,
 						)
 						return prevState
 					})
@@ -503,7 +512,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		setCustomModes: (value) => setState((prevState) => ({ ...prevState, customModes: value })),
 		setMaxOpenTabsContext: (value) => setState((prevState) => ({ ...prevState, maxOpenTabsContext: value })),
 		setMaxWorkspaceFiles: (value) => setState((prevState) => ({ ...prevState, maxWorkspaceFiles: value })),
-		setShowMirrorIgnoredFiles: (value) => setState((prevState) => ({ ...prevState, showMirrorIgnoredFiles: value })),
+		setShowMirrorIgnoredFiles: (value) =>
+			setState((prevState) => ({ ...prevState, showMirrorIgnoredFiles: value })),
 		setEnableSubfolderRules: (value) => setState((prevState) => ({ ...prevState, enableSubfolderRules: value })),
 		setAwsUsePromptCache: (value) => setState((prevState) => ({ ...prevState, awsUsePromptCache: value })),
 		setMaxImageFileSize: (value) => setState((prevState) => ({ ...prevState, maxImageFileSize: value })),
@@ -553,6 +563,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		showWorktreesInHomeScreen: state.showWorktreesInHomeScreen ?? true,
 		setShowWorktreesInHomeScreen: (value) =>
 			setState((prevState) => ({ ...prevState, showWorktreesInHomeScreen: value })),
+		setActiveSearchProvider: (value) => setState((prevState) => ({ ...prevState, activeSearchProvider: value })),
+		setUserBraveApiKey: (value) => setState((prevState) => ({ ...prevState, userBraveApiKey: value })),
 	}
 
 	return <ExtensionStateContext.Provider value={contextValue}>{children}</ExtensionStateContext.Provider>

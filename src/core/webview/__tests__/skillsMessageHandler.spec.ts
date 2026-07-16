@@ -56,6 +56,7 @@ describe("skillsMessageHandler", () => {
 	const createMockProvider = (hasSkillsManager: boolean = true): MirrorProvider => {
 		const skillsManager = hasSkillsManager
 			? {
+					discoverSkills: vi.fn().mockResolvedValue(undefined),
 					getSkillsMetadata: mockGetSkillsMetadata,
 					createSkill: mockCreateSkill,
 					deleteSkill: mockDeleteSkill,

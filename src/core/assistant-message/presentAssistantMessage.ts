@@ -44,6 +44,10 @@ import {
 	renderPreviewTool,
 } from "../tools/BrowserTools"
 import { webSearchTool } from "../tools/WebSearchTool"
+import { gitHubSearchTool } from "../tools/GitHubSearchTool"
+import { docsSearchTool } from "../tools/DocsSearchTool"
+import { packageSearchTool } from "../tools/PackageSearchTool"
+import { readUrlTool } from "../tools/ReadUrlTool"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
@@ -875,6 +879,34 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "web_search":
 					await webSearchTool.handle(mirror, block as ToolUse<"web_search">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "github_search":
+					await gitHubSearchTool.handle(mirror, block as ToolUse<"github_search">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "docs_search":
+					await docsSearchTool.handle(mirror, block as ToolUse<"docs_search">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "package_search":
+					await packageSearchTool.handle(mirror, block as ToolUse<"package_search">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "read_url":
+					await readUrlTool.handle(mirror, block as ToolUse<"read_url">, {
 						askApproval,
 						handleError,
 						pushToolResult,

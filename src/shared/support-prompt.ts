@@ -35,6 +35,7 @@ interface SupportPromptConfig {
 
 type SupportPromptType =
 	| "ENHANCE"
+	| "ENHANCE_IMAGE"
 	| "CONDENSE"
 	| "EXPLAIN"
 	| "FIX"
@@ -48,6 +49,11 @@ type SupportPromptType =
 const supportPromptConfigs: Record<SupportPromptType, SupportPromptConfig> = {
 	ENHANCE: {
 		template: `Generate an enhanced version of this prompt (reply with only the enhanced prompt - no conversation, explanations, lead-in, bullet points, placeholders, or surrounding quotes):
+
+\${userInput}`,
+	},
+	ENHANCE_IMAGE: {
+		template: `Generate an enhanced, highly detailed, descriptive image prompt suitable for Stable Diffusion or FLUX based on the input text below. Describe visual style, lighting, composition, colors, and key details. Reply with ONLY the enhanced prompt — no conversation, introductions, explanations, or quotes:
 
 \${userInput}`,
 	},

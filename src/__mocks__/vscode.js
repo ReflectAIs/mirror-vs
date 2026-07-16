@@ -95,6 +95,10 @@ export const window = {
 		tooltip: "",
 	}),
 	onDidChangeVisibleTextEditors: () => mockDisposable,
+	tabGroups: {
+		all: [],
+		onDidChangeTabs: () => mockDisposable,
+	},
 }
 
 export const commands = {
@@ -129,6 +133,12 @@ export const Disposable = mockDisposable
 export const ThemeIcon = class {
 	constructor(id) {
 		this.id = id
+	}
+}
+export const RelativePattern = class {
+	constructor(base, pattern) {
+		this.base = base
+		this.pattern = pattern
 	}
 }
 
@@ -192,4 +202,5 @@ export default {
 	CodeAction,
 	CodeActionKind,
 	StatusBarAlignment,
+	RelativePattern,
 }

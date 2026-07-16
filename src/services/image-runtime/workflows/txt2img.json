@@ -1,0 +1,80 @@
+{
+	"1": {
+		"inputs": {
+			"ckpt_name": "sd_xl_turbo.safetensors"
+		},
+		"class_type": "CheckpointLoaderSimple",
+		"_meta": {
+			"title": "Load Checkpoint"
+		}
+	},
+	"2": {
+		"inputs": {
+			"text": "A futuristic AI assistant sitting in a modern workspace, cinematic lighting, ultra detailed, masterpiece, 8k",
+			"clip": ["1", 1]
+		},
+		"class_type": "CLIPTextEncode",
+		"_meta": {
+			"title": "Positive Prompt"
+		}
+	},
+	"3": {
+		"inputs": {
+			"text": "blurry, low quality, watermark, text, logo",
+			"clip": ["1", 1]
+		},
+		"class_type": "CLIPTextEncode",
+		"_meta": {
+			"title": "Negative Prompt"
+		}
+	},
+	"5": {
+		"inputs": {
+			"width": 1024,
+			"height": 1024,
+			"batch_size": 1
+		},
+		"class_type": "EmptyLatentImage",
+		"_meta": {
+			"title": "Empty Latent Image"
+		}
+	},
+	"6": {
+		"inputs": {
+			"seed": 137215803061229,
+			"steps": 4,
+			"cfg": 1,
+			"sampler_name": "euler_ancestral",
+			"scheduler": "sgm_uniform",
+			"denoise": 1,
+			"model": ["1", 0],
+			"positive": ["2", 0],
+			"negative": ["3", 0],
+			"latent_image": ["5", 0]
+		},
+		"class_type": "KSampler",
+		"_meta": {
+			"title": "KSampler"
+		}
+	},
+	"7": {
+		"inputs": {
+			"samples": ["6", 0],
+			"vae": ["1", 2]
+		},
+		"class_type": "VAEDecode",
+		"_meta": {
+			"title": "VAE Decode"
+		}
+	},
+	"8": {
+		"inputs": {
+			"filename_prefix": "ComfyUI",
+			"images": ["7", 0]
+		},
+		"class_type": "SaveImage",
+		"_meta": {
+			"title": "Save Image"
+		}
+	}
+}

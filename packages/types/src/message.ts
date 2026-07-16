@@ -140,6 +140,8 @@ export function isNonBlockingAsk(ask: MirrorAsk): ask is NonBlockingAsk {
  * - `condense_context_error`: Error occurred during context condensation
  * - `codebase_search_result`: Results from searching the codebase
  * - `too_many_tools_warning`: Warning that too many MCP tools are enabled, which may confuse the LLM
+ * - `progress`: Rich progress updates for long-running operations (image generation, etc.)
+ *   The text field contains a JSON payload with { stage, progress, value?, max?, state?, eta?, currentNode? }
  */
 export const mirrorSays = [
 	"error",
@@ -170,6 +172,7 @@ export const mirrorSays = [
 	"user_edit_todos",
 	"too_many_tools_warning",
 	"tool",
+	"progress",
 ] as const
 
 export const mirrorSaySchema = z.enum(mirrorSays)

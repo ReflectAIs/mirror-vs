@@ -58,6 +58,7 @@ export const toolParamNames = [
 	"todos",
 	"prompt",
 	"image",
+	"pipeline",
 	// read_file parameters (native protocol)
 	"operations", // search_and_replace parameter for multiple operations
 	"patch", // apply_patch parameter
@@ -118,6 +119,10 @@ export type NativeToolArgs = {
 	switch_mode: { mode_slug: string; reason: string }
 	update_todo_list: { todos: string }
 	web_search: { query: string }
+	github_search: { query: string; type?: string; maxResults?: number }
+	docs_search: { query: string; docKey?: string; maxResults?: number }
+	package_search: { query: string; registry?: string; details?: boolean; maxResults?: number }
+	read_url: { url: string; maxLength?: number; plainTextOnly?: boolean }
 	use_mcp_tool: { server_name: string; tool_name: string; arguments?: Record<string, unknown> }
 	write_to_file: { path: string; content: string }
 	// Add more tools as they are migrated to native protocol
@@ -301,12 +306,26 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	browser_evaluate_script: "execute browser script",
 	web_search: "search the web",
 	render_preview: "render web preview",
+	github_search: "search GitHub",
+	docs_search: "search documentation",
+	package_search: "search package registries",
+	read_url: "read URL content",
 } as const
 
 // Define available tool groups.
 export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 	read: {
-		tools: ["read_file", "search_files", "list_files", "codebase_search", "web_search"],
+		tools: [
+			"read_file",
+			"search_files",
+			"list_files",
+			"codebase_search",
+			"web_search",
+			"github_search",
+			"docs_search",
+			"package_search",
+			"read_url",
+		],
 	},
 	edit: {
 		tools: ["apply_diff", "write_to_file", "generate_image"],
@@ -335,6 +354,10 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 }
 
 // Tools that are always available to all modes.
+// Note: generate_image is also gated behind the IMAGE_GENERATION experiment flag
+// at both the filter layer (filterNativeToolsForMode) and execution layer
+// (GenerateImageTool.execute), so adding it here only makes it selectable
+// in the mode tool system — it won't actually run unless the experiment is on.
 export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"ask_followup_question",
 	"attempt_completion",
@@ -343,6 +366,7 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"update_todo_list",
 	"run_slash_command",
 	"skill",
+	"generate_image",
 ] as const
 
 /**

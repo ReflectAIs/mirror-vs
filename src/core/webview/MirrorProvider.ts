@@ -51,6 +51,7 @@ import { EMBEDDING_MODEL_PROFILES } from "../../shared/embeddingModels"
 import { ProfileValidator } from "../../shared/ProfileValidator"
 
 import { Terminal } from "../../integrations/terminal/Terminal"
+import { TerminalRegistry } from "../../integrations/terminal/TerminalRegistry"
 import { downloadTask, getTaskFileName } from "../../integrations/misc/export-markdown"
 import { resolveDefaultSaveUri, saveLastExportPath } from "../../utils/export"
 import { getTheme } from "../../integrations/theme/getTheme"
@@ -861,6 +862,45 @@ export class MirrorProvider
 				setTtsSpeed(ttsSpeed ?? 1)
 			},
 		)
+
+		// Initialize image generation providers (async, non-blocking)
+		this.getState()
+			.then((state) => {
+				const {
+					initializeImageProviders,
+					connectProviderSelectorToSettings,
+				} = require("../../services/image-runtime")
+				initializeImageProviders(state.openRouterImageApiKey, this.context, {
+					comfyui: state.comfyuiAutoSetup,
+					currentProvider: state.imageGenerationProvider,
+				})
+				// Use a dynamic reader from ContextProxy so the selector always
+				// reflects the current settings value, not a stale startup snapshot.
+				// generationProviders provides per-pipeline-type overrides.
+				connectProviderSelectorToSettings(() => ({
+					imageGenerationProvider: this.contextProxy.getValue("imageGenerationProvider"),
+					generationProviders: this.contextProxy.getValue("generationProviders"),
+				}))
+			})
+			.catch((error) => {
+				this.log(`Failed to initialize image providers: ${error}`)
+			})
+
+		// Initialize search providers (non-blocking).
+		this.getState()
+			.then((state) => {
+				const { initializeSearchProviders, connectSearchProviderSelector } = require("../../services/search")
+				initializeSearchProviders({
+					userBraveApiKey: state.apiConfiguration?.apiKey, // Fallback if they share API keys field
+					activeProvider: state.activeSearchProvider,
+				})
+				connectSearchProviderSelector(() => ({
+					activeProvider: this.contextProxy.getValue("activeSearchProvider") as string | undefined,
+				}))
+			})
+			.catch((error) => {
+				this.log(`Failed to initialize search providers: ${error}`)
+			})
 
 		// Set up webview options with proper resource roots
 		const resourceMirrorts = [this.contextProxy.extensionUri]
@@ -2136,9 +2176,13 @@ export class MirrorProvider
 			imageGenerationProvider,
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
+			comfyuiAutoSetup,
 			lockApiConfigAcrossModes,
 			currentSessionId,
 			sessionNames,
+			comfyCloudApiToken,
+			atlasCloudApiToken,
+			atlasCloudModels,
 		} = await this.getState()
 
 		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
@@ -2254,6 +2298,7 @@ export class MirrorProvider
 			imageGenerationProvider,
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
+			comfyuiAutoSetup,
 			openAiCodexIsAuthenticated: await (async () => {
 				try {
 					const { openAiCodexOAuthManager } = await import("../../integrations/openai-codex/oauth")
@@ -2262,8 +2307,18 @@ export class MirrorProvider
 					return false
 				}
 			})(),
+			activeTerminalCount: TerminalRegistry.getTerminals(true).length,
+			activeTerminals: TerminalRegistry.getTerminals(true).map((t) => ({
+				id: t.id,
+				command: t.getLastCommand(),
+				cwd: t.getCurrentWorkingDirectory(),
+				taskId: t.taskId,
+			})),
 			currentSessionId,
 			sessionNames: sessionNames ?? {},
+			comfyCloudApiToken,
+			atlasCloudApiToken,
+			atlasCloudModels: atlasCloudModels ?? {},
 			debug: vscode.workspace.getConfiguration(Package.name).get<boolean>("debug", false),
 		}
 	}
@@ -2277,7 +2332,13 @@ export class MirrorProvider
 	async getState(): Promise<
 		Omit<
 			ExtensionState,
-			"mirrorMessages" | "renderContext" | "hasOpenedModeSelector" | "version" | "shouldShowAnnouncement"
+			| "mirrorMessages"
+			| "renderContext"
+			| "hasOpenedModeSelector"
+			| "version"
+			| "shouldShowAnnouncement"
+			| "activeTerminalCount"
+			| "activeTerminals"
 		>
 	> {
 		const stateValues = this.contextProxy.getValues()
@@ -2401,8 +2462,19 @@ export class MirrorProvider
 			imageGenerationProvider: stateValues.imageGenerationProvider,
 			openRouterImageApiKey: stateValues.openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel: stateValues.openRouterImageGenerationSelectedModel,
+			comfyuiAutoSetup: stateValues.comfyuiAutoSetup,
 			currentSessionId: stateValues.currentSessionId,
 			sessionNames: stateValues.sessionNames ?? {},
+			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
+			userBraveApiKey: stateValues.userBraveApiKey,
+			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},
+			comfyuiHardwareProfile: stateValues.comfyuiHardwareProfile,
+			huggingFaceApiToken: stateValues.huggingFaceApiToken ? "********" : undefined,
+			comfyCloudApiToken: stateValues.comfyCloudApiToken ? "********" : undefined,
+			atlasCloudApiToken: stateValues.atlasCloudApiToken ? "********" : undefined,
+			generationProviders: stateValues.generationProviders ?? {},
+			openRouterModels: stateValues.openRouterModels ?? {},
+			atlasCloudModels: stateValues.atlasCloudModels ?? {},
 		}
 	}
 
