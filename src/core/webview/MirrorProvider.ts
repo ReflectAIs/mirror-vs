@@ -1,19 +1,14 @@
 import os from "os"
 import * as path from "path"
-import fs from "fs/promises"
 import EventEmitter from "events"
 
 import { Anthropic } from "@anthropic-ai/sdk"
-import delay from "delay"
-import axios from "axios"
-import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
 
 import {
 	type TaskProviderLike,
 	type TaskProviderEvents,
 	type GlobalState,
-	type ProviderName,
 	type ProviderSettings,
 	type MirrorVSSettings,
 	type ProviderSettingsEntry,
@@ -28,30 +23,15 @@ import {
 	type ExtensionMessage,
 	type ExtensionState,
 	MirrorVSEventName,
-	requestyDefaultModelId,
-	openRouterDefaultModelId,
-	DEFAULT_WRITE_DELAY_MS,
-	ORGANIZATION_ALLOW_ALL,
 	DEFAULT_MODES,
-	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
-	getModelId,
-	isRetiredProvider,
 } from "@mirror-vs/types"
-import { aggregateTaskCostsRecursive, type AggregatedCosts } from "./aggregateTaskCosts"
+import { type AggregatedCosts } from "./aggregateTaskCosts"
 
 import { Package } from "../../shared/package"
-import { findLast } from "../../shared/array"
-import { supportPrompt } from "../../shared/support-prompt"
-import { GlobalFileNames } from "../../shared/globalFileNames"
 import { Mode, defaultModeSlug, getModeBySlug } from "../../shared/modes"
-import { experimentDefault } from "../../shared/experiments"
-import { formatLanguage } from "../../shared/language"
-import { WebviewMessage } from "../../shared/WebviewMessage"
 import { EMBEDDING_MODEL_PROFILES } from "../../shared/embeddingModels"
-import { ProfileValidator } from "../../shared/ProfileValidator"
 
 import { Terminal } from "../../integrations/terminal/Terminal"
-import { TerminalRegistry } from "../../integrations/terminal/TerminalRegistry"
 import { downloadTask, getTaskFileName } from "../../integrations/misc/export-markdown"
 import { resolveDefaultSaveUri, saveLastExportPath } from "../../utils/export"
 import { getTheme } from "../../integrations/theme/getTheme"
@@ -59,22 +39,17 @@ import WorkspaceTracker from "../../integrations/workspace/WorkspaceTracker"
 
 import { McpHub } from "../../services/mcp/McpHub"
 import { McpServerManager } from "../../services/mcp/McpServerManager"
-import { ShadowCheckpointService } from "../../services/checkpoints/ShadowCheckpointService"
 import { CodeIndexManager } from "../../services/code-index/manager"
 import type { IndexProgressUpdate } from "../../services/code-index/interfaces/manager"
 import { SkillsManager } from "../../services/skills/SkillsManager"
 
-import { fileExistsAtPath } from "../../utils/fs"
 import { setTtsEnabled, setTtsSpeed } from "../../utils/tts"
-import { getWorkspaceGitInfo } from "../../utils/git"
 import { getWorkspacePath } from "../../utils/path"
-import { OrganizationAllowListViolationError } from "../../utils/errors"
 
 import { setPanel } from "../../activate/registerCommands"
 
 import { t } from "../../i18n"
 
-import { buildApiHandler } from "../../api"
 import { forceFullModelDetailsLoad, hasLoadedFullDetails } from "../../api/providers/fetchers/lmstudio"
 
 import { ContextProxy } from "../config/ContextProxy"
@@ -83,13 +58,16 @@ import { CustomModesManager } from "../config/CustomModesManager"
 import { Task } from "../task/Task"
 
 import { webviewMessageHandler } from "./webviewMessageHandler"
-import type { MirrorMessage, TodoItem } from "@mirror-vs/types"
-import { readApiMessages, saveApiMessages, saveTaskMessages, TaskHistoryStore } from "../task-persistence"
-import { readTaskMessages } from "../task-persistence/taskMessages"
-import { getNonce } from "./getNonce"
-import { getUri } from "./getUri"
-import { REQUESTY_BASE_URL } from "../../shared/utils/requesty"
-import { validateAndFixToolResultIds } from "../task/validateToolResultIds"
+import type { TodoItem } from "@mirror-vs/types"
+import { TaskHistoryStore } from "../task-persistence"
+import { StateManager } from "./MirrorProviderState"
+import { SessionManager } from "./MirrorProviderSessions"
+import { WebviewManager } from "./MirrorProviderWebview"
+import { TaskHistoryManager } from "./MirrorProviderTaskHistory"
+import { TaskLifecycleManager } from "./MirrorProviderTaskLifecycle"
+import { ProfileManager } from "./MirrorProviderProfileManager"
+import { DelegationManager } from "./MirrorProviderDelegation"
+import { Helpers } from "./MirrorProviderHelpers"
 
 /**
  * https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/default/weather-webview/src/providers/WeatherViewProvider.ts
@@ -123,22 +101,22 @@ export class MirrorProvider
 	private disposables: vscode.Disposable[] = []
 	private webviewDisposables: vscode.Disposable[] = []
 	private view?: vscode.WebviewView | vscode.WebviewPanel
-	private mirrorStack: Task[] = []
+	/** @internal Extracted classes (TaskLifecycleManager, etc.) read this directly. */
+	public mirrorStack: Task[] = []
 	private codeIndexStatusSubscription?: vscode.Disposable
 	private codeIndexManager?: CodeIndexManager
 	private _workspaceTracker?: WorkspaceTracker // workSpaceTracker read-only for access outside this class
 	protected mcpHub?: McpHub // Change from private to protected
 	protected skillsManager?: SkillsManager
-	private taskCreationCallback: (task: Task) => void
+	/** @internal Extracted classes (TaskLifecycleManager, etc.) read this directly. */
+	public taskCreationCallback: (task: Task) => void
 	private taskEventListeners: WeakMap<Task, Array<() => void>> = new WeakMap()
 	private currentWorkspacePath: string | undefined
 	private _disposed = false
 
-	private recentTasksCache?: string[]
+	public recentTasksCache?: string[]
 	public readonly taskHistoryStore: TaskHistoryStore
-	private taskHistoryStoreInitialized = false
-	private globalStateWriteThroughTimer: ReturnType<typeof setTimeout> | null = null
-	private static readonly GLOBAL_STATE_WRITE_THROUGH_DEBOUNCE_MS = 5000 // 5 seconds
+	public taskHistoryStoreInitialized = false
 	private pendingOperations: Map<string, PendingEditOperation> = new Map()
 	private static readonly PENDING_OPERATION_TIMEOUT_MS = 30000 // 30 seconds
 
@@ -152,13 +130,63 @@ export class MirrorProvider
 	 * The ID of the current session, persisted across VS Code restarts.
 	 * All tasks created during this session share this ID for history grouping.
 	 */
-	private currentSessionId?: string
+	/** @internal Extracted classes (TaskLifecycleManager, etc.) read this directly. */
+	public currentSessionId?: string
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
 	public readonly latestAnnouncementId = "jul-2026-beta-welcome" // Mirror VS beta welcome announcement.
 	public readonly providerSettingsManager: ProviderSettingsManager
 	public readonly customModesManager: CustomModesManager
+	/**
+	 * Delegated state manager — handles all state assembly, merging, and posting.
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly stateManager: StateManager
+
+	/**
+	 * Delegated session manager — handles all session CRUD operations.
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly sessionManager: SessionManager
+
+	/**
+	 * Delegated webview manager — handles HTML generation, message posting,
+	 * message listener, and resource cleanup for the webview.
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly webviewManager: WebviewManager
+
+	/**
+	 * Delegated task history manager — handles all task history CRUD,
+	 * global-state write-through, and broadcast operations.
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly taskHistoryManager: TaskHistoryManager
+	public readonly taskLifecycleManager: TaskLifecycleManager
+
+	/**
+	 * Delegated profile manager — handles provider profile CRUD, activation,
+	 * delete, and callbacks for OpenRouter/Requesty auth flows.
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly profileManager: ProfileManager
+
+	/**
+	 * Delegated delegation manager — handles parent/child task delegation flows,
+	 * including flushing parent tool results, enforcing single-open invariant,
+	 * persisting delegation metadata, and reopening parent tasks with synthetic
+	 * tool_result injection.
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly delegationManager: DelegationManager
+
+	/**
+	 * Delegated helpers — provides static utility methods (instance resolution,
+	 * code/terminal action handlers, state reset, directory utilities).
+	 * Extracted from this class to reduce the monolithic footprint.
+	 */
+	public readonly helpers: Helpers
 
 	constructor(
 		readonly context: vscode.ExtensionContext,
@@ -168,6 +196,14 @@ export class MirrorProvider
 	) {
 		super()
 		this.currentWorkspacePath = getWorkspacePath()
+		this.stateManager = new StateManager(this)
+		this.sessionManager = new SessionManager(this)
+		this.webviewManager = new WebviewManager(this)
+		this.taskHistoryManager = new TaskHistoryManager(this)
+		this.taskLifecycleManager = new TaskLifecycleManager(this)
+		this.profileManager = new ProfileManager(this)
+		this.delegationManager = new DelegationManager(this)
+		this.helpers = new Helpers(this)
 
 		MirrorProvider.activeInstances.add(this)
 
@@ -178,10 +214,10 @@ export class MirrorProvider
 		// since per-task files are authoritative and globalState is only for downgrade compat.
 		this.taskHistoryStore = new TaskHistoryStore(this.contextProxy.globalStorageUri.fsPath, {
 			onWrite: async () => {
-				this.scheduleGlobalStateWriteThrough()
+				this.taskHistoryManager.scheduleGlobalStateWriteThrough()
 			},
 		})
-		this.initializeTaskHistoryStore().catch((error) => {
+		this.taskHistoryManager.initializeTaskHistoryStore().catch((error) => {
 			this.log(`Failed to initialize TaskHistoryStore: ${error}`)
 		})
 
@@ -319,7 +355,7 @@ export class MirrorProvider
 		}
 	}
 
-	// ── Session management ──────────────────────────────────────────────────
+	// ── Session management (delegated to SessionManager) ─────────────────────
 
 	/**
 	 * Returns the current session ID, if one exists.
@@ -329,125 +365,46 @@ export class MirrorProvider
 	}
 
 	/**
-	 * Creates a new session, persists it via contextProxy, and returns the id.
+	 * Sets the current session ID in memory (without persisting).
+	 * Used by SessionManager to keep the in-memory value in sync.
 	 */
-	public async createSession(): Promise<string> {
-		const sessionId = crypto.randomUUID()
+	public setCurrentSessionId(sessionId: string | undefined): void {
 		this.currentSessionId = sessionId
-		await this.contextProxy.setValue("currentSessionId", sessionId)
-		this.log(`[createSession] Created new session ${sessionId}`)
-		return sessionId
 	}
 
-	/**
-	 * Returns the existing session if present, otherwise restores from
-	 * persisted state, or creates a brand-new one as a last resort.
-	 */
+	public async createSession(): Promise<string> {
+		return this.sessionManager.createSession()
+	}
+
 	public async getOrCreateSession(): Promise<string> {
-		if (this.currentSessionId) {
-			console.log(`[SESSION-DBG] getOrCreateSession: returning cached=${this.currentSessionId}`)
-			return this.currentSessionId
-		}
-
-		const persistedSessionId = await this.contextProxy.getValue("currentSessionId")
-		if (persistedSessionId) {
-			this.currentSessionId = persistedSessionId
-			console.log(`[SESSION-DBG] getOrCreateSession: restored persisted=${persistedSessionId}`)
-			return persistedSessionId
-		}
-
-		const newSessionId = await this.createSession()
-		console.log(`[SESSION-DBG] getOrCreateSession: created new=${newSessionId}`)
-		return newSessionId
+		return this.sessionManager.getOrCreateSession()
 	}
 
-	/**
-	 * Clears the current session id from memory and persisted state.
-	 */
 	public async clearSession(): Promise<void> {
-		this.currentSessionId = undefined
-		await this.contextProxy.setValue("currentSessionId", undefined)
-		this.log("[clearSession] Session cleared")
+		await this.sessionManager.clearSession()
 	}
 
-	/**
-	 * Returns the map of session IDs to their user-assigned or auto-generated names.
-	 */
 	public async getSessionNames(): Promise<Record<string, string>> {
-		return (await this.contextProxy.getValue("sessionNames")) || {}
+		return this.sessionManager.getSessionNames()
 	}
 
-	/**
-	 * Sets a single session's name in the persisted sessionNames map.
-	 */
 	public async setSessionName(sessionId: string, name: string): Promise<void> {
-		const names = await this.getSessionNames()
-		names[sessionId] = name
-		await this.contextProxy.setValue("sessionNames", names)
-		this.log(`[setSessionName] Session ${sessionId} renamed to "${name}"`)
+		await this.sessionManager.setSessionName(sessionId, name)
 	}
 
-	/**
-	 * Renames a session and broadcasts the updated state to the webview.
-	 */
 	public async renameSession(sessionId: string, name: string): Promise<void> {
-		await this.setSessionName(sessionId, name)
-		await this.postStateToWebview()
+		await this.sessionManager.renameSession(sessionId, name)
 	}
 
-	/**
-	 * Create a brand-new task within the current session.
-	 * Called when the user sends a message and no active task is running,
-	 * but a session already exists.  The new task gets a fresh conversation
-	 * history but shares the same sessionId.
-	 */
 	public async startNewTaskInSession(text: string, images?: string[]): Promise<Task> {
-		const sessionId = await this.getOrCreateSession()
-		const task = await this.createTask(text, images, undefined, {}, {})
-
-		// Auto-rename: if this session doesn't have a name yet, generate one
-		// from the first line of the task text (max 60 chars).
-		const names = await this.getSessionNames()
-		if (!names[sessionId]) {
-			const autoName = text.split("\n")[0].slice(0, 60).trim()
-			if (autoName) {
-				names[sessionId] = autoName
-				await this.contextProxy.setValue("sessionNames", names)
-				this.log(`[startNewTaskInSession] Auto-named session ${sessionId} to "${autoName}"`)
-			}
-		}
-
-		this.log(`[startNewTaskInSession] New task ${task.taskId} in session ${sessionId}`)
-		return task
+		return this.sessionManager.startNewTaskInSession(text, images)
 	}
 
 	/**
 	 * Initialize the TaskHistoryStore and migrate from globalState if needed.
 	 */
 	private async initializeTaskHistoryStore(): Promise<void> {
-		try {
-			await this.taskHistoryStore.initialize()
-
-			// Migration: backfill per-task files from globalState on first run
-			const migrationKey = "taskHistoryMigratedToFiles"
-			const alreadyMigrated = this.context.globalState.get<boolean>(migrationKey)
-
-			if (!alreadyMigrated) {
-				const legacyHistory = this.context.globalState.get<HistoryItem[]>("taskHistory") ?? []
-
-				if (legacyHistory.length > 0) {
-					this.log(`[initializeTaskHistoryStore] Migrating ${legacyHistory.length} entries from globalState`)
-					await this.taskHistoryStore.migrateFromGlobalState(legacyHistory)
-				}
-
-				await this.context.globalState.update(migrationKey, true)
-				this.log("[initializeTaskHistoryStore] Migration complete")
-			}
-
-			this.taskHistoryStoreInitialized = true
-		} catch (error) {
-			this.log(`[initializeTaskHistoryStore] Error: ${error instanceof Error ? error.message : String(error)}`)
-		}
+		await this.taskHistoryManager.initializeTaskHistoryStore()
 	}
 
 	/**
@@ -662,12 +619,7 @@ export class MirrorProvider
 	- https://github.com/microsoft/vscode-extension-samples/blob/main/webview-sample/src/extension.ts
 	*/
 	private clearWebviewResources() {
-		while (this.webviewDisposables.length) {
-			const x = this.webviewDisposables.pop()
-			if (x) {
-				x.dispose()
-			}
-		}
+		this.webviewManager.clearWebviewResources()
 	}
 
 	async dispose() {
@@ -723,41 +675,15 @@ export class MirrorProvider
 	}
 
 	public static getVisibleInstance(): MirrorProvider | undefined {
-		return findLast(Array.from(this.activeInstances), (instance) => instance.view?.visible === true)
+		return Helpers.getVisibleInstance(this.activeInstances)
 	}
 
 	public static async getInstance(): Promise<MirrorProvider | undefined> {
-		let visibleProvider = MirrorProvider.getVisibleInstance()
-
-		// If no visible provider, try to show the sidebar view
-		if (!visibleProvider) {
-			await vscode.commands.executeCommand(`${Package.name}.SidebarProvider.focus`)
-			// Wait briefly for the view to become visible
-			await delay(100)
-			visibleProvider = MirrorProvider.getVisibleInstance()
-		}
-
-		// If still no visible provider, return
-		if (!visibleProvider) {
-			return
-		}
-
-		return visibleProvider
+		return Helpers.getInstance(this.activeInstances, MirrorProvider)
 	}
 
 	public static async isActiveTask(): Promise<boolean> {
-		const visibleProvider = await MirrorProvider.getInstance()
-
-		if (!visibleProvider) {
-			return false
-		}
-
-		// Check if there is a mirror instance in the stack (if this provider has an active task)
-		if (visibleProvider.getCurrentTask()) {
-			return true
-		}
-
-		return false
+		return Helpers.isActiveTask(this.activeInstances, MirrorProvider)
 	}
 
 	public static async handleCodeAction(
@@ -765,28 +691,7 @@ export class MirrorProvider
 		promptType: CodeActionName,
 		params: Record<string, string | any[]>,
 	): Promise<void> {
-		const visibleProvider = await MirrorProvider.getInstance()
-
-		if (!visibleProvider) {
-			return
-		}
-
-		const { customSupportPrompts } = await visibleProvider.getState()
-
-		// TODO: Improve type safety for promptType.
-		const prompt = supportPrompt.create(promptType, params, customSupportPrompts)
-
-		if (command === "addToContext") {
-			await visibleProvider.postMessageToWebview({
-				type: "invoke",
-				invoke: "setChatBoxMessage",
-				text: `${prompt}\n\n`,
-			})
-			await visibleProvider.postMessageToWebview({ type: "action", action: "focusInput" })
-			return
-		}
-
-		await visibleProvider.createTask(prompt)
+		return Helpers.handleCodeAction(this.activeInstances, MirrorProvider, command, promptType, params)
 	}
 
 	public static async handleTerminalAction(
@@ -794,35 +699,7 @@ export class MirrorProvider
 		promptType: TerminalActionPromptType,
 		params: Record<string, string | any[]>,
 	): Promise<void> {
-		const visibleProvider = await MirrorProvider.getInstance()
-
-		if (!visibleProvider) {
-			return
-		}
-
-		const { customSupportPrompts } = await visibleProvider.getState()
-		const prompt = supportPrompt.create(promptType, params, customSupportPrompts)
-
-		if (command === "terminalAddToContext") {
-			await visibleProvider.postMessageToWebview({
-				type: "invoke",
-				invoke: "setChatBoxMessage",
-				text: `${prompt}\n\n`,
-			})
-			await visibleProvider.postMessageToWebview({ type: "action", action: "focusInput" })
-			return
-		}
-
-		try {
-			await visibleProvider.createTask(prompt)
-		} catch (error) {
-			if (error instanceof OrganizationAllowListViolationError) {
-				// Errors from terminal commands seem to get swallowed / ignored.
-				vscode.window.showErrorMessage(error.message)
-			}
-
-			throw error
-		}
+		return Helpers.handleTerminalAction(this.activeInstances, MirrorProvider, command, promptType, params)
 	}
 
 	async resolveWebviewView(webviewView: vscode.WebviewView | vscode.WebviewPanel) {
@@ -1220,117 +1097,11 @@ export class MirrorProvider
 	}
 
 	public async postMessageToWebview(message: ExtensionMessage) {
-		if (this._disposed) {
-			return
-		}
-
-		try {
-			await this.view?.webview.postMessage(message)
-		} catch {
-			// View disposed, drop message silently
-		}
+		await this.webviewManager.postMessageToWebview(message)
 	}
 
 	private async getHMRHtmlContent(webview: vscode.Webview): Promise<string> {
-		let localPort = "5173"
-
-		try {
-			const fs = require("fs")
-			const path = require("path")
-			const portFilePath = path.resolve(__dirname, "../../.vite-port")
-
-			if (fs.existsSync(portFilePath)) {
-				localPort = fs.readFileSync(portFilePath, "utf8").trim()
-				console.log(`[MirrorProvider:Vite] Using Vite server port from ${portFilePath}: ${localPort}`)
-			} else {
-				console.log(
-					`[MirrorProvider:Vite] Port file not found at ${portFilePath}, using default port: ${localPort}`,
-				)
-			}
-		} catch (err) {
-			console.error("[MirrorProvider:Vite] Failed to read Vite port file:", err)
-		}
-
-		const localServerUrl = `localhost:${localPort}`
-
-		// Check if local dev server is running.
-		try {
-			await axios.get(`http://${localServerUrl}`)
-		} catch (error) {
-			vscode.window.showErrorMessage(t("common:errors.hmr_not_running"))
-			return this.getHtmlContent(webview)
-		}
-
-		const nonce = getNonce()
-
-		// Get the OpenRouter base URL from configuration
-		const { apiConfiguration } = await this.getState()
-		const openRouterBaseUrl = apiConfiguration.openRouterBaseUrl || "https://openrouter.ai"
-		// Extract the domain for CSP
-		const openRouterDomain = openRouterBaseUrl.match(/^(https?:\/\/[^\/]+)/)?.[1] || "https://openrouter.ai"
-
-		const stylesUri = getUri(webview, this.contextProxy.extensionUri, [
-			"webview-ui",
-			"build",
-			"assets",
-			"index.css",
-		])
-
-		const codiconsUri = getUri(webview, this.contextProxy.extensionUri, ["assets", "codicons", "codicon.css"])
-		const materialIconsUri = getUri(webview, this.contextProxy.extensionUri, [
-			"assets",
-			"vscode-material-icons",
-			"icons",
-		])
-		const imagesUri = getUri(webview, this.contextProxy.extensionUri, ["assets", "images"])
-		const audioUri = getUri(webview, this.contextProxy.extensionUri, ["webview-ui", "audio"])
-
-		const file = "src/index.tsx"
-		const scriptUri = `http://${localServerUrl}/${file}`
-
-		const reactRefresh = /*html*/ `
-			<script nonce="${nonce}" type="module">
-				import RefreshRuntime from "http://localhost:${localPort}/@react-refresh"
-				RefreshRuntime.injectIntoGlobalHook(window)
-				window.$RefreshReg$ = () => {}
-				window.$RefreshSig$ = () => (type) => type
-				window.__vite_plugin_react_preamble_installed__ = true
-			</script>
-		`
-
-		const csp = [
-			"default-src 'none'",
-			`font-src ${webview.cspSource} data:`,
-			`style-src ${webview.cspSource} 'unsafe-inline' https://* http://${localServerUrl} http://0.0.0.0:${localPort}`,
-			`img-src ${webview.cspSource} https://storage.googleapis.com https://img.clerk.com data:`,
-			`media-src ${webview.cspSource}`,
-			`script-src 'unsafe-eval' ${webview.cspSource} https://* http://${localServerUrl} http://0.0.0.0:${localPort} 'nonce-${nonce}'`,
-			`connect-src ${webview.cspSource} ${openRouterDomain} https://* ws://${localServerUrl} ws://0.0.0.0:${localPort} http://${localServerUrl} http://0.0.0.0:${localPort}`,
-		]
-
-		return /*html*/ `
-			<!DOCTYPE html>
-			<html lang="en">
-				<head>
-					<meta charset="utf-8">
-					<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
-					<meta http-equiv="Content-Security-Policy" content="${csp.join("; ")}">
-					<link rel="stylesheet" type="text/css" href="${stylesUri}">
-					<link href="${codiconsUri}" rel="stylesheet" />
-					<script nonce="${nonce}">
-						window.IMAGES_BASE_URI = "${imagesUri}"
-						window.AUDIO_BASE_URI = "${audioUri}"
-						window.MATERIAL_ICONS_BASE_URI = "${materialIconsUri}"
-					</script>
-					<title>Mirror VS</title>
-				</head>
-				<body>
-					<div id="root"></div>
-					${reactRefresh}
-					<script type="module" src="${scriptUri}"></script>
-				</body>
-			</html>
-		`
+		return this.webviewManager.getHMRHtmlContent(webview)
 	}
 
 	/**
@@ -1345,71 +1116,7 @@ export class MirrorProvider
 	 * rendered within the webview panel
 	 */
 	private async getHtmlContent(webview: vscode.Webview): Promise<string> {
-		// Get the local path to main script run in the webview,
-		// then convert it to a uri we can use in the webview.
-
-		// The CSS file from the React build output
-		const stylesUri = getUri(webview, this.contextProxy.extensionUri, [
-			"webview-ui",
-			"build",
-			"assets",
-			"index.css",
-		])
-
-		const scriptUri = getUri(webview, this.contextProxy.extensionUri, ["webview-ui", "build", "assets", "index.js"])
-		const codiconsUri = getUri(webview, this.contextProxy.extensionUri, ["assets", "codicons", "codicon.css"])
-		const materialIconsUri = getUri(webview, this.contextProxy.extensionUri, [
-			"assets",
-			"vscode-material-icons",
-			"icons",
-		])
-		const imagesUri = getUri(webview, this.contextProxy.extensionUri, ["assets", "images"])
-		const audioUri = getUri(webview, this.contextProxy.extensionUri, ["webview-ui", "audio"])
-
-		// Use a nonce to only allow a specific script to be run.
-		/*
-		content security policy of your webview to only allow scripts that have a specific nonce
-		create a content security policy meta tag so that only loading scripts with a nonce is allowed
-		As your extension grows you will likely want to add custom styles, fonts, and/or images to your webview. If you do, you will need to update the content security policy meta tag to explicitly allow for these resources. E.g.
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; img-src ${webview.cspSource} https:; script-src 'nonce-${nonce}';">
-		- 'unsafe-inline' is required for styles due to vscode-webview-toolkit's dynamic style injection
-		- since we pass base64 images to the webview, we need to specify img-src ${webview.cspSource} data:;
-
-		in meta tag we add nonce attribute: A cryptographic nonce (only used once) to allow scripts. The server must generate a unique nonce value each time it transmits a policy. It is critical to provide a nonce that cannot be guessed as bypassing a resource's policy is otherwise trivial.
-		*/
-		const nonce = getNonce()
-
-		// Get the OpenRouter base URL from configuration
-		const { apiConfiguration } = await this.getState()
-		const openRouterBaseUrl = apiConfiguration.openRouterBaseUrl || "https://openrouter.ai"
-		// Extract the domain for CSP
-		const openRouterDomain = openRouterBaseUrl.match(/^(https?:\/\/[^\/]+)/)?.[1] || "https://openrouter.ai"
-
-		// Tip: Install the es6-string-html VS Code extension to enable code highlighting below
-		return /*html*/ `
-        <!DOCTYPE html>
-        <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
-            <meta name="theme-color" content="#000000">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https://storage.googleapis.com https://img.clerk.com data:; media-src ${webview.cspSource}; script-src ${webview.cspSource} 'wasm-unsafe-eval' 'nonce-${nonce}' 'strict-dynamic'; connect-src ${webview.cspSource} ${openRouterDomain} https://api.requesty.ai;">
-            <link rel="stylesheet" type="text/css" href="${stylesUri}">
-			<link href="${codiconsUri}" rel="stylesheet" />
-			<script nonce="${nonce}">
-				window.IMAGES_BASE_URI = "${imagesUri}"
-				window.AUDIO_BASE_URI = "${audioUri}"
-				window.MATERIAL_ICONS_BASE_URI = "${materialIconsUri}"
-			</script>
-            <title>Mirror VS</title>
-          </head>
-          <body>
-            <noscript>You need to enable JavaScript to run this app.</noscript>
-            <div id="root"></div>
-            <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
-          </body>
-        </html>
-      `
+		return this.webviewManager.getHtmlContent(webview)
 	}
 
 	/**
@@ -1419,10 +1126,7 @@ export class MirrorProvider
 	 * @param webview A reference to the extension webview
 	 */
 	private setWebviewMessageListener(webview: vscode.Webview) {
-		const onReceiveMessage = async (message: WebviewMessage) => webviewMessageHandler(this, message)
-
-		const messageDisposable = webview.onDidReceiveMessage(onReceiveMessage)
-		this.webviewDisposables.push(messageDisposable)
+		this.webviewManager.setWebviewMessageListener(webview)
 	}
 
 	/**
@@ -1529,41 +1233,19 @@ export class MirrorProvider
 		providerSettings: ProviderSettings,
 		options: { forceRebuild?: boolean } = {},
 	): void {
-		const task = this.getCurrentTask()
-		if (!task) return
-
-		const { forceRebuild = false } = options
-
-		// Determine if we need to rebuild using the previous configuration snapshot
-		const prevConfig = task.apiConfiguration
-		const prevProvider = prevConfig?.apiProvider
-		const prevModelId = prevConfig ? getModelId(prevConfig) : undefined
-		const newProvider = providerSettings.apiProvider
-		const newModelId = getModelId(providerSettings)
-
-		const needsRebuild = forceRebuild || prevProvider !== newProvider || prevModelId !== newModelId
-
-		if (needsRebuild) {
-			// Use updateApiConfiguration which handles both API handler rebuild and parser sync.
-			// Note: updateApiConfiguration is declared async but has no actual async operations,
-			// so we can safely call it without awaiting.
-			task.updateApiConfiguration(providerSettings)
-		} else {
-			// No rebuild needed, just sync apiConfiguration
-			;(task as any).apiConfiguration = providerSettings
-		}
+		this.profileManager["updateTaskApiHandlerIfNeeded"](providerSettings, options)
 	}
 
 	getProviderProfileEntries(): ProviderSettingsEntry[] {
-		return this.contextProxy.getValues().listApiConfigMeta || []
+		return this.profileManager.getProviderProfileEntries()
 	}
 
 	getProviderProfileEntry(name: string): ProviderSettingsEntry | undefined {
-		return this.getProviderProfileEntries().find((profile) => profile.name === name)
+		return this.profileManager.getProviderProfileEntry(name)
 	}
 
 	public hasProviderProfileEntry(name: string): boolean {
-		return !!this.getProviderProfileEntry(name)
+		return this.profileManager.hasProviderProfileEntry(name)
 	}
 
 	async upsertProviderProfile(
@@ -1571,243 +1253,51 @@ export class MirrorProvider
 		providerSettings: ProviderSettings,
 		activate: boolean = true,
 	): Promise<string | undefined> {
-		try {
-			// TODO: Do we need to be calling `activateProfile`? It's not
-			// clear to me what the source of truth should be; in some cases
-			// we rely on the `ContextProxy`'s data store and in other cases
-			// we rely on the `ProviderSettingsManager`'s data store. It might
-			// be simpler to unify these two.
-			const id = await this.providerSettingsManager.saveConfig(name, providerSettings)
-
-			if (activate) {
-				const { mode } = await this.getState()
-
-				// These promises do the following:
-				// 1. Adds or updates the list of provider profiles.
-				// 2. Sets the current provider profile.
-				// 3. Sets the current mode's provider profile.
-				// 4. Copies the provider settings to the context.
-				//
-				// Note: 1, 2, and 4 can be done in one `ContextProxy` call:
-				// this.contextProxy.setValues({ ...providerSettings, listApiConfigMeta: ..., currentApiConfigName: ... })
-				// We should probably switch to that and verify that it works.
-				// I left the original implementation in just to be safe.
-				await Promise.all([
-					this.updateGlobalState("listApiConfigMeta", await this.providerSettingsManager.listConfig()),
-					this.updateGlobalState("currentApiConfigName", name),
-					this.providerSettingsManager.setModeConfig(mode, id),
-					this.contextProxy.setProviderSettings(providerSettings),
-				])
-
-				// Change the provider for the current task.
-				// TODO: We should rename `buildApiHandler` for clarity (e.g. `getProviderClient`).
-				this.updateTaskApiHandlerIfNeeded(providerSettings, { forceRebuild: true })
-
-				// Keep the current task's sticky provider profile in sync with the newly-activated profile.
-				await this.persistStickyProviderProfileToCurrentTask(name)
-			} else {
-				await this.updateGlobalState("listApiConfigMeta", await this.providerSettingsManager.listConfig())
-			}
-
-			await this.postStateToWebview()
-			return id
-		} catch (error) {
-			this.log(
-				`Error create new api configuration: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
-			)
-
-			vscode.window.showErrorMessage(t("common:errors.create_api_config"))
-			return undefined
-		}
+		return this.profileManager.upsertProviderProfile(name, providerSettings, activate)
 	}
 
 	async deleteProviderProfile(profileToDelete: ProviderSettingsEntry) {
-		const globalSettings = this.contextProxy.getValues()
-		let profileToActivate: string | undefined = globalSettings.currentApiConfigName
-
-		if (profileToDelete.name === profileToActivate) {
-			profileToActivate = this.getProviderProfileEntries().find(({ name }) => name !== profileToDelete.name)?.name
-		}
-
-		if (!profileToActivate) {
-			throw new Error("You cannot delete the last profile")
-		}
-
-		const entries = this.getProviderProfileEntries().filter(({ name }) => name !== profileToDelete.name)
-
-		await this.contextProxy.setValues({
-			...globalSettings,
-			currentApiConfigName: profileToActivate,
-			listApiConfigMeta: entries,
-		})
-
-		await this.postStateToWebview()
+		await this.profileManager.deleteProviderProfile(profileToDelete)
 	}
 
 	private async persistStickyProviderProfileToCurrentTask(apiConfigName: string): Promise<void> {
-		const task = this.getCurrentTask()
-		if (!task) {
-			return
-		}
-
-		try {
-			// Update in-memory state immediately so sticky behavior works even before the task has
-			// been persisted into taskHistory (it will be captured on the next save).
-			task.setTaskApiConfigName(apiConfigName)
-
-			const taskHistoryItem =
-				this.taskHistoryStore.get(task.taskId) ??
-				(this.getGlobalState("taskHistory") ?? []).find((item) => item.id === task.taskId)
-
-			if (taskHistoryItem) {
-				await this.updateTaskHistory({ ...taskHistoryItem, apiConfigName })
-			}
-		} catch (error) {
-			// If persistence fails, log the error but don't fail the profile switch.
-			this.log(
-				`Failed to persist provider profile switch for task ${task.taskId}: ${
-					error instanceof Error ? error.message : String(error)
-				}`,
-			)
-		}
+		await this.profileManager["persistStickyProviderProfileToCurrentTask"](apiConfigName)
 	}
 
 	async activateProviderProfile(
 		args: { name: string } | { id: string },
 		options?: { persistModeConfig?: boolean; persistTaskHistory?: boolean },
 	) {
-		const { name, id, ...providerSettings } = await this.providerSettingsManager.activateProfile(args)
-
-		const persistModeConfig = options?.persistModeConfig ?? true
-		const persistTaskHistory = options?.persistTaskHistory ?? true
-
-		// See `upsertProviderProfile` for a description of what this is doing.
-		await Promise.all([
-			this.contextProxy.setValue("listApiConfigMeta", await this.providerSettingsManager.listConfig()),
-			this.contextProxy.setValue("currentApiConfigName", name),
-			this.contextProxy.setProviderSettings(providerSettings),
-		])
-
-		const { mode } = await this.getState()
-
-		if (id && persistModeConfig) {
-			await this.providerSettingsManager.setModeConfig(mode, id)
-		}
-
-		// Change the provider for the current task.
-		this.updateTaskApiHandlerIfNeeded(providerSettings, { forceRebuild: true })
-
-		// Update the current task's sticky provider profile, unless this activation is
-		// being used purely as a non-persisting restoration (e.g., reopening a task from history).
-		if (persistTaskHistory) {
-			await this.persistStickyProviderProfileToCurrentTask(name)
-		}
-
-		await this.postStateToWebview()
-
-		if (providerSettings.apiProvider) {
-			this.emit(MirrorVSEventName.ProviderProfileChanged, { name, provider: providerSettings.apiProvider })
-		}
+		await this.profileManager.activateProviderProfile(args, options)
 	}
 
 	async updateCustomInstructions(instructions?: string) {
-		// User may be clearing the field.
-		await this.updateGlobalState("customInstructions", instructions || undefined)
-		await this.postStateToWebview()
+		await this.profileManager.updateCustomInstructions(instructions)
 	}
 
 	// MCP
 
 	async ensureMcpServersDirectoryExists(): Promise<string> {
-		// Get platform-specific application data directory
-		let mcpServersDir: string
-		if (process.platform === "win32") {
-			// Windows: %APPDATA%\Mirror-VS\MCP
-			mcpServersDir = path.join(os.homedir(), "AppData", "Roaming", "Mirror-VS", "MCP")
-		} else if (process.platform === "darwin") {
-			// macOS: ~/Documents/Mirror/MCP
-			mcpServersDir = path.join(os.homedir(), "Documents", "Mirror", "MCP")
-		} else {
-			// Linux: ~/.local/share/Mirror/MCP
-			mcpServersDir = path.join(os.homedir(), ".local", "share", "Mirror-VS", "MCP")
-		}
-
-		try {
-			await fs.mkdir(mcpServersDir, { recursive: true })
-		} catch (error) {
-			// Fallback to a relative path if directory creation fails
-			return path.join(os.homedir(), ".mirror-vs", "mcp")
-		}
-		return mcpServersDir
+		return this.helpers.ensureMcpServersDirectoryExists()
 	}
 
 	async ensureSettingsDirectoryExists(): Promise<string> {
-		const { getSettingsDirectoryPath } = await import("../../utils/storage")
-		const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
-		return getSettingsDirectoryPath(globalStoragePath)
+		return this.helpers.ensureSettingsDirectoryExists()
 	}
 
 	// OpenRouter
 
 	async handleOpenRouterCallback(code: string) {
-		let { apiConfiguration, currentApiConfigName = "default" } = await this.getState()
-
-		let apiKey: string
-
-		try {
-			const baseUrl = apiConfiguration.openRouterBaseUrl || "https://openrouter.ai/api/v1"
-			// Extract the base domain for the auth endpoint.
-			const baseUrlDomain = baseUrl.match(/^(https?:\/\/[^\/]+)/)?.[1] || "https://openrouter.ai"
-			const response = await axios.post(`${baseUrlDomain}/api/v1/auth/keys`, { code })
-
-			if (response.data && response.data.key) {
-				apiKey = response.data.key
-			} else {
-				throw new Error("Invalid response from OpenRouter API")
-			}
-		} catch (error) {
-			this.log(
-				`Error exchanging code for API key: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
-			)
-
-			throw error
-		}
-
-		const newConfiguration: ProviderSettings = {
-			...apiConfiguration,
-			apiProvider: "openrouter",
-			openRouterApiKey: apiKey,
-			openRouterModelId: apiConfiguration?.openRouterModelId || openRouterDefaultModelId,
-		}
-
-		await this.upsertProviderProfile(currentApiConfigName, newConfiguration)
+		await this.profileManager.handleOpenRouterCallback(code)
 	}
 
 	// Requesty
 
 	async handleRequestyCallback(code: string, baseUrl: string | null) {
-		let { apiConfiguration } = await this.getState()
-
-		const newConfiguration: ProviderSettings = {
-			...apiConfiguration,
-			apiProvider: "requesty",
-			requestyApiKey: code,
-			requestyModelId: apiConfiguration?.requestyModelId || requestyDefaultModelId,
-		}
-
-		// set baseUrl as undefined if we don't provide one
-		// or if it is the default requesty url
-		if (!baseUrl || baseUrl === REQUESTY_BASE_URL) {
-			newConfiguration.requestyBaseUrl = undefined
-		} else {
-			newConfiguration.requestyBaseUrl = baseUrl
-		}
-
-		const profileName = `Requesty (${new Date().toLocaleString()})`
-		await this.upsertProviderProfile(profileName, newConfiguration)
+		await this.profileManager.handleRequestyCallback(code, baseUrl)
 	}
 
-	// Task history
+	// Task history (delegated to TaskHistoryManager)
 
 	async getTaskWithId(id: string): Promise<{
 		historyItem: HistoryItem
@@ -1816,57 +1306,14 @@ export class MirrorProvider
 		uiMessagesFilePath: string
 		apiConversationHistory: Anthropic.MessageParam[]
 	}> {
-		const historyItem =
-			this.taskHistoryStore.get(id) ?? (this.getGlobalState("taskHistory") ?? []).find((item) => item.id === id)
-
-		if (!historyItem) {
-			throw new Error("Task not found")
-		}
-
-		const { getTaskDirectoryPath } = await import("../../utils/storage")
-		const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
-		const taskDirPath = await getTaskDirectoryPath(globalStoragePath, id)
-		const apiConversationHistoryFilePath = path.join(taskDirPath, GlobalFileNames.apiConversationHistory)
-		const uiMessagesFilePath = path.join(taskDirPath, GlobalFileNames.uiMessages)
-		const fileExists = await fileExistsAtPath(apiConversationHistoryFilePath)
-
-		let apiConversationHistory: Anthropic.MessageParam[] = []
-
-		if (fileExists) {
-			try {
-				apiConversationHistory = JSON.parse(await fs.readFile(apiConversationHistoryFilePath, "utf8"))
-			} catch (error) {
-				console.warn(
-					`[getTaskWithId] api_conversation_history.json corrupted for task ${id}, returning empty history: ${error instanceof Error ? error.message : String(error)}`,
-				)
-			}
-		} else {
-			console.warn(
-				`[getTaskWithId] api_conversation_history.json missing for task ${id}, returning empty history`,
-			)
-		}
-
-		return {
-			historyItem,
-			taskDirPath,
-			apiConversationHistoryFilePath,
-			uiMessagesFilePath,
-			apiConversationHistory,
-		}
+		return this.taskHistoryManager.getTaskWithId(id)
 	}
 
 	async getTaskWithAggregatedCosts(taskId: string): Promise<{
 		historyItem: HistoryItem
 		aggregatedCosts: AggregatedCosts
 	}> {
-		const { historyItem } = await this.getTaskWithId(taskId)
-
-		const aggregatedCosts = await aggregateTaskCostsRecursive(taskId, async (id: string) => {
-			const result = await this.getTaskWithId(id)
-			return result.historyItem
-		})
-
-		return { historyItem, aggregatedCosts }
+		return this.taskHistoryManager.getTaskWithAggregatedCosts(taskId)
 	}
 
 	async showTaskWithId(id: string) {
@@ -1895,439 +1342,40 @@ export class MirrorProvider
 
 	/* Condenses a task's message history to use fewer tokens. */
 	async condenseTaskContext(taskId: string) {
-		let task: Task | undefined
-		for (let i = this.mirrorStack.length - 1; i >= 0; i--) {
-			if (this.mirrorStack[i].taskId === taskId) {
-				task = this.mirrorStack[i]
-				break
-			}
-		}
-		if (!task) {
-			throw new Error(`Task with id ${taskId} not found in stack`)
-		}
-		await task.condenseContext()
-		await this.postMessageToWebview({ type: "condenseTaskContextResponse", text: taskId })
+		return this.taskLifecycleManager.condenseTaskContext(taskId)
 	}
 
 	// this function deletes a task from task history, and deletes its checkpoints and delete the task folder
 	// If the task has subtasks (childIds), they will also be deleted recursively
 	async deleteTaskWithId(id: string, cascadeSubtasks: boolean = true) {
-		try {
-			// get the task directory full path and history item
-			const { taskDirPath, historyItem } = await this.getTaskWithId(id)
-
-			// Collect all task IDs to delete (parent + all subtasks)
-			const allIdsToDelete: string[] = [id]
-
-			if (cascadeSubtasks) {
-				// Recursively collect all child IDs
-				const collectChildIds = async (taskId: string): Promise<void> => {
-					try {
-						const { historyItem: item } = await this.getTaskWithId(taskId)
-						if (item.childIds && item.childIds.length > 0) {
-							for (const childId of item.childIds) {
-								allIdsToDelete.push(childId)
-								await collectChildIds(childId)
-							}
-						}
-					} catch (error) {
-						// Child task may already be deleted or not found, continue
-						console.log(`[deleteTaskWithId] child task ${taskId} not found, skipping`)
-					}
-				}
-
-				await collectChildIds(id)
-			}
-
-			// Remove from stack if any of the tasks to delete are in the current task stack
-			for (const taskId of allIdsToDelete) {
-				if (taskId === this.getCurrentTask()?.taskId) {
-					// Close the current task instance; delegation flows will be handled via metadata if applicable.
-					await this.removeMirrorFromStack()
-					break
-				}
-			}
-
-			// Delete all tasks from state in one batch
-			await this.taskHistoryStore.deleteMany(allIdsToDelete)
-			this.recentTasksCache = undefined
-
-			// Delete associated shadow repositories or branches and task directories
-			const globalStorageDir = this.contextProxy.globalStorageUri.fsPath
-			const workspaceDir = this.cwd
-			const { getTaskDirectoryPath } = await import("../../utils/storage")
-			const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
-
-			for (const taskId of allIdsToDelete) {
-				try {
-					await ShadowCheckpointService.deleteTask({ taskId, globalStorageDir, workspaceDir })
-				} catch (error) {
-					console.error(
-						`[deleteTaskWithId${taskId}] failed to delete associated shadow repository or branch: ${error instanceof Error ? error.message : String(error)}`,
-					)
-				}
-
-				// Delete the task directory
-				try {
-					const dirPath = await getTaskDirectoryPath(globalStoragePath, taskId)
-					await fs.rm(dirPath, { recursive: true, force: true })
-					console.log(`[deleteTaskWithId${taskId}] removed task directory`)
-				} catch (error) {
-					console.error(
-						`[deleteTaskWithId${taskId}] failed to remove task directory: ${error instanceof Error ? error.message : String(error)}`,
-					)
-				}
-			}
-
-			await this.postStateToWebview()
-		} catch (error) {
-			// If task is not found, just remove it from state
-			if (error instanceof Error && error.message === "Task not found") {
-				await this.deleteTaskFromState(id)
-				return
-			}
-			throw error
-		}
+		return this.taskHistoryManager.deleteTaskWithId(id, cascadeSubtasks)
 	}
 
 	async deleteTaskFromState(id: string) {
-		await this.taskHistoryStore.delete(id)
-		this.recentTasksCache = undefined
-
-		await this.postStateToWebview()
+		return this.taskHistoryManager.deleteTaskFromState(id)
 	}
 
+	// ── State management (delegated to StateManager) ───────────────────────────
+
 	async refreshWorkspace() {
-		this.currentWorkspacePath = getWorkspacePath()
-		await this.postStateToWebview()
+		await this.stateManager.refreshWorkspace()
 	}
 
 	async postStateToWebview() {
-		const state = await this.getStateToPostToWebview()
-		this.mirrorMessagesSeq++
-		state.mirrorMessagesSeq = this.mirrorMessagesSeq
-		this.postMessageToWebview({ type: "state", state })
+		await this.stateManager.postStateToWebview()
 	}
 
-	/**
-	 * Like postStateToWebview but intentionally omits taskHistory.
-	 *
-	 * Rationale:
-	 * - taskHistory can be large and was being resent on every chat message update.
-	 * - The webview maintains taskHistory in-memory and receives updates via
-	 *   `taskHistoryUpdated` / `taskHistoryItemUpdated`.
-	 */
 	async postStateToWebviewWithoutTaskHistory(): Promise<void> {
-		const state = await this.getStateToPostToWebview()
-		this.mirrorMessagesSeq++
-		state.mirrorMessagesSeq = this.mirrorMessagesSeq
-		const { taskHistory: _omit, ...rest } = state
-		this.postMessageToWebview({ type: "state", state: rest })
+		await this.stateManager.postStateToWebviewWithoutTaskHistory()
 	}
 
-	/**
-	 * Like postStateToWebview but intentionally omits both mirrorMessages and taskHistory.
-	 *
-	 * Rationale:
-	 * - Settings and mode changes trigger state pushes
-	 *   that have nothing to do with chat messages. Including mirrorMessages in these pushes
-	 *   creates race conditions where a stale snapshot of mirrorMessages (captured during async
-	 *   getStateToPostToWebview) overwrites newer messages the task has streamed in the meantime.
-	 * - This method ensures non-message events only push the state fields they actually affect
-	 *   without interfering with task message streaming.
-	 */
 	async postStateToWebviewWithoutMirrorMessages(): Promise<void> {
-		const state = await this.getStateToPostToWebview()
-		const { mirrorMessages: _omitMessages, taskHistory: _omitHistory, ...rest } = state
-		this.postMessageToWebview({ type: "state", state: rest })
-	}
-
-	/**
-	 * Merges allowed commands from global state and workspace configuration
-	 * with proper validation and deduplication
-	 */
-	private mergeAllowedCommands(globalStateCommands?: string[]): string[] {
-		return this.mergeCommandLists("allowedCommands", "allowed", globalStateCommands)
-	}
-
-	/**
-	 * Merges denied commands from global state and workspace configuration
-	 * with proper validation and deduplication
-	 */
-	private mergeDeniedCommands(globalStateCommands?: string[]): string[] {
-		return this.mergeCommandLists("deniedCommands", "denied", globalStateCommands)
-	}
-
-	/**
-	 * Common utility for merging command lists from global state and workspace configuration.
-	 * Implements the Command Denylist feature's merging strategy with proper validation.
-	 *
-	 * @param configKey - VSCode workspace configuration key
-	 * @param commandType - Type of commands for error logging
-	 * @param globalStateCommands - Commands from global state
-	 * @returns Merged and deduplicated command list
-	 */
-	private mergeCommandLists(
-		configKey: "allowedCommands" | "deniedCommands",
-		commandType: "allowed" | "denied",
-		globalStateCommands?: string[],
-	): string[] {
-		try {
-			// Validate and sanitize global state commands
-			const validGlobalCommands = Array.isArray(globalStateCommands)
-				? globalStateCommands.filter((cmd) => typeof cmd === "string" && cmd.trim().length > 0)
-				: []
-
-			// Get workspace configuration commands
-			const workspaceCommands = vscode.workspace.getConfiguration(Package.name).get<string[]>(configKey) || []
-
-			// Validate and sanitize workspace commands
-			const validWorkspaceCommands = Array.isArray(workspaceCommands)
-				? workspaceCommands.filter((cmd) => typeof cmd === "string" && cmd.trim().length > 0)
-				: []
-
-			// Combine and deduplicate commands
-			// Global state takes precedence over workspace configuration
-			const mergedCommands = [...new Set([...validGlobalCommands, ...validWorkspaceCommands])]
-
-			return mergedCommands
-		} catch (error) {
-			console.error(`Error merging ${commandType} commands:`, error)
-			// Return empty array as fallback to prevent crashes
-			return []
-		}
+		await this.stateManager.postStateToWebviewWithoutMirrorMessages()
 	}
 
 	async getStateToPostToWebview(): Promise<ExtensionState> {
-		// Ensure the store is initialized before reading task history
-		await this.taskHistoryStore.initialized
-
-		const {
-			apiConfiguration,
-			lastShownAnnouncementId,
-			customInstructions,
-			alwaysAllowReadOnly,
-			alwaysAllowReadOnlyOutsideWorkspace,
-			alwaysAllowWrite,
-			alwaysAllowWriteOutsideWorkspace,
-			alwaysAllowWriteProtected,
-			alwaysAllowExecute,
-			allowedCommands,
-			deniedCommands,
-			alwaysAllowMcp,
-			alwaysAllowModeSwitch,
-			alwaysAllowSubtasks,
-			allowedMaxRequests,
-			allowedMaxCost,
-			autoCondenseContext,
-			autoCondenseContextPercent,
-			soundEnabled,
-			ttsEnabled,
-			ttsSpeed,
-			enableCheckpoints,
-			checkpointTimeout,
-			taskHistory,
-			soundVolume,
-			writeDelayMs,
-			terminalShellIntegrationTimeout,
-			terminalShellIntegrationDisabled,
-			terminalCommandDelay,
-			terminalPowershellCounter,
-			terminalZshClearEolMark,
-			terminalZshOhMy,
-			terminalZshP10k,
-			terminalZdotdir,
-			mcpEnabled,
-			currentApiConfigName,
-			listApiConfigMeta,
-			pinnedApiConfigs,
-			mode,
-			customModePrompts,
-			customSupportPrompts,
-			enhancementApiConfigId,
-			autoApprovalEnabled,
-			autonomousMode,
-			customModes,
-			experiments,
-			maxOpenTabsContext,
-			maxWorkspaceFiles,
-			disabledTools,
-			showMirrorIgnoredFiles,
-			enableSubfolderRules,
-			language,
-			maxImageFileSize,
-			maxTotalImageSize,
-			historyPreviewCollapsed,
-			reasoningBlockCollapsed,
-			enterBehavior,
-			organizationAllowList,
-			customCondensingPrompt,
-			codebaseIndexConfig,
-			codebaseIndexModels,
-			profileThresholds,
-			alwaysAllowFollowupQuestions,
-			followupAutoApproveTimeoutMs,
-			includeDiagnosticMessages,
-			maxDiagnosticMessages,
-			includeTaskHistoryInEnhance,
-			includeCurrentTime,
-			includeCurrentCost,
-			maxGitStatusFiles,
-			imageGenerationProvider,
-			openRouterImageApiKey,
-			openRouterImageGenerationSelectedModel,
-			comfyuiAutoSetup,
-			lockApiConfigAcrossModes,
-			currentSessionId,
-			sessionNames,
-			comfyCloudApiToken,
-			atlasCloudApiToken,
-			atlasCloudModels,
-		} = await this.getState()
-
-		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
-		const mergedDeniedCommands = this.mergeDeniedCommands(deniedCommands)
-		const cwd = this.cwd
-		const currentTask = this.getCurrentTask()
-
-		return {
-			version: this.context.extension?.packageJSON?.version ?? "",
-			apiConfiguration,
-			customInstructions,
-			alwaysAllowReadOnly: alwaysAllowReadOnly ?? false,
-			alwaysAllowReadOnlyOutsideWorkspace: alwaysAllowReadOnlyOutsideWorkspace ?? false,
-			alwaysAllowWrite: alwaysAllowWrite ?? false,
-			alwaysAllowWriteOutsideWorkspace: alwaysAllowWriteOutsideWorkspace ?? false,
-			alwaysAllowWriteProtected: alwaysAllowWriteProtected ?? false,
-			alwaysAllowExecute: alwaysAllowExecute ?? false,
-			alwaysAllowMcp: alwaysAllowMcp ?? false,
-			alwaysAllowModeSwitch: alwaysAllowModeSwitch ?? false,
-			alwaysAllowSubtasks: alwaysAllowSubtasks ?? false,
-			allowedMaxRequests,
-			allowedMaxCost,
-			autoCondenseContext: autoCondenseContext ?? true,
-			autoCondenseContextPercent: autoCondenseContextPercent ?? 100,
-			uriScheme: vscode.env.uriScheme,
-			currentTaskId: currentTask?.taskId,
-			currentTaskItem: currentTask?.taskId ? this.taskHistoryStore.get(currentTask.taskId) : undefined,
-			mirrorMessages: currentTask?.mirrorMessages || [],
-			currentTaskTodos: currentTask?.todoList || [],
-			messageQueue: currentTask?.messageQueueService?.messages,
-			taskHistory: this.taskHistoryStore.getAll().filter((item: HistoryItem) => item.ts && item.task),
-			soundEnabled: soundEnabled ?? false,
-			ttsEnabled: ttsEnabled ?? false,
-			ttsSpeed: ttsSpeed ?? 1.0,
-			enableCheckpoints: enableCheckpoints ?? true,
-			checkpointTimeout: checkpointTimeout ?? DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
-			shouldShowAnnouncement: lastShownAnnouncementId !== this.latestAnnouncementId,
-			allowedCommands: mergedAllowedCommands,
-			deniedCommands: mergedDeniedCommands,
-			hasActiveReviews: (() => {
-				try {
-					const { ReviewManager } = require("../../services/review-manager")
-					return ReviewManager.getInstance().getActiveReviewsCount() > 0
-				} catch {
-					return false
-				}
-			})(),
-			soundVolume: soundVolume ?? 0.5,
-			writeDelayMs: writeDelayMs ?? DEFAULT_WRITE_DELAY_MS,
-			terminalShellIntegrationTimeout: terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
-			terminalShellIntegrationDisabled: terminalShellIntegrationDisabled ?? true,
-			terminalCommandDelay: terminalCommandDelay ?? 0,
-			terminalPowershellCounter: terminalPowershellCounter ?? false,
-			terminalZshClearEolMark: terminalZshClearEolMark ?? true,
-			terminalZshOhMy: terminalZshOhMy ?? false,
-			terminalZshP10k: terminalZshP10k ?? false,
-			terminalZdotdir: terminalZdotdir ?? false,
-			mcpEnabled: mcpEnabled ?? true,
-			currentApiConfigName: currentApiConfigName ?? "default",
-			listApiConfigMeta: listApiConfigMeta ?? [],
-			pinnedApiConfigs: pinnedApiConfigs ?? {},
-			mode: mode ?? defaultModeSlug,
-			customModePrompts: customModePrompts ?? {},
-			customSupportPrompts: customSupportPrompts ?? {},
-			enhancementApiConfigId,
-			autoApprovalEnabled: autoApprovalEnabled ?? false,
-			autonomousMode: autonomousMode ?? false,
-			customModes,
-			experiments: experiments ?? experimentDefault,
-			mcpServers: this.mcpHub?.getAllServers() ?? [],
-			maxOpenTabsContext: maxOpenTabsContext ?? 20,
-			maxWorkspaceFiles: maxWorkspaceFiles ?? 200,
-			cwd,
-			disabledTools,
-			showMirrorIgnoredFiles: showMirrorIgnoredFiles ?? false,
-			enableSubfolderRules: enableSubfolderRules ?? false,
-			language: language ?? formatLanguage(vscode.env.language),
-			renderContext: this.renderContext,
-			maxImageFileSize: maxImageFileSize ?? 5,
-			maxTotalImageSize: maxTotalImageSize ?? 20,
-			settingsImportedAt: this.settingsImportedAt,
-			historyPreviewCollapsed: historyPreviewCollapsed ?? false,
-			reasoningBlockCollapsed: reasoningBlockCollapsed ?? true,
-			enterBehavior: enterBehavior ?? "send",
-			organizationAllowList,
-			customCondensingPrompt,
-			codebaseIndexModels: codebaseIndexModels ?? EMBEDDING_MODEL_PROFILES,
-			codebaseIndexConfig: {
-				codebaseIndexEnabled: codebaseIndexConfig?.codebaseIndexEnabled ?? false,
-				codebaseIndexQdrantUrl: codebaseIndexConfig?.codebaseIndexQdrantUrl ?? "http://localhost:6333",
-				codebaseIndexEmbedderProvider: codebaseIndexConfig?.codebaseIndexEmbedderProvider ?? "openai",
-				codebaseIndexEmbedderBaseUrl: codebaseIndexConfig?.codebaseIndexEmbedderBaseUrl ?? "",
-				codebaseIndexEmbedderModelId: codebaseIndexConfig?.codebaseIndexEmbedderModelId ?? "",
-				codebaseIndexEmbedderModelDimension: codebaseIndexConfig?.codebaseIndexEmbedderModelDimension ?? 1536,
-				codebaseIndexOpenAiCompatibleBaseUrl: codebaseIndexConfig?.codebaseIndexOpenAiCompatibleBaseUrl,
-				codebaseIndexSearchMaxResults: codebaseIndexConfig?.codebaseIndexSearchMaxResults,
-				codebaseIndexSearchMinScore: codebaseIndexConfig?.codebaseIndexSearchMinScore,
-				codebaseIndexBedrockRegion: codebaseIndexConfig?.codebaseIndexBedrockRegion,
-				codebaseIndexBedrockProfile: codebaseIndexConfig?.codebaseIndexBedrockProfile,
-				codebaseIndexOpenRouterSpecificProvider: codebaseIndexConfig?.codebaseIndexOpenRouterSpecificProvider,
-			},
-			profileThresholds: profileThresholds ?? {},
-			hasOpenedModeSelector: this.getGlobalState("hasOpenedModeSelector") ?? false,
-			lockApiConfigAcrossModes: lockApiConfigAcrossModes ?? false,
-			alwaysAllowFollowupQuestions: alwaysAllowFollowupQuestions ?? false,
-			followupAutoApproveTimeoutMs: followupAutoApproveTimeoutMs ?? 60000,
-			includeDiagnosticMessages: includeDiagnosticMessages ?? true,
-			maxDiagnosticMessages: maxDiagnosticMessages ?? 50,
-			includeTaskHistoryInEnhance: includeTaskHistoryInEnhance ?? true,
-			includeCurrentTime: includeCurrentTime ?? true,
-			includeCurrentCost: includeCurrentCost ?? true,
-			maxGitStatusFiles: maxGitStatusFiles ?? 0,
-			imageGenerationProvider,
-			openRouterImageApiKey,
-			openRouterImageGenerationSelectedModel,
-			comfyuiAutoSetup,
-			openAiCodexIsAuthenticated: await (async () => {
-				try {
-					const { openAiCodexOAuthManager } = await import("../../integrations/openai-codex/oauth")
-					return await openAiCodexOAuthManager.isAuthenticated()
-				} catch {
-					return false
-				}
-			})(),
-			activeTerminalCount: TerminalRegistry.getTerminals(true).length,
-			activeTerminals: TerminalRegistry.getTerminals(true).map((t) => ({
-				id: t.id,
-				command: t.getLastCommand(),
-				cwd: t.getCurrentWorkingDirectory(),
-				taskId: t.taskId,
-			})),
-			currentSessionId,
-			sessionNames: sessionNames ?? {},
-			comfyCloudApiToken,
-			atlasCloudApiToken,
-			atlasCloudModels: atlasCloudModels ?? {},
-			debug: vscode.workspace.getConfiguration(Package.name).get<boolean>("debug", false),
-		}
+		return this.stateManager.getStateToPostToWebview()
 	}
-
-	/**
-	 * Storage
-	 * https://dev.to/kompotkot/how-to-use-secretstorage-in-your-vscode-extensions-2hco
-	 * https://www.eliostruyf.com/devhack-code-extension-storage-options/
-	 */
 
 	async getState(): Promise<
 		Omit<
@@ -2341,141 +1389,7 @@ export class MirrorProvider
 			| "activeTerminals"
 		>
 	> {
-		const stateValues = this.contextProxy.getValues()
-		const customModes = await this.customModesManager.getCustomModes()
-
-		// Determine apiProvider with the same logic as before, while filtering retired providers.
-		const apiProvider: ProviderName =
-			stateValues.apiProvider && !isRetiredProvider(stateValues.apiProvider)
-				? stateValues.apiProvider
-				: "openrouter"
-
-		// Build the apiConfiguration object combining state values and secrets.
-		const providerSettings = this.contextProxy.getProviderSettings()
-
-		// Ensure apiProvider is set properly if not already in state
-		if (!providerSettings.apiProvider) {
-			providerSettings.apiProvider = apiProvider
-		}
-		if (providerSettings.apiProvider === "openrouter" && !providerSettings.openRouterModelId) {
-			providerSettings.openRouterModelId = openRouterDefaultModelId
-		}
-
-		const organizationAllowList = ORGANIZATION_ALLOW_ALL
-
-		// Return the same structure as before.
-		return {
-			apiConfiguration: providerSettings,
-			lastShownAnnouncementId: stateValues.lastShownAnnouncementId,
-			customInstructions: stateValues.customInstructions,
-			apiModelId: stateValues.apiModelId,
-			alwaysAllowReadOnly: stateValues.alwaysAllowReadOnly ?? false,
-			alwaysAllowReadOnlyOutsideWorkspace: stateValues.alwaysAllowReadOnlyOutsideWorkspace ?? false,
-			alwaysAllowWrite: stateValues.alwaysAllowWrite ?? false,
-			alwaysAllowWriteOutsideWorkspace: stateValues.alwaysAllowWriteOutsideWorkspace ?? false,
-			alwaysAllowWriteProtected: stateValues.alwaysAllowWriteProtected ?? false,
-			alwaysAllowExecute: stateValues.alwaysAllowExecute ?? false,
-			alwaysAllowMcp: stateValues.alwaysAllowMcp ?? false,
-			alwaysAllowModeSwitch: stateValues.alwaysAllowModeSwitch ?? false,
-			alwaysAllowSubtasks: stateValues.alwaysAllowSubtasks ?? false,
-			alwaysAllowFollowupQuestions: stateValues.alwaysAllowFollowupQuestions ?? false,
-			followupAutoApproveTimeoutMs: stateValues.followupAutoApproveTimeoutMs ?? 60000,
-			diagnosticsEnabled: stateValues.diagnosticsEnabled ?? true,
-			allowedMaxRequests: stateValues.allowedMaxRequests,
-			allowedMaxCost: stateValues.allowedMaxCost,
-			autoCondenseContext: stateValues.autoCondenseContext ?? true,
-			autoCondenseContextPercent: stateValues.autoCondenseContextPercent ?? 100,
-			taskHistory: this.taskHistoryStore.getAll(),
-			allowedCommands: stateValues.allowedCommands,
-			deniedCommands: stateValues.deniedCommands,
-			soundEnabled: stateValues.soundEnabled ?? false,
-			ttsEnabled: stateValues.ttsEnabled ?? false,
-			ttsSpeed: stateValues.ttsSpeed ?? 1.0,
-			enableCheckpoints: stateValues.enableCheckpoints ?? true,
-			checkpointTimeout: stateValues.checkpointTimeout ?? DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
-			soundVolume: stateValues.soundVolume,
-			writeDelayMs: stateValues.writeDelayMs ?? DEFAULT_WRITE_DELAY_MS,
-			terminalShellIntegrationTimeout:
-				stateValues.terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
-			terminalShellIntegrationDisabled: stateValues.terminalShellIntegrationDisabled ?? true,
-			terminalCommandDelay: stateValues.terminalCommandDelay ?? 0,
-			terminalPowershellCounter: stateValues.terminalPowershellCounter ?? false,
-			terminalZshClearEolMark: stateValues.terminalZshClearEolMark ?? true,
-			terminalZshOhMy: stateValues.terminalZshOhMy ?? false,
-			terminalZshP10k: stateValues.terminalZshP10k ?? false,
-			terminalZdotdir: stateValues.terminalZdotdir ?? false,
-			mode: stateValues.mode ?? defaultModeSlug,
-			language: stateValues.language ?? formatLanguage(vscode.env.language),
-			mcpEnabled: stateValues.mcpEnabled ?? true,
-			mcpServers: this.mcpHub?.getAllServers() ?? [],
-			currentApiConfigName: stateValues.currentApiConfigName ?? "default",
-			listApiConfigMeta: stateValues.listApiConfigMeta ?? [],
-			pinnedApiConfigs: stateValues.pinnedApiConfigs ?? {},
-			modeApiConfigs: stateValues.modeApiConfigs ?? ({} as Record<Mode, string>),
-			customModePrompts: stateValues.customModePrompts ?? {},
-			customSupportPrompts: stateValues.customSupportPrompts ?? {},
-			enhancementApiConfigId: stateValues.enhancementApiConfigId,
-			experiments: stateValues.experiments ?? experimentDefault,
-			autoApprovalEnabled: stateValues.autoApprovalEnabled ?? false,
-			autonomousMode: stateValues.autonomousMode ?? false,
-			customModes,
-			maxOpenTabsContext: stateValues.maxOpenTabsContext ?? 20,
-			maxWorkspaceFiles: stateValues.maxWorkspaceFiles ?? 200,
-			disabledTools: stateValues.disabledTools,
-			showMirrorIgnoredFiles: stateValues.showMirrorIgnoredFiles ?? false,
-			enableSubfolderRules: stateValues.enableSubfolderRules ?? false,
-			maxImageFileSize: stateValues.maxImageFileSize ?? 5,
-			maxTotalImageSize: stateValues.maxTotalImageSize ?? 20,
-			historyPreviewCollapsed: stateValues.historyPreviewCollapsed ?? false,
-			reasoningBlockCollapsed: stateValues.reasoningBlockCollapsed ?? true,
-			enterBehavior: stateValues.enterBehavior ?? "send",
-			organizationAllowList,
-			customCondensingPrompt: stateValues.customCondensingPrompt,
-			codebaseIndexModels: stateValues.codebaseIndexModels ?? EMBEDDING_MODEL_PROFILES,
-			codebaseIndexConfig: {
-				codebaseIndexEnabled: stateValues.codebaseIndexConfig?.codebaseIndexEnabled ?? false,
-				codebaseIndexQdrantUrl:
-					stateValues.codebaseIndexConfig?.codebaseIndexQdrantUrl ?? "http://localhost:6333",
-				codebaseIndexEmbedderProvider:
-					stateValues.codebaseIndexConfig?.codebaseIndexEmbedderProvider ?? "openai",
-				codebaseIndexEmbedderBaseUrl: stateValues.codebaseIndexConfig?.codebaseIndexEmbedderBaseUrl ?? "",
-				codebaseIndexEmbedderModelId: stateValues.codebaseIndexConfig?.codebaseIndexEmbedderModelId ?? "",
-				codebaseIndexEmbedderModelDimension:
-					stateValues.codebaseIndexConfig?.codebaseIndexEmbedderModelDimension,
-				codebaseIndexOpenAiCompatibleBaseUrl:
-					stateValues.codebaseIndexConfig?.codebaseIndexOpenAiCompatibleBaseUrl,
-				codebaseIndexSearchMaxResults: stateValues.codebaseIndexConfig?.codebaseIndexSearchMaxResults,
-				codebaseIndexSearchMinScore: stateValues.codebaseIndexConfig?.codebaseIndexSearchMinScore,
-				codebaseIndexBedrockRegion: stateValues.codebaseIndexConfig?.codebaseIndexBedrockRegion,
-				codebaseIndexBedrockProfile: stateValues.codebaseIndexConfig?.codebaseIndexBedrockProfile,
-				codebaseIndexOpenRouterSpecificProvider:
-					stateValues.codebaseIndexConfig?.codebaseIndexOpenRouterSpecificProvider,
-			},
-			profileThresholds: stateValues.profileThresholds ?? {},
-			lockApiConfigAcrossModes: this.context.workspaceState.get("lockApiConfigAcrossModes", false),
-			includeDiagnosticMessages: stateValues.includeDiagnosticMessages ?? true,
-			maxDiagnosticMessages: stateValues.maxDiagnosticMessages ?? 50,
-			includeTaskHistoryInEnhance: stateValues.includeTaskHistoryInEnhance ?? true,
-			includeCurrentTime: stateValues.includeCurrentTime ?? true,
-			includeCurrentCost: stateValues.includeCurrentCost ?? true,
-			maxGitStatusFiles: stateValues.maxGitStatusFiles ?? 0,
-			imageGenerationProvider: stateValues.imageGenerationProvider,
-			openRouterImageApiKey: stateValues.openRouterImageApiKey,
-			openRouterImageGenerationSelectedModel: stateValues.openRouterImageGenerationSelectedModel,
-			comfyuiAutoSetup: stateValues.comfyuiAutoSetup,
-			currentSessionId: stateValues.currentSessionId,
-			sessionNames: stateValues.sessionNames ?? {},
-			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
-			userBraveApiKey: stateValues.userBraveApiKey,
-			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},
-			comfyuiHardwareProfile: stateValues.comfyuiHardwareProfile,
-			huggingFaceApiToken: stateValues.huggingFaceApiToken ? "********" : undefined,
-			comfyCloudApiToken: stateValues.comfyCloudApiToken ? "********" : undefined,
-			atlasCloudApiToken: stateValues.atlasCloudApiToken ? "********" : undefined,
-			generationProviders: stateValues.generationProviders ?? {},
-			openRouterModels: stateValues.openRouterModels ?? {},
-			atlasCloudModels: stateValues.atlasCloudModels ?? {},
-		}
+		return this.stateManager.getState()
 	}
 
 	/**
@@ -2487,19 +1401,7 @@ export class MirrorProvider
 	 * @returns The updated task history array
 	 */
 	async updateTaskHistory(item: HistoryItem, options: { broadcast?: boolean } = {}): Promise<HistoryItem[]> {
-		const { broadcast = true } = options
-
-		const history = await this.taskHistoryStore.upsert(item)
-		this.recentTasksCache = undefined
-
-		// Broadcast the updated history to the webview if requested.
-		// Prefer per-item updates to avoid repeatedly cloning/sending the full history.
-		if (broadcast && this.isViewLaunched) {
-			const updatedItem = this.taskHistoryStore.get(item.id) ?? item
-			await this.postMessageToWebview({ type: "taskHistoryItemUpdated", taskHistoryItem: updatedItem })
-		}
-
-		return history
+		return this.taskHistoryManager.updateTaskHistory(item, options)
 	}
 
 	/**
@@ -2508,36 +1410,14 @@ export class MirrorProvider
 	 * Per-task files are authoritative; globalState is the downgrade fallback.
 	 */
 	private scheduleGlobalStateWriteThrough(): void {
-		if (this.globalStateWriteThroughTimer) {
-			clearTimeout(this.globalStateWriteThroughTimer)
-		}
-
-		this.globalStateWriteThroughTimer = setTimeout(async () => {
-			this.globalStateWriteThroughTimer = null
-			try {
-				const items = this.taskHistoryStore.getAll()
-				await this.updateGlobalState("taskHistory", items)
-			} catch (err) {
-				this.log(
-					`[scheduleGlobalStateWriteThrough] Failed: ${err instanceof Error ? err.message : String(err)}`,
-				)
-			}
-		}, MirrorProvider.GLOBAL_STATE_WRITE_THROUGH_DEBOUNCE_MS)
+		this.taskHistoryManager.scheduleGlobalStateWriteThrough()
 	}
 
 	/**
 	 * Flush any pending debounced globalState write-through immediately.
 	 */
 	private flushGlobalStateWriteThrough(): void {
-		if (this.globalStateWriteThroughTimer) {
-			clearTimeout(this.globalStateWriteThroughTimer)
-			this.globalStateWriteThroughTimer = null
-		}
-
-		const items = this.taskHistoryStore.getAll()
-		this.updateGlobalState("taskHistory", items).catch((err) => {
-			this.log(`[flushGlobalStateWriteThrough] Failed: ${err instanceof Error ? err.message : String(err)}`)
-		})
+		this.taskHistoryManager.flushGlobalStateWriteThrough()
 	}
 
 	/**
@@ -2546,21 +1426,7 @@ export class MirrorProvider
 	 * @param history The task history to broadcast (if not provided, reads from the store)
 	 */
 	public async broadcastTaskHistoryUpdate(history?: HistoryItem[]): Promise<void> {
-		if (!this.isViewLaunched) {
-			return
-		}
-
-		const taskHistory = history ?? this.taskHistoryStore.getAll()
-
-		// Sort and filter the history the same way as getStateToPostToWebview
-		const sortedHistory = taskHistory
-			.filter((item: HistoryItem) => item.ts && item.task)
-			.sort((a: HistoryItem, b: HistoryItem) => b.ts - a.ts)
-
-		await this.postMessageToWebview({
-			type: "taskHistoryUpdated",
-			taskHistory: sortedHistory,
-		})
+		await this.taskHistoryManager.broadcastTaskHistoryUpdate(history)
 	}
 
 	// ContextProxy
@@ -2568,6 +1434,14 @@ export class MirrorProvider
 	// @deprecated - Use `ContextProxy#setValue` instead.
 	private async updateGlobalState<K extends keyof GlobalState>(key: K, value: GlobalState[K]) {
 		await this.contextProxy.setValue(key, value)
+	}
+
+	/**
+	 * Public wrapper around getGlobalState — needed by StateManager (extracted class).
+	 * @deprecated - Use `ContextProxy#getValue` instead.
+	 */
+	public getGlobalStateValue<K extends keyof GlobalState>(key: K) {
+		return this.contextProxy.getValue(key)
 	}
 
 	// @deprecated - Use `ContextProxy#getValue` instead.
@@ -2594,22 +1468,7 @@ export class MirrorProvider
 	// dev
 
 	async resetState() {
-		const answer = await vscode.window.showInformationMessage(
-			t("common:confirmation.reset_state"),
-			{ modal: true },
-			t("common:answers.yes"),
-		)
-
-		if (answer !== t("common:answers.yes")) {
-			return
-		}
-
-		await this.contextProxy.resetAllState()
-		await this.providerSettingsManager.resetAllConfigs()
-		await this.customModesManager.resetCustomModes()
-		await this.removeMirrorFromStack()
-		await this.postStateToWebview()
-		await this.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
+		return this.helpers.resetState()
 	}
 
 	// logging
@@ -2633,12 +1492,68 @@ export class MirrorProvider
 		return this.getCurrentTask()?.mirrorMessages || []
 	}
 
+	/**
+	 * Exposes the render context for StateManager (extracted class).
+	 */
+	public getRenderContext(): "sidebar" | "editor" {
+		return this.renderContext
+	}
+
+	/**
+	 * Exposes the mirrorMessages sequence number for StateManager (extracted class).
+	 */
+	public getMirrorMessagesSeq(): number {
+		return this.mirrorMessagesSeq
+	}
+
+	/**
+	 * Increments the mirrorMessages sequence number for StateManager (extracted class).
+	 */
+	public incrementMirrorMessagesSeq(): number {
+		return ++this.mirrorMessagesSeq
+	}
+
+	/**
+	 * Exposes the current workspace path for StateManager (extracted class).
+	 */
+	public getCurrentWorkspacePath(): string | undefined {
+		return this.currentWorkspacePath
+	}
+
+	/**
+	 * Sets the current workspace path for StateManager (extracted class).
+	 */
+	public setCurrentWorkspacePath(path: string | undefined): void {
+		this.currentWorkspacePath = path
+	}
+
 	public getMcpHub(): McpHub | undefined {
 		return this.mcpHub
 	}
 
 	public getSkillsManager(): SkillsManager | undefined {
 		return this.skillsManager
+	}
+
+	/**
+	 * Exposes the disposed flag for WebviewManager (extracted class).
+	 */
+	public isDisposed(): boolean {
+		return this._disposed
+	}
+
+	/**
+	 * Exposes the view reference for WebviewManager (extracted class).
+	 */
+	public getView(): vscode.WebviewView | vscode.WebviewPanel | undefined {
+		return this.view
+	}
+
+	/**
+	 * Exposes webview disposables for WebviewManager (extracted class).
+	 */
+	public getWebviewDisposables(): vscode.Disposable[] {
+		return this.webviewDisposables
 	}
 
 	/**
@@ -2709,48 +1624,7 @@ export class MirrorProvider
 	}
 
 	public getRecentTasks(): string[] {
-		if (this.recentTasksCache) {
-			return this.recentTasksCache
-		}
-
-		const history = this.taskHistoryStore.getAll()
-		const workspaceTasks: HistoryItem[] = []
-
-		for (const item of history) {
-			if (!item.ts || !item.task || item.workspace !== this.cwd) {
-				continue
-			}
-
-			workspaceTasks.push(item)
-		}
-
-		if (workspaceTasks.length === 0) {
-			this.recentTasksCache = []
-			return this.recentTasksCache
-		}
-
-		workspaceTasks.sort((a, b) => b.ts - a.ts)
-		let recentTaskIds: string[] = []
-
-		if (workspaceTasks.length >= 100) {
-			// If we have at least 100 tasks, return tasks from the last 7 days.
-			const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-
-			for (const item of workspaceTasks) {
-				// Stop when we hit tasks older than 7 days.
-				if (item.ts < sevenDaysAgo) {
-					break
-				}
-
-				recentTaskIds.push(item.id)
-			}
-		} else {
-			// Otherwise, return the most recent 100 tasks (or all if less than 100).
-			recentTaskIds = workspaceTasks.slice(0, Math.min(100, workspaceTasks.length)).map((item) => item.id)
-		}
-
-		this.recentTasksCache = recentTaskIds
-		return this.recentTasksCache
+		return this.taskHistoryManager.getRecentTasks()
 	}
 
 	// When initializing a new task, (not from history but from a tool command
@@ -2766,204 +1640,21 @@ export class MirrorProvider
 		options: CreateTaskOptions = {},
 		configuration: MirrorVSSettings = {},
 	): Promise<Task> {
-		if (configuration) {
-			await this.setValues(configuration)
-
-			if (configuration.allowedCommands) {
-				await vscode.workspace
-					.getConfiguration(Package.name)
-					.update("allowedCommands", configuration.allowedCommands, vscode.ConfigurationTarget.Global)
-			}
-
-			if (configuration.deniedCommands) {
-				await vscode.workspace
-					.getConfiguration(Package.name)
-					.update("deniedCommands", configuration.deniedCommands, vscode.ConfigurationTarget.Global)
-			}
-
-			if (configuration.commandExecutionTimeout !== undefined) {
-				await vscode.workspace
-					.getConfiguration(Package.name)
-					.update(
-						"commandExecutionTimeout",
-						configuration.commandExecutionTimeout,
-						vscode.ConfigurationTarget.Global,
-					)
-			}
-
-			if (configuration.currentApiConfigName) {
-				await this.setProviderProfile(configuration.currentApiConfigName)
-			}
-
-			// Register custom modes so the CustomModesManager knows about them.
-			// setValues writes to global state, but the manager overwrites that
-			// when it merges .mirrormodes + global settings on refresh.  Persisting
-			// via updateCustomMode ensures modes survive the merge cycle.
-			if (configuration.customModes?.length) {
-				for (const mode of configuration.customModes) {
-					await this.customModesManager.updateCustomMode(mode.slug, mode)
-				}
-			}
-		}
-
-		const { apiConfiguration, organizationAllowList, enableCheckpoints, checkpointTimeout, experiments } =
-			await this.getState()
-
-		// Single-open-task invariant: always enforce for user-initiated top-level tasks
-		if (!parentTask) {
-			try {
-				await this.removeMirrorFromStack()
-			} catch {
-				// Non-fatal
-			}
-		}
-
-		if (!ProfileValidator.isProfileAllowed(apiConfiguration, organizationAllowList)) {
-			throw new OrganizationAllowListViolationError(t("common:errors.violated_organization_allowlist"))
-		}
-
-		const task = new Task({
-			provider: this,
-			apiConfiguration,
-			enableCheckpoints,
-			checkpointTimeout,
-			consecutiveMistakeLimit: apiConfiguration.consecutiveMistakeLimit,
-			task: text,
-			images,
-			experiments,
-			rootTask: this.mirrorStack.length > 0 ? this.mirrorStack[0] : undefined,
-			parentTask,
-			taskNumber: this.mirrorStack.length + 1,
-			onCreated: this.taskCreationCallback,
-			initialTodos: options.initialTodos,
-			// Session grouping: top-level tasks inherit the session ID.
-			// Child tasks (delegation) inherit via parentTask.sessionId flow.
-			sessionId: this.currentSessionId,
-			// Ensure this task is present in mirrorStack before startTask() emits
-			// its initial state update, so state.currentTaskId is available ASAP.
-			startTask: false,
-			...options,
-		})
-
-		console.log(
-			`[SESSION-DBG] createTask: task=${task.taskId}.${task.instanceId} ` +
-				`sessionId=${task.sessionId} parentTaskId=${task.parentTaskId} ` +
-				`currentSessionId=${this.currentSessionId}`,
-		)
-		await this.addMirrorToStack(task)
-		task.start()
-
-		this.log(
-			`[createTask] ${task.parentTask ? "child" : "parent"} task ${task.taskId}.${task.instanceId} instantiated`,
-		)
-
-		return task
+		return this.taskLifecycleManager.createTask(text, images, parentTask, options, configuration)
 	}
 
 	public async cancelTask(): Promise<void> {
-		const task = this.getCurrentTask()
-
-		if (!task) {
-			return
-		}
-
-		console.log(`[cancelTask] cancelling task ${task.taskId}.${task.instanceId}`)
-
-		let historyItem: HistoryItem | undefined
-		try {
-			const history = await this.getTaskWithId(task.taskId)
-			historyItem = history.historyItem
-		} catch (error) {
-			// During task startup there is a short window where currentTask exists
-			// but task history has not been persisted yet. Cancelling should still
-			// abort safely; we just skip post-cancel rehydration in that case.
-			if (error instanceof Error && error.message === "Task not found") {
-				this.log(`[cancelTask] task history missing for ${task.taskId}; skipping rehydrate`)
-			} else {
-				throw error
-			}
-		}
-
-		// Preserve parent and root task information for history item.
-		const rootTask = task.rootTask
-		const parentTask = task.parentTask
-
-		// Mark this as a user-initiated cancellation so provider-only rehydration can occur
-		task.abortReason = "user_cancelled"
-
-		// Capture the current instance to detect if rehydrate already occurred elsewhere
-		const originalInstanceId = task.instanceId
-
-		// Immediately cancel the underlying HTTP request if one is in progress
-		// This ensures the stream fails quickly rather than waiting for network timeout
-		task.cancelCurrentRequest()
-
-		// Begin abort (non-blocking)
-		task.abortTask()
-
-		// Immediately mark the original instance as abandoned to prevent any residual activity
-		task.abandoned = true
-
-		await pWaitFor(
-			() =>
-				this.getCurrentTask()! === undefined ||
-				this.getCurrentTask()!.isStreaming === false ||
-				this.getCurrentTask()!.didFinishAbortingStream ||
-				// If only the first chunk is processed, then there's no
-				// need to wait for graceful abort (closes edits, browser,
-				// etc).
-				this.getCurrentTask()!.isWaitingForFirstChunk,
-			{
-				timeout: 3_000,
-			},
-		).catch(() => {
-			console.error("Failed to abort task")
-		})
-
-		// Defensive safeguard: if current instance already changed, skip rehydrate
-		const current = this.getCurrentTask()
-		if (current && current.instanceId !== originalInstanceId) {
-			this.log(
-				`[cancelTask] Skipping rehydrate: current instance ${current.instanceId} != original ${originalInstanceId}`,
-			)
-			return
-		}
-
-		// Final race check before rehydrate to avoid duplicate rehydration
-		{
-			const currentAfterCheck = this.getCurrentTask()
-			if (currentAfterCheck && currentAfterCheck.instanceId !== originalInstanceId) {
-				this.log(
-					`[cancelTask] Skipping rehydrate after final check: current instance ${currentAfterCheck.instanceId} != original ${originalInstanceId}`,
-				)
-				return
-			}
-		}
-
-		if (!historyItem) {
-			return
-		}
-
-		// Clears task again, so we need to abortTask manually above.
-		await this.createTaskWithHistoryItem({ ...historyItem, rootTask, parentTask })
+		return this.taskLifecycleManager.cancelTask()
 	}
 
 	// Clear the current task without treating it as a subtask.
 	// This is used when the user cancels a task that is not a subtask.
 	public async clearTask(): Promise<void> {
-		if (this.mirrorStack.length > 0) {
-			const task = this.mirrorStack[this.mirrorStack.length - 1]
-			console.log(`[clearTask] clearing task ${task.taskId}.${task.instanceId}`)
-			await this.removeMirrorFromStack()
-		}
+		return this.taskLifecycleManager.clearTask()
 	}
 
 	public resumeTask(taskId: string): void {
-		// Use the existing showTaskWithId method which handles both current and
-		// historical tasks.
-		this.showTaskWithId(taskId).catch((error) => {
-			this.log(`Failed to resume task ${taskId}: ${error.message}`)
-		})
+		this.taskLifecycleManager.resumeTask(taskId)
 	}
 
 	// Modes
@@ -3020,329 +1711,15 @@ export class MirrorProvider
 		initialTodos: TodoItem[]
 		mode: string
 	}): Promise<Task> {
-		const { parentTaskId, message, initialTodos, mode } = params
-
-		// Metadata-driven delegation is always enabled
-
-		// 1) Get parent (must be current task)
-		const parent = this.getCurrentTask()
-		if (!parent) {
-			throw new Error("[delegateParentAndOpenChild] No current task")
-		}
-		if (parent.taskId !== parentTaskId) {
-			throw new Error(
-				`[delegateParentAndOpenChild] Parent mismatch: expected ${parentTaskId}, current ${parent.taskId}`,
-			)
-		}
-		// 2) Flush pending tool results to API history BEFORE disposing the parent.
-		//    This is critical: when tools are called before new_task,
-		//    their tool_result blocks are in userMessageContent but not yet saved to API history.
-		//    If we don't flush them, the parent's API conversation will be incomplete and
-		//    cause 400 errors when resumed (missing tool_result for tool_use blocks).
-		//
-		//    NOTE: We do NOT pass the assistant message here because the assistant message
-		//    is already added to apiConversationHistory by the normal flow in
-		//    recursivelyMakeMirrorRequests BEFORE tools start executing. We only need to
-		//    flush the pending user message with tool_results.
-		try {
-			const flushSuccess = await parent.flushPendingToolResultsToHistory()
-
-			if (!flushSuccess) {
-				console.warn(`[delegateParentAndOpenChild] Flush failed for parent ${parentTaskId}, retrying...`)
-				const retrySuccess = await parent.retrySaveApiConversationHistory()
-
-				if (!retrySuccess) {
-					console.error(
-						`[delegateParentAndOpenChild] CRITICAL: Parent ${parentTaskId} API history not persisted to disk. Child return may produce stale state.`,
-					)
-					vscode.window.showWarningMessage(
-						"Warning: Parent task state could not be saved. The parent task may lose recent context when resumed.",
-					)
-				}
-			}
-		} catch (error) {
-			this.log(
-				`[delegateParentAndOpenChild] Error flushing pending tool results (non-fatal): ${
-					error instanceof Error ? error.message : String(error)
-				}`,
-			)
-		}
-
-		// 3) Enforce single-open invariant by closing/disposing the parent first
-		//    This ensures we never have >1 tasks open at any time during delegation.
-		//    Await abort completion to ensure clean disposal and prevent unhandled rejections.
-		try {
-			await this.removeMirrorFromStack({ skipDelegationRepair: true })
-		} catch (error) {
-			this.log(
-				`[delegateParentAndOpenChild] Error during parent disposal (non-fatal): ${
-					error instanceof Error ? error.message : String(error)
-				}`,
-			)
-			// Non-fatal: proceed with child creation even if parent cleanup had issues
-		}
-
-		// 3) Switch provider mode to child's requested mode BEFORE creating the child task
-		//    This ensures the child's system prompt and configuration are based on the correct mode.
-		//    The mode switch must happen before createTask() because the Task constructor
-		//    initializes its mode from provider.getState() during initializeTaskMode().
-		try {
-			await this.handleModeSwitch(mode as any)
-		} catch (e) {
-			this.log(
-				`[delegateParentAndOpenChild] handleModeSwitch failed for mode '${mode}': ${
-					(e as Error)?.message ?? String(e)
-				}`,
-			)
-		}
-
-		// 4) Create child as sole active (parent reference preserved for lineage)
-		// Pass initialStatus: "active" to ensure the child task's historyItem is created
-		// with status from the start, avoiding race conditions where the task might
-		// call attempt_completion before status is persisted separately.
-		//
-		// Pass startTask: false to prevent the child from beginning its task loop
-		// (and writing to globalState via saveMirrorMessages → updateTaskHistory)
-		// before we persist the parent's delegation metadata in step 5.
-		// Without this, the child's fire-and-forget startTask() races with step 5,
-		// and the last writer to globalState overwrites the other's changes—
-		// causing the parent's delegation fields to be lost.
-		const child = await this.createTask(message, undefined, parent as any, {
-			initialTodos,
-			initialStatus: "active",
-			startTask: false,
-		})
-
-		// 5) Persist parent delegation metadata BEFORE the child starts writing.
-		try {
-			const { historyItem } = await this.getTaskWithId(parentTaskId)
-			const childIds = Array.from(new Set([...(historyItem.childIds ?? []), child.taskId]))
-			const updatedHistory: typeof historyItem = {
-				...historyItem,
-				status: "delegated",
-				delegatedToId: child.taskId,
-				awaitingChildId: child.taskId,
-				childIds,
-			}
-			await this.updateTaskHistory(updatedHistory)
-		} catch (err) {
-			this.log(
-				`[delegateParentAndOpenChild] Failed to persist parent metadata for ${parentTaskId} -> ${child.taskId}: ${
-					(err as Error)?.message ?? String(err)
-				}`,
-			)
-		}
-
-		// 6) Start the child task now that parent metadata is safely persisted.
-		child.start()
-
-		// 7) Emit TaskDelegated (provider-level)
-		try {
-			this.emit(MirrorVSEventName.TaskDelegated, parentTaskId, child.taskId)
-		} catch {
-			// non-fatal
-		}
-
-		return child
+		return this.delegationManager.delegateParentAndOpenChild(params)
 	}
 
-	/**
-	 * Reopen parent task from delegation with write-back and events.
-	 */
 	public async reopenParentFromDelegation(params: {
 		parentTaskId: string
 		childTaskId: string
 		completionResultSummary: string
 	}): Promise<void> {
-		const { parentTaskId, childTaskId, completionResultSummary } = params
-		const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
-
-		// 1) Load parent from history and current persisted messages
-		const { historyItem } = await this.getTaskWithId(parentTaskId)
-
-		let parentMirrorMessages: MirrorMessage[] = []
-		try {
-			parentMirrorMessages = await readTaskMessages({
-				taskId: parentTaskId,
-				globalStoragePath,
-			})
-		} catch {
-			parentMirrorMessages = []
-		}
-
-		let parentApiMessages: any[] = []
-		try {
-			parentApiMessages = (await readApiMessages({
-				taskId: parentTaskId,
-				globalStoragePath,
-			})) as any[]
-		} catch {
-			parentApiMessages = []
-		}
-
-		// 2) Inject synthetic records: UI subtask_result and update API tool_result
-		const ts = Date.now()
-
-		// Defensive: ensure arrays
-		if (!Array.isArray(parentMirrorMessages)) parentMirrorMessages = []
-		if (!Array.isArray(parentApiMessages)) parentApiMessages = []
-
-		const subtaskUiMessage: MirrorMessage = {
-			type: "say",
-			say: "subtask_result",
-			text: completionResultSummary,
-			ts,
-		}
-		parentMirrorMessages.push(subtaskUiMessage)
-		await saveTaskMessages({ messages: parentMirrorMessages, taskId: parentTaskId, globalStoragePath })
-
-		// Find the tool_use_id from the last assistant message's new_task tool_use
-		let toolUseId: string | undefined
-		for (let i = parentApiMessages.length - 1; i >= 0; i--) {
-			const msg = parentApiMessages[i]
-			if (msg.role === "assistant" && Array.isArray(msg.content)) {
-				for (const block of msg.content) {
-					if (block.type === "tool_use" && block.name === "new_task") {
-						toolUseId = block.id
-						break
-					}
-				}
-				if (toolUseId) break
-			}
-		}
-
-		// Preferred: if the parent history contains the native tool_use for new_task,
-		// inject a matching tool_result for the Anthropic message contract:
-		// user → assistant (tool_use) → user (tool_result)
-		if (toolUseId) {
-			// Check if the last message is already a user message with a tool_result for this tool_use_id
-			// (in case this is a retry or the history was already updated)
-			const lastMsg = parentApiMessages[parentApiMessages.length - 1]
-			let alreadyHasToolResult = false
-			if (lastMsg?.role === "user" && Array.isArray(lastMsg.content)) {
-				for (const block of lastMsg.content) {
-					if (block.type === "tool_result" && block.tool_use_id === toolUseId) {
-						// Update the existing tool_result content
-						block.content = `Subtask ${childTaskId} completed.\n\nResult:\n${completionResultSummary}`
-						alreadyHasToolResult = true
-						break
-					}
-				}
-			}
-
-			// If no existing tool_result found, create a NEW user message with the tool_result
-			if (!alreadyHasToolResult) {
-				parentApiMessages.push({
-					role: "user",
-					content: [
-						{
-							type: "tool_result" as const,
-							tool_use_id: toolUseId,
-							content: `Subtask ${childTaskId} completed.\n\nResult:\n${completionResultSummary}`,
-						},
-					],
-					ts,
-				})
-			}
-
-			// Validate the newly injected tool_result against the preceding assistant message.
-			// This ensures the tool_result's tool_use_id matches a tool_use in the immediately
-			// preceding assistant message (Anthropic API requirement).
-			const lastMessage = parentApiMessages[parentApiMessages.length - 1]
-			if (lastMessage?.role === "user") {
-				const validatedMessage = validateAndFixToolResultIds(lastMessage, parentApiMessages.slice(0, -1))
-				parentApiMessages[parentApiMessages.length - 1] = validatedMessage
-			}
-		} else {
-			// If there is no corresponding tool_use in the parent API history, we cannot emit a
-			// tool_result. Fall back to a plain user text note so the parent can still resume.
-			parentApiMessages.push({
-				role: "user",
-				content: [
-					{
-						type: "text" as const,
-						text: `Subtask ${childTaskId} completed.\n\nResult:\n${completionResultSummary}`,
-					},
-				],
-				ts,
-			})
-		}
-
-		await saveApiMessages({ messages: parentApiMessages as any, taskId: parentTaskId, globalStoragePath })
-
-		// 3) Close child instance if still open (single-open-task invariant).
-		//    This MUST happen BEFORE updating the child's status to "completed" because
-		//    removeMirrorFromStack() → abortTask(true) → saveMirrorMessages() writes
-		//    the historyItem with initialStatus (typically "active"), which would
-		//    overwrite a "completed" status set earlier.
-		const current = this.getCurrentTask()
-		if (current?.taskId === childTaskId) {
-			await this.removeMirrorFromStack()
-		}
-
-		// 4) Update child metadata to "completed" status.
-		//    This runs after the abort so it overwrites the stale "active" status
-		//    that saveMirrorMessages() may have written during step 3.
-		try {
-			const { historyItem: childHistory } = await this.getTaskWithId(childTaskId)
-			await this.updateTaskHistory({
-				...childHistory,
-				status: "completed",
-			})
-		} catch (err) {
-			this.log(
-				`[reopenParentFromDelegation] Failed to persist child completed status for ${childTaskId}: ${
-					(err as Error)?.message ?? String(err)
-				}`,
-			)
-		}
-
-		// 5) Update parent metadata and persist BEFORE emitting completion event
-		const childIds = Array.from(new Set([...(historyItem.childIds ?? []), childTaskId]))
-		const updatedHistory: typeof historyItem = {
-			...historyItem,
-			status: "active",
-			completedByChildId: childTaskId,
-			completionResultSummary,
-			awaitingChildId: undefined,
-			childIds,
-		}
-		await this.updateTaskHistory(updatedHistory)
-
-		// 6) Emit TaskDelegationCompleted (provider-level)
-		try {
-			this.emit(MirrorVSEventName.TaskDelegationCompleted, parentTaskId, childTaskId, completionResultSummary)
-		} catch {
-			// non-fatal
-		}
-
-		// 7) Reopen the parent from history as the sole active task (restores saved mode)
-		//    IMPORTANT: startTask=false to suppress resume-from-history ask scheduling
-		const parentInstance = await this.createTaskWithHistoryItem(updatedHistory, { startTask: false })
-
-		// 8) Inject restored histories into the in-memory instance before resuming
-		if (parentInstance) {
-			try {
-				await parentInstance.overwriteMirrorMessages(parentMirrorMessages)
-			} catch {
-				// non-fatal
-			}
-			try {
-				await parentInstance.overwriteApiConversationHistory(parentApiMessages as any)
-			} catch {
-				// non-fatal
-			}
-
-			// Auto-resume parent without ask("resume_task")
-			await parentInstance.resumeAfterDelegation()
-		}
-
-		// 9) Emit TaskDelegationResumed (provider-level)
-		try {
-			this.emit(MirrorVSEventName.TaskDelegationResumed, parentTaskId, childTaskId)
-		} catch {
-			// non-fatal
-		}
+		return this.delegationManager.reopenParentFromDelegation(params)
 	}
 
 	/**
