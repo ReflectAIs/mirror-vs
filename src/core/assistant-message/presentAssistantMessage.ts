@@ -48,6 +48,7 @@ import { gitHubSearchTool } from "../tools/GitHubSearchTool"
 import { docsSearchTool } from "../tools/DocsSearchTool"
 import { packageSearchTool } from "../tools/PackageSearchTool"
 import { readUrlTool } from "../tools/ReadUrlTool"
+import { checkpointSave } from "../checkpoints"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
@@ -1049,7 +1050,7 @@ async function checkpointSaveAndMark(task: Task) {
 		return
 	}
 	try {
-		await task.checkpointSave(true)
+		await checkpointSave(task, true)
 		task.currentStreamingDidCheckpoint = true
 	} catch (error) {
 		console.error(`[Task#presentAssistantMessage] Error saving checkpoint: ${error.message}`, error)

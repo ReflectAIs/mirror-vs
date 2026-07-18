@@ -19,6 +19,7 @@ import { MirrorAskResponse } from "../../shared/WebviewMessage"
 import { formatResponse } from "../prompts/responses"
 import { checkAutoApproval } from "../auto-approval"
 import { buildApiHandler } from "../../api"
+import { checkpointSave } from "../checkpoints"
 
 import type { Task } from "./Task"
 
@@ -292,7 +293,7 @@ export class TaskUserInteraction {
 		// Use allowEmpty=true to ensure a checkpoint is recorded even if there are no file changes.
 		// Suppress the checkpoint_saved chat row for this particular checkpoint to keep the timeline clean.
 		if (askResponse === "messageResponse") {
-			void this.task.checkpointSave(false, true)
+			void checkpointSave(this.task, false, true)
 		}
 
 		// Mark the last follow-up question as answered

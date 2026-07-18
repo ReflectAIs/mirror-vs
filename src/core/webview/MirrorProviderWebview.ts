@@ -45,7 +45,7 @@ export class WebviewManager {
 	 * Generates HTML for development mode, connecting to the Vite HMR server.
 	 */
 	public async getHMRHtmlContent(webview: vscode.Webview): Promise<string> {
-		let localPort = "5173"
+		let localPort = "3456"
 
 		try {
 			const fs = require("fs")

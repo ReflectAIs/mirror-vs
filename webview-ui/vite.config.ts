@@ -160,6 +160,8 @@ export default defineConfig(({ mode }) => {
 			},
 		},
 		server: {
+			port: 3456,
+			strictPort: false,
 			hmr: {
 				host: "localhost",
 				protocol: "ws",
