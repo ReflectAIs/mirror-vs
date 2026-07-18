@@ -651,11 +651,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (!(inputValue.trim() || selectedImages.length > 0)) {
 			return false
 		}
-		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command_output"
-		if (isRespondingToAsk) {
-			return false
-		}
-		return sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAsk === "command_output"
+		return sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAsk !== undefined
 	}, [inputValue, selectedImages, mirrorAsk, sendingDisabled, isStreaming, messageQueue.length])
 
 	const modelActivity = useMemo((): ModelActivity => {
@@ -742,14 +738,9 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					return
 				}
 
-				const isRespondingToAsk = mirrorAskRef.current && mirrorAskRef.current !== "command_output"
 				if (
 					!forceSend &&
-					!isRespondingToAsk &&
-					(sendingDisabled ||
-						isStreaming ||
-						messageQueue.length > 0 ||
-						mirrorAskRef.current === "command_output")
+					(sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAskRef.current !== undefined)
 				) {
 					try {
 						console.log("queueMessage", text, images)
