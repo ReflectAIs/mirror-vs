@@ -343,16 +343,20 @@ export class TaskUserInteraction {
 
 	/**
 	 * Attempt to drain one queued message if the task is blocked on a
-	 * text-accepting ask (followup, tool, completion_result, resume_task).
+	 * terminal/completion ask (completion_result, resume_completed_task).
 	 * Returns true if a message was drained, false otherwise.
 	 *
-	 * For completion_result / resume_completed_task (terminal asks):
+	 * Only drains for completion_result / resume_completed_task:
 	 *   Dequeue one message at a time as messageResponse (user feedback).
 	 *   This lets AttemptCompletionTool push it as a tool_result to the API
 	 *   conversation, so the model sees it, processes it, and calls
 	 *   attempt_completion again.  Each subsequent completion_result
 	 *   drains the next queued message until the queue is empty.  Only
 	 *   then does yesButtonClicked fire, letting the task truly complete.
+	 *
+	 * Interactive asks (followup, tool, command, etc.) NEVER auto-drain:
+	 *   The model is waiting for user input — auto-draining without the
+	 *   user's knowledge would cause unexpected message submission.
 	 *
 	 * Re-entrant guard: dequeueMessage() emits stateChanged synchronously,
 	 * which triggers the constructor's handler which calls this again.  We

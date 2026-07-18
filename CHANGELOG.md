@@ -18,7 +18,8 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Fixed
 
-- **Double-send bug**: When responding to follow-up questions, tool prompts, or other non-command asks, messages were being added to the queue (visible in the queue UI) while also being processed by the extension's auto-drain mechanism. This caused the same message to appear both in the chat and in the queue. Restored the `isRespondingToAsk` exclusion in `handleSendMessage` and `messageWillQueue` to send responses directly instead of queueing them.
+- **Double-send bug** (frontend): When responding to follow-up questions, tool prompts, or other non-command asks, messages were being added to the queue (visible in the queue UI) while also being processed by the extension's auto-drain mechanism. This caused the same message to appear both in the chat and in the queue. Restored the `isRespondingToAsk` exclusion in `handleSendMessage` and `messageWillQueue` to send responses directly instead of queueing them. Only `command_output` (terminal running) triggers queueing; all other asks bypass the queue.
+- **Double-send bug** (extension): [`tryDrainQueuedMessage`](src/core/task/TaskUserInteraction.ts:362) was auto-draining queued messages into ALL ask types (`followup`, `tool`, `command`, etc.), causing unintended message submission when the model asked interactive questions. Restricted auto-drain to only terminal/completion asks (`completion_result`, `resume_completed_task`) where dequeuing as `messageResponse` is the correct behavior for the task completion loop.
 - **Newline at EOF in [`package.json`](src/package.json)**: Added missing trailing newline for POSIX compliance.
 
 ## [0.6.0] - 2026-07-16
