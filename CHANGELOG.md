@@ -2,6 +2,24 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.1] - 2026-07-18
+
+### Added
+
+- **MirrorHero Mascot Upgrade**: Enhanced the welcome screen mascot with 3 new moods — `silly` (wink + tongue out), `love` (heart eyes with floating hearts), and `surprised` (wide O mouth with shake animation). Added pupil tracking that follows cursor position on hover. Introduced auto-blink every 3-4 seconds and a double-click celebration animation with sparkle bursts. The mood cycle now rotates through all 7 moods instead of 4.
+
+- **New Chat UI Components**: Extracted [`ChatActionBar`](webview-ui/src/components/chat/ChatActionBar.tsx) and [`ChatToolbar`](webview-ui/src/components/chat/ChatToolbar.tsx) as standalone components from the monolithic [`ChatView`](webview-ui/src/components/chat/ChatView.tsx). Added [`ChatWelcomeContent`](webview-ui/src/components/chat/ChatWelcomeContent.tsx) for the empty-state welcome screen. Chat message logic extracted into the [`useChatMessages`](webview-ui/src/components/chat/hooks/useChatMessages.tsx) hook with 1,872 lines of dedicated message orchestration.
+
+### Changed
+
+- **Massive Task & Provider Refactor**: Decomposed the monolithic [`Task`](src/core/task/Task.ts) (3,730→~300 lines) and [`MirrorProvider`](src/core/webview/MirrorProvider.ts) (2,035→~300 lines) classes into 17 modular domain-specific service files. New modules include [`TaskApiRequest`](src/core/task/TaskApiRequest.ts), [`TaskLifecycle`](src/core/task/TaskLifecycle.ts), [`TaskMainLoop`](src/core/task/TaskMainLoop.ts), [`TaskUserInteraction`](src/core/task/TaskUserInteraction.ts), [`TaskConversationHistory`](src/core/task/TaskConversationHistory.ts), [`TaskContextManagement`](src/core/task/TaskContextManagement.ts), [`TaskGetters`](src/core/task/TaskGetters.ts), [`TaskToolTracking`](src/core/task/TaskToolTracking.ts), [`TaskMirrorMessages`](src/core/task/TaskMirrorMessages.ts). Webview side decomposed into [`MirrorProviderDelegation`](src/core/webview/MirrorProviderDelegation.ts), [`MirrorProviderState`](src/core/webview/MirrorProviderState.ts), [`MirrorProviderHelpers`](src/core/webview/MirrorProviderHelpers.ts), [`MirrorProviderProfileManager`](src/core/webview/MirrorProviderProfileManager.ts), [`MirrorProviderSessions`](src/core/webview/MirrorProviderSessions.ts), [`MirrorProviderTaskHistory`](src/core/webview/MirrorProviderTaskHistory.ts), [`MirrorProviderTaskLifecycle`](src/core/webview/MirrorProviderTaskLifecycle.ts), and [`MirrorProviderWebview`](src/core/webview/MirrorProviderWebview.ts). Across 24 files: ~9,600 insertions, ~7,500 deletions (+2,100 net lines).
+
+- **Message Queue Logic Fix**: Simplified message sending guard conditions in [`useChatMessages`](webview-ui/src/components/chat/hooks/useChatMessages.tsx). The old `isRespondingToAsk` check had split logic treating `mirrorAsk === "command_output"` differently from other ask types, which could allow messages to bypass the queue. Unified to `mirrorAsk !== undefined`, ensuring all active ask states properly block sending while the queue is processing.
+
+### Fixed
+
+- **Newline at EOF in [`package.json`](src/package.json)**: Added missing trailing newline for POSIX compliance.
+
 ## [0.6.0] - 2026-07-16
 
 ### Added
