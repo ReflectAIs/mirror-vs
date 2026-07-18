@@ -372,13 +372,20 @@ export class TaskUserInteraction {
 			if (this.task.askResponse === undefined && !this.task.messageQueueService.isEmpty()) {
 				const lastMessage = this.mirrorMessages.at(-1)
 				if (lastMessage?.type === "ask" && lastMessage.ts === this.task.lastMessageTs) {
-					// command_output asks should not drain queued messages as inline feedback
-					if (lastMessage.ask === "command_output") {
+					// Only auto-drain for terminal/completion asks where the model is
+					// waiting for a yes/no on task completion. Interactive asks
+					// (followup, tool, command, etc.) should NOT auto-drain — the
+					// user must explicitly send their response.
+					if (lastMessage.ask !== "completion_result" && lastMessage.ask !== "resume_completed_task") {
 						return false
 					}
 
-					// All other asks (including completion_result, resume_completed_task,
-					// followup, tool, resume_task) drain one queued message as user feedback.
+					// For completion_result / resume_completed_task:
+					// Dequeue one message at a time as messageResponse (user feedback).
+					// This lets the model see it, process it, and call attempt_completion
+					// again. Each subsequent completion_result drains the next queued
+					// message until the queue is empty. Only then does yesButtonClicked
+					// fire, letting the task truly complete.
 					const queued = this.task.messageQueueService.dequeueMessage()
 					if (queued) {
 						this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
