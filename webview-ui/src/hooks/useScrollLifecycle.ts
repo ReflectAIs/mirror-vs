@@ -105,6 +105,28 @@ export function useScrollLifecycle({
 
 	// --- Re-anchor frame ---
 	const reanchorAnimationFrameRef = useRef<number | null>(null)
+	const isClickingScrollToBottomRef = useRef(false)
+
+	// --- Scroll anchoring (content-shift compensation) ---
+	// During streaming, content below the viewport can grow (text fills in),
+	// pushing existing items upward. The RAF polling loop below compensates
+	// by tracking ALL rendered [data-index] elements' visual positions each
+	// frame in a Map<string, number> (index → getBoundingClientRect().top).
+	//
+	// Key insight: Virtuoso recycles DOM nodes aggressively — the *first*
+	// visible [data-index] changes on almost every frame as items scroll in
+	// and out. A single-element anchor is too unstable. By tracking ALL
+	// visible items, we can find ONE element that persists across two frames
+	// and use its delta for compensation.
+	//
+	// Compensation: if the same logical item shifted position (delta != 0),
+	// apply inverse compensation: scrollTop += delta. This undoes the visual
+	// shift at the sub-pixel level, every frame. To prevent oscillation, we
+	// re-query the DOM immediately after applying compensation so the next
+	// frame sees the post-compensation positions.
+	const prevVisualAnchorRef = useRef<Map<string, number> | null>(null)
+	const driftAccumulatorRef = useRef<number>(0)
+	const lastUserScrollInputRef = useRef<number>(0)
 
 	// -----------------------------------------------------------------------
 	// Phase transitions
@@ -266,8 +288,8 @@ export function useScrollLifecycle({
 				return
 			}
 
-			const shouldForcePinForAnchoredStreaming = scrollPhaseRef.current === "ANCHORED_FOLLOWING" && isStreaming
-			if (isAtBottomRef.current || shouldForcePinForAnchoredStreaming) {
+			const shouldForcePin = scrollPhaseRef.current === "ANCHORED_FOLLOWING"
+			if (isAtBottomRef.current || shouldForcePin) {
 				if (isTaller) {
 					scrollToBottomSmooth()
 				} else {
@@ -275,7 +297,7 @@ export function useScrollLifecycle({
 				}
 			}
 		},
-		[isStreaming, scrollToBottomSmooth, scrollToBottomAuto],
+		[scrollToBottomSmooth, scrollToBottomAuto],
 	)
 
 	// -----------------------------------------------------------------------
@@ -283,6 +305,7 @@ export function useScrollLifecycle({
 	// -----------------------------------------------------------------------
 
 	const handleScrollToBottomClick = useCallback(() => {
+		isClickingScrollToBottomRef.current = true
 		enterAnchoredFollowing()
 		scrollToBottomAuto()
 		cancelReanchorFrame()
@@ -291,6 +314,9 @@ export function useScrollLifecycle({
 			if (scrollPhaseRef.current === "ANCHORED_FOLLOWING") {
 				scrollToBottomAuto()
 			}
+			setTimeout(() => {
+				isClickingScrollToBottomRef.current = false
+			}, 50)
 		})
 	}, [cancelReanchorFrame, enterAnchoredFollowing, scrollToBottomAuto])
 
@@ -327,12 +353,14 @@ export function useScrollLifecycle({
 				return
 			}
 
-			if (currentPhase === "ANCHORED_FOLLOWING" && !isAtBottom && pointerScrollActiveRef.current) {
-				enterUserBrowsingHistory("pointer-scroll-up")
-				return
-			}
-
-			if (currentPhase === "ANCHORED_FOLLOWING" && isStreaming) {
+			if (currentPhase === "ANCHORED_FOLLOWING" && !isAtBottom) {
+				if (pointerScrollActiveRef.current) {
+					enterUserBrowsingHistory("pointer-scroll-up")
+					return
+				}
+				if (isClickingScrollToBottomRef.current) {
+					return
+				}
 				scrollToBottomAuto()
 				setShowScrollToBottom(false)
 				return
@@ -340,8 +368,136 @@ export function useScrollLifecycle({
 
 			setShowScrollToBottom(currentPhase === "USER_BROWSING_HISTORY")
 		},
-		[enterAnchoredFollowing, enterUserBrowsingHistory, isStreaming, scrollToBottomAuto],
+		[enterAnchoredFollowing, enterUserBrowsingHistory, scrollToBottomAuto],
 	)
+
+	// -----------------------------------------------------------------------
+	// Scroll anchoring (Multi-Anchor Visual Tracking)
+	//
+	// During streaming, content below the viewport grows, pushing existing
+	// items upward. We compensate by tracking ALL rendered [data-index]
+	// elements' visual positions (getBoundingClientRect().top) each frame.
+	//
+	// Why multi-anchor: Virtuoso recycles DOM nodes aggressively — the
+	// FIRST visible [data-index] changes on almost every frame. By tracking
+	// ALL items in a Map<string, number>, we can find ANY element that
+	// persists across two frames and use its delta for compensation.
+	//
+	// Compensation: if the same logical item shifted (delta != 0), apply
+	// inverse compensation: scrollTop += delta. This undoes the visual shift
+	// at the sub-pixel level, every frame.
+	//
+	// Anti-oscillation: after applying compensation, we immediately re-query
+	// the DOM and store post-compensation positions as the new prev map.
+	// This prevents the next frame from seeing a stale pre-compensation delta.
+	// -----------------------------------------------------------------------
+
+	useEffect(() => {
+		let rafId: number | null = null
+
+		const pollAnchor = () => {
+			const phase = scrollPhaseRef.current
+			const scroller = scrollContainerRef.current
+
+			if (phase === "USER_BROWSING_HISTORY" && scroller) {
+				const msSinceUserInput = performance.now() - lastUserScrollInputRef.current
+				const activelyScrolling = msSinceUserInput < 150
+
+				// 1. Snapshot raw float positions of all [data-index] elements
+				const scrollerTop = scroller.getBoundingClientRect().top
+				const currentAnchors = new Map<string, number>()
+				const items = scroller.querySelectorAll<HTMLElement>("[data-index]")
+				for (let i = 0; i < items.length; i++) {
+					const el = items[i]
+					const inner = el.querySelector("[data-ts]")
+					const key = inner ? inner.getAttribute("data-ts") : el.getAttribute("data-index")
+					if (key !== null) {
+						currentAnchors.set(key, el.getBoundingClientRect().top - scrollerTop)
+					}
+				}
+
+				const prevAnchors = prevVisualAnchorRef.current
+				let compensated = false
+
+				// 2. Compare against previous frame's positions
+				if (!activelyScrolling && prevAnchors && prevAnchors.size > 0 && currentAnchors.size > 0) {
+					let matchCount = 0
+					let sumDelta = 0
+
+					for (const [idx, prevTop] of prevAnchors) {
+						const currentTop = currentAnchors.get(idx)
+						if (currentTop !== undefined) {
+							matchCount++
+							const delta = currentTop - prevTop
+							sumDelta += delta
+						}
+					}
+
+					if (matchCount > 0) {
+						// 3. Compute average drift across ALL matching elements.
+						// This smooths out measurement noise and gets sub-pixel
+						// precision.
+						const avgDelta = sumDelta / matchCount
+
+						// 4. Accumulate the fractional drift. Content grows at
+						// sub-pixel rates (e.g. 0.033px/frame = 2px/s). A simple
+						// threshold would never fire. The accumulator builds up
+						// drift until it crosses ±1px, then compensates.
+						const accumulator = driftAccumulatorRef.current + avgDelta
+						driftAccumulatorRef.current = accumulator
+
+						const intDelta = Math.round(accumulator)
+						if (intDelta !== 0) {
+							// 5. Apply inverse compensation (integer pixel amount)
+							scroller.scrollTop += intDelta
+
+							// 6. Remove compensated amount from accumulator
+							driftAccumulatorRef.current -= intDelta
+
+							// 7. Anti-oscillation: re-query DOM with post-compensation
+							// positions as new baseline
+							const postItems = scroller.querySelectorAll<HTMLElement>("[data-index]")
+							const postAnchors = new Map<string, number>()
+							const postScrollerTop = scroller.getBoundingClientRect().top
+							for (let i = 0; i < postItems.length; i++) {
+								const el = postItems[i]
+								const inner = el.querySelector("[data-ts]")
+								const key = inner ? inner.getAttribute("data-ts") : el.getAttribute("data-index")
+								if (key !== null) {
+									postAnchors.set(key, el.getBoundingClientRect().top - postScrollerTop)
+								}
+							}
+							prevVisualAnchorRef.current = postAnchors
+							compensated = true
+						}
+					}
+				} else if (activelyScrolling) {
+					// Reset accumulator when user actively scrolls
+					driftAccumulatorRef.current = 0
+				}
+
+				if (!compensated) {
+					prevVisualAnchorRef.current = currentAnchors
+				}
+			} else {
+				if (prevVisualAnchorRef.current !== null) {
+					prevVisualAnchorRef.current = null
+				}
+				driftAccumulatorRef.current = 0
+			}
+
+			rafId = requestAnimationFrame(pollAnchor)
+		}
+
+		rafId = requestAnimationFrame(pollAnchor)
+
+		return () => {
+			if (rafId !== null) {
+				cancelAnimationFrame(rafId)
+				rafId = null
+			}
+		}
+	}, [scrollContainerRef])
 
 	// -----------------------------------------------------------------------
 	// User intent: wheel
@@ -350,8 +506,15 @@ export function useScrollLifecycle({
 	const handleWheel = useCallback(
 		(event: Event) => {
 			const wheelEvent = event as WheelEvent
-			if (wheelEvent.deltaY < 0 && scrollContainerRef.current?.contains(wheelEvent.target as Node)) {
-				enterUserBrowsingHistory("wheel-up")
+			if (scrollContainerRef.current?.contains(wheelEvent.target as Node)) {
+				// Always timestamp user scroll input (any direction) so the
+				// compensation RAF loop knows not to fight user intent.
+				lastUserScrollInputRef.current = performance.now()
+
+				// Only disengage anchored follow when scrolling UP.
+				if (wheelEvent.deltaY < 0) {
+					enterUserBrowsingHistory("wheel-up")
+				}
 			}
 		},
 		[enterUserBrowsingHistory, scrollContainerRef],
@@ -420,8 +583,14 @@ export function useScrollLifecycle({
 			const currentTop = scrollTarget.scrollTop
 			pointerScrollLastTopRef.current = currentTop
 
-			if (previousTop !== null && currentTop < previousTop) {
-				enterUserBrowsingHistory("pointer-scroll-up")
+			// Always timestamp ANY scroll motion so the compensation RAF loop
+			// knows the user is actively scrolling (any direction).
+			if (previousTop !== null && currentTop !== previousTop) {
+				lastUserScrollInputRef.current = performance.now()
+
+				if (currentTop < previousTop) {
+					enterUserBrowsingHistory("pointer-scroll-up")
+				}
 			}
 		},
 		[enterUserBrowsingHistory, scrollContainerRef],
@@ -448,7 +617,13 @@ export function useScrollLifecycle({
 				return
 			}
 
-			if (keyEvent.key !== "PageUp" && keyEvent.key !== "Home" && keyEvent.key !== "ArrowUp") {
+			if (
+				keyEvent.key !== "PageUp" &&
+				keyEvent.key !== "PageDown" &&
+				keyEvent.key !== "Home" &&
+				keyEvent.key !== "ArrowUp" &&
+				keyEvent.key !== "ArrowDown"
+			) {
 				return
 			}
 
@@ -463,6 +638,7 @@ export function useScrollLifecycle({
 				keyEvent.target instanceof Node && !!scrollContainerRef.current?.contains(keyEvent.target)
 
 			if (focusInsideChat || eventTargetInsideChat || activeElement === document.body) {
+				lastUserScrollInputRef.current = performance.now()
 				enterUserBrowsingHistory("keyboard-nav-up")
 			}
 		},

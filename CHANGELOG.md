@@ -2,6 +2,36 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.2] - 2026-07-19
+
+### Added
+
+- **Multi-Anchor Visual Tracking**: New scroll anchoring system that tracks ALL rendered `[data-index]` elements' visual positions each frame via RAF polling loop. Compensates for content growth below the viewport during streaming by accumulating sub-pixel drift across frames (∼0.033px/frame) and applying scroll compensation when the accumulator crosses ±1px. Anti-oscillation ensures post-compensation positions become the next frame's baseline. Includes a drift accumulator (`driftAccumulatorRef`) that prevents sub-pixel drift from silently accumulating without ever triggering compensation.
+
+- **`data-ts` Attribute for Stable Element Keying**: Added `data-ts={message.ts}` to [`ChatRow`](webview-ui/src/components/chat/ChatRow.tsx:144) and `data-ts={task.ts}` to [`TaskHeader`](webview-ui/src/components/chat/TaskHeader.tsx:39). The anchor system now prefers `data-ts` keys (timestamps) over Virtuoso's recycled `data-index` keys, providing stable identity across DOM node recycling.
+
+- **User Scroll Intent Detection**: All scroll input handlers (wheel, pointer drag, keyboard) now timestamp a shared `lastUserScrollInputRef` on ANY scroll motion in ANY direction. The RAF loop uses a 150ms grace period after the last input timestamp to detect active user scrolling and pause compensation, preventing the system from fighting user-initiated scrolling.
+
+- **`overflow-anchor: none` CSS**: Added [`overflow-anchor: none`](webview-ui/src/index.css:624) to scrollable containers to disable the browser's native scroll anchoring, which was competing with the custom implementation.
+
+- **Scroll-to-Bottom Click Guard**: Added `isClickingScrollToBottomRef` to prevent spurious `atBottomStateChange(false)` signals during the scroll-to-bottom button click sequence from triggering unintended phase transitions.
+
+### Changed
+
+- **`handleRowHeightChange` Always Pins in Anchored Follow**: Removed the `isStreaming` gate from the force-pin condition — when in `ANCHORED_FOLLOWING` phase, row height changes now always trigger a scroll-to-bottom, regardless of streaming state.
+
+- **`atBottomStateChangeCallback` Logic Restructured**: Merged pointer-scroll and isStreaming branches into a unified `!isAtBottom` handling path. Removed `isStreaming` dependency from the callback, preventing stale closure issues. Early return added for `isClickingScrollToBottomRef` to avoid racing with button-initiated scroll-to-bottom.
+
+- **Removed `rangeChanged` from Virtuoso Props**: Deleted the unused [`rangeChanged={handleRangeChanged}`](webview-ui/src/components/chat/ChatView.tsx:371) prop from the Virtuoso component, cleaning up a stale callback reference.
+
+### Fixed
+
+- **Content Shifting Up During Streaming**: Multi-Anchor Visual Tracking with drift accumulator compensates for content growth below the viewport in real time, preventing the visual content shift (Bug 2). The drift accumulator solves the sub-pixel problem where individual per-frame deltas (∼0.033px) are too small for a raw threshold but accumulate significantly over 30+ frames.
+
+- **Scroll Lock During Downward Scrolling**: Previously, only upward scroll events timestamped `lastUserScrollInputRef`, causing the RAF loop to fight downward scrolling. All handlers now timestamp any scroll motion, allowing the 150ms grace period to suppress compensation during active scrolling.
+
+- **Keyboard Scroll Not Recognized**: The keyboard handler now includes `PageDown` and `ArrowDown` in its scroll-intent detection, ensuring downward keyboard scrolling also timestamps `lastUserScrollInputRef`.
+
 ## [0.6.1] - 2026-07-18
 
 ### Added

@@ -159,6 +159,7 @@ vi.mock("react-virtuoso", () => {
 			atBottomRef.current = atBottomStateChange
 		}, [atBottomStateChange])
 
+		// On data change, trigger at-bottom signals for hydration / growth
 		useEffect(() => {
 			if (harness.emitFalseOnDataChange) {
 				atBottomStateChange?.(false)

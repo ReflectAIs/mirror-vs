@@ -36,7 +36,7 @@ const TaskHeader = ({ task, buttonsDisabled }: TaskHeaderProps) => {
 	const displayImages = latestUserMsg?.images || task.images
 
 	return (
-		<div className="group pt-2 pb-1 px-3 shrink-0">
+		<div className="group pt-2 pb-1 px-3 shrink-0" data-ts={task.ts}>
 			<div
 				className={cn(
 					"p-3 rounded-lg transition-all border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03] hover:bg-vscode-button-background/[0.06] hover:border-vscode-button-background/25",

@@ -368,7 +368,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							atBottomStateChange={atBottomStateChangeCallback2}
 							atBottomThreshold={10}
 							startReached={() => setMessageLimit((prev) => prev + 100)}
-							rangeChanged={handleRangeChanged}
 							components={virtuosoComponents}
 						/>
 					</div>

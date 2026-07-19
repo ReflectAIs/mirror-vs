@@ -621,6 +621,7 @@ body.code-block-scrollable,
 .code-block-scrollable {
 	border-color: transparent;
 	transition: border-color 0.7s linear;
+	overflow-anchor: none;
 }
 
 body:hover.scrollable,
