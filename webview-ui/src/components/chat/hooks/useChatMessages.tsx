@@ -961,7 +961,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 
 	const selectImages = useCallback(() => vscode.postMessage({ type: "selectImages" }), [])
 
-	const shouldDisableImages = !model?.supportsImages || selectedImages.length >= MAX_IMAGES_PER_MESSAGE
+	const shouldDisableImages = selectedImages.length >= MAX_IMAGES_PER_MESSAGE
 
 	// Uses the passed-in setApiConfiguration from ExtensionStateContext
 	const setApiConfigurationField = useCallback(

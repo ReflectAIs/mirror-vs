@@ -34,6 +34,10 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 - **Non-Vision Model Safety**: Confirmed [`maybeRemoveImageBlocks`](src/api/transform/image-cleaning.ts:6) properly strips image blocks for models without vision support (e.g. DeepSeek has `supportsImages: false`), converting them to `"[Referenced image in conversation]"` text placeholders before API requests.
 
+### Changed
+
+- **Image Attach/Paste Unlocked for Non-Vision Models**: [`shouldDisableImages`](webview-ui/src/components/chat/hooks/useChatMessages.tsx:964) no longer gates on `!model?.supportsImages` — the OCR fallback for non-vision models already handles images at API-request time. Users can now attach (via the Image icon button at the bottom-right of the textarea) and paste (via clipboard paste handler in [`ChatTextArea.tsx`](webview-ui/src/components/chat/ChatTextArea.tsx:688)) images regardless of model vision capability. Also fixed the same guard in edit mode [`ChatRow.tsx`](webview-ui/src/components/chat/ChatRow.tsx:1529) inline editing. The max images per message limit (20) is still enforced.
+
 ### Added
 
 - **DOM Page Text in Browser Screenshots**: Both [`BrowserScreenshotTool`](src/core/tools/BrowserTools.ts:222) and [`RenderPreviewTool`](src/core/tools/BrowserTools.ts:393) now include the page's DOM `textContent` in the tool result text block (under `--- Page Text Content ---`), giving the model readable page content alongside the screenshot image. Extracted from Puppeteer's `document.body.innerText` — no additional overhead.
