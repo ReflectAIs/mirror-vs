@@ -323,6 +323,24 @@ export class TerminalRegistry {
 		})
 	}
 
+	/**
+	 * Kills a specific terminal by ID — aborts its running process and
+	 * removes it from the registry.
+	 */
+	public static killTerminal(id: number): boolean {
+		const terminal = this.terminals.find((t) => t.id === id)
+		if (!terminal) {
+			return false
+		}
+		if (terminal.process) {
+			terminal.process.abort()
+		}
+		terminal.busy = false
+		terminal.taskId = undefined
+		this.removeTerminal(id)
+		return true
+	}
+
 	private static getAllTerminals(): MirrorTerminal[] {
 		this.terminals = this.terminals.filter((t) => !t.isClosed())
 		return this.terminals

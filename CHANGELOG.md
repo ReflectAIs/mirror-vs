@@ -2,9 +2,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.4] - 2026-07-21
+
+### Fixed
+
+- **`alwaysAllowBrowser` not persisting after refresh**: Added `alwaysAllowBrowser` to the destructuring in `getStateToPostToWebview()` in [`MirrorProviderState.ts`](src/core/webview/MirrorProviderState.ts:159) — it was present in the return object but never extracted from global state.
+- **Global auto-approval On/Off toggle could never enable**: The message router at [`messageRouter.ts`](src/core/webview/messageRouter.ts:390) was calling `handleAutoApprovalEnabled(provider)` without passing `message.bool`, so the handler always received `undefined` → defaulted to `false`, making it impossible to turn auto-approval back on after disabling it.
+
+### Changed
+
+- **AutoApproveDropdown redesign**: Compact chip layout with slim header, inline On/Off pill, Settings button, and flex-wrap chip grid. Removed separate footer bar with Select All/None buttons.
+
 ## [0.6.3] - 2026-07-21
 
 ### Added
+
+- **Kill Running Terminals & SSH Sessions**: Added kill buttons (OctagonX icon, hidden until hover) to each terminal row in the [`TerminalStatusBadge`](webview-ui/src/components/chat/TerminalStatusBadge.tsx:125) popover. SSH sessions now appear in the active terminals list (Server icon) alongside VSCode terminals (Terminal icon). New [`handleKillTerminal`](src/core/webview/handlers/taskHandler.ts:156) backend handler routes kills to [`TerminalRegistry.killTerminal()`](src/integrations/terminal/TerminalRegistry.ts:330) or [`SshSessionRegistry.removeSession()`](src/core/tools/helpers/SshSessionRegistry.ts:172) using deterministic negative IDs from host:port hashes. Added [`SshSessionRegistry.getSessions()`](src/core/tools/helpers/SshSessionRegistry.ts:181) to expose live SSH sessions. Added `type`, `host`, `port` fields to [`TerminalInfo`](packages/types/src/vscode-extension-host.ts:286), `"killTerminal"` to [`WebviewMessage.type`](packages/types/src/vscode-extension-host.ts:481), and `terminalId`/`terminalType` payload fields. Badge always visible now — shows "—" when no terminals active.
 
 - **Browser Tool Chat Rendering**: Added 8 browser tool rendering cases to [`ChatRow.tsx`](webview-ui/src/components/chat/ChatRow.tsx:1062) — `browserNavigate`, `browserClick`, `browserType`, `browserScreenshot`, `browserScroll`, `browserSelect`, `browserEvaluate`, and `renderPreview`. Each renders a header with tool-specific icon (globe, debug, edit, camera, move, check, terminal, preview) and relevant parameters. Previously all browser tool calls fell through to `default: return null` and were invisible in the chat history.
 

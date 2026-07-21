@@ -20,6 +20,7 @@ import {
 	handleRenameSession,
 	handleAskResponse,
 	handleTerminalOperation,
+	handleKillTerminal,
 	handleClearTask,
 	handleDidShowAnnouncement,
 	handleSelectImages,
@@ -234,6 +235,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "terminalOperation":
 			await handleTerminalOperation(provider, message.terminalOperation)
 			break
+		case "killTerminal":
+			await handleKillTerminal(provider, message.terminalId, message.terminalType)
+			break
 		case "clearTask":
 			await handleClearTask(provider)
 			break
@@ -384,7 +388,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleEnhancementApiConfigId(provider, message.text)
 			break
 		case "autoApprovalEnabled":
-			await handleAutoApprovalEnabled(provider)
+			await handleAutoApprovalEnabled(provider, message.bool)
 			break
 		case "importSettings":
 			await handleImportSettings(provider)
