@@ -2,6 +2,17 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.4] - 2026-07-21
+
+### Fixed
+
+- **`alwaysAllowBrowser` not persisting after refresh**: Added `alwaysAllowBrowser` to the destructuring in `getStateToPostToWebview()` in [`MirrorProviderState.ts`](src/core/webview/MirrorProviderState.ts:159) — it was present in the return object but never extracted from global state.
+- **Global auto-approval On/Off toggle could never enable**: The message router at [`messageRouter.ts`](src/core/webview/messageRouter.ts:390) was calling `handleAutoApprovalEnabled(provider)` without passing `message.bool`, so the handler always received `undefined` → defaulted to `false`, making it impossible to turn auto-approval back on after disabling it.
+
+### Changed
+
+- **AutoApproveDropdown redesign**: Compact chip layout with slim header, inline On/Off pill, Settings button, and flex-wrap chip grid. Removed separate footer bar with Select All/None buttons.
+
 ## [0.6.3] - 2026-07-21
 
 ### Added
