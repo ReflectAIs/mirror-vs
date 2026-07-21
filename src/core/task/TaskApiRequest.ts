@@ -523,7 +523,25 @@ export class TaskApiRequest {
 		// For API only: merge consecutive user messages (excludes summary messages per
 		// mergeConsecutiveApiMessages implementation) without mutating stored history.
 		const mergedForApi = mergeConsecutiveApiMessages(messagesSinceLastSummary, { roles: ["user"] })
-		const messagesWithoutImages = await maybeRemoveImageBlocks(mergedForApi, this.task.api)
+
+		// Create AbortController BEFORE maybeRemoveImageBlocks so the user can cancel
+		// even if Tesseract.js OCR hangs on a large user-attached image.
+		// Previously this was created 72 lines later (after tool building), meaning
+		// a hanging OCR call would prevent both the API request AND the cancel button.
+		this.task.currentRequestAbortController = new AbortController()
+		const imageCleanupAbortSignal = this.task.currentRequestAbortController.signal
+
+		const messagesWithoutImages = await Promise.race([
+			maybeRemoveImageBlocks(mergedForApi, this.task.api),
+			new Promise<never>((_, reject) => {
+				if (imageCleanupAbortSignal.aborted) {
+					reject(new Error("Request cancelled by user"))
+				}
+				imageCleanupAbortSignal.addEventListener("abort", () => {
+					reject(new Error("Request cancelled by user"))
+				})
+			}),
+		])
 		const cleanConversationHistory = this.buildCleanConversationHistory(messagesWithoutImages as ApiMessage[])
 
 		// Check auto-approval limits
@@ -595,9 +613,7 @@ export class TaskApiRequest {
 				: {}),
 		}
 
-		// Create an AbortController to allow cancelling the request mid-stream
-		this.task.currentRequestAbortController = new AbortController()
-		const abortSignal = this.task.currentRequestAbortController.signal
+		const abortSignal = this.task.currentRequestAbortController!.signal
 		// Reset the flag after using it
 		this.task.skipPrevResponseIdOnce = false
 

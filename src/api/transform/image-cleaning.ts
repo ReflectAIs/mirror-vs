@@ -73,12 +73,20 @@ export async function maybeRemoveImageBlocks(messages: ApiMessage[], apiHandler:
 							})
 						} else {
 							// DOM text is empty/insufficient — run OCR fallback
+							// Add a 30-second timeout to prevent Tesseract.js from hanging indefinitely
+							// on large user-attached images (photos, high-res screenshots, etc.)
+							const OCR_TIMEOUT_MS = 30_000
 							try {
 								const mediaType = block.source.media_type ?? "image/png"
 								const dataUri = toDataUri(mediaType, block.source.data)
-								const { data } = await recognize(dataUri, "eng", {
-									logger: () => {}, // suppress logging
-								})
+								const { data } = await Promise.race([
+									recognize(dataUri, "eng", {
+										logger: () => {}, // suppress logging
+									}),
+									new Promise<never>((_, reject) =>
+										setTimeout(() => reject(new Error("OCR timed out")), OCR_TIMEOUT_MS),
+									),
+								])
 								const ocrText = data.text?.trim()
 								if (ocrText && ocrText.length > 20) {
 									newContent.push({
