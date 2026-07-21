@@ -220,8 +220,11 @@ export class BrowserScreenshotTool extends BaseTool<"browser_screenshot"> {
 				pushToolResult("Screenshot failed: no page loaded. Use browser_navigate first.")
 				return
 			}
+			const pageText = screenshot.textContent?.trim()
+				? `\n\n--- Page Text Content ---\n${screenshot.textContent}`
+				: ""
 			pushToolResult([
-				{ type: "text", text: "Browser screenshot taken." },
+				{ type: "text", text: `Browser screenshot taken.${pageText}` },
 				{
 					type: "image",
 					source: { type: "base64", media_type: "image/png", data: screenshot.base64 },
@@ -390,10 +393,14 @@ export class RenderPreviewTool extends BaseTool<"render_preview"> {
 					? `\nLayout changes detected (${deltas.length}):\n${deltas.map((d) => `  - ${d.description}`).join("\n")}`
 					: ""
 
+			const pageText = screenshot.textContent?.trim()
+				? `\n\n--- Page Text Content ---\n${screenshot.textContent}`
+				: ""
+
 			pushToolResult([
 				{
 					type: "text",
-					text: `Preview rendered successfully for ${url} (title: ${title})${savedMsg}${deltaMsg}`,
+					text: `Preview rendered successfully for ${url} (title: ${title})${savedMsg}${deltaMsg}${pageText}`,
 				},
 				{
 					type: "image",

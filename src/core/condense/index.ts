@@ -305,7 +305,7 @@ export async function summarizeConversation(options: SummarizeConversationOption
 	// when tool blocks are present. By converting them to text, we can send the conversation for
 	// summarization without needing to pass the tools parameter.
 	const messagesWithTextToolBlocks = transformMessagesForCondensing(
-		maybeRemoveImageBlocks([...messagesWithToolResults, finalRequestMessage], apiHandler),
+		await maybeRemoveImageBlocks([...messagesWithToolResults, finalRequestMessage], apiHandler),
 	)
 
 	const requestMessages = messagesWithTextToolBlocks.map(({ role, content }) => ({ role, content }))

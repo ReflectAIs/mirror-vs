@@ -34,6 +34,16 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 - **Non-Vision Model Safety**: Confirmed [`maybeRemoveImageBlocks`](src/api/transform/image-cleaning.ts:6) properly strips image blocks for models without vision support (e.g. DeepSeek has `supportsImages: false`), converting them to `"[Referenced image in conversation]"` text placeholders before API requests.
 
+### Added
+
+- **DOM Page Text in Browser Screenshots**: Both [`BrowserScreenshotTool`](src/core/tools/BrowserTools.ts:222) and [`RenderPreviewTool`](src/core/tools/BrowserTools.ts:393) now include the page's DOM `textContent` in the tool result text block (under `--- Page Text Content ---`), giving the model readable page content alongside the screenshot image. Extracted from Puppeteer's `document.body.innerText` — no additional overhead.
+
+- **Lightweight OCR Fallback for Non-Vision Models**: [`maybeRemoveImageBlocks`](src/api/transform/image-cleaning.ts:40) is now `async` and uses [Tesseract.js](https://github.com/naptha/tesseract.js) to OCR screenshots when the model doesn't support images. When DOM page text is present and substantive (≥50 chars), the image is replaced with a brief text reference. When DOM text is empty or insufficient (e.g. canvas/iframe-heavy pages), OCR extracts text from the base64 screenshot data. Vision models pass through completely unaffected — zero OCR cost. OCR errors are caught gracefully with fallback text. Both call sites ([`TaskApiRequest.ts:526`](src/core/task/TaskApiRequest.ts:526), [`condense/index.ts:308`](src/core/condense/index.ts:308)) have `await` added.
+
+### Changed
+
+- **`maybeRemoveImageBlocks` is Now Async**: Signature changed from `function maybeRemoveImageBlocks(...): ApiMessage[]` to `async function maybeRemoveImageBlocks(...): Promise<ApiMessage[]>`. Added lazy OCR via Tesseract.js at API-request time, so vision models never pay OCR latency. Added 4 new unit tests covering OCR success, empty OCR result, OCR error, and short-DOM-text-with-OCR-fallback scenarios.
+
 ## [0.6.2] - 2026-07-19
 
 ### Added
