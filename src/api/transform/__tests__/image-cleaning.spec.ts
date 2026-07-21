@@ -252,7 +252,7 @@ describe("maybeRemoveImageBlocks", () => {
 					},
 					{
 						type: "text",
-						text: "[Screenshot captured — OCR returned no meaningful text]",
+						text: "[Attached image — OCR returned no text]",
 					},
 				],
 			},
@@ -297,7 +297,7 @@ describe("maybeRemoveImageBlocks", () => {
 					},
 					{
 						type: "text",
-						text: "[Screenshot captured — OCR unavailable]",
+						text: "[Attached image — Non-vision model active. Switch to a vision model (e.g. Claude 3.5 Sonnet / GPT-4o) to visually inspect full image]",
 					},
 				],
 			},

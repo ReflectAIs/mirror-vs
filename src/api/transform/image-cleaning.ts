@@ -1,4 +1,7 @@
-import { recognize } from "tesseract.js"
+import TesseractModule, { recognize as namedRecognize } from "tesseract.js"
+import * as path from "path"
+import * as os from "os"
+import * as fs from "fs"
 import { ApiMessage } from "../../core/task-persistence/apiMessages"
 
 import { ApiHandler } from "../index"
@@ -72,38 +75,96 @@ export async function maybeRemoveImageBlocks(messages: ApiMessage[], apiHandler:
 								text: "[Screenshot captured — page text content is included above]",
 							})
 						} else {
-							// DOM text is empty/insufficient — run OCR fallback
-							// Add a 30-second timeout to prevent Tesseract.js from hanging indefinitely
-							// on large user-attached images (photos, high-res screenshots, etc.)
-							const OCR_TIMEOUT_MS = 30_000
+							// DOM text is empty/insufficient — attempt fast OCR fallback
+							// Use a 10-second timeout so large UI screenshots have ample time to process
+							// after worker & WASM initialization.
+							const OCR_TIMEOUT_MS = 10_000
 							try {
 								const mediaType = block.source.media_type ?? "image/png"
 								const dataUri = toDataUri(mediaType, block.source.data)
+								const recognizeFn =
+									namedRecognize ||
+									(TesseractModule as any)?.recognize ||
+									(TesseractModule as any)?.default?.recognize
+
+								// Specify explicit writable cache path and bundled worker script path.
+								const cachePath = path.join(os.homedir(), ".mirror", "tessdata")
+								try {
+									if (!fs.existsSync(cachePath)) {
+										fs.mkdirSync(cachePath, { recursive: true })
+									}
+								} catch {}
+
+								const localWorkerScript = path.join(
+									__dirname,
+									"tesseract-worker",
+									"worker-script",
+									"node",
+									"index.js",
+								)
+								const workerPath = fs.existsSync(localWorkerScript) ? localWorkerScript : undefined
+
+								const localCoreDir = path.join(__dirname, "node_modules", "tesseract.js-core")
+								const corePath = fs.existsSync(localCoreDir) ? localCoreDir : undefined
+
+								console.log(
+									`[OCR Debug] Attempting fast OCR (timeout ${OCR_TIMEOUT_MS}ms). mediaType=${mediaType}, dataUriLength=${dataUri.length}, recognizeFnType=${typeof recognizeFn}, workerPath=${workerPath || "default"}, corePath=${corePath || "default"}`,
+								)
+
+								if (typeof recognizeFn !== "function") {
+									throw new Error("Tesseract recognize function unavailable")
+								}
+
+								let timeoutId: NodeJS.Timeout | undefined
+								const timeoutPromise = new Promise<never>((_, reject) => {
+									timeoutId = setTimeout(
+										() => reject(new Error(`OCR timed out after ${OCR_TIMEOUT_MS}ms`)),
+										OCR_TIMEOUT_MS,
+									)
+								})
+
+								const recognizeOptions: any = {
+									cachePath,
+									logger: (m: any) => console.log("[OCR Progress]", m),
+								}
+								if (workerPath) {
+									recognizeOptions.workerPath = workerPath
+								}
+								if (corePath) {
+									recognizeOptions.corePath = corePath
+								}
+
 								const { data } = await Promise.race([
-									recognize(dataUri, "eng", {
-										logger: () => {}, // suppress logging
+									recognizeFn(dataUri, "eng", recognizeOptions).finally(() => {
+										if (timeoutId) clearTimeout(timeoutId)
 									}),
-									new Promise<never>((_, reject) =>
-										setTimeout(() => reject(new Error("OCR timed out")), OCR_TIMEOUT_MS),
-									),
+									timeoutPromise,
 								])
+
 								const ocrText = data.text?.trim()
-								if (ocrText && ocrText.length > 20) {
+								console.log(`[OCR Success] Extracted text length=${ocrText?.length || 0}: "${ocrText}"`)
+
+								if (ocrText && ocrText.length > 0) {
 									newContent.push({
 										type: "text",
 										text: `[Page screenshot OCR text:\n${ocrText}\n]`,
 									})
 								} else {
+									console.warn("[OCR Notice] Tesseract completed but returned empty text")
 									newContent.push({
 										type: "text",
-										text: "[Screenshot captured — OCR returned no meaningful text]",
+										text: "[Attached image — OCR returned no text]",
 									})
 								}
 							} catch (ocrError) {
-								// OCR failed — fall back to a simple reference
+								console.warn(
+									"[OCR Warning] OCR skipped or unavailable, using text fallback:",
+									(ocrError as Error)?.message || ocrError,
+								)
+								// Fast fallback for non-vision models when OCR is unavailable or times out
 								newContent.push({
 									type: "text",
-									text: "[Screenshot captured — OCR unavailable]",
+									text: "[Attached image — Non-vision model active. Switch to a vision model (e.g. Claude 3.5 Sonnet / GPT-4o) to visually inspect full image]",
 								})
 							}
 						}

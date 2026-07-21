@@ -1,6 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import { execSync } from "child_process"
+import { createRequire } from "module"
 
 import { ViewsContainer, Views, Menus, Configuration, Keybindings, contributesSchema } from "./types.js"
 
@@ -134,6 +135,42 @@ export function copyWasms(srcDir: string, distDir: string): void {
 	)
 
 	console.log(`[copyWasms] Copied tiktoken WASMs to ${workersDir}`)
+
+	// Tesseract.js worker files for Node extension host
+	try {
+		const req = typeof require !== "undefined" ? require : createRequire(import.meta.url)
+		const pkgPath = req.resolve("tesseract.js/package.json", { paths: [srcDir] })
+		const tesseractDir = path.dirname(pkgPath)
+		const tesseractSrc = path.join(tesseractDir, "src")
+		const workerDest = path.join(distDir, "tesseract-worker")
+		fs.mkdirSync(workerDest, { recursive: true })
+		fs.cpSync(tesseractSrc, workerDest, { recursive: true })
+		console.log(`[copyWasms] Copied Tesseract worker files to ${workerDest}`)
+
+		// Copy tesseract.js-core into dist/node_modules so require('tesseract.js-core/...') succeeds in worker thread
+		const corePkgPath = req.resolve("tesseract.js-core/package.json", { paths: [tesseractDir] })
+		const coreDir = path.dirname(corePkgPath)
+		const coreDest = path.join(distDir, "node_modules", "tesseract.js-core")
+		fs.mkdirSync(coreDest, { recursive: true })
+		fs.cpSync(coreDir, coreDest, { recursive: true })
+		console.log(`[copyWasms] Copied Tesseract core files to ${coreDest}`)
+
+		// Copy regenerator-runtime and other runtime dependencies into dist/node_modules
+		const depsToCopy = ["regenerator-runtime", "wasm-feature-detect", "zlibjs", "bmp-js", "is-url"]
+		for (const dep of depsToCopy) {
+			try {
+				const depPkgPath = req.resolve(`${dep}/package.json`, { paths: [tesseractDir, srcDir] })
+				const depDir = path.dirname(depPkgPath)
+				const depDest = path.join(distDir, "node_modules", dep)
+				fs.mkdirSync(depDest, { recursive: true })
+				fs.cpSync(depDir, depDest, { recursive: true })
+			} catch (_err) {
+				// Optional dependency copy fallback if package is absent
+			}
+		}
+	} catch (e) {
+		console.warn("[copyWasms] Failed to copy Tesseract worker/core files:", e)
+	}
 
 	// Main tree-sitter WASM file.
 	fs.copyFileSync(

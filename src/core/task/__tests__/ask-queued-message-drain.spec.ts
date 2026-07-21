@@ -1,4 +1,5 @@
 import { Task } from "../Task"
+import { TaskUserInteraction } from "../TaskUserInteraction"
 
 // NOTE: These tests validate the draining behavior of tryDrainQueuedMessage().
 //
@@ -32,20 +33,25 @@ describe("Task.ask queued message drain", () => {
 		;(task as any).askResponseText = undefined
 		;(task as any).askResponseImages = undefined
 		;(task as any).lastMessageTs = undefined
-		;(task as any).addToMirrorMessages = vi.fn(async (msg: any) => {
-			;(task as any).mirrorMessages.push(msg)
-		})
-		;(task as any).saveMirrorMessages = vi.fn(async () => {})
-		;(task as any).updateMirrorMessage = vi.fn(async () => {})
-		;(task as any).cancelAutoApprovalTimeout = vi.fn(() => {})
+		;(task as any).userInteractionManager = new TaskUserInteraction(task)
+		;(task as any).mirrorMessagesManager = {
+			addToMirrorMessages: vi.fn(async (msg: any) => {
+				;(task as any).mirrorMessages.push(msg)
+			}),
+			saveMirrorMessages: vi.fn(async () => {}),
+			updateMirrorMessage: vi.fn(async () => {}),
+			findMessageByTimestamp: vi.fn(() => undefined),
+		}
 		;(task as any).checkpointSave = vi.fn(async () => {})
 		;(task as any).emit = vi.fn()
 		;(task as any).providerRef = { deref: () => undefined }
-		;(task as any).handleWebviewAskResponse = vi.fn((response, text, images) => {
+		const handleWebviewAskResponse = vi.fn((response, text, images) => {
 			;(task as any).askResponse = response
 			;(task as any).askResponseText = text
 			;(task as any).askResponseImages = images
 		})
+		;(task as any).handleWebviewAskResponse = handleWebviewAskResponse
+		vi.spyOn(task.userInteractionManager, "handleWebviewAskResponse").mockImplementation(handleWebviewAskResponse)
 		return task
 	}
 
