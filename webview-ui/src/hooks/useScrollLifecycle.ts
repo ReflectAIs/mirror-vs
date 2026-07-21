@@ -354,13 +354,21 @@ export function useScrollLifecycle({
 			}
 
 			if (currentPhase === "ANCHORED_FOLLOWING" && !isAtBottom) {
-				if (pointerScrollActiveRef.current) {
-					enterUserBrowsingHistory("pointer-scroll-up")
-					return
-				}
 				if (isClickingScrollToBottomRef.current) {
 					return
 				}
+
+				const timeSinceUserInput = performance.now() - lastUserScrollInputRef.current
+				const userRecentlyScrolled = timeSinceUserInput < 250 || pointerScrollActiveRef.current
+
+				if (userRecentlyScrolled) {
+					// User explicitly initiated scroll input (wheel up, drag, key navigation)
+					enterUserBrowsingHistory("pointer-scroll-up")
+					return
+				}
+
+				// Content grew at the bottom during streaming (NO user scroll input).
+				// Auto-scroll to keep pinned at bottom.
 				scrollToBottomAuto()
 				setShowScrollToBottom(false)
 				return
