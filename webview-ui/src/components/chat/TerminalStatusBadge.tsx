@@ -1,10 +1,11 @@
 import React from "react"
-import { Terminal } from "lucide-react"
+import { Terminal, Server, OctagonX } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { useMirrorPortal } from "@/components/ui/hooks/useMirrorPortal"
-import { Popover, PopoverContent, PopoverTrigger, StandardTooltip } from "@/components/ui"
+import { vscode } from "@/utils/vscode"
+import { Popover, PopoverContent, PopoverTrigger, StandardTooltip, Button } from "@/components/ui"
 
 interface TerminalStatusBadgeProps {
 	className?: string
@@ -17,13 +18,12 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 
 	const count = activeTerminalCount ?? 0
 
-	if (count === 0) {
-		return null
-	}
-
 	return (
 		<Popover open={open} onOpenChange={setOpen} data-testid="terminal-status-root">
-			<StandardTooltip content={`${count} active terminal${count !== 1 ? "s" : ""} running`}>
+			<StandardTooltip
+				content={
+					count > 0 ? `${count} active terminal${count !== 1 ? "s" : ""} running` : "No active terminals"
+				}>
 				<PopoverTrigger
 					data-testid="terminal-status-trigger"
 					className={cn(
@@ -33,8 +33,13 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 						"opacity-90 hover:opacity-100 hover:bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.15)] cursor-pointer",
 						className,
 					)}>
-					<Terminal className="size-3 flex-shrink-0 text-green-500" />
-					<span className="hidden min-[450px]:inline truncate min-w-0">{count}</span>
+					<Terminal
+						className={cn(
+							"size-3 flex-shrink-0",
+							count > 0 ? "text-green-500" : "text-vscode-descriptionForeground",
+						)}
+					/>
+					<span className="hidden min-[450px]:inline truncate min-w-0">{count > 0 ? count : "—"}</span>
 				</PopoverTrigger>
 			</StandardTooltip>
 			<PopoverContent
@@ -46,19 +51,29 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 				<div className="flex flex-col w-full max-h-[70vh]">
 					{/* Header */}
 					<div className="p-3 border-b border-vscode-dropdown-border shrink-0">
-						<h4 className="m-0 font-bold text-base text-vscode-foreground">Active Terminals</h4>
+						<h4 className="m-0 font-bold text-base text-vscode-foreground">
+							{count > 0 ? "Active Terminals" : "Terminals"}
+						</h4>
 						<p className="m-0 mt-0.5 text-xs text-vscode-descriptionForeground">
-							{count} terminal{count !== 1 ? "s" : ""} currently running
+							{count > 0
+								? `${count} terminal${count !== 1 ? "s" : ""} currently running`
+								: "No terminals are currently running"}
 						</p>
 					</div>
 
 					{/* Terminal list */}
 					<div className="flex-1 overflow-y-auto">
-						<div className="flex flex-col">
-							{activeTerminals.map((term) => (
-								<TerminalRow key={term.id} terminal={term} />
-							))}
-						</div>
+						{activeTerminals.length > 0 ? (
+							<div className="flex flex-col">
+								{activeTerminals.map((term) => (
+									<TerminalRow key={term.id} terminal={term} />
+								))}
+							</div>
+						) : (
+							<div className="p-6 text-center text-xs text-vscode-descriptionForeground">
+								No active terminals or SSH sessions.
+							</div>
+						)}
 					</div>
 				</div>
 			</PopoverContent>
@@ -70,21 +85,54 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
  * A single terminal row in the popover list.
  */
 const TerminalRow = React.memo(
-	({ terminal }: { terminal: { id: number; command: string; cwd: string; taskId?: string } }) => {
-		const displayCommand = terminal.command || "Ready"
+	({
+		terminal,
+	}: {
+		terminal: {
+			id: number
+			command: string
+			cwd: string
+			taskId?: string
+			type?: "terminal" | "ssh"
+			host?: string
+			port?: number
+		}
+	}) => {
+		const displayCommand = terminal.command || (terminal.type === "ssh" ? "SSH Session" : "Ready")
 		const displayCwd = terminal.cwd || "—"
 
+		const handleKill = () => {
+			vscode.postMessage({
+				type: "killTerminal",
+				terminalId: terminal.id,
+				terminalType: terminal.type || "terminal",
+			})
+		}
+
 		return (
-			<div className="flex flex-col gap-0.5 px-3 py-2.5 border-b border-vscode-dropdown-border last:border-b-0 hover:bg-[rgba(255,255,255,0.03)] transition-colors">
+			<div className="flex flex-col gap-0.5 px-3 py-2.5 border-b border-vscode-dropdown-border last:border-b-0 hover:bg-[rgba(255,255,255,0.03)] transition-colors group">
 				<div className="flex items-center gap-2">
+					{terminal.type === "ssh" ? (
+						<Server className="size-3 text-amber-500 shrink-0" />
+					) : (
+						<Terminal className="size-3 text-green-500 shrink-0" />
+					)}
 					<span className="text-[10px] font-semibold text-vscode-descriptionForeground uppercase tracking-wider shrink-0">
-						#{terminal.id}
+						{terminal.type === "ssh" ? `SSH` : `#${terminal.id}`}
 					</span>
 					{terminal.taskId && (
 						<span className="text-[10px] text-vscode-descriptionForeground truncate shrink-0 max-w-[120px]">
 							task: {terminal.taskId}
 						</span>
 					)}
+					<div className="flex-1" />
+					<Button
+						variant="ghost"
+						size="icon"
+						className="size-5 opacity-0 group-hover:opacity-100 transition-opacity"
+						onClick={handleKill}>
+						<OctagonX className="size-3.5 text-red-400 hover:text-red-300" />
+					</Button>
 				</div>
 				<div className="flex items-center gap-1.5 min-w-0">
 					<span className="text-xs font-mono text-vscode-foreground truncate" title={displayCommand}>

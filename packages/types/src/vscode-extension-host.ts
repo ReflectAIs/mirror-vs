@@ -288,6 +288,12 @@ export interface TerminalInfo {
 	command: string
 	cwd: string
 	taskId?: string
+	/** Distinguishes VSCode terminals from SSH sessions */
+	type?: "terminal" | "ssh"
+	/** SSH host (only for SSH sessions) */
+	host?: string
+	/** SSH port (only for SSH sessions) */
+	port?: number
 }
 
 export type ExtensionState = Pick<
@@ -472,6 +478,7 @@ export interface WebviewMessage {
 		| "newTask"
 		| "askResponse"
 		| "terminalOperation"
+		| "killTerminal"
 		| "clearTask"
 		| "didShowAnnouncement"
 		| "selectImages"
@@ -690,6 +697,8 @@ export interface WebviewMessage {
 	requestId?: string
 	ids?: string[]
 	terminalOperation?: "continue" | "abort"
+	terminalId?: number
+	terminalType?: "terminal" | "ssh"
 	messageTs?: number
 	inclusive?: boolean
 	restoreCheckpoint?: boolean

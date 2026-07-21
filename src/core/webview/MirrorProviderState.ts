@@ -20,6 +20,7 @@ import { EMBEDDING_MODEL_PROFILES } from "../../shared/embeddingModels"
 
 import { Terminal } from "../../integrations/terminal/Terminal"
 import { TerminalRegistry } from "../../integrations/terminal/TerminalRegistry"
+import { SshSessionRegistry } from "../tools/helpers/SshSessionRegistry"
 
 import type { MirrorProvider } from "./MirrorProvider"
 
@@ -156,6 +157,7 @@ export class StateManager {
 			deniedCommands,
 			alwaysAllowMcp,
 			alwaysAllowModeSwitch,
+			alwaysAllowBrowser,
 			alwaysAllowSubtasks,
 			allowedMaxRequests,
 			allowedMaxCost,
@@ -288,6 +290,7 @@ export class StateManager {
 			customModePrompts: customModePrompts ?? {},
 			customSupportPrompts: customSupportPrompts ?? {},
 			enhancementApiConfigId,
+			alwaysAllowBrowser: alwaysAllowBrowser ?? false,
 			autoApprovalEnabled: autoApprovalEnabled ?? false,
 			autonomousMode: autonomousMode ?? false,
 			customModes,
@@ -347,13 +350,27 @@ export class StateManager {
 					return false
 				}
 			})(),
-			activeTerminalCount: TerminalRegistry.getTerminals(true).length,
-			activeTerminals: TerminalRegistry.getTerminals(true).map((t) => ({
-				id: t.id,
-				command: t.getLastCommand(),
-				cwd: t.getCurrentWorkingDirectory(),
-				taskId: t.taskId,
-			})),
+			activeTerminalCount: TerminalRegistry.getTerminals(true).length + SshSessionRegistry.getSessions().length,
+			activeTerminals: [
+				...TerminalRegistry.getTerminals(true).map((t) => ({
+					id: t.id,
+					command: t.getLastCommand(),
+					cwd: t.getCurrentWorkingDirectory(),
+					taskId: t.taskId,
+					type: "terminal" as const,
+				})),
+				...SshSessionRegistry.getSessions().map(({ host, port, session }) => ({
+					// Use a deterministic negative id based on host:port hash
+					id:
+						-Math.abs(host.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) + port) ||
+						-1,
+					command: `SSH: ${host}:${port}`,
+					cwd: "",
+					host,
+					port,
+					type: "ssh" as const,
+				})),
+			],
 			currentSessionId,
 			sessionNames: sessionNames ?? {},
 			comfyCloudApiToken,

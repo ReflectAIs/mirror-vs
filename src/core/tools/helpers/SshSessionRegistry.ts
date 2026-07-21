@@ -178,6 +178,17 @@ export class SshSessionRegistry {
 		}
 	}
 
+	public static getSessions(): Array<{ host: string; port: number; session: SshSession }> {
+		const result: Array<{ host: string; port: number; session: SshSession }> = []
+		for (const [key, session] of this.sessions.entries()) {
+			if (!session.isDead) {
+				const [host, portStr] = key.split(":")
+				result.push({ host, port: parseInt(portStr, 10), session })
+			}
+		}
+		return result
+	}
+
 	public static clearAll() {
 		for (const session of this.sessions.values()) {
 			session.close()
