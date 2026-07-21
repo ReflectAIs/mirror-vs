@@ -151,6 +151,40 @@ export async function handleTerminalOperation(
 }
 
 /**
+ * Handles the killTerminal message — kills a specific terminal or SSH session.
+ */
+export async function handleKillTerminal(
+	provider: MirrorProvider,
+	terminalId?: number,
+	terminalType?: "terminal" | "ssh",
+): Promise<void> {
+	if (terminalId === undefined) {
+		return
+	}
+
+	if (terminalType === "ssh") {
+		// Kill SSH session — need to find the host/port from the registry
+		const { SshSessionRegistry } = await import("../../tools/helpers/SshSessionRegistry")
+		const sessions = SshSessionRegistry.getSessions()
+		// The id for SSH sessions is a deterministic negative hash; we find the matching session
+		for (const { host, port, session } of sessions) {
+			const computedId =
+				-Math.abs(host.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) + port) || -1
+			if (computedId === terminalId) {
+				SshSessionRegistry.removeSession(host, port)
+				break
+			}
+		}
+	} else {
+		// Kill VSCode terminal
+		const { TerminalRegistry } = await import("../../../integrations/terminal/TerminalRegistry")
+		TerminalRegistry.killTerminal(terminalId)
+	}
+
+	await provider.postStateToWebview()
+}
+
+/**
  * Handles the clearTask message.
  */
 export async function handleClearTask(provider: MirrorProvider): Promise<void> {
