@@ -320,6 +320,10 @@
 			"description": "Automatically select the first suggested answer for follow-up questions after the configured timeout",
 			"timeoutLabel": "Time to wait before auto-selecting the first answer"
 		},
+		"browser": {
+			"label": "Browser",
+			"description": "Automatically allow the assistant to control the browser (navigate, click, type, scroll, screenshot) without requiring approval"
+		},
 		"execute": {
 			"label": "Execute",
 			"description": "Automatically execute allowed terminal commands without requiring approval",
@@ -847,6 +851,10 @@
 		"ASSISTANT_MESSAGE_PARSER": {
 			"name": "Use new message parser",
 			"description": "Enable the experimental streaming message parser that provides significant performance improvements for long assistant responses by processing messages more efficiently."
+		},
+		"BROWSER": {
+			"name": "Enable browser interaction tools",
+			"description": "When enabled, the assistant can interact with web browsers to navigate pages, click buttons, type text, take screenshots, scroll, select options, and execute JavaScript."
 		},
 		"NEW_TASK_REQUIRE_TODOS": {
 			"name": "Require 'todos' list for new tasks",

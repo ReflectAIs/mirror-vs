@@ -35,7 +35,7 @@
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](locales/zh-TW/README.md)
 - ...
-      </details>
+  </details>
 
 ---
 
@@ -59,6 +59,7 @@ Whether you're spinning up a new project, refactoring a gnarly codebase, or tryi
 - **Connect to MCP servers** for extended superpowers
 - **Index your codebase** for context-aware file suggestions and semantic search
 - **Manage tasks** with structured todo lists, checkpoints, and subtask delegation
+- **Persistent SSH Sessions** — connect to remote servers securely and execute multiple tasks over a single connection without rate-limiting blocks
 
 ---
 

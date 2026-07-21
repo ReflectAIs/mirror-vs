@@ -44,6 +44,8 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setHasOpenedModeSelector: (value: boolean) => void // Setter for the new property
 	alwaysAllowFollowupQuestions: boolean // New property for follow-up questions auto-approve
 	setAlwaysAllowFollowupQuestions: (value: boolean) => void // Setter for the new property
+	alwaysAllowBrowser: boolean
+	setAlwaysAllowBrowser: (value: boolean) => void
 	followupAutoApproveTimeoutMs: number | undefined // Timeout in ms for auto-approving follow-up questions
 	setFollowupAutoApproveTimeoutMs: (value: number) => void // Setter for the timeout
 	profileThresholds: Record<string, number>
@@ -258,6 +260,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 	const [currentCheckpoint, setCurrentCheckpoint] = useState<string>()
 	const [extensionRouterModels, setExtensionRouterModels] = useState<RouterModels | undefined>(undefined)
 	const [alwaysAllowFollowupQuestions, setAlwaysAllowFollowupQuestions] = useState(false) // Add state for follow-up questions auto-approve
+	const [alwaysAllowBrowser, setAlwaysAllowBrowser] = useState(false)
 	const [followupAutoApproveTimeoutMs, setFollowupAutoApproveTimeoutMs] = useState<number | undefined>(undefined) // Will be set from global settings
 	const [skills, setSkills] = useState<SkillMetadata[]>([])
 	const [includeTaskHistoryInEnhance, setIncludeTaskHistoryInEnhance] = useState(true)
@@ -291,6 +294,10 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					// Update alwaysAllowFollowupQuestions if present in state message
 					if ((newState as any).alwaysAllowFollowupQuestions !== undefined) {
 						setAlwaysAllowFollowupQuestions((newState as any).alwaysAllowFollowupQuestions)
+					}
+					// Update alwaysAllowBrowser if present in state message
+					if ((newState as any).alwaysAllowBrowser !== undefined) {
+						setAlwaysAllowBrowser((newState as any).alwaysAllowBrowser)
 					}
 					// Update followupAutoApproveTimeoutMs if present in state message
 					if ((newState as any).followupAutoApproveTimeoutMs !== undefined) {
@@ -463,6 +470,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		routerModels: extensionRouterModels,
 		profileThresholds: state.profileThresholds ?? {},
 		alwaysAllowFollowupQuestions,
+		alwaysAllowBrowser,
+		setAlwaysAllowBrowser,
 		followupAutoApproveTimeoutMs,
 		setExperimentEnabled: (id, enabled) =>
 			setState((prevState) => ({ ...prevState, experiments: { ...prevState.experiments, [id]: enabled } })),

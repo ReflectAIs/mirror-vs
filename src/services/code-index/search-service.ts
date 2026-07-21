@@ -54,7 +54,23 @@ export class CodeIndexSearchService {
 
 			// Perform search
 			const results = await this.vectorStore.search(vector, normalizedPrefix, minScore, maxResults)
-			return results
+
+			// Deduplicate results by file and line range to avoid redundant snippets in prompt context
+			const seen = new Set<string>()
+			const dedupedResults: VectorStoreSearchResult[] = []
+
+			for (const res of results) {
+				const payload = res.payload
+				const key = payload
+					? `${payload.filePath}:${payload.startLine}-${payload.endLine}:${(payload.codeChunk || "").trim()}`
+					: String(res.id)
+				if (!seen.has(key)) {
+					seen.add(key)
+					dedupedResults.push(res)
+				}
+			}
+
+			return dedupedResults
 		} catch (error) {
 			console.error("[CodeIndexSearchService] Error during search:", error)
 			this.stateManager.setSystemState("Error", `Search failed: ${(error as Error).message}`)

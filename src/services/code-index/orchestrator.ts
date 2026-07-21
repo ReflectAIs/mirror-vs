@@ -151,15 +151,28 @@ export class CodeIndexOrchestrator {
 				let cumulativeBlocksIndexed = 0
 				let cumulativeBlocksFoundSoFar = 0
 				let batchErrors: Error[] = []
+				let lastReportTime = 0
+				const REPORT_THROTTLE_MS = 100
+
+				const reportProgressThrottled = (force = false) => {
+					const now = Date.now()
+					if (force || now - lastReportTime >= REPORT_THROTTLE_MS) {
+						lastReportTime = now
+						this.stateManager.reportBlockIndexingProgress(
+							cumulativeBlocksIndexed,
+							cumulativeBlocksFoundSoFar,
+						)
+					}
+				}
 
 				const handleFileParsed = (fileBlockCount: number) => {
 					cumulativeBlocksFoundSoFar += fileBlockCount
-					this.stateManager.reportBlockIndexingProgress(cumulativeBlocksIndexed, cumulativeBlocksFoundSoFar)
+					reportProgressThrottled()
 				}
 
 				const handleBlocksIndexed = (indexedCount: number) => {
 					cumulativeBlocksIndexed += indexedCount
-					this.stateManager.reportBlockIndexingProgress(cumulativeBlocksIndexed, cumulativeBlocksFoundSoFar)
+					reportProgressThrottled(true)
 				}
 
 				// Run incremental scan - scanner will skip unchanged files using cache
@@ -213,15 +226,28 @@ export class CodeIndexOrchestrator {
 				let cumulativeBlocksIndexed = 0
 				let cumulativeBlocksFoundSoFar = 0
 				let batchErrors: Error[] = []
+				let lastReportTime = 0
+				const REPORT_THROTTLE_MS = 100
+
+				const reportProgressThrottled = (force = false) => {
+					const now = Date.now()
+					if (force || now - lastReportTime >= REPORT_THROTTLE_MS) {
+						lastReportTime = now
+						this.stateManager.reportBlockIndexingProgress(
+							cumulativeBlocksIndexed,
+							cumulativeBlocksFoundSoFar,
+						)
+					}
+				}
 
 				const handleFileParsed = (fileBlockCount: number) => {
 					cumulativeBlocksFoundSoFar += fileBlockCount
-					this.stateManager.reportBlockIndexingProgress(cumulativeBlocksIndexed, cumulativeBlocksFoundSoFar)
+					reportProgressThrottled()
 				}
 
 				const handleBlocksIndexed = (indexedCount: number) => {
 					cumulativeBlocksIndexed += indexedCount
-					this.stateManager.reportBlockIndexingProgress(cumulativeBlocksIndexed, cumulativeBlocksFoundSoFar)
+					reportProgressThrottled(true)
 				}
 
 				const result = await this.scanner.scanDirectory(

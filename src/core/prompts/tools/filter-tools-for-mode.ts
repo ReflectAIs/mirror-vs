@@ -300,6 +300,23 @@ export function filterNativeToolsForMode(
 		allowedToolNames.delete("run_slash_command")
 	}
 
+	// Conditionally exclude browser tools if the browser experiment is not enabled
+	const browserTools: ToolName[] = [
+		"browser_navigate",
+		"browser_click",
+		"browser_type",
+		"browser_screenshot",
+		"browser_scroll",
+		"browser_select",
+		"browser_evaluate_script",
+		"render_preview",
+	]
+	if (!experiments?.browser) {
+		for (const tool of browserTools) {
+			allowedToolNames.delete(tool)
+		}
+	}
+
 	// Remove tools that are explicitly disabled via the disabledTools setting
 	if (settings?.disabledTools?.length) {
 		for (const toolName of settings.disabledTools) {
@@ -398,6 +415,21 @@ export function isToolAllowedInMode(
 			return experiments?.runSlashCommand === true
 		}
 		return true
+	}
+
+	// Check if the tool is a browser tool — requires the browser experiment
+	const browserTools: ToolName[] = [
+		"browser_navigate",
+		"browser_click",
+		"browser_type",
+		"browser_screenshot",
+		"browser_scroll",
+		"browser_select",
+		"browser_evaluate_script",
+		"render_preview",
+	]
+	if ((browserTools as readonly ToolName[]).includes(toolName)) {
+		return experiments?.browser === true
 	}
 
 	// Check if the tool is allowed by the mode's groups

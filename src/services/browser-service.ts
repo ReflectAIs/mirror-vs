@@ -241,13 +241,25 @@ export class BrowserService {
 			const page = await this.getPage()
 			// Use 'domcontentloaded' — 'networkidle2' hangs indefinitely on dev servers
 			// that maintain persistent connections (e.g. python http.server, vite HMR).
-			await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 })
-			// Wait 10 seconds for JS-heavy pages, SPAs, and dev servers to finish rendering.
-			await new Promise((r) => setTimeout(r, 10000))
+			// Use a shorter timeout (10s) so connection errors like ERR_CONNECTION_REFUSED
+			// surface quickly without the model hanging for 30+ seconds.
+			await page.goto(url, { waitUntil: "domcontentloaded", timeout: 10000 })
+			// Wait 3 seconds for JS-heavy pages, SPAs, and dev servers to finish rendering.
+			// Reduced from 10s to minimize idle blocking while still allowing SPA rendering.
+			await new Promise((r) => setTimeout(r, 3000))
 			const title: string = await page.title()
 			const textContent: string = await page.evaluate(() => (document.body?.innerText || "").trim())
 			return { title, textContent }
 		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
+			// Provide a clearer error message for common connection failures
+			if (message.includes("ERR_CONNECTION_REFUSED")) {
+				this.logError(`navigate(${url})`, error)
+				throw new Error(
+					`Failed to connect to ${url}. The server may not be running or the address is unreachable. ` +
+						`Please verify the URL is correct and the server is started before requesting browser operations.`,
+				)
+			}
 			this.logError(`navigate(${url})`, error)
 			throw error
 		}
@@ -271,6 +283,63 @@ export class BrowserService {
 			return `Typed "${text}" into ${selector}`
 		} catch (error) {
 			this.logError(`type(${selector})`, error)
+			throw error
+		}
+	}
+
+	/**
+	 * Scrolls the page in a given direction by the specified amount (in pixels).
+	 * @param direction - "up" | "down" | "left" | "right"
+	 * @param amount - Number of pixels to scroll (default: 300)
+	 */
+	public async scroll(direction: string, amount: number = 300): Promise<string> {
+		try {
+			const page = await this.getPage()
+			await page.evaluate(
+				(dir: string, px: number) => {
+					const x = dir === "left" ? -px : dir === "right" ? px : 0
+					const y = dir === "up" ? -px : dir === "down" ? px : 0
+					window.scrollBy(x, y)
+				},
+				direction,
+				amount,
+			)
+			return `Scrolled ${direction} by ${amount}px`
+		} catch (error) {
+			this.logError(`scroll(${direction}, ${amount})`, error)
+			throw error
+		}
+	}
+
+	/**
+	 * Selects an option from a <select> element by its value or label text.
+	 * @param selector - CSS selector for the <select> element
+	 * @param value - The option value or visible label text to select
+	 */
+	public async selectOption(selector: string, value: string): Promise<string> {
+		try {
+			const page = await this.getPage()
+			// Try selecting by value first, then fall back to option label text
+			await page.evaluate(
+				(sel: string, val: string) => {
+					const el = document.querySelector(sel) as HTMLSelectElement | null
+					if (!el) throw new Error(`Select element "${sel}" not found`)
+					const option = Array.from(el.options).find(
+						(opt) => opt.value === val || opt.textContent?.trim() === val,
+					)
+					if (option) {
+						el.value = option.value
+						el.dispatchEvent(new Event("change", { bubbles: true }))
+					} else {
+						throw new Error(`Option "${val}" not found in select "${sel}"`)
+					}
+				},
+				selector,
+				value,
+			)
+			return `Selected option "${value}" in ${selector}`
+		} catch (error) {
+			this.logError(`selectOption(${selector}, ${value})`, error)
 			throw error
 		}
 	}

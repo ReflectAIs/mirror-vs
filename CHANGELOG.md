@@ -2,9 +2,43 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.3] - 2026-07-21
+
+### Added
+
+- **Browser Tool Chat Rendering**: Added 8 browser tool rendering cases to [`ChatRow.tsx`](webview-ui/src/components/chat/ChatRow.tsx:1062) — `browserNavigate`, `browserClick`, `browserType`, `browserScreenshot`, `browserScroll`, `browserSelect`, `browserEvaluate`, and `renderPreview`. Each renders a header with tool-specific icon (globe, debug, edit, camera, move, check, terminal, preview) and relevant parameters. Previously all browser tool calls fell through to `default: return null` and were invisible in the chat history.
+
+- **Browser Tool Approvals in MirrorSayTool**: Added all 8 browser tool names (`browserNavigate`, `browserClick`, `browserType`, `browserScreenshot`, `browserScroll`, `browserSelect`, `browserEvaluate`, `renderPreview`) to the [`MirrorSayTool`](packages/types/src/vscode-extension-host.ts:819) `tool` union type, with browser-specific properties (`url`, `selector`, `text`, `direction`, `amount`, `value`, `script`, `width`, `height`).
+
+- **Browser Tool Auto-Approval**: Added `alwaysAllowBrowser` toggle throughout the full auto-approval chain — [`GlobalSettings`](packages/types/src/global-settings.ts:114) schema, [`ExtensionState`](webview-ui/src/context/ExtensionStateContext.tsx:31) context, [`AutoApproveToggle`](webview-ui/src/components/settings/AutoApproveToggle.tsx:7) config, [`AutoApproveDropdown`](webview-ui/src/components/chat/AutoApproveDropdown.tsx:21) popover, [`AutoApproveSettings`](webview-ui/src/components/settings/AutoApproveSettings.tsx:21) props, and [`useAutoApprovalToggles`](webview-ui/src/hooks/useAutoApprovalToggles.ts:8) / [`useAutoApprovalState`](webview-ui/src/hooks/useAutoApprovalState.ts:3) hooks. Includes English i18n keys under `settings.autoApprove.browser` and `chat.browser.*` namespaces.
+
+- **Browser Chat Translation Keys**: Added 16 translation keys under the `browser` namespace in [`en/chat.json`](webview-ui/src/i18n/locales/en/chat.json:487) — `wantsTo*` and `did*` variants for each of the 8 browser tools.
+
+- **Persistent SSH Session Tool (`ssh_session`)**: New native persistent shell process channel supporting `connect`, `execute`, and `disconnect` actions. Maintains remote connections alive across turns to prevent SSH rate-limiting or firewall blocks caused by repeated authentication attempts. Includes a stdout completion sentinel (`__SSH_COMMAND_FINISHED__ $?`) to securely capture output and return codes without closing the connection. Integrated into `NativeToolCallParser` for native streaming and validation.
+
+### Changed
+
+- **Auto-Approve Popover Design**: Redesigned [`AutoApproveDropdown`](webview-ui/src/components/chat/AutoApproveDropdown.tsx:152) with proper VS Code theme colors — `bg-vscode-dropdown-background`, `border-vscode-dropdown-border`, `text-vscode-foreground`. Reduced popover width to `w-[min(400px,calc(100vw-2rem))]`, improved spacing and typography with section headers, centered icon layout, and border separator between settings and global toggle.
+
+- **Auto-Approve Toggle Design**: Replaced [`AutoApproveToggle`](webview-ui/src/components/settings/AutoApproveToggle.tsx:92) Button `variant` prop with manual `className`-based styling. Enabled state: `bg-vscode-button-background text-vscode-button-foreground shadow-sm border`. Disabled state: `bg-transparent text-vscode-foreground border border-vscode-dropdown-border/40`. Icon opacity: 100% (enabled) vs 60% (disabled) for clearer visual state differentiation.
+
+- **Browser Navigation Timeouts**: Reduced [`browser-service.ts`](src/services/browser-service.ts:239) navigate timeout from 30s to 10s (`page.goto` timeout) and hard wait from 10s to 3s, preventing 40-second hangs on connection failures.
+
+### Fixed
+
+- **Screenshots Not Sent to Vision Model**: Fixed both [`BrowserScreenshotTool`](src/core/tools/BrowserTools.ts:198) and [`RenderPreviewTool`](src/core/tools/BrowserTools.ts:335) passing base64 screenshot data as plain text embedded in a string literal — despite claiming "(Base64 data hidden from output but sent to vision model)". `pushToolResult` only extracts image blocks from `Array<Anthropic.ImageBlockParam>` entries; plain strings produce zero image blocks. Now passes proper `{ type: "image", source: { type: "base64", media_type: "image/png", data } }` blocks alongside text blocks, so screenshots actually reach the model's vision system.
+
+- **Auto-Approval Not Persisting After Browser Toggle**: Fixed root cause in [`MirrorProviderState.getState()`](src/core/webview/MirrorProviderState.ts:366) missing `alwaysAllowBrowser` in its return object. All other `alwaysAllow*` fields (ReadOnly, Write, Execute, Mcp, ModeSwitch, Subtasks, FollowupQuestions) were present, but `alwaysAllowBrowser` was omitted. The value WAS being saved to VS Code global state via `handleUpdateSettings`, but `getState()` never returned it → `checkAutoApproval()` always saw `undefined` → defaulted to `false`.
+
+- **ERR_CONNECTION_REFUSED Browser Hangs**: Added specific [`ERR_CONNECTION_REFUSED`](src/services/browser-service.ts:256) error handling in browser navigation, providing a clear, actionable error message instead of a generic timeout when the target server isn't running.
+
+- **Non-Vision Model Safety**: Confirmed [`maybeRemoveImageBlocks`](src/api/transform/image-cleaning.ts:6) properly strips image blocks for models without vision support (e.g. DeepSeek has `supportsImages: false`), converting them to `"[Referenced image in conversation]"` text placeholders before API requests.
+
 ## [0.6.2] - 2026-07-19
 
 ### Added
+
+- **Persistent SSH Session Tool (`ssh_session`)**: Introduced a native persistent shell process channel supporting `connect`, `execute`, and `disconnect` actions. Maintains remote connections alive across turns to prevent SSH rate-limiting or firewall blocks caused by repeated authentication attempts. Includes a stdout completion sentinel (`__SSH_COMMAND_FINISHED__ $?`) to securely capture output and return codes without closing the connection. Integrated into `NativeToolCallParser` for native streaming and validation.
 
 - **Multi-Anchor Visual Tracking**: New scroll anchoring system that tracks ALL rendered `[data-index]` elements' visual positions each frame via RAF polling loop. Compensates for content growth below the viewport during streaming by accumulating sub-pixel drift across frames (∼0.033px/frame) and applying scroll compensation when the accumulator crosses ±1px. Anti-oscillation ensures post-compensation positions become the next frame's baseline. Includes a drift accumulator (`driftAccumulatorRef`) that prevents sub-pixel drift from silently accumulating without ever triggering compensation.
 

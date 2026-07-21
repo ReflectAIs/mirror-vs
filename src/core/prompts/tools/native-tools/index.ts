@@ -4,6 +4,13 @@ import { apply_diff } from "./apply_diff"
 import applyPatch from "./apply_patch"
 import askFollowupQuestion from "./ask_followup_question"
 import attemptCompletion from "./attempt_completion"
+import browserClick from "./browser_click"
+import browserEvaluateScript from "./browser_evaluate_script"
+import browserNavigate from "./browser_navigate"
+import browserScreenshot from "./browser_screenshot"
+import browserScroll from "./browser_scroll"
+import browserSelect from "./browser_select"
+import browserType from "./browser_type"
 import codebaseSearch from "./codebase_search"
 import docsSearch from "./docs_search"
 import editTool from "./edit"
@@ -16,7 +23,9 @@ import packageSearch from "./package_search"
 import readCommandOutput from "./read_command_output"
 import { createReadFileTool, type ReadFileToolOptions } from "./read_file"
 import readUrl from "./read_url"
+import renderPreview from "./render_preview"
 import runSlashCommand from "./run_slash_command"
+import sshSession from "./ssh_session"
 import skill from "./skill"
 import searchReplace from "./search_replace"
 import edit_file from "./edit_file"
@@ -59,6 +68,13 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		applyPatch,
 		askFollowupQuestion,
 		attemptCompletion,
+		browserClick,
+		browserEvaluateScript,
+		browserNavigate,
+		browserScreenshot,
+		browserScroll,
+		browserSelect,
+		browserType,
 		codebaseSearch,
 		docsSearch,
 		executeCommand,
@@ -70,6 +86,8 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		readCommandOutput,
 		createReadFileTool(readFileOptions),
 		readUrl,
+		renderPreview,
+		sshSession,
 		runSlashCommand,
 		skill,
 		searchReplace,

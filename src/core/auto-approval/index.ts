@@ -22,6 +22,7 @@ export type AutoApprovalState =
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowExecute"
 	| "alwaysAllowFollowupQuestions"
+	| "alwaysAllowBrowser"
 	| "autonomousMode"
 
 // Some of these actions have additional settings associated with them.
@@ -40,10 +41,10 @@ export type CheckAutoApprovalResult =
 	| { decision: "deny" }
 	| { decision: "ask" }
 	| {
-		decision: "timeout"
-		timeout: number
-		fn: () => { askResponse: MirrorAskResponse; text?: string; images?: string[] }
-	}
+			decision: "timeout"
+			timeout: number
+			fn: () => { askResponse: MirrorAskResponse; text?: string; images?: string[] }
+	  }
 
 export async function checkAutoApproval({
 	state,
@@ -80,15 +81,11 @@ export async function checkAutoApproval({
 				}
 
 				if (tool.tool === "switchMode") {
-					return state.alwaysAllowModeSwitch === true
-						? { decision: "approve" }
-						: { decision: "ask" }
+					return state.alwaysAllowModeSwitch === true ? { decision: "approve" } : { decision: "ask" }
 				}
 
 				if (["newTask", "finishTask"].includes(tool.tool)) {
-					return state.alwaysAllowSubtasks === true
-						? { decision: "approve" }
-						: { decision: "ask" }
+					return state.alwaysAllowSubtasks === true ? { decision: "approve" } : { decision: "ask" }
 				}
 
 				// In autonomous mode, auto-approve operations outside workspace
@@ -205,6 +202,23 @@ export async function checkAutoApproval({
 
 		if (tool?.tool === "switchMode") {
 			return state.alwaysAllowModeSwitch === true ? { decision: "approve" } : { decision: "ask" }
+		}
+
+		// Auto-approve browser tools when alwaysAllowBrowser is enabled.
+		// Browser tool names used in askApproval: browserNavigate, browserClick, browserType,
+		// browserScreenshot, browserScroll, browserSelect, browserEvaluate, renderPreview
+		const browserToolActions = [
+			"browserNavigate",
+			"browserClick",
+			"browserType",
+			"browserScreenshot",
+			"browserScroll",
+			"browserSelect",
+			"browserEvaluate",
+			"renderPreview",
+		]
+		if (browserToolActions.includes(tool?.tool)) {
+			return state.alwaysAllowBrowser === true ? { decision: "approve" } : { decision: "ask" }
 		}
 
 		if (["newTask", "finishTask"].includes(tool?.tool)) {

@@ -22,6 +22,7 @@ import { editFileTool } from "../tools/EditFileTool"
 import { applyPatchTool } from "../tools/ApplyPatchTool"
 import { searchFilesTool } from "../tools/SearchFilesTool"
 import { executeCommandTool } from "../tools/ExecuteCommandTool"
+import { sshSessionTool } from "../tools/SshSessionTool"
 import { useMcpToolTool } from "../tools/UseMcpToolTool"
 import { accessMcpResourceTool } from "../tools/accessMcpResourceTool"
 import { askFollowupQuestionTool } from "../tools/AskFollowupQuestionTool"
@@ -40,6 +41,8 @@ import {
 	browserClickTool,
 	browserTypeTool,
 	browserScreenshotTool,
+	browserScrollTool,
+	browserSelectTool,
 	browserEvaluateScriptTool,
 	renderPreviewTool,
 } from "../tools/BrowserTools"
@@ -755,6 +758,13 @@ export async function presentAssistantMessage(mirror: Task) {
 						pushToolResult,
 					})
 					break
+				case "ssh_session":
+					await sshSessionTool.handle(mirror, block as ToolUse<"ssh_session">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
 				case "read_command_output":
 					await readCommandOutputTool.handle(mirror, block as ToolUse<"read_command_output">, {
 						askApproval,
@@ -859,6 +869,20 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "browser_screenshot":
 					await browserScreenshotTool.handle(mirror, block as ToolUse<"browser_screenshot">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "browser_scroll":
+					await browserScrollTool.handle(mirror, block as ToolUse<"browser_scroll">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "browser_select":
+					await browserSelectTool.handle(mirror, block as ToolUse<"browser_select">, {
 						askApproval,
 						handleError,
 						pushToolResult,

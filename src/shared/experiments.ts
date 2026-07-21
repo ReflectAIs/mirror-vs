@@ -12,6 +12,7 @@ export const EXPERIMENT_IDS = {
 	TXT2VIDEO: "txt2video",
 	RUN_SLASH_COMMAND: "runSlashCommand",
 	CUSTOM_TOOLS: "customTools",
+	BROWSER: "browser",
 } as const satisfies Record<string, ExperimentId>
 
 type _AssertExperimentIds = AssertEqual<Equals<ExperimentId, Values<typeof EXPERIMENT_IDS>>>
@@ -34,6 +35,7 @@ export const experimentConfigsMap: Record<ExperimentKey, ExperimentConfig> = {
 	TXT2VIDEO: { enabled: false },
 	RUN_SLASH_COMMAND: { enabled: false },
 	CUSTOM_TOOLS: { enabled: false },
+	BROWSER: { enabled: false },
 }
 
 export const experimentDefault = Object.fromEntries(

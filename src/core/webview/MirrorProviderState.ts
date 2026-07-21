@@ -452,6 +452,7 @@ export class StateManager {
 			enhancementApiConfigId: stateValues.enhancementApiConfigId,
 			experiments: stateValues.experiments ?? experimentDefault,
 			autoApprovalEnabled: stateValues.autoApprovalEnabled ?? false,
+			alwaysAllowBrowser: stateValues.alwaysAllowBrowser ?? false,
 			autonomousMode: stateValues.autonomousMode ?? false,
 			customModes,
 			maxOpenTabsContext: stateValues.maxOpenTabsContext ?? 20,

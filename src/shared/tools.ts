@@ -85,6 +85,10 @@ export const toolParamNames = [
 	// browser tool parameters
 	"selector",
 	"script",
+	"scroll_amount",
+	"direction",
+	"option_value",
+	"value",
 ] as const
 
 export type ToolParamName = (typeof toolParamNames)[number]
@@ -99,6 +103,14 @@ export type NativeToolArgs = {
 	read_command_output: { artifact_id: string; search?: string; offset?: number; limit?: number }
 	attempt_completion: { result: string }
 	execute_command: { command: string; cwd?: string; timeout?: number | null }
+	ssh_session: {
+		action: "connect" | "execute" | "disconnect"
+		host: string
+		port?: number
+		password?: string
+		command?: string
+		timeout?: number
+	}
 	apply_diff: { path: string; diff: string }
 	edit: { file_path: string; old_string: string; new_string: string; replace_all?: boolean }
 	search_and_replace: { file_path: string; old_string: string; new_string: string; replace_all?: boolean }
@@ -125,6 +137,14 @@ export type NativeToolArgs = {
 	read_url: { url: string; maxLength?: number; plainTextOnly?: boolean }
 	use_mcp_tool: { server_name: string; tool_name: string; arguments?: Record<string, unknown> }
 	write_to_file: { path: string; content: string }
+	browser_navigate: { url: string }
+	browser_click: { selector: string }
+	browser_type: { selector: string; text?: string; content?: string }
+	browser_screenshot: Record<string, never>
+	browser_evaluate_script: { script: string }
+	render_preview: { url: string; width?: number; height?: number }
+	browser_scroll: { direction: string; amount?: number }
+	browser_select: { selector: string; value: string }
 	// Add more tools as they are migrated to native protocol
 }
 
@@ -303,6 +323,8 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	browser_click: "click web element",
 	browser_type: "type text in browser",
 	browser_screenshot: "take browser screenshot",
+	browser_scroll: "scroll web page",
+	browser_select: "select dropdown option",
 	browser_evaluate_script: "execute browser script",
 	web_search: "search the web",
 	render_preview: "render web preview",
@@ -310,6 +332,7 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	docs_search: "search documentation",
 	package_search: "search package registries",
 	read_url: "read URL content",
+	ssh_session: "manage SSH server sessions",
 } as const
 
 // Define available tool groups.
@@ -332,7 +355,7 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 		customTools: ["edit", "search_replace", "edit_file", "apply_patch"],
 	},
 	command: {
-		tools: ["execute_command", "read_command_output"],
+		tools: ["execute_command", "read_command_output", "ssh_session"],
 	},
 	mcp: {
 		tools: ["use_mcp_tool", "access_mcp_resource"],
@@ -347,6 +370,8 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 			"browser_click",
 			"browser_type",
 			"browser_screenshot",
+			"browser_scroll",
+			"browser_select",
 			"browser_evaluate_script",
 			"render_preview",
 		],

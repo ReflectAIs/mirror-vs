@@ -22,6 +22,7 @@ export const experimentIds = [
 	"txt2video",
 	"runSlashCommand",
 	"customTools",
+	"browser",
 ] as const
 
 export const experimentIdsSchema = z.enum(experimentIds)
@@ -50,6 +51,7 @@ export const experimentsSchema = z
 		txt2video: z.boolean().optional(),
 		runSlashCommand: z.boolean().optional(),
 		customTools: z.boolean().optional(),
+		browser: z.boolean().optional(),
 	})
 	.transform((data) => {
 		// Strip the legacy field so it does not appear in the output type

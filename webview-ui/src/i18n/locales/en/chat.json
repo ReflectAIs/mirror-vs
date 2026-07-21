@@ -484,6 +484,24 @@
 		"openSettings": "Open Settings",
 		"mirrorMessage": "Please select a different provider in your settings."
 	},
+	"browser": {
+		"wantsToNavigate": "Navigate to URL",
+		"didNavigate": "Navigated to URL",
+		"wantsToClick": "Click element",
+		"didClick": "Clicked element",
+		"wantsToType": "Type into element",
+		"didType": "Typed into element",
+		"wantsToScreenshot": "Take screenshot",
+		"didScreenshot": "Took screenshot",
+		"wantsToScroll": "Scroll page",
+		"didScroll": "Scrolled page",
+		"wantsToSelect": "Select option",
+		"didSelect": "Selected option",
+		"wantsToEvaluate": "Run script",
+		"didEvaluate": "Ran script",
+		"wantsToRender": "Render preview",
+		"didRender": "Rendered preview"
+	},
 	"text": {
 		"mirrorSaid": "Mirror VS"
 	}

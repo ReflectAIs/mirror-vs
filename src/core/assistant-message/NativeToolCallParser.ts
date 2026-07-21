@@ -464,6 +464,19 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "ssh_session":
+				if (partialArgs.action || partialArgs.host) {
+					nativeArgs = {
+						action: partialArgs.action,
+						host: partialArgs.host,
+						port: partialArgs.port,
+						password: partialArgs.password,
+						command: partialArgs.command,
+						timeout: partialArgs.timeout,
+					}
+				}
+				break
+
 			case "write_to_file":
 				if (partialArgs.path || partialArgs.content) {
 					nativeArgs = {
@@ -686,6 +699,72 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "browser_navigate":
+				if (partialArgs.url !== undefined) {
+					nativeArgs = {
+						url: partialArgs.url,
+					}
+				}
+				break
+
+			case "browser_click":
+				if (partialArgs.selector !== undefined) {
+					nativeArgs = {
+						selector: partialArgs.selector,
+					}
+				}
+				break
+
+			case "browser_type":
+				if (partialArgs.selector !== undefined) {
+					nativeArgs = {
+						selector: partialArgs.selector,
+						text: partialArgs.text,
+						content: partialArgs.content,
+					}
+				}
+				break
+
+			case "browser_screenshot":
+				nativeArgs = {}
+				break
+
+			case "browser_evaluate_script":
+				if (partialArgs.script !== undefined) {
+					nativeArgs = {
+						script: partialArgs.script,
+					}
+				}
+				break
+
+			case "render_preview":
+				if (partialArgs.url !== undefined) {
+					nativeArgs = {
+						url: partialArgs.url,
+						width: partialArgs.width,
+						height: partialArgs.height,
+					}
+				}
+				break
+
+			case "browser_scroll":
+				if (partialArgs.direction !== undefined) {
+					nativeArgs = {
+						direction: partialArgs.direction,
+						amount: partialArgs.amount,
+					}
+				}
+				break
+
+			case "browser_select":
+				if (partialArgs.selector !== undefined || partialArgs.value !== undefined) {
+					nativeArgs = {
+						selector: partialArgs.selector,
+						value: partialArgs.value,
+					}
+				}
+				break
+
 			default:
 				break
 		}
@@ -837,6 +916,19 @@ export class NativeToolCallParser {
 						nativeArgs = {
 							command: args.command,
 							cwd: args.cwd,
+							timeout: args.timeout,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "ssh_session":
+					if (args.action && args.host) {
+						nativeArgs = {
+							action: args.action,
+							host: args.host,
+							port: args.port,
+							password: args.password,
+							command: args.command,
 							timeout: args.timeout,
 						} as NativeArgsFor<TName>
 					}
@@ -1081,6 +1173,72 @@ export class NativeToolCallParser {
 							url: args.url,
 							maxLength: args.maxLength,
 							plainTextOnly: args.plainTextOnly,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "browser_navigate":
+					if (args.url !== undefined) {
+						nativeArgs = {
+							url: args.url,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "browser_click":
+					if (args.selector !== undefined) {
+						nativeArgs = {
+							selector: args.selector,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "browser_type":
+					if (args.selector !== undefined) {
+						nativeArgs = {
+							selector: args.selector,
+							text: args.text,
+							content: args.content,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "browser_screenshot":
+					nativeArgs = {} as NativeArgsFor<TName>
+					break
+
+				case "browser_evaluate_script":
+					if (args.script !== undefined) {
+						nativeArgs = {
+							script: args.script,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "render_preview":
+					if (args.url !== undefined) {
+						nativeArgs = {
+							url: args.url,
+							width: args.width,
+							height: args.height,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "browser_scroll":
+					if (args.direction !== undefined) {
+						nativeArgs = {
+							direction: args.direction,
+							amount: args.amount,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "browser_select":
+					if (args.selector !== undefined || args.value !== undefined) {
+						nativeArgs = {
+							selector: args.selector,
+							value: args.value,
 						} as NativeArgsFor<TName>
 					}
 					break

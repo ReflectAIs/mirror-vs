@@ -13,6 +13,7 @@ type AutoApproveToggles = Pick<
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowExecute"
 	| "alwaysAllowFollowupQuestions"
+	| "alwaysAllowBrowser"
 >
 
 export type AutoApproveSetting = keyof AutoApproveToggles
@@ -75,6 +76,13 @@ export const autoApproveSettingsConfig: Record<AutoApproveSetting, AutoApproveCo
 		icon: "question",
 		testId: "always-allow-followup-questions-toggle",
 	},
+	alwaysAllowBrowser: {
+		key: "alwaysAllowBrowser",
+		labelKey: "settings:autoApprove.browser.label",
+		descriptionKey: "settings:autoApprove.browser.description",
+		icon: "globe",
+		testId: "always-allow-browser-toggle",
+	},
 }
 
 type AutoApproveToggleProps = AutoApproveToggles & {
@@ -86,20 +94,33 @@ export const AutoApproveToggle = ({ onToggle, ...props }: AutoApproveToggleProps
 
 	return (
 		<div className={cn("flex flex-row flex-wrap gap-2 py-2")}>
-			{Object.values(autoApproveSettingsConfig).map(({ key, descriptionKey, labelKey, icon, testId }) => (
-				<StandardTooltip key={key} content={t(descriptionKey || "")}>
-					<Button
-						variant={props[key] ? "primary" : "secondary"}
-						onClick={() => onToggle(key, !props[key])}
-						aria-label={t(labelKey)}
-						aria-pressed={!!props[key]}
-						data-testid={testId}
-						className={cn("gap-1.5 text-xs whitespace-nowrap", !props[key] && "opacity-50")}>
-						<span className={`codicon codicon-${icon} text-sm`} />
-						<span>{t(labelKey)}</span>
-					</Button>
-				</StandardTooltip>
-			))}
+			{Object.values(autoApproveSettingsConfig).map(({ key, descriptionKey, labelKey, icon, testId }) => {
+				const isEnabled = !!props[key]
+				return (
+					<StandardTooltip key={key} content={t(descriptionKey || "")}>
+						<Button
+							onClick={() => onToggle(key, !isEnabled)}
+							aria-label={t(labelKey)}
+							aria-pressed={isEnabled}
+							data-testid={testId}
+							className={cn(
+								"inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap rounded-md",
+								"transition-all duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
+								isEnabled
+									? "bg-vscode-button-background text-vscode-button-foreground shadow-sm border border-vscode-button-background"
+									: "bg-transparent text-vscode-foreground border border-vscode-dropdown-border/40 hover:bg-vscode-button-background/10 hover:border-vscode-dropdown-border",
+							)}>
+							<span
+								className={cn(
+									`codicon codicon-${icon} text-sm flex-shrink-0`,
+									isEnabled ? "opacity-100" : "opacity-60",
+								)}
+							/>
+							<span>{t(labelKey)}</span>
+						</Button>
+					</StandardTooltip>
+				)
+			})}
 		</div>
 	)
 }

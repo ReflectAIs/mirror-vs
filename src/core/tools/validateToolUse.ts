@@ -160,7 +160,7 @@ export function isToolAllowedForMode(
 	// These should be allowed if the mcp group is allowed for the mode
 	const isDynamicMcpTool = tool.startsWith("mcp_")
 
-	if (experiments && Object.values(EXPERIMENT_IDS).includes(tool as ExperimentId)) {
+	if (experiments && Object.values(EXPERIMENT_IDS).includes(tool as any)) {
 		if (!experiments[tool]) {
 			return false
 		}

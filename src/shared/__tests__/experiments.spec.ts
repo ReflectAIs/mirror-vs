@@ -28,6 +28,7 @@ describe("experiments", () => {
 				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
+				browser: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(false)
 		})
@@ -45,6 +46,7 @@ describe("experiments", () => {
 				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
+				browser: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(true)
 		})
@@ -62,6 +64,7 @@ describe("experiments", () => {
 				txt2video: false,
 				runSlashCommand: false,
 				customTools: false,
+				browser: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(false)
 		})

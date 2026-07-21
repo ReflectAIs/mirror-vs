@@ -1059,6 +1059,193 @@ export const ChatRowContent = ({
 						)}
 					</>
 				)
+			case "browserNavigate": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("globe")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask"
+									? t("chat:browser.wantsToNavigate")
+									: t("chat:browser.didNavigate")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<span className="text-xs text-vscode-descriptionForeground break-all">
+										{tool.content || tool.url}
+									</span>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
+			case "browserClick": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("debug-step-into")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask" ? t("chat:browser.wantsToClick") : t("chat:browser.didClick")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<code className="text-xs text-vscode-descriptionForeground break-all">
+										{tool.content || tool.selector}
+									</code>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
+			case "browserType": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("edit")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask" ? t("chat:browser.wantsToType") : t("chat:browser.didType")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<div className="flex flex-col gap-1 text-xs">
+										<code className="text-vscode-descriptionForeground break-all">
+											{tool.content || tool.selector}
+										</code>
+										{tool.content && tool.text && tool.text !== tool.content && (
+											<span className="text-vscode-descriptionForeground/70">
+												Text: {tool.text}
+											</span>
+										)}
+									</div>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
+			case "browserScreenshot": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("device-camera")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask"
+									? t("chat:browser.wantsToScreenshot")
+									: t("chat:browser.didScreenshot")}
+							</span>
+						</div>
+					</>
+				)
+			}
+			case "browserScroll": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("move")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask" ? t("chat:browser.wantsToScroll") : t("chat:browser.didScroll")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<span className="text-xs text-vscode-descriptionForeground">
+										{tool.content || tool.direction}
+										{tool.amount ? ` (${tool.amount}px)` : ""}
+									</span>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
+			case "browserSelect": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("check")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask" ? t("chat:browser.wantsToSelect") : t("chat:browser.didSelect")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<div className="flex flex-col gap-1 text-xs">
+										<code className="text-vscode-descriptionForeground break-all">
+											{tool.content || tool.selector}
+										</code>
+										{tool.value && (
+											<span className="text-vscode-descriptionForeground/70">
+												Value: {tool.value}
+											</span>
+										)}
+									</div>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
+			case "browserEvaluate": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("terminal")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask"
+									? t("chat:browser.wantsToEvaluate")
+									: t("chat:browser.didEvaluate")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<code className="text-xs text-vscode-descriptionForeground break-all whitespace-pre-wrap max-h-[200px] overflow-y-auto">
+										{tool.content || tool.script}
+									</code>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
+			case "renderPreview": {
+				return (
+					<>
+						<div style={headerStyle}>
+							{toolIcon("preview")}
+							<span style={{ fontWeight: "bold" }}>
+								{message.type === "ask" ? t("chat:browser.wantsToRender") : t("chat:browser.didRender")}
+							</span>
+						</div>
+						<div className="pl-6">
+							<ToolUseBlock>
+								<ToolUseBlockHeader className="group">
+									<div className="flex flex-col gap-1 text-xs">
+										<span className="text-vscode-descriptionForeground break-all">
+											{tool.content || tool.url}
+										</span>
+										{(tool.width || tool.height) && (
+											<span className="text-vscode-descriptionForeground/70">
+												{tool.width}×{tool.height}
+											</span>
+										)}
+									</div>
+								</ToolUseBlockHeader>
+							</ToolUseBlock>
+						</div>
+					</>
+				)
+			}
 			default:
 				return null
 		}

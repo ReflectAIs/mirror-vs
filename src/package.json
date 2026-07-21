@@ -386,6 +386,12 @@
 					"default": false,
 					"description": "%settings.debugProxy.tlsInsecure.description%",
 					"markdownDescription": "%settings.debugProxy.tlsInsecure.description%"
+				},
+				"mirror-vs.autoApproveBrowser": {
+					"type": "boolean",
+					"default": false,
+					"description": "%settings.autoApproveBrowser.description%",
+					"markdownDescription": "%settings.autoApproveBrowser.description%"
 				}
 			}
 		}

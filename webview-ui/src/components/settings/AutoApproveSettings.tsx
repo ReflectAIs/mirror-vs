@@ -29,6 +29,7 @@ type AutoApproveSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	alwaysAllowSubtasks?: boolean
 	alwaysAllowExecute?: boolean
 	alwaysAllowFollowupQuestions?: boolean
+	alwaysAllowBrowser?: boolean
 	autonomousMode?: boolean
 	followupAutoApproveTimeoutMs?: number
 	allowedCommands?: string[]
@@ -46,6 +47,7 @@ type AutoApproveSettingsProps = HTMLAttributes<HTMLDivElement> & {
 		| "alwaysAllowSubtasks"
 		| "alwaysAllowExecute"
 		| "alwaysAllowFollowupQuestions"
+		| "alwaysAllowBrowser"
 		| "autonomousMode"
 		| "followupAutoApproveTimeoutMs"
 		| "allowedCommands"
@@ -66,6 +68,7 @@ export const AutoApproveSettings = ({
 	alwaysAllowSubtasks,
 	alwaysAllowExecute,
 	alwaysAllowFollowupQuestions,
+	alwaysAllowBrowser,
 	autonomousMode,
 	followupAutoApproveTimeoutMs = 60000,
 	allowedCommands,
@@ -161,9 +164,7 @@ export const AutoApproveSettings = ({
 							onChange={(e: any) => {
 								setCachedStateField("autonomousMode", e.target.checked)
 							}}>
-							<span className="font-medium">
-								{t("settings:autoApprove.autonomousMode.label")}
-							</span>
+							<span className="font-medium">{t("settings:autoApprove.autonomousMode.label")}</span>
 						</VSCodeCheckbox>
 						<div className="text-vscode-descriptionForeground text-sm mt-1">
 							{t("settings:autoApprove.autonomousMode.description")}
@@ -178,6 +179,7 @@ export const AutoApproveSettings = ({
 						alwaysAllowSubtasks={alwaysAllowSubtasks}
 						alwaysAllowExecute={alwaysAllowExecute}
 						alwaysAllowFollowupQuestions={alwaysAllowFollowupQuestions}
+						alwaysAllowBrowser={alwaysAllowBrowser}
 						onToggle={(key, value) => setCachedStateField(key, value)}
 					/>
 

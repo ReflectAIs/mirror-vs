@@ -311,6 +311,7 @@ export type ExtensionState = Pick<
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowFollowupQuestions"
 	| "alwaysAllowExecute"
+	| "alwaysAllowBrowser"
 	| "followupAutoApproveTimeoutMs"
 	| "allowedCommands"
 	| "deniedCommands"
@@ -834,6 +835,14 @@ export interface MirrorSayTool {
 		| "runSlashCommand"
 		| "updateTodoList"
 		| "skill"
+		| "browserNavigate"
+		| "browserClick"
+		| "browserType"
+		| "browserScreenshot"
+		| "browserScroll"
+		| "browserSelect"
+		| "browserEvaluate"
+		| "renderPreview"
 	path?: string
 	// For readCommandOutput
 	readStart?: number
@@ -894,6 +903,16 @@ export interface MirrorSayTool {
 	description?: string
 	// Properties for skill tool
 	skill?: string
+	// Properties for browser tools
+	url?: string
+	selector?: string
+	text?: string
+	direction?: string
+	amount?: number
+	value?: string
+	script?: string
+	width?: number
+	height?: number
 }
 
 export interface MirrorAskUseMcpServer {
