@@ -388,7 +388,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleEnhancementApiConfigId(provider, message.text)
 			break
 		case "autoApprovalEnabled":
-			await handleAutoApprovalEnabled(provider)
+			await handleAutoApprovalEnabled(provider, message.bool)
 			break
 		case "importSettings":
 			await handleImportSettings(provider)
