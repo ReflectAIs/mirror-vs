@@ -2,6 +2,16 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.5] - 2026-07-22
+
+### Fixed
+
+- **SSH Kill Terminal Not Unblocking the Model**: Killing an SSH session via the terminal badge now properly aborts the current task's terminal process. Previously, [`handleKillTerminal`](src/core/webview/handlers/taskHandler.ts:156) called [`SshSessionRegistry.removeSession()`](src/core/tools/helpers/SshSessionRegistry.ts:172) → `session.close()` → `child.kill()` (SIGTERM), but never resolved the `abortPromise` in [`Promise.race`](src/core/tools/SshSessionTool.ts:125). Since the kill handler now also calls `task.handleTerminalOperation("abort")` → `sshProcess.abort()` → `triggerAbort()` → the `abortPromise` resolves, allowing the model to unblock with `"[Command execution aborted by user]"` instead of hanging forever.
+
+### Added
+
+- **Screenshots Saved to Disk with URL Labels**: Both [`BrowserScreenshotTool`](src/core/tools/BrowserTools.ts:232) and [`RenderPreviewTool`](src/core/tools/BrowserTools.ts:401) now save screenshots to `.mirror-vs/screenshots/` with URL-derived filenames via the existing [`saveScreenshot()`](src/core/tools/BrowserTools.ts:97) utility (updated to accept an optional `label` parameter). Added [`BrowserService.getCurrentUrl()`](src/services/browser-service.ts:425) to retrieve the page URL for labeling. The tool result includes the saved file path so the model can reference screenshots by filename when creating documents.
+
 ## [0.6.4] - 2026-07-21
 
 ### Fixed

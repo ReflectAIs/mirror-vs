@@ -94,10 +94,19 @@ function getScreenshotDir(): string | null {
 }
 
 /** Saves a base64-encoded PNG screenshot to the .mirror-vs/screenshots/ directory. */
-function saveScreenshot(base64: string): string | null {
+function saveScreenshot(base64: string, label?: string): string | null {
 	const dir = getScreenshotDir()
 	if (!dir) return null
-	const filename = `preview-${Date.now()}.png`
+	// Build a safe filename: use label if provided, or fall back to timestamp
+	const safeLabel = label
+		? label
+				.replace(/[^a-zA-Z0-9._-]/g, "_")
+				.replace(/^https?:\/\//, "")
+				.replace(/\/+$/, "")
+				.replace(/_{2,}/g, "_")
+				.slice(0, 120)
+		: `preview-${Date.now()}`
+	const filename = `${safeLabel}-${Date.now()}.png`
 	const filePath = path.join(dir, filename)
 	fs.writeFileSync(filePath, Buffer.from(base64, "base64"))
 	return filePath
@@ -220,11 +229,18 @@ export class BrowserScreenshotTool extends BaseTool<"browser_screenshot"> {
 				pushToolResult("Screenshot failed: no page loaded. Use browser_navigate first.")
 				return
 			}
+
+			// Get current page URL for identifiable filename
+			const currentUrl = await browser.getCurrentUrl()
+			// Save screenshot to disk in .mirror-vs/screenshots/
+			const savedPath = saveScreenshot(screenshot.base64, currentUrl || undefined)
+			const savedMsg = savedPath ? `\nScreenshot saved to: ${savedPath}` : ""
+
 			const pageText = screenshot.textContent?.trim()
 				? `\n\n--- Page Text Content ---\n${screenshot.textContent}`
 				: ""
 			pushToolResult([
-				{ type: "text", text: `Browser screenshot taken.${pageText}` },
+				{ type: "text", text: `Browser screenshot taken.${savedMsg}${pageText}` },
 				{
 					type: "image",
 					source: { type: "base64", media_type: "image/png", data: screenshot.base64 },
@@ -383,8 +399,8 @@ export class RenderPreviewTool extends BaseTool<"render_preview"> {
 				return
 			}
 
-			// Save screenshot to disk
-			const savedPath = saveScreenshot(screenshot.base64)
+			// Save screenshot to disk with URL-based filename
+			const savedPath = saveScreenshot(screenshot.base64, url)
 			const savedMsg = savedPath ? `\nScreenshot saved to: ${savedPath}` : ""
 
 			// Build layout delta report

@@ -422,6 +422,15 @@ export class BrowserService {
 		}
 	}
 
+	public async getCurrentUrl(): Promise<string> {
+		try {
+			const page = await this.getPage()
+			return page.url()
+		} catch {
+			return ""
+		}
+	}
+
 	public async setViewport(width: number, height: number): Promise<void> {
 		try {
 			const page = await this.getPage()

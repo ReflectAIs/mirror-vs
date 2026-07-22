@@ -163,17 +163,21 @@ export async function handleKillTerminal(
 	}
 
 	if (terminalType === "ssh") {
-		// Kill SSH session — need to find the host/port from the registry
+		// Kill SSH session — find the matching session by deterministic negative hash
 		const { SshSessionRegistry } = await import("../../tools/helpers/SshSessionRegistry")
 		const sessions = SshSessionRegistry.getSessions()
-		// The id for SSH sessions is a deterministic negative hash; we find the matching session
-		for (const { host, port, session } of sessions) {
+		for (const { host, port } of sessions) {
 			const computedId =
 				-Math.abs(host.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) + port) || -1
 			if (computedId === terminalId) {
 				SshSessionRegistry.removeSession(host, port)
 				break
 			}
+		}
+		// Also abort the current task's terminal process to resolve Promise.race
+		const task = provider.getCurrentTask?.()
+		if (task) {
+			task.handleTerminalOperation("abort")
 		}
 	} else {
 		// Kill VSCode terminal
