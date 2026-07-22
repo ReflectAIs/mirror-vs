@@ -2,6 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.6] - 2026-07-22
+
+### Fixed
+
+- **SSH Session Disconnecting Immediately After Connect**: Removed stale `SshSessionRegistry.removeSession()` calls from `close`/`error` event handlers in [`SshSessionRegistry.ts`](src/core/tools/helpers/SshSessionRegistry.ts:73). When `handleKillTerminal` killed an old session and deleted its map entry, the old session's asynchronous `close` event would fire later and call `removeSession(this.host, this.port)` — which operates by host:port key, not object reference — accidentally finding and killing any new session created at the same host:port. The `isDead` flag is sufficient for all cleanup; `getOrCreateSession()` and `getSessions()` already check it.
+
+- **ANSI Escape Sequences Bleeding Into SSH Output**: Added [`stripAnsi()`](src/core/tools/helpers/SshSessionRegistry.ts:4) to strip CSI sequences (e.g. cursor show/hide `?25h`, cursor up `?251A`), OSC sequences, and control characters from SSH stdout/stderr output so command results are cleanly parseable by the model.
+
+### Changed
+
+- **SSH Tool Description Warns Against Never-Exiting Commands**: Added prominent rule #2 in the [`ssh_session`](src/core/prompts/tools/native-tools/ssh_session.ts:3) tool description warning the model to NEVER run foreground processes that run indefinitely (e.g. `docker compose up` without `-d`, `tail -f`, `ping`, `watch`), with explicit guidance to use detached/one-shot alternatives instead.
+
 ## [0.6.5] - 2026-07-22
 
 ### Fixed

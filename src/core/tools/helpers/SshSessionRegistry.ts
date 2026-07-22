@@ -1,5 +1,13 @@
 import { ChildProcess, spawn } from "child_process"
 
+/**
+ * Strips ANSI escape sequences from a string.
+ * Covers CSI sequences (ESC[), OSC sequences (ESC]), and common terminal control codes.
+ */
+function stripAnsi(str: string): string {
+	return str.replace(/(\x1B\[[\d;]*[A-Za-z]|\x1B\][\d;]*(?:\x07|\x1B\\)|[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F])/g, "")
+}
+
 export class SshSession {
 	private child: ChildProcess
 	private outputBuffer: string = ""
@@ -20,7 +28,7 @@ export class SshSession {
 		this.child = spawn(password ? "sshpass" : "ssh", args)
 
 		this.child.stdout?.on("data", (data) => {
-			const str = data.toString()
+			const str = stripAnsi(data.toString())
 			this.outputBuffer += str
 
 			// Check for initial connection prompt stabilization if resolving connection
@@ -63,7 +71,7 @@ export class SshSession {
 		})
 
 		this.child.stderr?.on("data", (data) => {
-			const str = data.toString()
+			const str = stripAnsi(data.toString())
 			this.outputBuffer += str
 			if (this.commandPromise && this.onOutputCallback) {
 				this.onOutputCallback(str)
@@ -78,7 +86,6 @@ export class SshSession {
 				this.onOutputCallback = null
 				resolve(this.outputBuffer.trim() + `\n[SSH Connection Closed unexpectedly with code ${code}]`)
 			}
-			SshSessionRegistry.removeSession(this.host, this.port)
 		})
 
 		this.child.on("error", (err) => {
@@ -89,7 +96,6 @@ export class SshSession {
 				this.onOutputCallback = null
 				resolve(this.outputBuffer.trim() + `\n[SSH Process Error: ${err.message}]`)
 			}
-			SshSessionRegistry.removeSession(this.host, this.port)
 		})
 	}
 
