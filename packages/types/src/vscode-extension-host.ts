@@ -296,6 +296,36 @@ export interface TerminalInfo {
 	port?: number
 }
 
+/**
+ * Records a single file edit operation for the local edit history.
+ * This is populated on every successful edit tool execution and is
+ * NEVER sent to the LLM — it's kept purely for frontend display and revert.
+ */
+export interface FileEditRecord {
+	/** Path of the file that was edited (relative to workspace) */
+	path: string
+	/**
+	 * For diff-based tools (apply_diff, search_and_replace, etc.):
+	 * the raw diff string that was applied.
+	 */
+	diff?: string
+	/**
+	 * For content-replacement tools (write_to_file):
+	 * the full new content that was written.
+	 */
+	content?: string
+	/** Original file content before the edit (if available) */
+	originalContent?: string
+	/** Unified diff statistics (lines added/removed) */
+	diffStats?: { added: number; removed: number }
+	/** Timestamp (ms since epoch) when the edit was applied */
+	timestamp: number
+	/** Name of the tool that performed the edit (e.g. "apply_diff", "write_to_file") */
+	toolName: string
+	/** Git checkpoint hash, if checkpoints are enabled */
+	checkpointId?: string
+}
+
 export type ExtensionState = Pick<
 	GlobalSettings,
 	| "currentSessionId"
@@ -377,6 +407,7 @@ export type ExtensionState = Pick<
 	lockApiConfigAcrossModes?: boolean
 	version: string
 	mirrorMessages: MirrorMessage[]
+	fileEdits: FileEditRecord[]
 	currentTaskId?: string
 	currentTaskItem?: HistoryItem
 	currentTaskTodos?: TodoItem[] // Initial todos for the current task

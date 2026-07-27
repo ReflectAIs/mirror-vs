@@ -1105,7 +1105,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		} catch {}
 		const allKeys = [...new Set([...builtIn, ...custom])].filter((key) => !deleted.includes(key))
 		return allKeys.map((key) => ({ value: key, label: key }))
-	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider])
+	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider, apiConfiguration])
 
 	const handleModelChange = useCallback(
 		(newModelId: string) => {

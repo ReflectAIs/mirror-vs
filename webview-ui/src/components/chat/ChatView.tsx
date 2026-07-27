@@ -51,6 +51,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 	const {
 		mirrorMessages: messages,
+		fileEdits,
 		currentTaskItem,
 		currentTaskTodos,
 		taskHistory,
@@ -371,7 +372,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							components={virtuosoComponents}
 						/>
 					</div>
-					<FileChangesPanel mirrorMessages={messages} />
+					<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />
 					{areButtonsVisible && (
 						<ChatActionBar
 							showScrollToBottom={showScrollToBottom2}

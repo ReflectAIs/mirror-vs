@@ -103,6 +103,22 @@ export class MirrorProvider
 	private view?: vscode.WebviewView | vscode.WebviewPanel
 	/** @internal Extracted classes (TaskLifecycleManager, etc.) read this directly. */
 	public mirrorStack: Task[] = []
+
+	/**
+	 * Background tasks that are still running (streaming) but not currently focused.
+	 * Maps taskId → Task. These tasks continue their API streaming and save messages
+	 * to disk even while the user interacts with a different task.
+	 *
+	 * ## Lifecycle
+	 * - Tasks are parked here when the user switches to a different chat
+	 * - Tasks remain here until they complete naturally, the user explicitly cancels them,
+	 *   or the extension is disposed
+	 * - When the user switches back to a background task, it is removed from this map
+	 *   and pushed back onto mirrorStack
+	 * - Completed/aborted background tasks eventually get cleaned up via their event handlers
+	 */
+	private backgroundTasks: Map<string, Task> = new Map()
+
 	private codeIndexStatusSubscription?: vscode.Disposable
 	private codeIndexManager?: CodeIndexManager
 	private _workspaceTracker?: WorkspaceTracker // workSpaceTracker read-only for access outside this class
@@ -259,6 +275,21 @@ export class MirrorProvider
 				)
 				this.emit(MirrorVSEventName.TaskCompleted, taskId, tokenUsage, toolUsage)
 
+				// If this is a background task, clean it up automatically to prevent memory leaks.
+				// Background tasks are not in the mirrorStack, so they won't be cleaned up by
+				// the normal removeMirrorFromStack flow.
+				if (this.backgroundTasks.has(taskId)) {
+					this.log(
+						`[onTaskCompleted] Background task ${taskId}.${instance.instanceId} completed — cleaning up`,
+					)
+					const cleanupFunctions = this.taskEventListeners.get(instance)
+					if (cleanupFunctions) {
+						cleanupFunctions.forEach((cleanup) => cleanup())
+						this.taskEventListeners.delete(instance)
+					}
+					this.backgroundTasks.delete(taskId)
+				}
+
 				// Queued messages are drained by PATH-A inside initiateTaskLoop
 				// (Task.ts:2473). After attempt_completion auto-completes via
 				// PATH-C, the existing task loop continues and dequeues the next
@@ -272,6 +303,21 @@ export class MirrorProvider
 				this.emit(MirrorVSEventName.TaskAborted, instance.taskId)
 
 				try {
+					// If this is a background task, clean it up without rehydrating.
+					// Background tasks should not be promoted to the current task on failure.
+					if (this.backgroundTasks.has(instance.taskId)) {
+						this.log(
+							`[onTaskAborted] Background task ${instance.taskId}.${instance.instanceId} aborted — cleaning up`,
+						)
+						const cleanupFunctions = this.taskEventListeners.get(instance)
+						if (cleanupFunctions) {
+							cleanupFunctions.forEach((cleanup) => cleanup())
+							this.taskEventListeners.delete(instance)
+						}
+						this.backgroundTasks.delete(instance.taskId)
+						return // Don't rehydrate background tasks
+					}
+
 					// Only rehydrate on genuine streaming failures.
 					// User-initiated cancels are handled by cancelTask().
 					if (instance.abortReason === "streaming_failed") {
@@ -448,6 +494,83 @@ export class MirrorProvider
 		}
 	}
 
+	/**
+	 * Parks the current task by moving it to the background collection without
+	 * aborting its streaming. The task continues its API request and saves messages
+	 * to disk while the user interacts with a different task.
+	 *
+	 * When the user later switches back, the task is restored from the background
+	 * map — its in-memory state (mirrorMessages, streaming state) is fully intact.
+	 */
+	private async parkCurrentTask(): Promise<void> {
+		const currentTask = this.getCurrentTask()
+		if (!currentTask) {
+			return
+		}
+
+		// Pop from the stack
+		const task = this.mirrorStack.pop()
+		if (!task || task !== currentTask) {
+			// Safety check: the stack top should match getCurrentTask()
+			if (task && task !== currentTask) {
+				// Something went wrong — push it back
+				this.mirrorStack.push(task)
+			}
+			return
+		}
+
+		// Emit unfocused — the task is no longer the active chat
+		task.emit(MirrorVSEventName.TaskUnfocused)
+
+		// Move to background collection (keeps event listeners alive, streaming continues)
+		this.backgroundTasks.set(task.taskId, task)
+
+		this.log(`[parkCurrentTask] Task ${task.taskId}.${task.instanceId} parked to background (streaming continues)`)
+	}
+
+	/**
+	 * Focuses a background task, making it the current task and parking the
+	 * previously focused task.
+	 */
+	private async focusBackgroundTask(taskId: string): Promise<void> {
+		const backgroundTask = this.backgroundTasks.get(taskId)
+		if (!backgroundTask) {
+			this.log(`[focusBackgroundTask] Task ${taskId} not found in background tasks`)
+			return
+		}
+
+		// Park the current task first (move it to background)
+		await this.parkCurrentTask()
+
+		// Remove from background collection
+		this.backgroundTasks.delete(taskId)
+
+		// Push to the top of the stack (now it's the "current" task)
+		this.mirrorStack.push(backgroundTask)
+		backgroundTask.emit(MirrorVSEventName.TaskFocused)
+
+		// Post updated state to webview so it renders this task's messages
+		await this.postStateToWebview()
+
+		this.log(
+			`[focusBackgroundTask] Task ${backgroundTask.taskId}.${backgroundTask.instanceId} focused from background`,
+		)
+	}
+
+	/**
+	 * Returns the number of background tasks currently running.
+	 */
+	getBackgroundTaskCount(): number {
+		return this.backgroundTasks.size
+	}
+
+	/**
+	 * Returns true if the given taskId is currently running in the background.
+	 */
+	isBackgroundTask(taskId: string): boolean {
+		return this.backgroundTasks.has(taskId)
+	}
+
 	async performPreparationTasks(mirror: Task) {
 		// LMStudio: We need to force model loading in order to read its context
 		// size; we do it now since we're starting a task with that model selected.
@@ -468,6 +591,8 @@ export class MirrorProvider
 
 	// Removes and destroys the top Mirror instance (the current finished task),
 	// activating the previous one (resuming the parent task).
+	// NOTE: This method truly ABORTS the task. To switch to a different task
+	// without aborting, use parkCurrentTask() + focusBackgroundTask() instead.
 	async removeMirrorFromStack(options?: { skipDelegationRepair?: boolean }) {
 		if (this.mirrorStack.length === 0) {
 			return
@@ -500,6 +625,11 @@ export class MirrorProvider
 			if (cleanupFunctions) {
 				cleanupFunctions.forEach((cleanup) => cleanup())
 				this.taskEventListeners.delete(task)
+			}
+
+			// Also clean up from background tasks map if present
+			if (this.backgroundTasks.has(task.taskId)) {
+				this.backgroundTasks.delete(task.taskId)
 			}
 
 			// Make sure no reference kept, once promises end it will be
@@ -629,6 +759,24 @@ export class MirrorProvider
 
 		this._disposed = true
 		this.log("Disposing MirrorProvider...")
+
+		// Clear background tasks first (they are running independently)
+		for (const [taskId, task] of this.backgroundTasks) {
+			this.log(`[dispose] Aborting background task ${taskId}.${task.instanceId}`)
+			try {
+				await task.abortTask(true)
+			} catch (e) {
+				this.log(`[dispose] abortTask() failed for background task ${taskId}: ${e.message}`)
+			}
+			// Remove event listeners
+			const cleanupFunctions = this.taskEventListeners.get(task)
+			if (cleanupFunctions) {
+				cleanupFunctions.forEach((cleanup) => cleanup())
+				this.taskEventListeners.delete(task)
+			}
+		}
+		this.backgroundTasks.clear()
+		this.log("Cleared background tasks")
 
 		// Clear all tasks from the stack.
 		while (this.mirrorStack.length > 0) {
@@ -1317,10 +1465,25 @@ export class MirrorProvider
 	}
 
 	async showTaskWithId(id: string) {
-		if (id !== this.getCurrentTask()?.taskId) {
-			// Non-current task.
+		const currentTaskId = this.getCurrentTask()?.taskId
+
+		if (id === currentTaskId) {
+			// Already the current task — just open the chat UI
+			await this.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
+			return
+		}
+
+		// Check if this task is already running in the background
+		if (this.backgroundTasks.has(id)) {
+			// Swap focus: park current → focus background task
+			await this.focusBackgroundTask(id)
+		} else {
+			// Park the current task (don't abort it — keep streaming in background)
+			await this.parkCurrentTask()
+
+			// Create a fresh task from history for the requested chat
 			const { historyItem } = await this.getTaskWithId(id)
-			await this.createTaskWithHistoryItem(historyItem) // Clears existing task.
+			await this.createTaskWithHistoryItem(historyItem)
 		}
 
 		await this.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
@@ -1381,6 +1544,7 @@ export class MirrorProvider
 		Omit<
 			ExtensionState,
 			| "mirrorMessages"
+			| "fileEdits"
 			| "renderContext"
 			| "hasOpenedModeSelector"
 			| "version"
@@ -1641,6 +1805,18 @@ export class MirrorProvider
 		configuration: MirrorVSSettings = {},
 	): Promise<Task> {
 		return this.taskLifecycleManager.createTask(text, images, parentTask, options, configuration)
+	}
+
+	public async createTaskFromHistory(
+		historyItem: HistoryItem & { rootTask?: Task; parentTask?: Task },
+		options?: { startTask?: boolean; parkCurrent?: boolean },
+	): Promise<Task> {
+		// If parking is requested, park the current task instead of removing it
+		if (options?.parkCurrent) {
+			await this.parkCurrentTask()
+		}
+
+		return this.createTaskWithHistoryItem(historyItem, options)
 	}
 
 	public async cancelTask(): Promise<void> {

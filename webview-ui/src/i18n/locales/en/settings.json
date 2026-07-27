@@ -836,9 +836,9 @@
 			"name": "Use experimental insert content tool",
 			"description": "Enable the experimental insert content tool, allowing the assistant to insert content at specific line numbers without needing to create a diff."
 		},
-		"CONCURRENT_FILE_READS": {
-			"name": "Enable concurrent file reads",
-			"description": "When enabled, the assistant can read multiple files in a single request. When disabled, the assistant must read files one at a time. Disabling this can help when working with less capable models or when you want more control over file access."
+		"PARALLEL_TOOL_READS": {
+			"name": "Parallel tool reads (experimental)",
+			"description": "When enabled, the assistant can execute multiple independent read-only tools (read_file, search_files, list_files, etc.) in a single batch, improving performance. When disabled, each read tool runs sequentially. Disable this if you encounter issues with rate limits or model confusion."
 		},
 		"MULTI_SEARCH_AND_REPLACE": {
 			"name": "Use experimental multi block diff tool",

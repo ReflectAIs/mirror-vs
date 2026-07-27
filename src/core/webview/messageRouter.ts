@@ -376,7 +376,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleGetListApiConfiguration(provider)
 			break
 		case "modelChange":
-			await handleModelChange(provider, message.text)
+			await handleModelChange(provider, message.apiConfiguration)
 			break
 		case "lockApiConfigAcrossModes":
 			await handleLockApiConfigAcrossModes(provider, message.bool)

@@ -74,10 +74,12 @@ export class TaskLifecycleManager {
 		const { apiConfiguration, organizationAllowList, enableCheckpoints, checkpointTimeout, experiments } =
 			await this.provider.getState()
 
-		// Single-open-task invariant: always enforce for user-initiated top-level tasks
+		// For user-initiated top-level tasks, park the current task instead of killing it.
+		// The task continues streaming in the background and can be resumed later.
+		// Sub-tasks (delegation via new_task tool) still use the stack normally.
 		if (!parentTask) {
 			try {
-				await this.provider.removeMirrorFromStack()
+				await this.provider["parkCurrentTask"]()
 			} catch {
 				// Non-fatal
 			}

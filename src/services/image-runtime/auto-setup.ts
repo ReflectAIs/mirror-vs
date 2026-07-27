@@ -166,11 +166,7 @@ export async function autoSetupComfyUI(onStep?: SetupCallback): Promise<void> {
 	const defaultModel = modelRegistry.getModel(recommendation.model)
 	if (defaultModel?.downloadable && !defaultModel.installed) {
 		emit(onStep, "downloading-model", `Downloading ${defaultModel.displayName}...`)
-		// ComfyUIManager on macOS/Linux uses a "ComfyUI" subdirectory for the source
-		const isWindows = process.platform === "win32"
-		const modelsDir = isWindows
-			? path.join(manager["installPath"], "models", "checkpoints")
-			: path.join(manager["installPath"], "ComfyUI", "models", "checkpoints")
+		const modelsDir = path.join(manager.comfyUISrcPath, "models", "checkpoints")
 		await fs.mkdir(modelsDir, { recursive: true })
 		const modelPath = path.join(modelsDir, `${defaultModel.id}.safetensors`)
 		await new Promise<void>((resolve, reject) => {

@@ -106,6 +106,73 @@ export function transformMessagesForCondensing<
 	}))
 }
 
+/**
+ * Checks if a message is an assistant message containing a search_files tool call.
+ * This identifies exploratory search attempts that may have failed and can be deduplicated.
+ */
+function isExploratorySearch(msg: ApiMessage): boolean {
+	if (msg.role !== "assistant" || !Array.isArray(msg.content)) {
+		return false
+	}
+	return msg.content.some(
+		(block) => block.type === "tool_use" && (block as Anthropic.Messages.ToolUseBlockParam).name === "search_files",
+	)
+}
+
+/**
+ * Checks if a message is a user message containing an empty or error tool_result.
+ * Empty results indicate the search found nothing and can be safely removed
+ * when followed by another search attempt.
+ */
+function isEmptyResult(msg: ApiMessage): boolean {
+	if (msg.role !== "user" || !Array.isArray(msg.content)) {
+		return false
+	}
+	return msg.content.some((block) => {
+		if (block.type !== "tool_result") {
+			return false
+		}
+		const tr = block as Anthropic.Messages.ToolResultBlockParam
+		// True if the result is an error, empty, or very short (no meaningful data)
+		if (tr.is_error) {
+			return true
+		}
+		const text = typeof tr.content === "string" ? tr.content : ""
+		return text.trim().length === 0 || text.trim() === "(tool did not return anything)"
+	})
+}
+
+/**
+ * Deduplicates consecutive exploratory search tools that returned empty or error results.
+ *
+ * Pattern detected: search_files → tool_result (empty/error) → search_files → tool_result (empty/error)
+ * Keeps only the final search_files + its result, surgically removing the dead weight
+ * from failed exploration without risking condense quality.
+ *
+ * @param messages - The conversation messages to clean
+ * @returns The deduplicated messages with redundant failed searches removed
+ */
+export function deduplicateExploratoryTools(messages: ApiMessage[]): ApiMessage[] {
+	const deduped = [...messages]
+	for (let i = 0; i < deduped.length - 2; i++) {
+		const current = deduped[i]
+		const next = deduped[i + 1]
+
+		// If assistant made a search that found nothing, and the next search
+		// is the same pattern, remove the first pair
+		if (
+			isExploratorySearch(current) &&
+			isEmptyResult(next) &&
+			i + 3 < deduped.length &&
+			isExploratorySearch(deduped[i + 2])
+		) {
+			deduped.splice(i, 2) // Remove search + empty result
+			i -= 1 // Re-check from this position
+		}
+	}
+	return deduped
+}
+
 export const MIN_CONDENSE_THRESHOLD = 5 // Minimum percentage of context window to trigger condensing
 export const MAX_CONDENSE_THRESHOLD = 100 // Maximum percentage of context window to trigger condensing
 

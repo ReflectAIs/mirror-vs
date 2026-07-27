@@ -252,7 +252,11 @@ export function truncateOutput(content: string, lineLimit?: number, characterLim
 		const endSection = content.slice(-afterLimit)
 		const omittedChars = content.length - characterLimit
 
-		return startSection + `\n[...${omittedChars} characters omitted...]\n` + endSection
+		return (
+			startSection +
+			`\n[...${omittedChars} characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n` +
+			endSection
+		)
 	}
 
 	// If character limit is not exceeded or not specified, check line limit
@@ -297,7 +301,11 @@ export function truncateOutput(content: string, lineLimit?: number, characterLim
 	const omittedLines = totalLines - lineLimit
 	const startSection = content.slice(0, startEndPos + 1)
 	const endSection = content.slice(endStartPos)
-	return startSection + `\n[...${omittedLines} lines omitted...]\n\n` + endSection
+	return (
+		startSection +
+		`\n[...${omittedLines} lines omitted. Use read_command_output with artifact_id to search or read the full output in parts using offset and limit...]\n\n` +
+		endSection
+	)
 }
 
 /**

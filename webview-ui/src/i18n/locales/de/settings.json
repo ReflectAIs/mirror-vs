@@ -764,7 +764,7 @@
 			"name": "Experimentelles Inhalts-Einfügewerkzeug verwenden",
 			"description": "Aktiviere das experimentelle Inhalts-Einfügewerkzeug, mit dem der Assistent Inhalte an bestimmten Zeilennummern einfügen kann, ohne einen Diff erstellen zu müssen."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Gleichzeitiges Lesen von Dateien aktivieren",
 			"description": "Wenn aktiviert, kann der Assistent mehrere Dateien in einer einzigen Anfrage lesen. Wenn deaktiviert, muss der Assistent Dateien einzeln lesen. Das Deaktivieren kann hilfreich sein, wenn mit weniger fähigen Modellen gearbeitet wird oder wenn du mehr Kontrolle über den Dateizugriff haben möchtest."
 		},

@@ -29,6 +29,7 @@ describe("experiments", () => {
 				runSlashCommand: false,
 				customTools: false,
 				browser: false,
+				parallelToolReads: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(false)
 		})
@@ -47,6 +48,7 @@ describe("experiments", () => {
 				runSlashCommand: false,
 				customTools: false,
 				browser: false,
+				parallelToolReads: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(true)
 		})
@@ -65,6 +67,7 @@ describe("experiments", () => {
 				runSlashCommand: false,
 				customTools: false,
 				browser: false,
+				parallelToolReads: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(false)
 		})

@@ -396,3 +396,22 @@ export async function getGitStatus(cwd: string, maxFiles: number = 20): Promise<
 		return null
 	}
 }
+
+/**
+ * Safely retrieves the git diff for a specific file relative to the cwd.
+ * Returns an empty string if the file isn't tracked, has no changes, or an error occurs.
+ * Uses async execution to avoid blocking the VS Code Extension Host event loop.
+ *
+ * @param cwd - The git repository working directory
+ * @param relativePath - File path relative to cwd
+ * @returns The git diff output, or empty string on failure
+ */
+export async function getGitDiffForRelativeFile(cwd: string, relativePath: string): Promise<string> {
+	try {
+		const { stdout } = await execAsync(`git diff -- "${relativePath}"`, { cwd })
+		return stdout.trim()
+	} catch {
+		// Fails silently: not a git repo, file doesn't exist, or file isn't tracked
+		return ""
+	}
+}

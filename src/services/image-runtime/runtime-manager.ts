@@ -48,9 +48,12 @@ export abstract class RuntimeManager extends EventEmitter {
 	 */
 	async detectInstalled(): Promise<boolean> {
 		const { access } = await import("fs/promises")
+		const path = await import("path")
 		const execPath = this.getExecPath()
+		const mainPy = path.join(this.getCwd(), "main.py")
 		try {
 			await access(execPath)
+			await access(mainPy)
 			this.state.installed = true
 			console.log(`[RuntimeManager:${this.name}] detectInstalled: FOUND at ${execPath}`)
 		} catch {

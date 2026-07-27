@@ -485,6 +485,7 @@ describe("MirrorProvider", () => {
 		const mockState: ExtensionState = {
 			version: "1.0.0",
 			mirrorMessages: [],
+			fileEdits: [],
 			taskHistory: [],
 			shouldShowAnnouncement: false,
 			apiConfiguration: {

@@ -768,7 +768,7 @@
 			"name": "Usar ferramenta diff de múltiplos blocos experimental",
 			"description": "Quando ativado, o o assistente usará a ferramenta diff de múltiplos blocos. Isso tentará atualizar vários blocos de código no arquivo em uma única solicitação."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Habilitar leitura simultânea de arquivos",
 			"description": "Quando habilitado, o o assistente pode ler vários arquivos em uma única solicitação. Quando desabilitado, o o assistente deve ler arquivos um de cada vez. Desabilitar pode ajudar ao trabalhar com modelos menos capazes ou quando você deseja mais controle sobre o acesso aos arquivos."
 		},

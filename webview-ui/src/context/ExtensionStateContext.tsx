@@ -185,6 +185,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		apiConfiguration: {},
 		version: "",
 		mirrorMessages: [],
+		fileEdits: [],
 		taskHistory: [],
 		shouldShowAnnouncement: false,
 		allowedCommands: [],

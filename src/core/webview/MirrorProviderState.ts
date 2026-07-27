@@ -75,7 +75,7 @@ export class StateManager {
 	 */
 	async postStateToWebviewWithoutMirrorMessages(): Promise<void> {
 		const state = await this.getStateToPostToWebview()
-		const { mirrorMessages: _omitMessages, taskHistory: _omitHistory, ...rest } = state
+		const { mirrorMessages: _omitMessages, fileEdits: _omitEdits, taskHistory: _omitHistory, ...rest } = state
 		this.provider.postMessageToWebview({ type: "state", state: rest })
 	}
 
@@ -253,6 +253,7 @@ export class StateManager {
 			currentTaskId: currentTask?.taskId,
 			currentTaskItem: currentTask?.taskId ? this.provider.taskHistoryStore.get(currentTask.taskId) : undefined,
 			mirrorMessages: currentTask?.mirrorMessages || [],
+			fileEdits: currentTask?.fileEdits || [],
 			currentTaskTodos: currentTask?.todoList || [],
 			messageQueue: currentTask?.messageQueueService?.messages,
 			taskHistory: this.provider.taskHistoryStore.getAll().filter((item: HistoryItem) => item.ts && item.task),
@@ -384,6 +385,7 @@ export class StateManager {
 		Omit<
 			ExtensionState,
 			| "mirrorMessages"
+			| "fileEdits"
 			| "renderContext"
 			| "hasOpenedModeSelector"
 			| "version"

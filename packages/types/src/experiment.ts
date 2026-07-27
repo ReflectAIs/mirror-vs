@@ -23,6 +23,7 @@ export const experimentIds = [
 	"runSlashCommand",
 	"customTools",
 	"browser",
+	"parallelToolReads",
 ] as const
 
 export const experimentIdsSchema = z.enum(experimentIds)
@@ -52,6 +53,7 @@ export const experimentsSchema = z
 		runSlashCommand: z.boolean().optional(),
 		customTools: z.boolean().optional(),
 		browser: z.boolean().optional(),
+		parallelToolReads: z.boolean().optional(),
 	})
 	.transform((data) => {
 		// Strip the legacy field so it does not appear in the output type

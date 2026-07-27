@@ -33,6 +33,32 @@ const converter = new Convert({
 	newline: false, // We handle newlines ourselves via <pre>
 })
 
+function cleanTerminalOutput(content: string): string {
+	let cleaned = content
+	if (cleaned.includes("\r")) {
+		const lines = cleaned.split("\n")
+		const processedLines = lines.map((line) => {
+			if (!line.includes("\r")) return line
+			const chars: string[] = []
+			let cursor = 0
+			for (let i = 0; i < line.length; i++) {
+				const char = line[i]
+				if (char === "\r") {
+					cursor = 0
+				} else {
+					chars[cursor] = char
+					cursor++
+				}
+			}
+			return chars.join("")
+		})
+		cleaned = processedLines.join("\n")
+	}
+	// Strip decorative/visual TTY codes like cursor show/hide ([?25l, [?25h)
+	cleaned = cleaned.replace(/\[\?25[lh]/g, "")
+	return cleaned
+}
+
 /**
  * Renders terminal output with ANSI color/formatting support.
  *
@@ -44,12 +70,13 @@ const converter = new Convert({
  */
 export const TerminalOutput: React.FC<TerminalOutputProps> = ({ content, className }) => {
 	const html = useMemo(() => {
+		const cleanedContent = cleanTerminalOutput(content)
 		try {
-			return converter.toHtml(content)
+			return converter.toHtml(cleanedContent)
 		} catch {
 			// Fallback: if conversion fails, show raw text (stripped of ANSI)
 			// eslint-disable-next-line no-control-regex
-			return content.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")
+			return cleanedContent.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")
 		}
 	}, [content])
 

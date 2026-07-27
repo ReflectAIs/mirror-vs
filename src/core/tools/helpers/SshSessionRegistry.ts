@@ -8,11 +8,26 @@ function stripAnsi(str: string): string {
 	return str.replace(/(\x1B\[[\d;]*[A-Za-z]|\x1B\][\d;]*(?:\x07|\x1B\\)|[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F])/g, "")
 }
 
+/**
+ * Common SSH authentication failure patterns detected in output.
+ * Used to fail-fast on connection attempts rather than waiting for timeout.
+ */
+const AUTH_FAILURE_PATTERNS = [
+	"permission denied",
+	"password authentication failed",
+	"authentication failed",
+	"authenticity of host",
+	"host key verification failed",
+	"connection refused",
+	"connection closed",
+	"connection reset",
+]
+
 export class SshSession {
 	private child: ChildProcess
 	private outputBuffer: string = ""
 	private commandPromise: { resolve: (out: string) => void; reject: (err: Error) => void } | null = null
-	private onConnectCallback: (() => void) | null = null
+	private onConnectCallback: { resolve: () => void; reject: (err: Error) => void } | null = null
 	private onOutputCallback: ((chunk: string) => void) | null = null
 	public isDead = false
 
@@ -31,6 +46,8 @@ export class SshSession {
 			const str = stripAnsi(data.toString())
 			this.outputBuffer += str
 
+			this.checkAuthFailure()
+
 			// Check for initial connection prompt stabilization if resolving connection
 			if (
 				this.onConnectCallback &&
@@ -38,7 +55,7 @@ export class SshSession {
 			) {
 				const cb = this.onConnectCallback
 				this.onConnectCallback = null
-				cb()
+				cb.resolve()
 			}
 
 			if (this.commandPromise) {
@@ -73,6 +90,7 @@ export class SshSession {
 		this.child.stderr?.on("data", (data) => {
 			const str = stripAnsi(data.toString())
 			this.outputBuffer += str
+			this.checkAuthFailure()
 			if (this.commandPromise && this.onOutputCallback) {
 				this.onOutputCallback(str)
 			}
@@ -86,6 +104,12 @@ export class SshSession {
 				this.onOutputCallback = null
 				resolve(this.outputBuffer.trim() + `\n[SSH Connection Closed unexpectedly with code ${code}]`)
 			}
+			// Reject connection if still pending
+			if (this.onConnectCallback) {
+				const cb = this.onConnectCallback
+				this.onConnectCallback = null
+				cb.reject(new Error(`SSH connection closed unexpectedly (code: ${code})`))
+			}
 		})
 
 		this.child.on("error", (err) => {
@@ -96,12 +120,40 @@ export class SshSession {
 				this.onOutputCallback = null
 				resolve(this.outputBuffer.trim() + `\n[SSH Process Error: ${err.message}]`)
 			}
+			// Reject connection if still pending
+			if (this.onConnectCallback) {
+				const cb = this.onConnectCallback
+				this.onConnectCallback = null
+				cb.reject(new Error(`SSH process error: ${err.message}`))
+			}
 		})
+	}
+
+	/**
+	 * Detects authentication/connection failures in the output buffer
+	 * and rejects the connection promise early to avoid hanging.
+	 */
+	private checkAuthFailure(): void {
+		if (!this.onConnectCallback) return
+		const lower = this.outputBuffer.toLowerCase()
+		for (const pattern of AUTH_FAILURE_PATTERNS) {
+			if (lower.includes(pattern)) {
+				const cb = this.onConnectCallback
+				this.onConnectCallback = null
+				cb.reject(
+					new Error(
+						`SSH authentication/connection failed: detected "${pattern}" in server response.\n` +
+							`Output: ${this.outputBuffer.slice(0, 500).trim()}`,
+					),
+				)
+				return
+			}
+		}
 	}
 
 	public waitForConnection(timeoutMs: number = 10000): Promise<void> {
 		return new Promise((resolve, reject) => {
-			this.onConnectCallback = resolve
+			this.onConnectCallback = { resolve, reject }
 			setTimeout(() => {
 				if (this.onConnectCallback) {
 					this.onConnectCallback = null
@@ -128,8 +180,8 @@ export class SshSession {
 			this.onOutputCallback = onOutput || null
 			this.commandPromise = { resolve, reject }
 
-			// Using a structured execution format that redirects stdin to /dev/null to prevent hanging on interactive prompts (like git auth)
-			const formattedCommand = `(${command}) </dev/null\necho "__SSH_COMMAND_FINISHED__" $?\n`
+			// Using a structured execution format that exports non-interactive environment variables and redirects stdin to /dev/null to prevent hanging on TTY progress spinners or interactive prompts
+			const formattedCommand = `(export CI=true TERM=dumb DOCKER_CLI_HINTS=false DEBIAN_FRONTEND=noninteractive; ${command}) </dev/null\necho "__SSH_COMMAND_FINISHED__" $?\n`
 			this.child.stdin?.write(formattedCommand)
 
 			setTimeout(() => {
@@ -163,13 +215,33 @@ export class SshSession {
 
 export class SshSessionRegistry {
 	private static sessions = new Map<string, SshSession>()
+	/**
+	 * Caches passwords per host:port so that reconnection after a session
+	 * drops does not require the LLM to re-send the password parameter.
+	 */
+	private static passwordCache = new Map<string, string>()
 
 	public static async getOrCreateSession(host: string, port: number, password?: string): Promise<SshSession> {
 		const key = `${host}:${port}`
+		// Cache the password if provided (LLM may not send it on subsequent calls)
+		if (password) {
+			this.passwordCache.set(key, password)
+		}
+		const resolvedPassword = password || this.passwordCache.get(key)
+
 		let session = this.sessions.get(key)
 		if (!session || session.isDead) {
-			session = new SshSession(host, port, password)
-			await session.waitForConnection()
+			// Clean up dead session entry
+			if (session) {
+				this.sessions.delete(key)
+			}
+			session = new SshSession(host, port, resolvedPassword)
+			try {
+				await session.waitForConnection()
+			} catch (err) {
+				this.sessions.delete(key)
+				throw err
+			}
 			this.sessions.set(key, session)
 		}
 		return session
@@ -200,5 +272,6 @@ export class SshSessionRegistry {
 			session.close()
 		}
 		this.sessions.clear()
+		this.passwordCache.clear()
 	}
 }

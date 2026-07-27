@@ -12,6 +12,15 @@ import { t } from "../../i18n"
 
 const taskSizeCache = new NodeCache({ stdTTL: 30, checkperiod: 5 * 60 })
 
+function cleanTaskTitle(text?: string): string {
+	if (!text) return ""
+	let cleaned = text.trim()
+	cleaned = cleaned.replace(/^<user_message>\s*/i, "").replace(/\s*<\/user_message>$/i, "")
+	cleaned = cleaned.replace(/^<task>\s*/i, "").replace(/\s*<\/task>$/i, "")
+	cleaned = cleaned.split("\n")[0].trim()
+	return cleaned
+}
+
 export type TaskMetadataOptions = {
 	taskId: string
 	rootTaskId?: string
@@ -103,7 +112,7 @@ export async function taskMetadata({
 		number: taskNumber,
 		ts: timestamp,
 		task: hasMessages
-			? taskMessage!.text?.trim() || t("common:tasks.incomplete", { taskNumber })
+			? cleanTaskTitle(taskMessage!.text) || t("common:tasks.incomplete", { taskNumber })
 			: t("common:tasks.no_messages", { taskNumber }),
 		tokensIn: tokenUsage.totalTokensIn,
 		tokensOut: tokenUsage.totalTokensOut,

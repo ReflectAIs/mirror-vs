@@ -145,6 +145,12 @@ export class TaskLifecycle {
 		try {
 			const modifiedMirrorMessages = await this.task.mirrorMessagesManager.getSavedMirrorMessages()
 
+			// Load persisted fileEdits (local-only edit history) for this task
+			const savedFileEdits = await this.task.mirrorMessagesManager.getSavedFileEdits()
+			if (savedFileEdits.length > 0) {
+				this.task.fileEdits = savedFileEdits
+			}
+
 			// Remove any resume messages that may have been added before.
 			const lastRelevantMessageIndex = findLastIndex(
 				modifiedMirrorMessages,

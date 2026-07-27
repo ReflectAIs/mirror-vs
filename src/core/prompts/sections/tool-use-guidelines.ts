@@ -1,9 +1,15 @@
 export function getToolUseGuidelinesSection(): string {
-	return `# Tool Use Guidelines
+	return `## Tool Selection Guidelines
+- Read code: \`read_file\` | Search code: \`search_files\` or \`codebase_search\`
+- Truncated files: when \`read_file\` indicates output is truncated, call \`read_file\` with \`offset\` set to the next line number to read remaining parts.
+- Truncated terminal output: when output is truncated or persisted (Artifact ID: cmd-xxx.txt), call \`read_command_output\` with \`artifact_id\` (and optional \`offset\`, \`limit\`, or \`search\`) to read or search the output in parts.
+- Edit code: \`apply_diff\` | Create file: \`write_to_file\` | Shell command: \`execute_command\`
+- Non-interactive execution: always use non-interactive flags (-y, --no-input, -d) and '--progress=plain' with 'docker compose' commands to prevent TTY progress spinners from hanging.
+- Web info: \`web_search\` or \`read_url\` | List files: \`list_files\`
+- Refresh context: \`get_workspace_file_tree\`, \`get_workspace_pulse\`, \`get_git_status\`
 
-1. Assess what information you already have and what information you need to proceed with the task.
-2. Choose the most appropriate tool based on the task and the tool descriptions provided. Assess if you need additional information to proceed, and which of the available tools would be most effective for gathering this information. For example using the list_files tool is more effective than running a command like \`ls\` in the terminal. It's critical that you think about each available tool and use the one that best fits the current step in the task.
-3. If multiple actions are needed, you may use multiple tools in a single message when appropriate, or use tools iteratively across messages. Each tool use should be informed by the results of previous tool uses. Do not assume the outcome of any tool use. Each step must be informed by the previous step's result.
-
-By carefully considering the user's response after tool executions, you can react accordingly and make informed decisions about how to proceed with the task. This iterative process helps ensure the overall success and accuracy of your work.`
+## Batching Rules
+- Read-only tools (\`read_file\`, \`search_files\`, \`list_files\`, context retrieval tools) can be batched in parallel.
+- Any write tool + any other tool must NEVER be batched (writes must be sequential).
+- Flow-terminating tools (\`attempt_completion\`, \`switch_mode\`, \`new_task\`) must NEVER be batched.`
 }

@@ -33,6 +33,7 @@ import {
 	type ModelInfo,
 	type MirrorApiReqCancelReason,
 	type MirrorApiReqInfo,
+	type FileEditRecord,
 	MirrorVSEventName,
 	TaskStatus,
 	TodoItem,
@@ -123,6 +124,7 @@ import { TaskApiRequest } from "./TaskApiRequest"
 import { TaskContextManagement } from "./TaskContextManagement"
 import { TaskToolTracking } from "./TaskToolTracking"
 import { TaskGetters } from "./TaskGetters"
+import { StruggleLedger } from "./TaskMainLoop"
 
 const MAX_EXPONENTIAL_BACKOFF_SECONDS = 600 // 10 minutes
 const DEFAULT_USAGE_COLLECTION_TIMEOUT_MS = 5000 // 5 seconds
@@ -312,6 +314,18 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	apiConversationHistory: ApiMessage[] = []
 	mirrorMessages: MirrorMessage[] = []
 
+	/**
+	 * Local-only edit history. Populated by presentAssistantMessage whenever an
+	 * edit tool (apply_diff, write_to_file, etc.) succeeds. Persisted to disk
+	 * alongside mirrorMessages. NEVER sent to the LLM — kept purely for frontend
+	 * display and revert (FileChangesPanel).
+	 *
+	 * @see FileEditRecord
+	 * @see presentAssistantMessage.ts — population hook
+	 * @see MirrorProviderState — inclusion in ExtensionState
+	 */
+	fileEdits: FileEditRecord[] = []
+
 	// Extracted managers
 	readonly conversationHistory!: TaskConversationHistory
 	readonly mirrorMessagesManager!: TaskMirrorMessages
@@ -342,6 +356,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	consecutiveNoToolUseCount: number = 0
 	consecutiveNoAssistantMessagesCount: number = 0
 	toolUsage: ToolUsage = {}
+
+	// Struggle Ledger — tracks repeated failure patterns for auto-recovery
+	/** @internal */
+	struggleLedger: StruggleLedger = new StruggleLedger()
 
 	// Checkpoints
 	enableCheckpoints: boolean

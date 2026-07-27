@@ -768,7 +768,7 @@
 			"name": "Deneysel çoklu blok diff aracını kullan",
 			"description": "Etkinleştirildiğinde, asistan çoklu blok diff aracını kullanacaktır. Bu, tek bir istekte dosyadaki birden fazla kod bloğunu güncellemeye çalışacaktır."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Eşzamanlı dosya okumayı etkinleştir",
 			"description": "Etkinleştirildiğinde, asistan tek bir istekte birden fazla dosya okuyabilir. Devre dışı bırakıldığında, asistan dosyaları birer birer okumalıdır. Daha az yetenekli modellerle çalışırken veya dosya erişimi üzerinde daha fazla kontrol istediğinizde devre dışı bırakmak yardımcı olabilir."
 		},

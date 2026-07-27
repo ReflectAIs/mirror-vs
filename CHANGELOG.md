@@ -2,6 +2,20 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.7] - 2026-07-27
+
+### Fixed
+
+- **SSH Hanging on Authentication Failure**: Added password caching in [`SshSessionRegistry`](src/core/tools/helpers/SshSessionRegistry.ts:216) — passwords are now cached per `host:port` key on first connect and automatically reused on reconnect, preventing SSH from entering a non-interactive password prompt loop (which would hang forever since stdin is `/dev/null`). Also added [auth failure detection](src/core/tools/helpers/SshSessionRegistry.ts:136) that monitors stdout/stderr for patterns like `"Permission denied"`, `"authentication failed"`, and `"connection refused"`, immediately rejecting the connection promise instead of waiting for the 10-second timeout.
+
+- **SSH Output Flooding Context Window**: Integrated [`OutputInterceptor`](src/integrations/terminal/OutputInterceptor.ts:58) into [`SshSessionTool`](src/core/tools/SshSessionTool.ts:67) — large SSH command outputs are now truncated using the same head/tail preview buffer strategy as `execute_command`. The first 50% of the preview budget shows the beginning of output, the last 50% shows the end, and the middle is dropped. Full output is spilled to a persisted artifact file (`{taskDir}/command-output/cmd-{executionId}.txt`) accessible via the [`read_command_output`](src/core/tools/ReadCommandOutputTool.ts:85) tool with offset/limit/search support. Also fixed a TypeScript type error where `let toolResponse: string` was incompatible with the `ToolResponse` return type of `formatResponse.toolResult()`.
+
+- **PARALLEL_TOOL_READS Experiment Not Showing in Settings UI**: Fixed locale key mismatch across all 18 locale files — the settings JSON keys used `CONCURRENT_FILE_READS` but the code constant in [`experiments.ts`](src/shared/experiments.ts:16) is `PARALLEL_TOOL_READS`. The `ExperimentalFeature` component looks up translations dynamically via `settings.experimental.{experimentKey}.{name,description}`, so the stale key caused the parallel tool reads toggle to render without any visible name or description. Updated English title to _"Parallel tool reads (experimental)"_ with a proper description explaining the performance impact.
+
+### Changed
+
+- **SSH Tool Documentation Updated**: The [`ssh_session`](src/core/prompts/tools/native-tools/ssh_session.ts) tool prompt now documents password caching behavior (the model no longer needs to pass the password on reconnect) and the output truncation pattern with artifact_id for `read_command_output` access.
+
 ## [0.6.6] - 2026-07-22
 
 ### Fixed

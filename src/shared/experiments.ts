@@ -13,6 +13,7 @@ export const EXPERIMENT_IDS = {
 	RUN_SLASH_COMMAND: "runSlashCommand",
 	CUSTOM_TOOLS: "customTools",
 	BROWSER: "browser",
+	PARALLEL_TOOL_READS: "parallelToolReads",
 } as const satisfies Record<string, ExperimentId>
 
 type _AssertExperimentIds = AssertEqual<Equals<ExperimentId, Values<typeof EXPERIMENT_IDS>>>
@@ -36,6 +37,7 @@ export const experimentConfigsMap: Record<ExperimentKey, ExperimentConfig> = {
 	RUN_SLASH_COMMAND: { enabled: false },
 	CUSTOM_TOOLS: { enabled: false },
 	BROWSER: { enabled: false },
+	PARALLEL_TOOL_READS: { enabled: false },
 }
 
 export const experimentDefault = Object.fromEntries(

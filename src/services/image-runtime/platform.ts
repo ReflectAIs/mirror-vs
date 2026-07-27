@@ -21,19 +21,8 @@ export function getTotalRAM(): number {
 	return os.totalmem()
 }
 
-export function getComfyUIDownloadUrl(os_platform?: PlatformOS): string {
-	const p = os_platform || getPlatformOS()
-	const version = "latest"
-	switch (p) {
-		case "windows":
-			return `https://github.com/Comfy-Org/ComfyUI/releases/${version}/download/ComfyUI_windows_portable_nvidia.7z`
-		case "macos":
-			// macOS no longer offers a portable ZIP; use git clone instead
-			return "https://github.com/Comfy-Org/ComfyUI.git"
-		case "linux":
-			// Linux no longer offers a portable tarball; use git clone instead
-			return "https://github.com/Comfy-Org/ComfyUI.git"
-	}
+export function getComfyUIDownloadUrl(_os_platform?: PlatformOS): string {
+	return "https://github.com/Comfy-Org/ComfyUI.git"
 }
 
 export function getDefaultComfyUIPath(): string {
@@ -54,26 +43,31 @@ export function getDefaultComfyUIPath(): string {
  * image generation tools (requires 3.10 ≤ version < 3.13).
  *
  * Strategy:
- * 1. Try already-installed binaries: python3.12, python3.11, python3.10
- * 2. macOS: auto-install python@3.12 via Homebrew
- * 3. Linux: auto-install python3.12 via apt-get
- * 4. Windows: return "python" (portable bundles include their own Python)
+ * 1. Try commonly-named binaries: python3.12, python3.11, python3.10, python, py
+ * 2. macOS: auto-install python@3.12 via Homebrew if missing
+ * 3. Linux: auto-install python3.12 via apt-get if missing
  *
  * @returns The path or name of a compatible Python executable.
  * @throws If no compatible Python can be found or installed.
  */
 export async function findCompatiblePython(): Promise<string> {
-	if (process.platform === "win32") {
-		return "python"
-	}
+	const candidates =
+		process.platform === "win32"
+			? ["py -3.12", "py -3.11", "py -3.10", "python3.12", "python3.11", "python3.10", "python", "python3"]
+			: ["python3.12", "python3.11", "python3.10", "python3"]
 
-	// Try commonly-named compatible versions first
-	const candidates = ["python3.12", "python3.11", "python3.10"]
 	for (const py of candidates) {
 		try {
 			const { execSync } = await import("child_process")
-			execSync(`"${py}" --version`, { stdio: "pipe" })
-			return py
+			const output = execSync(`"${py}" --version`, { stdio: "pipe", encoding: "utf-8" }).trim()
+			// Validate version string (e.g. Python 3.12.2)
+			const match = output.match(/Python\s+(3\.\d+)/i)
+			if (match) {
+				const minor = parseInt(match[1].split(".")[1], 10)
+				if (minor >= 10 && minor <= 12) {
+					return py
+				}
+			}
 		} catch {
 			// not found, try next
 		}
@@ -83,11 +77,8 @@ export async function findCompatiblePython(): Promise<string> {
 	if (process.platform === "darwin") {
 		try {
 			const { execSync } = await import("child_process")
-			// Check if brew is available
 			execSync("brew --version", { stdio: "pipe" })
-			// Install python@3.12 (no-op if already installed)
 			execSync("brew install python@3.12", { stdio: "inherit" })
-			// Resolve the full path (brew --prefix returns the cellar prefix)
 			const prefix = execSync("brew --prefix python@3.12", {
 				stdio: "pipe",
 				encoding: "utf-8",
