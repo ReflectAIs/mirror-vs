@@ -62,13 +62,21 @@ export class TaskLifecycle {
 		if (this.task._started) {
 			return
 		}
-		this.task._started = true
 
 		const { task, images } = this.task.metadata
 
-		if (task || images) {
+		// Only kick off the AI loop when there's actual content.
+		// An empty string + empty array means the tab was created via "+" button
+		// and is waiting for user input before starting.
+		const hasContent = (task !== undefined && task.trim().length > 0) || (images !== undefined && images.length > 0)
+
+		if (hasContent) {
+			this.task._started = true
 			this.startTask(task ?? undefined, images ?? undefined)
 		}
+		// For idle tabs (no content), do NOT set _started = true.
+		// The idle detection in handleNewTask checks !_started && state === TaskState.Idle
+		// to know this tab was created via "+" and is waiting for user input.
 	}
 
 	public async startTask(task?: string, images?: string[]): Promise<void> {

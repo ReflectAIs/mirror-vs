@@ -214,20 +214,37 @@ export class SshSession {
 }
 
 export class SshSessionRegistry {
+	/**
+	 * Session key format: `${taskId}|${host}|${port}`
+	 * The `|` separator is used instead of `:` because hostnames and IPv4 addresses
+	 * never contain pipes, making parsing unambiguous.
+	 */
 	private static sessions = new Map<string, SshSession>()
 	/**
 	 * Caches passwords per host:port so that reconnection after a session
 	 * drops does not require the LLM to re-send the password parameter.
+	 * NOTE: Passwords are NOT isolated per taskId — they are shared across
+	 * tasks connecting to the same host:port so the LLM doesn't need to
+	 * re-authenticate when switching tabs.
 	 */
 	private static passwordCache = new Map<string, string>()
+	private static makeKey(taskId: string, host: string, port: number): string {
+		return `${taskId}|${host}|${port}`
+	}
 
-	public static async getOrCreateSession(host: string, port: number, password?: string): Promise<SshSession> {
-		const key = `${host}:${port}`
+	public static async getOrCreateSession(
+		taskId: string,
+		host: string,
+		port: number,
+		password?: string,
+	): Promise<SshSession> {
+		const key = this.makeKey(taskId, host, port)
+		const hostPortKey = `${host}:${port}`
 		// Cache the password if provided (LLM may not send it on subsequent calls)
 		if (password) {
-			this.passwordCache.set(key, password)
+			this.passwordCache.set(hostPortKey, password)
 		}
-		const resolvedPassword = password || this.passwordCache.get(key)
+		const resolvedPassword = password || this.passwordCache.get(hostPortKey)
 
 		let session = this.sessions.get(key)
 		if (!session || session.isDead) {
@@ -247,8 +264,8 @@ export class SshSessionRegistry {
 		return session
 	}
 
-	public static removeSession(host: string, port: number) {
-		const key = `${host}:${port}`
+	public static removeSession(taskId: string, host: string, port: number) {
+		const key = this.makeKey(taskId, host, port)
 		const session = this.sessions.get(key)
 		if (session) {
 			session.close()
@@ -256,15 +273,29 @@ export class SshSessionRegistry {
 		}
 	}
 
-	public static getSessions(): Array<{ host: string; port: number; session: SshSession }> {
-		const result: Array<{ host: string; port: number; session: SshSession }> = []
+	public static getSessions(): Array<{ taskId?: string; host: string; port: number; session: SshSession }> {
+		const result: Array<{ taskId?: string; host: string; port: number; session: SshSession }> = []
 		for (const [key, session] of this.sessions.entries()) {
 			if (!session.isDead) {
-				const [host, portStr] = key.split(":")
-				result.push({ host, port: parseInt(portStr, 10), session })
+				const parts = key.split("|")
+				// key format: taskId|host|port
+				result.push({ taskId: parts[0], host: parts[1], port: parseInt(parts[2], 10), session })
 			}
 		}
 		return result
+	}
+
+	/**
+	 * Removes all sessions for a given task. Called when a task is closed to
+	 * ensure SSH sessions don't leak across task boundaries.
+	 */
+	public static removeSessionsForTask(taskId: string) {
+		for (const [key, session] of this.sessions.entries()) {
+			if (key.startsWith(`${taskId}|`)) {
+				session.close()
+				this.sessions.delete(key)
+			}
+		}
 	}
 
 	public static clearAll() {

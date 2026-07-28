@@ -1,11 +1,8 @@
-import React, { memo, useState, useMemo, useCallback } from "react"
-import { ArrowLeft } from "lucide-react"
+import React, { memo, useState, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { DeleteTaskDialog } from "./DeleteTaskDialog"
 import { BatchDeleteTaskDialog } from "./BatchDeleteTaskDialog"
 import { Virtuoso } from "react-virtuoso"
-
-import { VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
 
 import {
 	Button,
@@ -18,13 +15,13 @@ import {
 	StandardTooltip,
 } from "@/components/ui"
 import { useAppTranslation } from "@/i18n/TranslationContext"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 
 import { Tab, TabContent, TabHeader } from "../common/Tab"
 import { useTaskSearch } from "./useTaskSearch"
 import { useGroupedTasks } from "./useGroupedTasks"
-import { countAllSubtasks } from "./types"
 import TaskItem from "./TaskItem"
-import TaskGroupItem from "./TaskGroupItem"
+import SessionGroupItem from "./SessionGroupItem"
 
 type HistoryViewProps = {
 	onDone: () => void
@@ -44,36 +41,24 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		setShowAllWorkspaces,
 	} = useTaskSearch()
 	const { t } = useAppTranslation()
+	const { sessionNames } = useExtensionState()
 
-	// Use grouped tasks hook — returns task groups directly (no session wrapping)
-	const { groups, flatTasks, toggleExpand, isSearchMode } = useGroupedTasks(tasks, searchQuery)
+	// Use grouped tasks hook — returns session groups
+	const { sessionGroups, flatTasks, toggleSessionExpand, setSessionName, isSearchMode } = useGroupedTasks(
+		tasks,
+		searchQuery,
+		sessionNames ?? {},
+	)
 
 	const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
-	const [deleteSubtaskCount, setDeleteSubtaskCount] = useState<number>(0)
 	const [isSelectionMode, setIsSelectionMode] = useState(false)
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
 	const [showBatchDeleteDialog, setShowBatchDeleteDialog] = useState<boolean>(false)
 
-	// Derive a selectedTaskIds Set from the array for O(1) lookups
-	const selectedTaskIdsSet = selectedTaskIds
-
-	// Get subtask count for a task (recursive total) — compute from all groups
-	const getSubtaskCount = useMemo(() => {
-		const countMap = new Map<string, number>()
-		for (const group of groups) {
-			countMap.set(group.parent.id, countAllSubtasks(group.subtasks))
-		}
-		return (taskId: string) => countMap.get(taskId) || 0
-	}, [groups])
-
-	// Handle delete with subtask count
-	const handleDelete = useCallback(
-		(taskId: string) => {
-			setDeleteTaskId(taskId)
-			setDeleteSubtaskCount(getSubtaskCount(taskId))
-		},
-		[getSubtaskCount],
-	)
+	// Handle delete
+	const handleDelete = useCallback((taskId: string) => {
+		setDeleteTaskId(taskId)
+	}, [])
 
 	// Toggle selection mode
 	const toggleSelectionMode = useCallback(() => {
@@ -306,10 +291,10 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 						)}
 					/>
 				) : (
-					// Task-grouped mode: render TaskGroupItem directly (no session wrapping)
+					// Session-grouped mode: render SessionGroupItem for each session
 					<Virtuoso
 						className="flex-1 overflow-y-scroll"
-						data={groups}
+						data={sessionGroups}
 						data-testid="virtuoso-container"
 						initialTopMostItemIndex={0}
 						components={{
@@ -317,18 +302,18 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								<div {...props} ref={ref} data-testid="virtuoso-item-list" />
 							)),
 						}}
-						itemContent={(_index, group) => (
-							<TaskGroupItem
-								key={group.parent.id}
-								group={group}
+						itemContent={(_index, session) => (
+							<SessionGroupItem
+								key={session.sessionId}
+								session={session}
 								variant="full"
 								showWorkspace={showAllWorkspaces}
 								isSelectionMode={isSelectionMode}
-								isSelected={selectedTaskIds.has(group.parent.id)}
+								selectedTaskIds={selectedTaskIds}
 								onToggleSelection={toggleTaskSelection}
 								onDelete={handleDelete}
-								onToggleExpand={() => toggleExpand(group.parent.id)}
-								onToggleSubtaskExpand={toggleExpand}
+								onToggleExpand={() => toggleSessionExpand(session.sessionId)}
+								onRenameSession={(name) => setSessionName(session.sessionId, name)}
 								className="m-2"
 							/>
 						)}
@@ -357,11 +342,9 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 			{deleteTaskId && (
 				<DeleteTaskDialog
 					taskId={deleteTaskId}
-					subtaskCount={deleteSubtaskCount}
 					onOpenChange={(open) => {
 						if (!open) {
 							setDeleteTaskId(null)
-							setDeleteSubtaskCount(0)
 						}
 					}}
 					open

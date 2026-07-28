@@ -36,6 +36,8 @@ import {
 	handleUpdateTodoList,
 	handleFocusPanelRequest,
 	handleSwitchTab,
+	handleSwitchTaskTab,
+	handleCloseTaskTab,
 	handleInsertTextIntoTextarea,
 	handleRefreshCustomTools,
 	handleOpenCustomModesSettings,
@@ -302,6 +304,12 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "switchTab":
 			await handleSwitchTab(provider, message.tab, message.values)
+			break
+		case "switchTaskTab":
+			await handleSwitchTaskTab(provider, message.taskId)
+			break
+		case "closeTaskTab":
+			await handleCloseTaskTab(provider, message.taskId)
 			break
 		case "insertTextIntoTextarea":
 			await handleInsertTextIntoTextarea(provider, message.text)

@@ -99,7 +99,7 @@ export class SshSessionTool extends BaseTool<"ssh_session"> {
 
 			if (action === "connect") {
 				task.consecutiveMistakeCount = 0
-				await SshSessionRegistry.getOrCreateSession(host, port, password)
+				await SshSessionRegistry.getOrCreateSession(task.taskId, host, port, password)
 				pushToolResult(
 					formatResponse.toolResult(
 						`Successfully connected and established persistent SSH session with ${host}:${port}`,
@@ -107,7 +107,7 @@ export class SshSessionTool extends BaseTool<"ssh_session"> {
 				)
 			} else if (action === "execute") {
 				task.consecutiveMistakeCount = 0
-				const session = await SshSessionRegistry.getOrCreateSession(host, port, password)
+				const session = await SshSessionRegistry.getOrCreateSession(task.taskId, host, port, password)
 
 				const timeoutVal = timeout || 180000
 				const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()
@@ -210,7 +210,7 @@ export class SshSessionTool extends BaseTool<"ssh_session"> {
 				pushToolResult(toolResponse)
 			} else if (action === "disconnect") {
 				task.consecutiveMistakeCount = 0
-				SshSessionRegistry.removeSession(host, port)
+				SshSessionRegistry.removeSession(task.taskId, host, port)
 				pushToolResult(formatResponse.toolResult(`Disconnected persistent SSH session with ${host}:${port}`))
 			}
 		} catch (error) {

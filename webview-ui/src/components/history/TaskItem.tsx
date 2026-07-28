@@ -101,7 +101,6 @@ const TaskItem = ({
 							item={item}
 							variant={variant}
 							isSelectionMode={isSelectionMode}
-							isSubtask={item.isSubtask}
 							onDelete={onDelete}
 						/>
 					</div>

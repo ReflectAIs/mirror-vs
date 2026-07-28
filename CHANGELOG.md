@@ -2,9 +2,17 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.6.7] - 2026-07-27
+## [0.6.7] - 2026-07-28
 
 ### Fixed
+
+- **Git Auto-Approval Bypassing Disabled Setting**: Moved git command check **before** autonomous mode check in [`checkAutoApproval()`](src/core/auto-approval/index.ts:69). Previously, `autonomousMode === true` returned `{ decision: "approve" }` for ALL commands at line 71-73, completely bypassing the `alwaysAllowGitCommit` toggle. Git operations (commit, push, add, pull, merge, rebase, etc.) now always respect the explicit `alwaysAllowGitCommit` setting — even in autonomous mode, git is never silently auto-approved unless the user has explicitly enabled it. The duplicate dead git check in the old `ask === "command"` block was removed.
+
+- **TabBar "+" Button Not Creating a New Session**: Fixed [`handleNewTask()`](src/core/webview/handlers/taskHandler.ts:97) to detect when the TabBar "+" button is clicked with empty text and no images. The handler now calls `provider.createSession()` to generate a fresh `sessionId` before creating the idle task, ensuring the new tab appears as its own session in history instead of being absorbed into the current session.
+
+- **Legacy Tasks Invisible After Session Grouping Migration**: Fixed [`buildSessionGroups()`](webview-ui/src/components/history/useGroupedTasks.ts:28) which had `if (!sid) continue` dropping all pre-existing history tasks that lack a `sessionId`. Each legacy task now gets a `__legacy__<id>` synthetic session ID, creating singleton sessions that display the task text as their session name.
+
+- **Session Restore Restoring All Historical Tabs**: Fixed [`restoreSessionTabs()`](src/core/webview/MirrorProvider.ts:1638) which was restoring ALL historical session tabs into the tab bar instead of only the newest/focused tab. Now only the single focused tab is restored on session load.
 
 - **SSH Hanging on Authentication Failure**: Added password caching in [`SshSessionRegistry`](src/core/tools/helpers/SshSessionRegistry.ts:216) — passwords are now cached per `host:port` key on first connect and automatically reused on reconnect, preventing SSH from entering a non-interactive password prompt loop (which would hang forever since stdin is `/dev/null`). Also added [auth failure detection](src/core/tools/helpers/SshSessionRegistry.ts:136) that monitors stdout/stderr for patterns like `"Permission denied"`, `"authentication failed"`, and `"connection refused"`, immediately rejecting the connection promise instead of waiting for the 10-second timeout.
 

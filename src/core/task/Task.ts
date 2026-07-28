@@ -131,6 +131,19 @@ const DEFAULT_USAGE_COLLECTION_TIMEOUT_MS = 5000 // 5 seconds
 const FORCED_CONTEXT_REDUCTION_PERCENT = 75 // Keep 75% of context (remove 25%) on context window errors
 const MAX_CONTEXT_WINDOW_RETRIES = 3 // Maximum retries for context window errors
 
+/**
+ * Single source of truth for task lifecycle state.
+ * Replaces scattered boolean checks (_aborted, _completed, etc.).
+ */
+export enum TaskState {
+	Idle = "idle",
+	Streaming = "streaming",
+	WaitingApproval = "interactive",
+	Completed = "completed",
+	Error = "error",
+	Aborted = "aborted",
+}
+
 export interface TaskOptions extends CreateTaskOptions {
 	provider: MirrorProvider
 	apiConfiguration: ProviderSettings
@@ -171,6 +184,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	readonly parentTask: Task | undefined = undefined
 	readonly taskNumber: number
 	readonly workspacePath: string
+
+	/** Stable display title for tabs, set once on creation from task text. */
+	public name?: string
+	/** Timestamp of task creation — for deterministic tab ordering (createdAt ASC). */
+	public readonly createdAt: number = Date.now()
+	/** Monotonic timestamp updated on any activity (message sent, received, etc.). */
+	public lastActivity: number = Date.now()
+	/** Single source of truth for task lifecycle state. Replaces scattered boolean checks. */
+	public state: TaskState = TaskState.Idle
 
 	/**
 	 * The mode associated with this task. Persisted across sessions
@@ -1142,6 +1164,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 */
 	public start(): void {
 		return this.lifecycleManager.start()
+	}
+
+	/**
+	 * Start an idle task (created via "+" button with no content) with user
+	 * text and images.  This is the public entry point for the
+	 * "sub-session" flow — clicking "+" creates an empty idle tab, and
+	 * typing + sending in that tab starts its AI loop.
+	 */
+	public async startWithContent(text?: string, images?: string[]): Promise<void> {
+		this._started = true
+		return this.lifecycleManager.startTask(text, images)
 	}
 
 	private async startTask(task?: string, images?: string[]): Promise<void> {

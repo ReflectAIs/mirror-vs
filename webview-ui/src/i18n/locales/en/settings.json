@@ -315,6 +315,10 @@
 			"label": "Subtasks",
 			"description": "Allow creation and completion of subtasks without requiring approval"
 		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "When enabled, git commands (commit, push, add, pull, merge, rebase, etc.) are automatically approved. When disabled, the assistant must ask for approval before running any git operation."
+		},
 		"followupQuestions": {
 			"label": "Question",
 			"description": "Automatically select the first suggested answer for follow-up questions after the configured timeout",

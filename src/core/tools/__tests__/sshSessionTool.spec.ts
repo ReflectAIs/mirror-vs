@@ -26,6 +26,7 @@ describe("sshSessionTool", () => {
 		vi.clearAllMocks()
 
 		mockMirror = {
+			taskId: "test-task-id",
 			consecutiveMistakeCount: 0,
 			recordToolError: vi.fn(),
 			sayAndCreateMissingParamError: vi.fn().mockResolvedValue("Missing parameter error"),
@@ -81,7 +82,12 @@ describe("sshSessionTool", () => {
 		})
 
 		expect(mockAskApproval).toHaveBeenCalledWith("command", "Connect SSH [root@127.0.0.1:22]")
-		expect(SshSessionRegistry.getOrCreateSession).toHaveBeenCalledWith("root@127.0.0.1", 22, undefined)
+		expect(SshSessionRegistry.getOrCreateSession).toHaveBeenCalledWith(
+			"test-task-id",
+			"root@127.0.0.1",
+			22,
+			undefined,
+		)
 		expect(toolResult).toContain("Successfully connected")
 	})
 

@@ -27,6 +27,8 @@ import ChatWelcomeContent from "./ChatWelcomeContent"
 // Types
 // ---------------------------------------------------------------------------
 
+import TabBar from "./TabBar"
+
 export interface ChatViewProps {
 	isHidden: boolean
 	showAnnouncement: boolean
@@ -67,6 +69,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		showWorktreesInHomeScreen,
 		setApiConfiguration,
 		routerModels,
+		tabs,
+		activeTabId,
 	} = useExtensionState()
 
 	// ── Use the extracted hook for all message state, effects, and handlers ──
@@ -339,6 +343,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				handleCondenseContext={handleCondenseContext}
 				t={t}
 			/>
+			<TabBar tabs={tabs} activeTabId={activeTabId} />
 
 			{task ? (
 				<>

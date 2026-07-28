@@ -326,6 +326,34 @@ export interface FileEditRecord {
 	checkpointId?: string
 }
 
+/**
+ * Tab status for multi-tab interface.
+ * - `streaming`: Task is actively streaming a response
+ * - `interactive`: Task is waiting for user input (approval/response)
+ * - `idle`: Task is idle/waiting (e.g., waiting for a tool result)
+ * - `completed`: Task has completed successfully
+ * - `error`: Task encountered an error
+ */
+export type TabStatus = "streaming" | "interactive" | "idle" | "completed" | "error"
+
+/**
+ * Represents one tab in the multi-tab interface.
+ * The frontend derives `isActive` from `activeTabId` and `hasUnread` from `lastActivity`.
+ */
+export interface TabInfo {
+	taskId: string
+	/** Stable display title, set once on task creation from task.name */
+	title: string
+	/** Current tab status derived from TaskState internally */
+	status: TabStatus
+	/** Whether the task is waiting for user approval on an action */
+	hasPendingApproval: boolean
+	/** Monotonic timestamp of last activity — frontend derives unread from this */
+	lastActivity: number
+	/** Timestamp of task creation — used for stable tab ordering (createdAt ASC) */
+	createdAt: number
+}
+
 export type ExtensionState = Pick<
 	GlobalSettings,
 	| "currentSessionId"
@@ -347,6 +375,7 @@ export type ExtensionState = Pick<
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowFollowupQuestions"
 	| "alwaysAllowExecute"
+	| "alwaysAllowGitCommit"
 	| "alwaysAllowBrowser"
 	| "followupAutoApproveTimeoutMs"
 	| "allowedCommands"
@@ -464,6 +493,10 @@ export type ExtensionState = Pick<
 	 */
 	mirrorMessagesSeq?: number
 	hasActiveReviews?: boolean
+	/** All open tabs from mirrorStack + backgroundTasks, sorted by createdAt ASC */
+	tabs: TabInfo[]
+	/** Currently active tab's taskId */
+	activeTabId: string
 	activeTerminalCount: number
 	activeTerminals: TerminalInfo[]
 }
@@ -595,6 +628,9 @@ export interface WebviewMessage {
 		| "focusPanelRequest"
 		| "openExternal"
 		| "switchTab"
+		// Multi-tab messages
+		| "switchTaskTab" // Switch to a specific task's tab
+		| "closeTaskTab" // Close a task tab (frontend has already confirmed)
 		| "exportMode"
 		| "exportModeResult"
 		| "importMode"

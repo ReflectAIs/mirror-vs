@@ -4,12 +4,16 @@ import {
 	type ProviderName,
 	type ExtensionState,
 	type HistoryItem,
+	type TabInfo,
+	type TabStatus,
 	openRouterDefaultModelId,
 	DEFAULT_WRITE_DELAY_MS,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 	ORGANIZATION_ALLOW_ALL,
 	isRetiredProvider,
 } from "@mirror-vs/types"
+
+import { TaskState } from "../task/Task"
 
 import { defaultModeSlug } from "../../shared/modes"
 
@@ -153,6 +157,7 @@ export class StateManager {
 			alwaysAllowWriteOutsideWorkspace,
 			alwaysAllowWriteProtected,
 			alwaysAllowExecute,
+			alwaysAllowGitCommit,
 			allowedCommands,
 			deniedCommands,
 			alwaysAllowMcp,
@@ -232,8 +237,50 @@ export class StateManager {
 		const cwd = this.provider.cwd
 		const currentTask = this.provider.getCurrentTask()
 
+		// Build tabs array from all live tasks
+		const allTasks = this.provider.getAllTasksSorted()
+		const tabs: TabInfo[] = allTasks.map((task) => {
+			// Determine hasPendingApproval — task has an ask that's pending user response
+			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
+
+			// Derive TabStatus from TaskState
+			let status: TabStatus
+			switch (task.state) {
+				case TaskState.Streaming:
+					status = "streaming"
+					break
+				case TaskState.WaitingApproval:
+					status = "interactive"
+					break
+				case TaskState.Completed:
+					status = "completed"
+					break
+				case TaskState.Error:
+				case TaskState.Aborted:
+					status = "error"
+					break
+				default:
+					status = "idle"
+					break
+			}
+
+			return {
+				taskId: task.taskId,
+				title:
+					task.name ||
+					task.metadata.task ||
+					`Task ${task.taskNumber > -1 ? `#${task.taskNumber}` : task.taskId.slice(0, 8)}`,
+				status,
+				hasPendingApproval,
+				lastActivity: task.lastActivity,
+				createdAt: task.createdAt,
+			}
+		})
+
 		return {
 			version: this.provider.context.extension?.packageJSON?.version ?? "",
+			tabs,
+			activeTabId: currentTask?.taskId ?? (tabs.length > 0 ? tabs[0].taskId : ""),
 			apiConfiguration,
 			customInstructions,
 			alwaysAllowReadOnly: alwaysAllowReadOnly ?? false,
@@ -242,6 +289,7 @@ export class StateManager {
 			alwaysAllowWriteOutsideWorkspace: alwaysAllowWriteOutsideWorkspace ?? false,
 			alwaysAllowWriteProtected: alwaysAllowWriteProtected ?? false,
 			alwaysAllowExecute: alwaysAllowExecute ?? false,
+			alwaysAllowGitCommit: alwaysAllowGitCommit ?? false,
 			alwaysAllowMcp: alwaysAllowMcp ?? false,
 			alwaysAllowModeSwitch: alwaysAllowModeSwitch ?? false,
 			alwaysAllowSubtasks: alwaysAllowSubtasks ?? false,
@@ -392,6 +440,8 @@ export class StateManager {
 			| "shouldShowAnnouncement"
 			| "activeTerminalCount"
 			| "activeTerminals"
+			| "tabs"
+			| "activeTabId"
 		>
 	> {
 		const provider = this.provider
@@ -429,6 +479,7 @@ export class StateManager {
 			alwaysAllowWriteOutsideWorkspace: stateValues.alwaysAllowWriteOutsideWorkspace ?? false,
 			alwaysAllowWriteProtected: stateValues.alwaysAllowWriteProtected ?? false,
 			alwaysAllowExecute: stateValues.alwaysAllowExecute ?? false,
+			alwaysAllowGitCommit: stateValues.alwaysAllowGitCommit ?? false,
 			alwaysAllowMcp: stateValues.alwaysAllowMcp ?? false,
 			alwaysAllowModeSwitch: stateValues.alwaysAllowModeSwitch ?? false,
 			alwaysAllowSubtasks: stateValues.alwaysAllowSubtasks ?? false,

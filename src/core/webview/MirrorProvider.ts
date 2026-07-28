@@ -558,6 +558,27 @@ export class MirrorProvider
 	}
 
 	/**
+	 * Returns all live tasks (mirrorStack + backgroundTasks) sorted by createdAt ASC.
+	 * Used by StateManager to build the tabs array for the webview.
+	 */
+	getAllTasksSorted(): Task[] {
+		const allTasks = new Map<string, Task>()
+
+		// Collect from mirrorStack (reverse order — top is current task)
+		for (const task of this.mirrorStack) {
+			allTasks.set(task.taskId, task)
+		}
+
+		// Collect from backgroundTasks (may overlap with mirrorStack in edge cases)
+		for (const [taskId, task] of this.backgroundTasks) {
+			allTasks.set(taskId, task)
+		}
+
+		// Sort by createdAt ASC for stable tab ordering
+		return Array.from(allTasks.values()).sort((a, b) => a.createdAt - b.createdAt)
+	}
+
+	/**
 	 * Returns the number of background tasks currently running.
 	 */
 	getBackgroundTaskCount(): number {
@@ -569,6 +590,119 @@ export class MirrorProvider
 	 */
 	isBackgroundTask(taskId: string): boolean {
 		return this.backgroundTasks.has(taskId)
+	}
+
+	/**
+	 * Public entry point for switching the active tab/task.
+	 *
+	 * Handles two cases:
+	 * 1. Target task is in backgroundTasks (parked mid-streaming) → use focusBackgroundTask()
+	 * 2. Target task is in mirrorStack (idle/completed/aborted — never parked) → restack it directly
+	 */
+	public async switchToTask(taskId: string): Promise<void> {
+		const currentTask = this.getCurrentTask()
+
+		// If already focused, nothing to do
+		if (currentTask?.taskId === taskId) {
+			return
+		}
+
+		// Case 1: Target is in background (parked mid-streaming)
+		if (this.backgroundTasks.has(taskId)) {
+			await this.focusBackgroundTask(taskId)
+			return
+		}
+
+		// Case 2: Target is in mirrorStack but not in backgroundTasks
+		// (idle/completed/aborted tasks are never parked — they stay in mirrorStack only)
+		const targetIndex = this.mirrorStack.findIndex((t) => t.taskId === taskId)
+		if (targetIndex === -1) {
+			this.log(`[switchToTask] Task ${taskId} not found in background tasks or mirror stack`)
+			return
+		}
+
+		// Park the current task first (pop from mirrorStack, move to background)
+		await this.parkCurrentTask()
+
+		// Remove the target from its current position in mirrorStack
+		// (targetIndex may have shifted if currentTask was above it)
+		const reIndex = this.mirrorStack.findIndex((t) => t.taskId === taskId)
+		if (reIndex === -1) {
+			this.log(`[switchToTask] Task ${taskId} vanished after parking current task`)
+			return
+		}
+		const target = this.mirrorStack.splice(reIndex, 1)[0]
+
+		// Push target to the top of the stack (now it's the "current" task)
+		this.mirrorStack.push(target)
+		target.emit(MirrorVSEventName.TaskFocused)
+
+		// Post updated state to webview
+		await this.postStateToWebview()
+
+		this.log(`[switchToTask] Task ${target.taskId}.${target.instanceId} focused from mirror stack`)
+	}
+
+	/**
+	 * Closes a task tab — aborts the task if it's still running and removes it
+	 * from both mirrorStack and backgroundTasks. If the closed task is the current
+	 * (active) task, the next available task is focused. If no tasks remain, the
+	 * webview shows the welcome/empty state.
+	 *
+	 * NOTE: The frontend is expected to have already confirmed with the user before
+	 * sending closeTaskTab. This method does NOT prompt for confirmation.
+	 */
+	public async closeTask(taskId: string): Promise<void> {
+		const currentTask = this.getCurrentTask()
+		const isCurrent = currentTask?.taskId === taskId
+		const isBackground = this.backgroundTasks.has(taskId)
+		const inMirrorStack = this.mirrorStack.some((t) => t.taskId === taskId)
+
+		if (!isCurrent && !isBackground && !inMirrorStack) {
+			this.log(`[closeTask] Task ${taskId} not found — nothing to close`)
+			return
+		}
+
+		// Find the task to close
+		let taskToClose: Task | undefined
+		if (isCurrent) {
+			taskToClose = currentTask
+		} else if (isBackground) {
+			taskToClose = this.backgroundTasks.get(taskId)
+		} else if (inMirrorStack) {
+			// Non-current, non-background task in mirrorStack (e.g. restored non-focused tab)
+			const index = this.mirrorStack.findIndex((t) => t.taskId === taskId)
+			if (index !== -1) {
+				taskToClose = this.mirrorStack[index]
+				this.mirrorStack.splice(index, 1)
+			}
+		}
+
+		if (!taskToClose) {
+			return
+		}
+
+		// Remove from background tasks map if present
+		if (isBackground) {
+			this.backgroundTasks.delete(taskId)
+		}
+
+		// If it's the current task, remove from stack with abort
+		if (isCurrent && this.mirrorStack.length > 0) {
+			await this.removeMirrorFromStack()
+		}
+
+		// Clean up event listeners
+		const cleanupFunctions = this.taskEventListeners.get(taskToClose)
+		if (cleanupFunctions) {
+			cleanupFunctions.forEach((cleanup) => cleanup())
+			this.taskEventListeners.delete(taskToClose)
+		}
+
+		this.log(`[closeTask] Task ${taskId} closed and removed`)
+
+		// Post updated state (will show next task or empty state)
+		await this.postStateToWebview()
 	}
 
 	async performPreparationTasks(mirror: Task) {
@@ -1026,7 +1160,7 @@ export class MirrorProvider
 
 	public async createTaskWithHistoryItem(
 		historyItem: HistoryItem & { rootTask?: Task; parentTask?: Task },
-		options?: { startTask?: boolean },
+		options?: { startTask?: boolean; skipStackCleanup?: boolean; skipGlobalStateChanges?: boolean },
 	) {
 		const isCliRuntime = process.env.MIRROR_CLI_RUNTIME === "1"
 		// CLI injects runtime provider settings from command flags/env at startup.
@@ -1038,12 +1172,14 @@ export class MirrorProvider
 		const currentTask = this.getCurrentTask()
 		const isRehydratingCurrentTask = currentTask && currentTask.taskId === historyItem.id
 
-		if (!isRehydratingCurrentTask) {
+		if (!isRehydratingCurrentTask && !options?.skipStackCleanup) {
 			await this.removeMirrorFromStack()
 		}
 
 		// If the history item has a saved mode, restore it and its associated API configuration.
-		if (historyItem.mode) {
+		// Skip when restoring background tabs during session reload (skipGlobalStateChanges),
+		// since only the focused task should drive global mode/config.
+		if (historyItem.mode && !options?.skipGlobalStateChanges) {
 			// Validate that the mode still exists
 			const customModes = await this.customModesManager.getCustomModes()
 			const modeExists = getModeBySlug(historyItem.mode, customModes) !== undefined
@@ -1105,7 +1241,9 @@ export class MirrorProvider
 		// If the history item has a saved API config name (provider profile), restore it.
 		// This overrides any mode-based config restoration above, because the task's
 		// specific provider profile takes precedence over mode defaults.
-		if (historyItem.apiConfigName && !skipProfileRestoreFromHistory) {
+		// Skip when restoring background tabs during session reload (skipGlobalStateChanges),
+		// since only the focused task should drive global config.
+		if (historyItem.apiConfigName && !skipProfileRestoreFromHistory && !options?.skipGlobalStateChanges) {
 			const listApiConfig = await this.providerSettingsManager.listConfig()
 			// Keep global state/UI in sync with latest profiles for parity with mode restoration above.
 			await this.updateGlobalState("listApiConfigMeta", listApiConfig)
@@ -1489,6 +1627,76 @@ export class MirrorProvider
 		await this.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
 	}
 
+	/**
+	 * Restores all tabs from the current session after VS Code restart or startup.
+	 *
+	 * Queries TaskHistoryStore for all history items matching the current
+	 * session ID, then creates live Task objects from them (with startTask: false)
+	 * so they appear as restored tabs in the webview.
+	 *
+	 * The most recent task becomes the focused (active) tab; all others are
+	 * added as background tabs in the mirrorStack.
+	 *
+	 * Safe to call even if the session has no tasks or no session ID is set
+	 * (both are no-ops).
+	 */
+	async restoreSessionTabs(): Promise<void> {
+		const sessionId = this.getCurrentSessionId()
+		if (!sessionId) {
+			this.log("[restoreSessionTabs] No session ID — skipping tab restoration")
+			return
+		}
+
+		// Get ALL history items and filter by sessionId
+		const allItems = this.taskHistoryStore.getAll()
+		const sessionItems = allItems.filter((item) => item.sessionId === sessionId)
+
+		if (sessionItems.length === 0) {
+			this.log(`[restoreSessionTabs] No history items found for session ${sessionId}`)
+			return
+		}
+
+		// Sort ascending by timestamp so the newest item is last
+		const sorted = sessionItems.sort((a, b) => a.ts - b.ts)
+
+		// The newest item becomes the focused task (last in mirrorStack).
+		// Only restore this ONE tab — the user can open additional session tabs
+		// later by expanding the session group in the history view and clicking
+		// on individual items. Restoring all historical tabs at once would
+		// flood the tab bar with every task ever created in this session.
+		const focusedItem = sorted[sorted.length - 1]
+
+		try {
+			const { apiConfiguration, enableCheckpoints, checkpointTimeout, experiments } = await this.getState()
+
+			const task = new Task({
+				provider: this,
+				apiConfiguration,
+				enableCheckpoints,
+				checkpointTimeout,
+				consecutiveMistakeLimit: apiConfiguration.consecutiveMistakeLimit,
+				historyItem: focusedItem,
+				experiments,
+				taskNumber: focusedItem.number,
+				workspacePath: focusedItem.workspace,
+				onCreated: this.taskCreationCallback,
+				startTask: false,
+				initialStatus: focusedItem.status,
+			})
+
+			// Push directly to mirrorStack — bypassing removeMirrorFromStack
+			this.mirrorStack.push(task)
+			task.emit(MirrorVSEventName.TaskFocused)
+			await this.performPreparationTasks(task)
+
+			this.log(`[restoreSessionTabs] Restored 1 tab (focused) for session ${sessionId}`)
+		} catch (error) {
+			this.log(
+				`[restoreSessionTabs] Failed to restore focused tab ${focusedItem.id}: ${error instanceof Error ? error.message : String(error)}`,
+			)
+		}
+	}
+
 	async exportTaskWithId(id: string) {
 		const { historyItem, apiConversationHistory } = await this.getTaskWithId(id)
 		const fileName = getTaskFileName(historyItem.ts)
@@ -1551,6 +1759,8 @@ export class MirrorProvider
 			| "shouldShowAnnouncement"
 			| "activeTerminalCount"
 			| "activeTerminals"
+			| "tabs"
+			| "activeTabId"
 		>
 	> {
 		return this.stateManager.getState()

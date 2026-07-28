@@ -532,6 +532,8 @@ describe("MirrorProvider", () => {
 			checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 			activeTerminalCount: 0,
 			activeTerminals: [],
+			tabs: [],
+			activeTabId: "",
 		}
 
 		const message: ExtensionMessage = {

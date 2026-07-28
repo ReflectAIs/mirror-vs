@@ -12,6 +12,7 @@ type AutoApproveToggles = Pick<
 	| "alwaysAllowModeSwitch"
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowExecute"
+	| "alwaysAllowGitCommit"
 	| "alwaysAllowFollowupQuestions"
 	| "alwaysAllowBrowser"
 >
@@ -68,6 +69,13 @@ export const autoApproveSettingsConfig: Record<AutoApproveSetting, AutoApproveCo
 		descriptionKey: "settings:autoApprove.execute.description",
 		icon: "terminal",
 		testId: "always-allow-execute-toggle",
+	},
+	alwaysAllowGitCommit: {
+		key: "alwaysAllowGitCommit",
+		labelKey: "settings:autoApprove.gitCommit.label",
+		descriptionKey: "settings:autoApprove.gitCommit.description",
+		icon: "git-commit",
+		testId: "always-allow-git-commit-toggle",
 	},
 	alwaysAllowFollowupQuestions: {
 		key: "alwaysAllowFollowupQuestions",

@@ -247,6 +247,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		includeCurrentTime: true,
 		includeCurrentCost: true,
 		lockApiConfigAcrossModes: false,
+		tabs: [],
+		activeTabId: "",
 		activeTerminalCount: 0,
 		activeTerminals: [],
 	})

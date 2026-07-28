@@ -21,6 +21,7 @@ export type AutoApprovalState =
 	| "alwaysAllowModeSwitch"
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowExecute"
+	| "alwaysAllowGitCommit"
 	| "alwaysAllowFollowupQuestions"
 	| "alwaysAllowBrowser"
 	| "autonomousMode"
@@ -63,6 +64,23 @@ export async function checkAutoApproval({
 
 	if (!state || !state.autoApprovalEnabled) {
 		return { decision: "ask" }
+	}
+
+	// ── Git command check (runs BEFORE autonomous mode) ──────────────────
+	// Git operations (commit, push, add, pull, merge, rebase, etc.) must
+	// NEVER be silently auto-approved — they modify the user's repository.
+	// Even in autonomous/trust-everything mode, we respect the explicit
+	// alwaysAllowGitCommit toggle so users can keep git as a manual gate.
+	if (ask === "command" && text) {
+		const trimmedText = text.trim()
+		const isGitCommand = /^git\b/.test(trimmedText)
+
+		if (isGitCommand) {
+			if (state.alwaysAllowGitCommit === true) {
+				return { decision: "approve" }
+			}
+			return { decision: "ask" }
+		}
 	}
 
 	// Autonomous mode: auto-approve ALL execute commands and ALL outside-workspace file operations.

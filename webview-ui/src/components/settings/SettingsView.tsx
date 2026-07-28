@@ -190,6 +190,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		maxTotalImageSize,
 		customSupportPrompts,
 		profileThresholds,
+		alwaysAllowGitCommit,
 		alwaysAllowFollowupQuestions,
 		followupAutoApproveTimeoutMs,
 		includeDiagnosticMessages,
@@ -884,6 +885,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								alwaysAllowModeSwitch={alwaysAllowModeSwitch}
 								alwaysAllowSubtasks={alwaysAllowSubtasks}
 								alwaysAllowExecute={alwaysAllowExecute}
+								alwaysAllowGitCommit={alwaysAllowGitCommit}
 								alwaysAllowFollowupQuestions={alwaysAllowFollowupQuestions}
 								autonomousMode={autonomousMode}
 								followupAutoApproveTimeoutMs={followupAutoApproveTimeoutMs}
