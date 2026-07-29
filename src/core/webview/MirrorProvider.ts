@@ -442,6 +442,10 @@ export class MirrorProvider
 		await this.sessionManager.renameSession(sessionId, name)
 	}
 
+	public async renameTask(taskId: string, name: string): Promise<void> {
+		await this.sessionManager.renameTask(taskId, name)
+	}
+
 	public async startNewTaskInSession(text: string, images?: string[]): Promise<Task> {
 		return this.sessionManager.startNewTaskInSession(text, images)
 	}

@@ -358,6 +358,7 @@ export type ExtensionState = Pick<
 	GlobalSettings,
 	| "currentSessionId"
 	| "sessionNames"
+	| "taskNames"
 	| "currentApiConfigName"
 	| "listApiConfigMeta"
 	| "pinnedApiConfigs"
@@ -708,6 +709,8 @@ export interface WebviewMessage {
 		| "deleteComfyuiWorkflow"
 		// Session messages
 		| "renameSession"
+		// Task/tab rename
+		| "renameTask"
 		// Model change messages
 		| "modelChange"
 	/** Session ID for session management operations */

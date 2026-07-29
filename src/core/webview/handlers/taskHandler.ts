@@ -177,6 +177,12 @@ export async function handleRenameSession(
 	}
 }
 
+export async function handleRenameTask(provider: MirrorProvider, taskId?: string, taskName?: string): Promise<void> {
+	if (taskId && taskName !== undefined) {
+		await provider.renameTask(taskId, taskName)
+	}
+}
+
 /**
  * Handles the customInstructions message.
  */

@@ -247,6 +247,12 @@ export const globalSettingsSchema = z.object({
 	 * Keyed by sessionId UUID.
 	 */
 	sessionNames: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * User-assigned display names for individual tasks/tabs.
+	 * Keyed by taskId.
+	 */
+	taskNames: z.record(z.string(), z.string()).optional(),
 	activeSearchProvider: z.string().optional(),
 	userBraveApiKey: z.string().optional(),
 

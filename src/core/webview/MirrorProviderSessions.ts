@@ -87,6 +87,18 @@ export class SessionManager {
 	}
 
 	/**
+	 * Sets a display name for an individual task/tab.
+	 * Persisted in the `taskNames` map on contextProxy.
+	 */
+	public async renameTask(taskId: string, name: string): Promise<void> {
+		const names: Record<string, string> = (await this.provider.contextProxy.getValue("taskNames")) || {}
+		names[taskId] = name
+		await this.provider.contextProxy.setValue("taskNames", names)
+		this.provider.log(`[renameTask] Task ${taskId} renamed to "${name}"`)
+		await this.provider.postStateToWebview()
+	}
+
+	/**
 	 * Create a brand-new task within the current session.
 	 * Called when the user sends a message and no active task is running,
 	 * but a session already exists.  The new task gets a fresh conversation

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
+import { vscode } from "@/utils/vscode"
 
 import { Tab, TabContent, TabHeader } from "../common/Tab"
 import { useTaskSearch } from "./useTaskSearch"
@@ -41,7 +42,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		setShowAllWorkspaces,
 	} = useTaskSearch()
 	const { t } = useAppTranslation()
-	const { sessionNames } = useExtensionState()
+	const { sessionNames, taskNames } = useExtensionState()
 
 	// Use grouped tasks hook — returns session groups
 	const { sessionGroups, flatTasks, toggleSessionExpand, setSessionName, isSearchMode } = useGroupedTasks(
@@ -49,6 +50,11 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		searchQuery,
 		sessionNames ?? {},
 	)
+
+	// Handle tab rename
+	const handleRenameTab = useCallback((taskId: string, newName: string) => {
+		vscode.postMessage({ type: "renameTask", taskId, sessionName: newName })
+	}, [])
 
 	const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
 	const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -286,6 +292,8 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								isSelected={selectedTaskIds.has(item.id)}
 								onToggleSelection={toggleTaskSelection}
 								onDelete={handleDelete}
+								displayName={taskNames?.[item.id]}
+								onRenameTab={handleRenameTab}
 								className="m-2"
 							/>
 						)}
@@ -312,8 +320,14 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								selectedTaskIds={selectedTaskIds}
 								onToggleSelection={toggleTaskSelection}
 								onDelete={handleDelete}
+								onDeleteSession={() => {
+									const ids = session.tabs.map((t) => t.id)
+									vscode.postMessage({ type: "deleteMultipleTasksWithIds", ids })
+								}}
 								onToggleExpand={() => toggleSessionExpand(session.sessionId)}
 								onRenameSession={(name) => setSessionName(session.sessionId, name)}
+								taskNames={taskNames}
+								onRenameTab={handleRenameTab}
 								className="m-2"
 							/>
 						)}

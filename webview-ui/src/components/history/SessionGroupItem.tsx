@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useEffect } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatTimeAgo } from "@/utils/format"
 import type { SessionGroup } from "./types"
@@ -24,6 +24,12 @@ interface SessionGroupItemProps {
 	onToggleExpand: () => void
 	/** Callback to rename the session */
 	onRenameSession: (newName: string) => void
+	/** Callback to delete the entire session (all its tabs) */
+	onDeleteSession?: () => void
+	/** Custom display names for tabs (from taskNames map) */
+	taskNames?: Record<string, string>
+	/** Callback to rename a tab */
+	onRenameTab?: (taskId: string, newName: string) => void
 	/** Optional className for styling */
 	className?: string
 }
@@ -45,6 +51,9 @@ const SessionGroupItem = ({
 	onDelete,
 	onToggleExpand,
 	onRenameSession,
+	onDeleteSession,
+	taskNames,
+	onRenameTab,
 	className,
 }: SessionGroupItemProps) => {
 	const { sessionId, sessionName, tabs, taskCount, isExpanded } = session
@@ -159,6 +168,25 @@ const SessionGroupItem = ({
 				<span className="shrink-0 text-[10px] text-vscode-descriptionForeground/40 whitespace-nowrap">
 					{timeLabel}
 				</span>
+
+				{/* Delete session button — only shown when there are tabs */}
+				{taskCount > 0 && !isSelectionMode && onDeleteSession && (
+					<button
+						onClick={(e) => {
+							e.stopPropagation()
+							onDeleteSession()
+						}}
+						className={cn(
+							"shrink-0 p-1 rounded-md border border-transparent",
+							"text-vscode-descriptionForeground/40 hover:text-vscode-errorForeground",
+							"hover:bg-vscode-input-background/50 hover:border-vscode-panel-border/30",
+							"opacity-0 group-hover:opacity-100 transition-all duration-150",
+						)}
+						aria-label="Delete session"
+						title="Delete session">
+						<Trash2 className="size-3.5" />
+					</button>
+				)}
 			</div>
 
 			{/* Expanded tab list */}
@@ -178,6 +206,8 @@ const SessionGroupItem = ({
 						isSelected={selectedTaskIds.has(tab.id)}
 						onToggleSelection={onToggleSelection}
 						onDelete={onDelete}
+						displayName={taskNames?.[tab.id]}
+						onRenameTab={onRenameTab}
 					/>
 				))}
 			</div>
