@@ -109,7 +109,10 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 			!resolved.text?.trim() && (!resolved.images || resolved.images.length === 0) && !message.sessionMode
 
 		if (isEmptyTabCreation) {
-			await provider.createSession()
+			// Use existing session if one exists; otherwise create a new one.
+			// This ensures clicking "+" adds a tab to the current session
+			// instead of creating a separate session for each new tab.
+			await provider.getOrCreateSession()
 			await provider.createTask("", [], undefined, { taskId: message.taskId }, message.taskConfiguration)
 			await provider.postStateToWebview()
 			await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
