@@ -2,9 +2,11 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.6.7] - 2026-07-28
+## [0.6.7] - 2026-07-29
 
 ### Fixed
+
+- **Blank Page on Extension Startup**: Removed the [`restoreSessionTabs()`](src/core/webview/MirrorProvider.ts:1643) call from [`handleWebviewDidLaunch()`](src/core/webview/handlers/taskHandler.ts:13). Previously, it created an idle `Task` (`startTask: false`) from the newest history item, which produced a tab with no conversation loaded — just a blank page. With session-based history grouping, users load specific tasks by clicking session groups in the history view, or create fresh tabs via the "+" button (which generates a new session). The persisted session ID is still restored via `getOrCreateSession()` so new tasks inherit the correct `sessionId` for grouping.
 
 - **Git Auto-Approval Bypassing Disabled Setting**: Moved git command check **before** autonomous mode check in [`checkAutoApproval()`](src/core/auto-approval/index.ts:69). Previously, `autonomousMode === true` returned `{ decision: "approve" }` for ALL commands at line 71-73, completely bypassing the `alwaysAllowGitCommit` toggle. Git operations (commit, push, add, pull, merge, rebase, etc.) now always respect the explicit `alwaysAllowGitCommit` setting — even in autonomous mode, git is never silently auto-approved unless the user has explicitly enabled it. The duplicate dead git check in the old `ask === "command"` block was removed.
 

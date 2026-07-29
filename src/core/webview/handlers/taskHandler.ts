@@ -14,11 +14,13 @@ export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<
 	const customModes = await provider.customModesManager.getCustomModes()
 	await provider.contextProxy.setValue("customModes", customModes)
 
-	// Restore session and rehydrate previous tabs before posting initial state.
-	// This ensures the webview receives all session tabs on startup, not just an empty list.
-	// Both calls are safe to make even if no session or tasks exist (no-ops).
+	// Restore the persisted session ID so new tasks created during this session
+	// inherit the same sessionId for history grouping.  Do NOT call
+	// restoreSessionTabs() here — creating an idle Task (startTask: false) from
+	// the newest history item produces a blank page with a meaningless tab.
+	// Users load specific tasks by clicking session groups in the history view,
+	// or create fresh tabs via the "+" button (which generates a new session).
 	await provider.getOrCreateSession()
-	await provider.restoreSessionTabs()
 
 	provider.postStateToWebview()
 	provider.workspaceTracker?.initializeFilePaths() // Don't await.
