@@ -111,6 +111,7 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 		if (isEmptyTabCreation) {
 			await provider.createSession()
 			await provider.createTask("", [], undefined, { taskId: message.taskId }, message.taskConfiguration)
+			await provider.postStateToWebview()
 			await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 			return
 		}
