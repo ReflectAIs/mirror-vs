@@ -746,9 +746,15 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					mirrorAskRef.current !== undefined &&
 					mirrorAskRef.current !== "command" &&
 					mirrorAskRef.current !== "command_output"
+				// If the chat is empty (first message in a new tab), never queue —
+				// send directly as a newTask. The queue check below can false-positive
+				// because handleChatReset() sets sendingDisabled=true when the idle
+				// tab is created, before the user has typed anything.
+				const isFirstMessageInTab = messagesRef.current.length === 0
 				if (
 					!forceSend &&
 					!isRespondingToAsk &&
+					!isFirstMessageInTab &&
 					(sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAskRef.current !== undefined)
 				) {
 					try {
