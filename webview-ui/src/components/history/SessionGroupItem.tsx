@@ -112,7 +112,7 @@ const SessionGroupItem = ({
 			{/* Collapsible session header */}
 			<div
 				className={cn(
-					"flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none",
+					"group flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none",
 					"bg-vscode-sideBar-background/20 border-b border-vscode-panel-border/10",
 					"hover:bg-vscode-sideBar-background/40 transition-colors",
 				)}
