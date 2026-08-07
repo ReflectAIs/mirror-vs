@@ -7,9 +7,14 @@
 		"jsxImportSource": "react",
 		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/*"]
+			"@/*": ["src/*"],
+			"@mirror-vs/types": ["../../packages/types/src/index.ts"],
+			"@mirror-vs/core": ["../../packages/core/src/index.ts"],
+			"@mirror-vs/core/cli": ["../../packages/core/src/cli.ts"],
+			"@mirror-vs/vscode-shim": ["../../packages/vscode-shim/src/index.ts"]
 		}
 	},
+
 	"include": ["src", "*.config.ts"],
 	"exclude": ["node_modules"]
 }

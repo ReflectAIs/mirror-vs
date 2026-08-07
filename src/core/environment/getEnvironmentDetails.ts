@@ -228,12 +228,14 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 
 	if (includeCurrentTime) {
 		const now = new Date()
+		// Round to nearest minute for prompt caching optimization
+		const roundedIso = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString()
 		const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 		const timeZoneOffset = -now.getTimezoneOffset() / 60
 		const timeZoneOffsetHours = Math.floor(Math.abs(timeZoneOffset))
 		const timeZoneOffsetMinutes = Math.abs(Math.round((Math.abs(timeZoneOffset) - timeZoneOffsetHours) * 60))
 		const timeZoneOffsetStr = `${timeZoneOffset >= 0 ? "+" : "-"}${timeZoneOffsetHours}:${timeZoneOffsetMinutes.toString().padStart(2, "0")}`
-		volatileDetails += `\n\n# Current Time\nCurrent time in ISO 8601 UTC format: ${now.toISOString()}\nUser time zone: ${timeZone}, UTC${timeZoneOffsetStr}`
+		volatileDetails += `\n\n# Current Time\nCurrent time in ISO 8601 UTC format: ${roundedIso}\nUser time zone: ${timeZone}, UTC${timeZoneOffsetStr}`
 	}
 
 	if (volatileDetails) {

@@ -25,6 +25,19 @@ import type { ApiMessage } from "../task-persistence"
 
 import type { Task } from "./Task"
 
+function generateAutoName(text: string): string {
+	if (!text) return "New Task"
+	let clean = text.trim()
+	// Remove markdown headers/formatting
+	clean = clean.replace(/^[#*`-\s]+/, "")
+	// Take first line or up to first sentence/punctuation
+	const firstLine = clean.split("\n")[0].trim()
+	if (firstLine.length <= 35) {
+		return firstLine
+	}
+	return firstLine.substring(0, 32).trim() + "..."
+}
+
 /**
  * Manages the lifecycle of a Task: start, resume, abort, dispose, and subtasks.
  *
@@ -93,6 +106,25 @@ export class TaskLifecycle {
 			// The todo list is already set in the constructor if initialTodos were provided
 			// No need to add any messages - the todoList property is already set
 
+			const provider = this.task.providerRef.deref()
+			if (provider && task && task.trim().length > 0) {
+				const autoName = generateAutoName(task)
+
+				// 1. Rename task/tab if it doesn't have a name yet
+				const taskNames = (await provider.contextProxy.getValue("taskNames")) || {}
+				if (!taskNames[this.task.taskId]) {
+					await provider.renameTask(this.task.taskId, autoName)
+				}
+
+				// 2. Rename session if it doesn't have a name yet
+				if (this.task.sessionId) {
+					const sessionNames = (await provider.contextProxy.getValue("sessionNames")) || {}
+					if (!sessionNames[this.task.sessionId]) {
+						await provider.renameSession(this.task.sessionId, autoName)
+					}
+				}
+			}
+
 			await this.task.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
 
 			await this.task.say("text", task, images)
@@ -146,6 +178,33 @@ export class TaskLifecycle {
 				return
 			}
 			throw error
+		}
+	}
+
+	/**
+	 * Loads saved mirrorMessages, fileEdits, and apiConversationHistory from disk into memory
+	 * without initiating an interactive ask prompt or running the AI agent loop.
+	 *
+	 * Used during session tab restoration on startup to ensure restored tabs render their
+	 * chat history immediately on webview load.
+	 */
+	public async loadSavedMessagesOnly(): Promise<void> {
+		try {
+			const savedMirrorMessages = await this.task.mirrorMessagesManager.getSavedMirrorMessages()
+			if (savedMirrorMessages.length > 0) {
+				this.task.mirrorMessages = savedMirrorMessages
+			}
+			const savedFileEdits = await this.task.mirrorMessagesManager.getSavedFileEdits()
+			if (savedFileEdits.length > 0) {
+				this.task.fileEdits = savedFileEdits
+			}
+			const savedApiHistory = await this.getSavedApiConversationHistory()
+			if (savedApiHistory.length > 0) {
+				this.task.apiConversationHistory = savedApiHistory
+			}
+			this.task.isInitialized = true
+		} catch (error) {
+			console.error(`[loadSavedMessagesOnly] Failed to load messages for task ${this.task.taskId}:`, error)
 		}
 	}
 
@@ -429,26 +488,32 @@ export class TaskLifecycle {
 		this.task.consecutiveNoToolUseCount = 0
 		this.task.consecutiveNoAssistantMessagesCount = 0
 
+		// Finalize any partial streaming messages so all streamed text is retained
+		for (const msg of this.task.mirrorMessages) {
+			if (msg.partial) {
+				delete msg.partial
+			}
+		}
+
 		// Force final token usage update before abort event
 		this.emitFinalTokenUsageUpdate()
 
 		this.task.emit(MirrorVSEventName.TaskAborted)
 
+		// Save all streamed messages to disk BEFORE disposing resources
 		try {
-			this.dispose() // Call the centralized dispose method
-		} catch (error) {
-			console.error(`Error during task ${this.task.taskId}.${this.task.instanceId} disposal:`, error)
-			// Don't rethrow - we want abort to always succeed
-		}
-		// Save the countdown message in the automatic retry or other content.
-		try {
-			// Save the countdown message in the automatic retry or other content.
 			await this.task.mirrorMessagesManager.saveMirrorMessages()
 		} catch (error) {
 			console.error(
 				`Error saving messages during abort for task ${this.task.taskId}.${this.task.instanceId}:`,
 				error,
 			)
+		}
+
+		try {
+			this.dispose() // Call the centralized dispose method
+		} catch (error) {
+			console.error(`Error during task ${this.task.taskId}.${this.task.instanceId} disposal:`, error)
 		}
 	}
 

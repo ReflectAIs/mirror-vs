@@ -42,10 +42,10 @@ function Header({
 			</Text>
 			<Box width={columns}>
 				<Box flexDirection="row">
-					<Box marginY={1}>
-						<Text color="magenta">{ASCII_MIRROR}</Text>
+					<Box marginY={1} marginLeft={1}>
+						<Text color="cyan">{ASCII_MIRROR}</Text>
 					</Box>
-					<Box flexDirection="column" marginLeft={1} marginTop={1}>
+					<Box flexDirection="column" marginLeft={2} marginTop={1}>
 						{user && <Text color={theme.dimText}>Welcome back, {user.name}</Text>}
 						<Text color={theme.dimText}>
 							cwd:{" "}

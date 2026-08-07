@@ -9,6 +9,11 @@ import { MirrorProvider } from "../core/webview/MirrorProvider"
 import { ContextProxy } from "../core/config/ContextProxy"
 import { focusPanel } from "../utils/focusPanel"
 import { handleNewTask } from "./handleTask"
+import {
+	handleClearTask,
+	handleCloseTaskTab,
+	handleNewTask as handleNewTaskMessage,
+} from "../core/webview/handlers/taskHandler"
 import { CodeIndexManager } from "../services/code-index/manager"
 import { importSettingsWithFeedback } from "../core/config/importExport"
 import { t } from "../i18n"
@@ -69,7 +74,7 @@ export const registerCommands = (options: RegisterCommandOptions) => {
 }
 
 const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOptions): Record<CommandId, any> => ({
-	activationCompleted: () => { },
+	activationCompleted: () => {},
 	plusButtonClicked: async () => {
 		const visibleProvider = getVisibleProviderOrLog(outputChannel)
 
@@ -109,6 +114,39 @@ const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOpt
 		visibleProvider.postMessageToWebview({ type: "action", action: "historyButtonClicked" })
 	},
 	newTask: handleNewTask,
+	// New tab: mirrors the "+" button in TabBar which sends an empty newTask
+	newTab: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+
+		if (!visibleProvider) {
+			return
+		}
+
+		await handleNewTaskMessage(visibleProvider, { type: "newTask", text: "", images: [] })
+	},
+	// New session: mirrors the ChatToolbar "New Session" button which sends clearTask
+	newSession: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+
+		if (!visibleProvider) {
+			return
+		}
+
+		await handleClearTask(visibleProvider)
+	},
+	// Close tab: closes the current task tab (the webview already confirms)
+	closeTab: async () => {
+		const visibleProvider = getVisibleProviderOrLog(outputChannel)
+
+		if (!visibleProvider) {
+			return
+		}
+
+		const currentTask = visibleProvider.getCurrentTask()
+		if (currentTask) {
+			await handleCloseTaskTab(visibleProvider, currentTask.taskId)
+		}
+	},
 	setCustomStoragePath: async () => {
 		const { promptForCustomStoragePath } = await import("../utils/storage")
 		await promptForCustomStoragePath()

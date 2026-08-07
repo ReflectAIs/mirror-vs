@@ -53,6 +53,10 @@ export const OPEN_ROUTER_PROMPT_CACHING_MODELS = new Set([
 	"google/gemini-2.0-flash-001",
 	"google/gemini-flash-1.5",
 	"google/gemini-flash-1.5-8b",
+	"deepseek/deepseek-chat",
+	"deepseek/deepseek-r1",
+	"deepseek/deepseek-r1:free",
+	"deepseek/deepseek-v3",
 ])
 
 // When we first launched these models we didn't have support for

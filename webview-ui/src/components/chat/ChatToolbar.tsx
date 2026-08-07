@@ -1,5 +1,5 @@
-import React from "react"
-import { FoldVertical, HardDriveDownload, HardDriveUpload, ListTodo } from "lucide-react"
+import React, { useState, useCallback } from "react"
+import { FoldVertical, HardDriveDownload, HardDriveUpload, ListTodo, Pencil } from "lucide-react"
 
 import type { ModelActivity } from "@src/components/welcome/MirrorHero"
 import MirrorHero from "@src/components/welcome/MirrorHero"
@@ -10,6 +10,7 @@ import { formatLargeNumber } from "@src/utils/format"
 import { vscode } from "@src/utils/vscode"
 import { ContextWindowProgress } from "./ContextWindowProgress"
 import { TodoListDisplay } from "./TodoListDisplay"
+import { MascotBadge, type MascotStatus } from "./MascotBadge"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +32,8 @@ export interface ChatToolbarProps {
 	setShowRetiredProviderWarning: React.Dispatch<React.SetStateAction<boolean>>
 	handleCondenseContext: (taskId: string) => void
 	t: (key: string) => string
+	currentSessionId?: string
+	sessionNames?: Record<string, string>
 }
 
 // ---------------------------------------------------------------------------
@@ -53,18 +56,75 @@ const ChatToolbar = ({
 	setShowRetiredProviderWarning,
 	handleCondenseContext,
 	t,
+	currentSessionId,
+	sessionNames,
 }: ChatToolbarProps) => {
+	const activeSessionName = currentSessionId ? (sessionNames?.[currentSessionId] ?? "New Session") : "New Session"
+
+	const [isEditingSession, setIsEditingSession] = useState(false)
+	const [editingSessionName, setEditingSessionName] = useState("")
+
+	const handleSaveSessionName = useCallback(() => {
+		setIsEditingSession(false)
+		const trimmed = editingSessionName.trim()
+		if (trimmed && currentSessionId && trimmed !== activeSessionName) {
+			vscode.postMessage({
+				type: "renameSession",
+				sessionId: currentSessionId,
+				sessionName: trimmed,
+			})
+		}
+	}, [editingSessionName, currentSessionId, activeSessionName])
+
+	// Determine mascot status from task state
+	const mascotStatus: MascotStatus = (() => {
+		if (!task) return "idle"
+		if (task.isStreaming || task.isWaitingForFirstChunk) return "streaming"
+		if (task.taskAsk && !task.taskAsk.isAnswered) return "interactive"
+		if (task.state === "error" || task.state === "aborted") return "error"
+		if (task.state === "completed") return "completed"
+		return "idle"
+	})()
+
 	return (
 		<>
 			{/* Top Header Area */}
-			<div className="flex items-center justify-between px-4 py-2.5 border-b border-vscode-editorGroup-border/50 bg-vscode-sideBar-background/30 backdrop-blur-md shrink-0">
-				<div className="flex items-center gap-2">
+			<div className="flex items-center justify-between px-4 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none">
+				<div className="flex items-center gap-2 min-w-0">
 					<MirrorHero activity={modelActivity} size="small" />
-					<div className="flex flex-col">
-						<span className="font-bold text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent">
-							Mirror VS
-						</span>
-						<span className="text-[10px] text-vscode-descriptionForeground">AI Pair Programmer</span>
+					<div className="flex flex-col min-w-0">
+						<div className="flex items-center gap-1.5">
+							<span className="font-bold text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent shrink-0">
+								Mirror VS
+							</span>
+						</div>
+						{isEditingSession ? (
+							<input
+								type="text"
+								value={editingSessionName}
+								onChange={(e) => setEditingSessionName(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") handleSaveSessionName()
+									if (e.key === "Escape") setIsEditingSession(false)
+								}}
+								onBlur={handleSaveSessionName}
+								autoFocus
+								className="text-[11px] px-1.5 py-0.5 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none max-w-[180px]"
+							/>
+						) : (
+							<div
+								onClick={() => {
+									setEditingSessionName(activeSessionName)
+									setIsEditingSession(true)
+								}}
+								className="group flex items-center gap-1 cursor-pointer max-w-[220px]"
+								title="Click to rename session">
+								<span className="text-[11px] font-medium text-vscode-descriptionForeground group-hover:text-vscode-foreground truncate transition-colors">
+									{activeSessionName}
+								</span>
+								<Pencil className="w-2.5 h-2.5 text-vscode-descriptionForeground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+							</div>
+						)}
 					</div>
 				</div>
 				<div className="flex items-center gap-1.5">

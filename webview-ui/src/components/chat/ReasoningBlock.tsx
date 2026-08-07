@@ -14,14 +14,14 @@ interface ReasoningBlockProps {
 	metadata?: any
 }
 
-export const ReasoningBlock = ({ content, isStreaming, isLast }: ReasoningBlockProps) => {
+export const ReasoningBlock = ({ content, ts, isStreaming, isLast }: ReasoningBlockProps) => {
 	const { t } = useTranslation()
 	const { reasoningBlockCollapsed } = useExtensionState()
 
 	const [isCollapsed, setIsCollapsed] = useState(reasoningBlockCollapsed)
 
-	const startTimeRef = useRef<number>(Date.now())
-	const [elapsed, setElapsed] = useState<number>(0)
+	const startTimeRef = useRef<number>(ts || Date.now())
+	const [elapsed, setElapsed] = useState<number>(() => Math.max(0, Date.now() - (ts || Date.now())))
 	const contentRef = useRef<HTMLDivElement>(null)
 
 	useEffect(() => {
@@ -29,13 +29,13 @@ export const ReasoningBlock = ({ content, isStreaming, isLast }: ReasoningBlockP
 	}, [reasoningBlockCollapsed])
 
 	useEffect(() => {
+		const tick = () => setElapsed(Date.now() - startTimeRef.current)
+		tick()
 		if (isLast && isStreaming) {
-			const tick = () => setElapsed(Date.now() - startTimeRef.current)
-			tick()
 			const id = setInterval(tick, 1000)
 			return () => clearInterval(id)
 		}
-	}, [isLast, isStreaming])
+	}, [isLast, isStreaming, ts])
 
 	const seconds = Math.floor(elapsed / 1000)
 	const secondsLabel = t("chat:reasoning.seconds", { count: seconds })

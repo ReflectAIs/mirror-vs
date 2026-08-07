@@ -15,12 +15,13 @@ export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<
 	await provider.contextProxy.setValue("customModes", customModes)
 
 	// Restore the persisted session ID so new tasks created during this session
-	// inherit the same sessionId for history grouping.  Do NOT call
-	// restoreSessionTabs() here — creating an idle Task (startTask: false) from
-	// the newest history item produces a blank page with a meaningless tab.
-	// Users load specific tasks by clicking session groups in the history view,
-	// or create fresh tabs via the "+" button (which generates a new session).
+	// inherit the same sessionId for history grouping.
 	await provider.getOrCreateSession()
+
+	// Restore the session's last active tab so the tab bar shows existing tabs
+	// from the current session. The task is created idle (startTask: false)
+	// so no AI loop runs — the user can interact with it by clicking.
+	await provider.restoreSessionTabs()
 
 	provider.postStateToWebview()
 	provider.workspaceTracker?.initializeFilePaths() // Don't await.
@@ -255,8 +256,13 @@ export async function handleKillTerminal(
  * Handles the clearTask message.
  */
 export async function handleClearTask(provider: MirrorProvider): Promise<void> {
-	await provider.clearTask()
+	await provider.createSession()
+	while (provider.mirrorStack.length > 0) {
+		await provider.removeMirrorFromStack()
+	}
+	await provider.createTask("", [])
 	await provider.postStateToWebview()
+	await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 }
 
 /**

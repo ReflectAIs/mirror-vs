@@ -1,8 +1,8 @@
 {
-	"name": "@mirror-vs/cli",
-	"version": "0.1.17",
+	"name": "@reflectai/mirror-vs-cli",
+	"version": "0.6.15",
 	"description": "Mirror VS CLI - Run the Mirror VS agent from the command line",
-	"private": true,
+	"private": false,
 	"type": "module",
 	"main": "dist/index.js",
 	"bin": {
@@ -21,10 +21,6 @@
 		"clean": "rimraf dist .turbo"
 	},
 	"dependencies": {
-		"@inkjs/ui": "^2.0.0",
-		"@mirror-vs/core": "workspace:^",
-		"@mirror-vs/types": "workspace:^",
-		"@mirror-vs/vscode-shim": "workspace:^",
 		"@trpc/client": "^11.8.1",
 		"@vscode/ripgrep": "^1.15.9",
 		"commander": "^12.1.0",

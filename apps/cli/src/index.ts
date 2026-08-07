@@ -2,7 +2,17 @@ import { Command } from "commander"
 
 import { DEFAULT_FLAGS } from "@/types/constants.js"
 import { VERSION } from "@/lib/utils/version.js"
-import { run, listCommands, listModes, listModels, listSessions, upgrade } from "@/commands/index.js"
+import {
+	run,
+	listCommands,
+	listModes,
+	listModels,
+	listSessions,
+	upgrade,
+	configGet,
+	configSet,
+	configReset,
+} from "@/commands/index.js"
 
 const program = new Command()
 
@@ -36,7 +46,7 @@ program
 	.option("-a, --require-approval", "Require manual approval for actions", false)
 	.option("-k, --api-key <key>", "API key for the LLM provider")
 	.option("--provider <provider>", "API provider (anthropic, openai, openrouter, etc.)")
-	.option("-m, --model <model>", "Model to use", DEFAULT_FLAGS.model)
+	.option("-m, --model <model>", "Model to use")
 	.option("--mode <mode>", "Mode to start in (code, architect, ask, debug, etc.)", DEFAULT_FLAGS.mode)
 	.option("--terminal-shell <path>", "Absolute path to shell executable for inline terminal commands")
 	.option(
@@ -124,6 +134,46 @@ program
 	.description("Upgrade Mirror VS CLI to the latest version")
 	.action(async () => {
 		await runUpgradeAction(() => upgrade())
+	})
+
+// ── mirror config ─────────────────────────────────────────────────────────
+
+const configCommand = program
+	.command("config")
+	.description("View or edit persisted CLI configuration (~/.mirror-vs/cli-config.json)")
+	.enablePositionalOptions()
+	.passThroughOptions()
+
+const runConfigAction = async (action: () => Promise<void>) => {
+	try {
+		await action()
+		process.exit(0)
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		console.error(`[CLI] Error: ${message}`)
+		process.exit(1)
+	}
+}
+
+configCommand
+	.command("get")
+	.description("Show current persisted config (API key shown redacted)")
+	.action(async () => {
+		await runConfigAction(() => configGet())
+	})
+
+configCommand
+	.command("set <key> <value>")
+	.description("Set a config value. Keys: provider, api-key, model")
+	.action(async (key: string, value: string) => {
+		await runConfigAction(() => configSet(key, value))
+	})
+
+configCommand
+	.command("reset")
+	.description("Delete all persisted config")
+	.action(async () => {
+		await runConfigAction(() => configReset())
 	})
 
 program.parse()

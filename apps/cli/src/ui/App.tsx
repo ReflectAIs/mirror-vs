@@ -1,5 +1,5 @@
 import { Box, Text, useApp, useInput } from "ink"
-import { Select } from "@inkjs/ui"
+import { SuggestionSelect } from "./components/SuggestionSelect.js"
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 
 import { ExtensionHostInterface, ExtensionHostOptions } from "@/agent/index.js"
@@ -64,6 +64,16 @@ export interface TUIAppProps extends ExtensionHostOptions {
 	initialSessionId?: string
 	continueSession?: boolean
 	version: string
+	/**
+	 * When true, the model was auto-corrected from a saved config that was incompatible
+	 * with the selected provider (e.g., claude model saved, but deepseek provider chosen).
+	 * The TUI will show a model confirmation screen before starting the chat.
+	 */
+	modelAutoCorrected?: boolean
+	/** The incompatible model that was replaced */
+	correctedFromModel?: string
+	/** The provider's default model ID (shown as the suggestion) */
+	defaultModelForProvider?: string
 	// Create extension host factory for dependency injection.
 	createExtensionHost: (options: ExtensionHostOptions) => ExtensionHostInterface
 }
@@ -90,7 +100,13 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 		reasoningEffort,
 		ephemeral,
 		version,
+		modelAutoCorrected = false,
+		correctedFromModel = "",
 	} = extensionHostOptions
+
+	// When a model was auto-corrected, hold off on starting the extension host
+	// until the user has confirmed (or entered) a model. null = not yet confirmed.
+	const [confirmedModel] = useState<string | null>(modelAutoCorrected ? null : model)
 
 	const { exit } = useApp()
 
@@ -154,7 +170,8 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 	}, [taskHistory])
 
 	// Scroll area state
-	const { rows } = useTerminalSize()
+	const { rows, columns } = useTerminalSize()
+
 	const [scrollState, setScrollState] = useState({ scrollTop: 0, maxScroll: 0, isAtBottom: true })
 	const { scrollToBottomTrigger, scrollToBottom } = useScrollToBottom()
 
@@ -170,6 +187,7 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 		seenMessageIds,
 		pendingCommandRef: _pendingCommandRef,
 		firstTextMessageSkipped,
+		lastProcessedTsRef,
 	} = useMessageHandlers({
 		nonInteractive,
 	})
@@ -184,7 +202,7 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 		user,
 		provider,
 		apiKey,
-		model,
+		model: confirmedModel ?? model,
 		workspacePath,
 		extensionPath,
 		debug,
@@ -224,6 +242,7 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 			showInfo,
 			seenMessageIds,
 			firstTextMessageSkipped,
+			lastProcessedTsRef,
 		})
 
 	// Initialize global input hook
@@ -252,6 +271,11 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 	const displayMessages = useMemo(() => {
 		return messages
 	}, [messages])
+
+	// The first user message (task prompt) — shown in the sticky bar while Mirror is responding
+	const firstUserMessage = useMemo(() => {
+		return displayMessages.find((m) => m.role === "user") ?? null
+	}, [displayMessages])
 
 	// Scroll to bottom when new messages arrive (if auto-scroll is enabled)
 	const prevMessageCount = useRef(messages.length)
@@ -418,6 +442,23 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 		)
 	}
 
+	// ── Model Setup View ─────────────────────────────────────────────────────
+	// NOTE: This check belongs in the outer App wrapper — AppInner should never
+	// render with an unconfirmed model. This is a safety guard only.
+	if (modelAutoCorrected && confirmedModel === null) {
+		return (
+			<Box flexDirection="column" padding={1}>
+				<Text color="cyan" bold>
+					◆ Model Setup Required
+				</Text>
+				<Text color="yellow">
+					⚠ Saved model {correctedFromModel} is not compatible with {provider}
+				</Text>
+				<Text color="gray">Confirming model...</Text>
+			</Box>
+		)
+	}
+
 	// Status bar content
 	// Priority: Toast > Exit hint > Loading > Scroll indicator > Input hint
 	// Don't show spinner when waiting for user input (pendingAsk is set)
@@ -472,6 +513,26 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 				/>
 			</Box>
 
+			{/* Sticky user message bar — shown on multi-message chats when not scrolled to the very top */}
+			{firstUserMessage &&
+				!pendingAsk &&
+				displayMessages.length > 1 &&
+				(scrollState.scrollTop > 0 || scrollState.isAtBottom) && (
+					<Box
+						flexDirection="row"
+						flexShrink={0}
+						paddingX={1}
+						paddingY={0}
+						borderStyle="single"
+						borderColor={theme.userHeader}>
+						<Text color={theme.userHeader} bold>
+							▶ Task:{" "}
+						</Text>
+						<Text color={theme.userText}>
+							{((firstUserMessage?.content || "").split("\n")[0] ?? "").slice(0, (columns ?? 80) - 12)}
+						</Text>
+					</Box>
+				)}
 			{/* Scrollable message history area - fills remaining space via flexGrow */}
 			<ScrollArea
 				isActive={isScrollAreaActive}
@@ -490,7 +551,7 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 						{pendingAsk.suggestions && pendingAsk.suggestions.length > 0 && !showCustomInput ? (
 							<Box flexDirection="column" marginTop={1}>
 								<HorizontalLine active={true} />
-								<Select
+								<SuggestionSelect
 									options={[
 										...pendingAsk.suggestions.map((s) => ({
 											label: s.answer,
@@ -498,7 +559,7 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 										})),
 										{ label: "Type something...", value: "__CUSTOM__" },
 									]}
-									onChange={(value) => {
+									onSelect={(value) => {
 										if (!value || typeof value !== "string") return
 										if (showCustomInput || isTransitioningToCustomInput) return
 
@@ -615,12 +676,115 @@ function AppInner({ createExtensionHost, ...extensionHostOptions }: TUIAppProps)
 }
 
 /**
+ * Standalone model setup view shown when the saved model is incompatible with the provider.
+ * Renders outside of AppInner so the extension host never mounts with a bad model.
+ */
+function ModelSetupView({
+	provider,
+	correctedFromModel,
+	defaultModelForProvider,
+	model,
+	onConfirm,
+}: {
+	provider: string
+	correctedFromModel: string
+	defaultModelForProvider: string
+	model: string
+	onConfirm: (model: string) => void
+}) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const inputRef = useRef<AutocompleteInputHandle<any>>(null)
+
+	return (
+		<Box flexDirection="column" padding={1}>
+			<Box flexDirection="column" marginBottom={1}>
+				<Text color="cyan" bold>
+					◆ Model Setup Required
+				</Text>
+				<Text color={theme.borderColor}>{"─".repeat(44)}</Text>
+			</Box>
+			<Box flexDirection="column" marginBottom={1}>
+				<Text>
+					<Text color="yellow">⚠ </Text>
+					<Text>Saved model </Text>
+					<Text color="red" bold>
+						{correctedFromModel}
+					</Text>
+				</Text>
+				<Text>
+					<Text> is not compatible with provider </Text>
+					<Text color="cyan" bold>
+						{provider}
+					</Text>
+				</Text>
+			</Box>
+			<Box flexDirection="column" marginBottom={1}>
+				<Text color="gray">Enter model ID (press Enter to use default):</Text>
+				<Box marginTop={1} flexDirection="row">
+					<Text color="cyan">› </Text>
+					<AutocompleteInput
+						ref={inputRef}
+						placeholder={defaultModelForProvider || model}
+						onSubmit={(text: string) => {
+							const chosen = text.trim() || defaultModelForProvider || model
+							onConfirm(chosen)
+						}}
+						isActive={true}
+						triggers={[]}
+						onPickerStateChange={() => {}}
+						prompt=""
+					/>
+				</Box>
+			</Box>
+			<Box flexDirection="column">
+				<Text color="gray">
+					Press <Text color="green">Enter</Text>
+					{" to use "}
+					<Text color="cyan">{defaultModelForProvider || model}</Text>
+				</Text>
+				<Text color={theme.dimText} dimColor>
+					Or type a model ID and press Enter
+				</Text>
+				<Text color={theme.dimText} dimColor>
+					To persist: mirror config set model {"<model-id>"}
+				</Text>
+			</Box>
+		</Box>
+	)
+}
+
+/**
  * Main TUI Application Component - wraps with TerminalSizeProvider
  */
 export function App(props: TUIAppProps) {
+	const [confirmedModel, setConfirmedModel] = useState<string | null>(props.modelAutoCorrected ? null : props.model)
+
+	// While model isn't confirmed, show the setup screen outside of TerminalSizeProvider
+	// so AppInner (and its extension host) never mounts with a bad/empty model.
+	if (props.modelAutoCorrected && confirmedModel === null) {
+		return (
+			<TerminalSizeProvider>
+				<ModelSetupView
+					provider={props.provider}
+					correctedFromModel={props.correctedFromModel ?? ""}
+					defaultModelForProvider={props.defaultModelForProvider ?? props.model}
+					model={props.model}
+					onConfirm={(chosen) => setConfirmedModel(chosen)}
+				/>
+			</TerminalSizeProvider>
+		)
+	}
+
+	// Model confirmed (or no correction needed) — render the full app with the confirmed model.
+	const finalModel = confirmedModel ?? props.model
 	return (
 		<TerminalSizeProvider>
-			<AppInner {...props} />
+			<AppInner
+				{...props}
+				model={finalModel}
+				// Pass modelAutoCorrected=false so AppInner doesn't show a second setup view
+				modelAutoCorrected={false}
+			/>
 		</TerminalSizeProvider>
 	)
 }

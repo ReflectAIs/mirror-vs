@@ -149,7 +149,14 @@ export class TaskLifecycleManager {
 				`currentSessionId=${this.provider.currentSessionId}`,
 		)
 		await this.provider.addMirrorToStack(task)
-		task.start()
+		await task.saveMirrorMessages()
+
+		// Only start the AI loop if there is text/images content or a history item.
+		// If created with empty text and images (e.g. clicking '+' or opening fresh workspace),
+		// keep it as an idle tab waiting for user input without sending an empty message.
+		if ((text && text.trim().length > 0) || (images && images.length > 0) || task.historyItem) {
+			task.start()
+		}
 
 		this.provider.log(
 			`[createTask] ${task.parentTask ? "child" : "parent"} task ${task.taskId}.${task.instanceId} instantiated`,

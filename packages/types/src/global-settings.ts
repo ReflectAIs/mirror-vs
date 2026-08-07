@@ -253,6 +253,14 @@ export const globalSettingsSchema = z.object({
 	 * Keyed by taskId.
 	 */
 	taskNames: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * Tracks task IDs that the user has explicitly closed within each session.
+	 * Keyed by sessionId, values are arrays of taskId strings.
+	 * Closed tabs are excluded from session tab restoration on next startup.
+	 */
+	sessionClosedTabs: z.record(z.string(), z.array(z.string())).optional(),
+
 	activeSearchProvider: z.string().optional(),
 	userBraveApiKey: z.string().optional(),
 

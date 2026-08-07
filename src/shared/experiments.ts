@@ -14,6 +14,7 @@ export const EXPERIMENT_IDS = {
 	CUSTOM_TOOLS: "customTools",
 	BROWSER: "browser",
 	PARALLEL_TOOL_READS: "parallelToolReads",
+	MULTI_TAB: "multiTab",
 } as const satisfies Record<string, ExperimentId>
 
 type _AssertExperimentIds = AssertEqual<Equals<ExperimentId, Values<typeof EXPERIMENT_IDS>>>
@@ -38,6 +39,7 @@ export const experimentConfigsMap: Record<ExperimentKey, ExperimentConfig> = {
 	CUSTOM_TOOLS: { enabled: false },
 	BROWSER: { enabled: false },
 	PARALLEL_TOOL_READS: { enabled: false },
+	MULTI_TAB: { enabled: false },
 }
 
 export const experimentDefault = Object.fromEntries(

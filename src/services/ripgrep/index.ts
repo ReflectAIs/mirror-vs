@@ -79,21 +79,106 @@ const MAX_LINE_LENGTH = 500
 export function truncateLine(line: string, maxLength: number = MAX_LINE_LENGTH): string {
 	return line.length > maxLength ? line.substring(0, maxLength) + " [truncated...]" : line
 }
+import * as fs from "fs"
+
 /**
- * Get the path to the ripgrep binary within the VSCode installation
+ * Ensures the binary has execute permissions on Unix/macOS systems.
  */
-export async function getBinPath(vscodeAppMirrort: string): Promise<string | undefined> {
-	const checkPath = async (pkgFolder: string) => {
-		const fullPath = path.join(vscodeAppMirrort, pkgFolder, binName)
-		return (await fileExistsAtPath(fullPath)) ? fullPath : undefined
+function ensureExecutable(binPath: string): string {
+	if (!isWindows && binPath) {
+		try {
+			fs.chmodSync(binPath, 0o755)
+		} catch {
+			// Ignore errors on read-only filesystems or restricted permissions
+		}
+	}
+	return binPath
+}
+
+/**
+ * Get the path to the ripgrep binary.
+ *
+ * Resolution order:
+ * 1. The bundled binary at `dist/ripgrep/rg` (or `rg.exe` on Windows).
+ * 2. `@vscode/ripgrep` via Node module resolution.
+ * 3. Well-known locations relative to VS Code application root (`vscode.env.appRoot`).
+ * 4. System PATH resolution (e.g. `/opt/homebrew/bin/rg`, `/usr/local/bin/rg`, `which rg`).
+ */
+export async function getBinPath(vscodeAppRoot?: string): Promise<string | undefined> {
+	// 1) Bundled binary (production + F5 debug where __dirname is dist/ or src/).
+	const bundledCandidates = [
+		path.join(__dirname, "ripgrep", binName),
+		path.join(__dirname, "dist", "ripgrep", binName),
+		path.join(__dirname, "..", "ripgrep", binName),
+		path.join(__dirname, "..", "..", "..", "ripgrep", binName),
+	]
+	for (const candidate of bundledCandidates) {
+		if (await fileExistsAtPath(candidate)) {
+			return ensureExecutable(candidate)
+		}
 	}
 
-	return (
+	// 2) Resolve from the @vscode/ripgrep package when it's available to this module.
+	try {
+		const rgPath = require("@vscode/ripgrep").rgPath as string
+		if (rgPath && (await fileExistsAtPath(rgPath))) {
+			return ensureExecutable(rgPath)
+		}
+	} catch {
+		// @vscode/ripgrep is not resolvable from this module - fall through.
+	}
+
+	// 3) Well-known locations relative to the provided roots (appRoot / extension dir).
+	const candidateRoots = [
+		vscodeAppRoot,
+		vscodeAppRoot ? path.dirname(vscodeAppRoot) : undefined,
+		path.join(__dirname, "..", "..", ".."),
+	].filter((root): root is string => Boolean(root))
+
+	const checkPath = async (pkgFolder: string) => {
+		for (const root of candidateRoots) {
+			const fullPath = path.join(root, pkgFolder, binName)
+			if (await fileExistsAtPath(fullPath)) {
+				return ensureExecutable(fullPath)
+			}
+		}
+		return undefined
+	}
+
+	const appRootPath =
 		(await checkPath("node_modules/@vscode/ripgrep/bin/")) ||
 		(await checkPath("node_modules/vscode-ripgrep/bin")) ||
 		(await checkPath("node_modules.asar.unpacked/vscode-ripgrep/bin/")) ||
-		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/"))
-	)
+		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/")) ||
+		(await checkPath("app/node_modules.asar.unpacked/@vscode/ripgrep/bin/"))
+
+	if (appRootPath) {
+		return appRootPath
+	}
+
+	// 4) System PATH fallback (Homebrew, system install, PATH).
+	const systemCandidates = isWindows
+		? ["C:\\Program Files\\ripgrep\\rg.exe"]
+		: ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"]
+
+	for (const candidate of systemCandidates) {
+		if (await fileExistsAtPath(candidate)) {
+			return ensureExecutable(candidate)
+		}
+	}
+
+	// Try resolving via system command (which / where)
+	try {
+		const whichCmd = isWindows ? "where rg" : "which rg"
+		const resolvedPath = childProcess.execSync(whichCmd, { encoding: "utf8" }).trim().split("\n")[0]?.trim()
+		if (resolvedPath && (await fileExistsAtPath(resolvedPath))) {
+			return ensureExecutable(resolvedPath)
+		}
+	} catch {
+		// system which/where failed or rg not in PATH
+	}
+
+	return undefined
 }
 
 async function execRipgrep(bin: string, args: string[]): Promise<string> {
@@ -102,12 +187,13 @@ async function execRipgrep(bin: string, args: string[]): Promise<string> {
 		// cross-platform alternative to head, which is ripgrep author's recommendation for limiting output.
 		const rl = readline.createInterface({
 			input: rgProcess.stdout,
-			crlfDelay: Infinity, // treat \r\n as a single line break even if it's split across chunks. This ensures consistent behavior across different operating systems.
+			crlfDelay: Infinity, // treat \r\n as a single line break even if it's split across chunks.
 		})
 
 		let output = ""
 		let lineCount = 0
-		const maxLines = MAX_RESULTS * 5 // limiting ripgrep output with max lines since there's no other way to limit results. it's okay that we're outputting as json, since we're parsing it line by line and ignore anything that's not part of a match. This assumes each result is at most 5 lines.
+		let exitCode: number | null = null
+		const maxLines = MAX_RESULTS * 5
 
 		rl.on("line", (line) => {
 			if (lineCount < maxLines) {
@@ -123,13 +209,22 @@ async function execRipgrep(bin: string, args: string[]): Promise<string> {
 		rgProcess.stderr.on("data", (data) => {
 			errorOutput += data.toString()
 		})
+
+		rgProcess.on("exit", (code) => {
+			exitCode = code
+		})
+
 		rl.on("close", () => {
-			if (errorOutput) {
+			// ripgrep exit code 0 = matches found, 1 = no matches found, 143 = killed by SIGTERM (max lines)
+			// Do not treat non-fatal stderr warnings (e.g. unreadable files) as hard errors if exit code is 0 or 1 or output was produced.
+			const isSuccess = exitCode === 0 || exitCode === 1 || exitCode === 143 || output.length > 0
+			if (!isSuccess && errorOutput) {
 				reject(new Error(`ripgrep process error: ${errorOutput}`))
 			} else {
 				resolve(output)
 			}
 		})
+
 		rgProcess.on("error", (error) => {
 			reject(new Error(`ripgrep process error: ${error.message}`))
 		})
@@ -143,8 +238,8 @@ export async function regexSearchFiles(
 	filePattern?: string,
 	mirrorIgnoreController?: MirrorIgnoreController,
 ): Promise<string> {
-	const vscodeAppMirrort = vscode.env.appRoot
-	const rgPath = await getBinPath(vscodeAppMirrort)
+	const vscodeAppRoot = vscode.env.appRoot
+	const rgPath = await getBinPath(vscodeAppRoot)
 
 	if (!rgPath) {
 		throw new Error("Could not find ripgrep binary")

@@ -244,30 +244,37 @@ export class StateManager {
 			// Determine hasPendingApproval — task has an ask that's pending user response
 			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
 
-			// Derive TabStatus from TaskState
+			// Derive TabStatus from live streaming/ask flags & TaskState
 			let status: TabStatus
-			switch (task.state) {
-				case TaskState.Streaming:
-					status = "streaming"
-					break
-				case TaskState.WaitingApproval:
-					status = "interactive"
-					break
-				case TaskState.Completed:
-					status = "completed"
-					break
-				case TaskState.Error:
-				case TaskState.Aborted:
-					status = "error"
-					break
-				default:
-					status = "idle"
-					break
+			if (task.isStreaming || task.isWaitingForFirstChunk) {
+				status = "streaming"
+			} else if (hasPendingApproval) {
+				status = "interactive"
+			} else {
+				switch (task.state) {
+					case TaskState.Streaming:
+						status = "streaming"
+						break
+					case TaskState.WaitingApproval:
+						status = "interactive"
+						break
+					case TaskState.Completed:
+						status = "completed"
+						break
+					case TaskState.Error:
+					case TaskState.Aborted:
+						status = "error"
+						break
+					default:
+						status = "idle"
+						break
+				}
 			}
 
 			return {
 				taskId: task.taskId,
 				title:
+					taskNames?.[task.taskId] ||
 					task.name ||
 					task.metadata.task ||
 					`Task ${task.taskNumber > -1 ? `#${task.taskNumber}` : task.taskId.slice(0, 8)}`,

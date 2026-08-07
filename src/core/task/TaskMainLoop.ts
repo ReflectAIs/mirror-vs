@@ -31,6 +31,7 @@ import type { ToolUse, ToolParamName } from "../../shared/tools"
 import type { AssistantMessageContent } from "../assistant-message"
 import type { GroundingSource } from "../../api/transform/stream"
 import { Task } from "./Task"
+import { isTransientProviderError } from "./transient-error"
 
 // ────────────────────────────────────────────────────────────
 //  Struggle Ledger — Auto-Recovery Engine
@@ -867,9 +868,13 @@ export class TaskMainLoop {
 								`[Task#${this.task.taskId}.${this.task.instanceId}] Stream failed, will retry: ${streamingFailedMessage}`,
 							)
 
-							// Apply exponential backoff similar to first-chunk errors when auto-resubmit is enabled
+							// Apply exponential backoff similar to first-chunk errors when auto-resubmit is
+							// enabled. Transient provider capacity errors (overloaded 529, rate limit 429,
+							// unavailable 503) also auto-retry even without auto-approval so concurrent
+							// multi-tab use doesn't dump the raw "provider couldn't process the request"
+							// error on the user.
 							const stateForBackoff = await this.task.providerRef.deref()?.getState()
-							if (stateForBackoff?.autoApprovalEnabled) {
+							if (stateForBackoff?.autoApprovalEnabled || isTransientProviderError(error)) {
 								await this.task.backoffAndAnnounce(currentItem.retryAttempt ?? 0, error)
 
 								// Check if task was aborted during the backoff

@@ -16,6 +16,8 @@ export interface UseMessageHandlersReturn {
 	seenMessageIds: React.MutableRefObject<Set<string>>
 	pendingCommandRef: React.MutableRefObject<string | null>
 	firstTextMessageSkipped: React.MutableRefObject<boolean>
+	/** Reset this ref to 0 alongside seenMessageIds.clear() when switching tabs */
+	lastProcessedTsRef: React.MutableRefObject<number>
 }
 
 /**
@@ -49,6 +51,10 @@ export function useMessageHandlers({ nonInteractive }: UseMessageHandlersOptions
 	// Track seen message timestamps to filter duplicates and the prompt echo
 	const seenMessageIds = useRef<Set<string>>(new Set())
 	const firstTextMessageSkipped = useRef(false)
+
+	// Track the highest ts we've already processed. Messages with ts <= this are already in the store.
+	// This avoids re-processing the entire mirrorMessages array on every state update.
+	const lastProcessedTsRef = useRef<number>(0)
 
 	// Track pending command for injecting into command_output toolData
 	const pendingCommandRef = useRef<string | null>(null)
@@ -325,8 +331,17 @@ export function useMessageHandlers({ nonInteractive }: UseMessageHandlersOptions
 				const mirrorMessages = state.mirrorMessages
 
 				if (mirrorMessages) {
+					// Performance optimization: only process messages newer than the last processed ts.
+					// On a fresh load or tab switch (seenMessageIds cleared), lastProcessedTsRef is 0 so all messages run.
+					// During streaming, only newly-arrived messages (ts > lastProcessedTs) are processed.
+					const lastTs = lastProcessedTsRef.current
+					let newMaxTs = lastTs
+
 					for (const mirrorMsg of mirrorMessages) {
 						const ts = mirrorMsg.ts
+						// Skip already-processed messages (fast path for streaming updates)
+						if (ts <= lastTs) continue
+
 						const type = mirrorMsg.type
 						const say = mirrorMsg.say
 						const ask = mirrorMsg.ask
@@ -338,7 +353,12 @@ export function useMessageHandlers({ nonInteractive }: UseMessageHandlersOptions
 						} else if (type === "ask" && ask) {
 							handleAskMessage(ts, ask, text, partial)
 						}
+
+						if (ts > newMaxTs) newMaxTs = ts
 					}
+
+					// Update the high-water mark so next state update skips already-processed messages
+					lastProcessedTsRef.current = newMaxTs
 
 					// Compute token usage metrics from mirrorMessages
 					// Skip first message (task prompt) as per webview UI pattern
@@ -406,5 +426,6 @@ export function useMessageHandlers({ nonInteractive }: UseMessageHandlersOptions
 		seenMessageIds,
 		pendingCommandRef,
 		firstTextMessageSkipped,
+		lastProcessedTsRef,
 	}
 }

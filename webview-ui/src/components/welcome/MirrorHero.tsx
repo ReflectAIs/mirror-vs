@@ -16,9 +16,24 @@ type EyeShape = {
 	pupilOffsetY: number
 }
 
-type Mood = "happy" | "curious" | "sleepy" | "excited" | "silly" | "love" | "surprised"
+type Mood = "happy" | "curious" | "sleepy" | "excited" | "silly" | "love" | "surprised" | "cool" | "cheeky"
 
-const MOOD_CYCLE: Mood[] = ["happy", "curious", "sleepy", "excited", "silly", "love", "surprised"]
+const MOOD_CYCLE: Mood[] = ["happy", "curious", "sleepy", "excited", "silly", "love", "surprised", "cool", "cheeky"]
+
+const FUNNY_DEVELOPER_QUOTES = [
+	"I don't always test code, but when I do, I do it in prod! 😎",
+	"Converting coffee into clean code... ☕",
+	"It's not a bug, it's an undocumented feature! 🐛✨",
+	"Did you try turning it off and on again? 🔌",
+	"LGTM! (Let's Get This Money) 💸",
+	"Remember to hydrate while debugging! 💧",
+	"git commit -m 'fixed stuff' 🚀",
+	"Zero errors, zero warnings... is this real life? 🌈",
+	"Ctrl+C, Ctrl+V... peak software engineering! 🪄",
+	"Works on my machine! 💻✨",
+	"404: Sleep not found 🌙",
+	"Reticulating splines... 🌀",
+]
 
 /**
  * An animated diamond mascot with facial expressions that react to model activity states.
@@ -50,6 +65,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 	const [isDoubleClicked, setIsDoubleClicked] = useState(false)
 	const [isBlinking, setIsBlinking] = useState(false)
 	const [moodIndex, setMoodIndex] = useState(0)
+	const [quoteIndex, setQuoteIndex] = useState(0)
 	const clickTimerRef = useRef<ReturnType<typeof setTimeout>>()
 	const clickCountRef = useRef(0)
 	const moodCycleRef = useRef<ReturnType<typeof setInterval>>()
@@ -60,6 +76,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 	// Mood cycling on hover while idle
 	useEffect(() => {
 		if (isHovered && activity === "idle") {
+			setQuoteIndex(Math.floor(Math.random() * FUNNY_DEVELOPER_QUOTES.length))
 			moodCycleRef.current = setInterval(() => {
 				setMoodIndex((prev) => (prev + 1) % MOOD_CYCLE.length)
 			}, 2000)
@@ -452,7 +469,10 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		<div
 			ref={containerRef}
 			className="mb-4 relative forced-color-adjust-none group flex flex-col items-center w-30 pt-4 overflow-visible cursor-pointer"
-			onMouseEnter={() => setIsHovered(true)}
+			onMouseEnter={() => {
+				setIsHovered(true)
+				setQuoteIndex(Math.floor(Math.random() * FUNNY_DEVELOPER_QUOTES.length))
+			}}
 			onMouseLeave={() => {
 				setIsHovered(false)
 				setPupilOffset({ x: 0, y: 0 })
@@ -472,6 +492,13 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 						? "mirror-shake 0.5s ease-in-out"
 						: undefined,
 			}}>
+			{/* Funny developer quote speech bubble on hover */}
+			{isHovered && size === "normal" && (
+				<div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap bg-purple-900/90 text-purple-100 text-[10.5px] font-mono px-3 py-1 rounded-full shadow-xl border border-purple-400/40 animate-bounce">
+					{FUNNY_DEVELOPER_QUOTES[quoteIndex % FUNNY_DEVELOPER_QUOTES.length]}
+				</div>
+			)}
+
 			{/* Orbiting sparkles for thinking/writing states */}
 			{sparkleCount > 0 && (
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">

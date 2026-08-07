@@ -111,7 +111,14 @@ export class ComfyUIProvider implements ImageProvider {
 		}
 
 		console.log(`[ComfyUIProvider] starting ComfyUI...`)
-		await this.manager.launch()
+
+		try {
+			await this.manager.launch()
+		} catch (launchError) {
+			throw new Error(
+				`ComfyUI failed to launch: ${launchError instanceof Error ? launchError.message : String(launchError)}`,
+			)
+		}
 
 		// Wait for health check to pass (up to 30s)
 		for (let i = 0; i < 30; i++) {
@@ -123,7 +130,7 @@ export class ComfyUIProvider implements ImageProvider {
 			}
 		}
 
-		throw new Error("ComfyUI failed to start within 30 seconds")
+		throw new Error("ComfyUI failed to become healthy within 30 seconds")
 	}
 
 	/**

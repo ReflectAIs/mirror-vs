@@ -190,6 +190,21 @@
 				"command": "mirror-vs.nextChange",
 				"title": "%command.nextChange.title%",
 				"category": "%configuration.title%"
+			},
+			{
+				"command": "mirror-vs.newTab",
+				"title": "%command.newTab.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "mirror-vs.newSession",
+				"title": "%command.newSession.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "mirror-vs.closeTab",
+				"title": "%command.closeTab.title%",
+				"category": "%configuration.title%"
 			}
 		],
 		"menus": {
@@ -249,6 +264,30 @@
 				"mac": "cmd+alt+a",
 				"win": "ctrl+alt+a",
 				"linux": "ctrl+alt+a"
+			},
+			{
+				"command": "mirror-vs.newTab",
+				"key": "ctrl+n",
+				"mac": "cmd+n",
+				"win": "ctrl+n",
+				"linux": "ctrl+n",
+				"when": "activeWebviewPanelId == 'mirror-vs.TabPanelProvider' || focusedView == 'mirror-vs.SidebarProvider'"
+			},
+			{
+				"command": "mirror-vs.newSession",
+				"key": "ctrl+shift+n",
+				"mac": "cmd+shift+n",
+				"win": "ctrl+shift+n",
+				"linux": "ctrl+shift+n",
+				"when": "activeWebviewPanelId == 'mirror-vs.TabPanelProvider' || focusedView == 'mirror-vs.SidebarProvider'"
+			},
+			{
+				"command": "mirror-vs.closeTab",
+				"key": "ctrl+w",
+				"mac": "cmd+w",
+				"win": "ctrl+w",
+				"linux": "ctrl+w",
+				"when": "activeWebviewPanelId == 'mirror-vs.TabPanelProvider' || focusedView == 'mirror-vs.SidebarProvider'"
 			}
 		],
 		"submenus": [
@@ -432,6 +471,7 @@
 		"@modelcontextprotocol/sdk": "1.12.0",
 		"@qdrant/js-client-rest": "^1.14.0",
 		"@vscode/codicons": "^0.0.36",
+		"@vscode/ripgrep": "^1.17.0",
 		"ai-sdk-provider-poe": "2.0.18",
 		"async-mutex": "^0.5.0",
 		"axios": "^1.12.0",

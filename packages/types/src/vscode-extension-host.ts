@@ -359,6 +359,7 @@ export type ExtensionState = Pick<
 	| "currentSessionId"
 	| "sessionNames"
 	| "taskNames"
+	| "sessionClosedTabs"
 	| "currentApiConfigName"
 	| "listApiConfigMeta"
 	| "pinnedApiConfigs"

@@ -1,3 +1,5 @@
+import debounce from "lodash.debounce"
+
 import { MirrorVSEventName } from "@mirror-vs/types"
 import type { FileEditRecord, MirrorMessage, TokenUsage, ToolUsage } from "@mirror-vs/types"
 
@@ -99,10 +101,19 @@ export class TaskMirrorMessages {
 		await this.saveMirrorMessages()
 	}
 
+	private debouncedSaveMirrorMessages = debounce(async () => {
+		try {
+			await this.saveMirrorMessages()
+		} catch (err) {
+			console.error("Failed to save mirror messages in debounced update:", err)
+		}
+	}, 1000)
+
 	async updateMirrorMessage(message: MirrorMessage) {
 		const provider = this.task.providerRef.deref()
 		await provider?.postMessageToWebview({ type: "messageUpdated", mirrorMessage: message })
 		this.task.emit(MirrorVSEventName.Message, { action: "updated", message })
+		this.debouncedSaveMirrorMessages()
 	}
 
 	/**
