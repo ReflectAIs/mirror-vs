@@ -38,10 +38,12 @@ export function toolUseToText(block: Anthropic.Messages.ToolUseBlockParam): stri
  */
 export function toolResultToText(block: Anthropic.Messages.ToolResultBlockParam): string {
 	const errorSuffix = block.is_error ? " (Error)" : ""
+	let contentText = ""
+
 	if (typeof block.content === "string") {
-		return `[Tool Result${errorSuffix}]\n${block.content}`
+		contentText = block.content
 	} else if (Array.isArray(block.content)) {
-		const contentText = block.content
+		contentText = block.content
 			.map((contentBlock) => {
 				if (contentBlock.type === "text") {
 					return contentBlock.text
@@ -53,9 +55,17 @@ export function toolResultToText(block: Anthropic.Messages.ToolResultBlockParam)
 				return `[${(contentBlock as { type: string }).type}]`
 			})
 			.join("\n")
-		return `[Tool Result${errorSuffix}]\n${contentText}`
 	}
-	return `[Tool Result${errorSuffix}]`
+
+	// Smart truncation for summarizer efficiency: limit very large tool outputs
+	const MAX_SUMMARY_TOOL_LEN = 1500
+	if (contentText.length > MAX_SUMMARY_TOOL_LEN) {
+		const head = contentText.slice(0, 800)
+		const tail = contentText.slice(-500)
+		contentText = `${head}\n\n[... Truncated ${contentText.length - 1300} characters of tool output for summarization ...]\n\n${tail}`
+	}
+
+	return contentText ? `[Tool Result${errorSuffix}]\n${contentText}` : `[Tool Result${errorSuffix}]`
 }
 
 /**
