@@ -1,3 +1,4 @@
+import * as path from "path"
 import * as vscode from "vscode"
 
 import {
@@ -243,12 +244,24 @@ export class StateManager {
 		if (currentTask) {
 			try {
 				const metadata = await currentTask.fileContextTracker.getTaskMetadata(currentTask.taskId)
-				filesReadByMirror = (metadata?.files_in_context || []).map((entry) => ({
-					path: entry.path,
-					record_source: entry.record_source,
-					storage_tier: entry.storage_tier || "hot",
-					mirror_read_date: entry.mirror_read_date,
-				}))
+				const rawFiles = metadata?.files_in_context || []
+				const seen = new Set<string>()
+				const deduped: any[] = []
+				// Iterate backwards to keep the latest entries
+				for (let i = rawFiles.length - 1; i >= 0; i--) {
+					const entry = rawFiles[i]
+					const normPath = path.normalize(entry.path).replace(/\\/g, "/")
+					if (!seen.has(normPath)) {
+						seen.add(normPath)
+						deduped.unshift({
+							path: entry.path,
+							record_source: entry.record_source,
+							storage_tier: entry.storage_tier || "hot",
+							mirror_read_date: entry.mirror_read_date,
+						})
+					}
+				}
+				filesReadByMirror = deduped
 			} catch (e) {
 				console.error("Failed to read context files metadata for webview state:", e)
 			}

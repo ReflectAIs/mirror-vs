@@ -12,7 +12,9 @@ export default function AnalyticsView({ onDone }: AnalyticsViewProps) {
 	// Calculate statistics
 	const totalTasks = taskHistory.length
 	const totalSpent = taskHistory.reduce((acc, item) => acc + (item.totalCost || 0), 0)
-	const totalTokens = taskHistory.reduce((acc, item) => acc + ((item.tokensIn || 0) + (item.tokensOut || 0)), 0)
+	const totalTokensIn = taskHistory.reduce((acc, item) => acc + (item.tokensIn || 0), 0)
+	const totalTokensOut = taskHistory.reduce((acc, item) => acc + (item.tokensOut || 0), 0)
+	const totalTokens = totalTokensIn + totalTokensOut
 
 	// Group by mode / profile
 	const modelStats = taskHistory.reduce(
@@ -96,6 +98,37 @@ export default function AnalyticsView({ onDone }: AnalyticsViewProps) {
 						</div>
 					</div>
 				</div>
+
+				{/* Token Distribution (Ratio Bar) */}
+				{totalTokens > 0 && (
+					<div className="p-3.5 rounded-lg bg-vscode-sideBarSticky-background border border-vscode-panel-border shadow-sm flex flex-col gap-2">
+						<span className="text-[10px] text-vscode-descriptionForeground font-bold uppercase tracking-wider">
+							Token Ratio (Input vs Output)
+						</span>
+						<div className="w-full h-3 rounded-full bg-vscode-panel-border overflow-hidden flex">
+							<div
+								className="h-full bg-blue-500"
+								style={{ width: `${(totalTokensIn / totalTokens) * 100}%` }}
+								title={`Input (Prompt) Tokens: ${formatLargeNumber(totalTokensIn)}`}
+							/>
+							<div
+								className="h-full bg-purple-500"
+								style={{ width: `${(totalTokensOut / totalTokens) * 100}%` }}
+								title={`Output (Completion) Tokens: ${formatLargeNumber(totalTokensOut)}`}
+							/>
+						</div>
+						<div className="flex justify-between items-center text-[10px] text-vscode-descriptionForeground font-mono">
+							<span className="flex items-center gap-1.5">
+								<span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+								Input: {((totalTokensIn / totalTokens) * 100).toFixed(0)}%
+							</span>
+							<span className="flex items-center gap-1.5">
+								<span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+								Output: {((totalTokensOut / totalTokens) * 100).toFixed(0)}%
+							</span>
+						</div>
+					</div>
+				)}
 
 				{/* Model Spending breakdown */}
 				<div className="flex flex-col gap-2">

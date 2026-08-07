@@ -1,4 +1,5 @@
-import { ArrowLeft, Trash2, ShieldAlert, Sparkles, Database } from "lucide-react"
+import { useState } from "react"
+import { ArrowLeft, Trash2, ShieldAlert, Sparkles, Database, Search } from "lucide-react"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { vscode } from "@src/utils/vscode"
 
@@ -8,11 +9,18 @@ interface BrainViewProps {
 
 export default function BrainView({ onDone }: BrainViewProps) {
 	const { filesReadByMirror = [] } = useExtensionState()
+	const [searchQuery, setSearchQuery] = useState("")
 
 	const handleForget = (path: string) => {
 		vscode.postMessage({
 			type: "forgetContextFile",
 			text: path,
+		})
+	}
+
+	const handleForgetAll = () => {
+		vscode.postMessage({
+			type: "forgetAllContextFiles",
 		})
 	}
 
@@ -25,10 +33,29 @@ export default function BrainView({ onDone }: BrainViewProps) {
 		})
 	}
 
-	// Calculate counts
+	const handleArchiveAll = () => {
+		vscode.postMessage({
+			type: "toggleAllContextFilesStorageTier",
+			values: { tier: "cold" },
+		})
+	}
+
+	const handleRestoreAll = () => {
+		vscode.postMessage({
+			type: "toggleAllContextFilesStorageTier",
+			values: { tier: "hot" },
+		})
+	}
+
+	// Calculate counts on the deduplicated files
 	const totalFiles = filesReadByMirror.length
 	const hotFiles = filesReadByMirror.filter((f) => f.storage_tier !== "cold").length
 	const coldFiles = totalFiles - hotFiles
+
+	// Filter by search query
+	const filteredFiles = filesReadByMirror.filter((file) =>
+		file.path.toLowerCase().includes(searchQuery.toLowerCase()),
+	)
 
 	return (
 		<div className="flex flex-col h-full bg-vscode-sideBar-background text-vscode-foreground">
@@ -77,16 +104,54 @@ export default function BrainView({ onDone }: BrainViewProps) {
 				</div>
 			</div>
 
+			{/* Toolbar (Search & Bulk Actions) */}
+			{filesReadByMirror.length > 0 && (
+				<div className="p-4 pb-2 border-b border-vscode-panel-border flex flex-col gap-2 shrink-0">
+					{/* Search input */}
+					<div className="relative flex items-center">
+						<input
+							type="text"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="Search context files..."
+							className="w-full text-xs pl-8 pr-3 py-1.5 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-panel-border outline-none focus:border-vscode-focusBorder"
+						/>
+						<Search className="absolute left-2.5 w-3.5 h-3.5 text-vscode-descriptionForeground" />
+					</div>
+
+					{/* Bulk Actions */}
+					<div className="flex gap-2 mt-1">
+						<button
+							onClick={handleArchiveAll}
+							className="flex-1 py-1 px-2 text-[10px] font-semibold rounded border border-vscode-panel-border bg-vscode-button-background/5 text-vscode-foreground hover:bg-vscode-button-background/20 cursor-pointer text-center select-none"
+							title="Archive all files to Cold Storage">
+							Archive All
+						</button>
+						<button
+							onClick={handleRestoreAll}
+							className="flex-1 py-1 px-2 text-[10px] font-semibold rounded border border-vscode-panel-border bg-vscode-button-background/5 text-vscode-foreground hover:bg-vscode-button-background/20 cursor-pointer text-center select-none"
+							title="Promote all files to Hot Context">
+							Restore All
+						</button>
+						<button
+							onClick={handleForgetAll}
+							className="py-1 px-2.5 text-[10px] font-semibold rounded border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer text-center select-none"
+							title="Clear all context files">
+							Forget All
+						</button>
+					</div>
+				</div>
+			)}
+
 			{/* Files List */}
 			<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-				{filesReadByMirror.length === 0 ? (
+				{filteredFiles.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-12 text-center select-none text-vscode-descriptionForeground">
 						<ShieldAlert className="w-8 h-8 opacity-40 mb-3" />
-						<p className="text-xs">No files currently in context memory.</p>
-						<p className="text-[10px] opacity-75 mt-1">Read files or run commands to populate context.</p>
+						<p className="text-xs">No files matching filter.</p>
 					</div>
 				) : (
-					filesReadByMirror.map((file) => {
+					filteredFiles.map((file) => {
 						const isCold = file.storage_tier === "cold"
 						const filename = file.path.split(/[/\\]/).pop() || file.path
 

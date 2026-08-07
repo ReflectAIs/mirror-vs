@@ -315,10 +315,23 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 				await provider.postStateToWebview()
 			}
 			break
+		case "forgetAllContextFiles":
+			if (provider.getCurrentTask()) {
+				await provider.getCurrentTask()!.fileContextTracker.forgetAllFiles()
+				await provider.postStateToWebview()
+			}
+			break
 		case "toggleContextFileStorageTier":
 			if (message.text && provider.getCurrentTask() && message.values?.tier) {
 				const tier = message.values.tier as "hot" | "cold"
 				await provider.getCurrentTask()!.fileContextTracker.toggleFileStorageTier(message.text, tier)
+				await provider.postStateToWebview()
+			}
+			break
+		case "toggleAllContextFilesStorageTier":
+			if (provider.getCurrentTask() && message.values?.tier) {
+				const tier = message.values.tier as "hot" | "cold"
+				await provider.getCurrentTask()!.fileContextTracker.toggleAllFilesStorageTier(tier)
 				await provider.postStateToWebview()
 			}
 			break

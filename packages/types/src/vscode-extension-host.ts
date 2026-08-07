@@ -536,7 +536,9 @@ export type EditQueuedMessagePayload = Pick<QueuedMessage, "id" | "text" | "imag
 export interface WebviewMessage {
 	type:
 		| "forgetContextFile"
+		| "forgetAllContextFiles"
 		| "toggleContextFileStorageTier"
+		| "toggleAllContextFilesStorageTier"
 		| "updateTodoList"
 		| "deleteMultipleTasksWithIds"
 		| "currentApiConfigName"
