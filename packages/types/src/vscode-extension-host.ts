@@ -479,6 +479,12 @@ export type ExtensionState = Pick<
 	autoCondenseContextPercent: number
 	profileThresholds: Record<string, number>
 	hasOpenedModeSelector: boolean
+	filesReadByMirror?: Array<{
+		path: string
+		record_source: "read_tool" | "user_edited" | "mirror_edited" | "file_mentioned"
+		storage_tier?: "hot" | "cold"
+		mirror_read_date?: number | null
+	}>
 	openRouterImageApiKey?: string
 	messageQueue?: QueuedMessage[]
 	lastShownAnnouncementId?: string
@@ -529,6 +535,8 @@ export type EditQueuedMessagePayload = Pick<QueuedMessage, "id" | "text" | "imag
 
 export interface WebviewMessage {
 	type:
+		| "forgetContextFile"
+		| "toggleContextFileStorageTier"
 		| "updateTodoList"
 		| "deleteMultipleTasksWithIds"
 		| "currentApiConfigName"
@@ -723,7 +731,7 @@ export interface WebviewMessage {
 	text?: string
 	taskId?: string
 	editedMessageContent?: string
-	tab?: "settings" | "history" | "mcp" | "modes" | "chat"
+	tab?: "settings" | "history" | "mcp" | "modes" | "chat" | "brain" | "analytics"
 	disabled?: boolean
 	context?: string
 	dataUri?: string

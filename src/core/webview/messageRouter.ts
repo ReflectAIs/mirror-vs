@@ -309,6 +309,19 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "switchTab":
 			await handleSwitchTab(provider, message.tab, message.values)
 			break
+		case "forgetContextFile":
+			if (message.text && provider.getCurrentTask()) {
+				await provider.getCurrentTask()!.fileContextTracker.forgetFile(message.text)
+				await provider.postStateToWebview()
+			}
+			break
+		case "toggleContextFileStorageTier":
+			if (message.text && provider.getCurrentTask() && message.values?.tier) {
+				const tier = message.values.tier as "hot" | "cold"
+				await provider.getCurrentTask()!.fileContextTracker.toggleFileStorageTier(message.text, tier)
+				await provider.postStateToWebview()
+			}
+			break
 		case "switchTaskTab":
 			await handleSwitchTaskTab(provider, message.taskId)
 			break

@@ -90,6 +90,8 @@ export const MascotBadge: React.FC<MascotBadgeProps> = ({ status = "idle", class
 	const info = MASCOT_EXPRESSIONS[status] || MASCOT_EXPRESSIONS.idle
 	const [expressionIndex, setExpressionIndex] = useState(0)
 	const [quoteIndex, setQuoteIndex] = useState(0)
+	const [hovered, setHovered] = useState(false)
+	const [animate, setAnimate] = useState(false)
 
 	// Cycle expressions periodically while active
 	useEffect(() => {
@@ -105,16 +107,39 @@ export const MascotBadge: React.FC<MascotBadgeProps> = ({ status = "idle", class
 	const currentExpression = info.expressions[expressionIndex % info.expressions.length] || info.expressions[0]
 	const currentQuote = info.funnyQuotes[quoteIndex % info.funnyQuotes.length] || info.funnyQuotes[0]
 
+	const handleClick = (e: React.MouseEvent) => {
+		e.stopPropagation()
+		setAnimate(true)
+		setExpressionIndex((prev) => (prev + 1) % info.expressions.length)
+		setQuoteIndex((prev) => (prev + 1) % info.funnyQuotes.length)
+		setTimeout(() => setAnimate(false), 400)
+	}
+
 	return (
-		<div
-			className={cn(
-				"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono tracking-tight border transition-all duration-300 select-none shadow-sm cursor-pointer hover:scale-105 active:scale-95",
-				info.badgeClass,
-				className,
+		<div className="relative inline-block select-none">
+			<div
+				onMouseEnter={() => setHovered(true)}
+				onMouseLeave={() => setHovered(false)}
+				onClick={handleClick}
+				className={cn(
+					"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono tracking-tight border transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95 shadow-sm",
+					animate && "animate-bounce scale-110",
+					info.badgeClass,
+					className,
+				)}
+				title={`${info.label} • ${currentQuote}`}>
+				<span className={cn("w-2 h-2 rounded-full shrink-0 transition-all", info.dotClass)} />
+				<span className="font-semibold leading-none text-xs">{currentExpression}</span>
+			</div>
+
+			{hovered && (
+				<div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-44 p-2 rounded-md border border-vscode-panel-border bg-vscode-sideBarSticky-background text-vscode-foreground shadow-xl text-[10px] text-center leading-normal animate-in fade-in-0 zoom-in-95 duration-100">
+					<div className="font-bold text-purple-400 mb-0.5 tracking-wide">{info.label}</div>
+					<div className="italic text-vscode-descriptionForeground">{currentQuote}</div>
+					{/* Speech bubble tail */}
+					<div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 rotate-45 border-r border-b border-vscode-panel-border bg-vscode-sideBarSticky-background" />
+				</div>
 			)}
-			title={`${info.label} • ${currentQuote}`}>
-			<span className={cn("w-2 h-2 rounded-full shrink-0 transition-all", info.dotClass)} />
-			<span className="font-semibold leading-none text-xs">{currentExpression}</span>
 		</div>
 	)
 }

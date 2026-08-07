@@ -226,6 +226,11 @@ export class FileContextTracker {
 					return false
 				}
 
+				// Skip cold storage files
+				if (entry.storage_tier === "cold") {
+					return false
+				}
+
 				// If sinceTimestamp is provided, only include files read after that time
 				if (sinceTimestamp && entry.mirror_read_date) {
 					return entry.mirror_read_date >= sinceTimestamp
@@ -256,6 +261,52 @@ export class FileContextTracker {
 		} catch (error) {
 			console.error("Failed to get files read by Mirror VS:", error)
 			return []
+		}
+	}
+
+	async forgetFile(filePath: string): Promise<void> {
+		try {
+			const metadata = await this.getTaskMetadata(this.taskId)
+			metadata.files_in_context = metadata.files_in_context.filter((entry) => entry.path !== filePath)
+			await this.saveTaskMetadata(this.taskId, metadata)
+
+			// Also dispose of the file watcher if it exists
+			const watcher = this.fileWatchers.get(filePath)
+			if (watcher) {
+				watcher.dispose()
+				this.fileWatchers.delete(filePath)
+			}
+		} catch (error) {
+			console.error("Failed to forget file context:", error)
+		}
+	}
+
+	async toggleFileStorageTier(filePath: string, tier: "hot" | "cold"): Promise<void> {
+		try {
+			const metadata = await this.getTaskMetadata(this.taskId)
+			let updated = false
+			metadata.files_in_context.forEach((entry) => {
+				if (entry.path === filePath) {
+					entry.storage_tier = tier
+					updated = true
+				}
+			})
+
+			// If it wasn't tracked yet, track it now with the specific tier
+			if (!updated) {
+				metadata.files_in_context.push({
+					path: filePath,
+					record_state: "active",
+					record_source: "read_tool",
+					storage_tier: tier,
+					mirror_read_date: Date.now(),
+					mirror_edit_date: null,
+				})
+			}
+
+			await this.saveTaskMetadata(this.taskId, metadata)
+		} catch (error) {
+			console.error("Failed to toggle file storage tier:", error)
 		}
 	}
 

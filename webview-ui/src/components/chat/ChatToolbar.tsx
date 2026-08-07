@@ -182,6 +182,20 @@ const ChatToolbar = ({
 					<Button
 						variant="ghost"
 						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
+						onClick={() => vscode.postMessage({ type: "switchTab", tab: "brain" })}
+						title="Brain (Context Memory)">
+						<span className="codicon codicon-database text-xs flex items-center justify-center" />
+					</Button>
+					<Button
+						variant="ghost"
+						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
+						onClick={() => vscode.postMessage({ type: "switchTab", tab: "analytics" })}
+						title="Cost & Token Analytics">
+						<span className="codicon codicon-graph text-xs flex items-center justify-center" />
+					</Button>
+					<Button
+						variant="ghost"
+						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
 						onClick={() => vscode.postMessage({ type: "switchTab", tab: "settings" })}
 						title="Settings">
 						<span className="codicon codicon-settings-gear text-xs flex items-center justify-center" />

@@ -2,6 +2,19 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.8] - 2026-08-07
+
+### Added
+
+- **Brain Explorer Panel**: New "Brain" view (database icon in the chat toolbar) that shows every file the AI currently holds in active memory. Files can be toggled to **Cold Storage** to exclude them from prompt contexts (saving tokens) or forgotten entirely. Backed by new `hot`/`cold` `storage_tier` on context metadata, new `forgetContextFile` / `toggleContextFileStorageTier` webview messages, and [`FileContextTracker.forgetFile()`](src/core/context-tracking/FileContextTracker.ts:267) / [`FileContextTracker.toggleFileStorageTier()`](src/core/context-tracking/FileContextTracker.ts:284). Cold-tier files are skipped when building the prompt context in [`FileContextTracker`](src/core/context-tracking/FileContextTracker.ts:230).
+- **Session Analytics Panel**: New "Analytics" view (graph icon in the chat toolbar) that aggregates task history into total cost, total tokens, and per-model/per-mode breakdowns, computed from [`AnalyticsView`](webview-ui/src/components/analytics/AnalyticsView.tsx:9).
+- **Concise-Thinking Prompt Rule**: Added a rule instructing the model to keep `<thinking>`/planning blocks to 1–2 minimal sentences for speed and token efficiency in [`rules.ts`](src/core/prompts/sections/rules.ts:89).
+- **Mascot Badge Interactions**: The mascot badge now cycles expressions/quotes on click with a bounce animation and shows a hover tooltip with the current quote in [`MascotBadge`](webview-ui/src/components/chat/MascotBadge.tsx:90).
+
+### Changed
+
+- **CLI Formatting**: Prettier-normalized object/expression formatting across [`extension-host.ts`](apps/cli/src/agent/extension-host.ts:234) and [`run.ts`](apps/cli/src/commands/cli/run.ts:56) (no behavior change).
+
 ## [0.6.7] - 2026-07-29
 
 ### Fixed

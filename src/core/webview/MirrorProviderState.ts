@@ -238,6 +238,22 @@ export class StateManager {
 		const cwd = this.provider.cwd
 		const currentTask = this.provider.getCurrentTask()
 
+		// Fetch filesReadByMirror safely
+		let filesReadByMirror: any[] = []
+		if (currentTask) {
+			try {
+				const metadata = await currentTask.fileContextTracker.getTaskMetadata(currentTask.taskId)
+				filesReadByMirror = (metadata?.files_in_context || []).map((entry) => ({
+					path: entry.path,
+					record_source: entry.record_source,
+					storage_tier: entry.storage_tier || "hot",
+					mirror_read_date: entry.mirror_read_date,
+				}))
+			} catch (e) {
+				console.error("Failed to read context files metadata for webview state:", e)
+			}
+		}
+
 		// Build tabs array from all live tasks
 		const allTasks = this.provider.getAllTasksSorted()
 		const tabs: TabInfo[] = allTasks.map((task) => {
@@ -289,6 +305,7 @@ export class StateManager {
 			version: this.provider.context.extension?.packageJSON?.version ?? "",
 			tabs,
 			activeTabId: currentTask?.taskId ?? (tabs.length > 0 ? tabs[0].taskId : ""),
+			filesReadByMirror,
 			apiConfiguration,
 			customInstructions,
 			alwaysAllowReadOnly: alwaysAllowReadOnly ?? false,

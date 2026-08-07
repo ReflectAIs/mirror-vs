@@ -13,6 +13,8 @@ import ChatView, { ChatViewRef } from "./components/chat/ChatView"
 import HistoryView from "./components/history/HistoryView"
 import SettingsView, { SettingsViewRef } from "./components/settings/SettingsView"
 import WelcomeView from "./components/welcome/WelcomeViewProvider"
+import BrainView from "./components/brain/BrainView"
+import AnalyticsView from "./components/analytics/AnalyticsView"
 import { CheckpointRestoreDialog } from "./components/chat/CheckpointRestoreDialog"
 import { DeleteMessageDialog, EditMessageDialog } from "./components/chat/MessageModificationConfirmationDialog"
 import ErrorBoundary from "./components/ErrorBoundary"
@@ -20,7 +22,7 @@ import { useAddNonInteractiveClickListener } from "./components/ui/hooks/useNonI
 import { TooltipProvider } from "./components/ui/tooltip"
 import { STANDARD_TOOLTIP_DELAY } from "./components/ui/standard-tooltip"
 
-type Tab = "settings" | "history" | "chat"
+type Tab = "settings" | "history" | "chat" | "brain" | "analytics"
 
 interface DeleteMessageDialogState {
 	isOpen: boolean
@@ -179,6 +181,8 @@ const App = () => {
 	) : (
 		<>
 			{tab === "history" && <HistoryView onDone={() => switchTab("chat")} />}
+			{tab === "brain" && <BrainView onDone={() => switchTab("chat")} />}
+			{tab === "analytics" && <AnalyticsView onDone={() => switchTab("chat")} />}
 			{tab === "settings" && (
 				<SettingsView ref={settingsRef} onDone={() => setTab("chat")} targetSection={currentSection} />
 			)}
