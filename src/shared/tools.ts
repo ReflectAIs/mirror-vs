@@ -340,6 +340,8 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	get_workspace_file_tree: "get workspace file tree",
 	get_workspace_pulse: "get workspace pulse",
 	get_git_status: "get git status",
+	search_mcp_tools: "search mcp tools",
+	activate_mcp_tool: "activate mcp tool",
 } as const
 
 // Define available tool groups.
@@ -407,6 +409,8 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"get_workspace_file_tree",
 	"get_workspace_pulse",
 	"get_git_status",
+	"search_mcp_tools",
+	"activate_mcp_tool",
 ] as const
 
 /**

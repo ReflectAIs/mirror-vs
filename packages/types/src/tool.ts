@@ -65,6 +65,8 @@ export const toolNames = [
 	"get_workspace_file_tree",
 	"get_workspace_pulse",
 	"get_git_status",
+	"search_mcp_tools",
+	"activate_mcp_tool",
 ] as const
 
 export const toolNamesSchema = z.enum(toolNames)

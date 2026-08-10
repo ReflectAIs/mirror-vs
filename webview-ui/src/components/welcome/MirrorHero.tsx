@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 
-export type ModelActivity = "idle" | "reading" | "thinking" | "writing"
+export type ModelActivity = "idle" | "reading" | "thinking" | "writing" | "error" | "completed" | "sleeping"
 
 interface MirrorHeroProps {
 	activity?: ModelActivity
@@ -36,28 +36,7 @@ const FUNNY_DEVELOPER_QUOTES = [
 ]
 
 /**
- * An animated diamond mascot with facial expressions that react to model activity states.
- *
- * States:
- * - idle:    Neutral eyes, gentle smile, gentle floating
- * - reading: Squinting/concentrating eyes, straight mouth, scanning beam
- * - thinking: Eyes looking upward, wavy thoughtful mouth, rotating sparkles
- * - writing:  Wide excited eyes, open happy mouth, rapid sparkle bursts
- *
- * Moods (hover + idle):
- * - happy:    Normal rounded eyes, gentle smile
- * - curious:  One eye narrower, small 'o' mouth
- * - sleepy:   Half-closed eyes, relaxed slight smile
- * - excited:  Wide bright eyes, big open smile
- * - silly:    Wink + tongue out
- * - love:     Heart eyes with floating hearts
- * - surprised: Wide O mouth, shake animation
- *
- * Interactivity:
- * - Hover: Triggers bounce animation, ground line appears, mood cycles, pupil tracking
- * - Click: Brief "pop" pulse effect
- * - Double-click: Celebration animation with sparkles
- * - Auto-blink: Eyes close momentarily every 3-4 seconds
+ * An animated robotic screen mascot with glowing neon facial expressions that react to model activity states.
  */
 const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => {
 	const [isHovered, setIsHovered] = useState(false)
@@ -72,6 +51,14 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 	const blinkTimerRef = useRef<ReturnType<typeof setTimeout>>()
 	const containerRef = useRef<HTMLDivElement>(null)
 	const [pupilOffset, setPupilOffset] = useState({ x: 0, y: 0 })
+
+	const [isSleeping, setIsSleeping] = useState(false)
+	const lastActivityTimeRef = useRef<number>(Date.now())
+
+	const resetSleepTimer = useCallback(() => {
+		setIsSleeping(false)
+		lastActivityTimeRef.current = Date.now()
+	}, [])
 
 	// Mood cycling on hover while idle
 	useEffect(() => {
@@ -95,10 +82,10 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		}
 	}, [isHovered, activity])
 
-	// Auto-blinking every 3-4 seconds
+	// Auto-blinking every 4-5 seconds
 	useEffect(() => {
 		const scheduleBlink = () => {
-			const delay = 3000 + Math.random() * 2000 // 3-5 seconds
+			const delay = 4000 + Math.random() * 2000
 			blinkTimerRef.current = setTimeout(() => {
 				setIsBlinking(true)
 				setTimeout(() => setIsBlinking(false), 150)
@@ -114,35 +101,60 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		}
 	}, [])
 
-	// Pupil tracking on hover (normal size only)
+	// Face tracking (entire face group slides in response to mouse movement)
 	useEffect(() => {
-		if (size !== "normal" || !isHovered) {
-			setPupilOffset({ x: 0, y: 0 })
-			return
-		}
-
 		const container = containerRef.current
 		if (!container) return
 
 		const handleMouseMove = (e: MouseEvent) => {
+			resetSleepTimer()
 			const rect = container.getBoundingClientRect()
 			const centerX = rect.left + rect.width / 2
 			const centerY = rect.top + rect.height / 2
-			// Map mouse position relative to center, clamp to max 2px offset
-			const dx = Math.max(-2, Math.min(2, (e.clientX - centerX) / 30))
-			const dy = Math.max(-1.5, Math.min(1.5, (e.clientY - centerY) / 40))
+			const dxRaw = e.clientX - centerX
+			const dyRaw = e.clientY - centerY
+			const distance = Math.sqrt(dxRaw * dxRaw + dyRaw * dyRaw)
+
+			const maxOffset = size === "small" ? 1.5 : 3.0
+			const scale = Math.min(maxOffset, distance / 40)
+
+			const dx = distance > 0 ? (dxRaw / distance) * scale : 0
+			const dy = distance > 0 ? (dyRaw / distance) * scale : 0
+
 			setPupilOffset({ x: dx, y: dy })
 		}
 
 		window.addEventListener("mousemove", handleMouseMove)
 		return () => window.removeEventListener("mousemove", handleMouseMove)
-	}, [isHovered, size])
+	}, [size, resetSleepTimer])
+
+	// Sleep timer logic (sleep after 5 mins of idle)
+	useEffect(() => {
+		if (activity !== "idle") {
+			setIsSleeping(false)
+			lastActivityTimeRef.current = Date.now()
+			return
+		}
+
+		const checkSleep = () => {
+			const idleTime = Date.now() - lastActivityTimeRef.current
+			if (idleTime >= 300000) {
+				setIsSleeping(true)
+			} else {
+				const remaining = 300000 - idleTime
+				sleepTimeout = setTimeout(checkSleep, remaining)
+			}
+		}
+
+		let sleepTimeout = setTimeout(checkSleep, 300000)
+		return () => clearTimeout(sleepTimeout)
+	}, [activity])
 
 	const handleClick = useCallback(() => {
+		resetSleepTimer()
 		clickCountRef.current += 1
 
 		if (clickCountRef.current === 1) {
-			// Single click
 			setIsClicked(true)
 			if (clickTimerRef.current) {
 				clearTimeout(clickTimerRef.current)
@@ -152,7 +164,6 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				clickCountRef.current = 0
 			}, 700)
 		} else if (clickCountRef.current >= 2) {
-			// Double click — celebration!
 			setIsDoubleClicked(true)
 			setIsClicked(false)
 			if (clickTimerRef.current) {
@@ -164,11 +175,12 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			}, 1200)
 		}
 
-		// Reset double-click detection after a short window
 		setTimeout(() => {
 			clickCountRef.current = 0
 		}, 300)
-	}, [])
+	}, [resetSleepTimer])
+
+	const activeState = activity === "sleeping" || isSleeping ? "sleeping" : activity
 
 	const diamondAnimation = () => {
 		if (isDoubleClicked) {
@@ -177,23 +189,22 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		if (isClicked) {
 			return "mirror-click-pop 0.3s ease-out"
 		}
-		switch (activity) {
+		switch (activeState) {
 			case "reading":
 				return "mirror-read 1.5s ease-in-out infinite"
 			case "thinking":
 				return "mirror-think 2s ease-in-out infinite"
 			case "writing":
 				return "mirror-write 0.8s ease-in-out infinite"
+			case "sleeping":
+				return "mirror-float 4s ease-in-out infinite"
 			default:
 				return "mirror-float 3s ease-in-out infinite"
 		}
 	}
 
-	const sparkleCount = activity === "writing" ? 8 : activity === "thinking" ? 4 : 0
+	const sparkleCount = activeState === "writing" ? 8 : activeState === "thinking" ? 4 : 0
 
-	/**
-	 * Returns the current mood for idle state when hovered.
-	 */
 	const getIdleMood = (): Mood => {
 		if (!isHovered) return "happy"
 		return MOOD_CYCLE[moodIndex]
@@ -201,106 +212,32 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 
 	const currentMood = getIdleMood()
 
-	/**
-	 * Returns the eye shape configuration based on the current activity and mood.
-	 */
-	const getEye = (side: "left" | "right"): EyeShape => {
-		const cx = side === "left" ? 31 : 65
-		const baseCy = 37
-
-		// Blink takes priority — eyes close
-		if (isBlinking) {
-			return { cx, cy: baseCy, rx: 3.5, ry: 0.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-		}
-
-		if (isDoubleClicked) {
-			// Starry happy squint
-			return { cx, cy: baseCy, rx: 5, ry: 4, pupilOffsetX: 0, pupilOffsetY: 0 }
-		}
-
-		if (isClicked) {
-			// Wide excited happy starry-like eyes
-			return { cx, cy: baseCy, rx: 5.5, ry: 5.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-		}
-
-		if (activity !== "idle") {
-			switch (activity) {
-				case "reading":
-					// Squinting / concentrating eyes
-					return { cx, cy: baseCy, rx: 4, ry: 2, pupilOffsetX: 0, pupilOffsetY: 0 }
-				case "thinking":
-					// Looking upward, slightly narrowed
-					return { cx, cy: baseCy - 1, rx: 3.5, ry: 2.5, pupilOffsetX: 0, pupilOffsetY: -1.5 }
-				case "writing":
-					// Wide excited eyes
-					return { cx, cy: baseCy, rx: 4.5, ry: 5.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-				default:
-					return { cx, cy: baseCy, rx: 3.5, ry: 4.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-			}
-		}
-
-		// Idle state — mood-based expressions when hovered
-		const mood = getIdleMood()
-		switch (mood) {
-			case "curious":
-				return {
-					cx,
-					cy: baseCy,
-					rx: side === "left" ? 3.5 : 3.5,
-					ry: side === "left" ? 4.5 : 3.5,
-					pupilOffsetX: side === "left" ? 0.5 : -0.5,
-					pupilOffsetY: 0,
-				}
-			case "sleepy":
-				return { cx, cy: baseCy + 1, rx: 3, ry: 1.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-			case "excited":
-				return { cx, cy: baseCy, rx: 4, ry: 5, pupilOffsetX: 0, pupilOffsetY: 0 }
-			case "silly":
-				// Left eye wink (narrow), right eye normal
-				return {
-					cx,
-					cy: baseCy,
-					rx: side === "left" ? 4 : 3.5,
-					ry: side === "left" ? 1 : 4.5,
-					pupilOffsetX: side === "left" ? 0 : 0.5,
-					pupilOffsetY: 0,
-				}
-			case "love":
-				// Heart-shaped eyes - wider, rounder
-				return { cx, cy: baseCy - 1, rx: 4.5, ry: 5, pupilOffsetX: 0, pupilOffsetY: 0 }
-			case "surprised":
-				// Wide round eyes
-				return { cx, cy: baseCy, rx: 5, ry: 5.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-			default:
-				// Neutral / happy — normal rounded eyes
-				return { cx, cy: baseCy, rx: 3.5, ry: 4.5, pupilOffsetX: 0, pupilOffsetY: 0 }
-		}
-	}
-
-	/**
-	 * Returns an SVG path string for the mouth based on the current activity and mood.
-	 */
 	const getMouthPath = (): string => {
 		if (isDoubleClicked) {
-			// Huge happy open smile
 			return "M 34 48 Q 48 70 62 48"
 		}
-
 		if (isClicked) {
-			// Big open curved smile!
 			return "M 36 50 Q 48 65 60 50"
 		}
-
-		if (activity !== "idle") {
-			switch (activity) {
+		if (activeState === "error") {
+			return "M 42 56 Q 48 50 54 56"
+		}
+		if (activeState === "completed") {
+			return "M 36 50 Q 48 68 60 50"
+		}
+		if (activeState === "sleeping") {
+			return "M 44 54 L 52 54"
+		}
+		if (activeState !== "idle") {
+			switch (activeState) {
 				case "reading":
-					return "M 42 58 L 54 58"
+					return "M 42 56 L 54 56"
 				case "thinking":
-					return "M 39 56 Q 44 52 48 56 Q 52 60 57 56"
+					return "M 40 56 Q 48 52 56 56"
 				case "writing":
-					return "M 38 52 Q 48 68 58 52"
+					return "M 38 52 Q 48 66 58 52"
 				default:
-					return "M 39 54 Q 48 62 57 54"
+					return "M 41 54 Q 48 60 55 54"
 			}
 		}
 
@@ -309,85 +246,285 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			case "curious":
 				return "M 43 56 Q 48 53 53 56"
 			case "sleepy":
-				return "M 42 57 Q 48 59 54 57"
+				return "M 44 55 Q 48 57 52 55"
 			case "excited":
 				return "M 37 50 Q 48 66 59 50"
 			case "silly":
-				// Slightly crooked smile
-				return "M 39 56 Q 45 68 57 58"
+				return "M 39 54 Q 45 66 57 56"
 			case "love":
-				// Soft curved smile
 				return "M 38 52 Q 48 64 58 52"
 			case "surprised":
-				// Open "O" shape
-				return "M 40 54 Q 48 46 56 54 Q 48 62 40 54"
+				return "M 42 54 Q 48 48 54 54 Q 48 60 42 54"
 			default:
-				return "M 39 54 Q 48 62 57 54"
+				return "M 41 54 Q 48 60 55 54"
 		}
 	}
 
-	/**
-	 * Returns eyebrows SVG paths based on mood.
-	 */
-	const getEyebrows = (): { left: string; right: string } | null => {
-		if (size === "small") return null
-
-		const mood = getIdleMood()
-		switch (mood) {
-			case "surprised":
-				return {
-					left: "M 22 25 Q 31 18 38 25",
-					right: "M 58 25 Q 65 18 74 25",
-				}
-			case "sleepy":
-				return {
-					left: "M 22 28 Q 31 30 38 28",
-					right: "M 58 28 Q 65 30 74 28",
-				}
-			case "silly":
-				return {
-					left: "M 22 24 Q 31 20 38 24",
-					right: "M 58 24 Q 65 28 74 24",
-				}
-			case "curious":
-				return {
-					left: "M 22 25 Q 31 22 38 25",
-					right: "M 58 25 Q 65 22 74 25",
-				}
-			default:
-				return null
-		}
-	}
-
-	const leftEye = getEye("left")
-	const rightEye = getEye("right")
 	const mouthPath = getMouthPath()
-	const eyebrows = getEyebrows()
 
-	// Blush opacity varies by mood
+	// Cheeks blush opacity
 	const getBlushOpacity = (): number => {
 		if (isDoubleClicked) return 0.65
 		if (isClicked) return 0.5
 		const mood = getIdleMood()
 		switch (mood) {
 			case "love":
-				return 0.55
+				return 0.6
 			case "excited":
-				return 0.5
+				return 0.55
 			case "silly":
-				return 0.45
+				return 0.5
 			case "surprised":
-				return 0.4
+				return 0.45
 			default:
-				return 0.35
+				return 0.4
 		}
 	}
 
 	const blushOpacity = getBlushOpacity()
 
+	// Visor / Face elements for rendering
+	const renderVisorFace = () => {
+		const leftCx = 31
+		const rightCx = 65
+		const cy = 37
+
+		if (isBlinking) {
+			return (
+				<>
+					<path
+						d={`M ${leftCx - 5} ${cy} L ${leftCx + 5} ${cy}`}
+						stroke="#22d3ee"
+						strokeWidth="4.5"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+					<path
+						d={`M ${rightCx - 5} ${cy} L ${rightCx + 5} ${cy}`}
+						stroke="#22d3ee"
+						strokeWidth="4.5"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+				</>
+			)
+		}
+
+		if (activeState === "error") {
+			return (
+				<>
+					<path
+						d={`M ${leftCx - 4.5} ${cy - 4.5} L ${leftCx + 4.5} ${cy + 4.5} M ${leftCx + 4.5} ${cy - 4.5} L ${leftCx - 4.5} ${cy + 4.5}`}
+						stroke="#f87171"
+						strokeWidth="4.5"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+					<path
+						d={`M ${rightCx - 4.5} ${cy - 4.5} L ${rightCx + 4.5} ${cy + 4.5} M ${rightCx + 4.5} ${cy - 4.5} L ${rightCx - 4.5} ${cy + 4.5}`}
+						stroke="#f87171"
+						strokeWidth="4.5"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+				</>
+			)
+		}
+
+		if (activeState === "completed" || activeState === "sleeping") {
+			const isSleepingState = activeState === "sleeping"
+			const strokeColor = isSleepingState ? "#38bdf8" : "#22d3ee"
+			return (
+				<>
+					<path
+						d={
+							isSleepingState
+								? `M ${leftCx - 5} ${cy - 1.5} Q ${leftCx} ${cy + 3.5} ${leftCx + 5} ${cy - 1.5}`
+								: `M ${leftCx - 5} ${cy + 1.5} Q ${leftCx} ${cy - 3.5} ${leftCx + 5} ${cy + 1.5}`
+						}
+						fill="none"
+						stroke={strokeColor}
+						strokeWidth="4"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+					<path
+						d={
+							isSleepingState
+								? `M ${rightCx - 5} ${cy - 1.5} Q ${rightCx} ${cy + 3.5} ${rightCx + 5} ${cy - 1.5}`
+								: `M ${rightCx - 5} ${cy + 1.5} Q ${rightCx} ${cy - 3.5} ${rightCx + 5} ${cy + 1.5}`
+						}
+						fill="none"
+						stroke={strokeColor}
+						strokeWidth="4"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+				</>
+			)
+		}
+
+		// Double clicked / click triggers starry arches
+		if (isDoubleClicked || isClicked) {
+			return (
+				<>
+					<path
+						d={`M ${leftCx - 5.5} ${cy + 1.5} Q ${leftCx} ${cy - 4.5} ${leftCx + 5.5} ${cy + 1.5}`}
+						fill="none"
+						stroke="#22d3ee"
+						strokeWidth="4.5"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+					<path
+						d={`M ${rightCx - 5.5} ${cy + 1.5} Q ${rightCx} ${cy - 4.5} ${rightCx + 5.5} ${cy + 1.5}`}
+						fill="none"
+						stroke="#22d3ee"
+						strokeWidth="4.5"
+						strokeLinecap="round"
+						filter="url(#neon-glow)"
+					/>
+				</>
+			)
+		}
+
+		// Non-idle model activities
+		if (activeState !== "idle") {
+			switch (activeState) {
+				case "reading":
+					// concentrated slits
+					return (
+						<>
+							<ellipse cx={leftCx} cy={cy} rx="5.5" ry="2.2" fill="#22d3ee" filter="url(#neon-glow)" />
+							<ellipse cx={rightCx} cy={cy} rx="5.5" ry="2.2" fill="#22d3ee" filter="url(#neon-glow)" />
+						</>
+					)
+				case "thinking":
+					// looking slightly upward
+					return (
+						<>
+							<circle cx={leftCx} cy={cy - 2} r="5" fill="#38bdf8" filter="url(#neon-glow)" />
+							<circle cx={rightCx} cy={cy - 2} r="5" fill="#38bdf8" filter="url(#neon-glow)" />
+						</>
+					)
+				case "writing":
+					// sparkly ovals
+					return (
+						<>
+							<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
+							<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
+						</>
+					)
+			}
+		}
+
+		// Idle mood states (curious, love, excited, etc.)
+		const mood = getIdleMood()
+		switch (mood) {
+			case "curious":
+				return (
+					<>
+						<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7.5" fill="#22d3ee" filter="url(#neon-glow)" />
+						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="4.5" fill="#22d3ee" filter="url(#neon-glow)" />
+					</>
+				)
+			case "sleepy":
+				return (
+					<>
+						<ellipse cx={leftCx} cy={cy + 1.5} rx="5" ry="2.2" fill="#38bdf8" filter="url(#neon-glow)" />
+						<ellipse cx={rightCx} cy={cy + 1.5} rx="5" ry="2.2" fill="#38bdf8" filter="url(#neon-glow)" />
+					</>
+				)
+			case "excited":
+				return (
+					<>
+						<circle cx={leftCx} cy={cy} r="6.2" fill="#22d3ee" filter="url(#neon-glow)" />
+						<circle cx={rightCx} cy={cy} r="6.2" fill="#22d3ee" filter="url(#neon-glow)" />
+					</>
+				)
+			case "silly":
+				// wink left eye, normal right eye
+				return (
+					<>
+						<path
+							d={`M ${leftCx - 5} ${cy} L ${leftCx + 5} ${cy}`}
+							stroke="#22d3ee"
+							strokeWidth="4.5"
+							strokeLinecap="round"
+							filter="url(#neon-glow)"
+						/>
+						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7.5" fill="#22d3ee" filter="url(#neon-glow)" />
+					</>
+				)
+			case "love":
+				// glowing pink hearts
+				return (
+					<>
+						<path
+							d={`M ${leftCx} ${cy + 2.5} L ${leftCx - 3.5} ${cy - 1} Q ${leftCx - 6} ${cy - 5} ${leftCx - 3} ${cy - 5} Q ${leftCx} ${cy - 2} ${leftCx} ${cy - 2.5} Q ${leftCx} -2 ${leftCx + 3} ${cy - 5} Q ${leftCx + 6} ${cy - 5} ${leftCx + 3} ${cy - 1} Z`}
+							fill="#f472b6"
+							filter="url(#neon-glow)"
+						/>
+						<path
+							d={`M ${rightCx} ${cy + 2.5} L ${rightCx - 3.5} ${cy - 1} Q ${rightCx - 6} ${cy - 5} ${rightCx - 3} ${cy - 5} Q ${rightCx} ${cy - 2} ${rightCx} ${cy - 2.5} Q ${rightCx} -2 ${rightCx + 3} ${cy - 5} Q ${rightCx + 6} ${cy - 5} ${rightCx + 3} ${cy - 1} Z`}
+							fill="#f472b6"
+							filter="url(#neon-glow)"
+						/>
+					</>
+				)
+			case "surprised":
+				return (
+					<>
+						<circle cx={leftCx} cy={cy} r="6.5" fill="#22d3ee" filter="url(#neon-glow)" />
+						<circle cx={rightCx} cy={cy} r="6.5" fill="#22d3ee" filter="url(#neon-glow)" />
+					</>
+				)
+			default:
+				// normal happy ovals
+				return (
+					<>
+						<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
+						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
+					</>
+				)
+		}
+	}
+
 	if (size === "small") {
 		return (
-			<div className="cursor-pointer active:scale-95 transition-transform" onClick={handleClick}>
+			<div
+				ref={containerRef}
+				className="relative cursor-pointer active:scale-95 transition-transform"
+				onClick={handleClick}>
+				<style>{`
+					@keyframes mirror-float-z {
+						0% { transform: translateY(0px) scale(0.6); opacity: 0; }
+						50% { opacity: 0.8; }
+						100% { transform: translateY(-12px) scale(1); opacity: 0; }
+					}
+					.animate-float-z {
+						animation: mirror-float-z 2s ease-in-out infinite;
+					}
+				`}</style>
+				{activeState === "sleeping" && (
+					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+						<span
+							className="absolute text-[5px] font-bold text-vscode-foreground opacity-0 animate-float-z"
+							style={{ animationDelay: "0s", transform: "translate(10px, -10px)" }}>
+							Z
+						</span>
+						<span
+							className="absolute text-[7px] font-bold text-vscode-foreground opacity-0 animate-float-z"
+							style={{ animationDelay: "0.6s", transform: "translate(14px, -15px)" }}>
+							Z
+						</span>
+						<span
+							className="absolute text-[9px] font-bold text-vscode-foreground opacity-0 animate-float-z"
+							style={{ animationDelay: "1.2s", transform: "translate(18px, -20px)" }}>
+							Z
+						</span>
+					</div>
+				)}
 				<svg viewBox="0 0 96 96" className="h-8 w-auto block overflow-visible select-none" role="presentation">
 					<defs>
 						<linearGradient id="mirror-gradient-small" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -395,74 +532,47 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 							<stop offset="50%" stopColor="var(--mirror-brand-via, #14b8a6)" />
 							<stop offset="100%" stopColor="var(--mirror-brand-to, #06b6d4)" />
 						</linearGradient>
+						<filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+							<feGaussianBlur stdDeviation="1.5" result="blur" />
+							<feMerge>
+								<feMergeNode in="blur" />
+								<feMergeNode in="SourceGraphic" />
+							</feMerge>
+						</filter>
 					</defs>
-					{/* Base head circle */}
+
+					{/* Visor head */}
 					<circle
 						cx="48"
 						cy="48"
 						r="38"
-						fill="var(--vscode-sideBar-background)"
+						fill="#0f0f23"
 						stroke="url(#mirror-gradient-small)"
-						strokeWidth="2.5"
+						strokeWidth="3.0"
 					/>
 
-					{/* Cheeks */}
-					<ellipse cx="48" cy="54" rx="24" ry="8" fill="#f472b6" opacity={blushOpacity} />
+					{/* Inner Visor Frame Highlight */}
+					<circle cx="48" cy="48" r="36" fill="none" stroke="#ffffff" strokeWidth="0.75" opacity={0.15} />
 
-					{/* Left eye — white */}
-					<ellipse cx={leftEye.cx} cy={leftEye.cy} rx={leftEye.rx} ry={leftEye.ry} fill="#ffffff" />
-					{/* Left eye — pupil + catchlight */}
-					<circle
-						cx={leftEye.cx + leftEye.pupilOffsetX}
-						cy={leftEye.cy + leftEye.pupilOffsetY}
-						r={1.5}
-						fill="#1e293b"
-					/>
-					{leftEye.ry > 1.5 && (
-						<circle
-							cx={leftEye.cx + leftEye.pupilOffsetX - 0.8}
-							cy={leftEye.cy + leftEye.pupilOffsetY - 0.8}
-							r={0.6}
-							fill="#ffffff"
-							opacity={0.9}
+					{/* Face group shifting in response to cursor */}
+					<g transform={`translate(${pupilOffset.x}, ${pupilOffset.y})`}>
+						<ellipse cx="48" cy="54" rx="24" ry="8" fill="#f472b6" opacity={0.35} />
+						{renderVisorFace()}
+						<path
+							d={mouthPath}
+							fill="none"
+							stroke={activeState === "error" ? "#f87171" : "#22d3ee"}
+							strokeWidth="3.5"
+							strokeLinecap="round"
+							filter="url(#neon-glow)"
 						/>
-					)}
-
-					{/* Right eye — white */}
-					<ellipse cx={rightEye.cx} cy={rightEye.cy} rx={rightEye.rx} ry={rightEye.ry} fill="#ffffff" />
-					{/* Right eye — pupil + catchlight */}
-					<circle
-						cx={rightEye.cx + rightEye.pupilOffsetX}
-						cy={rightEye.cy + rightEye.pupilOffsetY}
-						r={1.5}
-						fill="#1e293b"
-					/>
-					{rightEye.ry > 1.5 && (
-						<circle
-							cx={rightEye.cx + rightEye.pupilOffsetX - 0.8}
-							cy={rightEye.cy + rightEye.pupilOffsetY - 0.8}
-							r={0.6}
-							fill="#ffffff"
-							opacity={0.9}
-						/>
-					)}
-
-					{/* Mouth */}
-					<path d={mouthPath} fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
-
-					{/* Tongue for silly mood */}
-					{getIdleMood() === "silly" && activity === "idle" && (
-						<path d="M 46 62 Q 48 68 52 60" fill="#f472b6" opacity={0.7} />
-					)}
+					</g>
 				</svg>
 			</div>
 		)
 	}
 
-	// Hearts for love mood
-	const showHearts = getIdleMood() === "love" && activity === "idle" && isHovered
-
-	// Surprised shake
+	const showHearts = getIdleMood() === "love" && activeState === "idle" && isHovered
 	const mainAnimation = diamondAnimation()
 
 	return (
@@ -479,7 +589,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			}}
 			onClick={handleClick}
 			role="img"
-			aria-label={`Mirror VS mascot — ${activity} state`}
+			aria-label={`Mirror VS mascot — ${activeState} state`}
 			style={{
 				transform: isDoubleClicked
 					? "translateY(-8px) scale(1.15)"
@@ -488,18 +598,35 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 						: undefined,
 				transition: "transform 0.6s cubic-bezier(0.34, 1.6, 0.64, 1)",
 				animation:
-					currentMood === "surprised" && activity === "idle" && isHovered
+					currentMood === "surprised" && activeState === "idle" && isHovered
 						? "mirror-shake 0.5s ease-in-out"
 						: undefined,
 			}}>
-			{/* Funny developer quote speech bubble on hover */}
+			<style>{`
+				@keyframes mirror-float-z {
+					0% {
+						transform: translateY(0px) scale(0.6);
+						opacity: 0;
+					}
+					50% {
+						opacity: 0.8;
+					}
+					100% {
+						transform: translateY(-15px) scale(1);
+						opacity: 0;
+					}
+				}
+				.animate-float-z {
+					animation: mirror-float-z 2s ease-in-out infinite;
+				}
+			`}</style>
+
 			{isHovered && size === "normal" && (
 				<div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap bg-purple-900/90 text-purple-100 text-[10.5px] font-mono px-3 py-1 rounded-full shadow-xl border border-purple-400/40 animate-bounce">
 					{FUNNY_DEVELOPER_QUOTES[quoteIndex % FUNNY_DEVELOPER_QUOTES.length]}
 				</div>
 			)}
 
-			{/* Orbiting sparkles for thinking/writing states */}
 			{sparkleCount > 0 && (
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 					{Array.from({ length: sparkleCount }).map((_, i) => (
@@ -509,9 +636,9 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 							style={{
 								backgroundColor: "var(--vscode-foreground)",
 								opacity: 0.6,
-								animation: `mirror-sparkle-${activity} ${activity === "writing" ? "0.6s" : "1.2s"} ease-in-out infinite`,
-								animationDelay: `${i * (activity === "writing" ? 0.075 : 0.3)}s`,
-								transform: `rotate(${(360 / sparkleCount) * i}deg) translateX(${activity === "writing" ? "28px" : "22px"})`,
+								animation: `mirror-sparkle-${activeState} ${activeState === "writing" ? "0.6s" : "1.2s"} ease-in-out infinite`,
+								animationDelay: `${i * (activeState === "writing" ? 0.075 : 0.3)}s`,
+								transform: `rotate(${(360 / sparkleCount) * i}deg) translateX(${activeState === "writing" ? "28px" : "22px"})`,
 								transformOrigin: "center",
 							}}
 						/>
@@ -519,7 +646,6 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				</div>
 			)}
 
-			{/* Floating hearts for love mood */}
 			{showHearts && (
 				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 					{[0, 1, 2].map((i) => (
@@ -538,20 +664,38 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				</div>
 			)}
 
-			{/* Main character */}
+			{activeState === "sleeping" && (
+				<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+					<span
+						className="absolute text-[8px] font-bold text-vscode-foreground opacity-0 animate-float-z"
+						style={{ animationDelay: "0s", transform: "translate(22px, -20px)" }}>
+						Z
+					</span>
+					<span
+						className="absolute text-[10px] font-bold text-vscode-foreground opacity-0 animate-float-z"
+						style={{ animationDelay: "0.6s", transform: "translate(28px, -28px)" }}>
+						Z
+					</span>
+					<span
+						className="absolute text-[12px] font-bold text-vscode-foreground opacity-0 animate-float-z"
+						style={{ animationDelay: "1.2s", transform: "translate(34px, -36px)" }}>
+						Z
+					</span>
+				</div>
+			)}
+
 			<div
 				className="relative"
 				style={{
 					animation: mainAnimation,
 				}}>
-				{/* Glow effect behind character — enhanced on hover/click */}
 				<div
 					className="absolute -inset-3 rounded-full opacity-30 blur-md transition-all duration-300"
 					style={{
 						background:
-							activity === "writing"
+							activeState === "writing"
 								? "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 70%)"
-								: activity === "thinking"
+								: activeState === "thinking"
 									? "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 60%)"
 									: isDoubleClicked
 										? "radial-gradient(circle, #f472b6 0%, transparent 70%)"
@@ -560,9 +704,9 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 											: "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 50%)",
 						opacity: isDoubleClicked ? 0.7 : isClicked ? 0.6 : isHovered ? 0.4 : 0.3,
 						animation:
-							activity === "idle" && !isClicked && !isDoubleClicked
+							activeState === "idle" && !isClicked && !isDoubleClicked
 								? "mirror-glow-pulse 2s ease-in-out infinite"
-								: activity === "thinking" && !isClicked && !isDoubleClicked
+								: activeState === "thinking" && !isClicked && !isDoubleClicked
 									? "mirror-glow-pulse 1.5s ease-in-out infinite"
 									: !isClicked && !isDoubleClicked
 										? "mirror-glow-pulse 0.8s ease-in-out infinite"
@@ -570,175 +714,45 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					}}
 				/>
 
-				{/* SVG Character with facial expressions */}
-				<svg viewBox="0 0 96 96" className="h-8 w-auto block" role="presentation">
+				<svg viewBox="0 0 96 96" className="h-8 w-auto block overflow-visible" role="presentation">
 					<defs>
 						<linearGradient id="mirror-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
 							<stop offset="0%" stopColor="var(--mirror-brand-from, #10b981)" />
 							<stop offset="50%" stopColor="var(--mirror-brand-via, #14b8a6)" />
 							<stop offset="100%" stopColor="var(--mirror-brand-to, #06b6d4)" />
 						</linearGradient>
+						<filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+							<feGaussianBlur stdDeviation="1.5" result="blur" />
+							<feMerge>
+								<feMergeNode in="blur" />
+								<feMergeNode in="SourceGraphic" />
+							</feMerge>
+						</filter>
 					</defs>
-					{/* Base head circle */}
-					<circle
-						cx="48"
-						cy="48"
-						r="38"
-						fill="var(--vscode-sideBar-background)"
-						stroke="url(#mirror-gradient)"
-						strokeWidth="2.5"
-					/>
 
-					{/* Eyebrows */}
-					{eyebrows && (
-						<>
-							<path
-								d={eyebrows.left}
-								fill="none"
-								stroke="#ffffff"
-								strokeWidth="2"
-								strokeLinecap="round"
-								opacity={0.6}
-								className="transition-all duration-300 ease-in-out"
-							/>
-							<path
-								d={eyebrows.right}
-								fill="none"
-								stroke="#ffffff"
-								strokeWidth="2"
-								strokeLinecap="round"
-								opacity={0.6}
-								className="transition-all duration-300 ease-in-out"
-							/>
-						</>
-					)}
+					{/* Visor head */}
+					<circle cx="48" cy="48" r="38" fill="#0f0f23" stroke="url(#mirror-gradient)" strokeWidth="3.0" />
 
-					{/* Cheeks with blush pulse animation */}
-					<ellipse
-						cx="48"
-						cy={getIdleMood() === "surprised" ? 56 : 54}
-						rx="24"
-						ry="8"
-						fill="#f472b6"
-						opacity={blushOpacity}
-						className={isHovered && activity === "idle" ? undefined : undefined}
-						style={
-							isHovered &&
-							activity === "idle" &&
-							(getIdleMood() === "love" || getIdleMood() === "excited")
-								? { animation: "mirror-blush-pulse 1.5s ease-in-out infinite" }
-								: undefined
-						}
-					/>
+					{/* Inner Visor Frame Highlight */}
+					<circle cx="48" cy="48" r="36" fill="none" stroke="#ffffff" strokeWidth="0.75" opacity={0.15} />
 
-					{/* Left eye — white */}
-					<ellipse
-						cx={leftEye.cx}
-						cy={leftEye.cy}
-						rx={leftEye.rx}
-						ry={leftEye.ry}
-						fill="#ffffff"
-						className="transition-all duration-300 ease-in-out"
-					/>
-					{/* Left eye — pupil + catchlight */}
-					<circle
-						cx={leftEye.cx + leftEye.pupilOffsetX + (isHovered && activity === "idle" ? pupilOffset.x : 0)}
-						cy={leftEye.cy + leftEye.pupilOffsetY + (isHovered && activity === "idle" ? pupilOffset.y : 0)}
-						r={1.5}
-						fill="#1e293b"
-						className="transition-all duration-300 ease-in-out"
-					/>
-					{/* Catchlight (specular highlight) */}
-					{leftEye.ry > 1.5 && (
-						<circle
-							cx={
-								leftEye.cx +
-								leftEye.pupilOffsetX +
-								(isHovered && activity === "idle" ? pupilOffset.x : 0) -
-								0.8
-							}
-							cy={
-								leftEye.cy +
-								leftEye.pupilOffsetY +
-								(isHovered && activity === "idle" ? pupilOffset.y : 0) -
-								0.8
-							}
-							r={0.6}
-							fill="#ffffff"
-							opacity={0.9}
-						/>
-					)}
-
-					{/* Right eye — white */}
-					<ellipse
-						cx={rightEye.cx}
-						cy={rightEye.cy}
-						rx={rightEye.rx}
-						ry={rightEye.ry}
-						fill="#ffffff"
-						className="transition-all duration-300 ease-in-out"
-					/>
-					{/* Right eye — pupil + catchlight */}
-					<circle
-						cx={
-							rightEye.cx + rightEye.pupilOffsetX + (isHovered && activity === "idle" ? pupilOffset.x : 0)
-						}
-						cy={
-							rightEye.cy + rightEye.pupilOffsetY + (isHovered && activity === "idle" ? pupilOffset.y : 0)
-						}
-						r={1.5}
-						fill="#1e293b"
-						className="transition-all duration-300 ease-in-out"
-					/>
-					{/* Catchlight (specular highlight) */}
-					{rightEye.ry > 1.5 && (
-						<circle
-							cx={
-								rightEye.cx +
-								rightEye.pupilOffsetX +
-								(isHovered && activity === "idle" ? pupilOffset.x : 0) -
-								0.8
-							}
-							cy={
-								rightEye.cy +
-								rightEye.pupilOffsetY +
-								(isHovered && activity === "idle" ? pupilOffset.y : 0) -
-								0.8
-							}
-							r={0.6}
-							fill="#ffffff"
-							opacity={0.9}
-						/>
-					)}
-
-					{/* Mouth */}
-					<path
-						d={mouthPath}
-						fill={
-							getIdleMood() === "surprised" && activity === "idle" && isHovered
-								? "rgba(255,255,255,0.15)"
-								: "none"
-						}
-						stroke="#ffffff"
-						strokeWidth="2.5"
-						strokeLinecap="round"
-						className="transition-all duration-300 ease-in-out"
-					/>
-
-					{/* Tongue for silly mood */}
-					{getIdleMood() === "silly" && activity === "idle" && isHovered && (
+					{/* Face group shifting in response to cursor */}
+					<g transform={`translate(${pupilOffset.x}, ${pupilOffset.y})`}>
+						<ellipse cx="48" cy="54" rx="24" ry="8" fill="#f472b6" opacity={blushOpacity} />
+						{renderVisorFace()}
 						<path
-							d="M 44 62 Q 48 70 54 60"
-							fill="#f472b6"
-							opacity={0.75}
-							className="transition-all duration-300 ease-in-out"
+							d={mouthPath}
+							fill="none"
+							stroke={activeState === "error" ? "#f87171" : "#22d3ee"}
+							strokeWidth="3.5"
+							strokeLinecap="round"
+							filter="url(#neon-glow)"
 						/>
-					)}
+					</g>
 				</svg>
 			</div>
 
-			{/* Scanning beam for reading state */}
-			{activity === "reading" && (
+			{activeState === "reading" && (
 				<div className="absolute top-0 left-0 right-0 h-full pointer-events-none overflow-hidden">
 					<div
 						className="absolute w-full h-0.5 opacity-30"
@@ -750,7 +764,6 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				</div>
 			)}
 
-			{/* Side gradients */}
 			<div className="z-4 bg-gradient-to-r from-transparent to-vscode-sideBar-background absolute top-0 right-0 bottom-0 w-10 opacity-100" />
 			<div className="z-3 bg-gradient-to-l from-transparent to-vscode-sideBar-background absolute top-0 left-0 bottom-0 w-10 opacity-100" />
 		</div>

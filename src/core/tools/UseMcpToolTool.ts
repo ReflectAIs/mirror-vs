@@ -329,6 +329,11 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 					(outputText || (images.length > 0 ? `[${images.length} image(s) received]` : ""))
 			}
 
+			// Record successful tool execution to update usage tracking stats
+			if (!toolResult.isError) {
+				await task.providerRef.deref()?.getMcpHub()?.recordToolExecution(serverName, toolName)
+			}
+
 			// Send completion status
 			await this.sendExecutionStatus(task, {
 				executionId,

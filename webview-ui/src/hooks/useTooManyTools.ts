@@ -32,18 +32,19 @@ export interface TooManyToolsInfo {
  */
 export function useTooManyTools(): TooManyToolsInfo {
 	const { t } = useAppTranslation()
-	const { mcpServers } = useExtensionState()
+	const { mcpServers, mcpToolsThreshold } = useExtensionState()
 
 	const { enabledServerCount, enabledToolCount } = useMemo(() => countEnabledMcpTools(mcpServers), [mcpServers])
 
-	const isOverThreshold = enabledToolCount > MAX_MCP_TOOLS_THRESHOLD
+	const threshold = mcpToolsThreshold ?? MAX_MCP_TOOLS_THRESHOLD
+	const isOverThreshold = enabledToolCount > threshold
 
 	const toolsPart = t("chat:tooManyTools.toolsPart", { count: enabledToolCount })
 	const serversPart = t("chat:tooManyTools.serversPart", { count: enabledServerCount })
 	const message = t("chat:tooManyTools.messageTemplate", {
 		tools: toolsPart,
 		servers: serversPart,
-		threshold: MAX_MCP_TOOLS_THRESHOLD,
+		threshold,
 	})
 
 	return {

@@ -25,6 +25,7 @@ import { useEscapeKey } from "@src/hooks/useEscapeKey"
 
 import { ModelInfoView } from "./ModelInfoView"
 import { ApiErrorMessage } from "./ApiErrorMessage"
+import { ContextLimitControl } from "./ContextLimitControl"
 
 type ModelIdKey = keyof Pick<
 	ProviderSettings,
@@ -476,6 +477,13 @@ export const ModelPicker = ({
 							isDescriptionExpanded={isDescriptionExpanded}
 							setIsDescriptionExpanded={setIsDescriptionExpanded}
 							hidePricing={hidePricing}
+						/>
+					)}
+					{selectedModelId && (
+						<ContextLimitControl
+							value={apiConfiguration.modelContextLimit}
+							onChange={(value) => setApiConfigurationField("modelContextLimit", value)}
+							maxLimit={selectedModelInfo?.contextWindow || 1000000}
 						/>
 					)}
 					{!hidePricing && (

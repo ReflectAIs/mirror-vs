@@ -197,4 +197,25 @@ describe("getMcpServerTools", () => {
 		})
 		expect(getFunction(result[0]).parameters).not.toHaveProperty("required")
 	})
+
+	it("should sort and prune tools exceeding the threshold", () => {
+		const tools = [createMockTool("tool1"), createMockTool("tool2"), createMockTool("tool3")]
+		const server = createMockServer("testServer", tools)
+		const mockHub = {
+			getServers: vi.fn().mockReturnValue([server]),
+			getProviderThreshold: vi.fn().mockReturnValue(2),
+			getToolUsage: vi.fn().mockImplementation((serverName, toolName) => {
+				if (toolName === "tool3") return { useCount: 10, lastUsed: 1000 }
+				if (toolName === "tool1") return { useCount: 5, lastUsed: 500 }
+				return { useCount: 0, lastUsed: 0 }
+			}),
+		}
+
+		const result = getMcpServerTools(mockHub as unknown as McpHub)
+
+		// Threshold is 2, so it should keep tool3 and tool1, prune tool2
+		expect(result).toHaveLength(2)
+		expect(getFunction(result[0]).name).toBe("mcp--testServer--tool3")
+		expect(getFunction(result[1]).name).toBe("mcp--testServer--tool1")
+	})
 })

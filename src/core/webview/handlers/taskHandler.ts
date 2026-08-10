@@ -110,6 +110,20 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 			!resolved.text?.trim() && (!resolved.images || resolved.images.length === 0) && !message.sessionMode
 
 		if (isEmptyTabCreation) {
+			// Do not allow creating multiple empty tabs.
+			// Switch to the existing empty tab if one is already present on the stack.
+			const allTasks = provider.getAllTasksSorted()
+			const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0)
+
+			if (emptyTask) {
+				provider.log(
+					`[handleNewTask] Found existing empty tab ${emptyTask.taskId} — switching instead of creating a new one`,
+				)
+				await provider.switchToTask(emptyTask.taskId)
+				await provider.postStateToWebview()
+				return
+			}
+
 			// Use existing session if one exists; otherwise create a new one.
 			// This ensures clicking "+" adds a tab to the current session
 			// instead of creating a separate session for each new tab.

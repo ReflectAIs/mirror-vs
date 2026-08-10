@@ -38,6 +38,8 @@ import { applyDiffTool as applyDiffToolClass } from "../tools/ApplyDiffTool"
 import { getWorkspaceFileTreeTool } from "../tools/GetWorkspaceFileTreeTool"
 import { getWorkspacePulseTool } from "../tools/GetWorkspacePulseTool"
 import { getGitStatusTool } from "../tools/GetGitStatusTool"
+import { searchMcpToolsTool } from "../tools/SearchMcpToolsTool"
+import { activateMcpToolTool } from "../tools/ActivateMcpToolTool"
 import { isValidToolName, validateToolUse } from "../tools/validateToolUse"
 import { codebaseSearchTool } from "../tools/CodebaseSearchTool"
 import {
@@ -442,6 +444,10 @@ export async function presentAssistantMessage(mirror: Task) {
 						return `[${block.name}]`
 					case "switch_mode":
 						return `[${block.name} to '${block.params.mode_slug}'${block.params.reason ? ` because: ${block.params.reason}` : ""}]`
+					case "search_mcp_tools":
+						return `[${block.name}${block.params?.query ? ` for '${block.params.query}'` : ""}]`
+					case "activate_mcp_tool":
+						return `[${block.name} for '${block.params?.tool_name}' on '${block.params?.server_name}']`
 					case "codebase_search":
 						return `[${block.name} for '${block.params.query}']`
 					case "read_command_output":
@@ -936,6 +942,20 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "switch_mode":
 					await switchModeTool.handle(mirror, block as ToolUse<"switch_mode">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "search_mcp_tools":
+					await searchMcpToolsTool.handle(mirror, block as ToolUse<"search_mcp_tools">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "activate_mcp_tool":
+					await activateMcpToolTool.handle(mirror, block as ToolUse<"activate_mcp_tool">, {
 						askApproval,
 						handleError,
 						pushToolResult,

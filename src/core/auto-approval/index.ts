@@ -90,6 +90,10 @@ export async function checkAutoApproval({
 			return { decision: "approve" }
 		}
 
+		if (ask === "use_mcp_server") {
+			return { decision: "approve" }
+		}
+
 		if (ask === "tool" && text) {
 			try {
 				const tool = JSON.parse(text) as MirrorSayTool

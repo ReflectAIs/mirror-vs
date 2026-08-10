@@ -463,6 +463,7 @@ export type ExtensionState = Pick<
 	experiments: Experiments // Map of experiment IDs to their enabled state
 
 	mcpEnabled: boolean
+	mcpToolsThreshold?: number
 
 	mode: string
 	customModes: ModeConfig[]

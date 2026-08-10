@@ -86,12 +86,14 @@ const ChatToolbar = ({
 		return "idle"
 	})()
 
+	const activity = mascotStatus === "error" ? "error" : mascotStatus === "completed" ? "completed" : modelActivity
+
 	return (
 		<>
 			{/* Top Header Area */}
 			<div className="flex items-center justify-between px-4 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none">
 				<div className="flex items-center gap-2 min-w-0">
-					<MirrorHero activity={modelActivity} size="small" />
+					<MirrorHero activity={activity as any} size="small" />
 					<div className="flex flex-col min-w-0">
 						<div className="flex items-center gap-1.5">
 							<span className="font-bold text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent shrink-0">

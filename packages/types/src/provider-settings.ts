@@ -187,6 +187,9 @@ const baseProviderSettingsSchema = z.object({
 
 	// Model verbosity.
 	verbosity: verbosityLevelsSchema.optional(),
+
+	// Custom model context limit.
+	modelContextLimit: z.number().optional(),
 })
 
 // Several of the providers share common model config properties.

@@ -28,7 +28,7 @@ import McpEnabledToggle from "./McpEnabledToggle"
 import { McpErrorRow } from "./McpErrorRow"
 
 const McpView = () => {
-	const { mcpServers: servers, alwaysAllowMcp, mcpEnabled } = useExtensionState()
+	const { mcpServers: servers, alwaysAllowMcp, mcpEnabled, mcpToolsThreshold } = useExtensionState()
 
 	const { t } = useAppTranslation()
 	const { isOverThreshold, title, message } = useTooManyTools()
@@ -55,6 +55,62 @@ const McpView = () => {
 				</div>
 
 				<McpEnabledToggle />
+
+				{mcpEnabled && (
+					<div
+						style={{
+							marginBottom: "25px",
+							padding: "15px",
+							backgroundColor: "rgba(128, 128, 128, 0.05)",
+							border: "1px solid var(--vscode-panel-border)",
+							borderRadius: "4px",
+							maxWidth: "400px",
+						}}>
+						<div
+							style={{
+								display: "flex",
+								justifyContent: "space-between",
+								alignItems: "center",
+								marginBottom: "8px",
+							}}>
+							<span style={{ fontWeight: "500", fontSize: "12px", color: "var(--vscode-foreground)" }}>
+								Max Active MCP Tools Limit
+							</span>
+							<span style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: "bold" }}>
+								{mcpToolsThreshold ?? 40} tools
+							</span>
+						</div>
+						<input
+							type="range"
+							min="10"
+							max="100"
+							step="5"
+							value={mcpToolsThreshold ?? 40}
+							onChange={(e) => {
+								const val = parseInt(e.target.value)
+								vscode.postMessage({
+									type: "updateSettings",
+									updatedSettings: { mcpToolsThreshold: val },
+								})
+							}}
+							style={{
+								width: "100%",
+								cursor: "pointer",
+								accentColor: "var(--vscode-button-background)",
+							}}
+						/>
+						<p
+							style={{
+								fontSize: "11px",
+								color: "var(--vscode-descriptionForeground)",
+								marginTop: "8px",
+								lineHeight: "1.4",
+							}}>
+							Limits the number of active tools exposed to the LLM to prevent model confusion and save API
+							cost. Top used tools are kept active; others are parked and can be swapped in on demand.
+						</p>
+					</div>
+				)}
 
 				{mcpEnabled && (
 					<>

@@ -42,6 +42,7 @@ type ContextManagementSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	includeCurrentTime?: boolean
 	includeCurrentCost?: boolean
 	maxGitStatusFiles?: number
+	mcpToolsThreshold?: number
 	customSupportPrompts: Record<string, string | undefined>
 	setCustomSupportPrompts: (prompts: Record<string, string | undefined>) => void
 	setCachedStateField: SetCachedStateField<
@@ -60,12 +61,14 @@ type ContextManagementSettingsProps = HTMLAttributes<HTMLDivElement> & {
 		| "includeCurrentTime"
 		| "includeCurrentCost"
 		| "maxGitStatusFiles"
+		| "mcpToolsThreshold"
 	>
 }
 
 export const ContextManagementSettings = ({
 	autoCondenseContext,
 	autoCondenseContextPercent,
+	mcpToolsThreshold,
 	listApiConfigMeta,
 	maxOpenTabsContext,
 	maxWorkspaceFiles,
@@ -357,14 +360,14 @@ export const ContextManagementSettings = ({
 							}
 							aria-valuetext={
 								(maxDiagnosticMessages !== undefined && maxDiagnosticMessages <= 0) ||
-									maxDiagnosticMessages === 100
+								maxDiagnosticMessages === 100
 									? t("settings:contextManagement.diagnostics.maxMessages.unlimitedLabel")
 									: `${maxDiagnosticMessages ?? 50} ${t("settings:contextManagement.diagnostics.maxMessages.label")}`
 							}
 						/>
 						<span className="w-20 text-sm font-medium">
 							{(maxDiagnosticMessages !== undefined && maxDiagnosticMessages <= 0) ||
-								maxDiagnosticMessages === 100
+							maxDiagnosticMessages === 100
 								? t("settings:contextManagement.diagnostics.maxMessages.unlimitedLabel")
 								: (maxDiagnosticMessages ?? 50)}
 						</span>
@@ -516,11 +519,11 @@ export const ContextManagementSettings = ({
 											profileThreshold !== undefined
 												? profileThreshold === -1
 													? ` ${t(
-														"settings:contextManagement.condensingThreshold.usesGlobal",
-														{
-															threshold: autoCondenseContextPercent,
-														},
-													)}`
+															"settings:contextManagement.condensingThreshold.usesGlobal",
+															{
+																threshold: autoCondenseContextPercent,
+															},
+														)}`
 													: ` (${profileThreshold}%)`
 												: ""
 										return (
@@ -550,13 +553,38 @@ export const ContextManagementSettings = ({
 							<div className="text-vscode-descriptionForeground text-sm mt-1">
 								{selectedThresholdProfile === "default"
 									? t("settings:contextManagement.condensingThreshold.defaultDescription", {
-										threshold: autoCondenseContextPercent,
-									})
+											threshold: autoCondenseContextPercent,
+										})
 									: t("settings:contextManagement.condensingThreshold.profileDescription")}
 							</div>
 						</div>
 					</div>
 				)}
+
+				{/* Max Active MCP Tools Limit */}
+				<SearchableSetting
+					settingId="mcp-tools-threshold"
+					section="contextManagement"
+					label="Max Active MCP Tools Limit">
+					<div className="flex flex-col gap-2 mt-4">
+						<div className="flex items-center gap-2">
+							<Slider
+								min={10}
+								max={100}
+								step={5}
+								value={[mcpToolsThreshold ?? 40]}
+								onValueChange={([value]) => setCachedStateField("mcpToolsThreshold", value)}
+								data-testid="mcp-tools-threshold-slider"
+							/>
+							<span className="w-16 font-mono text-xs">{mcpToolsThreshold ?? 40} tools</span>
+						</div>
+						<div className="text-vscode-descriptionForeground text-xs leading-relaxed">
+							Limits the number of active tools exposed to the LLM to prevent model confusion and save API
+							cost. Active tools are kept based on execution recency/frequency; others are parked and can
+							be activated dynamically.
+						</div>
+					</div>
+				</SearchableSetting>
 			</Section>
 		</div>
 	)
