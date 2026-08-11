@@ -45,6 +45,8 @@ type SupportPromptType =
 	| "TERMINAL_FIX"
 	| "TERMINAL_EXPLAIN"
 	| "NEW_TASK"
+	| "GENERATE_TESTS"
+	| "REFACTOR"
 
 const supportPromptConfigs: Record<SupportPromptType, SupportPromptConfig> = {
 	ENHANCE: {
@@ -245,6 +247,28 @@ Please provide:
 	},
 	NEW_TASK: {
 		template: `\${userInput}`,
+	},
+	GENERATE_TESTS: {
+		template: `Please generate comprehensive unit tests for this code from \${filePath}\${startLine ? \` (lines \${startLine}-\${endLine})\` : \"\"}:
+\`\`\`
+\${selectedText}
+\`\`\`
+
+Please:
+1. Identify the key test cases (success paths, edge cases, error handling).
+2. Write clean, idiomatic unit tests using the standard test framework for this language (e.g. Jest/Vitest for TS/JS, pytest for Python, etc.).
+3. Include mock setups for external dependencies if applicable.`,
+	},
+	REFACTOR: {
+		template: `Please refactor this code/function from \${filePath}\${startLine ? \` (lines \${startLine}-\${endLine})\` : \"\"}:
+\`\`\`
+\${selectedText}
+\`\`\`
+
+Please:
+1. Identify clean code improvements (reusability, modularity, readability).
+2. Perform refactoring without changing the external behavior/API of the code.
+3. Suggest optimizations (Big O complexity, memory safety, async performance).`,
 	},
 } as const
 

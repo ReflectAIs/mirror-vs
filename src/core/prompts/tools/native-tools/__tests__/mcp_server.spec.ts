@@ -32,6 +32,8 @@ describe("getMcpServerTools", () => {
 
 	const createMockMcpHub = (servers: McpServer[]): Partial<McpHub> => ({
 		getServers: vi.fn().mockReturnValue(servers),
+		getProviderThreshold: vi.fn().mockReturnValue(40),
+		getToolUsage: vi.fn().mockReturnValue({ useCount: 0, lastUsed: 0 }),
 	})
 
 	it("should return empty array when mcpHub is undefined", () => {

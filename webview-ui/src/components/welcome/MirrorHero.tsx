@@ -1,19 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useExtensionState } from "../../context/ExtensionStateContext"
 
 export type ModelActivity = "idle" | "reading" | "thinking" | "writing" | "error" | "completed" | "sleeping"
 
 interface MirrorHeroProps {
 	activity?: ModelActivity
 	size?: "small" | "normal"
-}
-
-type EyeShape = {
-	cx: number
-	cy: number
-	rx: number
-	ry: number
-	pupilOffsetX: number
-	pupilOffsetY: number
 }
 
 type Mood = "happy" | "curious" | "sleepy" | "excited" | "silly" | "love" | "surprised" | "cool" | "cheeky"
@@ -35,10 +27,62 @@ const FUNNY_DEVELOPER_QUOTES = [
 	"Reticulating splines... 🌀",
 ]
 
+interface MascotThemeColors {
+	eyes: string
+	blush: string
+	visorFill: string
+	gradientFrom: string
+	gradientVia: string
+	gradientTo: string
+	glowColor: string
+}
+
+const THEME_COLORS: Record<string, MascotThemeColors> = {
+	cyberpunk: {
+		eyes: "#22d3ee", // neon cyan
+		blush: "#f472b6", // neon pink
+		visorFill: "#0f0f23", // dark slate
+		gradientFrom: "#10b981", // emerald
+		gradientVia: "#14b8a6", // teal
+		gradientTo: "#06b6d4", // cyan
+		glowColor: "#22d3ee",
+	},
+	retro: {
+		eyes: "#22c55e", // amber green phosphor
+		blush: "#15803d", // forest green
+		visorFill: "#090d09", // deep amber green black
+		gradientFrom: "#166534", // deep green
+		gradientVia: "#22c55e", // medium green
+		gradientTo: "#86efac", // light green
+		glowColor: "#22c55e",
+	},
+	synthwave: {
+		eyes: "#ec4899", // hot pink
+		blush: "#a21caf", // deep purple magenta
+		visorFill: "#1a0b2e", // deep violet black
+		gradientFrom: "#f43f5e", // sunset rose
+		gradientVia: "#d946ef", // bright violet
+		gradientTo: "#8b5cf6", // synth purple
+		glowColor: "#ec4899",
+	},
+	solar: {
+		eyes: "#facc15", // bright sun gold
+		blush: "#b45309", // dark amber
+		visorFill: "#180805", // charcoal sun-red
+		gradientFrom: "#ef4444", // blood red
+		gradientVia: "#f97316", // orange
+		gradientTo: "#facc15", // yellow
+		glowColor: "#f97316",
+	},
+}
+
 /**
  * An animated robotic screen mascot with glowing neon facial expressions that react to model activity states.
  */
 const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => {
+	const { mascotTheme = "cyberpunk" } = useExtensionState()
+	const colors = THEME_COLORS[mascotTheme] || THEME_COLORS.cyberpunk
+
 	const [isHovered, setIsHovered] = useState(false)
 	const [isClicked, setIsClicked] = useState(false)
 	const [isDoubleClicked, setIsDoubleClicked] = useState(false)
@@ -294,14 +338,14 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				<>
 					<path
 						d={`M ${leftCx - 5} ${cy} L ${leftCx + 5} ${cy}`}
-						stroke="#22d3ee"
+						stroke={colors.eyes}
 						strokeWidth="4.5"
 						strokeLinecap="round"
 						filter="url(#neon-glow)"
 					/>
 					<path
 						d={`M ${rightCx - 5} ${cy} L ${rightCx + 5} ${cy}`}
-						stroke="#22d3ee"
+						stroke={colors.eyes}
 						strokeWidth="4.5"
 						strokeLinecap="round"
 						filter="url(#neon-glow)"
@@ -332,13 +376,12 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		}
 
 		if (activeState === "completed" || activeState === "sleeping") {
-			const isSleepingState = activeState === "sleeping"
-			const strokeColor = isSleepingState ? "#38bdf8" : "#22d3ee"
+			const strokeColor = colors.eyes
 			return (
 				<>
 					<path
 						d={
-							isSleepingState
+							activeState === "sleeping"
 								? `M ${leftCx - 5} ${cy - 1.5} Q ${leftCx} ${cy + 3.5} ${leftCx + 5} ${cy - 1.5}`
 								: `M ${leftCx - 5} ${cy + 1.5} Q ${leftCx} ${cy - 3.5} ${leftCx + 5} ${cy + 1.5}`
 						}
@@ -350,7 +393,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					/>
 					<path
 						d={
-							isSleepingState
+							activeState === "sleeping"
 								? `M ${rightCx - 5} ${cy - 1.5} Q ${rightCx} ${cy + 3.5} ${rightCx + 5} ${cy - 1.5}`
 								: `M ${rightCx - 5} ${cy + 1.5} Q ${rightCx} ${cy - 3.5} ${rightCx + 5} ${cy + 1.5}`
 						}
@@ -371,7 +414,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					<path
 						d={`M ${leftCx - 5.5} ${cy + 1.5} Q ${leftCx} ${cy - 4.5} ${leftCx + 5.5} ${cy + 1.5}`}
 						fill="none"
-						stroke="#22d3ee"
+						stroke={colors.eyes}
 						strokeWidth="4.5"
 						strokeLinecap="round"
 						filter="url(#neon-glow)"
@@ -379,7 +422,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					<path
 						d={`M ${rightCx - 5.5} ${cy + 1.5} Q ${rightCx} ${cy - 4.5} ${rightCx + 5.5} ${cy + 1.5}`}
 						fill="none"
-						stroke="#22d3ee"
+						stroke={colors.eyes}
 						strokeWidth="4.5"
 						strokeLinecap="round"
 						filter="url(#neon-glow)"
@@ -395,24 +438,38 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					// concentrated slits
 					return (
 						<>
-							<ellipse cx={leftCx} cy={cy} rx="5.5" ry="2.2" fill="#22d3ee" filter="url(#neon-glow)" />
-							<ellipse cx={rightCx} cy={cy} rx="5.5" ry="2.2" fill="#22d3ee" filter="url(#neon-glow)" />
+							<ellipse
+								cx={leftCx}
+								cy={cy}
+								rx="5.5"
+								ry="2.2"
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
+							<ellipse
+								cx={rightCx}
+								cy={cy}
+								rx="5.5"
+								ry="2.2"
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
 						</>
 					)
 				case "thinking":
 					// looking slightly upward
 					return (
 						<>
-							<circle cx={leftCx} cy={cy - 2} r="5" fill="#38bdf8" filter="url(#neon-glow)" />
-							<circle cx={rightCx} cy={cy - 2} r="5" fill="#38bdf8" filter="url(#neon-glow)" />
+							<circle cx={leftCx} cy={cy - 2} r="5" fill={colors.eyes} filter="url(#neon-glow)" />
+							<circle cx={rightCx} cy={cy - 2} r="5" fill={colors.eyes} filter="url(#neon-glow)" />
 						</>
 					)
 				case "writing":
 					// sparkly ovals
 					return (
 						<>
-							<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
-							<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
+							<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7" fill={colors.eyes} filter="url(#neon-glow)" />
+							<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7" fill={colors.eyes} filter="url(#neon-glow)" />
 						</>
 					)
 			}
@@ -424,22 +481,36 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			case "curious":
 				return (
 					<>
-						<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7.5" fill="#22d3ee" filter="url(#neon-glow)" />
-						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="4.5" fill="#22d3ee" filter="url(#neon-glow)" />
+						<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7.5" fill={colors.eyes} filter="url(#neon-glow)" />
+						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="4.5" fill={colors.eyes} filter="url(#neon-glow)" />
 					</>
 				)
 			case "sleepy":
 				return (
 					<>
-						<ellipse cx={leftCx} cy={cy + 1.5} rx="5" ry="2.2" fill="#38bdf8" filter="url(#neon-glow)" />
-						<ellipse cx={rightCx} cy={cy + 1.5} rx="5" ry="2.2" fill="#38bdf8" filter="url(#neon-glow)" />
+						<ellipse
+							cx={leftCx}
+							cy={cy + 1.5}
+							rx="5"
+							ry="2.2"
+							fill={colors.eyes}
+							filter="url(#neon-glow)"
+						/>
+						<ellipse
+							cx={rightCx}
+							cy={cy + 1.5}
+							rx="5"
+							ry="2.2"
+							fill={colors.eyes}
+							filter="url(#neon-glow)"
+						/>
 					</>
 				)
 			case "excited":
 				return (
 					<>
-						<circle cx={leftCx} cy={cy} r="6.2" fill="#22d3ee" filter="url(#neon-glow)" />
-						<circle cx={rightCx} cy={cy} r="6.2" fill="#22d3ee" filter="url(#neon-glow)" />
+						<circle cx={leftCx} cy={cy} r="6.2" fill={colors.eyes} filter="url(#neon-glow)" />
+						<circle cx={rightCx} cy={cy} r="6.2" fill={colors.eyes} filter="url(#neon-glow)" />
 					</>
 				)
 			case "silly":
@@ -448,26 +519,26 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					<>
 						<path
 							d={`M ${leftCx - 5} ${cy} L ${leftCx + 5} ${cy}`}
-							stroke="#22d3ee"
+							stroke={colors.eyes}
 							strokeWidth="4.5"
 							strokeLinecap="round"
 							filter="url(#neon-glow)"
 						/>
-						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7.5" fill="#22d3ee" filter="url(#neon-glow)" />
+						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7.5" fill={colors.eyes} filter="url(#neon-glow)" />
 					</>
 				)
 			case "love":
-				// glowing pink hearts
+				// glowing themed hearts
 				return (
 					<>
 						<path
 							d={`M ${leftCx} ${cy + 2.5} L ${leftCx - 3.5} ${cy - 1} Q ${leftCx - 6} ${cy - 5} ${leftCx - 3} ${cy - 5} Q ${leftCx} ${cy - 2} ${leftCx} ${cy - 2.5} Q ${leftCx} -2 ${leftCx + 3} ${cy - 5} Q ${leftCx + 6} ${cy - 5} ${leftCx + 3} ${cy - 1} Z`}
-							fill="#f472b6"
+							fill={colors.blush}
 							filter="url(#neon-glow)"
 						/>
 						<path
 							d={`M ${rightCx} ${cy + 2.5} L ${rightCx - 3.5} ${cy - 1} Q ${rightCx - 6} ${cy - 5} ${rightCx - 3} ${cy - 5} Q ${rightCx} ${cy - 2} ${rightCx} ${cy - 2.5} Q ${rightCx} -2 ${rightCx + 3} ${cy - 5} Q ${rightCx + 6} ${cy - 5} ${rightCx + 3} ${cy - 1} Z`}
-							fill="#f472b6"
+							fill={colors.blush}
 							filter="url(#neon-glow)"
 						/>
 					</>
@@ -475,16 +546,16 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			case "surprised":
 				return (
 					<>
-						<circle cx={leftCx} cy={cy} r="6.5" fill="#22d3ee" filter="url(#neon-glow)" />
-						<circle cx={rightCx} cy={cy} r="6.5" fill="#22d3ee" filter="url(#neon-glow)" />
+						<circle cx={leftCx} cy={cy} r="6.5" fill={colors.eyes} filter="url(#neon-glow)" />
+						<circle cx={rightCx} cy={cy} r="6.5" fill={colors.eyes} filter="url(#neon-glow)" />
 					</>
 				)
 			default:
 				// normal happy ovals
 				return (
 					<>
-						<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
-						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7" fill="#22d3ee" filter="url(#neon-glow)" />
+						<ellipse cx={leftCx} cy={cy} rx="5.5" ry="7" fill={colors.eyes} filter="url(#neon-glow)" />
+						<ellipse cx={rightCx} cy={cy} rx="5.5" ry="7" fill={colors.eyes} filter="url(#neon-glow)" />
 					</>
 				)
 		}
@@ -528,9 +599,9 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				<svg viewBox="0 0 96 96" className="h-8 w-auto block overflow-visible select-none" role="presentation">
 					<defs>
 						<linearGradient id="mirror-gradient-small" x1="0%" y1="0%" x2="100%" y2="100%">
-							<stop offset="0%" stopColor="var(--mirror-brand-from, #10b981)" />
-							<stop offset="50%" stopColor="var(--mirror-brand-via, #14b8a6)" />
-							<stop offset="100%" stopColor="var(--mirror-brand-to, #06b6d4)" />
+							<stop offset="0%" stopColor={colors.gradientFrom} />
+							<stop offset="50%" stopColor={colors.gradientVia} />
+							<stop offset="100%" stopColor={colors.gradientTo} />
 						</linearGradient>
 						<filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
 							<feGaussianBlur stdDeviation="1.5" result="blur" />
@@ -546,7 +617,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 						cx="48"
 						cy="48"
 						r="38"
-						fill="#0f0f23"
+						fill={colors.visorFill}
 						stroke="url(#mirror-gradient-small)"
 						strokeWidth="3.0"
 					/>
@@ -556,12 +627,12 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 
 					{/* Face group shifting in response to cursor */}
 					<g transform={`translate(${pupilOffset.x}, ${pupilOffset.y})`}>
-						<ellipse cx="48" cy="54" rx="24" ry="8" fill="#f472b6" opacity={0.35} />
+						<ellipse cx="48" cy="54" rx="24" ry="8" fill={colors.blush} opacity={0.35} />
 						{renderVisorFace()}
 						<path
 							d={mouthPath}
 							fill="none"
-							stroke={activeState === "error" ? "#f87171" : "#22d3ee"}
+							stroke={activeState === "error" ? "#f87171" : colors.eyes}
 							strokeWidth="3.5"
 							strokeLinecap="round"
 							filter="url(#neon-glow)"
@@ -694,14 +765,14 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					style={{
 						background:
 							activeState === "writing"
-								? "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 70%)"
+								? `radial-gradient(circle, ${colors.glowColor} 0%, transparent 70%)`
 								: activeState === "thinking"
-									? "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 60%)"
+									? `radial-gradient(circle, ${colors.glowColor} 0%, transparent 60%)`
 									: isDoubleClicked
-										? "radial-gradient(circle, #f472b6 0%, transparent 70%)"
+										? `radial-gradient(circle, ${colors.blush} 0%, transparent 70%)`
 										: isHovered
-											? "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 55%)"
-											: "radial-gradient(circle, var(--vscode-foreground) 0%, transparent 50%)",
+											? `radial-gradient(circle, ${colors.glowColor} 0%, transparent 55%)`
+											: `radial-gradient(circle, ${colors.glowColor} 0%, transparent 50%)`,
 						opacity: isDoubleClicked ? 0.7 : isClicked ? 0.6 : isHovered ? 0.4 : 0.3,
 						animation:
 							activeState === "idle" && !isClicked && !isDoubleClicked
@@ -717,9 +788,9 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				<svg viewBox="0 0 96 96" className="h-8 w-auto block overflow-visible" role="presentation">
 					<defs>
 						<linearGradient id="mirror-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-							<stop offset="0%" stopColor="var(--mirror-brand-from, #10b981)" />
-							<stop offset="50%" stopColor="var(--mirror-brand-via, #14b8a6)" />
-							<stop offset="100%" stopColor="var(--mirror-brand-to, #06b6d4)" />
+							<stop offset="0%" stopColor={colors.gradientFrom} />
+							<stop offset="50%" stopColor={colors.gradientVia} />
+							<stop offset="100%" stopColor={colors.gradientTo} />
 						</linearGradient>
 						<filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
 							<feGaussianBlur stdDeviation="1.5" result="blur" />
@@ -731,19 +802,26 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					</defs>
 
 					{/* Visor head */}
-					<circle cx="48" cy="48" r="38" fill="#0f0f23" stroke="url(#mirror-gradient)" strokeWidth="3.0" />
+					<circle
+						cx="48"
+						cy="48"
+						r="38"
+						fill={colors.visorFill}
+						stroke="url(#mirror-gradient)"
+						strokeWidth="3.0"
+					/>
 
 					{/* Inner Visor Frame Highlight */}
 					<circle cx="48" cy="48" r="36" fill="none" stroke="#ffffff" strokeWidth="0.75" opacity={0.15} />
 
 					{/* Face group shifting in response to cursor */}
 					<g transform={`translate(${pupilOffset.x}, ${pupilOffset.y})`}>
-						<ellipse cx="48" cy="54" rx="24" ry="8" fill="#f472b6" opacity={blushOpacity} />
+						<ellipse cx="48" cy="54" rx="24" ry="8" fill={colors.blush} opacity={blushOpacity} />
 						{renderVisorFace()}
 						<path
 							d={mouthPath}
 							fill="none"
-							stroke={activeState === "error" ? "#f87171" : "#22d3ee"}
+							stroke={activeState === "error" ? "#f87171" : colors.eyes}
 							strokeWidth="3.5"
 							strokeLinecap="round"
 							filter="url(#neon-glow)"

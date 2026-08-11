@@ -175,6 +175,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		ttsEnabled,
 		ttsSpeed,
 		soundVolume,
+		mascotTheme,
+		soundTheme,
 		terminalOutputPreviewSize,
 		terminalShellIntegrationTimeout,
 		terminalShellIntegrationDisabled, // Added from upstream
@@ -433,6 +435,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					soundVolume: soundVolume ?? 0.5,
 					ttsEnabled,
 					ttsSpeed,
+					mascotTheme: mascotTheme ?? "cyberpunk",
+					soundTheme: soundTheme ?? "classic",
 					enableCheckpoints: enableCheckpoints ?? false,
 					checkpointTimeout: checkpointTimeout ?? DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 					writeDelayMs,
@@ -921,6 +925,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								ttsSpeed={ttsSpeed}
 								soundEnabled={soundEnabled}
 								soundVolume={soundVolume}
+								mascotTheme={mascotTheme}
+								soundTheme={soundTheme}
 								setCachedStateField={setCachedStateField}
 							/>
 						)}

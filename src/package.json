@@ -112,6 +112,16 @@
 				"category": "%configuration.title%"
 			},
 			{
+				"command": "mirror-vs.generateTests",
+				"title": "%command.generateTests.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "mirror-vs.refactorFunction",
+				"title": "%command.refactorFunction.title%",
+				"category": "%configuration.title%"
+			},
+			{
 				"command": "mirror-vs.newTask",
 				"title": "%command.newTask.title%",
 				"category": "%configuration.title%"
@@ -226,6 +236,14 @@
 				{
 					"command": "mirror-vs.improveCode",
 					"group": "1_actions@3"
+				},
+				{
+					"command": "mirror-vs.generateTests",
+					"group": "1_actions@4"
+				},
+				{
+					"command": "mirror-vs.refactorFunction",
+					"group": "1_actions@5"
 				}
 			],
 			"terminal/context": [

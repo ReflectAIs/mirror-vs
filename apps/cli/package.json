@@ -36,6 +36,9 @@
 	"devDependencies": {
 		"@mirror-vs/config-eslint": "workspace:^",
 		"@mirror-vs/config-typescript": "workspace:^",
+		"@mirror-vs/types": "workspace:^",
+		"@mirror-vs/core": "workspace:^",
+		"@mirror-vs/vscode-shim": "workspace:^",
 		"@types/node": "^24.1.0",
 		"@types/react": "^19.1.6",
 		"ink-testing-library": "^4.0.0",

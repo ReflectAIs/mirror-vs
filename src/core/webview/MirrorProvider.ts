@@ -1724,11 +1724,8 @@ export class MirrorProvider
 
 		if (openItems.length === 0) {
 			this.log(
-				`[restoreSessionTabs] No open history items found for session ${sessionId} in workspace ${currentWorkspace} — creating fresh tab`,
+				`[restoreSessionTabs] No open history items found for session ${sessionId} in workspace ${currentWorkspace} — no tabs to restore`,
 			)
-			if (this.mirrorStack.length === 0) {
-				await this.createTask("", [])
-			}
 			return
 		}
 

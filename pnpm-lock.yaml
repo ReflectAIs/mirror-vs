@@ -123,6 +123,15 @@ importers:
       '@mirror-vs/config-typescript':
         specifier: workspace:^
         version: link:../../packages/config-typescript
+      '@mirror-vs/core':
+        specifier: workspace:^
+        version: link:../../packages/core
+      '@mirror-vs/types':
+        specifier: workspace:^
+        version: link:../../packages/types
+      '@mirror-vs/vscode-shim':
+        specifier: workspace:^
+        version: link:../../packages/vscode-shim
       '@types/node':
         specifier: ^24.1.0
         version: 24.2.1

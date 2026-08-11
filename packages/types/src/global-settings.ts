@@ -164,6 +164,8 @@ export const globalSettingsSchema = z.object({
 	ttsSpeed: z.number().optional(),
 	soundEnabled: z.boolean().optional(),
 	soundVolume: z.number().optional(),
+	mascotTheme: z.enum(["cyberpunk", "retro", "synthwave", "solar"]).optional(),
+	soundTheme: z.enum(["classic", "scifi"]).optional(),
 
 	maxOpenTabsContext: z.number().optional(),
 	maxWorkspaceFiles: z.number().optional(),
