@@ -398,6 +398,33 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			modelId = "nomic-embed-text"
 			secretKey = ""
 			secretKeyName = ""
+
+			// Auto-detect installed embedding models from local Ollama service
+			try {
+				const response = await fetch("http://localhost:11434/api/tags")
+				if (response.ok) {
+					const data = (await response.json()) as any
+					const models = data.models || []
+					const hasNomic = models.some((m: any) => m.name.startsWith("nomic-embed-text"))
+					if (!hasNomic) {
+						const foundEmbedModel = models.find((m: any) => {
+							const nameLower = m.name.toLowerCase()
+							const capabilities = m.capabilities || []
+							const families = m.details?.families || []
+							return (
+								nameLower.includes("embed") ||
+								capabilities.includes("embedding") ||
+								families.some((f: string) => f.toLowerCase().includes("embed"))
+							)
+						})
+						if (foundEmbedModel) {
+							modelId = foundEmbedModel.name
+						}
+					}
+				}
+			} catch (e) {
+				// Ignore error, fallback to default
+			}
 		} else {
 			// Fallback: search for any available keys
 			const geminiKey = await provider.context.secrets.get("geminiApiKey")

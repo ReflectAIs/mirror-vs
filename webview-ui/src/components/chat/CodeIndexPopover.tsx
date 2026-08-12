@@ -663,6 +663,21 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 								{indexingStatus.message ? ` - ${indexingStatus.message}` : ""}
 							</div>
 
+							{indexingStatus.systemStatus === "Error" && indexingStatus.message && (
+								<div className="mt-2">
+									<Button
+										variant="secondary"
+										size="sm"
+										className="w-full flex items-center justify-center gap-1.5"
+										onClick={() => {
+											navigator.clipboard.writeText(indexingStatus.message || "")
+										}}>
+										<span className="codicon codicon-copy mr-1" />
+										Copy Error Details
+									</Button>
+								</div>
+							)}
+
 							{indexingStatus.systemStatus === "Indexing" && (
 								<div className="mt-2">
 									<ProgressPrimitive.Root
