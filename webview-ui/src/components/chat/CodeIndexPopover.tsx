@@ -679,6 +679,21 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 							)}
 						</div>
 
+						{/* One-Click Auto-Setup Button */}
+						<div className="mt-4 mb-4">
+							<Button
+								className="w-full flex items-center justify-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/95 transition-colors"
+								size="sm"
+								onClick={() => vscode.postMessage({ type: "autoSetupCodeIndex" })}>
+								<span className="codicon codicon-zap mr-1" />
+								One-Click Auto-Setup
+							</Button>
+							<p className="text-[11px] text-vscode-descriptionForeground mt-1 mb-0 leading-normal">
+								Automatically configures indexing using your active API key and default embedding model
+								(requires Qdrant running on localhost:6333).
+							</p>
+						</div>
+
 						{/* Setup Settings Disclosure */}
 						<div className="mt-4">
 							<button
@@ -808,15 +823,15 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 													{getAvailableModels().map((modelId) => {
 														const model =
 															codebaseIndexModels?.[
-															currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
+																currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
 															]?.[modelId]
 														return (
 															<VSCodeOption key={modelId} value={modelId} className="p-2">
 																{modelId}{" "}
 																{model
 																	? t("settings:codeIndex.modelDimensions", {
-																		dimension: model.dimension,
-																	})
+																			dimension: model.dimension,
+																		})
 																	: ""}
 															</VSCodeOption>
 														)
@@ -1065,15 +1080,15 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 													{getAvailableModels().map((modelId) => {
 														const model =
 															codebaseIndexModels?.[
-															currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
+																currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
 															]?.[modelId]
 														return (
 															<VSCodeOption key={modelId} value={modelId} className="p-2">
 																{modelId}{" "}
 																{model
 																	? t("settings:codeIndex.modelDimensions", {
-																		dimension: model.dimension,
-																	})
+																			dimension: model.dimension,
+																		})
 																	: ""}
 															</VSCodeOption>
 														)
@@ -1130,15 +1145,15 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 													{getAvailableModels().map((modelId) => {
 														const model =
 															codebaseIndexModels?.[
-															currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
+																currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
 															]?.[modelId]
 														return (
 															<VSCodeOption key={modelId} value={modelId} className="p-2">
 																{modelId}{" "}
 																{model
 																	? t("settings:codeIndex.modelDimensions", {
-																		dimension: model.dimension,
-																	})
+																			dimension: model.dimension,
+																		})
 																	: ""}
 															</VSCodeOption>
 														)
@@ -1200,15 +1215,15 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 													{getAvailableModels().map((modelId) => {
 														const model =
 															codebaseIndexModels?.[
-															currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
+																currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
 															]?.[modelId]
 														return (
 															<VSCodeOption key={modelId} value={modelId} className="p-2">
 																{modelId}{" "}
 																{model
 																	? t("settings:codeIndex.modelDimensions", {
-																		dimension: model.dimension,
-																	})
+																			dimension: model.dimension,
+																		})
 																	: ""}
 															</VSCodeOption>
 														)
@@ -1293,15 +1308,15 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 													{getAvailableModels().map((modelId) => {
 														const model =
 															codebaseIndexModels?.[
-															currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
+																currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
 															]?.[modelId]
 														return (
 															<VSCodeOption key={modelId} value={modelId} className="p-2">
 																{modelId}{" "}
 																{model
 																	? t("settings:codeIndex.modelDimensions", {
-																		dimension: model.dimension,
-																	})
+																			dimension: model.dimension,
+																		})
 																	: ""}
 															</VSCodeOption>
 														)
@@ -1358,15 +1373,15 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 													{getAvailableModels().map((modelId) => {
 														const model =
 															codebaseIndexModels?.[
-															currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
+																currentSettings.codebaseIndexEmbedderProvider as keyof typeof codebaseIndexModels
 															]?.[modelId]
 														return (
 															<VSCodeOption key={modelId} value={modelId} className="p-2">
 																{modelId}{" "}
 																{model
 																	? t("settings:codeIndex.modelDimensions", {
-																		dimension: model.dimension,
-																	})
+																			dimension: model.dimension,
+																		})
 																	: ""}
 															</VSCodeOption>
 														)
@@ -1515,7 +1530,7 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 												step={CODEBASE_INDEX_DEFAULTS.SEARCH_SCORE_STEP}
 												value={[
 													currentSettings.codebaseIndexSearchMinScore ??
-													CODEBASE_INDEX_DEFAULTS.DEFAULT_SEARCH_MIN_SCORE,
+														CODEBASE_INDEX_DEFAULTS.DEFAULT_SEARCH_MIN_SCORE,
 												]}
 												onValueChange={(values) =>
 													updateSetting("codebaseIndexSearchMinScore", values[0])
@@ -1561,7 +1576,7 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 												step={CODEBASE_INDEX_DEFAULTS.SEARCH_RESULTS_STEP}
 												value={[
 													currentSettings.codebaseIndexSearchMaxResults ??
-													CODEBASE_INDEX_DEFAULTS.DEFAULT_SEARCH_RESULTS,
+														CODEBASE_INDEX_DEFAULTS.DEFAULT_SEARCH_RESULTS,
 												]}
 												onValueChange={(values) =>
 													updateSetting("codebaseIndexSearchMaxResults", values[0])

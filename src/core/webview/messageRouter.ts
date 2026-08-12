@@ -127,6 +127,7 @@ import {
 	handleToggleWorkspaceIndexing,
 	handleSetAutoEnableDefault,
 	handleClearIndexData,
+	handleAutoSetupCodeIndex,
 } from "./handlers/codeIndexHandler"
 
 // ── Command handlers ───────────────────────────────────────────
@@ -620,6 +621,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "clearIndexData":
 			await handleClearIndexData(provider)
+			break
+		case "autoSetupCodeIndex":
+			await handleAutoSetupCodeIndex(provider)
 			break
 
 		// ── Commands & Skills ───────────────────────────────

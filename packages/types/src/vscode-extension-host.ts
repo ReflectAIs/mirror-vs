@@ -636,6 +636,7 @@ export interface WebviewMessage {
 		| "startIndexing"
 		| "stopIndexing"
 		| "clearIndexData"
+		| "autoSetupCodeIndex"
 		| "indexingStatusUpdate"
 		| "indexCleared"
 		| "toggleWorkspaceIndexing"
