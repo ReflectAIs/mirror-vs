@@ -26,7 +26,7 @@ import {
 	MAX_PENDING_BATCHES,
 } from "../constants"
 import { isPathInIgnoredDirectory } from "../../glob/ignore-utils"
-import { sanitizeErrorMessage } from "../shared/validation-helpers"
+import { sanitizeErrorMessage, stringifyErrorDetail } from "../shared/validation-helpers"
 import { Package } from "../../../shared/package"
 
 export class DirectoryScanner implements IDirectoryScanner {
@@ -446,7 +446,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 				}
 				success = true
 			} catch (error) {
-				lastError = error as Error
+				lastError = new Error(stringifyErrorDetail(error))
 				console.error(
 					`[DirectoryScanner] Error processing batch (attempt ${attempts}) in workspace ${scanWorkspace}:`,
 					error,
