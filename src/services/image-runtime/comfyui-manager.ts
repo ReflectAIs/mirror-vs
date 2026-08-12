@@ -86,17 +86,69 @@ export class ComfyUIManager extends RuntimeManager {
 	async install(onProgress?: InstallProgressCallback): Promise<void> {
 		await fs.mkdir(this.installPath, { recursive: true })
 
-		onProgress?.("git-clone", "Setting up ComfyUI source repository...", 15)
-		await this.cloneRepo(onProgress)
+		if (this.isWindows) {
+			const archivePath = path.join(this.installPath, "comfyui_portable.7z")
+			onProgress?.("download-runtime", "Downloading ComfyUI Windows Portable...", 10)
 
-		onProgress?.("create-venv", "Creating virtual environment...", 30)
-		await this.createVenv()
+			// Download portable archive
+			await new Promise<void>((resolve, reject) => {
+				const onProgressHandler = (p: {
+					id: string
+					downloadedBytes: number
+					totalBytes: number
+					progress: number
+				}) => {
+					// Scale download progress from 10% to 75%
+					const scaled = 10 + Math.round((p.progress / 100) * 65)
+					onProgress?.("download-runtime", `Downloading ComfyUI Windows Portable (${p.progress}%)...`, scaled)
+				}
+				downloadManager.on("progress", onProgressHandler)
+				downloadManager.once("complete", () => {
+					downloadManager.off("progress", onProgressHandler)
+					resolve()
+				})
+				downloadManager.once("error", (e) => {
+					downloadManager.off("progress", onProgressHandler)
+					reject(new Error(e.error))
+				})
+				downloadManager.enqueue(this.downloadUrl, archivePath)
+			})
 
-		onProgress?.("install-deps", "Installing Python dependencies...", 35)
-		await this.installDependencies(onProgress)
+			onProgress?.("extract-runtime", "Extracting ComfyUI Windows Portable...", 80)
+			await this.extractArchive(archivePath, this.installPath)
+
+			// Clean up archive
+			try {
+				await fs.rm(archivePath, { force: true })
+			} catch {
+				// ignore cleanup error
+			}
+		} else {
+			onProgress?.("git-clone", "Setting up ComfyUI source repository...", 15)
+			await this.cloneRepo(onProgress)
+
+			onProgress?.("create-venv", "Creating virtual environment...", 30)
+			await this.createVenv()
+
+			onProgress?.("install-deps", "Installing Python dependencies...", 35)
+			await this.installDependencies(onProgress)
+		}
 
 		this.state.installed = true
 		this.emit("state-change", { ...this.state })
+	}
+
+	private async extractArchive(archivePath: string, destDir: string): Promise<void> {
+		const { execSync } = await import("child_process")
+		try {
+			// Using Windows tar.exe which natively extracts .7z / .zip
+			execSync(`tar -xf "${archivePath}" -C "${destDir}"`, { stdio: "inherit" })
+		} catch (err) {
+			throw new Error(
+				`Failed to extract ComfyUI archive. Please ensure you have tar or a compatible extractor.\n` +
+					`  Original error: ${(err as Error).message}`,
+			)
+		}
 	}
 
 	private async cloneRepo(onProgress?: InstallProgressCallback): Promise<void> {
@@ -175,8 +227,10 @@ export class ComfyUIManager extends RuntimeManager {
 		}
 	}
 
-	protected getLaunchArgs(): string[] {
-		return ["main.py", "--port", String(this.port), "--listen", "127.0.0.1", "--disable-auto-launch"]
+	protected override async getLaunchArgs(): Promise<string[]> {
+		const { HardwareDetector } = await import("./hardware-detector")
+		const hwFlags = await HardwareDetector.getRecommendedFlags()
+		return ["main.py", "--port", String(this.port), "--listen", "127.0.0.1", "--disable-auto-launch", ...hwFlags]
 	}
 
 	protected getLaunchEnv(): Record<string, string> {

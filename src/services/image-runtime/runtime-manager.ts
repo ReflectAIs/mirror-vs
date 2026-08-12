@@ -93,7 +93,7 @@ export abstract class RuntimeManager extends EventEmitter {
 		}
 
 		const execPath = this.getExecPath()
-		const launchArgs = this.getLaunchArgs()
+		const launchArgs = await this.getLaunchArgs()
 		const cwd = this.getCwd()
 
 		console.log(`[RuntimeManager:${this.name}] ====== LAUNCH ======`)
@@ -230,7 +230,7 @@ export abstract class RuntimeManager extends EventEmitter {
 		return `http://127.0.0.1:${this.port}`
 	}
 
-	protected abstract getLaunchArgs(): string[]
+	protected abstract getLaunchArgs(): string[] | Promise<string[]>
 	protected abstract getLaunchEnv(): Record<string, string>
 
 	private startHealthCheck(): void {

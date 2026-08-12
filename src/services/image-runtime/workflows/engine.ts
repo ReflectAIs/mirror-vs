@@ -335,6 +335,7 @@ export class WorkflowEngine {
 			// Map known widget values to named inputs based on the static order.
 			for (let i = 0; i < Math.min(inputOrder.length, widgets.length); i++) {
 				const inputName = inputOrder[i]
+				if (inputName === undefined) continue
 				// Only set if not already defined (connection inputs take priority)
 				if (!(inputName in node.inputs)) {
 					node.inputs[inputName] = widgets[i]

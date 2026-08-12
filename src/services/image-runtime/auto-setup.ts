@@ -162,6 +162,12 @@ export async function autoSetupComfyUI(onStep?: SetupCallback): Promise<void> {
 		})
 	}
 
+	// Seed default workflows and provision custom nodes
+	emit(onStep, "installing-runtime", "Seeding default workflows and custom nodes...", 65)
+	const { WorkflowScanner } = await import("./workflow-scanner")
+	await WorkflowScanner.seedDefaultWorkflows(manager.comfyUISrcPath)
+	await WorkflowScanner.provisionCustomNodes(manager.comfyUISrcPath)
+
 	// Download default model
 	const defaultModel = modelRegistry.getModel(recommendation.model)
 	if (defaultModel?.downloadable && !defaultModel.installed) {

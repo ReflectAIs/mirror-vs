@@ -19,7 +19,7 @@ async function getComfyUIManager(platform: "darwin" | "win32" = "darwin") {
 		mkdir: vi.fn(),
 		rm: vi.fn(),
 	}
-	vi.doMock("fs/promises", () => fsMock)
+	vi.doMock("fs/promises", () => ({ ...fsMock, default: fsMock }))
 
 	// --- mock `fs` (used by existsSync checks)
 	const fsMod = {
@@ -38,11 +38,14 @@ async function getComfyUIManager(platform: "darwin" | "win32" = "darwin") {
 		getDefaultComfyUIPath: () => "/tmp/comfyui",
 		findCompatiblePython: () => Promise.resolve("/opt/homebrew/bin/python3.12"),
 		getComfyUIDownloadUrl: () => "https://example.com/comfyui.7z",
+		getPlatformOS: () => (platform === "darwin" ? "macos" : platform === "win32" ? "windows" : "linux"),
 	}))
 
 	// --- mock download-manager (EventEmitter)
 	const downloadManagerMock = {
+		on: vi.fn(),
 		once: vi.fn(),
+		off: vi.fn(),
 		enqueue: vi.fn(),
 	}
 	vi.doMock("../download-manager", () => ({
@@ -145,6 +148,38 @@ describe("ComfyUIManager", () => {
 			await manager.healthCheck()
 
 			expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:9999/system_stats")
+		})
+	})
+
+	describe("install and launch args", () => {
+		it("should use portable download on win32", async () => {
+			const { ComfyUIManager, downloadManagerMock } = await getComfyUIManager("win32")
+
+			downloadManagerMock.enqueue.mockImplementation(() => {
+				setTimeout(() => {
+					const completeCall = downloadManagerMock.once.mock.calls.find((call) => call[0] === "complete")
+					if (completeCall) {
+						completeCall[1]({ id: "dl_id", destPath: "/tmp/comfyui/comfyui_portable.7z" })
+					}
+				}, 10)
+				return "dl_id"
+			})
+
+			const manager = new ComfyUIManager()
+			const extractSpy = vi.spyOn(manager as any, "extractArchive").mockResolvedValue(undefined)
+
+			await manager.install()
+
+			expect(downloadManagerMock.enqueue).toHaveBeenCalled()
+			expect(extractSpy).toHaveBeenCalled()
+		})
+
+		it("should resolve dynamic hardware flags on getLaunchArgs", async () => {
+			const { ComfyUIManager } = await getComfyUIManager("darwin")
+			const manager = new ComfyUIManager()
+
+			const args = await (manager as any).getLaunchArgs()
+			expect(args).toContain("--force-fp16")
 		})
 	})
 })

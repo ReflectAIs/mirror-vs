@@ -21,7 +21,11 @@ export function getTotalRAM(): number {
 	return os.totalmem()
 }
 
-export function getComfyUIDownloadUrl(_os_platform?: PlatformOS): string {
+export function getComfyUIDownloadUrl(os_platform?: PlatformOS): string {
+	const platform = os_platform || getPlatformOS()
+	if (platform === "windows") {
+		return "https://github.com/comfyanonymous/ComfyUI/releases/latest/download/ComfyUI_windows_portable_nvidia.7z"
+	}
 	return "https://github.com/Comfy-Org/ComfyUI.git"
 }
 

@@ -13,7 +13,7 @@ async function main() {
 	const raw = JSON.parse(fs.readFileSync(workflowPath, "utf-8"))
 	const { _pipeline, ...workflow } = raw
 
-	const { WorkflowEngine } = await import("../src/services/image-runtime/workflows/engine")
+	const { WorkflowEngine } = await import("../src/services/image-runtime/workflows/engine.js")
 
 	// Run normalization (includes convertLegacyToObject + populateWidgetInputs)
 	const normalized = WorkflowEngine.normalizeWorkflow(workflow)
