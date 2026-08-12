@@ -23,6 +23,7 @@ export class CodeIndexOrchestrator {
 		private readonly vectorStore: IVectorStore,
 		private readonly scanner: DirectoryScanner,
 		private readonly fileWatcher: IFileWatcher,
+		private readonly context?: vscode.ExtensionContext,
 	) {}
 
 	/**
@@ -124,6 +125,17 @@ export class CodeIndexOrchestrator {
 		let indexingStarted = false
 
 		try {
+			const qdrantUrl = this.configManager.getConfig().qdrantUrl
+			const isLocalQdrant = qdrantUrl === "http://localhost:6333" || qdrantUrl === "http://127.0.0.1:6333"
+			if (isLocalQdrant && this.context) {
+				this.stateManager.setSystemState("Indexing", "Starting local vector database...")
+				const { LocalQdrantManager } = await import("./local-qdrant")
+				const localQdrant = LocalQdrantManager.getInstance(this.context)
+				await localQdrant.start((p) => {
+					this.stateManager.setSystemState("Indexing", `Downloading local database (${p}%)...`)
+				})
+			}
+
 			const collectionCreated = await this.vectorStore.initialize()
 
 			// Successfully connected to Qdrant
