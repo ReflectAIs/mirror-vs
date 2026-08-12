@@ -67,7 +67,12 @@ detect_platform() {
         darwin) OS="darwin" ;;
         linux) OS="linux" ;;
         mingw*|msys*|cygwin*) 
-            error "Windows is not supported by this installer. Please use WSL or install manually."
+            echo ""
+            echo "Windows detected. Please use the PowerShell installer instead:"
+            echo ""
+            echo "  iwr -useb https://raw.githubusercontent.com/ReflectAIs/mirror-vs/main/apps/cli/install.ps1 | iex"
+            echo ""
+            exit 0
             ;;
         *) error "Unsupported OS: $OS" ;;
     esac

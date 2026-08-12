@@ -106,11 +106,18 @@ function ensureExecutable(binPath: string): string {
  */
 export async function getBinPath(vscodeAppRoot?: string): Promise<string | undefined> {
 	// 1) Bundled binary (production + F5 debug where __dirname is dist/ or src/).
+	// Walk up multiple levels to cover:
+	// - Antigravity/VS Code (installed): extensions/mirror-vs-x.y.z/dist/extension.js -> __dirname=dist/ -> dist/ripgrep/rg ✓
+	// - VS Code (installed): extensions/dipeshmajithia.mirror-vs-x.y.z/dist/ -> dist/ripgrep/rg ✓
+	// - F5 Debug (src/): src/services/ripgrep -> ../ripgrep/ ✓
 	const bundledCandidates = [
-		path.join(__dirname, "ripgrep", binName),
-		path.join(__dirname, "dist", "ripgrep", binName),
-		path.join(__dirname, "..", "ripgrep", binName),
+		path.join(__dirname, "ripgrep", binName), // dist/ripgrep/rg (most common bundled)
+		path.join(__dirname, "dist", "ripgrep", binName), // src/dist/ripgrep/rg (dev mode)
+		path.join(__dirname, "..", "ripgrep", binName), // services/../ripgrep/rg
+		path.join(__dirname, "..", "..", "ripgrep", binName),
 		path.join(__dirname, "..", "..", "..", "ripgrep", binName),
+		path.join(__dirname, "..", "..", "..", "..", "ripgrep", binName),
+		path.join(__dirname, "..", "..", "..", "..", "..", "ripgrep", binName),
 	]
 	for (const candidate of bundledCandidates) {
 		if (await fileExistsAtPath(candidate)) {
