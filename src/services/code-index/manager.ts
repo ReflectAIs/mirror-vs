@@ -408,6 +408,7 @@ export class CodeIndexManager {
 			vectorStore,
 			scanner,
 			fileWatcher,
+			this.context,
 		)
 
 		// (Re)Initialize search service

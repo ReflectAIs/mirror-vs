@@ -768,7 +768,7 @@
 			"name": "Utiliser l'outil diff multi-blocs expérimental",
 			"description": "Lorsqu'il est activé, l'assistant utilisera l'outil diff multi-blocs. Cela tentera de mettre à jour plusieurs blocs de code dans le fichier en une seule requête."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Activer la lecture simultanée de fichiers",
 			"description": "Lorsqu'activé, l'assistant peut lire plusieurs fichiers dans une seule requête. Lorsque désactivé, l'assistant doit lire les fichiers un par un. La désactivation peut aider lors du travail avec des modèles moins performants ou lorsque tu souhaites plus de contrôle sur l'accès aux fichiers."
 		},

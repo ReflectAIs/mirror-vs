@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { serializeError } from "serialize-error"
 import pWaitFor from "p-wait-for"
+import path from "path"
 
 import {
 	type MirrorMessage,
@@ -24,13 +25,159 @@ import { sanitizeToolUseId } from "../../utils/tool-id"
 import { defaultModeSlug, getModeBySlug } from "../../shared/modes"
 import { getCheckpointService } from "../checkpoints"
 import { t } from "../../i18n"
+import { listFiles } from "../../services/glob/list-files"
 
 import type { ToolUse, ToolParamName } from "../../shared/tools"
 import type { AssistantMessageContent } from "../assistant-message"
 import type { GroundingSource } from "../../api/transform/stream"
 import { Task } from "./Task"
+import { isTransientProviderError } from "./transient-error"
 
-const DEFAULT_USAGE_COLLECTION_TIMEOUT_MS = 5_000 // 5 seconds
+// ────────────────────────────────────────────────────────────
+//  Struggle Ledger — Auto-Recovery Engine
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Tracks repeated failures of the same pattern to prevent silent
+ * infinite billing loops. If the same pattern fires 2+ times,
+ * the task hard-aborts and escalates to the user.
+ */
+export interface StruggleEntry {
+	pattern: string
+	timestamps: number[]
+	resolved: boolean
+}
+
+/**
+ * Outcome of a {@link StruggleLedger.record} call.
+ */
+export interface StruggleRecordResult {
+	shouldEscalate: boolean
+	entry: StruggleEntry
+}
+
+/**
+ * Thread-safe ledger that records tool-call failures by pattern.
+ *
+ * ## Lifecycle
+ * 1. A tool call fails → `ledger.record("file_not_found")`
+ * 2. If same pattern fires twice → `shouldEscalate = true`
+ * 3. On success → `ledger.resolve("file_not_found")` clears the entry
+ */
+export class StruggleLedger {
+	private entries: Map<string, StruggleEntry> = new Map()
+
+	/**
+	 * Record a failure for the given pattern.
+	 * @returns `{ shouldEscalate: true }` if this is the **2nd** (or later) occurrence.
+	 */
+	record(pattern: string): StruggleRecordResult {
+		const existing = this.entries.get(pattern)
+		const entry: StruggleEntry = existing ?? { pattern, timestamps: [], resolved: false }
+		entry.timestamps.push(Date.now())
+		this.entries.set(pattern, entry)
+
+		if (entry.timestamps.length >= 2) {
+			entry.resolved = false
+			return { shouldEscalate: true, entry }
+		}
+		return { shouldEscalate: false, entry }
+	}
+
+	/**
+	 * Mark a pattern as resolved — typically called after a successful retry.
+	 */
+	resolve(pattern: string): void {
+		const entry = this.entries.get(pattern)
+		if (entry) {
+			entry.resolved = true
+		}
+	}
+
+	/**
+	 * Return a snapshot of all tracked entries (for debugging / telemetry).
+	 */
+	snapshot(): StruggleEntry[] {
+		return Array.from(this.entries.values())
+	}
+}
+
+/**
+ * A recovery strategy knows how to detect and auto-fix a specific mistake
+ * pattern (e.g. `file_not_found` → list the parent directory).
+ */
+export interface RecoveryStrategy {
+	pattern: RegExp
+	action: (
+		errorMessage: string,
+		toolName: string,
+		toolArgs: Record<string, unknown>,
+		ledger: StruggleLedger,
+	) => Promise<RecoveryAction>
+}
+
+/**
+ * The result of running a {@link RecoveryStrategy}.
+ * - `"escalate"` → hard-abort, ask the user for help
+ * - `"retry"` → continue with adjusted arguments (the message will be fed back to the model)
+ * - `"skip"` → not a recoverable error after all, let normal error handling proceed
+ */
+export type RecoveryAction =
+	| { type: "escalate"; message: string }
+	| { type: "retry"; message: string }
+	| { type: "skip" }
+
+/**
+ * Built-in recovery strategies keyed by pattern name.
+ *
+ * ### `file_not_found`
+ * Detects `ENOENT`, `file not found`, or similar filesystem errors.
+ * On first occurrence: lists the parent directory and returns the first
+ * file found as a corrected path (auto-fix).
+ * On second occurrence: escalates to the user.
+ */
+export const RECOVERY_STRATEGIES: Record<string, RecoveryStrategy> = {
+	file_not_found: {
+		pattern: /ENOENT|file.*not found|no such file or directory/i,
+		action: async (
+			_errorMessage: string,
+			_toolName: string,
+			toolArgs: Record<string, unknown>,
+			ledger: StruggleLedger,
+		) => {
+			const { shouldEscalate } = ledger.record("file_not_found")
+
+			if (shouldEscalate) {
+				return {
+					type: "escalate" as const,
+					message: "File not found after 2 retries. Please specify the correct file path.",
+				}
+			}
+
+			// Auto-fix: list the parent directory so the model can pick the right file
+			const filePath = (toolArgs as any)?.path ?? (toolArgs as any)?.file_path ?? ""
+			const dir = path.dirname(String(filePath))
+			try {
+				const [files] = await listFiles(dir, false, 50)
+				if (files.length > 0) {
+					return {
+						type: "retry" as const,
+						message: `File "${filePath}" not found. Found files in "${dir}": ${files.slice(0, 10).join(", ")}${files.length > 10 ? `…and ${files.length - 10} more` : ""}`,
+					}
+				}
+				return {
+					type: "retry" as const,
+					message: `File "${filePath}" not found. Directory "${dir}" appears empty or does not exist.`,
+				}
+			} catch {
+				return {
+					type: "retry" as const,
+					message: `File "${filePath}" not found. Could not list directory "${dir}".`,
+				}
+			}
+		},
+	},
+}
 
 /**
  * Manages the main agentic loop of a Task — initiating the task loop and
@@ -40,7 +187,7 @@ const DEFAULT_USAGE_COLLECTION_TIMEOUT_MS = 5_000 // 5 seconds
  * - The outer `initiateTaskLoop` that re-queues user feedback
  * - The inner `recursivelyMakeMirrorRequests` stack-based loop
  * - Streaming response processing (text, tool_use, reasoning, grounding)
- * - Background usage collection (`drainStreamInBackgroundToFindAllUsage`)
+ * - Inline usage capture from stream chunks
  * - Retry / backoff logic for streaming failures and empty responses
  */
 export class TaskMainLoop {
@@ -225,7 +372,7 @@ export class TaskMainLoop {
 				}
 			}
 
-			const environmentDetails = await getEnvironmentDetails(this.task, currentIncludeFileDetails)
+			const environmentDetails = await getEnvironmentDetails(this.task, currentIncludeFileDetails, currentMode)
 
 			// Remove any existing environment_details blocks before adding fresh ones.
 			// This prevents duplicate environment details when resuming tasks,
@@ -675,143 +822,23 @@ export class TaskMainLoop {
 						}
 					}
 
-					// Create a copy of current token values to avoid race conditions
-					const currentTokens = {
-						input: inputTokens,
-						output: outputTokens,
-						cacheWrite: cacheWriteTokens,
-						cacheRead: cacheReadTokens,
-						total: totalCost,
-					}
+					// Persist final token usage to the API request message
+					// The main loop already captured all usage chunks inline (case "usage"),
+					// so we just need to update the message and save.
+					updateApiReqMsg()
 
-					const drainStreamInBackgroundToFindAllUsage = async (apiReqIndex: number) => {
-						const timeoutMs = DEFAULT_USAGE_COLLECTION_TIMEOUT_MS
-						const startTime = performance.now()
-						const modelId = getModelId(this.task.apiConfiguration)
-
-						// Local variables to accumulate usage data without affecting the main flow
-						let bgInputTokens = currentTokens.input
-						let bgOutputTokens = currentTokens.output
-						let bgCacheWriteTokens = currentTokens.cacheWrite
-						let bgCacheReadTokens = currentTokens.cacheRead
-						let bgTotalCost = currentTokens.total
-
-						// Helper function to update messages
-						const captureUsageData = async (
-							tokens: {
-								input: number
-								output: number
-								cacheWrite: number
-								cacheRead: number
-								total?: number
-							},
-							messageIndex: number = apiReqIndex,
-						) => {
-							if (
-								tokens.input > 0 ||
-								tokens.output > 0 ||
-								tokens.cacheWrite > 0 ||
-								tokens.cacheRead > 0
-							) {
-								inputTokens = tokens.input
-								outputTokens = tokens.output
-								cacheWriteTokens = tokens.cacheWrite
-								cacheReadTokens = tokens.cacheRead
-								totalCost = tokens.total
-
-								updateApiReqMsg()
-								await this.task.mirrorMessagesManager.saveMirrorMessages()
-
-								const apiReqMessage = this.task.mirrorMessages[messageIndex]
-								if (apiReqMessage) {
-									await this.task.mirrorMessagesManager.updateMirrorMessage(apiReqMessage)
-								}
-							}
-						}
-
+					// Fire-and-forget the disk write so the main loop isn't blocked
+					;(async () => {
 						try {
-							// Continue processing the original stream from where the main loop left off
-							let usageFound = false
-							let chunkCount = 0
-
-							// Use the same iterator that the main loop was using
-							while (!item.done) {
-								// Check for timeout
-								if (performance.now() - startTime > timeoutMs) {
-									console.warn(
-										`[Background Usage Collection] Timed out after ${timeoutMs}ms for model: ${modelId}, processed ${chunkCount} chunks`,
-									)
-									// Clean up the iterator before breaking
-									if (iterator.return) {
-										await iterator.return(undefined)
-									}
-									break
-								}
-
-								const chunk = item.value
-								item = await iterator.next()
-								chunkCount++
-
-								if (chunk && chunk.type === "usage") {
-									usageFound = true
-									bgInputTokens += chunk.inputTokens
-									bgOutputTokens += chunk.outputTokens
-									bgCacheWriteTokens += chunk.cacheWriteTokens ?? 0
-									bgCacheReadTokens += chunk.cacheReadTokens ?? 0
-									bgTotalCost = chunk.totalCost
-								}
-							}
-
-							if (
-								usageFound ||
-								bgInputTokens > 0 ||
-								bgOutputTokens > 0 ||
-								bgCacheWriteTokens > 0 ||
-								bgCacheReadTokens > 0
-							) {
-								// We have usage data either from a usage chunk or accumulated tokens
-								await captureUsageData(
-									{
-										input: bgInputTokens,
-										output: bgOutputTokens,
-										cacheWrite: bgCacheWriteTokens,
-										cacheRead: bgCacheReadTokens,
-										total: bgTotalCost,
-									},
-									lastApiReqIndex,
-								)
-							} else {
-								console.warn(
-									`[Background Usage Collection] Suspicious: request ${apiReqIndex} is complete, but no usage info was found. Model: ${modelId}`,
-								)
+							await this.task.mirrorMessagesManager.saveMirrorMessages()
+							const apiReqMessage = this.task.mirrorMessages[lastApiReqIndex]
+							if (apiReqMessage) {
+								await this.task.mirrorMessagesManager.updateMirrorMessage(apiReqMessage)
 							}
 						} catch (error) {
-							console.error("Error draining stream for usage data:", error)
-							// Still try to capture whatever usage data we have collected so far
-							if (
-								bgInputTokens > 0 ||
-								bgOutputTokens > 0 ||
-								bgCacheWriteTokens > 0 ||
-								bgCacheReadTokens > 0
-							) {
-								await captureUsageData(
-									{
-										input: bgInputTokens,
-										output: bgOutputTokens,
-										cacheWrite: bgCacheWriteTokens,
-										cacheRead: bgCacheReadTokens,
-										total: bgTotalCost,
-									},
-									lastApiReqIndex,
-								)
-							}
+							console.error("Failed to persist usage data:", error)
 						}
-					}
-
-					// Start the background task and handle any errors
-					drainStreamInBackgroundToFindAllUsage(lastApiReqIndex).catch((error) => {
-						console.error("Background usage collection failed:", error)
-					})
+					})()
 				} catch (error) {
 					// Abandoned happens when extension is no longer waiting for the
 					// Mirror instance to finish aborting (error is thrown here when
@@ -841,9 +868,13 @@ export class TaskMainLoop {
 								`[Task#${this.task.taskId}.${this.task.instanceId}] Stream failed, will retry: ${streamingFailedMessage}`,
 							)
 
-							// Apply exponential backoff similar to first-chunk errors when auto-resubmit is enabled
+							// Apply exponential backoff similar to first-chunk errors when auto-resubmit is
+							// enabled. Transient provider capacity errors (overloaded 529, rate limit 429,
+							// unavailable 503) also auto-retry even without auto-approval so concurrent
+							// multi-tab use doesn't dump the raw "provider couldn't process the request"
+							// error on the user.
 							const stateForBackoff = await this.task.providerRef.deref()?.getState()
-							if (stateForBackoff?.autoApprovalEnabled) {
+							if (stateForBackoff?.autoApprovalEnabled || isTransientProviderError(error)) {
 								await this.task.backoffAndAnnounce(currentItem.retryAttempt ?? 0, error)
 
 								// Check if task was aborted during the backoff

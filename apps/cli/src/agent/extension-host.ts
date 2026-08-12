@@ -19,6 +19,7 @@ import pWaitFor from "p-wait-for"
 import type {
 	MirrorMessage,
 	ExtensionMessage,
+	ProviderNameWithRetired,
 	ReasoningEffortExtended,
 	MirrorVSSettings,
 	WebviewMessage,
@@ -220,14 +221,15 @@ export class ExtensionHost extends EventEmitter implements ExtensionHostInterfac
 
 		// Populate initial settings.
 		const baseSettings: MirrorVSSettings = {
+			...getProviderSettings(this.options.provider, this.options.apiKey, this.options.model),
 			mode: this.options.mode,
+			apiProvider: this.options.provider as ProviderNameWithRetired,
 			consecutiveMistakeLimit: this.options.consecutiveMistakeLimit ?? DEFAULT_FLAGS.consecutiveMistakeLimit,
 			commandExecutionTimeout: 300,
 			enableCheckpoints: false,
 			experiments: {
 				customTools: true,
 			},
-			...getProviderSettings(this.options.provider, this.options.apiKey, this.options.model),
 		}
 
 		this.initialSettings = this.options.nonInteractive
@@ -393,8 +395,19 @@ export class ExtensionHost extends EventEmitter implements ExtensionHostInterfac
 		const Module = require("module")
 		const originalResolve = Module._resolveFilename
 
+		// Intercept resolution of react so extension bundle shares React instance with TUI
+		const reactInstance = require("react")
+		let reactDomInstance: unknown
+		try {
+			reactDomInstance = require("react-dom")
+		} catch {
+			reactDomInstance = {}
+		}
+
 		Module._resolveFilename = function (request: string, parent: unknown, isMain: boolean, options: unknown) {
 			if (request === "vscode") return "vscode-mock"
+			if (request === "react") return "react-mock"
+			if (request === "react-dom") return "react-dom-mock"
 			return originalResolve.call(this, request, parent, isMain, options)
 		}
 
@@ -403,6 +416,32 @@ export class ExtensionHost extends EventEmitter implements ExtensionHostInterfac
 			filename: "vscode-mock",
 			loaded: true,
 			exports: this.vscode,
+			children: [],
+			paths: [],
+			path: "",
+			isPreloading: false,
+			parent: null,
+			require: require,
+		} as unknown as NodeJS.Module
+
+		require.cache["react-mock"] = {
+			id: "react-mock",
+			filename: "react-mock",
+			loaded: true,
+			exports: reactInstance,
+			children: [],
+			paths: [],
+			path: "",
+			isPreloading: false,
+			parent: null,
+			require: require,
+		} as unknown as NodeJS.Module
+
+		require.cache["react-dom-mock"] = {
+			id: "react-dom-mock",
+			filename: "react-dom-mock",
+			loaded: true,
+			exports: reactDomInstance,
 			children: [],
 			paths: [],
 			path: "",
@@ -421,13 +460,14 @@ export class ExtensionHost extends EventEmitter implements ExtensionHostInterfac
 			)
 		}
 
-		Module._resolveFilename = originalResolve
-
 		try {
 			this.extensionAPI = await this.extensionModule.activate(this.vscode.context)
 		} catch (error) {
+			Module._resolveFilename = originalResolve
 			throw new Error(`Failed to activate extension: ${error instanceof Error ? error.message : String(error)}`)
 		}
+
+		Module._resolveFilename = originalResolve
 
 		// Set up message listener - forward all messages to client.
 		this.messageListener = (message: ExtensionMessage) => this.client.handleMessage(message)
@@ -449,6 +489,11 @@ export class ExtensionHost extends EventEmitter implements ExtensionHostInterfac
 		// instead of the CLI-provided settings.
 		setRuntimeConfigValues("mirror-vs", this.initialSettings as Record<string, unknown>)
 		this.sendToExtension({ type: "updateSettings", updatedSettings: this.initialSettings })
+		this.sendToExtension({
+			type: "upsertApiConfiguration",
+			text: "default",
+			apiConfiguration: this.initialSettings,
+		})
 
 		// Now trigger extension initialization. The context proxy should already
 		// have CLI-provided values when the webviewDidLaunch handler runs.

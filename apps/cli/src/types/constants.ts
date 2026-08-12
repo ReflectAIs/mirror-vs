@@ -15,9 +15,11 @@ export const REASONING_EFFORTS = [...reasoningEffortsExtended, "unspecified", "d
  */
 export const FOLLOWUP_TIMEOUT_SECONDS = 60
 
-export const ASCII_MIRROR = `  _,'   ___
- <__\\__/   \\
-    \\_  /  _\\
-      \\,\\ / \\\\
-        //   \\\\
-      ,/'     \`\\_,`
+export const ASCII_MIRROR = `    /\\
+   /  \\
+  / ◕‿◕ \\
+ / /  \\ \\
+ \\ \\  / /
+  \\ \\/ /
+   \\  /
+    \\/`

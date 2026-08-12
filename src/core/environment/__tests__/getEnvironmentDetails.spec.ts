@@ -28,6 +28,15 @@ vi.mock("vscode", () => ({
 	env: {
 		language: "en-US",
 	},
+	languages: {
+		getDiagnostics: vi.fn().mockReturnValue([]),
+	},
+	DiagnosticSeverity: {
+		Error: 0,
+		Warning: 1,
+		Information: 2,
+		Hint: 3,
+	},
 }))
 
 vi.mock("p-wait-for", () => ({
@@ -382,14 +391,14 @@ describe("getEnvironmentDetails", () => {
 		const result = await getEnvironmentDetails(mirror as Task)
 		expect(result).toContain("REMINDERS")
 	})
-	it("should include git status when maxGitStatusFiles > 0", async () => {
+	it("should include git status when maxGitStatusFiles > 0 and includeFileDetails is true", async () => {
 		;(getGitStatus as Mock).mockResolvedValue("## main\nM  file1.ts")
 		mockProvider.getState.mockResolvedValue({
 			...mockState,
 			maxGitStatusFiles: 10,
 		})
 
-		const result = await getEnvironmentDetails(mockMirror as Task)
+		const result = await getEnvironmentDetails(mockMirror as Task, true)
 
 		expect(result).toContain("# Git Status")
 		expect(result).toContain("## main")
@@ -420,7 +429,7 @@ describe("getEnvironmentDetails", () => {
 		expect(getGitStatus).not.toHaveBeenCalled()
 	})
 
-	it("should handle git status returning null gracefully when enabled", async () => {
+	it("should show tool hint instead of inline git status when includeFileDetails is false", async () => {
 		;(getGitStatus as Mock).mockResolvedValue(null)
 		mockProvider.getState.mockResolvedValue({
 			...mockState,
@@ -429,18 +438,27 @@ describe("getEnvironmentDetails", () => {
 
 		const result = await getEnvironmentDetails(mockMirror as Task)
 
-		expect(result).not.toContain("# Git Status")
-		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 10)
+		// Should show tool hint rather than calling getGitStatus
+		expect(result).toContain("# Git Status")
+		expect(result).toContain("Use `get_git_status`")
+		expect(getGitStatus).not.toHaveBeenCalled()
 	})
 
-	it("should pass maxFiles parameter to getGitStatus", async () => {
+	it("should show tool hint instead of inline workspace pulse when includeFileDetails is false", async () => {
+		const result = await getEnvironmentDetails(mockMirror as Task)
+
+		expect(result).toContain("# Workspace Pulse")
+		expect(result).toContain("Use `get_workspace_pulse`")
+	})
+
+	it("should pass maxFiles parameter to getGitStatus when includeFileDetails is true", async () => {
 		;(getGitStatus as Mock).mockResolvedValue("## main")
 		mockProvider.getState.mockResolvedValue({
 			...mockState,
 			maxGitStatusFiles: 5,
 		})
 
-		await getEnvironmentDetails(mockMirror as Task)
+		await getEnvironmentDetails(mockMirror as Task, true)
 
 		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 5)
 	})

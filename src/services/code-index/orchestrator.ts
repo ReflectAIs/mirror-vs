@@ -23,6 +23,7 @@ export class CodeIndexOrchestrator {
 		private readonly vectorStore: IVectorStore,
 		private readonly scanner: DirectoryScanner,
 		private readonly fileWatcher: IFileWatcher,
+		private readonly context?: vscode.ExtensionContext,
 	) {}
 
 	/**
@@ -122,8 +123,20 @@ export class CodeIndexOrchestrator {
 		// Track whether we successfully connected to Qdrant and started indexing
 		// This helps us decide whether to preserve cache on error
 		let indexingStarted = false
+		const batchErrors: Error[] = []
 
 		try {
+			const qdrantUrl = this.configManager.getConfig().qdrantUrl
+			const isLocalQdrant = qdrantUrl === "http://localhost:6333" || qdrantUrl === "http://127.0.0.1:6333"
+			if (isLocalQdrant && this.context) {
+				this.stateManager.setSystemState("Indexing", "Starting local vector database...")
+				const { LocalQdrantManager } = await import("./local-qdrant")
+				const localQdrant = LocalQdrantManager.getInstance(this.context)
+				await localQdrant.start((p) => {
+					this.stateManager.setSystemState("Indexing", `Downloading local database (${p}%)...`)
+				})
+			}
+
 			const collectionCreated = await this.vectorStore.initialize()
 
 			// Successfully connected to Qdrant
@@ -150,7 +163,6 @@ export class CodeIndexOrchestrator {
 
 				let cumulativeBlocksIndexed = 0
 				let cumulativeBlocksFoundSoFar = 0
-				let batchErrors: Error[] = []
 				let lastReportTime = 0
 				const REPORT_THROTTLE_MS = 100
 
@@ -225,7 +237,6 @@ export class CodeIndexOrchestrator {
 
 				let cumulativeBlocksIndexed = 0
 				let cumulativeBlocksFoundSoFar = 0
-				let batchErrors: Error[] = []
 				let lastReportTime = 0
 				const REPORT_THROTTLE_MS = 100
 
@@ -353,10 +364,31 @@ export class CodeIndexOrchestrator {
 				)
 			}
 
+			// Build a detailed error report including stack, causes, and all batch errors
+			let detailedMessage = error.message || t("embeddings:orchestrator.unknownError")
+			if (error.stack) {
+				detailedMessage += `\n\nStack Trace:\n${error.stack}`
+			}
+			if (error.cause) {
+				detailedMessage += `\n\nCaused by:\n${error.cause.message || String(error.cause)}`
+				if (error.cause.stack) {
+					detailedMessage += `\n${error.cause.stack}`
+				}
+			}
+			if (batchErrors.length > 0) {
+				detailedMessage += `\n\nBatch Errors (${batchErrors.length}):`
+				batchErrors.forEach((err, idx) => {
+					detailedMessage += `\n[Batch ${idx + 1}] ${err.message || String(err)}`
+					if (err.stack) {
+						detailedMessage += `\n${err.stack}`
+					}
+				})
+			}
+
 			this.stateManager.setSystemState(
 				"Error",
 				t("embeddings:orchestrator.failedDuringInitialScan", {
-					errorMessage: error.message || t("embeddings:orchestrator.unknownError"),
+					errorMessage: detailedMessage,
 				}),
 			)
 			this.stopWatcher()

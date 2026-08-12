@@ -18,6 +18,7 @@ import {
 	handleWebviewDidLaunch,
 	handleNewTask,
 	handleRenameSession,
+	handleRenameTask,
 	handleAskResponse,
 	handleTerminalOperation,
 	handleKillTerminal,
@@ -36,6 +37,8 @@ import {
 	handleUpdateTodoList,
 	handleFocusPanelRequest,
 	handleSwitchTab,
+	handleSwitchTaskTab,
+	handleCloseTaskTab,
 	handleInsertTextIntoTextarea,
 	handleRefreshCustomTools,
 	handleOpenCustomModesSettings,
@@ -124,6 +127,7 @@ import {
 	handleToggleWorkspaceIndexing,
 	handleSetAutoEnableDefault,
 	handleClearIndexData,
+	handleAutoSetupCodeIndex,
 } from "./handlers/codeIndexHandler"
 
 // ── Command handlers ───────────────────────────────────────────
@@ -226,6 +230,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "renameSession":
 			await handleRenameSession(provider, message.sessionId, message.sessionName)
 			break
+		case "renameTask":
+			await handleRenameTask(provider, message.taskId, message.sessionName)
+			break
 		case "customInstructions":
 			await provider.updateCustomInstructions(message.text)
 			break
@@ -303,6 +310,38 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "switchTab":
 			await handleSwitchTab(provider, message.tab, message.values)
 			break
+		case "forgetContextFile":
+			if (message.text && provider.getCurrentTask()) {
+				await provider.getCurrentTask()!.fileContextTracker.forgetFile(message.text)
+				await provider.postStateToWebview()
+			}
+			break
+		case "forgetAllContextFiles":
+			if (provider.getCurrentTask()) {
+				await provider.getCurrentTask()!.fileContextTracker.forgetAllFiles()
+				await provider.postStateToWebview()
+			}
+			break
+		case "toggleContextFileStorageTier":
+			if (message.text && provider.getCurrentTask() && message.values?.tier) {
+				const tier = message.values.tier as "hot" | "cold"
+				await provider.getCurrentTask()!.fileContextTracker.toggleFileStorageTier(message.text, tier)
+				await provider.postStateToWebview()
+			}
+			break
+		case "toggleAllContextFilesStorageTier":
+			if (provider.getCurrentTask() && message.values?.tier) {
+				const tier = message.values.tier as "hot" | "cold"
+				await provider.getCurrentTask()!.fileContextTracker.toggleAllFilesStorageTier(tier)
+				await provider.postStateToWebview()
+			}
+			break
+		case "switchTaskTab":
+			await handleSwitchTaskTab(provider, message.taskId)
+			break
+		case "closeTaskTab":
+			await handleCloseTaskTab(provider, message.taskId)
+			break
 		case "insertTextIntoTextarea":
 			await handleInsertTextIntoTextarea(provider, message.text)
 			break
@@ -376,7 +415,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleGetListApiConfiguration(provider)
 			break
 		case "modelChange":
-			await handleModelChange(provider, message.text)
+			await handleModelChange(provider, message.apiConfiguration)
 			break
 		case "lockApiConfigAcrossModes":
 			await handleLockApiConfigAcrossModes(provider, message.bool)
@@ -582,6 +621,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "clearIndexData":
 			await handleClearIndexData(provider)
+			break
+		case "autoSetupCodeIndex":
+			await handleAutoSetupCodeIndex(provider)
 			break
 
 		// ── Commands & Skills ───────────────────────────────

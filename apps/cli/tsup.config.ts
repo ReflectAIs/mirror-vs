@@ -28,4 +28,16 @@ export default defineConfig({
 		options.jsx = "automatic"
 		options.jsxImportSource = "react"
 	},
+	async onSuccess() {
+		const fs = await import("fs")
+		const path = await import("path")
+		const srcDist = path.resolve(__dirname, "../../src/dist")
+		const cliExt = path.resolve(__dirname, "extension")
+		if (fs.existsSync(path.join(srcDist, "extension.js"))) {
+			fs.mkdirSync(cliExt, { recursive: true })
+			fs.cpSync(srcDist, cliExt, { recursive: true })
+			fs.writeFileSync(path.join(cliExt, "package.json"), JSON.stringify({ type: "commonjs" }, null, 2))
+			console.log("[tsup] Copied extension bundle & package.json (commonjs) to apps/cli/extension")
+		}
+	},
 })

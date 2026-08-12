@@ -270,4 +270,37 @@ export class HardwareDetector {
 
 		return { supported: true }
 	}
+
+	/**
+	 * Recommend optimal ComfyUI command line flags based on hardware.
+	 */
+	static async getRecommendedFlags(hardware?: HardwareInfo): Promise<string[]> {
+		const hw = hardware || (await HardwareDetector.detect())
+		const flags: string[] = []
+
+		if (hw.os === "macos" && hw.hasMetal) {
+			// macOS metal / Apple Silicon
+			flags.push("--force-fp16")
+			if (hw.totalRAMGB < 16) {
+				flags.push("--lowvram")
+			}
+		} else if (hw.hasCUDA && hw.gpuMemoryGB !== undefined) {
+			// Nvidia GPU with CUDA
+			if (hw.gpuMemoryGB < 4) {
+				flags.push("--lowvram")
+			} else if (hw.gpuMemoryGB >= 16) {
+				flags.push("--highvram")
+			}
+		} else if (hw.hasROCm) {
+			// AMD GPU with ROCm
+			if (hw.gpuMemoryGB !== undefined && hw.gpuMemoryGB < 8) {
+				flags.push("--lowvram")
+			}
+		} else {
+			// CPUfallback
+			flags.push("--cpu")
+		}
+
+		return flags
+	}
 }

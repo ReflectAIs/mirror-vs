@@ -145,6 +145,10 @@ export type NativeToolArgs = {
 	render_preview: { url: string; width?: number; height?: number }
 	browser_scroll: { direction: string; amount?: number }
 	browser_select: { selector: string; value: string }
+	// On-demand context retrieval tools (cost optimization)
+	get_workspace_file_tree: Record<string, never>
+	get_workspace_pulse: Record<string, never>
+	get_git_status: { maxFiles?: number }
 	// Add more tools as they are migrated to native protocol
 }
 
@@ -333,6 +337,11 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	package_search: "search package registries",
 	read_url: "read URL content",
 	ssh_session: "manage SSH server sessions",
+	get_workspace_file_tree: "get workspace file tree",
+	get_workspace_pulse: "get workspace pulse",
+	get_git_status: "get git status",
+	search_mcp_tools: "search mcp tools",
+	activate_mcp_tool: "activate mcp tool",
 } as const
 
 // Define available tool groups.
@@ -348,6 +357,10 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 			"docs_search",
 			"package_search",
 			"read_url",
+			// On-demand context retrieval tools
+			"get_workspace_file_tree",
+			"get_workspace_pulse",
+			"get_git_status",
 		],
 	},
 	edit: {
@@ -392,6 +405,12 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"run_slash_command",
 	"skill",
 	"generate_image",
+	// On-demand context retrieval tools — available in all modes, cost-optimized
+	"get_workspace_file_tree",
+	"get_workspace_pulse",
+	"get_git_status",
+	"search_mcp_tools",
+	"activate_mcp_tool",
 ] as const
 
 /**

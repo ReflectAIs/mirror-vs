@@ -1,28 +1,14 @@
 import { render, screen, fireEvent } from "@/utils/test-utils"
 
-import TaskGroupItem from "../TaskGroupItem"
-import type { TaskGroup, DisplayHistoryItem, SubtaskTreeNode } from "../types"
+import SessionGroupItem from "../SessionGroupItem"
+import type { SessionGroup, DisplayHistoryItem } from "../types"
 
 vi.mock("@src/utils/vscode")
-vi.mock("@src/i18n/TranslationContext", () => ({
-	useAppTranslation: () => ({
-		t: (key: string, options?: Record<string, unknown>) => {
-			if (key === "history:subtasks" && options?.count !== undefined) {
-				return `${options.count} Subtask${options.count === 1 ? "" : "s"}`
-			}
-			if (key === "history:subtaskTag") return "Subtask: "
-			return key
-		},
-	}),
-}))
-
 vi.mock("@/utils/format", () => ({
 	formatTimeAgo: vi.fn(() => "2 hours ago"),
-	formatDate: vi.fn(() => "January 15 at 2:30 PM"),
-	formatLargeNumber: vi.fn((num: number) => num.toString()),
 }))
 
-const createMockDisplayHistoryItem = (overrides: Partial<DisplayHistoryItem> = {}): DisplayHistoryItem => ({
+const createMockDisplayItem = (overrides: Partial<DisplayHistoryItem> = {}): DisplayHistoryItem => ({
 	id: "task-1",
 	number: 1,
 	task: "Test task",
@@ -34,340 +20,354 @@ const createMockDisplayHistoryItem = (overrides: Partial<DisplayHistoryItem> = {
 	...overrides,
 })
 
-const createMockSubtaskNode = (
-	itemOverrides: Partial<DisplayHistoryItem> = {},
-	children: SubtaskTreeNode[] = [],
-	isExpanded = false,
-): SubtaskTreeNode => ({
-	item: createMockDisplayHistoryItem(itemOverrides),
-	children,
-	isExpanded,
-})
-
-const createMockGroup = (overrides: Partial<TaskGroup> = {}): TaskGroup => ({
-	parent: createMockDisplayHistoryItem({ id: "parent-1", task: "Parent task" }),
-	subtasks: [],
+const createMockSession = (overrides: Partial<SessionGroup> = {}): SessionGroup => ({
+	sessionId: "session-1",
+	sessionName: "Session 1",
+	tabs: [],
+	taskCount: 0,
+	newestTs: Date.now(),
 	isExpanded: false,
 	...overrides,
 })
 
-describe("TaskGroupItem", () => {
+describe("SessionGroupItem", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 	})
 
-	describe("parent task rendering", () => {
-		it("renders parent task content", () => {
-			const group = createMockGroup({
-				parent: createMockDisplayHistoryItem({
-					id: "parent-1",
-					task: "Test parent task content",
-				}),
+	describe("session header rendering", () => {
+		it("renders session name and test id", () => {
+			const session = createMockSession({
+				sessionId: "my-session",
+				sessionName: "My Session",
 			})
 
 			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
 			)
 
-			expect(screen.getByText("Test parent task content")).toBeInTheDocument()
+			expect(screen.getByTestId("session-group-my-session")).toBeInTheDocument()
+			expect(screen.getByText("My Session")).toBeInTheDocument()
 		})
 
-		it("renders group container with correct test id", () => {
-			const group = createMockGroup({
-				parent: createMockDisplayHistoryItem({ id: "my-parent-id" }),
+		it("shows tab count in header", () => {
+			const tabs = [
+				createMockDisplayItem({ id: "tab-1", task: "Tab 1" }),
+				createMockDisplayItem({ id: "tab-2", task: "Tab 2" }),
+			]
+			const session = createMockSession({
+				tabs,
+				taskCount: 2,
 			})
 
 			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
 			)
 
-			expect(screen.getByTestId("task-group-my-parent-id")).toBeInTheDocument()
+			expect(screen.getByText("2 tabs")).toBeInTheDocument()
 		})
-	})
 
-	describe("subtask count display", () => {
-		it("shows correct subtask count", () => {
-			const group = createMockGroup({
-				subtasks: [
-					createMockSubtaskNode({ id: "child-1", task: "Child 1" }),
-					createMockSubtaskNode({ id: "child-2", task: "Child 2" }),
-					createMockSubtaskNode({ id: "child-3", task: "Child 3" }),
-				],
+		it("shows singular tab label for single tab", () => {
+			const session = createMockSession({
+				tabs: [createMockDisplayItem({ id: "tab-1" })],
+				taskCount: 1,
 			})
 
 			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
 			)
 
-			expect(screen.getByText("3 Subtasks")).toBeInTheDocument()
-		})
-
-		it("shows singular subtask text for single subtask", () => {
-			const group = createMockGroup({
-				subtasks: [createMockSubtaskNode({ id: "child-1", task: "Child 1" })],
-			})
-
-			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
-			)
-
-			expect(screen.getByText("1 Subtask")).toBeInTheDocument()
-		})
-
-		it("does not show subtask row when no subtasks", () => {
-			const group = createMockGroup({ subtasks: [] })
-
-			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
-			)
-
-			expect(screen.queryByTestId("subtask-collapsible-row")).not.toBeInTheDocument()
-		})
-
-		it("renders correct total subtask count with nested children", () => {
-			const group = createMockGroup({
-				subtasks: [
-					createMockSubtaskNode({ id: "child-1", task: "Child 1" }, [
-						createMockSubtaskNode({ id: "grandchild-1", task: "Grandchild 1" }),
-						createMockSubtaskNode({ id: "grandchild-2", task: "Grandchild 2" }),
-					]),
-					createMockSubtaskNode({ id: "child-2", task: "Child 2" }),
-				],
-			})
-
-			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
-			)
-
-			// 2 direct children + 2 grandchildren = 4 total
-			expect(screen.getByText("4 Subtasks")).toBeInTheDocument()
+			expect(screen.getByText("1 tab")).toBeInTheDocument()
 		})
 	})
 
 	describe("expand/collapse behavior", () => {
-		it("calls onToggleExpand when chevron row is clicked", () => {
+		it("calls onToggleExpand when header is clicked", () => {
 			const onToggleExpand = vi.fn()
-			const group = createMockGroup({
-				subtasks: [createMockSubtaskNode({ id: "child-1", task: "Child 1" })],
-			})
+			const session = createMockSession()
 
 			render(
-				<TaskGroupItem
-					group={group}
+				<SessionGroupItem
+					session={session}
 					variant="full"
+					selectedTaskIds={new Set()}
 					onToggleExpand={onToggleExpand}
-					onToggleSubtaskExpand={vi.fn()}
+					onRenameSession={vi.fn()}
 				/>,
 			)
 
-			const collapsibleRow = screen.getByTestId("subtask-collapsible-row")
-			fireEvent.click(collapsibleRow)
+			const header = screen.getByRole("button", { name: /Session 1/i })
+			fireEvent.click(header)
 
 			expect(onToggleExpand).toHaveBeenCalledTimes(1)
 		})
 
-		it("shows subtasks when expanded", () => {
-			const group = createMockGroup({
+		it("shows tabs when expanded", () => {
+			const tabs = [createMockDisplayItem({ id: "tab-1", task: "Visible tab content" })]
+			const session = createMockSession({
 				isExpanded: true,
-				subtasks: [
-					createMockSubtaskNode({ id: "child-1", task: "Subtask content 1" }),
-					createMockSubtaskNode({ id: "child-2", task: "Subtask content 2" }),
-				],
+				tabs,
+				taskCount: 1,
 			})
 
 			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
 			)
 
-			expect(screen.getByTestId("subtask-list")).toBeInTheDocument()
-			expect(screen.getByText("Subtask content 1")).toBeInTheDocument()
-			expect(screen.getByText("Subtask content 2")).toBeInTheDocument()
+			expect(screen.getByTestId("session-tab-list")).toBeInTheDocument()
+			expect(screen.getByText("Visible tab content")).toBeInTheDocument()
 		})
 
-		it("hides subtasks when collapsed", () => {
-			const group = createMockGroup({
+		it("hides tabs when collapsed using max-h-0", () => {
+			const tabs = [createMockDisplayItem({ id: "tab-1", task: "Hidden tab" })]
+			const session = createMockSession({
 				isExpanded: false,
-				subtasks: [createMockSubtaskNode({ id: "child-1", task: "Subtask content" })],
+				tabs,
+				taskCount: 1,
 			})
 
-			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
+			const { container } = render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
 			)
 
-			// The subtask-list element is present but collapsed via CSS (max-h-0)
-			const subtaskList = screen.queryByTestId("subtask-list")
-			expect(subtaskList).toBeInTheDocument()
-			expect(subtaskList).toHaveClass("max-h-0")
+			const tabList = screen.getByTestId("session-tab-list")
+			expect(tabList).toHaveClass("max-h-0")
+		})
+	})
+
+	describe("inline rename", () => {
+		it("shows input field on double-click", () => {
+			const session = createMockSession({ sessionName: "Original Name" })
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
+			)
+
+			const nameSpan = screen.getByText("Original Name")
+			fireEvent.doubleClick(nameSpan)
+
+			const input = screen.getByRole("textbox")
+			expect(input).toBeInTheDocument()
+			expect(input).toHaveValue("Original Name")
 		})
 
-		it("renders nested subtask when a node has children and is expanded", () => {
-			const group = createMockGroup({
-				isExpanded: true,
-				subtasks: [
-					createMockSubtaskNode(
-						{ id: "child-1", task: "Parent subtask" },
-						[createMockSubtaskNode({ id: "grandchild-1", task: "Nested subtask" })],
-						true, // child-1 is expanded
-					),
-				],
-			})
+		it("calls onRenameSession with trimmed value on Enter", () => {
+			const onRenameSession = vi.fn()
+			const session = createMockSession({ sessionName: "Old Name" })
 
 			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={onRenameSession}
+				/>,
 			)
 
-			expect(screen.getByText("Parent subtask")).toBeInTheDocument()
-			expect(screen.getByText("Nested subtask")).toBeInTheDocument()
-			expect(screen.getByTestId("subtask-row-grandchild-1")).toBeInTheDocument()
+			fireEvent.doubleClick(screen.getByText("Old Name"))
+			const input = screen.getByRole("textbox")
+			fireEvent.change(input, { target: { value: "New Name" } })
+			fireEvent.keyDown(input, { key: "Enter" })
+
+			expect(onRenameSession).toHaveBeenCalledWith("New Name")
+		})
+
+		it("reverts name on Escape", () => {
+			const session = createMockSession({ sessionName: "Original" })
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
+			)
+
+			fireEvent.doubleClick(screen.getByText("Original"))
+			const input = screen.getByRole("textbox")
+			fireEvent.change(input, { target: { value: "Changed" } })
+			fireEvent.keyDown(input, { key: "Escape" })
+
+			// Should revert to original name
+			expect(screen.getByText("Original")).toBeInTheDocument()
+		})
+
+		it("does not call onRenameSession on blur with unchanged value", () => {
+			const onRenameSession = vi.fn()
+			const session = createMockSession({ sessionName: "Same Name" })
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={onRenameSession}
+				/>,
+			)
+
+			fireEvent.doubleClick(screen.getByText("Same Name"))
+			const input = screen.getByRole("textbox")
+			fireEvent.blur(input)
+
+			expect(onRenameSession).not.toHaveBeenCalled()
 		})
 	})
 
 	describe("selection mode", () => {
-		it("handles selection mode correctly", () => {
-			const onToggleSelection = vi.fn()
-			const group = createMockGroup({
-				parent: createMockDisplayHistoryItem({ id: "parent-1" }),
+		it("renders checkboxes in selection mode", () => {
+			const tabs = [createMockDisplayItem({ id: "tab-1", task: "Selectable tab" })]
+			const session = createMockSession({
+				isExpanded: true,
+				tabs,
+				taskCount: 1,
 			})
 
 			render(
-				<TaskGroupItem
-					group={group}
+				<SessionGroupItem
+					session={session}
 					variant="full"
 					isSelectionMode={true}
-					isSelected={false}
-					onToggleSelection={onToggleSelection}
-					onToggleExpand={vi.fn()}
-					onToggleSubtaskExpand={vi.fn()}
-				/>,
-			)
-
-			const checkbox = screen.getByRole("checkbox")
-			fireEvent.click(checkbox)
-
-			expect(onToggleSelection).toHaveBeenCalledWith("parent-1", true)
-		})
-
-		it("shows selected state when isSelected is true", () => {
-			const group = createMockGroup({
-				parent: createMockDisplayHistoryItem({ id: "parent-1" }),
-			})
-
-			render(
-				<TaskGroupItem
-					group={group}
-					variant="full"
-					isSelectionMode={true}
-					isSelected={true}
+					selectedTaskIds={new Set()}
 					onToggleSelection={vi.fn()}
 					onToggleExpand={vi.fn()}
-					onToggleSubtaskExpand={vi.fn()}
+					onRenameSession={vi.fn()}
 				/>,
 			)
 
-			const checkbox = screen.getByRole("checkbox")
-			// Radix checkbox uses data-state instead of checked attribute
-			expect(checkbox).toHaveAttribute("data-state", "checked")
-		})
-	})
-
-	describe("variant handling", () => {
-		it("passes compact variant to TaskItem", () => {
-			const group = createMockGroup()
-
-			render(
-				<TaskGroupItem
-					group={group}
-					variant="compact"
-					onToggleExpand={vi.fn()}
-					onToggleSubtaskExpand={vi.fn()}
-				/>,
-			)
-
-			// TaskItem should be rendered with compact styling
-			const taskItem = screen.getByTestId("task-item-parent-1")
-			expect(taskItem).toBeInTheDocument()
-		})
-
-		it("passes full variant to TaskItem", () => {
-			const group = createMockGroup()
-
-			render(
-				<TaskGroupItem group={group} variant="full" onToggleExpand={vi.fn()} onToggleSubtaskExpand={vi.fn()} />,
-			)
-
-			const taskItem = screen.getByTestId("task-item-parent-1")
-			expect(taskItem).toBeInTheDocument()
+			const checkboxes = screen.getAllByRole("checkbox")
+			expect(checkboxes.length).toBeGreaterThanOrEqual(1)
 		})
 	})
 
 	describe("delete handling", () => {
 		it("passes onDelete to TaskItem", () => {
 			const onDelete = vi.fn()
-			const group = createMockGroup({
-				parent: createMockDisplayHistoryItem({ id: "parent-1", task: "Parent task" }),
+			const tabs = [createMockDisplayItem({ id: "tab-1", task: "Deletable tab" })]
+			const session = createMockSession({
+				isExpanded: true,
+				tabs,
+				taskCount: 1,
 			})
 
 			render(
-				<TaskGroupItem
-					group={group}
+				<SessionGroupItem
+					session={session}
 					variant="full"
+					selectedTaskIds={new Set()}
 					onDelete={onDelete}
 					onToggleExpand={vi.fn()}
-					onToggleSubtaskExpand={vi.fn()}
+					onRenameSession={vi.fn()}
 				/>,
 			)
 
-			// Delete button uses "delete-task-button" as testid
 			const deleteButton = screen.getByTestId("delete-task-button")
 			fireEvent.click(deleteButton)
 
-			expect(onDelete).toHaveBeenCalledWith("parent-1")
-		})
-	})
-
-	describe("workspace display", () => {
-		it("passes showWorkspace to TaskItem", () => {
-			const group = createMockGroup({
-				parent: createMockDisplayHistoryItem({
-					id: "parent-1",
-					workspace: "/test/workspace/path",
-				}),
-			})
-
-			render(
-				<TaskGroupItem
-					group={group}
-					variant="full"
-					showWorkspace={true}
-					onToggleExpand={vi.fn()}
-					onToggleSubtaskExpand={vi.fn()}
-				/>,
-			)
-
-			// Workspace should be displayed in TaskItem
-			const taskItem = screen.getByTestId("task-item-parent-1")
-			expect(taskItem).toBeInTheDocument()
-			// Check that workspace folder is shown
-			expect(screen.getByText("/test/workspace/path")).toBeInTheDocument()
+			expect(onDelete).toHaveBeenCalledWith("tab-1")
 		})
 	})
 
 	describe("custom className", () => {
 		it("applies custom className to container", () => {
-			const group = createMockGroup()
+			const session = createMockSession({ sessionId: "custom-class-session" })
 
 			render(
-				<TaskGroupItem
-					group={group}
+				<SessionGroupItem
+					session={session}
 					variant="full"
+					selectedTaskIds={new Set()}
 					className="custom-class"
 					onToggleExpand={vi.fn()}
-					onToggleSubtaskExpand={vi.fn()}
+					onRenameSession={vi.fn()}
 				/>,
 			)
 
-			const container = screen.getByTestId("task-group-parent-1")
+			const container = screen.getByTestId("session-group-custom-class-session")
 			expect(container).toHaveClass("custom-class")
+		})
+	})
+
+	describe("variant handling", () => {
+		it("renders with full variant", () => {
+			const tabs = [createMockDisplayItem({ id: "tab-1", task: "Full variant tab" })]
+			const session = createMockSession({
+				isExpanded: true,
+				tabs,
+				taskCount: 1,
+			})
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
+			)
+
+			expect(screen.getByText("Full variant tab")).toBeInTheDocument()
+		})
+
+		it("renders with compact variant", () => {
+			const tabs = [createMockDisplayItem({ id: "tab-1", task: "Compact variant tab" })]
+			const session = createMockSession({
+				isExpanded: true,
+				tabs,
+				taskCount: 1,
+			})
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="compact"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
+			)
+
+			expect(screen.getByText("Compact variant tab")).toBeInTheDocument()
 		})
 	})
 })

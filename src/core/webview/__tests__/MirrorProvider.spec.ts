@@ -485,6 +485,7 @@ describe("MirrorProvider", () => {
 		const mockState: ExtensionState = {
 			version: "1.0.0",
 			mirrorMessages: [],
+			fileEdits: [],
 			taskHistory: [],
 			shouldShowAnnouncement: false,
 			apiConfiguration: {
@@ -531,6 +532,8 @@ describe("MirrorProvider", () => {
 			checkpointTimeout: DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 			activeTerminalCount: 0,
 			activeTerminals: [],
+			tabs: [],
+			activeTabId: "",
 		}
 
 		const message: ExtensionMessage = {

@@ -201,6 +201,65 @@ export function copyWasms(srcDir: string, distDir: string): void {
 }
 
 /**
+ * Copy the ripgrep binary into the extension dist directory.
+ *
+ * The extension is packaged with `--no-dependencies`, so the `@vscode/ripgrep`
+ * package and its binary are not shipped by default. Instead of relying on the
+ * host editor's bundled ripgrep (which is not guaranteed to exist at a known
+ * path in all VS Code forks such as Cursor), we bundle the binary ourselves so
+ * the extension is fully self-contained.
+ *
+ * The binary is placed at `dist/ripgrep/rg` (or `rg.exe` on Windows) and
+ * resolved at runtime from `__dirname` (which becomes `dist/` when bundled).
+ */
+export function copyRipgrepBinary(srcDir: string, distDir: string): void {
+	const nodeModulesDir = path.join(srcDir, "node_modules")
+	const binName = process.platform.startsWith("win") ? "rg.exe" : "rg"
+
+	// Resolve the @vscode/ripgrep package location. Prefer Node module resolution
+	// so it works regardless of how pnpm hoists the dependency.
+	let ripgrepDir: string | undefined
+	try {
+		const req = typeof require !== "undefined" ? require : createRequire(import.meta.url)
+		const pkgPath = req.resolve("@vscode/ripgrep/package.json", { paths: [srcDir] })
+		ripgrepDir = path.dirname(pkgPath)
+	} catch {
+		// Fall back to a well-known pnpm layout.
+		const fallback = path.join(nodeModulesDir, "@vscode", "ripgrep")
+		if (fs.existsSync(fallback)) {
+			ripgrepDir = fallback
+		}
+	}
+
+	if (!ripgrepDir) {
+		throw new Error(
+			"Could not locate @vscode/ripgrep. Add it to the extension dependencies and re-run pnpm install.",
+		)
+	}
+
+	const srcBin = path.join(ripgrepDir, "bin", binName)
+	if (!fs.existsSync(srcBin)) {
+		throw new Error(`Ripgrep binary not found at expected location: ${srcBin}`)
+	}
+
+	const destDir = path.join(distDir, "ripgrep")
+	fs.mkdirSync(destDir, { recursive: true })
+	const destBin = path.join(destDir, binName)
+	fs.copyFileSync(srcBin, destBin)
+
+	// Ensure the binary is executable (Unix only).
+	if (process.platform !== "win32") {
+		try {
+			fs.chmodSync(destBin, 0o755)
+		} catch {
+			// Ignore chmod errors on Windows.
+		}
+	}
+
+	console.log(`[copyRipgrepBinary] Copied ${binName} to ${destBin}`)
+}
+
+/**
  * Copy esbuild-wasm files to the dist/bin directory.
  *
  * This function copies the esbuild-wasm CLI and WASM binary, which provides

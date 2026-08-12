@@ -1,9 +1,17 @@
+import debounce from "lodash.debounce"
+
 import { MirrorVSEventName } from "@mirror-vs/types"
-import type { MirrorMessage, TokenUsage, ToolUsage } from "@mirror-vs/types"
+import type { FileEditRecord, MirrorMessage, TokenUsage, ToolUsage } from "@mirror-vs/types"
 
 import { defaultModeSlug } from "../../shared/modes"
 
-import { readTaskMessages, saveTaskMessages, taskMetadata } from "../task-persistence"
+import {
+	readTaskMessages,
+	saveTaskMessages,
+	readTaskFileEdits,
+	saveTaskFileEdits,
+	taskMetadata,
+} from "../task-persistence"
 import { restoreTodoListForTask } from "../tools/UpdateTodoListTool"
 
 import type { Task } from "./Task"
@@ -13,6 +21,7 @@ import type { Task } from "./Task"
  *
  * Handles:
  * - Loading/saving mirror messages to disk
+ * - Loading/saving fileEdits (local-only edit history) to disk
  * - Adding, overwriting, and updating messages
  * - Finding messages by timestamp
  * - Emitting token/tool usage updates via debounced function
@@ -28,6 +37,14 @@ export class TaskMirrorMessages {
 
 	private set mirrorMessages(value: MirrorMessage[]) {
 		this.task.mirrorMessages = value
+	}
+
+	private get fileEdits(): FileEditRecord[] {
+		return this.task.fileEdits
+	}
+
+	private set fileEdits(value: FileEditRecord[]) {
+		this.task.fileEdits = value
 	}
 
 	private get taskId(): string {
@@ -64,6 +81,10 @@ export class TaskMirrorMessages {
 		return readTaskMessages({ taskId: this.taskId, globalStoragePath: this.globalStoragePath })
 	}
 
+	async getSavedFileEdits(): Promise<FileEditRecord[]> {
+		return readTaskFileEdits({ taskId: this.taskId, globalStoragePath: this.globalStoragePath })
+	}
+
 	async addToMirrorMessages(message: MirrorMessage) {
 		this.mirrorMessages.push(message)
 		const provider = this.task.providerRef.deref()
@@ -80,10 +101,42 @@ export class TaskMirrorMessages {
 		await this.saveMirrorMessages()
 	}
 
+	private debouncedSaveMirrorMessages = debounce(async () => {
+		try {
+			await this.saveMirrorMessages()
+		} catch (err) {
+			console.error("Failed to save mirror messages in debounced update:", err)
+		}
+	}, 1000)
+
 	async updateMirrorMessage(message: MirrorMessage) {
 		const provider = this.task.providerRef.deref()
 		await provider?.postMessageToWebview({ type: "messageUpdated", mirrorMessage: message })
 		this.task.emit(MirrorVSEventName.Message, { action: "updated", message })
+		this.debouncedSaveMirrorMessages()
+	}
+
+	/**
+	 * Add a single FileEditRecord to the local edit history and persist.
+	 * This is called from presentAssistantMessage after each successful edit tool.
+	 */
+	async addFileEdit(record: FileEditRecord) {
+		this.fileEdits.push(record)
+		await this.saveFileEdits()
+	}
+
+	async saveFileEdits(): Promise<boolean> {
+		try {
+			await saveTaskFileEdits({
+				fileEdits: structuredClone(this.fileEdits),
+				taskId: this.taskId,
+				globalStoragePath: this.globalStoragePath,
+			})
+			return true
+		} catch (error) {
+			console.error("Failed to save file edits:", error)
+			return false
+		}
 	}
 
 	async saveMirrorMessages(): Promise<boolean> {
@@ -93,6 +146,9 @@ export class TaskMirrorMessages {
 				taskId: this.taskId,
 				globalStoragePath: this.globalStoragePath,
 			})
+
+			// Also persist fileEdits alongside mirrorMessages
+			await this.saveFileEdits()
 
 			if (this.task._taskApiConfigName === undefined) {
 				await this.task.taskApiConfigReady

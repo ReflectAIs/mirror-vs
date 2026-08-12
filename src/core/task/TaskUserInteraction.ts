@@ -250,8 +250,8 @@ export class TaskUserInteraction {
 			{ interval: 100 },
 		)
 
-		if (this.task.lastMessageTs !== askTs) {
-			// Could happen if we send multiple asks in a row i.e. with
+		if (this.task.askResponse === undefined && this.task.lastMessageTs !== askTs) {
+			// Could happen if we send multiple un-answered asks in a row i.e. with
 			// command_output. It's important that when we know an ask could
 			// fail, it is handled gracefully.
 			throw new AskIgnoredError("superseded")

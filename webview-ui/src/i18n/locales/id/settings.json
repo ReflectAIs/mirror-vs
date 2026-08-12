@@ -764,7 +764,7 @@
 			"name": "Gunakan tool insert content eksperimental",
 			"description": "Aktifkan tool insert content eksperimental, memungkinkan asisten menyisipkan konten pada nomor baris spesifik tanpa perlu membuat diff."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Aktifkan pembacaan file bersamaan",
 			"description": "Ketika diaktifkan, asisten dapat membaca beberapa file dalam satu permintaan. Ketika dinonaktifkan, asisten harus membaca file satu per satu. Menonaktifkan ini dapat membantu saat bekerja dengan model yang kurang mampu atau ketika kamu ingin kontrol lebih terhadap akses file."
 		},

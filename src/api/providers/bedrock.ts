@@ -390,10 +390,17 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 		if ((isThinkingExplicitlyEnabled || isThinkingEnabledBySettings) && modelConfig.info.supportsReasoningBudget) {
 			thinkingEnabled = true
+			// Respect user-configured thinking budget (modelMaxThinkingTokens) first,
+			// then fall back to request metadata, model defaults, and a hard floor of 4096.
+			const userThinkingBudget = this.options.modelMaxThinkingTokens
 			additionalModelRequestFields = {
 				thinking: {
 					type: "enabled",
-					budget_tokens: metadata?.thinking?.maxThinkingTokens || modelConfig.reasoningBudget || 4096,
+					budget_tokens:
+						userThinkingBudget ||
+						metadata?.thinking?.maxThinkingTokens ||
+						modelConfig.reasoningBudget ||
+						4096,
 				},
 			}
 			logger.info("Extended thinking enabled for Bedrock request", {

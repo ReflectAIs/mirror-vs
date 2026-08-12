@@ -11,6 +11,7 @@ export const fileMetadataEntrySchema = z.object({
 	path: z.string(),
 	record_state: z.enum(["active", "stale"]),
 	record_source: recordSourceSchema,
+	storage_tier: z.enum(["hot", "cold"]).optional(),
 	mirror_read_date: z.number().nullable(),
 	mirror_edit_date: z.number().nullable(),
 	user_edit_date: z.number().nullable().optional(),

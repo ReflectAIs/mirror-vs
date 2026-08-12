@@ -5,7 +5,7 @@ import { fileURLToPath } from "url"
 import process from "node:process"
 import * as console from "node:console"
 
-import { copyPaths, copyWasms, copyLocales, setupLocaleWatcher } from "@mirror-vs/build"
+import { copyPaths, copyWasms, copyRipgrepBinary, copyLocales, setupLocaleWatcher } from "@mirror-vs/build"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -85,6 +85,12 @@ async function main() {
 			name: "copyWasms",
 			setup(build) {
 				build.onEnd(() => copyWasms(srcDir, distDir))
+			},
+		},
+		{
+			name: "copyRipgrepBinary",
+			setup(build) {
+				build.onEnd(() => copyRipgrepBinary(srcDir, distDir))
 			},
 		},
 		{

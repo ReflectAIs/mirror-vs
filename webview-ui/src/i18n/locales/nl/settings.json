@@ -768,7 +768,7 @@
 			"name": "Experimentele multi-block diff-tool gebruiken",
 			"description": "Indien ingeschakeld, gebruikt de assistent de multi-block diff-tool. Hiermee wordt geprobeerd meerdere codeblokken in het bestand in één verzoek bij te werken."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Gelijktijdig lezen van bestanden inschakelen",
 			"description": "Wanneer ingeschakeld, kan de assistent meerdere bestanden in één verzoek lezen. Wanneer uitgeschakeld, moet de assistent bestanden één voor één lezen. Uitschakelen kan helpen bij het werken met minder capabele modellen of wanneer u meer controle over bestandstoegang wilt."
 		},

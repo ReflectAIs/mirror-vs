@@ -5,6 +5,7 @@ import type { WebviewMessage } from "@mirror-vs/types"
 import type { MirrorProvider } from "../MirrorProvider"
 import { resolveIncomingImages } from "./_helpers"
 import { t } from "../../../i18n"
+import { TaskState } from "../../task/Task"
 
 /**
  * Handles the webviewDidLaunch message - initializes custom modes, MCP, API config, theme.
@@ -12,6 +13,15 @@ import { t } from "../../../i18n"
 export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<void> {
 	const customModes = await provider.customModesManager.getCustomModes()
 	await provider.contextProxy.setValue("customModes", customModes)
+
+	// Restore the persisted session ID so new tasks created during this session
+	// inherit the same sessionId for history grouping.
+	await provider.getOrCreateSession()
+
+	// Restore the session's last active tab so the tab bar shows existing tabs
+	// from the current session. The task is created idle (startTask: false)
+	// so no AI loop runs — the user can interact with it by clicking.
+	await provider.restoreSessionTabs()
 
 	provider.postStateToWebview()
 	provider.workspaceTracker?.initializeFilePaths() // Don't await.
@@ -86,6 +96,68 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 		const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
 
 		const currentTask = provider.getCurrentTask()
+
+		// ── New session from TabBar "+" ──────────────────────────────────────
+		// When the user clicks "+" in the tab bar, the intent is to create a
+		// brand-new session with a fresh idle tab.  Detect this by checking for
+		// empty text, no images, and no sessionMode (TabBar never sets it).
+		//
+		// Steps:
+		//   1. Create a new session (generates a fresh sessionId)
+		//   2. Create an idle task in that session
+		//   3. Post invoke:newChat so the webview switches to the new tab
+		const isEmptyTabCreation =
+			!resolved.text?.trim() && (!resolved.images || resolved.images.length === 0) && !message.sessionMode
+
+		if (isEmptyTabCreation) {
+			// Do not allow creating multiple empty tabs.
+			// Switch to the existing empty tab if one is already present on the stack.
+			const allTasks = provider.getAllTasksSorted()
+			const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0)
+
+			if (emptyTask) {
+				provider.log(
+					`[handleNewTask] Found existing empty tab ${emptyTask.taskId} — switching instead of creating a new one`,
+				)
+				await provider.switchToTask(emptyTask.taskId)
+				await provider.postStateToWebview()
+				return
+			}
+
+			// Use existing session if one exists; otherwise create a new one.
+			// This ensures clicking "+" adds a tab to the current session
+			// instead of creating a separate session for each new tab.
+			await provider.getOrCreateSession()
+			await provider.createTask("", [], undefined, { taskId: message.taskId }, message.taskConfiguration)
+			await provider.postStateToWebview()
+			await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
+			return
+		}
+
+		// ── Idle task detection ───────────────────────────────────────────────
+		// When the user clicks "+" in the tab bar, an empty idle task is created
+		// (_started remains false, state is TaskState.Idle). If the user then
+		// types and sends a message in that tab, we detect here that the current
+		// task is idle and start it with content instead of creating a second task.
+		//
+		// IMPORTANT: Do NOT post "invoke: newChat" here — startWithContent()
+		// already triggers a natural state update via startTask() → say(),
+		// and posting newChat would race with handleChatReset() clearing state
+		// that the user just populated.
+		// When the user clicks "+", an empty newTask message is sent.
+		// Only start the idle task if there's actual content to send —
+		// otherwise clicking "+" a second time would start the previous
+		// idle tab with an empty message.
+		if (
+			currentTask &&
+			!currentTask._started &&
+			currentTask.state === TaskState.Idle &&
+			(resolved.text?.trim() || (resolved.images && resolved.images.length > 0))
+		) {
+			await currentTask.startWithContent(resolved.text, resolved.images)
+			return
+		}
+
 		const hasActiveTask = currentTask !== undefined && !currentTask.abandoned && !currentTask.abort
 		const sessionId = provider.getCurrentSessionId()
 
@@ -120,6 +192,12 @@ export async function handleRenameSession(
 ): Promise<void> {
 	if (sessionId && sessionName !== undefined) {
 		await provider.renameSession(sessionId, sessionName)
+	}
+}
+
+export async function handleRenameTask(provider: MirrorProvider, taskId?: string, taskName?: string): Promise<void> {
+	if (taskId && taskName !== undefined) {
+		await provider.renameTask(taskId, taskName)
 	}
 }
 
@@ -163,17 +241,21 @@ export async function handleKillTerminal(
 	}
 
 	if (terminalType === "ssh") {
-		// Kill SSH session — need to find the host/port from the registry
+		// Kill SSH session — find the matching session by deterministic negative hash
 		const { SshSessionRegistry } = await import("../../tools/helpers/SshSessionRegistry")
 		const sessions = SshSessionRegistry.getSessions()
-		// The id for SSH sessions is a deterministic negative hash; we find the matching session
-		for (const { host, port, session } of sessions) {
+		for (const { taskId, host, port } of sessions) {
 			const computedId =
 				-Math.abs(host.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0) + port) || -1
-			if (computedId === terminalId) {
-				SshSessionRegistry.removeSession(host, port)
+			if (computedId === terminalId && taskId) {
+				SshSessionRegistry.removeSession(taskId, host, port)
 				break
 			}
+		}
+		// Also abort the current task's terminal process to resolve Promise.race
+		const task = provider.getCurrentTask?.()
+		if (task) {
+			task.handleTerminalOperation("abort")
 		}
 	} else {
 		// Kill VSCode terminal
@@ -188,8 +270,13 @@ export async function handleKillTerminal(
  * Handles the clearTask message.
  */
 export async function handleClearTask(provider: MirrorProvider): Promise<void> {
-	await provider.clearTask()
+	await provider.createSession()
+	while (provider.mirrorStack.length > 0) {
+		await provider.removeMirrorFromStack()
+	}
+	await provider.createTask("", [])
 	await provider.postStateToWebview()
+	await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 }
 
 /**
@@ -471,6 +558,27 @@ export async function handleUpdateTodoList(message: WebviewMessage): Promise<voi
 export async function handleFocusPanelRequest(): Promise<void> {
 	const { getCommand } = await import("../../../utils/commands")
 	await vscode.commands.executeCommand(getCommand("focusPanel"))
+}
+
+/**
+ * Handles the switchTaskTab message — switches the active task tab.
+ * The frontend sends this when the user clicks on a different tab.
+ */
+export async function handleSwitchTaskTab(provider: MirrorProvider, taskId?: string): Promise<void> {
+	if (taskId) {
+		await provider.switchToTask(taskId)
+	}
+}
+
+/**
+ * Handles the closeTaskTab message — closes a task tab.
+ * The frontend is expected to have already confirmed with the user before
+ * sending this message. This method does NOT prompt for confirmation.
+ */
+export async function handleCloseTaskTab(provider: MirrorProvider, taskId?: string): Promise<void> {
+	if (taskId) {
+		await provider.closeTask(taskId)
+	}
 }
 
 /**

@@ -12,6 +12,8 @@ export const TITLES: Record<CodeActionName, string> = {
 	IMPROVE: "Improve with Mirror VS",
 	ADD_TO_CONTEXT: "Add to Mirror VS",
 	NEW_TASK: "New Mirror VS Task",
+	GENERATE_TESTS: "Generate Unit Tests with Mirror VS",
+	REFACTOR: "Refactor Function with Mirror VS",
 } as const
 
 export class CodeActionProvider implements vscode.CodeActionProvider {
@@ -87,6 +89,24 @@ export class CodeActionProvider implements vscode.CodeActionProvider {
 
 				actions.push(
 					this.createAction(TITLES.IMPROVE, vscode.CodeActionKind.QuickFix, "improveCode", [
+						filePath,
+						effectiveRange.text,
+						effectiveRange.range.start.line + 1,
+						effectiveRange.range.end.line + 1,
+					]),
+				)
+
+				actions.push(
+					this.createAction(TITLES.GENERATE_TESTS, vscode.CodeActionKind.QuickFix, "generateTests", [
+						filePath,
+						effectiveRange.text,
+						effectiveRange.range.start.line + 1,
+						effectiveRange.range.end.line + 1,
+					]),
+				)
+
+				actions.push(
+					this.createAction(TITLES.REFACTOR, vscode.CodeActionKind.RefactorRewrite, "refactorFunction", [
 						filePath,
 						effectiveRange.text,
 						effectiveRange.range.start.line + 1,

@@ -35,6 +35,7 @@ describe("MirrorProvider.removeMirrorFromStack() delegation awareness", () => {
 		const provider = {
 			mirrorStack: [childTask] as any[],
 			taskEventListeners: new Map(),
+			backgroundTasks: new Map(),
 			log: vi.fn(),
 			getTaskWithId,
 			updateTaskHistory,
@@ -180,6 +181,7 @@ describe("MirrorProvider.removeMirrorFromStack() delegation awareness", () => {
 		const provider = {
 			mirrorStack: [] as any[],
 			taskEventListeners: new Map(),
+			backgroundTasks: new Map(),
 			log: vi.fn(),
 			getTaskWithId: vi.fn(),
 			updateTaskHistory: vi.fn(),
@@ -260,6 +262,7 @@ describe("MirrorProvider.removeMirrorFromStack() delegation awareness", () => {
 		const provider = {
 			mirrorStack: [taskB] as any[],
 			taskEventListeners: new Map(),
+			backgroundTasks: new Map(),
 			log: vi.fn(),
 			getTaskWithId,
 			updateTaskHistory,

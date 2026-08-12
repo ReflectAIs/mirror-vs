@@ -11,6 +11,8 @@ export const registerCodeActions = (context: vscode.ExtensionContext) => {
 	registerCodeAction(context, "fixCode", "FIX")
 	registerCodeAction(context, "improveCode", "IMPROVE")
 	registerCodeAction(context, "addToContext", "ADD_TO_CONTEXT")
+	registerCodeAction(context, "generateTests", "GENERATE_TESTS")
+	registerCodeAction(context, "refactorFunction", "REFACTOR")
 }
 
 const registerCodeAction = (context: vscode.ExtensionContext, command: CodeActionId, promptType: CodeActionName) => {

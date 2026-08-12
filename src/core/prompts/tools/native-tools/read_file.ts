@@ -70,7 +70,7 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		` PREFER indentation mode when you have a specific line number from search results, error messages, or definition lookups - it guarantees complete, syntactically valid code blocks without mid-function truncation.` +
 		` IMPORTANT: Indentation mode requires anchor_line to be useful. Without it, only header content (imports) is returned.`
 
-	const limitNote = ` By default, returns up to ${DEFAULT_LINE_LIMIT} lines per file. Lines longer than ${MAX_LINE_LENGTH} characters are truncated.`
+	const limitNote = ` By default, returns up to ${DEFAULT_LINE_LIMIT} lines per file. Lines longer than ${MAX_LINE_LENGTH} characters are truncated. If a file is truncated, call read_file with offset set to the next line number to read subsequent parts.`
 
 	const description =
 		descriptionIntro +
@@ -79,6 +79,7 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		" " +
 		getReadFileSupportsNote(supportsImages) +
 		` Example: { path: 'src/app.ts' }` +
+		` Example (reading next part of truncated file): { path: 'src/app.ts', offset: 2001, limit: 2000 }` +
 		` Example (indentation mode): { path: 'src/app.ts', mode: 'indentation', indentation: { anchor_line: 42 } }`
 
 	const indentationProperties: Record<string, unknown> = {

@@ -19,6 +19,8 @@ export interface UsePickerHandlersOptions {
 	showInfo: (msg: string, duration?: number) => void
 	seenMessageIds: React.MutableRefObject<Set<string>>
 	firstTextMessageSkipped: React.MutableRefObject<boolean>
+	/** Reset to 0 on tab switch so message processor re-reads history from scratch */
+	lastProcessedTsRef: React.MutableRefObject<number>
 }
 
 export interface UsePickerHandlersReturn {
@@ -47,6 +49,7 @@ export function usePickerHandlers({
 	showInfo,
 	seenMessageIds,
 	firstTextMessageSkipped,
+	lastProcessedTsRef,
 }: UsePickerHandlersOptions): UsePickerHandlersReturn {
 	const { isLoading, currentTaskId, setCurrentTaskId } = useCLIStore()
 	const { pickerState, setPickerState } = useUIStateStore()
@@ -110,6 +113,8 @@ export function usePickerHandlers({
 					// Reset refs to avoid stale state across task switches
 					seenMessageIds.current.clear()
 					firstTextMessageSkipped.current = false
+					// Reset ts high-water mark so the full message history of the new task gets processed
+					lastProcessedTsRef.current = 0
 
 					// Send message to resume the selected task
 					// This triggers createTaskWithHistoryItem -> postStateToWebview

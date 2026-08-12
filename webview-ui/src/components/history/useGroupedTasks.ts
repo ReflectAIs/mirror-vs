@@ -1,134 +1,168 @@
 import { useState, useMemo, useCallback } from "react"
 import type { HistoryItem } from "@mirror-vs/types"
-import type { DisplayHistoryItem, SubtaskTreeNode, TaskGroup, GroupedTasksResult } from "./types"
+import type { DisplayHistoryItem, SessionGroup, GroupedTasksResult } from "./types"
+import { vscode } from "@/utils/vscode"
 
 /**
- * Recursively builds a subtask tree node for the given task.
- * Pure function — exported for independent testing.
+ * Groups tasks by session and builds SessionGroup[] sorted by newest task descending.
+ * Tabs within each session are sorted by timestamp ascending (oldest first = leftmost tab).
  *
- * @param task - The task to build a tree node for
- * @param childrenMap - Map of parentId → direct children
- * @param expandedIds - Set of task IDs whose children are currently expanded
- * @returns A SubtaskTreeNode with recursively built children sorted by ts (newest first)
+ * Unnamed sessions are assigned "Session N" where N is a 1-based index determined
+ * by the chronological order of sessions by their newest task timestamp.
+ *
+ * @param tasks - Flat list of history items (filtered/search results)
+ * @param sessionNames - Map of sessionId → user-assigned name from extension state
+ * @param expandedSessionIds - Set of session IDs whose contents are expanded
+ * @returns SessionGroup[] sorted by newestTs descending
  */
-export function buildSubtree(
-	task: HistoryItem,
-	childrenMap: Map<string, HistoryItem[]>,
-	expandedIds: Set<string>,
-): SubtaskTreeNode {
-	const directChildren = (childrenMap.get(task.id) || []).slice().sort((a, b) => b.ts - a.ts)
-
-	return {
-		item: task as DisplayHistoryItem,
-		children: directChildren.map((child) => buildSubtree(child, childrenMap, expandedIds)),
-		isExpanded: expandedIds.has(task.id),
-	}
-}
-
-/**
- * Builds task groups from a list of tasks based on parent-child relationships.
- * Exported for testing.
- */
-export function buildTaskGroups(
+export function buildSessionGroups(
 	tasks: HistoryItem[],
-	taskMap: Map<string, HistoryItem>,
-	expandedIds: Set<string>,
-): TaskGroup[] {
-	// Build children map: parentId -> direct children[]
-	const childrenMap = new Map<string, HistoryItem[]>()
+	sessionNames: Record<string, string>,
+	expandedSessionIds: Set<string>,
+): SessionGroup[] {
+	// Group tasks by sessionId
+	const sessionMap = new Map<string, HistoryItem[]>()
 
 	for (const task of tasks) {
-		if (task.parentTaskId && taskMap.has(task.parentTaskId)) {
-			const siblings = childrenMap.get(task.parentTaskId) || []
-			siblings.push(task)
-			childrenMap.set(task.parentTaskId, siblings)
+		let sid = task.sessionId
+
+		// Legacy tasks (created before the session feature) have no sessionId.
+		// Treat each as its own singleton session so they remain visible.
+		if (!sid) {
+			sid = `__legacy__${task.id}`
 		}
+
+		const group = sessionMap.get(sid) || []
+		group.push(task)
+		sessionMap.set(sid, group)
 	}
 
-	// Identify root tasks - tasks that either:
-	// 1. Have no parentTaskId
-	// 2. Have a parentTaskId that doesn't exist in our task list (orphans promoted to root)
-	const rootTasks = tasks.filter((task) => !task.parentTaskId || !taskMap.has(task.parentTaskId))
+	if (sessionMap.size === 0) return []
 
-	// Build groups from root tasks with recursively nested subtask trees
-	const taskGroups: TaskGroup[] = rootTasks.map((parent) => {
-		const directChildren = (childrenMap.get(parent.id) || []).slice().sort((a, b) => b.ts - a.ts)
+	// Build intermediate sessions with computed metadata
+	const sessions: Array<{
+		sessionId: string
+		tabs: HistoryItem[]
+		newestTs: number
+		taskCount: number
+	}> = []
+
+	for (const [sessionId, tabs] of sessionMap) {
+		// Sort tabs by timestamp ascending (oldest first)
+		const sortedTabs = tabs.slice().sort((a, b) => a.ts - b.ts)
+
+		// Find newest timestamp for session-level sorting
+		const newestTs = sortedTabs[sortedTabs.length - 1]?.ts ?? 0
+
+		sessions.push({
+			sessionId,
+			tabs: sortedTabs,
+			newestTs,
+			taskCount: sortedTabs.length,
+		})
+	}
+
+	// Sort sessions by newest task timestamp descending
+	sessions.sort((a, b) => b.newestTs - a.newestTs)
+
+	// Assign sequential numbers to unnamed sessions based on their sorted order.
+	// Legacy singleton sessions get a truncated task-name label instead of "Session N".
+	let unnamedCounter = 0
+
+	return sessions.map((session) => {
+		const isLegacy = session.sessionId.startsWith("__legacy__")
+		const userDefinedName = !isLegacy ? sessionNames[session.sessionId] : undefined
+
+		let sessionName: string
+		if (userDefinedName) {
+			sessionName = userDefinedName
+		} else if (isLegacy) {
+			// For legacy singleton tasks, use the task text as the session label
+			const firstTask = session.tabs[0]
+			const label = firstTask?.task?.trim() || `Task ${firstTask?.number ?? ""}`
+			sessionName = label.length > 60 ? `${label.slice(0, 60)}…` : label
+		} else {
+			unnamedCounter++
+			sessionName = `Session ${unnamedCounter}`
+		}
 
 		return {
-			parent: parent as DisplayHistoryItem,
-			subtasks: directChildren.map((child) => buildSubtree(child, childrenMap, expandedIds)),
-			isExpanded: expandedIds.has(parent.id),
+			sessionId: session.sessionId,
+			sessionName,
+			tabs: session.tabs as DisplayHistoryItem[],
+			taskCount: session.taskCount,
+			newestTs: session.newestTs,
+			isExpanded: expandedSessionIds.has(session.sessionId),
 		}
 	})
-
-	// Sort groups by parent timestamp (newest first)
-	taskGroups.sort((a, b) => b.parent.ts - a.parent.ts)
-
-	return taskGroups
 }
 
 /**
- * Hook to transform a flat task list into grouped structure based on parent-child relationships.
- * In search mode, returns a flat list with isSubtask flag for each item.
- * In normal mode, returns task groups directly (no session grouping).
+ * Hook to transform a flat task list into session-based grouped structure.
  *
- * @param tasks - The list of tasks to group
+ * In search mode, returns a flat list (no session grouping).
+ * In normal mode, returns SessionGroup[] with collapsible sessions.
+ *
+ * @param tasks - The list of tasks to group (from useTaskSearch)
  * @param searchQuery - Current search query (empty string means not searching)
- * @returns GroupedTasksResult with groups, flatTasks, toggleExpand, and isSearchMode
+ * @param sessionNames - Map of sessionId → user-assigned name from extension state
+ * @returns GroupedTasksResult with sessionGroups, flatTasks, toggleSessionExpand, and isSearchMode
  */
-export function useGroupedTasks(tasks: HistoryItem[], searchQuery: string): GroupedTasksResult {
-	const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+export function useGroupedTasks(
+	tasks: HistoryItem[],
+	searchQuery: string,
+	sessionNames: Record<string, string> = {},
+): GroupedTasksResult {
+	const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(new Set())
 
 	const isSearchMode = searchQuery.trim().length > 0
 
-	// Build a map of taskId -> HistoryItem for quick lookup
-	const taskMap = useMemo(() => {
-		const map = new Map<string, HistoryItem>()
-		for (const task of tasks) {
-			map.set(task.id, task)
-		}
-		return map
-	}, [tasks])
-
-	// Group tasks by parent-child relationship
-	const groups = useMemo((): TaskGroup[] => {
+	// Build session groups
+	const sessionGroups = useMemo((): SessionGroup[] => {
 		if (isSearchMode) {
-			// In search mode, we don't group - return empty groups
+			// In search mode, we don't group — return empty
 			return []
 		}
 
-		return buildTaskGroups(tasks, taskMap, expandedIds)
-	}, [tasks, taskMap, isSearchMode, expandedIds])
+		return buildSessionGroups(tasks, sessionNames, expandedSessionIds)
+	}, [tasks, sessionNames, isSearchMode, expandedSessionIds])
 
-	// Flatten tasks for search mode with isSubtask flag
+	// Flatten tasks for search mode
 	const flatTasks = useMemo((): DisplayHistoryItem[] | null => {
 		if (!isSearchMode) {
 			return null
 		}
 
-		return tasks.map((task) => ({
-			...task,
-			isSubtask: !!task.parentTaskId && taskMap.has(task.parentTaskId),
-		})) as DisplayHistoryItem[]
-	}, [tasks, taskMap, isSearchMode])
+		return tasks.map((task) => ({ ...task })) as DisplayHistoryItem[]
+	}, [tasks, isSearchMode])
 
-	// Toggle expand/collapse for a task group
-	const toggleExpand = useCallback((taskId: string) => {
-		setExpandedIds((prev) => {
+	// Toggle expand/collapse for a session group
+	const toggleSessionExpand = useCallback((sessionId: string) => {
+		setExpandedSessionIds((prev) => {
 			const newSet = new Set(prev)
-			if (newSet.has(taskId)) {
-				newSet.delete(taskId)
+			if (newSet.has(sessionId)) {
+				newSet.delete(sessionId)
 			} else {
-				newSet.add(taskId)
+				newSet.add(sessionId)
 			}
 			return newSet
 		})
 	}, [])
 
+	// Rename a session by sending renameSession message to backend
+	const setSessionName = useCallback((sessionId: string, name: string) => {
+		vscode.postMessage({
+			type: "renameSession",
+			sessionId,
+			sessionName: name,
+		})
+	}, [])
+
 	return {
-		groups,
+		sessionGroups,
 		flatTasks,
-		toggleExpand,
+		toggleSessionExpand,
+		setSessionName,
 		isSearchMode,
 	}
 }

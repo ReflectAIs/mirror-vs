@@ -296,10 +296,70 @@ export interface TerminalInfo {
 	port?: number
 }
 
+/**
+ * Records a single file edit operation for the local edit history.
+ * This is populated on every successful edit tool execution and is
+ * NEVER sent to the LLM — it's kept purely for frontend display and revert.
+ */
+export interface FileEditRecord {
+	/** Path of the file that was edited (relative to workspace) */
+	path: string
+	/**
+	 * For diff-based tools (apply_diff, search_and_replace, etc.):
+	 * the raw diff string that was applied.
+	 */
+	diff?: string
+	/**
+	 * For content-replacement tools (write_to_file):
+	 * the full new content that was written.
+	 */
+	content?: string
+	/** Original file content before the edit (if available) */
+	originalContent?: string
+	/** Unified diff statistics (lines added/removed) */
+	diffStats?: { added: number; removed: number }
+	/** Timestamp (ms since epoch) when the edit was applied */
+	timestamp: number
+	/** Name of the tool that performed the edit (e.g. "apply_diff", "write_to_file") */
+	toolName: string
+	/** Git checkpoint hash, if checkpoints are enabled */
+	checkpointId?: string
+}
+
+/**
+ * Tab status for multi-tab interface.
+ * - `streaming`: Task is actively streaming a response
+ * - `interactive`: Task is waiting for user input (approval/response)
+ * - `idle`: Task is idle/waiting (e.g., waiting for a tool result)
+ * - `completed`: Task has completed successfully
+ * - `error`: Task encountered an error
+ */
+export type TabStatus = "streaming" | "interactive" | "idle" | "completed" | "error"
+
+/**
+ * Represents one tab in the multi-tab interface.
+ * The frontend derives `isActive` from `activeTabId` and `hasUnread` from `lastActivity`.
+ */
+export interface TabInfo {
+	taskId: string
+	/** Stable display title, set once on task creation from task.name */
+	title: string
+	/** Current tab status derived from TaskState internally */
+	status: TabStatus
+	/** Whether the task is waiting for user approval on an action */
+	hasPendingApproval: boolean
+	/** Monotonic timestamp of last activity — frontend derives unread from this */
+	lastActivity: number
+	/** Timestamp of task creation — used for stable tab ordering (createdAt ASC) */
+	createdAt: number
+}
+
 export type ExtensionState = Pick<
 	GlobalSettings,
 	| "currentSessionId"
 	| "sessionNames"
+	| "taskNames"
+	| "sessionClosedTabs"
 	| "currentApiConfigName"
 	| "listApiConfigMeta"
 	| "pinnedApiConfigs"
@@ -317,6 +377,7 @@ export type ExtensionState = Pick<
 	| "alwaysAllowSubtasks"
 	| "alwaysAllowFollowupQuestions"
 	| "alwaysAllowExecute"
+	| "alwaysAllowGitCommit"
 	| "alwaysAllowBrowser"
 	| "followupAutoApproveTimeoutMs"
 	| "allowedCommands"
@@ -327,6 +388,8 @@ export type ExtensionState = Pick<
 	| "ttsSpeed"
 	| "soundEnabled"
 	| "soundVolume"
+	| "mascotTheme"
+	| "soundTheme"
 	| "terminalOutputPreviewSize"
 	| "terminalShellIntegrationTimeout"
 	| "terminalShellIntegrationDisabled"
@@ -377,6 +440,7 @@ export type ExtensionState = Pick<
 	lockApiConfigAcrossModes?: boolean
 	version: string
 	mirrorMessages: MirrorMessage[]
+	fileEdits: FileEditRecord[]
 	currentTaskId?: string
 	currentTaskItem?: HistoryItem
 	currentTaskTodos?: TodoItem[] // Initial todos for the current task
@@ -401,6 +465,7 @@ export type ExtensionState = Pick<
 	experiments: Experiments // Map of experiment IDs to their enabled state
 
 	mcpEnabled: boolean
+	mcpToolsThreshold?: number
 
 	mode: string
 	customModes: ModeConfig[]
@@ -417,6 +482,12 @@ export type ExtensionState = Pick<
 	autoCondenseContextPercent: number
 	profileThresholds: Record<string, number>
 	hasOpenedModeSelector: boolean
+	filesReadByMirror?: Array<{
+		path: string
+		record_source: "read_tool" | "user_edited" | "mirror_edited" | "file_mentioned"
+		storage_tier?: "hot" | "cold"
+		mirror_read_date?: number | null
+	}>
 	openRouterImageApiKey?: string
 	messageQueue?: QueuedMessage[]
 	lastShownAnnouncementId?: string
@@ -433,6 +504,10 @@ export type ExtensionState = Pick<
 	 */
 	mirrorMessagesSeq?: number
 	hasActiveReviews?: boolean
+	/** All open tabs from mirrorStack + backgroundTasks, sorted by createdAt ASC */
+	tabs: TabInfo[]
+	/** Currently active tab's taskId */
+	activeTabId: string
 	activeTerminalCount: number
 	activeTerminals: TerminalInfo[]
 }
@@ -463,6 +538,10 @@ export type EditQueuedMessagePayload = Pick<QueuedMessage, "id" | "text" | "imag
 
 export interface WebviewMessage {
 	type:
+		| "forgetContextFile"
+		| "forgetAllContextFiles"
+		| "toggleContextFileStorageTier"
+		| "toggleAllContextFilesStorageTier"
 		| "updateTodoList"
 		| "deleteMultipleTasksWithIds"
 		| "currentApiConfigName"
@@ -557,6 +636,7 @@ export interface WebviewMessage {
 		| "startIndexing"
 		| "stopIndexing"
 		| "clearIndexData"
+		| "autoSetupCodeIndex"
 		| "indexingStatusUpdate"
 		| "indexCleared"
 		| "toggleWorkspaceIndexing"
@@ -564,6 +644,9 @@ export interface WebviewMessage {
 		| "focusPanelRequest"
 		| "openExternal"
 		| "switchTab"
+		// Multi-tab messages
+		| "switchTaskTab" // Switch to a specific task's tab
+		| "closeTaskTab" // Close a task tab (frontend has already confirmed)
 		| "exportMode"
 		| "exportModeResult"
 		| "importMode"
@@ -641,6 +724,8 @@ export interface WebviewMessage {
 		| "deleteComfyuiWorkflow"
 		// Session messages
 		| "renameSession"
+		// Task/tab rename
+		| "renameTask"
 		// Model change messages
 		| "modelChange"
 	/** Session ID for session management operations */
@@ -652,7 +737,7 @@ export interface WebviewMessage {
 	text?: string
 	taskId?: string
 	editedMessageContent?: string
-	tab?: "settings" | "history" | "mcp" | "modes" | "chat"
+	tab?: "settings" | "history" | "mcp" | "modes" | "chat" | "brain" | "analytics"
 	disabled?: boolean
 	context?: string
 	dataUri?: string

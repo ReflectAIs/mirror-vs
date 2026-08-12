@@ -2,28 +2,35 @@ import type OpenAI from "openai"
 
 const SSH_SESSION_DESCRIPTION = `Establish or interact with a persistent SSH session. This is designed for server access and remote operations, allowing multiple commands to be executed over a single connection. By keeping the connection alive, it prevents SSH rate-limiting or firewall blocking that typically occurs when connecting repeatedly.
 
+PASSWORD CACHING: The password is cached per host:port after the first successful connect. You do NOT need to provide the password on subsequent execute/disconnect calls — the system will reuse the previously provided password if the session needs to be re-established.
+
+OUTPUT TRUNCATION: Large command output is automatically truncated to avoid consuming excessive context. When output exceeds the preview threshold, you will receive a concise preview (showing the beginning and end of the output) along with an "Artifact ID" reference. Use the read_command_output tool to retrieve the full output if needed.
+
 Operational Guidelines & Stuck Situations:
 1. **Interactive Prompts**: Commands run non-interactively with stdin redirected to /dev/null. Any command prompting for input (e.g. passwords, confirmations [y/n], or git credentials) will fail or exit immediately. Always pass automated flags (like -y, --no-input, etc.) where possible.
-2. **Timeouts**: If a command is expected to take a long time (like 'docker compose build' or 'docker compose down'), you must supply a custom, high 'timeout' value in milliseconds (e.g., 300000 for 5 minutes).
-3. **Handling Timeout Responses**: If you receive a response containing '[Command execution timed out after X ms]', the connection is NOT lost, but the command was running too slow. You should:
+2. **Foreground processes & TTY Spinners**: NEVER run commands that run indefinitely (e.g. 'docker compose up' without '-d', 'docker compose logs -f', 'tail -f', 'ping', 'watch'). ALWAYS use '--progress=plain' with 'docker compose' commands (e.g. 'docker compose --progress=plain up -d --no-deps app') to disable interactive TTY progress spinners that hang remote SSH streams. Always use detached flags (e.g. 'docker compose up -d') or one-shot alternatives (e.g. 'docker compose logs' without '-f', 'tail' without '-f').
+3. **Timeouts**: If a command is expected to take a long time (like 'docker compose build' or 'docker compose down'), you must supply a custom, high 'timeout' value in milliseconds (e.g., 300000 for 5 minutes).
+4. **Handling Timeout Responses**: If you receive a response containing '[Command execution timed out after X ms]', the connection is NOT lost, but the command was running too slow. You should:
    - Check the state of the system using status commands (like 'docker ps' or logs) with a normal timeout.
    - Re-run the command with a significantly larger 'timeout' parameter if needed.
+5. **Handling Truncated Output**: If the SSH command output includes an "Artifact ID" reference and a preview, the full output was persisted to disk. Use the read_command_output tool with the provided artifact_id to view the full output. You can also use search and offset parameters to find specific content without reading the entire file.
+6. **Authentication Failure**: If you receive an error containing "SSH authentication/connection failed", the password was incorrect or the server is unreachable. Double-check the host, port, and password before retrying.
 
 Parameters:
 - action: (required) The operation to perform: 'connect' (starts the session), 'execute' (runs a command on the active session), or 'disconnect' (closes the session).
 - host: (required) Remote host target (e.g. root@152.228.227.51).
 - port: (optional) SSH port number, defaults to 22.
-- password: (optional) Password for SSH authentication. Leave empty if using local SSH keys or agent auth.
+- password: (optional) Password for SSH authentication. Only needed on the first connect — it is cached for subsequent calls.
 - command: (optional) The command to run on the server. Required when action is 'execute'.
 - timeout: (optional) Command execution timeout in milliseconds. Defaults to 180000 (3 minutes).
 
-Example: Connecting to a server
+Example: Connecting to a server (password is cached after this)
 { "action": "connect", "host": "root@152.228.227.51", "port": 20043, "password": "pass" }
 
-Example: Running a long-running command with custom timeout
+Example: Running a long-running command with custom timeout (no password needed — cached)
 { "action": "execute", "host": "root@152.228.227.51", "port": 20043, "command": "docker compose build", "timeout": 300000 }
 
-Example: Disconnecting
+Example: Disconnecting (no password needed — cached)
 { "action": "disconnect", "host": "root@152.228.227.51", "port": 20043 }`
 
 export default {

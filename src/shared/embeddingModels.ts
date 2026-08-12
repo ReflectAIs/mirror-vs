@@ -18,10 +18,13 @@ export const EMBEDDING_MODEL_PROFILES: EmbeddingModelProfiles = {
 			scoreThreshold: 0.15,
 			queryPrefix: "Represent this query for searching relevant code: ",
 		},
+		embeddinggemma: { dimension: 768, scoreThreshold: 0.4 },
+		"embeddinggemma:latest": { dimension: 768, scoreThreshold: 0.4 },
 		"mxbai-embed-large": { dimension: 1024, scoreThreshold: 0.4 },
 		"all-minilm": { dimension: 384, scoreThreshold: 0.4 },
-		// Add default Ollama model if applicable, e.g.:
-		// 'default': { dimension: 768 } // Assuming a default dimension
+		"bge-m3": { dimension: 1024, scoreThreshold: 0.4 },
+		"bge-large": { dimension: 1024, scoreThreshold: 0.4 },
+		"snowflake-arctic-embed": { dimension: 1024, scoreThreshold: 0.4 },
 	},
 	"openai-compatible": {
 		"text-embedding-3-small": { dimension: 1536, scoreThreshold: 0.4 },

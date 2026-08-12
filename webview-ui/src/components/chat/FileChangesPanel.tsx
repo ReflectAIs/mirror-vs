@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { ChevronDown, ChevronRight, FileDiff } from "lucide-react"
 import { createTwoFilesPatch } from "diff"
 
-import type { MirrorMessage, ExtensionMessage } from "@mirror-vs/types"
+import type { MirrorMessage, ExtensionMessage, FileEditRecord } from "@mirror-vs/types"
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger, Button } from "@/components/ui"
 import { cn } from "@/lib/utils"
@@ -15,10 +15,11 @@ import CodeAccordion from "../common/CodeAccordion"
 
 interface FileChangesPanelProps {
 	mirrorMessages: MirrorMessage[] | undefined
+	fileEdits?: FileEditRecord[]
 	className?: string
 }
 
-const FileChangesPanel = memo(({ mirrorMessages, className }: FileChangesPanelProps) => {
+const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileChangesPanelProps) => {
 	const { t } = useTranslation()
 	const { hasActiveReviews } = useExtensionState()
 	const [panelExpanded, setPanelExpanded] = useState(false)
@@ -33,7 +34,20 @@ const FileChangesPanel = memo(({ mirrorMessages, className }: FileChangesPanelPr
 		pendingPathsRef.current = new Set()
 	}, [mirrorMessages])
 
-	const fileChanges = useMemo(() => fileChangesFromMessages(mirrorMessages), [mirrorMessages])
+	// Derive file changes from either the dedicated fileEdits store (preferred)
+	// or fall back to extracting from mirrorMessages.
+	// fileEdits survives condensing/truncation — it's the persistent source of truth.
+	const fileChanges = useMemo((): FileChangeEntry[] => {
+		if (fileEdits && fileEdits.length > 0) {
+			return fileEdits.map((fe) => ({
+				path: fe.path,
+				diff: fe.diff ?? fe.content ?? "",
+				diffStats: fe.diffStats,
+				originalContent: fe.originalContent,
+			}))
+		}
+		return fileChangesFromMessages(mirrorMessages)
+	}, [fileEdits, mirrorMessages])
 
 	// Group by path so we show one row per file (multiple edits to same file combined for display)
 	const byPath = useMemo(() => {

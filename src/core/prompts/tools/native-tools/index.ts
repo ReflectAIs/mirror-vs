@@ -34,6 +34,11 @@ import switchMode from "./switch_mode"
 import updateTodoList from "./update_todo_list"
 import webSearch from "./web_search"
 import writeToFile from "./write_to_file"
+import getWorkspaceFileTree from "./get_workspace_file_tree"
+import getWorkspacePulse from "./get_workspace_pulse"
+import getGitStatus from "./get_git_status"
+import searchMcpTools from "./searchMcpTools"
+import activateMcpTool from "./activateMcpTool"
 
 export { getMcpServerTools } from "./mcp_server"
 export { convertOpenAIToolToAnthropic, convertOpenAIToolsToAnthropic } from "./converters"
@@ -98,6 +103,11 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		updateTodoList,
 		webSearch,
 		writeToFile,
+		getWorkspaceFileTree,
+		getWorkspacePulse,
+		getGitStatus,
+		searchMcpTools,
+		activateMcpTool,
 	] satisfies OpenAI.Chat.ChatCompletionTool[]
 }
 

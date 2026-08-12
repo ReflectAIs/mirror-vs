@@ -321,7 +321,9 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 	Status: Showing lines ${startLine}-${endLine} of ${result.totalLines} total lines.
 	To read more: Use the read_file tool with offset=${nextOffset} and limit=${limit}.
 	
-	${result.content}`
+	${result.content}
+
+[File truncated at line ${endLine} of ${result.totalLines}. Call read_file with path: "${entry.path}", offset: ${nextOffset}, limit: ${limit} to read the next part.]`
 		} else if (result.returnedLines === 0) {
 			output = "Note: File is empty"
 		}

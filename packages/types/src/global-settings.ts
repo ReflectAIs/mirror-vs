@@ -110,6 +110,7 @@ export const globalSettingsSchema = z.object({
 	alwaysAllowModeSwitch: z.boolean().optional(),
 	alwaysAllowSubtasks: z.boolean().optional(),
 	alwaysAllowExecute: z.boolean().optional(),
+	alwaysAllowGitCommit: z.boolean().optional(),
 	alwaysAllowFollowupQuestions: z.boolean().optional(),
 	alwaysAllowBrowser: z.boolean().optional(),
 	followupAutoApproveTimeoutMs: z.number().optional(),
@@ -163,6 +164,8 @@ export const globalSettingsSchema = z.object({
 	ttsSpeed: z.number().optional(),
 	soundEnabled: z.boolean().optional(),
 	soundVolume: z.number().optional(),
+	mascotTheme: z.enum(["cyberpunk", "retro", "synthwave", "solar"]).optional(),
+	soundTheme: z.enum(["classic", "scifi"]).optional(),
 
 	maxOpenTabsContext: z.number().optional(),
 	maxWorkspaceFiles: z.number().optional(),
@@ -193,6 +196,7 @@ export const globalSettingsSchema = z.object({
 	language: languagesSchema.optional(),
 
 	mcpEnabled: z.boolean().optional(),
+	mcpToolsThreshold: z.number().optional(),
 
 	mode: z.string().optional(),
 	modeApiConfigs: z.record(z.string(), z.string()).optional(),
@@ -246,6 +250,20 @@ export const globalSettingsSchema = z.object({
 	 * Keyed by sessionId UUID.
 	 */
 	sessionNames: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * User-assigned display names for individual tasks/tabs.
+	 * Keyed by taskId.
+	 */
+	taskNames: z.record(z.string(), z.string()).optional(),
+
+	/**
+	 * Tracks task IDs that the user has explicitly closed within each session.
+	 * Keyed by sessionId, values are arrays of taskId strings.
+	 * Closed tabs are excluded from session tab restoration on next startup.
+	 */
+	sessionClosedTabs: z.record(z.string(), z.array(z.string())).optional(),
+
 	activeSearchProvider: z.string().optional(),
 	userBraveApiKey: z.string().optional(),
 

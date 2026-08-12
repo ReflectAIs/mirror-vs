@@ -768,7 +768,7 @@
 			"name": "Usa strumento diff multi-blocco sperimentale",
 			"description": "Quando abilitato, l'assistente utilizzerà lo strumento diff multi-blocco. Questo tenterà di aggiornare più blocchi di codice nel file in una singola richiesta."
 		},
-		"CONCURRENT_FILE_READS": {
+		"PARALLEL_TOOL_READS": {
 			"name": "Abilita lettura simultanea dei file",
 			"description": "Quando abilitato, l'assistente può leggere più file in una singola richiesta. Quando disabilitato, l'assistente deve leggere i file uno alla volta. Disabilitarlo può aiutare quando si lavora con modelli meno capaci o quando si desidera maggiore controllo sull'accesso ai file."
 		},

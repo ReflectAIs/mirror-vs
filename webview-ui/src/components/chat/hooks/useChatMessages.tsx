@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useDeepCompareEffect, useEvent } from "react-use"
 import useSound from "use-sound"
+import { useExtensionState } from "../../../context/ExtensionStateContext"
 import { LRUCache } from "lru-cache"
 import removeMd from "remove-markdown"
 import { VirtuosoHandle } from "react-virtuoso"
@@ -179,6 +180,103 @@ export interface UseChatMessagesReturn {
 	}
 }
 
+const playScifiSuccess = (volume: number) => {
+	try {
+		const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+		if (!AudioContextClass) return
+		const ctx = new AudioContextClass()
+		const now = ctx.currentTime
+
+		// Cute ascending futuristic synth chime arpeggio
+		const notes = [523.25, 659.25, 783.99, 1046.5]
+		notes.forEach((freq, index) => {
+			const osc = ctx.createOscillator()
+			const gain = ctx.createGain()
+
+			osc.type = "sine"
+			osc.frequency.setValueAtTime(freq, now + index * 0.06)
+			osc.frequency.exponentialRampToValueAtTime(freq * 1.15, now + index * 0.06 + 0.15)
+
+			gain.gain.setValueAtTime(0, now + index * 0.06)
+			gain.gain.linearRampToValueAtTime(volume * 0.25, now + index * 0.06 + 0.02)
+			gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.06 + 0.25)
+
+			osc.connect(gain)
+			gain.connect(ctx.destination)
+
+			osc.start(now + index * 0.06)
+			osc.stop(now + index * 0.06 + 0.28)
+		})
+	} catch (e) {
+		console.error("Sci-fi sound play error:", e)
+	}
+}
+
+const playScifiError = (volume: number) => {
+	try {
+		const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+		if (!AudioContextClass) return
+		const ctx = new AudioContextClass()
+		const now = ctx.currentTime
+
+		const osc = ctx.createOscillator()
+		const gain = ctx.createGain()
+
+		osc.type = "triangle"
+		osc.frequency.setValueAtTime(240, now)
+		osc.frequency.exponentialRampToValueAtTime(75, now + 0.35)
+
+		const lfo = ctx.createOscillator()
+		const lfoGain = ctx.createGain()
+		lfo.frequency.value = 14
+		lfoGain.gain.value = 35
+
+		lfo.connect(lfoGain)
+		lfoGain.connect(osc.frequency)
+
+		gain.gain.setValueAtTime(volume * 0.35, now)
+		gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4)
+
+		osc.connect(gain)
+		gain.connect(ctx.destination)
+
+		lfo.start(now)
+		osc.start(now)
+
+		lfo.stop(now + 0.45)
+		osc.stop(now + 0.45)
+	} catch (e) {
+		console.error("Sci-fi sound play error:", e)
+	}
+}
+
+const playScifiProgress = (volume: number) => {
+	try {
+		const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+		if (!AudioContextClass) return
+		const ctx = new AudioContextClass()
+		const now = ctx.currentTime
+
+		const osc = ctx.createOscillator()
+		const gain = ctx.createGain()
+
+		osc.type = "sine"
+		osc.frequency.setValueAtTime(880, now)
+		osc.frequency.exponentialRampToValueAtTime(440, now + 0.1)
+
+		gain.gain.setValueAtTime(volume * 0.15, now)
+		gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1)
+
+		osc.connect(gain)
+		gain.connect(ctx.destination)
+
+		osc.start(now)
+		osc.stop(now + 0.12)
+	} catch (e) {
+		console.error("Sci-fi sound play error:", e)
+	}
+}
+
 const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
 
 // ---------------------------------------------------------------------------
@@ -345,6 +443,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		interrupt: true,
 	})
 
+	const { soundTheme = "classic" } = useExtensionState()
 	const lastPlayedRef = useRef<Record<string, number>>({})
 
 	const playSound = useCallback(
@@ -360,6 +459,26 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			}
 			lastPlayedRef.current[audioType] = now
 
+			if (soundTheme === "scifi") {
+				switch (audioType) {
+					case "notification":
+						// Play synthesized sci-fi warning sweep
+						playScifiError(volume)
+						break
+					case "celebration":
+						// Play synthesized sci-fi success chime arpeggio
+						playScifiSuccess(volume)
+						break
+					case "progress_loop":
+						// Play synthesized sci-fi click
+						playScifiProgress(volume)
+						break
+					default:
+						console.warn(`Unknown audio type: ${audioType}`)
+				}
+				return
+			}
+
 			switch (audioType) {
 				case "notification":
 					playNotification()
@@ -374,7 +493,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					console.warn(`Unknown audio type: ${audioType}`)
 			}
 		},
-		[soundEnabled, playNotification, playCelebration, playProgressLoop],
+		[soundEnabled, soundTheme, volume, playNotification, playCelebration, playProgressLoop],
 	)
 
 	function playTts(text: string) {
@@ -746,9 +865,15 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					mirrorAskRef.current !== undefined &&
 					mirrorAskRef.current !== "command" &&
 					mirrorAskRef.current !== "command_output"
+				// If the chat is empty (first message in a new tab), never queue —
+				// send directly as a newTask. The queue check below can false-positive
+				// because handleChatReset() sets sendingDisabled=true when the idle
+				// tab is created, before the user has typed anything.
+				const isFirstMessageInTab = messagesRef.current.length === 0
 				if (
 					!forceSend &&
 					!isRespondingToAsk &&
+					!isFirstMessageInTab &&
 					(sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAskRef.current !== undefined)
 				) {
 					try {
@@ -1105,7 +1230,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		} catch {}
 		const allKeys = [...new Set([...builtIn, ...custom])].filter((key) => !deleted.includes(key))
 		return allKeys.map((key) => ({ value: key, label: key }))
-	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider])
+	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider, apiConfiguration])
 
 	const handleModelChange = useCallback(
 		(newModelId: string) => {

@@ -6,7 +6,7 @@ import type { ModelInfo } from "../model.js"
 // continuation within the same turn. See: https://api-docs.deepseek.com/guides/thinking_mode
 export type DeepSeekModelId = keyof typeof deepSeekModels
 
-export const deepSeekDefaultModelId: DeepSeekModelId = "deepseek-chat"
+export const deepSeekDefaultModelId: DeepSeekModelId = "deepseek-v4-flash"
 
 export const deepSeekModels = {
 	"deepseek-chat": {
@@ -14,23 +14,67 @@ export const deepSeekModels = {
 		contextWindow: 128_000,
 		supportsImages: false,
 		supportsPromptCache: true,
-		inputPrice: 0.28, // $0.28 per million tokens (cache miss) - Updated Dec 9, 2025
-		outputPrice: 0.42, // $0.42 per million tokens - Updated Dec 9, 2025
-		cacheWritesPrice: 0.28, // $0.28 per million tokens (cache miss) - Updated Dec 9, 2025
-		cacheReadsPrice: 0.028, // $0.028 per million tokens (cache hit) - Updated Dec 9, 2025
-		description: `DeepSeek-V3.2 (Non-thinking Mode) achieves a significant breakthrough in inference speed over previous models. It tops the leaderboard among open-source models and rivals the most advanced closed-source models globally. Supports JSON output, tool calls, chat prefix completion (beta), and FIM completion (beta).`,
+		supportsReasoningEffort: true,
+		inputPrice: 0.28,
+		outputPrice: 0.42,
+		cacheWritesPrice: 0.28,
+		cacheReadsPrice: 0.028,
+		deprecated: true,
+		description: `[DEPRECATED] DeepSeek-V3.2 (Non-thinking Mode).`,
 	},
 	"deepseek-reasoner": {
 		maxTokens: 8192, // 8K max output
 		contextWindow: 128_000,
 		supportsImages: false,
 		supportsPromptCache: true,
+		supportsReasoningEffort: true,
+		supportsReasoningBudget: true,
 		preserveReasoning: true,
-		inputPrice: 0.28, // $0.28 per million tokens (cache miss) - Updated Dec 9, 2025
-		outputPrice: 0.42, // $0.42 per million tokens - Updated Dec 9, 2025
-		cacheWritesPrice: 0.28, // $0.28 per million tokens (cache miss) - Updated Dec 9, 2025
-		cacheReadsPrice: 0.028, // $0.028 per million tokens (cache hit) - Updated Dec 9, 2025
-		description: `DeepSeek-V3.2 (Thinking Mode) achieves performance comparable to OpenAI-o1 across math, code, and reasoning tasks. Supports Chain of Thought reasoning with up to 8K output tokens. Supports JSON output, tool calls, and chat prefix completion (beta).`,
+		inputPrice: 0.28,
+		outputPrice: 0.42,
+		cacheWritesPrice: 0.28,
+		cacheReadsPrice: 0.028,
+		deprecated: true,
+		description: `[DEPRECATED] DeepSeek-R1 (Thinking Mode).`,
+	},
+	"deepseek-v3": {
+		maxTokens: 8192,
+		contextWindow: 128_000,
+		supportsImages: false,
+		supportsPromptCache: true,
+		supportsReasoningEffort: true,
+		inputPrice: 0.14,
+		outputPrice: 0.28,
+		cacheWritesPrice: 0.14,
+		cacheReadsPrice: 0.014,
+		description: `DeepSeek-V3 delivers next-generation intelligence and inference speed, topping open-source benchmarks.`,
+	},
+	"deepseek-r1": {
+		maxTokens: 8192,
+		contextWindow: 128_000,
+		supportsImages: false,
+		supportsPromptCache: true,
+		supportsReasoningEffort: true,
+		supportsReasoningBudget: true,
+		preserveReasoning: true,
+		inputPrice: 0.14,
+		outputPrice: 0.28,
+		cacheWritesPrice: 0.14,
+		cacheReadsPrice: 0.014,
+		description: `DeepSeek-R1 achieves OpenAI-o1-level performance across math, code, and complex reasoning tasks with full thinking output.`,
+	},
+	"deepseek-v4-flash": {
+		maxTokens: 8192, // 8K max output
+		contextWindow: 128_000,
+		supportsImages: false,
+		supportsPromptCache: true,
+		supportsReasoningEffort: true,
+		supportsReasoningBudget: true,
+		inputPrice: 0.14,
+		outputPrice: 0.28,
+		cacheWritesPrice: 0.14,
+		cacheReadsPrice: 0.014,
+		description: `DeepSeek-V4 Flash delivers high-speed inference and thinking capabilities, optimized for low-latency coding and interactive agentic tasks.`,
 	},
 } as const satisfies Record<string, ModelInfo>
 

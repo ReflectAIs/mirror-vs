@@ -1,18 +1,12 @@
-import type { ProviderName, ReasoningEffortExtended } from "@mirror-vs/types"
+import { providerNames, type ProviderName, type ReasoningEffortExtended } from "@mirror-vs/types"
 import type { OutputFormat } from "./json-events.js"
 
-export const supportedProviders = [
-	"anthropic",
-	"openai-native",
-	"gemini",
-	"openrouter",
-	"vercel-ai-gateway",
-] as const satisfies ProviderName[]
+export const supportedProviders = providerNames
 
-export type SupportedProvider = (typeof supportedProviders)[number]
+export type SupportedProvider = ProviderName
 
 export function isSupportedProvider(provider: string): provider is SupportedProvider {
-	return supportedProviders.includes(provider as SupportedProvider)
+	return providerNames.includes(provider as ProviderName)
 }
 
 export type ReasoningEffortFlagOptions = ReasoningEffortExtended | "unspecified" | "disabled"

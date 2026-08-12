@@ -23,6 +23,7 @@ describe("AutoApproveToggle", () => {
 		alwaysAllowModeSwitch: true,
 		alwaysAllowSubtasks: false,
 		alwaysAllowExecute: true,
+		alwaysAllowGitCommit: false,
 		alwaysAllowFollowupQuestions: false,
 		alwaysAllowBrowser: false,
 		onToggle: mockOnToggle,

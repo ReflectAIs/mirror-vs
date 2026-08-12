@@ -14,13 +14,15 @@ import {
 	DEFAULT_FLAGS,
 	REASONING_EFFORTS,
 	OutputFormat,
+	type SupportedProvider,
 } from "@/types/index.js"
 import { isValidOutputFormat } from "@/types/json-events.js"
 import { JsonEventEmitter } from "@/agent/json-event-emitter.js"
 
 import { loadSettings } from "@/lib/storage/index.js"
 import { readWorkspaceTaskSessions, resolveWorkspaceResumeSessionId } from "@/lib/task-history/index.js"
-import { getEnvVarName, getApiKeyFromEnv } from "@/lib/utils/provider.js"
+import { getEnvVarName, getApiKeyFromEnv, isModelCompatibleWithProvider } from "@/lib/utils/provider.js"
+import { getProviderDefaultModelId, type ProviderName } from "@mirror-vs/types"
 import { validateTerminalShellPath } from "@/lib/utils/shell.js"
 import { getDefaultExtensionPath } from "@/lib/utils/extension.js"
 import { isValidSessionId } from "@/lib/utils/session-id.js"
@@ -29,6 +31,7 @@ import { VERSION } from "@/lib/utils/version.js"
 import { ExtensionHost, ExtensionHostOptions } from "@/agent/index.js"
 import { isExpectedControlFlowError } from "./cancellation.js"
 import { runStdinStreamMode } from "./stdin-stream.js"
+import { getCliConfig } from "./config.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SIGNAL_ONLY_EXIT_KEEPALIVE_MS = 60_000
@@ -111,17 +114,36 @@ export async function run(promptArg: string | undefined, flagOptions: FlagOption
 	// Options
 
 	const settings = await loadSettings()
+	// Load persisted CLI config (~/.mirror-vs/cli-config.json) so users who
+	// ran `mirror config set api-key/provider/model ...` don't need flags every time.
+	const cliConfig = await getCliConfig()
 
 	const isTuiSupported = process.stdin.isTTY && process.stdout.isTTY
 	const isTuiEnabled = !flagOptions.print && isTuiSupported
 
-	// Determine effective values: CLI flags > settings file > DEFAULT_FLAGS.
+	// Determine effective values: CLI flags > CLI config file > settings file > DEFAULT_FLAGS.
 	const effectiveMode = flagOptions.mode || settings.mode || DEFAULT_FLAGS.mode
-	const effectiveModel = flagOptions.model || settings.model || DEFAULT_FLAGS.model
 	const effectiveReasoningEffort =
 		flagOptions.reasoningEffort || settings.reasoningEffort || DEFAULT_FLAGS.reasoningEffort
-	const effectiveProvider = flagOptions.provider ?? settings.provider ?? "openrouter"
+	const effectiveProvider = flagOptions.provider ?? cliConfig.provider ?? settings.provider ?? "openrouter"
+	const defaultModelForProvider = getProviderDefaultModelId(effectiveProvider as ProviderName) || DEFAULT_FLAGS.model
+	const effectiveModel = flagOptions.model || cliConfig.model || settings.model || defaultModelForProvider
 	const effectiveWorkspacePath = flagOptions.workspace ? path.resolve(flagOptions.workspace) : process.cwd()
+
+	// Detect model/provider mismatch: when the model came from saved config (not an explicit --model flag)
+	// and is clearly incompatible with the chosen provider (e.g., "anthropic/claude-*" with deepseek).
+	// In that case, auto-correct to the provider's default and flag it for the TUI to show a prompt.
+	const modelCameFromFlag = Boolean(flagOptions.model)
+	let modelAutoCorrected = false
+	let correctedFromModel = ""
+	let finalEffectiveModel = effectiveModel
+
+	if (!modelCameFromFlag && !isModelCompatibleWithProvider(effectiveModel, effectiveProvider as SupportedProvider)) {
+		correctedFromModel = effectiveModel
+		finalEffectiveModel = defaultModelForProvider
+		modelAutoCorrected = true
+	}
+
 	const legacyRequireApprovalFromSettings =
 		settings.requireApproval ??
 		(settings.dangerouslySkipPermissions === undefined ? undefined : !settings.dangerouslySkipPermissions)
@@ -151,13 +173,17 @@ export async function run(promptArg: string | undefined, flagOptions: FlagOption
 		}
 	}
 
+	const effectiveApiKey =
+		flagOptions.apiKey || cliConfig.apiKey || getApiKeyFromEnv(effectiveProvider as SupportedProvider)
+
 	const extensionHostOptions: ExtensionHostOptions = {
 		mode: effectiveMode,
 		reasoningEffort: effectiveReasoningEffort === "unspecified" ? undefined : effectiveReasoningEffort,
 		consecutiveMistakeLimit: effectiveConsecutiveMistakeLimit,
 		user: null,
-		provider: effectiveProvider,
-		model: effectiveModel,
+		provider: effectiveProvider as SupportedProvider,
+		apiKey: effectiveApiKey,
+		model: finalEffectiveModel,
 		workspacePath: effectiveWorkspacePath,
 		extensionPath: path.resolve(flagOptions.extension || getDefaultExtensionPath(__dirname)),
 		nonInteractive: !effectiveRequireApproval,
@@ -179,12 +205,23 @@ export async function run(promptArg: string | undefined, flagOptions: FlagOption
 		process.exit(1)
 	}
 
-	extensionHostOptions.apiKey =
-		extensionHostOptions.apiKey || flagOptions.apiKey || getApiKeyFromEnv(extensionHostOptions.provider)
-
 	if (!extensionHostOptions.apiKey) {
-		console.error(`[CLI] Error: No API key provided. Use --api-key or set the appropriate environment variable.`)
-		console.error(`[CLI] For ${extensionHostOptions.provider}, set ${getEnvVarName(extensionHostOptions.provider)}`)
+		const envVar = getEnvVarName(extensionHostOptions.provider)
+		console.error(`\n========================================================================`)
+		console.error(` ❌ Mirror VS CLI Setup Required: Missing API Key`)
+		console.error(`========================================================================`)
+		console.error(`Selected Provider : ${extensionHostOptions.provider}`)
+		console.error(`Default Model     : ${extensionHostOptions.model}`)
+		console.error(`Expected Env Var  : ${envVar}\n`)
+		console.error(`To setup Mirror VS CLI, choose one of the following methods:\n`)
+		console.error(`  Method 1: Save configuration permanently (Recommended)`)
+		console.error(`    mirror config set provider ${extensionHostOptions.provider}`)
+		console.error(`    mirror config set api-key <your-api-key>\n`)
+		console.error(`  Method 2: Set your environment variable`)
+		console.error(`    export ${envVar}="your-api-key"\n`)
+		console.error(`  Method 3: Pass options directly in your command`)
+		console.error(`    mirror --provider ${extensionHostOptions.provider} --api-key <your-api-key> "your task"\n`)
+		console.error(`========================================================================\n`)
 
 		process.exit(1)
 	}
@@ -226,7 +263,9 @@ export async function run(promptArg: string | undefined, flagOptions: FlagOption
 
 	if (flagOptions.signalOnlyExit && !flagOptions.stdinPromptStream) {
 		console.error("[CLI] Error: --signal-only-exit requires --stdin-prompt-stream")
-		console.error("[CLI] Usage: mirror --print --output-format stream-json --stdin-prompt-stream --signal-only-exit")
+		console.error(
+			"[CLI] Usage: mirror --print --output-format stream-json --stdin-prompt-stream --signal-only-exit",
+		)
 		process.exit(1)
 	}
 
@@ -279,9 +318,9 @@ export async function run(promptArg: string | undefined, flagOptions: FlagOption
 					"[CLI] For stdin control mode: mirror --print --output-format stream-json --stdin-prompt-stream [options]",
 				)
 			} else {
-				console.error("[CLI] Error: prompt is required in non-interactive mode")
+				console.error("[CLI] Error: prompt is required when standard terminal input (TTY) is not available.")
 				console.error("[CLI] Usage: mirror <prompt> [options]")
-				console.error("[CLI] Run without -p for interactive mode")
+				console.error("[CLI] Or run directly in an interactive terminal shell.")
 			}
 
 			process.exit(1)
@@ -307,6 +346,9 @@ export async function run(promptArg: string | undefined, flagOptions: FlagOption
 					initialSessionId: resolvedResumeSessionId,
 					continueSession: false,
 					version: VERSION,
+					modelAutoCorrected,
+					correctedFromModel,
+					defaultModelForProvider,
 					createExtensionHost: (opts: ExtensionHostOptions) => new ExtensionHost(opts),
 				}),
 				// Handle Ctrl+C in App component for double-press exit.

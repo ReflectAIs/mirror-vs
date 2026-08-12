@@ -43,9 +43,8 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 
 	const { command, output: parsedOutput } = useMemo(() => parseCommandAndOutput(text), [text])
 
-	// If we aren't opening the VSCode terminal for this command then we default
-	// to expanding the command execution output.
-	const [isExpanded, setIsExpanded] = useState(terminalShellIntegrationDisabled)
+	// Default command execution output blocks to collapsed (closed) by default
+	const [isExpanded, setIsExpanded] = useState(false)
 	const [streamingOutput, setStreamingOutput] = useState("")
 	const [status, setStatus] = useState<CommandExecutionStatus | null>(null)
 
@@ -147,7 +146,9 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 
 	return (
 		<>
-			<div className="flex flex-row items-center justify-between gap-2 mb-1">
+			<div
+				className="flex flex-row items-center justify-between gap-2 mb-1 cursor-pointer select-none"
+				onClick={() => setIsExpanded(!isExpanded)}>
 				<div className="flex flex-row items-center gap-2">
 					{icon}
 					{title}
@@ -174,19 +175,26 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 									<Button
 										variant="ghost"
 										size="icon"
-										onClick={() =>
+										onClick={(e) => {
+											e.stopPropagation()
 											vscode.postMessage({
 												type: "terminalOperation",
 												terminalOperation: "abort",
 											})
-										}>
+										}}>
 										<OctagonX className="size-4" />
 									</Button>
 								</StandardTooltip>
 							</div>
 						)}
 						{output.length > 0 && (
-							<Button variant="ghost" size="icon" onClick={() => setIsExpanded(!isExpanded)}>
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={(e) => {
+									e.stopPropagation()
+									setIsExpanded(!isExpanded)
+								}}>
 								<ChevronDown
 									className={cn(
 										"size-4 transition-transform duration-300",

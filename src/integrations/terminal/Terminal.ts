@@ -40,7 +40,10 @@ export class Terminal extends BaseTerminal {
 		return this.terminal.exitStatus !== undefined
 	}
 
-	public override runCommand(command: string, callbacks: MirrorTerminalCallbacks): MirrorTerminalProcessResultPromise {
+	public override runCommand(
+		command: string,
+		callbacks: MirrorTerminalCallbacks,
+	): MirrorTerminalProcessResultPromise {
 		// We set busy before the command is running because the terminal may be
 		// waiting on terminal integration, and we must prevent another instance
 		// from selecting the terminal for use during that time.
@@ -154,6 +157,10 @@ export class Terminal extends BaseTerminal {
 		const env: Record<string, string> = {
 			MIRROR_ACTIVE: "true",
 			PAGER: process.platform === "win32" ? "" : "cat",
+			CI: "true",
+			TERM: "dumb",
+			DOCKER_CLI_HINTS: "false",
+			DEBIAN_FRONTEND: "noninteractive",
 
 			// VTE must be disabled because it prevents the prompt command from executing
 			// See https://wiki.gnome.org/Apps/Terminal/VTE

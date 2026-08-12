@@ -305,6 +305,21 @@ export class TaskHistoryManager {
 				}
 			}
 
+			// Check if all tasks in the active session were deleted — if so, reset to a New Session
+			const currentSessionId = this.provider.getCurrentSessionId()
+			if (currentSessionId) {
+				const remainingSessionTasks = this.provider.taskHistoryStore
+					.getAll()
+					.filter((item) => item.sessionId === currentSessionId && !allIdsToDelete.includes(item.id))
+				if (remainingSessionTasks.length === 0) {
+					await this.provider.createSession()
+					while (this.provider.mirrorStack.length > 0) {
+						await this.provider.removeMirrorFromStack()
+					}
+					await this.provider.createTask("", [])
+				}
+			}
+
 			await this.provider.postStateToWebview()
 		} catch (error) {
 			// If task is not found, just remove it from state

@@ -254,6 +254,32 @@ describe("executeCommandTool", () => {
 			expect(mockAskApproval).not.toHaveBeenCalled()
 			// executeCommandInTerminal should not be called since mirrorignore blocked it
 		})
+
+		it("should block destructive commands targeting root, home, system, or wildcard deletions", async () => {
+			const tool = executeCommandModule.executeCommandTool
+			const mockToolError = "Destructive command error"
+			;(formatResponse.toolError as any).mockReturnValue(mockToolError)
+
+			const dangerousCommands = ["rm -rf /", "rm -rf ~", "rm -rf /System", "rm -rf *", "rm -rf ../"]
+
+			for (const dangerousCmd of dangerousCommands) {
+				vitest.clearAllMocks()
+				mockToolUse.params.command = dangerousCmd
+
+				await tool.execute(mockToolUse.params as any, mockMirror, {
+					askApproval: mockAskApproval,
+					handleError: mockHandleError,
+					pushToolResult: mockPushToolResult,
+				})
+
+				expect(mockMirror.say).toHaveBeenCalledWith(
+					"error",
+					expect.stringMatching(/Destructive command blocked/),
+				)
+				expect(mockPushToolResult).toHaveBeenCalledWith(mockToolError)
+				expect(mockAskApproval).not.toHaveBeenCalled()
+			}
+		})
 	})
 
 	describe("Command execution timeout configuration", () => {

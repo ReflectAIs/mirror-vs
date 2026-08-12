@@ -147,6 +147,15 @@ const McpSettingsSchema = z.object({
 	mcpServers: z.record(ServerConfigSchema),
 })
 
+interface ToolUsage {
+	useCount: number
+	lastUsed: number
+}
+
+interface ToolUsageData {
+	usages: Record<string, ToolUsage>
+}
+
 export class McpHub {
 	private providerRef: WeakRef<MirrorProvider>
 	private disposables: vscode.Disposable[] = []
@@ -162,6 +171,7 @@ export class McpHub {
 	private flagResetTimer?: NodeJS.Timeout
 	private sanitizedNameRegistry: Map<string, string> = new Map()
 	private initializationPromise: Promise<void>
+	private toolUsageData: ToolUsageData = { usages: {} }
 
 	constructor(provider: MirrorProvider) {
 		this.providerRef = new WeakRef(provider)
@@ -171,7 +181,75 @@ export class McpHub {
 		this.initializationPromise = Promise.all([
 			this.initializeGlobalMcpServers(),
 			this.initializeProjectMcpServers(),
+			this.loadToolUsageFromDisk(),
 		]).then(() => {})
+	}
+
+	private async loadToolUsageData(): Promise<ToolUsageData> {
+		try {
+			const provider = this.providerRef.deref()
+			if (!provider) {
+				return { usages: {} }
+			}
+			const usageFilePath = path.join(await provider.ensureSettingsDirectoryExists(), "mcp_tool_usage.json")
+			const fileExists = await fileExistsAtPath(usageFilePath)
+			if (!fileExists) {
+				return { usages: {} }
+			}
+			const content = await fs.readFile(usageFilePath, "utf-8")
+			return JSON.parse(content) as ToolUsageData
+		} catch (error) {
+			console.error("Failed to load MCP tool usage data:", error)
+			return { usages: {} }
+		}
+	}
+
+	private async saveToolUsageData(data: ToolUsageData): Promise<void> {
+		try {
+			const provider = this.providerRef.deref()
+			if (!provider) {
+				return
+			}
+			const usageFilePath = path.join(await provider.ensureSettingsDirectoryExists(), "mcp_tool_usage.json")
+			await fs.writeFile(usageFilePath, JSON.stringify(data, null, 2))
+		} catch (error) {
+			console.error("Failed to save MCP tool usage data:", error)
+		}
+	}
+
+	private async loadToolUsageFromDisk(): Promise<void> {
+		this.toolUsageData = await this.loadToolUsageData()
+	}
+
+	public getToolUsage(serverName: string, toolName: string): ToolUsage {
+		const key = `${serverName}:${toolName}`
+		return this.toolUsageData.usages?.[key] || { useCount: 0, lastUsed: 0 }
+	}
+
+	public async recordToolExecution(serverName: string, toolName: string): Promise<void> {
+		const key = `${serverName}:${toolName}`
+		if (!this.toolUsageData.usages) {
+			this.toolUsageData.usages = {}
+		}
+		if (!this.toolUsageData.usages[key]) {
+			this.toolUsageData.usages[key] = { useCount: 0, lastUsed: 0 }
+		}
+		this.toolUsageData.usages[key].useCount++
+		this.toolUsageData.usages[key].lastUsed = Date.now()
+		await this.saveToolUsageData(this.toolUsageData)
+	}
+
+	public async activateToolExplicitly(serverName: string, toolName: string): Promise<void> {
+		const key = `${serverName}:${toolName}`
+		if (!this.toolUsageData.usages) {
+			this.toolUsageData.usages = {}
+		}
+		if (!this.toolUsageData.usages[key]) {
+			this.toolUsageData.usages[key] = { useCount: 0, lastUsed: 0 }
+		}
+		this.toolUsageData.usages[key].lastUsed = Date.now()
+		this.toolUsageData.usages[key].useCount = (this.toolUsageData.usages[key].useCount || 0) + 1
+		await this.saveToolUsageData(this.toolUsageData)
 	}
 
 	/**
@@ -644,12 +722,22 @@ export class McpHub {
 	 * @returns Promise<boolean> indicating if MCP is enabled
 	 */
 	private async isMcpEnabled(): Promise<boolean> {
-		const provider = this.providerRef.deref()
-		if (!provider) {
-			return true // Default to enabled if provider is not available
+		const state = await this.providerRef.deref()?.getState()
+		if (!state) {
+			return true
 		}
-		const state = await provider.getState()
 		return state.mcpEnabled ?? true
+	}
+
+	public getProviderThreshold(): number {
+		const provider = this.providerRef.deref()
+		if (provider) {
+			const val = provider.getValue("mcpToolsThreshold")
+			if (typeof val === "number") {
+				return val
+			}
+		}
+		return 40
 	}
 
 	private async connectToServer(

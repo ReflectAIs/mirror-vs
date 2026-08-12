@@ -14,7 +14,7 @@ interface TerminalStatusBadgeProps {
 export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ className }) => {
 	const [open, setOpen] = React.useState(false)
 	const portalContainer = useMirrorPortal("mirror-portal")
-	const { activeTerminalCount, activeTerminals } = useExtensionState()
+	const { activeTerminalCount, activeTerminals = [] } = useExtensionState()
 
 	const count = activeTerminalCount ?? 0
 

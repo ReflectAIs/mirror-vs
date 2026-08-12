@@ -2,6 +2,71 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.8] - 2026-08-07
+
+### Added
+
+- **Brain Explorer Panel**: New "Brain" view (database icon in the chat toolbar) that shows every file the AI currently holds in active memory. Files can be toggled to **Cold Storage** to exclude them from prompt contexts (saving tokens) or forgotten entirely. Backed by new `hot`/`cold` `storage_tier` on context metadata, new `forgetContextFile` / `toggleContextFileStorageTier` webview messages, and [`FileContextTracker.forgetFile()`](src/core/context-tracking/FileContextTracker.ts:267) / [`FileContextTracker.toggleFileStorageTier()`](src/core/context-tracking/FileContextTracker.ts:284). Cold-tier files are skipped when building the prompt context in [`FileContextTracker`](src/core/context-tracking/FileContextTracker.ts:230).
+- **Session Analytics Panel**: New "Analytics" view (graph icon in the chat toolbar) that aggregates task history into total cost, total tokens, and per-model/per-mode breakdowns, computed from [`AnalyticsView`](webview-ui/src/components/analytics/AnalyticsView.tsx:9).
+- **Concise-Thinking Prompt Rule**: Added a rule instructing the model to keep `<thinking>`/planning blocks to 1–2 minimal sentences for speed and token efficiency in [`rules.ts`](src/core/prompts/sections/rules.ts:89).
+- **Mascot Badge Interactions**: The mascot badge now cycles expressions/quotes on click with a bounce animation and shows a hover tooltip with the current quote in [`MascotBadge`](webview-ui/src/components/chat/MascotBadge.tsx:90).
+
+### Changed
+
+- **CLI Formatting**: Prettier-normalized object/expression formatting across [`extension-host.ts`](apps/cli/src/agent/extension-host.ts:234) and [`run.ts`](apps/cli/src/commands/cli/run.ts:56) (no behavior change).
+
+## [0.6.7] - 2026-07-29
+
+### Fixed
+
+- **Blank Page on Extension Startup**: Removed the [`restoreSessionTabs()`](src/core/webview/MirrorProvider.ts:1643) call from [`handleWebviewDidLaunch()`](src/core/webview/handlers/taskHandler.ts:13). Previously, it created an idle `Task` (`startTask: false`) from the newest history item, which produced a tab with no conversation loaded — just a blank page. With session-based history grouping, users load specific tasks by clicking session groups in the history view, or create fresh tabs via the "+" button (which generates a new session). The persisted session ID is still restored via `getOrCreateSession()` so new tasks inherit the correct `sessionId` for grouping.
+
+- **Git Auto-Approval Bypassing Disabled Setting**: Moved git command check **before** autonomous mode check in [`checkAutoApproval()`](src/core/auto-approval/index.ts:69). Previously, `autonomousMode === true` returned `{ decision: "approve" }` for ALL commands at line 71-73, completely bypassing the `alwaysAllowGitCommit` toggle. Git operations (commit, push, add, pull, merge, rebase, etc.) now always respect the explicit `alwaysAllowGitCommit` setting — even in autonomous mode, git is never silently auto-approved unless the user has explicitly enabled it. The duplicate dead git check in the old `ask === "command"` block was removed.
+
+- **TabBar "+" Button Not Creating a New Session**: Fixed [`handleNewTask()`](src/core/webview/handlers/taskHandler.ts:97) to detect when the TabBar "+" button is clicked with empty text and no images. The handler now calls `provider.createSession()` to generate a fresh `sessionId` before creating the idle task, ensuring the new tab appears as its own session in history instead of being absorbed into the current session.
+
+- **Legacy Tasks Invisible After Session Grouping Migration**: Fixed [`buildSessionGroups()`](webview-ui/src/components/history/useGroupedTasks.ts:28) which had `if (!sid) continue` dropping all pre-existing history tasks that lack a `sessionId`. Each legacy task now gets a `__legacy__<id>` synthetic session ID, creating singleton sessions that display the task text as their session name.
+
+- **Session Restore Restoring All Historical Tabs**: Fixed [`restoreSessionTabs()`](src/core/webview/MirrorProvider.ts:1638) which was restoring ALL historical session tabs into the tab bar instead of only the newest/focused tab. Now only the single focused tab is restored on session load.
+
+- **SSH Hanging on Authentication Failure**: Added password caching in [`SshSessionRegistry`](src/core/tools/helpers/SshSessionRegistry.ts:216) — passwords are now cached per `host:port` key on first connect and automatically reused on reconnect, preventing SSH from entering a non-interactive password prompt loop (which would hang forever since stdin is `/dev/null`). Also added [auth failure detection](src/core/tools/helpers/SshSessionRegistry.ts:136) that monitors stdout/stderr for patterns like `"Permission denied"`, `"authentication failed"`, and `"connection refused"`, immediately rejecting the connection promise instead of waiting for the 10-second timeout.
+
+- **SSH Output Flooding Context Window**: Integrated [`OutputInterceptor`](src/integrations/terminal/OutputInterceptor.ts:58) into [`SshSessionTool`](src/core/tools/SshSessionTool.ts:67) — large SSH command outputs are now truncated using the same head/tail preview buffer strategy as `execute_command`. The first 50% of the preview budget shows the beginning of output, the last 50% shows the end, and the middle is dropped. Full output is spilled to a persisted artifact file (`{taskDir}/command-output/cmd-{executionId}.txt`) accessible via the [`read_command_output`](src/core/tools/ReadCommandOutputTool.ts:85) tool with offset/limit/search support. Also fixed a TypeScript type error where `let toolResponse: string` was incompatible with the `ToolResponse` return type of `formatResponse.toolResult()`.
+
+- **PARALLEL_TOOL_READS Experiment Not Showing in Settings UI**: Fixed locale key mismatch across all 18 locale files — the settings JSON keys used `CONCURRENT_FILE_READS` but the code constant in [`experiments.ts`](src/shared/experiments.ts:16) is `PARALLEL_TOOL_READS`. The `ExperimentalFeature` component looks up translations dynamically via `settings.experimental.{experimentKey}.{name,description}`, so the stale key caused the parallel tool reads toggle to render without any visible name or description. Updated English title to _"Parallel tool reads (experimental)"_ with a proper description explaining the performance impact.
+
+- **Keyboard Shortcuts Not Firing While Mirror VS Is Focused**: VS Code's `when`-clause keybindings (`activeWebviewPanelId` / `focusedView`) do NOT reliably match when focus is inside a webview iframe (microsoft/vscode#61762), so `Ctrl+N` / `Ctrl+Shift+N` / `Ctrl+W` were still handled by VS Code (New File / New Window / Close Editor). Added a webview-level `keydown` listener in [`useShortcutKeys()`](webview-ui/src/hooks/useShortcutKeys.ts:1) mounted from [`App.tsx`](webview-ui/src/App.tsx:53) that intercepts these combos while Mirror VS is focused, calls `preventDefault()` so the native VS Code action never runs, and posts the equivalent `WebviewMessage` (`newTask` / `clearTask` / `closeTaskTab`). Shortcuts: `Ctrl/Cmd+N` or `Ctrl/Cmd+T` new tab, `Ctrl/Cmd+Shift+N` new session, `Ctrl/Cmd+W` close active tab. The commands (`mirror-vs.newTab`, `mirror-vs.newSession`, `mirror-vs.closeTab`) registered in [`registerCommands.ts`](src/activate/registerCommands.ts:126) and contributed in [`src/package.json`](src/package.json:49) remain available as backup for users who rebind them via the Keyboard Shortcuts editor.
+
+- **Closing a Tab Does Not Activate Its Previous Tab**: When closing the active tab (via the tab bar X or `Ctrl/Cmd+W`), the extension relied on whatever task happened to end up at the top of the mirror stack after the pop, which is not guaranteed to be the closed tab's predecessor (tasks can be parked in `backgroundTasks` mid-stream, and tabs are ordered by `createdAt`). Updated [`closeTask()`](src/core/webview/MirrorProvider.ts:660) to capture the tab-bar order before removal, determine the closed tab's position, and — when closing the active tab — explicitly focus its previous tab (falling back to the next tab when closing the first one) via [`switchToTask()`](src/core/webview/MirrorProvider.ts:599). This gives browser-like behavior: closing a tab activates the tab immediately before it. Closing a non-active tab leaves the active tab unchanged.
+
+- **Concurrent Tabs Failing With "The provider couldn't process the request as made"**: When 2-3 tabs ran simultaneously, every tab transmitted its streaming request at the same instant, tripping the provider's overload protection (Anthropic HTTP 529 `overloaded_error`). Added a global cross-tab request gate in [`Task.acquireGlobalRequestGate()`](src/core/task/Task.ts:328) that serializes request _transmission_ across all tabs: each [`attemptApiRequest()`](src/core/task/TaskApiRequest.ts:316) acquires the gate and holds it until the provider accepts the request (first chunk) or it fails, so tabs queue instead of firing together — then streaming continues fully in parallel. Also made transient provider capacity errors (529 overloaded, 429 rate limit, 503 unavailable) auto-retry with exponential backoff via [`isTransientProviderError()`](src/core/task/transient-error.ts:10) even when auto-approval is disabled, in both the first-chunk path ([`attemptApiRequest()`](src/core/task/TaskApiRequest.ts:705)) and the mid-stream path ([`recursivelyMakeMirrorRequests()`](src/core/task/TaskMainLoop.ts:870)), so concurrent multi-tab use no longer dumps the raw error on the user.
+
+### Changed
+
+- **SSH Tool Documentation Updated**: The [`ssh_session`](src/core/prompts/tools/native-tools/ssh_session.ts) tool prompt now documents password caching behavior (the model no longer needs to pass the password on reconnect) and the output truncation pattern with artifact_id for `read_command_output` access.
+
+## [0.6.6] - 2026-07-22
+
+### Fixed
+
+- **SSH Session Disconnecting Immediately After Connect**: Removed stale `SshSessionRegistry.removeSession()` calls from `close`/`error` event handlers in [`SshSessionRegistry.ts`](src/core/tools/helpers/SshSessionRegistry.ts:73). When `handleKillTerminal` killed an old session and deleted its map entry, the old session's asynchronous `close` event would fire later and call `removeSession(this.host, this.port)` — which operates by host:port key, not object reference — accidentally finding and killing any new session created at the same host:port. The `isDead` flag is sufficient for all cleanup; `getOrCreateSession()` and `getSessions()` already check it.
+
+- **ANSI Escape Sequences Bleeding Into SSH Output**: Added [`stripAnsi()`](src/core/tools/helpers/SshSessionRegistry.ts:4) to strip CSI sequences (e.g. cursor show/hide `?25h`, cursor up `?251A`), OSC sequences, and control characters from SSH stdout/stderr output so command results are cleanly parseable by the model.
+
+### Changed
+
+- **SSH Tool Description Warns Against Never-Exiting Commands**: Added prominent rule #2 in the [`ssh_session`](src/core/prompts/tools/native-tools/ssh_session.ts:3) tool description warning the model to NEVER run foreground processes that run indefinitely (e.g. `docker compose up` without `-d`, `tail -f`, `ping`, `watch`), with explicit guidance to use detached/one-shot alternatives instead.
+
+## [0.6.5] - 2026-07-22
+
+### Fixed
+
+- **SSH Kill Terminal Not Unblocking the Model**: Killing an SSH session via the terminal badge now properly aborts the current task's terminal process. Previously, [`handleKillTerminal`](src/core/webview/handlers/taskHandler.ts:156) called [`SshSessionRegistry.removeSession()`](src/core/tools/helpers/SshSessionRegistry.ts:172) → `session.close()` → `child.kill()` (SIGTERM), but never resolved the `abortPromise` in [`Promise.race`](src/core/tools/SshSessionTool.ts:125). Since the kill handler now also calls `task.handleTerminalOperation("abort")` → `sshProcess.abort()` → `triggerAbort()` → the `abortPromise` resolves, allowing the model to unblock with `"[Command execution aborted by user]"` instead of hanging forever.
+
+### Added
+
+- **Screenshots Saved to Disk with URL Labels**: Both [`BrowserScreenshotTool`](src/core/tools/BrowserTools.ts:232) and [`RenderPreviewTool`](src/core/tools/BrowserTools.ts:401) now save screenshots to `.mirror-vs/screenshots/` with URL-derived filenames via the existing [`saveScreenshot()`](src/core/tools/BrowserTools.ts:97) utility (updated to accept an optional `label` parameter). Added [`BrowserService.getCurrentUrl()`](src/services/browser-service.ts:425) to retrieve the page URL for labeling. The tool result includes the saved file path so the model can reference screenshots by filename when creating documents.
+
 ## [0.6.4] - 2026-07-21
 
 ### Fixed

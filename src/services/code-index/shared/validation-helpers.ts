@@ -227,3 +227,48 @@ export function formatEmbeddingError(error: any, maxRetries: number): Error {
 		return new Error(t("embeddings:failedWithError", { attempts: maxRetries, errorMessage }))
 	}
 }
+
+/**
+ * Creates a comprehensive string representation of any error object for diagnostics
+ */
+export function stringifyErrorDetail(error: any): string {
+	if (!error) return "Unknown error"
+
+	const details: Record<string, any> = {
+		message: error.message || String(error),
+		name: error.name,
+		stack: error.stack,
+	}
+
+	try {
+		for (const key of Object.keys(error)) {
+			if (!(key in details)) {
+				details[key] = error[key]
+			}
+		}
+	} catch (e) {
+		// Ignore
+	}
+
+	if (error.status) details.status = error.status
+	if (error.statusCode) details.statusCode = error.statusCode
+	if (error.code) details.code = error.code
+	if (error.body) details.body = error.body
+	if (error.response) {
+		try {
+			if (typeof error.response === "object") {
+				details.response = {
+					status: error.response.status,
+					statusText: error.response.statusText,
+					url: error.response.url,
+				}
+			} else {
+				details.response = String(error.response)
+			}
+		} catch (e) {
+			// Ignore
+		}
+	}
+
+	return JSON.stringify(details, null, 2)
+}

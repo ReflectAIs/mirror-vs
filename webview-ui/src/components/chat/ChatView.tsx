@@ -27,6 +27,8 @@ import ChatWelcomeContent from "./ChatWelcomeContent"
 // Types
 // ---------------------------------------------------------------------------
 
+import TabBar from "./TabBar"
+
 export interface ChatViewProps {
 	isHidden: boolean
 	showAnnouncement: boolean
@@ -51,6 +53,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 	const {
 		mirrorMessages: messages,
+		fileEdits,
 		currentTaskItem,
 		currentTaskTodos,
 		taskHistory,
@@ -66,6 +69,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		showWorktreesInHomeScreen,
 		setApiConfiguration,
 		routerModels,
+		tabs,
+		activeTabId,
+		currentSessionId,
+		sessionNames,
+		experiments,
 	} = useExtensionState()
 
 	// ── Use the extracted hook for all message state, effects, and handlers ──
@@ -337,7 +345,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				setShowRetiredProviderWarning={setShowRetiredProviderWarning}
 				handleCondenseContext={handleCondenseContext}
 				t={t}
+				currentSessionId={currentSessionId}
+				sessionNames={sessionNames}
 			/>
+			{experiments?.multiTab && <TabBar tabs={tabs} activeTabId={activeTabId} />}
 
 			{task ? (
 				<>
@@ -371,7 +382,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							components={virtuosoComponents}
 						/>
 					</div>
-					<FileChangesPanel mirrorMessages={messages} />
+					<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />
 					{areButtonsVisible && (
 						<ChatActionBar
 							showScrollToBottom={showScrollToBottom2}

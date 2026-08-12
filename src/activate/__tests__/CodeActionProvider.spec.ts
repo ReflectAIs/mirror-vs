@@ -73,10 +73,12 @@ describe("CodeActionProvider", () => {
 		it("should provide explain, improve, fix logic, and add to context actions by default", () => {
 			const actions = provider.provideCodeActions(mockDocument, mockRange, mockContext)
 
-			expect(actions).toHaveLength(3)
+			expect(actions).toHaveLength(5)
 			expect((actions as any)[0].title).toBe(TITLES.ADD_TO_CONTEXT)
 			expect((actions as any)[1].title).toBe(TITLES.EXPLAIN)
 			expect((actions as any)[2].title).toBe(TITLES.IMPROVE)
+			expect((actions as any)[3].title).toBe(TITLES.GENERATE_TESTS)
+			expect((actions as any)[4].title).toBe(TITLES.REFACTOR)
 		})
 
 		it("should provide fix action instead of fix logic when diagnostics exist", () => {

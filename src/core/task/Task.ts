@@ -33,6 +33,7 @@ import {
 	type ModelInfo,
 	type MirrorApiReqCancelReason,
 	type MirrorApiReqInfo,
+	type FileEditRecord,
 	MirrorVSEventName,
 	TaskStatus,
 	TodoItem,
@@ -123,11 +124,25 @@ import { TaskApiRequest } from "./TaskApiRequest"
 import { TaskContextManagement } from "./TaskContextManagement"
 import { TaskToolTracking } from "./TaskToolTracking"
 import { TaskGetters } from "./TaskGetters"
+import { StruggleLedger } from "./TaskMainLoop"
 
 const MAX_EXPONENTIAL_BACKOFF_SECONDS = 600 // 10 minutes
 const DEFAULT_USAGE_COLLECTION_TIMEOUT_MS = 5000 // 5 seconds
 const FORCED_CONTEXT_REDUCTION_PERCENT = 75 // Keep 75% of context (remove 25%) on context window errors
 const MAX_CONTEXT_WINDOW_RETRIES = 3 // Maximum retries for context window errors
+
+/**
+ * Single source of truth for task lifecycle state.
+ * Replaces scattered boolean checks (_aborted, _completed, etc.).
+ */
+export enum TaskState {
+	Idle = "idle",
+	Streaming = "streaming",
+	WaitingApproval = "interactive",
+	Completed = "completed",
+	Error = "error",
+	Aborted = "aborted",
+}
 
 export interface TaskOptions extends CreateTaskOptions {
 	provider: MirrorProvider
@@ -169,6 +184,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	readonly parentTask: Task | undefined = undefined
 	readonly taskNumber: number
 	readonly workspacePath: string
+
+	/** Stable display title for tabs, set once on creation from task text. */
+	public name?: string
+	/** Timestamp of task creation — for deterministic tab ordering (createdAt ASC). */
+	public readonly createdAt: number = Date.now()
+	/** Monotonic timestamp updated on any activity (message sent, received, etc.). */
+	public lastActivity: number = Date.now()
+	/** Single source of truth for task lifecycle state. Replaces scattered boolean checks. */
+	public state: TaskState = TaskState.Idle
 
 	/**
 	 * The mode associated with this task. Persisted across sessions
@@ -290,6 +314,56 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	autoApprovalHandler: AutoApprovalHandler
 
 	/**
+	 * Serialization gate for concurrent provider requests across ALL tasks/tabs.
+	 *
+	 * When 2-3 tabs run simultaneously, every tab would otherwise transmit its
+	 * streaming request at the same instant, tripping the provider's overload
+	 * protection (Anthropic HTTP 529 "overloaded_error" → "The provider couldn't
+	 * process the request as made."). This promise-chain mutex lets only one tab
+	 * transmit at a time; the slot is released once the provider accepts the
+	 * request (first chunk arrives) or the request fails, so other tabs queue up
+	 * instead of firing together.
+	 * @internal
+	 */
+	static globalRequestGate: Promise<void> = Promise.resolve()
+
+	/**
+	 * Acquire the global request gate. Resolves with a `release` function once
+	 * it is this caller's turn to transmit. Callers MUST call `release` exactly
+	 * once (in both the success and failure paths) to avoid deadlocking the gate.
+	 * @internal
+	 */
+	static acquireGlobalRequestGate(): Promise<() => void> {
+		const previous = Task.globalRequestGate
+		let release!: () => void
+		Task.globalRequestGate = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		return previous.then(async () => {
+			// Enforce a minimum 350ms stagger delay between consecutive request transmissions
+			// to avoid tripping provider rate limits on concurrent parallel tab bursts.
+			const STAGGER_MS = 350
+			const now = performance.now()
+			if (Task.lastGlobalApiRequestTime) {
+				const elapsed = now - Task.lastGlobalApiRequestTime
+				if (elapsed < STAGGER_MS) {
+					await new Promise((r) => setTimeout(r, STAGGER_MS - elapsed))
+				}
+			}
+			Task.lastGlobalApiRequestTime = performance.now()
+			return release
+		})
+	}
+
+	/**
+	 * Reset the global request gate. This should only be used for testing.
+	 * @internal
+	 */
+	static resetGlobalRequestGate(): void {
+		Task.globalRequestGate = Promise.resolve()
+	}
+
+	/**
 	 * Reset the global API request timestamp. This should only be used for testing.
 	 * @internal
 	 */
@@ -311,6 +385,18 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	// LLM Messages & Chat Messages
 	apiConversationHistory: ApiMessage[] = []
 	mirrorMessages: MirrorMessage[] = []
+
+	/**
+	 * Local-only edit history. Populated by presentAssistantMessage whenever an
+	 * edit tool (apply_diff, write_to_file, etc.) succeeds. Persisted to disk
+	 * alongside mirrorMessages. NEVER sent to the LLM — kept purely for frontend
+	 * display and revert (FileChangesPanel).
+	 *
+	 * @see FileEditRecord
+	 * @see presentAssistantMessage.ts — population hook
+	 * @see MirrorProviderState — inclusion in ExtensionState
+	 */
+	fileEdits: FileEditRecord[] = []
 
 	// Extracted managers
 	readonly conversationHistory!: TaskConversationHistory
@@ -342,6 +428,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	consecutiveNoToolUseCount: number = 0
 	consecutiveNoAssistantMessagesCount: number = 0
 	toolUsage: ToolUsage = {}
+
+	// Struggle Ledger — tracks repeated failure patterns for auto-recovery
+	/** @internal */
+	struggleLedger: StruggleLedger = new StruggleLedger()
 
 	// Checkpoints
 	enableCheckpoints: boolean
@@ -422,6 +512,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	// Initial status for the task's history item (set at creation time to avoid race conditions)
 	/** @internal */
 	readonly initialStatus?: "active" | "delegated" | "completed"
+	readonly historyItem?: HistoryItem
 
 	// MessageManager for high-level message operations (lazy initialized)
 	/** @internal */
@@ -458,6 +549,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.contextManager = new TaskContextManagement(this)
 		this.toolTrackingManager = new TaskToolTracking(this)
 		this.getters = new TaskGetters(this)
+		this.providerRef = new WeakRef(provider)
 
 		if (startTask && !task && !images && !historyItem) {
 			throw new Error("Either historyItem or task/images must be provided")
@@ -477,6 +569,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			)
 		}
 
+		this.historyItem = historyItem
 		this.taskId = historyItem ? historyItem.id : (taskId ?? uuidv7())
 		this.rootTaskId = historyItem ? historyItem.rootTaskId : rootTask?.taskId
 		this.parentTaskId = historyItem ? historyItem.parentTaskId : parentTask?.taskId
@@ -596,6 +689,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				throw new Error("Either historyItem or task/images must be provided")
 			}
 		}
+	}
+
+	public async loadSavedMessagesOnly(): Promise<void> {
+		return this.lifecycleManager.loadSavedMessagesOnly()
 	}
 
 	/**
@@ -943,7 +1040,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		await this.mirrorMessagesManager.updateMirrorMessage(message)
 	}
 
-	private async saveMirrorMessages(): Promise<boolean> {
+	public async saveMirrorMessages(): Promise<boolean> {
 		return this.mirrorMessagesManager.saveMirrorMessages()
 	}
 
@@ -1124,6 +1221,30 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 */
 	public start(): void {
 		return this.lifecycleManager.start()
+	}
+
+	/**
+	 * Start an idle task (created via "+" button with no content) with user
+	 * text and images.  This is the public entry point for the
+	 * "sub-session" flow — clicking "+" creates an empty idle tab, and
+	 * typing + sending in that tab starts its AI loop.
+	 */
+	public async startWithContent(text?: string, images?: string[]): Promise<void> {
+		this._started = true
+		return this.lifecycleManager.startTask(text, images)
+	}
+
+	/**
+	 * Starts or resumes a restored task when it is focused or selected in the UI.
+	 * If the task has not been started yet, this triggers resumeTaskFromHistory()
+	 * to show the Resume banner and wait for user messages without queueing.
+	 */
+	public async startRestoredTask(): Promise<void> {
+		if (this._started) {
+			return
+		}
+		this._started = true
+		await this.lifecycleManager.resumeTaskFromHistory()
 	}
 
 	private async startTask(task?: string, images?: string[]): Promise<void> {

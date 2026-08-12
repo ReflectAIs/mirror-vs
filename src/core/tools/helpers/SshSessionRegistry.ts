@@ -1,10 +1,33 @@
 import { ChildProcess, spawn } from "child_process"
 
+/**
+ * Strips ANSI escape sequences from a string.
+ * Covers CSI sequences (ESC[), OSC sequences (ESC]), and common terminal control codes.
+ */
+function stripAnsi(str: string): string {
+	return str.replace(/(\x1B\[[\d;]*[A-Za-z]|\x1B\][\d;]*(?:\x07|\x1B\\)|[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F])/g, "")
+}
+
+/**
+ * Common SSH authentication failure patterns detected in output.
+ * Used to fail-fast on connection attempts rather than waiting for timeout.
+ */
+const AUTH_FAILURE_PATTERNS = [
+	"permission denied",
+	"password authentication failed",
+	"authentication failed",
+	"authenticity of host",
+	"host key verification failed",
+	"connection refused",
+	"connection closed",
+	"connection reset",
+]
+
 export class SshSession {
 	private child: ChildProcess
 	private outputBuffer: string = ""
 	private commandPromise: { resolve: (out: string) => void; reject: (err: Error) => void } | null = null
-	private onConnectCallback: (() => void) | null = null
+	private onConnectCallback: { resolve: () => void; reject: (err: Error) => void } | null = null
 	private onOutputCallback: ((chunk: string) => void) | null = null
 	public isDead = false
 
@@ -20,8 +43,10 @@ export class SshSession {
 		this.child = spawn(password ? "sshpass" : "ssh", args)
 
 		this.child.stdout?.on("data", (data) => {
-			const str = data.toString()
+			const str = stripAnsi(data.toString())
 			this.outputBuffer += str
+
+			this.checkAuthFailure()
 
 			// Check for initial connection prompt stabilization if resolving connection
 			if (
@@ -30,7 +55,7 @@ export class SshSession {
 			) {
 				const cb = this.onConnectCallback
 				this.onConnectCallback = null
-				cb()
+				cb.resolve()
 			}
 
 			if (this.commandPromise) {
@@ -63,8 +88,9 @@ export class SshSession {
 		})
 
 		this.child.stderr?.on("data", (data) => {
-			const str = data.toString()
+			const str = stripAnsi(data.toString())
 			this.outputBuffer += str
+			this.checkAuthFailure()
 			if (this.commandPromise && this.onOutputCallback) {
 				this.onOutputCallback(str)
 			}
@@ -78,7 +104,12 @@ export class SshSession {
 				this.onOutputCallback = null
 				resolve(this.outputBuffer.trim() + `\n[SSH Connection Closed unexpectedly with code ${code}]`)
 			}
-			SshSessionRegistry.removeSession(this.host, this.port)
+			// Reject connection if still pending
+			if (this.onConnectCallback) {
+				const cb = this.onConnectCallback
+				this.onConnectCallback = null
+				cb.reject(new Error(`SSH connection closed unexpectedly (code: ${code})`))
+			}
 		})
 
 		this.child.on("error", (err) => {
@@ -89,13 +120,40 @@ export class SshSession {
 				this.onOutputCallback = null
 				resolve(this.outputBuffer.trim() + `\n[SSH Process Error: ${err.message}]`)
 			}
-			SshSessionRegistry.removeSession(this.host, this.port)
+			// Reject connection if still pending
+			if (this.onConnectCallback) {
+				const cb = this.onConnectCallback
+				this.onConnectCallback = null
+				cb.reject(new Error(`SSH process error: ${err.message}`))
+			}
 		})
+	}
+
+	/**
+	 * Detects authentication/connection failures in the output buffer
+	 * and rejects the connection promise early to avoid hanging.
+	 */
+	private checkAuthFailure(): void {
+		if (!this.onConnectCallback) return
+		const lower = this.outputBuffer.toLowerCase()
+		for (const pattern of AUTH_FAILURE_PATTERNS) {
+			if (lower.includes(pattern)) {
+				const cb = this.onConnectCallback
+				this.onConnectCallback = null
+				cb.reject(
+					new Error(
+						`SSH authentication/connection failed: detected "${pattern}" in server response.\n` +
+							`Output: ${this.outputBuffer.slice(0, 500).trim()}`,
+					),
+				)
+				return
+			}
+		}
 	}
 
 	public waitForConnection(timeoutMs: number = 10000): Promise<void> {
 		return new Promise((resolve, reject) => {
-			this.onConnectCallback = resolve
+			this.onConnectCallback = { resolve, reject }
 			setTimeout(() => {
 				if (this.onConnectCallback) {
 					this.onConnectCallback = null
@@ -122,8 +180,8 @@ export class SshSession {
 			this.onOutputCallback = onOutput || null
 			this.commandPromise = { resolve, reject }
 
-			// Using a structured execution format that redirects stdin to /dev/null to prevent hanging on interactive prompts (like git auth)
-			const formattedCommand = `(${command}) </dev/null\necho "__SSH_COMMAND_FINISHED__" $?\n`
+			// Using a structured execution format that exports non-interactive environment variables and redirects stdin to /dev/null to prevent hanging on TTY progress spinners or interactive prompts
+			const formattedCommand = `(export CI=true TERM=dumb DOCKER_CLI_HINTS=false DEBIAN_FRONTEND=noninteractive; ${command}) </dev/null\necho "__SSH_COMMAND_FINISHED__" $?\n`
 			this.child.stdin?.write(formattedCommand)
 
 			setTimeout(() => {
@@ -156,21 +214,58 @@ export class SshSession {
 }
 
 export class SshSessionRegistry {
+	/**
+	 * Session key format: `${taskId}|${host}|${port}`
+	 * The `|` separator is used instead of `:` because hostnames and IPv4 addresses
+	 * never contain pipes, making parsing unambiguous.
+	 */
 	private static sessions = new Map<string, SshSession>()
+	/**
+	 * Caches passwords per host:port so that reconnection after a session
+	 * drops does not require the LLM to re-send the password parameter.
+	 * NOTE: Passwords are NOT isolated per taskId — they are shared across
+	 * tasks connecting to the same host:port so the LLM doesn't need to
+	 * re-authenticate when switching tabs.
+	 */
+	private static passwordCache = new Map<string, string>()
+	private static makeKey(taskId: string, host: string, port: number): string {
+		return `${taskId}|${host}|${port}`
+	}
 
-	public static async getOrCreateSession(host: string, port: number, password?: string): Promise<SshSession> {
-		const key = `${host}:${port}`
+	public static async getOrCreateSession(
+		taskId: string,
+		host: string,
+		port: number,
+		password?: string,
+	): Promise<SshSession> {
+		const key = this.makeKey(taskId, host, port)
+		const hostPortKey = `${host}:${port}`
+		// Cache the password if provided (LLM may not send it on subsequent calls)
+		if (password) {
+			this.passwordCache.set(hostPortKey, password)
+		}
+		const resolvedPassword = password || this.passwordCache.get(hostPortKey)
+
 		let session = this.sessions.get(key)
 		if (!session || session.isDead) {
-			session = new SshSession(host, port, password)
-			await session.waitForConnection()
+			// Clean up dead session entry
+			if (session) {
+				this.sessions.delete(key)
+			}
+			session = new SshSession(host, port, resolvedPassword)
+			try {
+				await session.waitForConnection()
+			} catch (err) {
+				this.sessions.delete(key)
+				throw err
+			}
 			this.sessions.set(key, session)
 		}
 		return session
 	}
 
-	public static removeSession(host: string, port: number) {
-		const key = `${host}:${port}`
+	public static removeSession(taskId: string, host: string, port: number) {
+		const key = this.makeKey(taskId, host, port)
 		const session = this.sessions.get(key)
 		if (session) {
 			session.close()
@@ -178,15 +273,29 @@ export class SshSessionRegistry {
 		}
 	}
 
-	public static getSessions(): Array<{ host: string; port: number; session: SshSession }> {
-		const result: Array<{ host: string; port: number; session: SshSession }> = []
+	public static getSessions(): Array<{ taskId?: string; host: string; port: number; session: SshSession }> {
+		const result: Array<{ taskId?: string; host: string; port: number; session: SshSession }> = []
 		for (const [key, session] of this.sessions.entries()) {
 			if (!session.isDead) {
-				const [host, portStr] = key.split(":")
-				result.push({ host, port: parseInt(portStr, 10), session })
+				const parts = key.split("|")
+				// key format: taskId|host|port
+				result.push({ taskId: parts[0], host: parts[1], port: parseInt(parts[2], 10), session })
 			}
 		}
 		return result
+	}
+
+	/**
+	 * Removes all sessions for a given task. Called when a task is closed to
+	 * ensure SSH sessions don't leak across task boundaries.
+	 */
+	public static removeSessionsForTask(taskId: string) {
+		for (const [key, session] of this.sessions.entries()) {
+			if (key.startsWith(`${taskId}|`)) {
+				session.close()
+				this.sessions.delete(key)
+			}
+		}
 	}
 
 	public static clearAll() {
@@ -194,5 +303,6 @@ export class SshSessionRegistry {
 			session.close()
 		}
 		this.sessions.clear()
+		this.passwordCache.clear()
 	}
 }

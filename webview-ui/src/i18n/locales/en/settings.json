@@ -315,6 +315,10 @@
 			"label": "Subtasks",
 			"description": "Allow creation and completion of subtasks without requiring approval"
 		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "When enabled, git commands (commit, push, add, pull, merge, rebase, etc.) are automatically approved. When disabled, the assistant must ask for approval before running any git operation."
+		},
 		"followupQuestions": {
 			"label": "Question",
 			"description": "Automatically select the first suggested answer for follow-up questions after the configured timeout",
@@ -836,9 +840,9 @@
 			"name": "Use experimental insert content tool",
 			"description": "Enable the experimental insert content tool, allowing the assistant to insert content at specific line numbers without needing to create a diff."
 		},
-		"CONCURRENT_FILE_READS": {
-			"name": "Enable concurrent file reads",
-			"description": "When enabled, the assistant can read multiple files in a single request. When disabled, the assistant must read files one at a time. Disabling this can help when working with less capable models or when you want more control over file access."
+		"PARALLEL_TOOL_READS": {
+			"name": "Parallel tool reads (experimental)",
+			"description": "When enabled, the assistant can execute multiple independent read-only tools (read_file, search_files, list_files, etc.) in a single batch, improving performance. When disabled, each read tool runs sequentially. Disable this if you encounter issues with rate limits or model confusion."
 		},
 		"MULTI_SEARCH_AND_REPLACE": {
 			"name": "Use experimental multi block diff tool",
@@ -919,6 +923,10 @@
 			"refreshSuccess": "Tools refreshed successfully",
 			"refreshError": "Failed to refresh tools",
 			"toolParameters": "Parameters"
+		},
+		"MULTI_TAB": {
+			"name": "Experimental Multi-Tab Interface",
+			"description": "When enabled, provides a browser-like multi-tab workspace to switch between and run multiple tasks simultaneously inside a session."
 		}
 	},
 	"imageGeneration": {

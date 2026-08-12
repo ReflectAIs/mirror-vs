@@ -241,4 +241,86 @@ export class WorkflowScanner {
 			return false
 		}
 	}
+
+	/**
+	 * Seed default workflow .json files into:
+	 *   1. {comfyUISrcPath}/user/default/workflows/ (so ComfyUI sees them)
+	 *   2. ~/.mirror/pipelines/comfyui/ (so Mirror VS has them)
+	 */
+	static async seedDefaultWorkflows(comfyUISrcPath: string): Promise<void> {
+		const workflowsSrcDir = resolveWorkflowsDir()
+		const userWorkflowsDir = this.getUserWorkflowDir(comfyUISrcPath)
+		const persistentDir = this.getComfyuiPipelinesDir()
+
+		await fsp.mkdir(userWorkflowsDir, { recursive: true })
+		await fsp.mkdir(persistentDir, { recursive: true })
+
+		try {
+			const files = await fsp.readdir(workflowsSrcDir)
+			const jsonFiles = files.filter((f) => f.endsWith(".json") && f !== "pipeline-meta.json")
+
+			for (const file of jsonFiles) {
+				const srcPath = path.join(workflowsSrcDir, file)
+				const userDestPath = path.join(userWorkflowsDir, file)
+				const persistentDestPath = path.join(persistentDir, file)
+
+				// Copy to user default workflows dir
+				try {
+					await fsp.copyFile(srcPath, userDestPath)
+				} catch (err) {
+					logger.warn(`[WorkflowScanner] Failed to copy workflow to user workflows: ${err}`)
+				}
+
+				// Copy to persistent mirror pipelines dir
+				try {
+					await fsp.copyFile(srcPath, persistentDestPath)
+				} catch (err) {
+					logger.warn(`[WorkflowScanner] Failed to copy workflow to persistent pipelines: ${err}`)
+				}
+			}
+			logger.info(`[WorkflowScanner] Successfully seeded default workflows.`)
+		} catch (err) {
+			logger.error(`[WorkflowScanner] Error seeding default workflows: ${err}`)
+		}
+	}
+
+	/**
+	 * Automatically provision custom nodes (like ComfyUI-Manager) if not already installed.
+	 */
+	static async provisionCustomNodes(comfyUISrcPath: string): Promise<void> {
+		const { execSync } = await import("child_process")
+		const customNodesDir = path.join(comfyUISrcPath, "custom_nodes")
+		await fsp.mkdir(customNodesDir, { recursive: true })
+
+		const nodes = [
+			{
+				name: "ComfyUI-Manager",
+				url: "https://github.com/ltdrdata/ComfyUI-Manager.git",
+			},
+		]
+
+		for (const node of nodes) {
+			const nodePath = path.join(customNodesDir, node.name)
+			if (!fs.existsSync(nodePath)) {
+				logger.info(`[WorkflowScanner] Auto-installing custom node: ${node.name}`)
+				try {
+					execSync(`git clone --depth 1 ${node.url} "${nodePath}"`, { stdio: "ignore" })
+				} catch (err) {
+					logger.warn(`[WorkflowScanner] Failed to clone custom node ${node.name}: ${err}`)
+				}
+			}
+		}
+	}
+}
+
+function resolveWorkflowsDir(): string {
+	const devOrBundled = path.join(__dirname, "workflows")
+	if (fs.existsSync(devOrBundled)) {
+		return devOrBundled
+	}
+	const testPath = path.join(__dirname, "..", "workflows")
+	if (fs.existsSync(testPath)) {
+		return testPath
+	}
+	return __dirname
 }

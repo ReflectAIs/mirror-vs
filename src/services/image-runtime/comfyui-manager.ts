@@ -15,13 +15,14 @@ import { getComfyUIDownloadUrl, getDefaultComfyUIPath, findCompatiblePython } fr
 export class ComfyUIManager extends RuntimeManager {
 	/**
 	 * Path to the ComfyUI source (subdirectory within installPath).
-	 * On macOS/Linux this is where `git clone` puts the repo.
-	 * On Windows the portable archive extracts directly into installPath.
+	 * Cloned into `installPath/ComfyUI` or extracted into root.
 	 */
-	private get comfyUISrcPath(): string {
-		// Windows portable archives extract to installPath directly
-		// macOS/Linux git clone creates a subdirectory
-		return this.isWindows ? this.installPath : path.join(this.installPath, "ComfyUI")
+	public get comfyUISrcPath(): string {
+		const subDir = path.join(this.installPath, "ComfyUI")
+		if (existsSync(subDir)) {
+			return subDir
+		}
+		return this.installPath
 	}
 
 	private get venvPath(): string {
@@ -45,19 +46,30 @@ export class ComfyUIManager extends RuntimeManager {
 	}
 
 	/**
-	 * On macOS/Linux we launch the venv's python directly.
-	 * On Windows the portable archive includes its own python.exe.
+	 * Resolves the Python executable path across platforms and setups.
+	 * Checks venv, embedded portable Python, or root directory.
 	 */
 	protected override getExecPath(): string {
-		// On Unix we launch the venv python directly so ComfyUI finds its
-		// installed dependencies via the venv's site-packages.
-		return this.isWindows ? path.join(this.installPath, this.executableName) : path.join(this.venvBinDir, "python3")
+		const venvExec = path.join(this.venvBinDir, this.executableName)
+		if (existsSync(venvExec)) {
+			return venvExec
+		}
+
+		const embeddedExec = path.join(this.installPath, "python_embeded", "python.exe")
+		if (this.isWindows && existsSync(embeddedExec)) {
+			return embeddedExec
+		}
+
+		const rootExec = path.join(this.installPath, this.executableName)
+		if (existsSync(rootExec)) {
+			return rootExec
+		}
+
+		return venvExec
 	}
 
 	/**
-	 * Spawn from the ComfyUI source directory so that relative imports
-	 * like `comfy/`, `node_helpers.py` resolve correctly.
-	 * On Windows the portable extract puts everything at the root.
+	 * Working directory from which ComfyUI is launched.
 	 */
 	protected override getCwd(): string {
 		return this.comfyUISrcPath
@@ -75,76 +87,96 @@ export class ComfyUIManager extends RuntimeManager {
 		await fs.mkdir(this.installPath, { recursive: true })
 
 		if (this.isWindows) {
-			await this.installWindows(onProgress)
-		} else {
-			await this.installUnix(onProgress)
-		}
+			const archivePath = path.join(this.installPath, "comfyui_portable.7z")
+			onProgress?.("download-runtime", "Downloading ComfyUI Windows Portable...", 10)
 
-		// Create venv + install Python dependencies (Unix only — Windows
-		// portable already bundles its own Python and dependencies)
-		if (!this.isWindows) {
+			// Download portable archive
+			await new Promise<void>((resolve, reject) => {
+				const onProgressHandler = (p: {
+					id: string
+					downloadedBytes: number
+					totalBytes: number
+					progress: number
+				}) => {
+					// Scale download progress from 10% to 75%
+					const scaled = 10 + Math.round((p.progress / 100) * 65)
+					onProgress?.("download-runtime", `Downloading ComfyUI Windows Portable (${p.progress}%)...`, scaled)
+				}
+				downloadManager.on("progress", onProgressHandler)
+				downloadManager.once("complete", () => {
+					downloadManager.off("progress", onProgressHandler)
+					resolve()
+				})
+				downloadManager.once("error", (e) => {
+					downloadManager.off("progress", onProgressHandler)
+					reject(new Error(e.error))
+				})
+				downloadManager.enqueue(this.downloadUrl, archivePath)
+			})
+
+			onProgress?.("extract-runtime", "Extracting ComfyUI Windows Portable...", 80)
+			await this.extractArchive(archivePath, this.installPath)
+
+			// Clean up archive
+			try {
+				await fs.rm(archivePath, { force: true })
+			} catch {
+				// ignore cleanup error
+			}
+		} else {
+			onProgress?.("git-clone", "Setting up ComfyUI source repository...", 15)
+			await this.cloneRepo(onProgress)
+
 			onProgress?.("create-venv", "Creating virtual environment...", 30)
 			await this.createVenv()
-			onProgress?.("create-venv", "Virtual environment ready", 35)
+
+			onProgress?.("install-deps", "Installing Python dependencies...", 35)
+			await this.installDependencies(onProgress)
 		}
-		onProgress?.("install-deps", "Installing Python dependencies...", 35)
-		await this.installDependencies(onProgress)
 
 		this.state.installed = true
 		this.emit("state-change", { ...this.state })
 	}
 
-	private async installWindows(onProgress?: InstallProgressCallback): Promise<void> {
+	private async extractArchive(archivePath: string, destDir: string): Promise<void> {
 		const { execSync } = await import("child_process")
-
-		// Download portable 7z archive
-		onProgress?.("download", "Downloading ComfyUI portable archive...", 18)
-		const archivePath = path.join(this.installPath, "comfyui.7z")
-		await new Promise<void>((resolve, reject) => {
-			downloadManager.once("complete", (event: { id: string; destPath: string }) => {
-				if (event.destPath === archivePath) resolve()
-			})
-			downloadManager.once("error", (event: { id: string; error: string }) => {
-				reject(new Error(event.error))
-			})
-			downloadManager.enqueue(this.downloadUrl, archivePath)
-		})
-
-		// Extract
-		onProgress?.("extract", "Extracting ComfyUI archive...", 25)
-		execSync(`7z x "${archivePath}" -o"${this.installPath}" -y`, { stdio: "inherit" })
+		try {
+			// Using Windows tar.exe which natively extracts .7z / .zip
+			execSync(`tar -xf "${archivePath}" -C "${destDir}"`, { stdio: "inherit" })
+		} catch (err) {
+			throw new Error(
+				`Failed to extract ComfyUI archive. Please ensure you have tar or a compatible extractor.\n` +
+					`  Original error: ${(err as Error).message}`,
+			)
+		}
 	}
 
-	private async installUnix(onProgress?: InstallProgressCallback): Promise<void> {
+	private async cloneRepo(onProgress?: InstallProgressCallback): Promise<void> {
 		const { execSync } = await import("child_process")
-		const mainPy = path.join(this.comfyUISrcPath, "main.py")
+		const cloneTarget = path.join(this.installPath, "ComfyUI")
+		const mainPy = path.join(cloneTarget, "main.py")
+		const rootMainPy = path.join(this.installPath, "main.py")
 
-		// If already fully cloned, skip
-		if (existsSync(mainPy)) {
+		if (existsSync(mainPy) || existsSync(rootMainPy)) {
 			return
 		}
 
-		// If a partial/incomplete checkout exists from a previous failed
-		// attempt, remove it first so git clone can write into an empty dir.
-		if (existsSync(this.comfyUISrcPath)) {
-			await fs.rm(this.comfyUISrcPath, { recursive: true, force: true })
+		if (existsSync(cloneTarget)) {
+			await fs.rm(cloneTarget, { recursive: true, force: true })
 		}
 
-		// Step 1: Find compatible Python (may trigger brew install)
 		onProgress?.("check-python", "Checking Python compatibility...", 10)
 		try {
 			const { findCompatiblePython } = await import("./platform")
-			// Pre-cache Python check so it's done before clone
 			const python = await findCompatiblePython()
 			onProgress?.("check-python", `Using Python: ${python}`, 15)
 		} catch {
-			// Will fail later in createVenv, don't block clone
+			// Will fail later in createVenv if Python is completely missing
 		}
 
-		// Step 2: Git clone
 		onProgress?.("git-clone", "Cloning ComfyUI repository...", 18)
 		try {
-			execSync(`git clone --depth 1 https://github.com/Comfy-Org/ComfyUI.git "${this.comfyUISrcPath}"`, {
+			execSync(`git clone --depth 1 https://github.com/Comfy-Org/ComfyUI.git "${cloneTarget}"`, {
 				cwd: this.installPath,
 				stdio: "inherit",
 			})
@@ -159,16 +191,13 @@ export class ComfyUIManager extends RuntimeManager {
 
 	private async createVenv(): Promise<void> {
 		const { execSync } = await import("child_process")
+		const venvPython = path.join(this.venvBinDir, this.executableName)
 
-		// Find a Python 3.10–3.12 compatible with ComfyUI / PyTorch
-		const python = await findCompatiblePython()
-
-		// Create venv (skip if it already exists and has python3)
-		const venvPython = path.join(this.venvBinDir, "python3")
 		if (existsSync(venvPython)) {
 			return
 		}
 
+		const python = await findCompatiblePython()
 		execSync(`"${python}" -m venv "${this.venvPath}"`, { stdio: "inherit" })
 	}
 
@@ -184,12 +213,9 @@ export class ComfyUIManager extends RuntimeManager {
 
 	async healthCheck(): Promise<boolean> {
 		try {
-			// Try /system_stats first (ComfyUI >= ~v0.2.0)
 			const res = await fetch(`http://127.0.0.1:${this.port}/system_stats`)
 			if (res.ok) return true
 
-			// Fall back to /object_info for older ComfyUI builds that
-			// don't ship the /system_stats endpoint at all (HTTP 404).
 			if (res.status === 404) {
 				const fallbackRes = await fetch(`http://127.0.0.1:${this.port}/object_info`)
 				return fallbackRes.ok
@@ -201,10 +227,10 @@ export class ComfyUIManager extends RuntimeManager {
 		}
 	}
 
-	protected getLaunchArgs(): string[] {
-		// On Unix: exec is venv/bin/python3, so args[0] is the script.
-		// On Windows: exec is the portable python.exe, so args[0] is the script.
-		return ["main.py", "--port", String(this.port), "--listen", "127.0.0.1", "--disable-auto-launch"]
+	protected override async getLaunchArgs(): Promise<string[]> {
+		const { HardwareDetector } = await import("./hardware-detector")
+		const hwFlags = await HardwareDetector.getRecommendedFlags()
+		return ["main.py", "--port", String(this.port), "--listen", "127.0.0.1", "--disable-auto-launch", ...hwFlags]
 	}
 
 	protected getLaunchEnv(): Record<string, string> {
@@ -217,10 +243,15 @@ export class ComfyUIManager extends RuntimeManager {
 		const requirementsPath = path.join(this.comfyUISrcPath, "requirements.txt")
 		if (existsSync(requirementsPath)) {
 			const { execSync } = await import("child_process")
-			onProgress?.("pip-install", "Installing ComfyUI dependencies (this may take several minutes)...", 38)
-			const pipCmd = this.isWindows
-				? `"${path.join(this.installPath, "python.exe")}" -m pip install -r "${requirementsPath}"`
-				: `"${path.join(this.venvBinDir, "pip")}" install -r "${requirementsPath}"`
+			onProgress?.("pip-install", "Installing ComfyUI dependencies...", 38)
+
+			const venvPython = path.join(this.venvBinDir, this.executableName)
+			const pipCmd = existsSync(venvPython)
+				? `"${venvPython}" -m pip install -r "${requirementsPath}"`
+				: this.isWindows
+					? `"${path.join(this.installPath, "python.exe")}" -m pip install -r "${requirementsPath}"`
+					: `"${path.join(this.venvBinDir, "pip")}" install -r "${requirementsPath}"`
+
 			execSync(pipCmd, { cwd: this.comfyUISrcPath, stdio: "inherit" })
 			onProgress?.("pip-install", "Dependencies installed", 45)
 		}

@@ -1,6 +1,6 @@
 import { HTMLAttributes } from "react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
-import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
+import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption } from "@vscode/webview-ui-toolkit/react"
 
 import { SetCachedStateField } from "./types"
 import { SectionHeader } from "./SectionHeader"
@@ -13,7 +13,11 @@ type NotificationSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	ttsSpeed?: number
 	soundEnabled?: boolean
 	soundVolume?: number
-	setCachedStateField: SetCachedStateField<"ttsEnabled" | "ttsSpeed" | "soundEnabled" | "soundVolume">
+	mascotTheme?: "cyberpunk" | "retro" | "synthwave" | "solar"
+	soundTheme?: "classic" | "scifi"
+	setCachedStateField: SetCachedStateField<
+		"ttsEnabled" | "ttsSpeed" | "soundEnabled" | "soundVolume" | "mascotTheme" | "soundTheme"
+	>
 }
 
 export const NotificationSettings = ({
@@ -21,6 +25,8 @@ export const NotificationSettings = ({
 	ttsSpeed,
 	soundEnabled,
 	soundVolume,
+	mascotTheme,
+	soundTheme,
 	setCachedStateField,
 	...props
 }: NotificationSettingsProps) => {
@@ -30,6 +36,41 @@ export const NotificationSettings = ({
 			<SectionHeader>{t("settings:sections.notifications")}</SectionHeader>
 
 			<Section>
+				<SearchableSetting settingId="notifications-mascot-theme" section="notifications" label="Mascot Theme">
+					<label className="block font-medium mb-1">Mascot Theme</label>
+					<VSCodeDropdown
+						value={mascotTheme || "cyberpunk"}
+						onChange={(e: any) => setCachedStateField("mascotTheme", e.target.value)}
+						className="w-full"
+						data-testid="mascot-theme-dropdown">
+						<VSCodeOption value="cyberpunk">Cyberpunk Neon</VSCodeOption>
+						<VSCodeOption value="retro">Retro Monochrome</VSCodeOption>
+						<VSCodeOption value="synthwave">Synthwave Sunset</VSCodeOption>
+						<VSCodeOption value="solar">Solar Flare</VSCodeOption>
+					</VSCodeDropdown>
+					<div className="text-vscode-descriptionForeground text-sm mt-1">
+						Choose a visual theme style for the AI helper mascot.
+					</div>
+				</SearchableSetting>
+
+				<SearchableSetting
+					settingId="notifications-sound-theme"
+					section="notifications"
+					label="Sound Effect Style">
+					<label className="block font-medium mb-1">Sound Effect Style</label>
+					<VSCodeDropdown
+						value={soundTheme || "classic"}
+						onChange={(e: any) => setCachedStateField("soundTheme", e.target.value)}
+						className="w-full"
+						data-testid="sound-theme-dropdown">
+						<VSCodeOption value="classic">Classic WAV</VSCodeOption>
+						<VSCodeOption value="scifi">Sci-Fi Synth (Web Audio)</VSCodeOption>
+					</VSCodeDropdown>
+					<div className="text-vscode-descriptionForeground text-sm mt-1">
+						Choose a synthesized audio style for events.
+					</div>
+				</SearchableSetting>
+
 				<SearchableSetting
 					settingId="notifications-tts"
 					section="notifications"

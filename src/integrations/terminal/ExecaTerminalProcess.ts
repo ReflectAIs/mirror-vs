@@ -50,6 +50,10 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 					// Ensure UTF-8 encoding for Ruby, CocoaPods, etc.
 					LANG: "en_US.UTF-8",
 					LC_ALL: "en_US.UTF-8",
+					CI: "true",
+					TERM: "dumb",
+					DOCKER_CLI_HINTS: "false",
+					DEBIAN_FRONTEND: "noninteractive",
 				},
 			})`${command}`
 

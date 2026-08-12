@@ -121,66 +121,84 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 		throw new Error(`${retiredProviderMessage}\n\nPlease select a different provider in your API profile settings.`)
 	}
 
-	switch (apiProvider) {
-		case "anthropic":
-			return new AnthropicHandler(options)
-		case "openrouter":
-			return new OpenRouterHandler(options)
-		case "bedrock":
-			return new AwsBedrockHandler(options)
-		case "vertex":
-			return options.apiModelId?.startsWith("claude")
-				? new AnthropicVertexHandler(options)
-				: new VertexHandler(options)
-		case "openai":
-			return new OpenAiHandler(options)
-		case "ollama":
-			return new NativeOllamaHandler(options)
-		case "lmstudio":
-			return new LmStudioHandler(options)
-		case "gemini":
-			return new GeminiHandler(options)
-		case "openai-codex":
-			return new OpenAiCodexHandler(options)
-		case "openai-native":
-			return new OpenAiNativeHandler(options)
-		case "deepseek":
-			return new DeepSeekHandler(options)
-		case "qwen-code":
-			return new QwenCodeHandler(options)
-		case "moonshot":
-			return new MoonshotHandler(options)
-		case "vscode-lm":
-			return new VsCodeLmHandler(options)
-		case "mistral":
-			return new MistralHandler(options)
-		case "requesty":
-			return new RequestyHandler(options)
-		case "unbound":
-			return new UnboundHandler(options)
-		case "fake-ai":
-			return new FakeAIHandler(options)
-		case "xai":
-			return new XAIHandler(options)
-		case "litellm":
-			return new LiteLLMHandler(options)
-		case "sambanova":
-			return new SambaNovaHandler(options)
-		case "zai":
-			return new ZAiHandler(options)
-		case "fireworks":
-			return new FireworksHandler(options)
-		case "vercel-ai-gateway":
-			return new VercelAiGatewayHandler(options)
-		case "minimax":
-			return new MiniMaxHandler(options)
-		case "baseten":
-			return new BasetenHandler(options)
-		case "custom":
-			return new CustomHandler(options)
-		case "poe":
-			return new PoeHandler(options)
-		default:
-			return new AnthropicHandler(options)
+	const handler = (() => {
+		switch (apiProvider) {
+			case "anthropic":
+				return new AnthropicHandler(options)
+			case "openrouter":
+				return new OpenRouterHandler(options)
+			case "bedrock":
+				return new AwsBedrockHandler(options)
+			case "vertex":
+				return options.apiModelId?.startsWith("claude")
+					? new AnthropicVertexHandler(options)
+					: new VertexHandler(options)
+			case "openai":
+				return new OpenAiHandler(options)
+			case "ollama":
+				return new NativeOllamaHandler(options)
+			case "lmstudio":
+				return new LmStudioHandler(options)
+			case "gemini":
+				return new GeminiHandler(options)
+			case "openai-codex":
+				return new OpenAiCodexHandler(options)
+			case "openai-native":
+				return new OpenAiNativeHandler(options)
+			case "deepseek":
+				return new DeepSeekHandler(options)
+			case "qwen-code":
+				return new QwenCodeHandler(options)
+			case "moonshot":
+				return new MoonshotHandler(options)
+			case "vscode-lm":
+				return new VsCodeLmHandler(options)
+			case "mistral":
+				return new MistralHandler(options)
+			case "requesty":
+				return new RequestyHandler(options)
+			case "unbound":
+				return new UnboundHandler(options)
+			case "fake-ai":
+				return new FakeAIHandler(options)
+			case "xai":
+				return new XAIHandler(options)
+			case "litellm":
+				return new LiteLLMHandler(options)
+			case "sambanova":
+				return new SambaNovaHandler(options)
+			case "zai":
+				return new ZAiHandler(options)
+			case "fireworks":
+				return new FireworksHandler(options)
+			case "vercel-ai-gateway":
+				return new VercelAiGatewayHandler(options)
+			case "minimax":
+				return new MiniMaxHandler(options)
+			case "baseten":
+				return new BasetenHandler(options)
+			case "custom":
+				return new CustomHandler(options)
+			case "poe":
+				return new PoeHandler(options)
+			default:
+				return new AnthropicHandler(options)
+		}
+	})()
+
+	if (configuration.modelContextLimit !== undefined && configuration.modelContextLimit > 0) {
+		const originalGetModel = handler.getModel.bind(handler)
+		handler.getModel = () => {
+			const model = originalGetModel()
+			return {
+				...model,
+				info: {
+					...model.info,
+					contextWindow: configuration.modelContextLimit!,
+				},
+			}
+		}
 	}
+
+	return handler
 }

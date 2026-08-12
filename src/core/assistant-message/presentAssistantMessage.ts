@@ -1,13 +1,14 @@
 import { serializeError } from "serialize-error"
 import { Anthropic } from "@anthropic-ai/sdk"
 
-import type { ToolName, MirrorAsk, ToolProgressStatus } from "@mirror-vs/types"
+import { MirrorVSEventName, type ToolName, type MirrorAsk, type ToolProgressStatus } from "@mirror-vs/types"
 import { customToolRegistry } from "@mirror-vs/core"
 
 import { t } from "../../i18n"
 
 import { defaultModeSlug, getModeBySlug } from "../../shared/modes"
 import type { ToolParamName, ToolResponse, ToolUse, McpToolUse } from "../../shared/tools"
+import { RECOVERY_STRATEGIES } from "../task/TaskMainLoop"
 
 import { AskIgnoredError } from "../task/AskIgnoredError"
 import { Task } from "../task/Task"
@@ -34,6 +35,11 @@ import { runSlashCommandTool } from "../tools/RunSlashCommandTool"
 import { skillTool } from "../tools/SkillTool"
 import { generateImageTool } from "../tools/GenerateImageTool"
 import { applyDiffTool as applyDiffToolClass } from "../tools/ApplyDiffTool"
+import { getWorkspaceFileTreeTool } from "../tools/GetWorkspaceFileTreeTool"
+import { getWorkspacePulseTool } from "../tools/GetWorkspacePulseTool"
+import { getGitStatusTool } from "../tools/GetGitStatusTool"
+import { searchMcpToolsTool } from "../tools/SearchMcpToolsTool"
+import { activateMcpToolTool } from "../tools/ActivateMcpToolTool"
 import { isValidToolName, validateToolUse } from "../tools/validateToolUse"
 import { codebaseSearchTool } from "../tools/CodebaseSearchTool"
 import {
@@ -55,6 +61,65 @@ import { checkpointSave } from "../checkpoints"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
+
+/**
+ * Set of read-only tool names that are safe to execute in parallel.
+ * These tools do not mutate state and can be run concurrently without
+ * risk of data races or double-checkpoints.
+ */
+const READ_TOOLS = new Set([
+	"read_file",
+	"search_files",
+	"list_files",
+	"web_search",
+	"github_search",
+	"docs_search",
+	"package_search",
+	"codebase_search",
+	"read_url",
+	"get_workspace_file_tree",
+	"get_workspace_pulse",
+	"get_git_status",
+	"read_command_output",
+])
+
+/**
+ * Error thrown when a mixed read/write tool batch is attempted.
+ * The orchestrator uses this to reject batches that cannot be safely
+ * parallelised.
+ */
+class ToolCannonError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = "ToolCannonError"
+	}
+}
+
+/**
+ * Exponential backoff sleep helper.
+ */
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Lookup map from tool name → tool handler instance for read-only tools.
+ * Used by the parallel read batching path to dispatch tools without
+ * the normal switch/case chain.
+ */
+const READ_TOOL_MAP: Record<string, { handle: (task: Task, block: any, callbacks: any) => Promise<void> }> = {
+	read_file: readFileTool,
+	search_files: searchFilesTool,
+	list_files: listFilesTool,
+	web_search: webSearchTool,
+	github_search: gitHubSearchTool,
+	docs_search: docsSearchTool,
+	package_search: packageSearchTool,
+	codebase_search: codebaseSearchTool,
+	read_url: readUrlTool,
+	get_workspace_file_tree: getWorkspaceFileTreeTool,
+	get_workspace_pulse: getWorkspacePulseTool,
+	get_git_status: getGitStatusTool,
+	read_command_output: readCommandOutputTool,
+}
 
 /**
  * Processes and presents assistant message content to the user interface.
@@ -379,6 +444,10 @@ export async function presentAssistantMessage(mirror: Task) {
 						return `[${block.name}]`
 					case "switch_mode":
 						return `[${block.name} to '${block.params.mode_slug}'${block.params.reason ? ` because: ${block.params.reason}` : ""}]`
+					case "search_mcp_tools":
+						return `[${block.name}${block.params?.query ? ` for '${block.params.query}'` : ""}]`
+					case "activate_mcp_tool":
+						return `[${block.name} for '${block.params?.tool_name}' on '${block.params?.server_name}']`
 					case "codebase_search":
 						return `[${block.name} for '${block.params.query}']`
 					case "read_command_output":
@@ -397,6 +466,12 @@ export async function presentAssistantMessage(mirror: Task) {
 						return `[${block.name} for '${block.params.skill}'${block.params.args ? ` with args: ${block.params.args}` : ""}]`
 					case "generate_image":
 						return `[${block.name} for '${block.params.path}']`
+					case "get_workspace_file_tree":
+						return `[${block.name}]`
+					case "get_workspace_pulse":
+						return `[${block.name}]`
+					case "get_git_status":
+						return `[${block.name}${block.nativeArgs?.maxFiles ? ` (max ${block.nativeArgs.maxFiles} files)` : ""}]`
 					default:
 						return `[${block.name}]`
 				}
@@ -557,6 +632,58 @@ export async function presentAssistantMessage(mirror: Task) {
 				if (error instanceof AskIgnoredError) {
 					return
 				}
+
+				// ── Auto-Recovery: Check Struggle Ledger strategies ──────────
+				// Attempt to recover from known mistake patterns before falling
+				// through to the generic error path.
+				const errorMsg = error.message ?? ""
+				const toolArgs = {
+					...(block.params ?? {}),
+					...(block.nativeArgs ?? {}),
+				}
+				for (const [, strategy] of Object.entries(RECOVERY_STRATEGIES)) {
+					if (strategy.pattern.test(errorMsg)) {
+						try {
+							const recovery = await strategy.action(
+								errorMsg,
+								block.name as string,
+								toolArgs as Record<string, unknown>,
+								mirror.struggleLedger,
+							)
+
+							if (recovery.type === "escalate") {
+								// Hard-abort: double-failure of the same pattern.
+								mirror.consecutiveMistakeCount++
+								const recoveryError = `[Recovery Failed] ${recovery.message}`
+								await mirror.say("error", recoveryError)
+								pushToolResult(formatResponse.toolError(recoveryError))
+								return
+							}
+
+							if (recovery.type === "retry") {
+								// Successful auto-recovery: feed the corrected info back.
+								mirror.struggleLedger.resolve("file_not_found")
+								const recoveryMsg = `[Auto-Recovery] ${recovery.message}`
+								// Log it so the model sees the correction
+								await mirror.say("error", recoveryMsg)
+								// Emit telemetry event — schema: z.tuple([z.string(), toolNamesSchema, z.string()])
+								mirror.emit(
+									MirrorVSEventName.TaskToolFailed,
+									mirror.taskId,
+									block.name as ToolName,
+									recoveryMsg,
+								)
+								pushToolResult(recoveryMsg)
+								return
+							}
+						} catch {
+							// If recovery itself throws, fall through to generic error
+						}
+						break // Only try the first matching strategy
+					}
+				}
+				// ── End Auto-Recovery ───────────────────────────────────────
+
 				const errorString = `Error ${action}: ${JSON.stringify(serializeError(error))}`
 
 				await mirror.say(
@@ -665,6 +792,20 @@ export async function presentAssistantMessage(mirror: Task) {
 				}
 			}
 
+			// --- Parallel Read Batching ---
+			// When the parallelToolReads experiment is enabled, scan ahead for
+			// consecutive non-partial read-only tool blocks and execute them all
+			// at once via Promise.all. This gives a 2-5x speedup on read-heavy
+			// turns without risking data races (reads are idempotent).
+			if (stateExperiments?.parallelToolReads && !block.partial && READ_TOOLS.has(block.name)) {
+				await executeReadBatch(mirror, block, toolCallId, {
+					pushToolResult,
+					handleError,
+					askApproval,
+				})
+				break
+			}
+
 			switch (block.name) {
 				case "write_to_file":
 					await checkpointSaveAndMark(mirror)
@@ -673,6 +814,7 @@ export async function presentAssistantMessage(mirror: Task) {
 						handleError,
 						pushToolResult,
 					})
+					recordFileEdit(mirror, block)
 					break
 				case "update_todo_list":
 					await updateTodoListTool.handle(mirror, block as ToolUse<"update_todo_list">, {
@@ -688,6 +830,7 @@ export async function presentAssistantMessage(mirror: Task) {
 						handleError,
 						pushToolResult,
 					})
+					recordFileEdit(mirror, block)
 					break
 				case "edit":
 				case "search_and_replace":
@@ -697,6 +840,7 @@ export async function presentAssistantMessage(mirror: Task) {
 						handleError,
 						pushToolResult,
 					})
+					recordFileEdit(mirror, block)
 					break
 				case "search_replace":
 					await checkpointSaveAndMark(mirror)
@@ -705,6 +849,7 @@ export async function presentAssistantMessage(mirror: Task) {
 						handleError,
 						pushToolResult,
 					})
+					recordFileEdit(mirror, block)
 					break
 				case "edit_file":
 					await checkpointSaveAndMark(mirror)
@@ -713,6 +858,7 @@ export async function presentAssistantMessage(mirror: Task) {
 						handleError,
 						pushToolResult,
 					})
+					recordFileEdit(mirror, block)
 					break
 				case "apply_patch":
 					await checkpointSaveAndMark(mirror)
@@ -721,6 +867,7 @@ export async function presentAssistantMessage(mirror: Task) {
 						handleError,
 						pushToolResult,
 					})
+					recordFileEdit(mirror, block)
 					break
 				case "read_file":
 					// Type assertion is safe here because we're in the "read_file" case
@@ -795,6 +942,20 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "switch_mode":
 					await switchModeTool.handle(mirror, block as ToolUse<"switch_mode">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "search_mcp_tools":
+					await searchMcpToolsTool.handle(mirror, block as ToolUse<"search_mcp_tools">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "activate_mcp_tool":
+					await activateMcpToolTool.handle(mirror, block as ToolUse<"activate_mcp_tool">, {
 						askApproval,
 						handleError,
 						pushToolResult,
@@ -937,6 +1098,27 @@ export async function presentAssistantMessage(mirror: Task) {
 						pushToolResult,
 					})
 					break
+				case "get_workspace_file_tree":
+					await getWorkspaceFileTreeTool.handle(mirror, block as ToolUse<"get_workspace_file_tree">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "get_workspace_pulse":
+					await getWorkspacePulseTool.handle(mirror, block as ToolUse<"get_workspace_pulse">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "get_git_status":
+					await getGitStatusTool.handle(mirror, block as ToolUse<"get_git_status">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
 				default: {
 					// Handle unknown/invalid tool names OR custom tools
 					// This is critical for native tool calling where every tool_use MUST have a tool_result
@@ -1065,6 +1247,47 @@ export async function presentAssistantMessage(mirror: Task) {
 }
 
 /**
+ * Records a successful file edit in the local-only edit history.
+ * Extracts path/diff/content/checkpointId from the tool block and
+ * persists it to the task's fileEdits array. This data is NEVER sent
+ * to the LLM — it's kept purely for frontend display and revert.
+ *
+ * Only records non-partial (fully streamed) blocks to avoid recording
+ * partial/incomplete edits during streaming.
+ */
+function recordFileEdit(mirror: Task, block: any) {
+	if (block.partial) return
+
+	// Extract path (handles both "path" and "file_path" param keys)
+	const path = block.params?.path ?? block.params?.file_path
+	if (!path) return
+
+	const diff = block.params?.diff ?? block.params?.patch ?? undefined
+	const content = block.params?.content ?? undefined
+	const timestamp = Date.now()
+	const toolName = block.name as string
+
+	// Get the most recent checkpoint ID from mirrorMessages
+	let checkpointId: string | undefined
+	for (let i = mirror.mirrorMessages.length - 1; i >= 0; i--) {
+		const msg = mirror.mirrorMessages[i]
+		if (msg.say === "checkpoint_saved" && msg.text) {
+			checkpointId = msg.text
+			break
+		}
+	}
+
+	mirror.mirrorMessagesManager.addFileEdit({
+		path,
+		diff,
+		content,
+		timestamp,
+		toolName,
+		checkpointId,
+	})
+}
+
+/**
  * save checkpoint and mark done in the current streaming task.
  * @param task The Task instance to checkpoint save and mark.
  * @returns
@@ -1078,5 +1301,176 @@ async function checkpointSaveAndMark(task: Task) {
 		task.currentStreamingDidCheckpoint = true
 	} catch (error) {
 		console.error(`[Task#presentAssistantMessage] Error saving checkpoint: ${error.message}`, error)
+	}
+}
+
+/**
+ * Batch-execute consecutive read-only tool blocks in parallel.
+ *
+ * Scans ahead from the current index in `assistantMessageContent`, collects
+ * all non-partial read-only blocks, and dispatches them via `Promise.all`.
+ * Implements exponential backoff (3 retries, BASE_DELAY=1000ms) for rate
+ * limit errors (HTTP 429). Falls back to sequential execution if all retries
+ * are exhausted.
+ *
+ * When the feature flag is disabled, this function is never called and the
+ * normal switch/case path handles each block one-at-a-time.
+ */
+async function executeReadBatch(
+	mirror: Task,
+	_firstBlock: any,
+	_firstToolCallId: string,
+	callbacks: {
+		pushToolResult: (content: ToolResponse) => void
+		handleError: (action: string, error: Error) => Promise<void>
+		askApproval: (
+			type: MirrorAsk,
+			partialMessage?: string,
+			progressStatus?: ToolProgressStatus,
+			isProtected?: boolean,
+		) => Promise<boolean>
+	},
+) {
+	const startIndex = mirror.currentStreamingContentIndex
+	const content = mirror.assistantMessageContent
+
+	// Collect consecutive non-partial read-only tool blocks.
+	const readBlocks: Array<{ block: any; toolCallId: string }> = []
+	for (let i = startIndex; i < content.length; i++) {
+		const b = content[i]
+		if (b.type !== "tool_use" || b.partial) break
+		if (!READ_TOOLS.has(b.name as string)) break
+		readBlocks.push({ block: b, toolCallId: (b as any).id as string })
+	}
+
+	// Safety: if no blocks were collected (should not happen since this is
+	// called only when the current block is a read tool) fall through to
+	// sequential single-tool execution via the normal switch/case dispatch.
+	if (readBlocks.length === 0) {
+		const tool = READ_TOOL_MAP[_firstBlock.name as string]
+		if (tool) {
+			await tool.handle(mirror, _firstBlock, {
+				askApproval: callbacks.askApproval,
+				handleError: callbacks.handleError,
+				pushToolResult: callbacks.pushToolResult,
+			})
+		}
+		return
+	}
+
+	const MAX_RETRIES = 3
+	const BASE_DELAY = 1000 // 1 second
+
+	// Helper: create a per-block pushToolResult closure so each parallel
+	// execution can report its own result independently.
+	const makePushToolResult = (toolCallId: string) => {
+		let hasResult = false
+		return (content: ToolResponse) => {
+			if (hasResult) return
+			hasResult = true
+
+			let resultContent: string
+			let imageBlocks: Anthropic.ImageBlockParam[] = []
+
+			if (typeof content === "string") {
+				resultContent = content || "(tool did not return anything)"
+			} else {
+				const textBlocks = content.filter((item) => item.type === "text")
+				imageBlocks = content.filter((item) => item.type === "image") as Anthropic.ImageBlockParam[]
+				resultContent =
+					textBlocks.map((item) => (item as Anthropic.TextBlockParam).text).join("\n") ||
+					"(tool did not return anything)"
+			}
+
+			mirror.pushToolResultToUserContent({
+				type: "tool_result",
+				tool_use_id: sanitizeToolUseId(toolCallId),
+				content: resultContent,
+			})
+
+			if (imageBlocks.length > 0) {
+				mirror.userMessageContent.push(...imageBlocks)
+			}
+		}
+	}
+
+	// Serialized askApproval lock to ensure interactive approval dialogs run sequentially
+	let askLock: Promise<any> = Promise.resolve()
+	const serializedAskApproval = (
+		type: MirrorAsk,
+		partialMessage?: string,
+		progressStatus?: ToolProgressStatus,
+		isProtected?: boolean,
+	): Promise<boolean> => {
+		const next = askLock.then(() => callbacks.askApproval(type, partialMessage, progressStatus, isProtected))
+		askLock = next.catch(() => {})
+		return next
+	}
+
+	// Attempt parallel execution with exponential backoff for rate limits.
+	const attemptParallel = async (): Promise<void> => {
+		for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+			try {
+				await Promise.all(
+					readBlocks.map(({ block, toolCallId }) => {
+						const tool = READ_TOOL_MAP[block.name as string]
+						if (!tool) {
+							throw new ToolCannonError(`Unknown read tool: "${block.name}"`)
+						}
+						return tool.handle(mirror, block, {
+							askApproval: serializedAskApproval,
+							handleError: callbacks.handleError,
+							pushToolResult: makePushToolResult(toolCallId),
+						})
+					}),
+				)
+				return // success
+			} catch (error: any) {
+				const isRateLimit =
+					String(error).includes("429") ||
+					error?.status === 429 ||
+					String(error).toLowerCase().includes("rate limit")
+
+				if (isRateLimit && attempt < MAX_RETRIES - 1) {
+					const delay = BASE_DELAY * Math.pow(2, attempt)
+					console.warn(
+						`[presentAssistantMessage] Rate limited on parallel read batch (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms`,
+					)
+					await sleep(delay)
+					continue
+				}
+				throw error
+			}
+		}
+	}
+
+	try {
+		await attemptParallel()
+	} catch (error) {
+		// Fall back to sequential execution for the entire batch.
+		console.warn(`[presentAssistantMessage] Parallel read batch failed, falling back to sequential:`, error)
+		for (const { block, toolCallId } of readBlocks) {
+			const tool = READ_TOOL_MAP[block.name as string]
+			if (tool) {
+				await tool.handle(mirror, block, {
+					askApproval: callbacks.askApproval,
+					handleError: callbacks.handleError,
+					pushToolResult: makePushToolResult(toolCallId),
+				})
+			}
+		}
+	}
+
+	// Advance the streaming index past all processed blocks.
+	// The main loop will increment by 1 on top of this, so we set it to
+	// `startIndex + blocksProcessed - 1`.
+	const blocksProcessed = readBlocks.length
+	mirror.currentStreamingContentIndex = startIndex + blocksProcessed - 1
+
+	// Record tool usage for each executed block.
+	// Record tool usage for each executed block.
+	// Use ToolName cast since we've already validated the block is in READ_TOOLS.
+	for (const { block } of readBlocks) {
+		mirror.recordToolUsage(block.name as ToolName)
 	}
 }

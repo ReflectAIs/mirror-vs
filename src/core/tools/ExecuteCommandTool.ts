@@ -19,6 +19,8 @@ import { Package } from "../../shared/package"
 import { t } from "../../i18n"
 import { getTaskDirectoryPath } from "../../utils/storage"
 import { BaseTool, ToolCallbacks } from "./BaseTool"
+import { SHIELD_SYMBOL } from "../protect/MirrorProtectedController"
+import type { MirrorProtectedController } from "../protect/MirrorProtectedController"
 
 class ShellIntegrationError extends Error {}
 
@@ -35,6 +37,136 @@ export function resolveAgentTimeoutMs(timeoutSeconds: number | null | undefined)
 	// solely by commandExecutionTimeout (user setting), not model-provided
 	// background timeouts.
 	return process.env.MIRROR_CLI_RUNTIME === "1" ? 0 : requestedAgentTimeout
+}
+
+function validateCommandSafety(command: string, workspacePath: string): string | null {
+	const lower = command.toLowerCase().trim()
+
+	// Pattern match for rm or rmdir
+	const hasDangerousRm = /\b(rm|rmdir)\b/.test(lower)
+	if (hasDangerousRm) {
+		const isRecursive =
+			/\s-(r|R|f|rf|fr|rf\w*|f\w*r)\b/.test(lower) || lower.includes("--recursive") || lower.includes("-f")
+
+		// Split command to analyze parts / arguments
+		const parts = command.split(/\s+/)
+		for (const part of parts) {
+			const cleanPart = part.replace(/['"]/g, "").trim()
+			if (!cleanPart) continue
+
+			// Block root level deletion
+			if (cleanPart === "/" || cleanPart.startsWith("//") || cleanPart === "/*" || cleanPart === "/ *") {
+				return "Destructive command blocked: Deleting the root directory '/' is prohibited."
+			}
+
+			// Block home directory deletion
+			if (
+				cleanPart === "~" ||
+				cleanPart === "~/" ||
+				cleanPart.startsWith("~/*") ||
+				cleanPart.startsWith("$HOME")
+			) {
+				return "Destructive command blocked: Deleting the user home directory '~' is prohibited."
+			}
+
+			// Block system paths
+			const systemPaths = [
+				"/system",
+				"/library",
+				"/usr",
+				"/bin",
+				"/sbin",
+				"/etc",
+				"/var",
+				"/private",
+				"/users",
+				"c:\\windows",
+				"c:\\program files",
+				"c:\\users",
+			]
+			if (systemPaths.some((p) => cleanPart.toLowerCase().startsWith(p))) {
+				return `Destructive command blocked: Modifying or deleting system directory '${cleanPart}' is prohibited.`
+			}
+
+			// Block wildcards/current dir deletions at workspace root if recursive
+			if (isRecursive) {
+				if (cleanPart === "*" || cleanPart === "." || cleanPart === "./" || cleanPart === "./*") {
+					return "Destructive command blocked: Recursive deletion of the entire current directory or wildcard '*' is prohibited for safety."
+				}
+
+				// Check if the resolved path goes outside the workspace or is the workspace root
+				try {
+					const resolvedPath = path.resolve(workspacePath, cleanPart)
+					const relative = path.relative(workspacePath, resolvedPath)
+
+					// If resolvedPath equals workspace root, block it
+					if (resolvedPath === path.resolve(workspacePath) || relative === "") {
+						return "Destructive command blocked: Deleting the workspace root directory recursively is prohibited."
+					}
+
+					// If resolvedPath goes outside the workspace (starts with '..')
+					if (relative.startsWith("..")) {
+						return `Destructive command blocked: Deleting directories outside the workspace ('${cleanPart}') is prohibited.`
+					}
+				} catch (e) {
+					if (cleanPart.startsWith("..") || cleanPart.startsWith("/")) {
+						return "Destructive command blocked: Path resolves outside the workspace."
+					}
+				}
+			}
+		}
+	}
+
+	return null
+}
+
+/**
+ * Checks whether a shell command targets any Mirror VS protected files.
+ *
+ * Extracts path-like tokens from the command and checks them against the
+ * MirrorProtectedController. Returns an error message if a protected path
+ * is found, or null if the command is safe.
+ *
+ * This is a HARD BLOCK — protected config files cannot be deleted/modified
+ * via shell commands regardless of auto-approval settings.
+ */
+function validateCommandAgainstProtectedFiles(
+	command: string,
+	workspacePath: string,
+	protectedController: MirrorProtectedController | undefined,
+): string | null {
+	if (!protectedController) return null
+
+	// Only scan commands that could destructively modify files
+	const lower = command.toLowerCase().trim()
+	const isDestructive =
+		/\b(rm|rmdir|git\s+clean|find\b.*-delete|truncate|shred|mv\b|cp\b|chmod|chown|echo\b.*>)/.test(lower)
+
+	if (!isDestructive) return null
+
+	// Extract path-like tokens from the command (anything that looks like a path or starts with . / ~)
+	const tokens = command.split(/\s+/)
+	for (const token of tokens) {
+		// Strip common shell quoting
+		const cleanToken = token.replace(/^['"]|['"]$/g, "").trim()
+		if (!cleanToken || cleanToken.startsWith("-")) continue
+
+		// Resolve to relative path within workspace
+		try {
+			const absolute = path.resolve(workspacePath, cleanToken)
+			const relative = path.relative(workspacePath, absolute)
+			// Skip paths outside workspace — those are handled by validateCommandSafety
+			if (relative.startsWith("..")) continue
+
+			if (protectedController.isWriteProtected(relative)) {
+				return `Command blocked: "${cleanToken}" is a Mirror VS protected configuration file ${SHIELD_SYMBOL} and cannot be modified via shell commands. ${protectedController.getProtectionMessage()}`
+			}
+		} catch {
+			// Ignore path resolution errors — best-effort check
+		}
+	}
+
+	return null
 }
 
 export class ExecuteCommandTool extends BaseTool<"execute_command"> {
@@ -59,6 +191,26 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			if (ignoredFileAttemptedToAccess) {
 				await task.say("mirrorignore_error", ignoredFileAttemptedToAccess)
 				pushToolResult(formatResponse.mirrorIgnoreError(ignoredFileAttemptedToAccess))
+				return
+			}
+
+			const safetyViolation = validateCommandSafety(canonicalCommand, task.cwd)
+			if (safetyViolation) {
+				await task.say("error", safetyViolation)
+				pushToolResult(formatResponse.toolError(safetyViolation))
+				return
+			}
+
+			// Hard-block commands that target Mirror VS protected files.
+			// This guard runs BEFORE askApproval so auto-approval cannot bypass it.
+			const protectedViolation = validateCommandAgainstProtectedFiles(
+				canonicalCommand,
+				task.cwd,
+				task.mirrorProtectedController,
+			)
+			if (protectedViolation) {
+				await task.say("error", protectedViolation)
+				pushToolResult(formatResponse.toolError(protectedViolation))
 				return
 			}
 
@@ -563,7 +715,7 @@ function formatPersistedOutput(
 		"Preview:",
 		result.preview,
 		"",
-		"Use read_command_output tool to view full output if needed.",
+		"Use read_command_output tool with artifact_id to search or read the full output in parts using offset and limit if needed.",
 	].join("\n")
 }
 

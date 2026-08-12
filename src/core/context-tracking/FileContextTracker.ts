@@ -140,60 +140,80 @@ export class FileContextTracker {
 	// Adds a file to the metadata tracker
 	// This handles the business logic of determining if the file is new, stale, or active.
 	// It also updates the metadata with the latest read/edit dates.
-	async addFileToFileContextTracker(taskId: string, filePath: string, source: RecordSource) {
+	async addFileToFileContextTracker(taskId: string, rawFilePath: string, source: RecordSource) {
 		try {
+			const filePath = path.normalize(rawFilePath).replace(/\\/g, "/")
 			const metadata = await this.getTaskMetadata(taskId)
 			const now = Date.now()
 
-			// Mark existing entries for this file as stale
-			metadata.files_in_context.forEach((entry) => {
-				if (entry.path === filePath && entry.record_state === "active") {
-					entry.record_state = "stale"
+			// Check if we already have an entry for this file
+			let existingEntry = metadata.files_in_context.find(
+				(entry) => path.normalize(entry.path).replace(/\\/g, "/") === filePath,
+			)
+
+			if (existingEntry) {
+				// Update the existing entry
+				existingEntry.record_state = "active"
+				existingEntry.record_source = source
+
+				switch (source) {
+					case "user_edited":
+						existingEntry.user_edit_date = now
+						break
+					case "mirror_edited":
+						existingEntry.mirror_read_date = now
+						existingEntry.mirror_edit_date = now
+						this.checkpointPossibleFiles.add(filePath)
+						this.markFileAsEditedByMirror(filePath)
+						break
+					case "read_tool":
+					case "file_mentioned":
+						existingEntry.mirror_read_date = now
+						break
 				}
-			})
+			} else {
+				// Mark other active entries as stale (if applicable, though in-place updates minimize this)
+				metadata.files_in_context.forEach((entry) => {
+					if (
+						path.normalize(entry.path).replace(/\\/g, "/") === filePath &&
+						entry.record_state === "active"
+					) {
+						entry.record_state = "stale"
+					}
+				})
 
-			// Helper to get the latest date for a specific field and file
-			const getLatestDateForField = (path: string, field: keyof FileMetadataEntry): number | null => {
-				const relevantEntries = metadata.files_in_context
-					.filter((entry) => entry.path === path && entry[field])
-					.sort((a, b) => (b[field] as number) - (a[field] as number))
+				let newEntry: FileMetadataEntry = {
+					path: filePath,
+					record_state: "active",
+					record_source: source,
+					mirror_read_date: null,
+					mirror_edit_date: null,
+					user_edit_date: null,
+				}
 
-				return relevantEntries.length > 0 ? (relevantEntries[0][field] as number) : null
+				switch (source) {
+					case "user_edited":
+						newEntry.user_edit_date = now
+						this.recentlyModifiedFiles.add(filePath)
+						break
+					case "mirror_edited":
+						newEntry.mirror_read_date = now
+						newEntry.mirror_edit_date = now
+						this.checkpointPossibleFiles.add(filePath)
+						this.markFileAsEditedByMirror(filePath)
+						break
+					case "read_tool":
+					case "file_mentioned":
+						newEntry.mirror_read_date = now
+						break
+				}
+
+				metadata.files_in_context.push(newEntry)
 			}
 
-			let newEntry: FileMetadataEntry = {
-				path: filePath,
-				record_state: "active",
-				record_source: source,
-				mirror_read_date: getLatestDateForField(filePath, "mirror_read_date"),
-				mirror_edit_date: getLatestDateForField(filePath, "mirror_edit_date"),
-				user_edit_date: getLatestDateForField(filePath, "user_edit_date"),
-			}
-
-			switch (source) {
-				// user_edited: The user has edited the file
-				case "user_edited":
-					newEntry.user_edit_date = now
-					this.recentlyModifiedFiles.add(filePath)
-					break
-
-				// mirror_edited: Mirror VS has edited the file
-				case "mirror_edited":
-					newEntry.mirror_read_date = now
-					newEntry.mirror_edit_date = now
-					this.checkpointPossibleFiles.add(filePath)
-					this.markFileAsEditedByMirror(filePath)
-					break
-
-				// read_tool/file_mentioned: Mirror VS has read the file via a tool or file mention
-				case "read_tool":
-				case "file_mentioned":
-					newEntry.mirror_read_date = now
-					break
-			}
-
-			metadata.files_in_context.push(newEntry)
 			await this.saveTaskMetadata(taskId, metadata)
+			// Set up file watcher for this file
+			await this.setupFileWatcher(filePath)
 		} catch (error) {
 			console.error("Failed to add file to metadata:", error)
 		}
@@ -223,6 +243,11 @@ export class FileContextTracker {
 				// Only include files that were read by Mirror VS (not user edits)
 				const isReadByMirror = entry.record_source === "read_tool" || entry.record_source === "file_mentioned"
 				if (!isReadByMirror) {
+					return false
+				}
+
+				// Skip cold storage files
+				if (entry.storage_tier === "cold") {
 					return false
 				}
 
@@ -256,6 +281,81 @@ export class FileContextTracker {
 		} catch (error) {
 			console.error("Failed to get files read by Mirror VS:", error)
 			return []
+		}
+	}
+
+	async forgetFile(rawFilePath: string): Promise<void> {
+		try {
+			const filePath = path.normalize(rawFilePath).replace(/\\/g, "/")
+			const metadata = await this.getTaskMetadata(this.taskId)
+			metadata.files_in_context = metadata.files_in_context.filter(
+				(entry) => path.normalize(entry.path).replace(/\\/g, "/") !== filePath,
+			)
+			await this.saveTaskMetadata(this.taskId, metadata)
+
+			// Also dispose of the file watcher if it exists
+			const watcher = this.fileWatchers.get(filePath) || this.fileWatchers.get(rawFilePath)
+			if (watcher) {
+				watcher.dispose()
+				this.fileWatchers.delete(filePath)
+				this.fileWatchers.delete(rawFilePath)
+			}
+		} catch (error) {
+			console.error("Failed to forget file context:", error)
+		}
+	}
+
+	async toggleFileStorageTier(rawFilePath: string, tier: "hot" | "cold"): Promise<void> {
+		try {
+			const filePath = path.normalize(rawFilePath).replace(/\\/g, "/")
+			const metadata = await this.getTaskMetadata(this.taskId)
+			let updated = false
+			metadata.files_in_context.forEach((entry) => {
+				if (path.normalize(entry.path).replace(/\\/g, "/") === filePath) {
+					entry.storage_tier = tier
+					updated = true
+				}
+			})
+
+			// If it wasn't tracked yet, track it now with the specific tier
+			if (!updated) {
+				metadata.files_in_context.push({
+					path: filePath,
+					record_state: "active",
+					record_source: "read_tool",
+					storage_tier: tier,
+					mirror_read_date: Date.now(),
+					mirror_edit_date: null,
+				})
+			}
+			await this.saveTaskMetadata(this.taskId, metadata)
+		} catch (error) {
+			console.error("Failed to toggle file storage tier:", error)
+		}
+	}
+
+	async forgetAllFiles(): Promise<void> {
+		try {
+			const metadata = { files_in_context: [] }
+			await this.saveTaskMetadata(this.taskId, metadata)
+			for (const watcher of this.fileWatchers.values()) {
+				watcher.dispose()
+			}
+			this.fileWatchers.clear()
+		} catch (error) {
+			console.error("Failed to forget all files context:", error)
+		}
+	}
+
+	async toggleAllFilesStorageTier(tier: "hot" | "cold"): Promise<void> {
+		try {
+			const metadata = await this.getTaskMetadata(this.taskId)
+			metadata.files_in_context.forEach((entry) => {
+				entry.storage_tier = tier
+			})
+			await this.saveTaskMetadata(this.taskId, metadata)
+		} catch (error) {
+			console.error("Failed to toggle all files storage tier:", error)
 		}
 	}
 

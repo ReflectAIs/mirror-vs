@@ -8,7 +8,7 @@ import { Package } from "../../shared/package"
 import { t } from "../../i18n"
 import { OrganizationAllowListViolationError } from "../../utils/errors"
 
-import { Task } from "../task/Task"
+import { Task, TaskState } from "../task/Task"
 
 import type { MirrorProvider } from "./MirrorProvider"
 
@@ -74,12 +74,45 @@ export class TaskLifecycleManager {
 		const { apiConfiguration, organizationAllowList, enableCheckpoints, checkpointTimeout, experiments } =
 			await this.provider.getState()
 
-		// Single-open-task invariant: always enforce for user-initiated top-level tasks
+		// For user-initiated top-level tasks, park the current task instead of killing it.
+		// The task continues streaming in the background and can be resumed later.
+		// Sub-tasks (delegation via new_task tool) still use the stack normally.
+		// Optimization: skip parking if the current task is already idle, completed, or aborted.
 		if (!parentTask) {
-			try {
-				await this.provider.removeMirrorFromStack()
-			} catch {
-				// Non-fatal
+			const currentTask = this.provider.getCurrentTask()
+
+			// Skip parking if no current task exists, or it's already idle/completed/aborted
+			if (
+				currentTask &&
+				currentTask.state !== TaskState.Idle &&
+				currentTask.state !== TaskState.Completed &&
+				currentTask.state !== TaskState.Aborted
+			) {
+				try {
+					await this.provider["parkCurrentTask"]()
+				} catch {
+					// Non-fatal
+				}
+			}
+		}
+
+		// Max concurrent streaming tasks gate:
+		// If we would exceed the limit, wait (block) until one finishes or is parked.
+		if (!parentTask) {
+			const maxConcurrent = 3
+			const streamingTasks = this.provider.getAllTasksSorted().filter((t) => t.state === TaskState.Streaming)
+			if (streamingTasks.length >= maxConcurrent) {
+				this.provider.log(
+					`[createTask] Reached max ${maxConcurrent} concurrent streaming tasks. ` +
+						`Waiting for a slot before creating new task.`,
+				)
+				// Wait until a streaming slot opens up (poll every 500ms)
+				await pWaitFor(
+					() =>
+						this.provider.getAllTasksSorted().filter((t) => t.state === TaskState.Streaming).length <
+						maxConcurrent,
+					{ interval: 500, timeout: 120_000 },
+				)
 			}
 		}
 
@@ -116,7 +149,14 @@ export class TaskLifecycleManager {
 				`currentSessionId=${this.provider.currentSessionId}`,
 		)
 		await this.provider.addMirrorToStack(task)
-		task.start()
+		await task.saveMirrorMessages()
+
+		// Only start the AI loop if there is text/images content or a history item.
+		// If created with empty text and images (e.g. clicking '+' or opening fresh workspace),
+		// keep it as an idle tab waiting for user input without sending an empty message.
+		if ((text && text.trim().length > 0) || (images && images.length > 0) || task.historyItem) {
+			task.start()
+		}
 
 		this.provider.log(
 			`[createTask] ${task.parentTask ? "child" : "parent"} task ${task.taskId}.${task.instanceId} instantiated`,

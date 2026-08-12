@@ -26,7 +26,7 @@ import {
 	MAX_PENDING_BATCHES,
 } from "../constants"
 import { isPathInIgnoredDirectory } from "../../glob/ignore-utils"
-import { sanitizeErrorMessage } from "../shared/validation-helpers"
+import { sanitizeErrorMessage, stringifyErrorDetail } from "../shared/validation-helpers"
 import { Package } from "../../../shared/package"
 
 export class DirectoryScanner implements IDirectoryScanner {
@@ -416,6 +416,18 @@ export class DirectoryScanner implements IDirectoryScanner {
 				// Create embeddings for batch
 				const { embeddings } = await this.embedder.createEmbeddings(batchTexts)
 
+				// Sanity check: Ensure embeddings is array and length matches batchTexts
+				if (!embeddings || !Array.isArray(embeddings)) {
+					throw new Error(
+						`Embedder returned invalid response: embeddings is not an array. Got: ${typeof embeddings}`,
+					)
+				}
+				if (embeddings.length !== batchTexts.length) {
+					throw new Error(
+						`Embedder returned mismatched embeddings length: expected ${batchTexts.length}, got ${embeddings.length}`,
+					)
+				}
+
 				// Prepare points for Qdrant
 				const points = batchBlocks.map((block, index) => {
 					const normalizedAbsolutePath = generateNormalizedAbsolutePath(block.file_path, scanWorkspace)
@@ -423,9 +435,24 @@ export class DirectoryScanner implements IDirectoryScanner {
 					// Use segmentHash for unique ID generation to handle multiple segments from same line
 					const pointId = uuidv5(block.segmentHash, QDRANT_CODE_BLOCK_NAMESPACE)
 
+					const vector = embeddings[index]
+					if (!vector || !Array.isArray(vector)) {
+						throw new Error(
+							`Embedder returned invalid vector at index ${index} for block ${pointId}: expected array, got ${typeof vector}`,
+						)
+					}
+					if (vector.length === 0) {
+						throw new Error(`Embedder returned empty vector at index ${index} for block ${pointId}`)
+					}
+					if (vector.some((val) => val === null || val === undefined || isNaN(val))) {
+						throw new Error(
+							`Embedder returned vector containing null/undefined/NaN at index ${index} for block ${pointId}`,
+						)
+					}
+
 					return {
 						id: pointId,
-						vector: embeddings[index],
+						vector: vector,
 						payload: {
 							filePath: generateRelativeFilePath(normalizedAbsolutePath, scanWorkspace),
 							codeChunk: block.content,
@@ -446,7 +473,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 				}
 				success = true
 			} catch (error) {
-				lastError = error as Error
+				lastError = new Error(stringifyErrorDetail(error))
 				console.error(
 					`[DirectoryScanner] Error processing batch (attempt ${attempts}) in workspace ${scanWorkspace}:`,
 					error,

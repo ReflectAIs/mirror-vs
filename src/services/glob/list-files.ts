@@ -184,8 +184,8 @@ async function handleSpecialDirectories(dirPath: string): Promise<[string[], boo
  * Get the path to the ripgrep binary
  */
 async function getRipgrepPath(): Promise<string> {
-	const vscodeAppMirrort = vscode.env.appRoot
-	const rgPath = await getBinPath(vscodeAppMirrort)
+	const vscodeAppRoot = vscode.env.appRoot
+	const rgPath = await getBinPath(vscodeAppRoot)
 
 	if (!rgPath) {
 		throw new Error("Could not find ripgrep binary")

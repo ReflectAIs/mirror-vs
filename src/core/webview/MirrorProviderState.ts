@@ -1,15 +1,20 @@
+import * as path from "path"
 import * as vscode from "vscode"
 
 import {
 	type ProviderName,
 	type ExtensionState,
 	type HistoryItem,
+	type TabInfo,
+	type TabStatus,
 	openRouterDefaultModelId,
 	DEFAULT_WRITE_DELAY_MS,
 	DEFAULT_CHECKPOINT_TIMEOUT_SECONDS,
 	ORGANIZATION_ALLOW_ALL,
 	isRetiredProvider,
 } from "@mirror-vs/types"
+
+import { TaskState } from "../task/Task"
 
 import { defaultModeSlug } from "../../shared/modes"
 
@@ -75,7 +80,7 @@ export class StateManager {
 	 */
 	async postStateToWebviewWithoutMirrorMessages(): Promise<void> {
 		const state = await this.getStateToPostToWebview()
-		const { mirrorMessages: _omitMessages, taskHistory: _omitHistory, ...rest } = state
+		const { mirrorMessages: _omitMessages, fileEdits: _omitEdits, taskHistory: _omitHistory, ...rest } = state
 		this.provider.postMessageToWebview({ type: "state", state: rest })
 	}
 
@@ -153,6 +158,7 @@ export class StateManager {
 			alwaysAllowWriteOutsideWorkspace,
 			alwaysAllowWriteProtected,
 			alwaysAllowExecute,
+			alwaysAllowGitCommit,
 			allowedCommands,
 			deniedCommands,
 			alwaysAllowMcp,
@@ -180,6 +186,7 @@ export class StateManager {
 			terminalZshP10k,
 			terminalZdotdir,
 			mcpEnabled,
+			mcpToolsThreshold,
 			currentApiConfigName,
 			listApiConfigMeta,
 			pinnedApiConfigs,
@@ -222,6 +229,7 @@ export class StateManager {
 			lockApiConfigAcrossModes,
 			currentSessionId,
 			sessionNames,
+			taskNames,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels,
@@ -232,8 +240,86 @@ export class StateManager {
 		const cwd = this.provider.cwd
 		const currentTask = this.provider.getCurrentTask()
 
+		// Fetch filesReadByMirror safely
+		let filesReadByMirror: any[] = []
+		if (currentTask) {
+			try {
+				const metadata = await currentTask.fileContextTracker.getTaskMetadata(currentTask.taskId)
+				const rawFiles = metadata?.files_in_context || []
+				const seen = new Set<string>()
+				const deduped: any[] = []
+				// Iterate backwards to keep the latest entries
+				for (let i = rawFiles.length - 1; i >= 0; i--) {
+					const entry = rawFiles[i]
+					const normPath = path.normalize(entry.path).replace(/\\/g, "/")
+					if (!seen.has(normPath)) {
+						seen.add(normPath)
+						deduped.unshift({
+							path: entry.path,
+							record_source: entry.record_source,
+							storage_tier: entry.storage_tier || "hot",
+							mirror_read_date: entry.mirror_read_date,
+						})
+					}
+				}
+				filesReadByMirror = deduped
+			} catch (e) {
+				console.error("Failed to read context files metadata for webview state:", e)
+			}
+		}
+
+		// Build tabs array from all live tasks
+		const allTasks = this.provider.getAllTasksSorted()
+		const tabs: TabInfo[] = allTasks.map((task) => {
+			// Determine hasPendingApproval — task has an ask that's pending user response
+			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
+
+			// Derive TabStatus from live streaming/ask flags & TaskState
+			let status: TabStatus
+			if (task.isStreaming || task.isWaitingForFirstChunk) {
+				status = "streaming"
+			} else if (hasPendingApproval) {
+				status = "interactive"
+			} else {
+				switch (task.state) {
+					case TaskState.Streaming:
+						status = "streaming"
+						break
+					case TaskState.WaitingApproval:
+						status = "interactive"
+						break
+					case TaskState.Completed:
+						status = "completed"
+						break
+					case TaskState.Error:
+					case TaskState.Aborted:
+						status = "error"
+						break
+					default:
+						status = "idle"
+						break
+				}
+			}
+
+			return {
+				taskId: task.taskId,
+				title:
+					taskNames?.[task.taskId] ||
+					task.name ||
+					task.metadata.task ||
+					`Task ${task.taskNumber > -1 ? `#${task.taskNumber}` : task.taskId.slice(0, 8)}`,
+				status,
+				hasPendingApproval,
+				lastActivity: task.lastActivity,
+				createdAt: task.createdAt,
+			}
+		})
+
 		return {
 			version: this.provider.context.extension?.packageJSON?.version ?? "",
+			tabs,
+			activeTabId: currentTask?.taskId ?? (tabs.length > 0 ? tabs[0].taskId : ""),
+			filesReadByMirror,
 			apiConfiguration,
 			customInstructions,
 			alwaysAllowReadOnly: alwaysAllowReadOnly ?? false,
@@ -242,6 +328,7 @@ export class StateManager {
 			alwaysAllowWriteOutsideWorkspace: alwaysAllowWriteOutsideWorkspace ?? false,
 			alwaysAllowWriteProtected: alwaysAllowWriteProtected ?? false,
 			alwaysAllowExecute: alwaysAllowExecute ?? false,
+			alwaysAllowGitCommit: alwaysAllowGitCommit ?? false,
 			alwaysAllowMcp: alwaysAllowMcp ?? false,
 			alwaysAllowModeSwitch: alwaysAllowModeSwitch ?? false,
 			alwaysAllowSubtasks: alwaysAllowSubtasks ?? false,
@@ -253,6 +340,7 @@ export class StateManager {
 			currentTaskId: currentTask?.taskId,
 			currentTaskItem: currentTask?.taskId ? this.provider.taskHistoryStore.get(currentTask.taskId) : undefined,
 			mirrorMessages: currentTask?.mirrorMessages || [],
+			fileEdits: currentTask?.fileEdits || [],
 			currentTaskTodos: currentTask?.todoList || [],
 			messageQueue: currentTask?.messageQueueService?.messages,
 			taskHistory: this.provider.taskHistoryStore.getAll().filter((item: HistoryItem) => item.ts && item.task),
@@ -283,6 +371,7 @@ export class StateManager {
 			terminalZshP10k: terminalZshP10k ?? false,
 			terminalZdotdir: terminalZdotdir ?? false,
 			mcpEnabled: mcpEnabled ?? true,
+			mcpToolsThreshold: mcpToolsThreshold ?? 40,
 			currentApiConfigName: currentApiConfigName ?? "default",
 			listApiConfigMeta: listApiConfigMeta ?? [],
 			pinnedApiConfigs: pinnedApiConfigs ?? {},
@@ -373,6 +462,7 @@ export class StateManager {
 			],
 			currentSessionId,
 			sessionNames: sessionNames ?? {},
+			taskNames: taskNames ?? {},
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels: atlasCloudModels ?? {},
@@ -384,12 +474,15 @@ export class StateManager {
 		Omit<
 			ExtensionState,
 			| "mirrorMessages"
+			| "fileEdits"
 			| "renderContext"
 			| "hasOpenedModeSelector"
 			| "version"
 			| "shouldShowAnnouncement"
 			| "activeTerminalCount"
 			| "activeTerminals"
+			| "tabs"
+			| "activeTabId"
 		>
 	> {
 		const provider = this.provider
@@ -427,6 +520,7 @@ export class StateManager {
 			alwaysAllowWriteOutsideWorkspace: stateValues.alwaysAllowWriteOutsideWorkspace ?? false,
 			alwaysAllowWriteProtected: stateValues.alwaysAllowWriteProtected ?? false,
 			alwaysAllowExecute: stateValues.alwaysAllowExecute ?? false,
+			alwaysAllowGitCommit: stateValues.alwaysAllowGitCommit ?? false,
 			alwaysAllowMcp: stateValues.alwaysAllowMcp ?? false,
 			alwaysAllowModeSwitch: stateValues.alwaysAllowModeSwitch ?? false,
 			alwaysAllowSubtasks: stateValues.alwaysAllowSubtasks ?? false,
@@ -459,6 +553,7 @@ export class StateManager {
 			mode: stateValues.mode ?? defaultModeSlug,
 			language: stateValues.language ?? formatLanguage(vscode.env.language),
 			mcpEnabled: stateValues.mcpEnabled ?? true,
+			mcpToolsThreshold: stateValues.mcpToolsThreshold ?? 40,
 			mcpServers: provider.getMcpHub()?.getAllServers() ?? [],
 			currentApiConfigName: stateValues.currentApiConfigName ?? "default",
 			listApiConfigMeta: stateValues.listApiConfigMeta ?? [],
@@ -518,6 +613,7 @@ export class StateManager {
 			comfyuiAutoSetup: stateValues.comfyuiAutoSetup,
 			currentSessionId: stateValues.currentSessionId,
 			sessionNames: stateValues.sessionNames ?? {},
+			taskNames: stateValues.taskNames ?? {},
 			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
 			userBraveApiKey: stateValues.userBraveApiKey,
 			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},

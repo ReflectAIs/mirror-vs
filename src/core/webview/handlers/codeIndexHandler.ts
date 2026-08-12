@@ -357,3 +357,140 @@ export async function handleClearIndexData(provider: MirrorProvider): Promise<vo
 		})
 	}
 }
+
+/**
+ * Auto-configures Codebase Indexing based on active LLM settings.
+ */
+export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promise<void> {
+	try {
+		const state = await provider.getState()
+		const apiConfig = state.apiConfiguration
+
+		let embedderProvider: any = "openai"
+		let modelId = ""
+		let secretKey = ""
+		let secretKeyName = ""
+
+		const providerName = apiConfig?.apiProvider
+
+		if (providerName === "gemini") {
+			embedderProvider = "gemini"
+			modelId = "gemini-embedding-001"
+			secretKey = (await provider.context.secrets.get("geminiApiKey")) ?? ""
+			secretKeyName = "codebaseIndexGeminiApiKey"
+		} else if (providerName === "openai") {
+			embedderProvider = "openai"
+			modelId = "text-embedding-3-small"
+			secretKey = (await provider.context.secrets.get("openAiApiKey")) ?? ""
+			secretKeyName = "codeIndexOpenAiKey"
+		} else if (providerName === "openrouter") {
+			embedderProvider = "openrouter"
+			modelId = "openai/text-embedding-3-small"
+			secretKey = (await provider.context.secrets.get("openRouterApiKey")) ?? ""
+			secretKeyName = "codebaseIndexOpenRouterApiKey"
+		} else if (providerName === "mistral") {
+			embedderProvider = "mistral"
+			modelId = "codestral-embed-2505"
+			secretKey = (await provider.context.secrets.get("mistralApiKey")) ?? ""
+			secretKeyName = "codebaseIndexMistralApiKey"
+		} else if (providerName === "ollama") {
+			embedderProvider = "ollama"
+			modelId = "nomic-embed-text"
+			secretKey = ""
+			secretKeyName = ""
+
+			// Auto-detect installed embedding models from local Ollama service
+			try {
+				const response = await fetch("http://localhost:11434/api/tags")
+				if (response.ok) {
+					const data = (await response.json()) as any
+					const models = data.models || []
+					const hasNomic = models.some((m: any) => m.name.startsWith("nomic-embed-text"))
+					if (!hasNomic) {
+						const foundEmbedModel = models.find((m: any) => {
+							const nameLower = m.name.toLowerCase()
+							const capabilities = m.capabilities || []
+							const families = m.details?.families || []
+							return (
+								nameLower.includes("embed") ||
+								capabilities.includes("embedding") ||
+								families.some((f: string) => f.toLowerCase().includes("embed"))
+							)
+						})
+						if (foundEmbedModel) {
+							modelId = foundEmbedModel.name
+						}
+					}
+				}
+			} catch (e) {
+				// Ignore error, fallback to default
+			}
+		} else {
+			// Fallback: search for any available keys
+			const geminiKey = await provider.context.secrets.get("geminiApiKey")
+			const openAiKey = await provider.context.secrets.get("openAiApiKey")
+			const openRouterKey = await provider.context.secrets.get("openRouterApiKey")
+
+			if (geminiKey) {
+				embedderProvider = "gemini"
+				modelId = "gemini-embedding-001"
+				secretKey = geminiKey
+				secretKeyName = "codebaseIndexGeminiApiKey"
+			} else if (openAiKey) {
+				embedderProvider = "openai"
+				modelId = "text-embedding-3-small"
+				secretKey = openAiKey
+				secretKeyName = "codeIndexOpenAiKey"
+			} else if (openRouterKey) {
+				embedderProvider = "openrouter"
+				modelId = "openai/text-embedding-3-small"
+				secretKey = openRouterKey
+				secretKeyName = "codebaseIndexOpenRouterApiKey"
+			}
+		}
+
+		if (!secretKey && embedderProvider !== "ollama") {
+			vscode.window.showErrorMessage("No active API keys found. Please configure an API key in settings first.")
+			return
+		}
+
+		const currentConfig = getGlobalState(provider, "codebaseIndexConfig") || {}
+		const globalStateConfig = {
+			...currentConfig,
+			codebaseIndexEnabled: true,
+			codebaseIndexQdrantUrl: "http://localhost:6333",
+			codebaseIndexEmbedderProvider: embedderProvider,
+			codebaseIndexEmbedderModelId: modelId,
+			codebaseIndexEmbedderModelDimension: undefined,
+			codebaseIndexSearchMaxResults: 5,
+			codebaseIndexSearchMinScore: 0.3,
+		}
+
+		await updateGlobalState(provider, "codebaseIndexConfig", globalStateConfig)
+		if (secretKeyName) {
+			await provider.contextProxy.storeSecret(secretKeyName as any, secretKey)
+		}
+
+		await provider.postMessageToWebview({
+			type: "codeIndexSettingsSaved",
+			success: true,
+			settings: globalStateConfig,
+		})
+
+		await provider.postStateToWebview()
+
+		const currentCodeIndexManager = provider.getCurrentWorkspaceCodeIndexManager()
+		if (currentCodeIndexManager) {
+			await currentCodeIndexManager.handleSettingsChange()
+			if (currentCodeIndexManager.isFeatureEnabled && currentCodeIndexManager.isFeatureConfigured) {
+				await currentCodeIndexManager.initialize(provider.contextProxy)
+				currentCodeIndexManager.startIndexing()
+			}
+		}
+
+		vscode.window.showInformationMessage("✅ Codebase Indexing auto-configured and started successfully!")
+	} catch (error: any) {
+		provider.log(`Error auto setting up codebase indexing: ${error.message || error}`)
+		vscode.window.showErrorMessage(`Failed to auto-setup Codebase Indexing: ${error.message || error}`)
+	}
+}

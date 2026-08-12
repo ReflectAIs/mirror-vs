@@ -191,6 +191,7 @@ describe("mergeExtensionState", () => {
 			version: "",
 			mcpEnabled: false,
 			mirrorMessages: [],
+			fileEdits: [],
 			taskHistory: [],
 			shouldShowAnnouncement: false,
 			enableCheckpoints: true,
@@ -215,6 +216,8 @@ describe("mergeExtensionState", () => {
 			maxReadFileLine: -1,
 			activeTerminalCount: 0,
 			activeTerminals: [],
+			tabs: [],
+			activeTabId: "",
 		}
 
 		const prevState: ExtensionState = {
@@ -270,6 +273,7 @@ describe("mergeExtensionState", () => {
 			version: "",
 			mcpEnabled: false,
 			mirrorMessages: [],
+			fileEdits: [],
 			taskHistory: [],
 			shouldShowAnnouncement: false,
 			enableCheckpoints: true,
@@ -294,6 +298,8 @@ describe("mergeExtensionState", () => {
 			maxReadFileLine: -1,
 			activeTerminalCount: 0,
 			activeTerminals: [],
+			tabs: [],
+			activeTabId: "",
 		}
 
 		const makeMessage = (ts: number, text: string): MirrorMessage =>

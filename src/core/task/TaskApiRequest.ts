@@ -32,6 +32,7 @@ import { mergeConsecutiveApiMessages } from "./mergeConsecutiveApiMessages"
 import { defaultModeSlug } from "../../shared/modes"
 import { type ApiMessage } from "../task-persistence"
 import { Task } from "./Task"
+import { isTransientProviderError } from "./transient-error"
 
 const MAX_EXPONENTIAL_BACKOFF_SECONDS = 600 // 10 minutes
 const FORCED_CONTEXT_REDUCTION_PERCENT = 75 // Keep 75% of context (remove 25%) on context window errors
@@ -322,7 +323,7 @@ export class TaskApiRequest {
 			requestDelaySeconds,
 			mode,
 			autoCondenseContext = true,
-			autoCondenseContextPercent = 100,
+			autoCondenseContextPercent = 80,
 			profileThresholds = {},
 		} = state ?? {}
 
@@ -617,6 +618,29 @@ export class TaskApiRequest {
 		// Reset the flag after using it
 		this.task.skipPrevResponseIdOnce = false
 
+		// ──────────────────────────────────────────────────────────
+		//  Global cross-tab request gate
+		// ──────────────────────────────────────────────────────────
+		// When 2-3 tabs run simultaneously, every tab would otherwise transmit
+		// its streaming request at the same instant, tripping the provider's
+		// overload protection (Anthropic HTTP 529 "overloaded_error" → "The
+		// provider couldn't process the request as made."). We acquire the
+		// global gate here and hold it until the provider ACCEPTS the request
+		// (first chunk arrives) or the request fails. This serializes the
+		// *transmission* of concurrent requests across all tabs — each tab gets
+		// its own turn to reach the provider instead of all firing together.
+		// After the first chunk, the gate is released and streaming continues
+		// fully in parallel (Anthropic permits concurrent active streams; it
+		// only rejects the simultaneous start burst).
+		const releaseGlobalGate = await Task.acquireGlobalRequestGate()
+		let globalGateReleased = false
+		const releaseGlobalGateOnce = (): void => {
+			if (!globalGateReleased) {
+				globalGateReleased = true
+				releaseGlobalGate()
+			}
+		}
+
 		// The provider accepts reasoning items alongside standard messages; cast to the expected parameter type.
 		const stream = this.task.api.createMessage(
 			systemPrompt,
@@ -650,7 +674,13 @@ export class TaskApiRequest {
 			const firstChunk = await Promise.race([firstChunkPromise, abortPromise])
 			yield firstChunk.value
 			this.task.isWaitingForFirstChunk = false
+			// Provider accepted the request — release the global gate so the next
+			// queued tab can transmit. Streaming continues in parallel from here.
+			releaseGlobalGateOnce()
 		} catch (error) {
+			// Request failed before the first chunk — always release the gate so
+			// other tabs are not blocked, then handle the error (backoff/retry).
+			releaseGlobalGateOnce()
 			this.task.isWaitingForFirstChunk = false
 			this.task.currentRequestAbortController = undefined
 			const isContextWindowExceededError = checkContextWindowExceededError(error)
@@ -672,7 +702,15 @@ export class TaskApiRequest {
 			// streamed any content yet (ie it fails on the first chunk due), as it would allow them to hit a retry
 			// button. However if the api failed mid-stream, it could be in any arbitrary state where some tools may
 			// have executed, so that error is handled differently and requires cancelling the task entirely.
-			if (autoApprovalEnabled) {
+			//
+			// Transient provider capacity errors (overloaded 529, rate limit 429,
+			// unavailable 503) resolve on their own and are safe to auto-retry with
+			// backoff EVEN when auto-approval is disabled — otherwise concurrent
+			// multi-tab use would dump the raw "provider couldn't process the
+			// request" error on the user. Non-transient errors keep the existing
+			// behavior (only auto-retried under auto-approval).
+			const shouldAutoRetry = autoApprovalEnabled || isTransientProviderError(error)
+			if (shouldAutoRetry) {
 				// Apply shared exponential backoff and countdown UX
 				await this.backoffAndAnnounce(retryAttempt, error)
 
