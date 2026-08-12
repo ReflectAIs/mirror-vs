@@ -393,6 +393,11 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			modelId = "codestral-embed-2505"
 			secretKey = (await provider.context.secrets.get("mistralApiKey")) ?? ""
 			secretKeyName = "codebaseIndexMistralApiKey"
+		} else if (providerName === "ollama") {
+			embedderProvider = "ollama"
+			modelId = "nomic-embed-text"
+			secretKey = ""
+			secretKeyName = ""
 		} else {
 			// Fallback: search for any available keys
 			const geminiKey = await provider.context.secrets.get("geminiApiKey")
@@ -417,7 +422,7 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			}
 		}
 
-		if (!secretKey) {
+		if (!secretKey && embedderProvider !== "ollama") {
 			vscode.window.showErrorMessage("No active API keys found. Please configure an API key in settings first.")
 			return
 		}
@@ -435,7 +440,9 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 		}
 
 		await updateGlobalState(provider, "codebaseIndexConfig", globalStateConfig)
-		await provider.contextProxy.storeSecret(secretKeyName as any, secretKey)
+		if (secretKeyName) {
+			await provider.contextProxy.storeSecret(secretKeyName as any, secretKey)
+		}
 
 		await provider.postMessageToWebview({
 			type: "codeIndexSettingsSaved",
