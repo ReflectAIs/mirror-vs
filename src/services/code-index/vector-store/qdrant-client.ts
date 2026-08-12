@@ -368,9 +368,30 @@ export class QdrantVectorStore implements IVectorStore {
 				points: processedPoints,
 				wait: true,
 			})
-		} catch (error) {
+		} catch (error: any) {
 			console.error("Failed to upsert points:", error)
-			throw error
+			let errorMessage = error?.message || String(error)
+			if (error && typeof error === "object") {
+				if (error.status) {
+					errorMessage += ` (Status: ${error.status})`
+				}
+				if (error.body) {
+					const bodyStr = typeof error.body === "object" ? JSON.stringify(error.body) : String(error.body)
+					errorMessage += ` (Body: ${bodyStr})`
+				}
+				if (error.response) {
+					try {
+						const responseText =
+							typeof error.response.text === "function"
+								? await error.response.text()
+								: JSON.stringify(error.response)
+						errorMessage += ` (Response: ${responseText})`
+					} catch (e) {
+						// Ignore
+					}
+				}
+			}
+			throw new Error(errorMessage)
 		}
 	}
 
