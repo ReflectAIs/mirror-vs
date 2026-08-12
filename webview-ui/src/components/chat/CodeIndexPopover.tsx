@@ -680,19 +680,29 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 						</div>
 
 						{/* One-Click Auto-Setup Button */}
-						<div className="mt-4 mb-4">
-							<Button
-								className="w-full flex items-center justify-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/95 transition-colors"
-								size="sm"
-								onClick={() => vscode.postMessage({ type: "autoSetupCodeIndex" })}>
-								<span className="codicon codicon-zap mr-1" />
-								One-Click Auto-Setup
-							</Button>
-							<p className="text-[11px] text-vscode-descriptionForeground mt-1 mb-0 leading-normal">
-								Automatically configures indexing using your active API key and default embedding model
-								(requires Qdrant running on localhost:6333).
-							</p>
-						</div>
+						{!(
+							currentSettings.codebaseIndexEmbedderProvider &&
+							currentSettings.codebaseIndexEmbedderModelId
+						) ? (
+							<div className="mt-4 mb-4">
+								<Button
+									className="w-full flex items-center justify-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/95 transition-colors"
+									size="sm"
+									onClick={() => vscode.postMessage({ type: "autoSetupCodeIndex" })}>
+									<span className="codicon codicon-zap mr-1" />
+									One-Click Auto-Setup
+								</Button>
+								<p className="text-[11px] text-vscode-descriptionForeground mt-1 mb-0 leading-normal">
+									Automatically configures indexing using your active API key and default embedding
+									model (requires Qdrant running on localhost:6333).
+								</p>
+							</div>
+						) : (
+							<div className="mt-4 mb-4 flex items-center gap-1.5 text-xs text-green-500 font-medium">
+								<span className="codicon codicon-pass text-green-500" />
+								<span>Setup is complete</span>
+							</div>
+						)}
 
 						{/* Setup Settings Disclosure */}
 						<div className="mt-4">
