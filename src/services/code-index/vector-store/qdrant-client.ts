@@ -364,12 +364,69 @@ export class QdrantVectorStore implements IVectorStore {
 				return point
 			})
 
+			// Self-healing check: Verify points vector dimension against configured vectorSize
+			if (points.length > 0 && Array.isArray(points[0].vector)) {
+				const actualDimension = points[0].vector.length
+				if (actualDimension > 0 && actualDimension !== this.vectorSize) {
+					console.warn(
+						`[QdrantVectorStore] Vector dimension mismatch detected before upsert: point has ${actualDimension}, configured is ${this.vectorSize}. Auto-recreating collection...`,
+					)
+					;(this as any).vectorSize = actualDimension
+					await this._recreateCollectionWithNewDimension(0)
+					await this._createPayloadIndexes()
+				}
+			}
+
 			await this.client.upsert(this.collectionName, {
 				points: processedPoints,
 				wait: true,
 			})
 		} catch (error: any) {
 			console.error("Failed to upsert points:", error)
+
+			// Self-healing fallback: If HTTP 400 occurred (dimension mismatch on server), delete and recreate collection with actual vector dimension
+			if (
+				points.length > 0 &&
+				Array.isArray(points[0].vector) &&
+				(error?.status === 400 || error?.message?.includes("400") || error?.message?.includes("Bad Request"))
+			) {
+				const actualDimension = points[0].vector.length
+				console.warn(
+					`[QdrantVectorStore] Upsert failed with Bad Request. Self-healing by recreating collection with vector dimension ${actualDimension}...`,
+				)
+				try {
+					;(this as any).vectorSize = actualDimension
+					try {
+						await this.client.deleteCollection(this.collectionName)
+					} catch (delErr) {
+						// Ignore deletion error if collection didn't exist
+					}
+					await this.client.createCollection(this.collectionName, {
+						vectors: {
+							size: actualDimension,
+							distance: this.DISTANCE_METRIC,
+							on_disk: true,
+						},
+						hnsw_config: {
+							m: 64,
+							ef_construct: 512,
+							on_disk: true,
+						},
+					})
+					await this._createPayloadIndexes()
+
+					// Retry upserting processed points
+					await this.client.upsert(this.collectionName, {
+						points: processedPoints,
+						wait: true,
+					})
+					console.log(`[QdrantVectorStore] Self-healing collection recreation & retry upsert succeeded!`)
+					return
+				} catch (retryErr) {
+					console.error("[QdrantVectorStore] Self-healing retry failed:", retryErr)
+				}
+			}
+
 			let errorMessage = error?.message || String(error)
 			if (error && typeof error === "object") {
 				if (error.status) {
