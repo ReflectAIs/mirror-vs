@@ -342,28 +342,25 @@ export class QdrantVectorStore implements IVectorStore {
 			payload: Record<string, any>
 		}>,
 	): Promise<void> {
-		try {
-			const processedPoints = points.map((point) => {
-				if (point.payload?.filePath) {
-					const segments = point.payload.filePath.split(path.sep).filter(Boolean)
-					const pathSegments = segments.reduce(
-						(acc: Record<string, string>, segment: string, index: number) => {
-							acc[index.toString()] = segment
-							return acc
-						},
-						{},
-					)
-					return {
-						...point,
-						payload: {
-							...point.payload,
-							pathSegments,
-						},
-					}
+		const processedPoints = points.map((point) => {
+			if (point.payload?.filePath) {
+				const segments = point.payload.filePath.split(path.sep).filter(Boolean)
+				const pathSegments = segments.reduce((acc: Record<string, string>, segment: string, index: number) => {
+					acc[index.toString()] = segment
+					return acc
+				}, {})
+				return {
+					...point,
+					payload: {
+						...point.payload,
+						pathSegments,
+					},
 				}
-				return point
-			})
+			}
+			return point
+		})
 
+		try {
 			// Self-healing check: Verify points vector dimension against configured vectorSize
 			if (points.length > 0 && Array.isArray(points[0].vector)) {
 				const actualDimension = points[0].vector.length
