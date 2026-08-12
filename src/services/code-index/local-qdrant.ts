@@ -126,9 +126,17 @@ export class LocalQdrantManager {
 		await this.install(onProgress)
 
 		console.log(`[LocalQdrantManager] Launching Qdrant from ${this.getBinaryPath()}...`)
+		let logStream: any = "ignore"
+		try {
+			const logFile = path.join(this.installPath, "qdrant.log")
+			logStream = require("fs").createWriteStream(logFile, { flags: "a" })
+		} catch (e) {
+			console.error("[LocalQdrantManager] Failed to create log file:", e)
+		}
+
 		this.process = spawn(this.getBinaryPath(), [], {
 			cwd: this.getCwd(),
-			stdio: "ignore",
+			stdio: ["ignore", logStream, logStream],
 			detached: false,
 		})
 
