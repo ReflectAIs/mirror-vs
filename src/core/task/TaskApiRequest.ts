@@ -972,7 +972,10 @@ export class TaskApiRequest {
 					cleanConversationHistory.push({
 						role: "assistant",
 						content: assistantContent,
-					} satisfies Anthropic.Messages.MessageParam)
+						...(((first as any).text || msg.reasoning_content) && {
+							reasoning_content: (first as any).text || msg.reasoning_content,
+						}),
+					} as any)
 
 					continue
 				}
@@ -983,7 +986,9 @@ export class TaskApiRequest {
 				cleanConversationHistory.push({
 					role: msg.role,
 					content: msg.content as Anthropic.Messages.ContentBlockParam[] | string,
-				})
+					...(msg.role === "assistant" &&
+						msg.reasoning_content && { reasoning_content: msg.reasoning_content }),
+				} as any)
 			}
 		}
 
