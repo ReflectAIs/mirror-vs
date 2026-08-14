@@ -115,7 +115,7 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 	)
 
 	const handleCloseClick = useCallback(
-		(e: React.MouseEvent, tab: TabInfo) => {
+		(e: React.MouseEvent | React.KeyboardEvent, tab: TabInfo) => {
 			e.stopPropagation()
 
 			// Active task with streaming/interactive status — confirm with user
@@ -210,7 +210,15 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 							</div>
 							{/* Close button - separate from clickable area */}
 							<span
-								onClick={(e) => handleCloseClick(e, tab)}
+								onMouseDown={(e) => {
+									e.stopPropagation()
+									e.preventDefault()
+									handleCloseClick(e, tab)
+								}}
+								onClick={(e) => {
+									e.stopPropagation()
+									e.preventDefault()
+								}}
 								className="shrink-0 p-0.5 rounded hover:bg-vscode-toolbar-activeBackground text-vscode-descriptionForeground hover:text-vscode-foreground ml-1 cursor-pointer"
 								role="button"
 								aria-label={`Close ${tab.title}`}
@@ -218,7 +226,7 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 								onKeyDown={(e) => {
 									if (e.key === "Enter" || e.key === " ") {
 										e.preventDefault()
-										handleCloseClick(e as unknown as React.MouseEvent, tab)
+										handleCloseClick(e, tab)
 									}
 								}}>
 								<X className="w-3 h-3" />
