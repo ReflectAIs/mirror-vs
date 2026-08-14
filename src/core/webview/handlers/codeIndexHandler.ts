@@ -393,6 +393,11 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			modelId = "codestral-embed-2505"
 			secretKey = (await provider.context.secrets.get("mistralApiKey")) ?? ""
 			secretKeyName = "codebaseIndexMistralApiKey"
+		} else if (providerName === "anthropic") {
+			embedderProvider = "anthropic"
+			modelId = "voyage-code-2"
+			secretKey = (await provider.context.secrets.get("apiKey")) ?? ""
+			secretKeyName = "codebaseIndexAnthropicApiKey"
 		} else if (providerName === "ollama") {
 			embedderProvider = "ollama"
 			modelId = "nomic-embed-text"
@@ -430,6 +435,7 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			const geminiKey = await provider.context.secrets.get("geminiApiKey")
 			const openAiKey = await provider.context.secrets.get("openAiApiKey")
 			const openRouterKey = await provider.context.secrets.get("openRouterApiKey")
+			const anthropicKey = await provider.context.secrets.get("apiKey")
 
 			if (geminiKey) {
 				embedderProvider = "gemini"
@@ -446,6 +452,11 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 				modelId = "openai/text-embedding-3-small"
 				secretKey = openRouterKey
 				secretKeyName = "codebaseIndexOpenRouterApiKey"
+			} else if (anthropicKey) {
+				embedderProvider = "anthropic"
+				modelId = "voyage-code-2"
+				secretKey = anthropicKey
+				secretKeyName = "codebaseIndexAnthropicApiKey"
 			}
 		}
 
