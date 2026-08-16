@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Yeni Görev Başlat",
 				"description": "Girdiyle yeni bir görev başlat. Komut paletinde kullanılabilir."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Görüntü Komutunu Geliştir",
+				"description": "Görüntü komutlarınızı Stable Diffusion ve FLUX gibi metinden görüntüye üreteçler için uygun ayrıntılar, ışıklandırma öğeleri, renkler ve tanımlayıcılarla geliştirir. ✨ öğesine tıkladığınızda Tasarımcı modunda otomatik olarak kullanılır."
 			}
 		}
 	},

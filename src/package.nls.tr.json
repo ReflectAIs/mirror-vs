@@ -43,5 +43,18 @@
 	"settings.debug.description": "API konuşma geçmişini ve UI mesajlarını geçici dosyalarda biçimlendirilmiş JSON olarak görüntülemek için ek düğmeler göstermek üzere hata ayıklama modunu etkinleştirin.",
 	"settings.debugProxy.enabled.description": "**Hata Ayıklama Proxy'sini Etkinleştir** — MITM hata ayıklaması için tüm giden ağ isteklerini bir proxy üzerinden yönlendirin. Yalnızca hata ayıklama modunda (F5) çalışırken etkindir.",
 	"settings.debugProxy.serverUrl.description": "Proxy URL'si (örn. `http://127.0.0.1:8888`). Yalnızca **Hata Ayıklama Proxy'si** etkinleştirildiğinde kullanılır.",
-	"settings.debugProxy.tlsInsecure.description": "Proxy'den kendinden imzalı sertifikaları kabul edin. **MITM incelemesi için gereklidir.** ⚠️ Güvenli değil — yalnızca yerel hata ayıklama için kullanın."
+	"settings.debugProxy.tlsInsecure.description": "Proxy'den kendinden imzalı sertifikaları kabul edin. **MITM incelemesi için gereklidir.** ⚠️ Güvenli değil — yalnızca yerel hata ayıklama için kullanın.",
+	"command.newTab.title": "Yeni Sekme",
+	"command.newSession.title": "Yeni Oturum",
+	"command.closeTab.title": "Sekmeyi Kapat",
+	"command.generateTests.title": "Birim Testleri Oluştur",
+	"command.refactorFunction.title": "Fonksiyonu Yeniden Düzenle",
+	"command.toggleAutonomousMode.title": "Otonom Modu Değiştir",
+	"command.acceptReview.title": "Değişiklikleri Kabul Et",
+	"command.rejectReview.title": "Değişiklikleri Reddet",
+	"command.acceptAllReviews.title": "Tüm Değişiklikleri Kabul Et",
+	"command.diffReview.title": "Değişiklikleri Karşılaştır",
+	"command.prevChange.title": "Önceki İnceleme Değişikliği",
+	"command.nextChange.title": "Sonraki İnceleme Değişikliği",
+	"settings.autoApproveBrowser.description": "Tarayıcı eylemlerini otomatik olarak onayla (gezinme, tıklama, yazma, ekran görüntüsü vb.)"
 }

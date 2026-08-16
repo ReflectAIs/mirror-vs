@@ -41,7 +41,9 @@
 		"experimental": "Thử nghiệm",
 		"language": "Ngôn ngữ",
 		"about": "Giới thiệu",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Tạo hình ảnh",
+		"pipelines": "Pipeline"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Tự động thực hiện các yêu cầu lên đến các giới hạn này trước khi xin phê duyệt để tiếp tục."
+		},
+		"autonomousMode": {
+			"label": "Chế độ tự động",
+			"description": "Khi được bật, tất cả lệnh thực thi và thao tác tệp bên ngoài không gian làm việc sẽ tự động được phê duyệt mà không cần xin phép. Đây là chế độ tin cậy hoàn toàn — hãy sử dụng thận trọng."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Khi được bật, các lệnh git (commit, push, add, pull, merge, rebase, v.v.) sẽ tự động được phê duyệt. Khi bị tắt, trợ lý phải xin phê duyệt trước khi chạy bất kỳ thao tác git nào."
+		},
+		"browser": {
+			"label": "Trình duyệt",
+			"description": "Tự động cho phép trợ lý điều khiển trình duyệt (điều hướng, bấm, nhập, cuộn, chụp màn hình) mà không cần phê duyệt"
 		}
 	},
 	"providers": {
@@ -815,6 +829,42 @@
 			"refreshSuccess": "Làm mới công cụ thành công",
 			"refreshError": "Không thể làm mới công cụ",
 			"toolParameters": "Thông số"
+		},
+		"TXT2IMG": {
+			"name": "Văn bản thành Hình ảnh (txt2img)",
+			"description": "Khi được bật, trợ lý có thể tạo hình ảnh từ mô tả văn bản bằng loại pipeline này."
+		},
+		"IMG2IMG": {
+			"name": "Hình ảnh thành Hình ảnh (img2img)",
+			"description": "Khi được bật, trợ lý có thể biến đổi hình ảnh hiện có bằng cách chỉnh sửa theo hướng dẫn văn bản."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "Khi được bật, trợ lý có thể thay thế hoặc sửa chữa các vùng cụ thể của hình ảnh."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "Khi được bật, trợ lý có thể mở rộng hình ảnh ra ngoài ranh giới ban đầu của nó."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "Khi được bật, trợ lý có thể tăng độ phân giải của hình ảnh."
+		},
+		"REMOVE_BG": {
+			"name": "Xóa nền",
+			"description": "Khi được bật, trợ lý có thể xóa nền khỏi hình ảnh."
+		},
+		"TXT2AUDIO": {
+			"name": "Văn bản thành Âm thanh (txt2audio)",
+			"description": "Khi được bật, trợ lý có thể tạo nhạc và clip âm thanh từ mô tả văn bản."
+		},
+		"TXT2VIDEO": {
+			"name": "Văn bản thành Video (txt2video)",
+			"description": "Khi được bật, trợ lý có thể tạo clip video ngắn từ mô tả văn bản."
+		},
+		"MULTI_TAB": {
+			"name": "Giao diện đa tab thử nghiệm",
+			"description": "Khi được bật, cung cấp không gian làm việc đa tab giống trình duyệt để chuyển đổi giữa nhiều tác vụ và chạy chúng đồng thời trong một phiên."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1047,36 @@
 			"nameInvalid": "Tên phải là 1-64 chữ thường, số hoặc dấu gạch ngang",
 			"descriptionRequired": "Mô tả là bắt buộc",
 			"descriptionTooLong": "Mô tả phải có tối đa 1024 ký tự"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "Cách hoạt động của tính năng tạo hình ảnh",
+		"guideDescription": "Mỗi loại tạo (txt2img, img2img, v.v.) sử dụng một pipeline — quy trình ComfyUI xác định cách mô hình xử lý đầu vào. Bật một loại, chọn nhà cung cấp (ComfyUI cục bộ hoặc OpenRouter đám mây), sau đó chọn pipeline hoặc mô hình.",
+		"imagePipelines": "Pipeline hình ảnh",
+		"imagePipelinesDescription": "Tạo, chỉnh sửa và biến đổi hình ảnh bằng quy trình ComfyUI hoặc mô hình OpenRouter.",
+		"mediaPipelines": "Pipeline phương tiện",
+		"mediaPipelinesDescription": "Tạo nội dung âm thanh và video bằng pipeline chuyên dụng.",
+		"pipelineSettings": "Cài đặt Pipeline",
+		"pipelineSettingsDescription": "Quản lý pipeline quy trình ComfyUI để tạo hình ảnh. Tải lên quy trình tùy chỉnh hoặc đặt mặc định theo loại tác vụ.",
+		"pipelineSummary": "Đã phát hiện {{count}} pipeline",
+		"importPipeline": "Nhập Pipeline",
+		"inlineImportTooltip": "Nhập JSON quy trình ComfyUI cho loại pipeline này",
+		"noPipelinesFound": "Không tìm thấy pipeline nào. Nhập JSON quy trình ComfyUI để bắt đầu.",
+		"alreadyDefault": "Đã được đặt làm mặc định cho loại này",
+		"setAsDefault": "Đặt làm mặc định cho loại này",
+		"deletePipeline": "Xóa pipeline",
+		"deleteDialog": {
+			"title": "Xóa Pipeline",
+			"description": "Bạn có chắc chắn muốn xóa pipeline \"{{name}}\"? Hành động này không thể hoàn tác.",
+			"confirm": "Xóa",
+			"cancel": "Hủy"
+		},
+		"importDialog": {
+			"title": "Nhập Pipeline",
+			"description": "Dán JSON quy trình ComfyUI để nhập dưới dạng pipeline mới.",
+			"confirm": "Nhập",
+			"cancel": "Hủy",
+			"importing": "Đang nhập..."
 		}
 	}
 }

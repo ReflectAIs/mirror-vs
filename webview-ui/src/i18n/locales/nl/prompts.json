@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Nieuwe taak starten",
 				"description": "Start een nieuwe taak met gebruikersinvoer. Beschikbaar via de Command Palette."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Afbeeldingsprompt verbeteren",
+				"description": "Verbeter je afbeeldingsprompts met details, lichtelementen, kleuren en beschrijvingen die geschikt zijn voor tekst-naar-afbeeldinggeneratoren zoals Stable Diffusion en FLUX. Wordt automatisch gebruikt in de ontwerpermodus wanneer je op ✨ klikt."
 			}
 		}
 	},

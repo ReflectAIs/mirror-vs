@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Iniciar nueva tarea",
 				"description": "Inicia una nueva tarea con entrada del usuario. Disponible en la Paleta de comandos."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Mejorar prompt de imagen",
+				"description": "Mejora tus prompts de imagen con detalles, elementos de iluminación, colores y descriptores adecuados para generadores de texto a imagen como Stable Diffusion y FLUX. Se usa automáticamente en el modo Diseñador cuando haces clic en ✨."
 			}
 		}
 	},

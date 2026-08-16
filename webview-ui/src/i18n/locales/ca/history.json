@@ -54,5 +54,11 @@
 	"subtaskTag": "Subtasca",
 	"deleteWithSubtasks": "Això també eliminarà {{count}} subtasca(s). Estàs segur?",
 	"expandSubtasks": "Expandir subtasques",
-	"collapseSubtasks": "Contreure subtasques"
+	"collapseSubtasks": "Contreure subtasques",
+	"session": "Sessió",
+	"renameSession": "Reanomena la sessió",
+	"renameSave": "Desa",
+	"renameCancel": "Cancel·la",
+	"tasks_one": "{{count}} tasca",
+	"tasks_other": "{{count}} tasques"
 }

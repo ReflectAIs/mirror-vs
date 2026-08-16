@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Mulai Tugas Baru",
 				"description": "Mulai tugas baru dengan input pengguna. Tersedia di Command Palette."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Tingkatkan Prompt Gambar",
+				"description": "Meningkatkan prompt gambar Anda dengan detail, elemen pencahayaan, warna, dan deskriptor yang sesuai untuk generator teks-ke-gambar seperti Stable Diffusion dan FLUX. Digunakan secara otomatis dalam mode Desainer saat Anda mengklik ✨."
 			}
 		}
 	},

@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Démarrer une nouvelle tâche",
 				"description": "Démarre une nouvelle tâche avec ton entrée. Disponible dans la palette de commandes."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Améliorer le prompt d'image",
+				"description": "Améliore vos prompts d'image avec des détails, des éléments d'éclairage, des couleurs et des descripteurs adaptés aux générateurs texte-à-image comme Stable Diffusion et FLUX. Utilisé automatiquement en mode Designer lorsque vous cliquez sur ✨."
 			}
 		}
 	},

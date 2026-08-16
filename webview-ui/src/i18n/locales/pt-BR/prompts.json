@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Iniciar Nova Tarefa",
 				"description": "Inicie uma nova tarefa com a entrada fornecida. Disponível na paleta de comandos."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Melhorar prompt de imagem",
+				"description": "Melhora seus prompts de imagem com detalhes, elementos de iluminação, cores e descritores adequados para geradores de texto para imagem como Stable Diffusion e FLUX. Usado automaticamente no modo Designer quando você clica em ✨."
 			}
 		}
 	},

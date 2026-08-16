@@ -1,29 +1,34 @@
 {
-    "routers": {
-        "requesty": {
-            "description": "Optimize edilmiş LLM yönlendiriciniz",
-            "incentive": "$1 ücretsiz kredi"
-        },
-        "openrouter": {
-            "description": "LLM'ler için birleşik bir arayüz"
-        }
-    },
-    "landing": {
-        "greeting": "Mirror VS'a Hoş Geldin!",
-        "introduction": "Yerleşik ve genişletilebilir Modlar yelpazesiyle Mirror VS, daha önce hiç olmadığı gibi planlama, mimari tasarım, kodlama, hata ayıklama ve üretkenliğini artırmanı sağlar.",
-        "getStarted": "Mirror VS Hesabı Oluştur"
-    },
-    "providerSignup": {
-        "heading": "Sağlayıcınızı seçin",
-        "chooseProvider": "asistan'nun çalışması için bir LLM sağlayıcısına ihtiyacı var. Başlamak için bir tane seç, sonra daha fazlasını ekleyebilirsin.",
-        "learnMore": "Daha fazla bilgi",
-        "useAnotherProvider": "Üçüncü taraf Sağlayıcı",
-        "useAnotherProviderDescription": "Bir API anahtarı gir ve başla.",
-        "noApiKeys": "API anahtarları ve ayrı hesaplarla uğraşmak istemez misin?",
-        "goBack": "Geri",
-        "finish": "Bitir"
-    },
-    "startRouter": "Bir LLM yönlendiricisi kullanmanızı öneririz:",
-    "startCustom": "Veya kendi API anahtarınızı getirebilirsiniz:",
-    "importSettings": "Ayarları İçe Aktar"
+	"routers": {
+		"requesty": {
+			"description": "Optimize edilmiş LLM yönlendiriciniz",
+			"incentive": "$1 ücretsiz kredi"
+		},
+		"openrouter": {
+			"description": "LLM'ler için birleşik bir arayüz"
+		}
+	},
+	"landing": {
+		"greeting": "Mirror VS'a Hoş Geldin!",
+		"introduction": "Yerleşik ve genişletilebilir Modlar yelpazesiyle Mirror VS, daha önce hiç olmadığı gibi planlama, mimari tasarım, kodlama, hata ayıklama ve üretkenliğini artırmanı sağlar.",
+		"getStarted": "Mirror VS Hesabı Oluştur"
+	},
+	"providerSignup": {
+		"heading": "Sağlayıcınızı seçin",
+		"chooseProvider": "asistan'nun çalışması için bir LLM sağlayıcısına ihtiyacı var. Başlamak için bir tane seç, sonra daha fazlasını ekleyebilirsin.",
+		"learnMore": "Daha fazla bilgi",
+		"useAnotherProvider": "Üçüncü taraf Sağlayıcı",
+		"useAnotherProviderDescription": "Bir API anahtarı gir ve başla.",
+		"noApiKeys": "API anahtarları ve ayrı hesaplarla uğraşmak istemez misin?",
+		"goBack": "Geri",
+		"finish": "Bitir"
+	},
+	"startRouter": "Bir LLM yönlendiricisi kullanmanızı öneririz:",
+	"startCustom": "Veya kendi API anahtarınızı getirebilirsiniz:",
+	"importSettings": "Ayarları İçe Aktar",
+	"complete": {
+		"heading": "Her şey hazır!",
+		"description": "Sağlayıcınız yapılandırıldı ve Mirror VS daha akıllıca planlamanıza, tasarlamanıza, kod yazmanıza ve hata ayıklamanıza yardımcı olmaya hazır.",
+		"startExploring": "Keşfetmeye Başla"
+	}
 }

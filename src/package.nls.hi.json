@@ -43,5 +43,18 @@
 	"settings.debug.description": "API वार्तालाप इतिहास और UI संदेशों को अस्थायी फ़ाइलों में स्वरूपित JSON के रूप में देखने के लिए अतिरिक्त बटन दिखाने के लिए डीबग मोड सक्षम करें।",
 	"settings.debugProxy.enabled.description": "**डीबग प्रॉक्सी सक्षम करें** — MITM डीबगिंग के लिए सभी आउटबाउंड नेटवर्क अनुरोधों को प्रॉक्सी के माध्यम से रूट करें। केवल डीबग मोड (F5) में चलने पर सक्रिय।",
 	"settings.debugProxy.serverUrl.description": "प्रॉक्सी URL (जैसे, `http://127.0.0.1:8888`)। केवल तब उपयोग किया जाता है जब **डीबग प्रॉक्सी** सक्षम हो।",
-	"settings.debugProxy.tlsInsecure.description": "प्रॉक्सी से स्व-हस्ताक्षरित प्रमाणपत्र स्वीकार करें। **MITM निरीक्षण के लिए आवश्यक।** ⚠️ असुरक्षित — केवल स्थानीय डीबगिंग के लिए उपयोग करें।"
+	"settings.debugProxy.tlsInsecure.description": "प्रॉक्सी से स्व-हस्ताक्षरित प्रमाणपत्र स्वीकार करें। **MITM निरीक्षण के लिए आवश्यक।** ⚠️ असुरक्षित — केवल स्थानीय डीबगिंग के लिए उपयोग करें।",
+	"command.newTab.title": "नया टैब",
+	"command.newSession.title": "नया सत्र",
+	"command.closeTab.title": "टैब बंद करें",
+	"command.generateTests.title": "यूनिट टेस्ट उत्पन्न करें",
+	"command.refactorFunction.title": "फ़ंक्शन रीफैक्टर करें",
+	"command.toggleAutonomousMode.title": "स्वायत्त मोड टॉगल करें",
+	"command.acceptReview.title": "परिवर्तन स्वीकारें",
+	"command.rejectReview.title": "परिवर्तन अस्वीकारें",
+	"command.acceptAllReviews.title": "सभी परिवर्तन स्वीकारें",
+	"command.diffReview.title": "परिवर्तनों की तुलना करें",
+	"command.prevChange.title": "पिछला समीक्षा परिवर्तन",
+	"command.nextChange.title": "अगला समीक्षा परिवर्तन",
+	"settings.autoApproveBrowser.description": "ब्राउज़र क्रियाओं को स्वचालित रूप से स्वीकृत करें (नेविगेट करें, क्लिक करें, टाइप करें, स्क्रीनशॉट लें, आदि)"
 }

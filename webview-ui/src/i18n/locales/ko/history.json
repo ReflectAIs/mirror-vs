@@ -47,5 +47,12 @@
 	"subtaskTag": "부분작업",
 	"deleteWithSubtasks": "이는 {{count}} 부분작업도 삭제합니다. 확실하십니까?",
 	"expandSubtasks": "부분작업 확장",
-	"collapseSubtasks": "부분작업 축소"
+	"collapseSubtasks": "부분작업 축소",
+	"session": "세션",
+	"renameSession": "세션 이름 바꾸기",
+	"renameSave": "저장",
+	"renameCancel": "취소",
+	"tasks_one": "작업 {{count}}개",
+	"tasks_other": "작업 {{count}}개",
+	"tokens": "토큰"
 }

@@ -1,29 +1,34 @@
 {
-    "routers": {
-        "requesty": {
-            "description": "Tu router LLM optimizado",
-            "incentive": "$1 de crédito gratis"
-        },
-        "openrouter": {
-            "description": "Una interfaz unificada para LLMs"
-        }
-    },
-    "landing": {
-        "greeting": "¡Bienvenido a Mirror VS!",
-        "introduction": "Con una variedad de Modos integrados y extensibles, Mirror VS te permite planificar, arquitectar, codificar, depurar y aumentar tu productividad como nunca antes.",
-        "getStarted": "Get Started"
-    },
-    "providerSignup": {
-        "heading": "Elige tu proveedor",
-        "chooseProvider": "el asistente necesita un proveedor de LLM para funcionar. Elige uno para comenzar, puedes añadir más después.",
-        "learnMore": "Más información",
-        "useAnotherProvider": "Proveedor de terceros",
-        "useAnotherProviderDescription": "Introduce una clave API y comienza.",
-        "noApiKeys": "¿No quieres lidiar con claves API y cuentas separadas?",
-        "goBack": "Atrás",
-        "finish": "Finalizar"
-    },
-    "startRouter": "Recomendamos usar un router LLM:",
-    "startCustom": "O puedes traer tu propia clave API:",
-    "importSettings": "Importar configuración"
+	"routers": {
+		"requesty": {
+			"description": "Tu router LLM optimizado",
+			"incentive": "$1 de crédito gratis"
+		},
+		"openrouter": {
+			"description": "Una interfaz unificada para LLMs"
+		}
+	},
+	"landing": {
+		"greeting": "¡Bienvenido a Mirror VS!",
+		"introduction": "Con una variedad de Modos integrados y extensibles, Mirror VS te permite planificar, arquitectar, codificar, depurar y aumentar tu productividad como nunca antes.",
+		"getStarted": "Get Started"
+	},
+	"providerSignup": {
+		"heading": "Elige tu proveedor",
+		"chooseProvider": "el asistente necesita un proveedor de LLM para funcionar. Elige uno para comenzar, puedes añadir más después.",
+		"learnMore": "Más información",
+		"useAnotherProvider": "Proveedor de terceros",
+		"useAnotherProviderDescription": "Introduce una clave API y comienza.",
+		"noApiKeys": "¿No quieres lidiar con claves API y cuentas separadas?",
+		"goBack": "Atrás",
+		"finish": "Finalizar"
+	},
+	"startRouter": "Recomendamos usar un router LLM:",
+	"startCustom": "O puedes traer tu propia clave API:",
+	"importSettings": "Importar configuración",
+	"complete": {
+		"heading": "¡Todo listo!",
+		"description": "Tu proveedor está configurado y Mirror VS está listo para ayudarte a planificar, diseñar, codificar y depurar de manera más inteligente.",
+		"startExploring": "Comenzar a explorar"
+	}
 }

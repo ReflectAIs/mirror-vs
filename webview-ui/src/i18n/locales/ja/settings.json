@@ -41,7 +41,9 @@
 		"experimental": "実験的",
 		"language": "言語",
 		"about": "Mirror VSについて",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "画像生成",
+		"pipelines": "パイプライン"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "これらの上限まで自動的にリクエストを行い、その後継続の承認を求めます。"
+		},
+		"autonomousMode": {
+			"label": "自律モード",
+			"description": "有効にすると、ワークスペース外のすべての実行コマンドとファイル操作が許可なしで自動承認されます。これは完全信頼モードです — 注意して使用してください。"
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "有効にすると、git コマンド（commit、push、add、pull、merge、rebase など）が自動承認されます。無効にすると、アシスタントは git 操作を実行する前に承認を求める必要があります。"
+		},
+		"browser": {
+			"label": "ブラウザー",
+			"description": "承認を必要とせずに、アシスタントがブラウザー（移動、クリック、入力、スクロール、スクリーンショット）を制御することを自動的に許可します"
 		}
 	},
 	"providers": {
@@ -815,6 +829,42 @@
 			"refreshSuccess": "ツールが正常に更新されました",
 			"refreshError": "ツールの更新に失敗しました",
 			"toolParameters": "パラメーター"
+		},
+		"TXT2IMG": {
+			"name": "テキストから画像 (txt2img)",
+			"description": "有効にすると、アシスタントはこのパイプラインタイプを使用してテキストの説明から画像を生成できます。"
+		},
+		"IMG2IMG": {
+			"name": "画像から画像 (img2img)",
+			"description": "有効にすると、アシスタントはテキストで指示された編集を使用して既存の画像を変換できます。"
+		},
+		"INPAINT": {
+			"name": "インペイント",
+			"description": "有効にすると、アシスタントは画像の特定の領域を置き換えたり修復したりできます。"
+		},
+		"OUTPAINT": {
+			"name": "アウトペイント",
+			"description": "有効にすると、アシスタントは画像を元の境界を超えて拡張できます。"
+		},
+		"UPSCALE": {
+			"name": "アップスケール",
+			"description": "有効にすると、アシスタントは画像の解像度を上げることができます。"
+		},
+		"REMOVE_BG": {
+			"name": "背景の削除",
+			"description": "有効にすると、アシスタントは画像から背景を削除できます。"
+		},
+		"TXT2AUDIO": {
+			"name": "テキストからオーディオ (txt2audio)",
+			"description": "有効にすると、アシスタントはテキストの説明から音楽やオーディオクリップを生成できます。"
+		},
+		"TXT2VIDEO": {
+			"name": "テキストからビデオ (txt2video)",
+			"description": "有効にすると、アシスタントはテキストの説明から短いビデオクリップを生成できます。"
+		},
+		"MULTI_TAB": {
+			"name": "実験的なマルチタブインターフェース",
+			"description": "有効にすると、セッション内で複数のタスクを切り替えて同時に実行できる、ブラウザーのようなマルチタブワークスペースを提供します。"
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1047,36 @@
 			"nameInvalid": "名前は1〜64文字の小文字、数字、またはハイフンである必要があります",
 			"descriptionRequired": "説明は必須です",
 			"descriptionTooLong": "説明は1024文字以内である必要があります"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "画像生成の仕組み",
+		"guideDescription": "各生成タイプ（txt2img、img2img など）はパイプラインを使用します — モデルが入力を処理する方法を定義する ComfyUI ワークフローです。タイプを有効にし、プロバイダー（ローカル ComfyUI またはクラウド OpenRouter）を選択してから、パイプラインまたはモデルを選択します。",
+		"imagePipelines": "画像パイプライン",
+		"imagePipelinesDescription": "ComfyUI ワークフローまたは OpenRouter モデルを使用して画像を生成、編集、変換します。",
+		"mediaPipelines": "メディアパイプライン",
+		"mediaPipelinesDescription": "専用パイプラインを使用してオーディオおよびビデオコンテンツを生成します。",
+		"pipelineSettings": "パイプライン設定",
+		"pipelineSettingsDescription": "画像生成用の ComfyUI ワークフローパイプラインを管理します。カスタムワークフローをアップロードするか、タスクタイプごとにデフォルトを設定します。",
+		"pipelineSummary": "{{count}} 件のパイプラインが見つかりました",
+		"importPipeline": "パイプラインをインポート",
+		"inlineImportTooltip": "このパイプラインタイプ用の ComfyUI ワークフロー JSON をインポート",
+		"noPipelinesFound": "パイプラインが見つかりません。ComfyUI ワークフロー JSON をインポートして開始してください。",
+		"alreadyDefault": "このタイプのデフォルトとしてすでに設定されています",
+		"setAsDefault": "このタイプのデフォルトとして設定",
+		"deletePipeline": "パイプラインを削除",
+		"deleteDialog": {
+			"title": "パイプラインを削除",
+			"description": "パイプライン \"{{name}}\" を削除してもよろしいですか？この操作は元に戻せません。",
+			"confirm": "削除",
+			"cancel": "キャンセル"
+		},
+		"importDialog": {
+			"title": "パイプラインをインポート",
+			"description": "ComfyUI ワークフロー JSON を貼り付けて、新しいパイプラインとしてインポートします。",
+			"confirm": "インポート",
+			"cancel": "キャンセル",
+			"importing": "インポート中..."
 		}
 	}
 }

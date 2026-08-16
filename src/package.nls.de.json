@@ -43,5 +43,18 @@
 	"settings.debug.description": "Aktiviere den Debug-Modus, um zusätzliche Schaltflächen zum Anzeigen des API-Konversationsverlaufs und der UI-Nachrichten als formatiertes JSON in temporären Dateien anzuzeigen.",
 	"settings.debugProxy.enabled.description": "**Debug-Proxy aktivieren** — Leite alle ausgehenden Netzwerkanfragen über einen Proxy für MITM-Debugging. Nur aktiv, wenn du im Debug-Modus (F5) läufst.",
 	"settings.debugProxy.serverUrl.description": "Proxy-URL (z. B. `http://127.0.0.1:8888`). Wird nur verwendet, wenn der **Debug-Proxy** aktiviert ist.",
-	"settings.debugProxy.tlsInsecure.description": "Akzeptiere selbstsignierte Zertifikate vom Proxy. **Erforderlich für MITM-Inspektion.** ⚠️ Unsicher – verwende das nur für lokales Debugging."
+	"settings.debugProxy.tlsInsecure.description": "Akzeptiere selbstsignierte Zertifikate vom Proxy. **Erforderlich für MITM-Inspektion.** ⚠️ Unsicher – verwende das nur für lokales Debugging.",
+	"command.newTab.title": "Neuer Tab",
+	"command.newSession.title": "Neue Sitzung",
+	"command.closeTab.title": "Tab schließen",
+	"command.generateTests.title": "Unit-Tests generieren",
+	"command.refactorFunction.title": "Funktion refaktorieren",
+	"command.toggleAutonomousMode.title": "Autonomen Modus umschalten",
+	"command.acceptReview.title": "Änderungen annehmen",
+	"command.rejectReview.title": "Änderungen ablehnen",
+	"command.acceptAllReviews.title": "Alle Änderungen annehmen",
+	"command.diffReview.title": "Änderungen vergleichen",
+	"command.prevChange.title": "Vorherige Review-Änderung",
+	"command.nextChange.title": "Nächste Review-Änderung",
+	"settings.autoApproveBrowser.description": "Browseraktionen automatisch genehmigen (navigieren, klicken, eingeben, Screenshot usw.)"
 }

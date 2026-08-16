@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "Konnte die Vektordimension für Modell '{{modelId}}' mit Anbieter '{{provider}}' nicht bestimmen. Stelle sicher, dass die 'Embedding-Dimension' in den OpenAI-kompatiblen Anbietereinstellungen korrekt eingestellt ist.",
 		"vectorDimensionNotDetermined": "Konnte die Vektordimension für Modell '{{modelId}}' mit Anbieter '{{provider}}' nicht bestimmen. Überprüfe die Modellprofile oder Konfiguration.",
 		"qdrantUrlMissing": "Qdrant-URL fehlt für die Erstellung des Vektorspeichers",
-		"codeIndexingNotConfigured": "Kann keine Dienste erstellen: Code-Indizierung ist nicht richtig konfiguriert"
+		"codeIndexingNotConfigured": "Kann keine Dienste erstellen: Code-Indizierung ist nicht richtig konfiguriert",
+		"anthropicConfigMissing": "Anthropic-Konfiguration fehlt für die Erstellung des Embedders",
+		"cohereConfigMissing": "Cohere-Konfiguration fehlt für die Erstellung des Embedders",
+		"jinaConfigMissing": "Jina-Konfiguration fehlt für die Erstellung des Embedders",
+		"voyageConfigMissing": "Voyage-Konfiguration fehlt für die Erstellung des Embedders"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "Indizierung fehlgeschlagen: Keine Code-Blöcke wurden erfolgreich indiziert. Dies deutet normalerweise auf ein Embedder-Konfigurationsproblem hin.",

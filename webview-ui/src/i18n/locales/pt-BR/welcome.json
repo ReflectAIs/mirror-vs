@@ -1,29 +1,34 @@
 {
-    "routers": {
-        "requesty": {
-            "description": "Seu roteador LLM otimizado",
-            "incentive": "Crédito grátis de $1"
-        },
-        "openrouter": {
-            "description": "Uma interface unificada para LLMs"
-        }
-    },
-    "landing": {
-        "greeting": "Bem-vindo ao Mirror VS!",
-        "introduction": "Com uma variedade de Modos integrados e extensíveis, o Mirror VS permite que você planeje, arquitete, codifique, depure e aumente sua produtividade como nunca antes.",
-        "getStarted": "Get Started"
-    },
-    "providerSignup": {
-        "heading": "Escolha seu provedor",
-        "chooseProvider": "o assistente precisa de um provedor LLM para funcionar. Escolha um para começar, você pode adicionar mais depois.",
-        "learnMore": "Saiba mais",
-        "useAnotherProvider": "Provedor de terceiros",
-        "useAnotherProviderDescription": "Insira uma chave API e comece.",
-        "noApiKeys": "Não quer lidar com chaves API e contas separadas?",
-        "goBack": "Voltar",
-        "finish": "Concluir"
-    },
-    "startRouter": "Recomendamos usar um roteador LLM:",
-    "startCustom": "Ou você pode trazer sua própria chave API:",
-    "importSettings": "Importar configurações"
+	"routers": {
+		"requesty": {
+			"description": "Seu roteador LLM otimizado",
+			"incentive": "Crédito grátis de $1"
+		},
+		"openrouter": {
+			"description": "Uma interface unificada para LLMs"
+		}
+	},
+	"landing": {
+		"greeting": "Bem-vindo ao Mirror VS!",
+		"introduction": "Com uma variedade de Modos integrados e extensíveis, o Mirror VS permite que você planeje, arquitete, codifique, depure e aumente sua produtividade como nunca antes.",
+		"getStarted": "Get Started"
+	},
+	"providerSignup": {
+		"heading": "Escolha seu provedor",
+		"chooseProvider": "o assistente precisa de um provedor LLM para funcionar. Escolha um para começar, você pode adicionar mais depois.",
+		"learnMore": "Saiba mais",
+		"useAnotherProvider": "Provedor de terceiros",
+		"useAnotherProviderDescription": "Insira uma chave API e comece.",
+		"noApiKeys": "Não quer lidar com chaves API e contas separadas?",
+		"goBack": "Voltar",
+		"finish": "Concluir"
+	},
+	"startRouter": "Recomendamos usar um roteador LLM:",
+	"startCustom": "Ou você pode trazer sua própria chave API:",
+	"importSettings": "Importar configurações",
+	"complete": {
+		"heading": "Tudo pronto!",
+		"description": "Seu provedor está configurado e o Mirror VS está pronto para ajudá-lo a planejar, projetar, codificar e depurar de forma mais inteligente.",
+		"startExploring": "Começar a explorar"
+	}
 }

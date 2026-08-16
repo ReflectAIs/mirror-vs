@@ -43,5 +43,18 @@
 	"settings.debug.description": "デバッグモードを有効にし、API会話履歴やUIメッセージをフォーマットされたJSONとして一時ファイルで表示する追加ボタンを表示します。",
 	"settings.debugProxy.enabled.description": "**Debug Proxyを有効にする** — MITMデバッグのためにすべての送信ネットワークリクエストをプロキシ経由でルーティングします。デバッグモード（F5）で実行している場合のみ有効です。",
 	"settings.debugProxy.serverUrl.description": "プロキシURL（例：`http://127.0.0.1:8888`）。**Debug Proxy**が有効な場合のみ使用されます。",
-	"settings.debugProxy.tlsInsecure.description": "プロキシからの自己署名証明書を受け入れます。**MITM検査に必要です。** ⚠️ 安全ではありません—ローカルデバッグにのみ使用してください。"
+	"settings.debugProxy.tlsInsecure.description": "プロキシからの自己署名証明書を受け入れます。**MITM検査に必要です。** ⚠️ 安全ではありません—ローカルデバッグにのみ使用してください。",
+	"command.newTab.title": "新しいタブ",
+	"command.newSession.title": "新しいセッション",
+	"command.closeTab.title": "タブを閉じる",
+	"command.generateTests.title": "単体テストを生成",
+	"command.refactorFunction.title": "関数をリファクタリング",
+	"command.toggleAutonomousMode.title": "自律モードを切り替え",
+	"command.acceptReview.title": "変更を承認",
+	"command.rejectReview.title": "変更を却下",
+	"command.acceptAllReviews.title": "すべての変更を承認",
+	"command.diffReview.title": "変更を比較",
+	"command.prevChange.title": "前のレビュー変更",
+	"command.nextChange.title": "次のレビュー変更",
+	"settings.autoApproveBrowser.description": "ブラウザーの操作（移動、クリック、入力、スクリーンショットなど）を自動的に承認します"
 }

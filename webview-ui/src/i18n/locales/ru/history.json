@@ -47,5 +47,12 @@
 	"subtaskTag": "Подзадача",
 	"deleteWithSubtasks": "Это также удалит {{count}} подзадачу(и). Вы уверены?",
 	"expandSubtasks": "Развернуть подзадачи",
-	"collapseSubtasks": "Свернуть подзадачи"
+	"collapseSubtasks": "Свернуть подзадачи",
+	"session": "Сессия",
+	"renameSession": "Переименовать сессию",
+	"renameSave": "Сохранить",
+	"renameCancel": "Отмена",
+	"tasks_one": "{{count}} задача",
+	"tasks_other": "{{count}} задач",
+	"tokens": "токены"
 }

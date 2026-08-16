@@ -41,7 +41,9 @@
 		"experimental": "Experimental",
 		"language": "Idioma",
 		"about": "Sobre Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Generació d'imatges",
+		"pipelines": "Pipelines"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Fes sol·licituds automàticament fins a aquests límits abans de demanar aprovació per continuar."
+		},
+		"autonomousMode": {
+			"label": "Mode autònom",
+			"description": "Quan s'activa, totes les ordres d'execució i operacions de fitxers fora de l'espai de treball s'aproven automàticament sense permís. Aquest és un mode de confiança total: utilitza'l amb precaució."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Quan s'activa, les ordres de git (commit, push, add, pull, merge, rebase, etc.) s'aproven automàticament. Quan es desactiva, l'assistent ha de demanar aprovació abans d'executar qualsevol operació de git."
+		},
+		"browser": {
+			"label": "Navegador",
+			"description": "Permet automàticament que l'assistent controli el navegador (navegar, fer clic, escriure, desplaçar-se, capturar pantalla) sense requerir aprovació"
 		}
 	},
 	"providers": {
@@ -815,6 +829,42 @@
 			"refreshSuccess": "Eines actualitzades correctament",
 			"refreshError": "Error en actualitzar les eines",
 			"toolParameters": "Paràmetres"
+		},
+		"TXT2IMG": {
+			"name": "Text-a-Imatge (txt2img)",
+			"description": "Quan s'activa, l'assistent pot generar imatges a partir de descripcions de text mitjançant aquest tipus de pipeline."
+		},
+		"IMG2IMG": {
+			"name": "Imatge-a-Imatge (img2img)",
+			"description": "Quan s'activa, l'assistent pot transformar imatges existents mitjançant edicions guiades per text."
+		},
+		"INPAINT": {
+			"name": "Repintar (Inpaint)",
+			"description": "Quan s'activa, l'assistent pot substituir o reparar regions específiques d'una imatge."
+		},
+		"OUTPAINT": {
+			"name": "Ampliar (Outpaint)",
+			"description": "Quan s'activa, l'assistent pot ampliar una imatge més enllà dels seus límits originals."
+		},
+		"UPSCALE": {
+			"name": "Escala superior (Upscale)",
+			"description": "Quan s'activa, l'assistent pot augmentar la resolució d'una imatge."
+		},
+		"REMOVE_BG": {
+			"name": "Eliminar fons",
+			"description": "Quan s'activa, l'assistent pot eliminar el fons d'una imatge."
+		},
+		"TXT2AUDIO": {
+			"name": "Text-a-Àudio (txt2audio)",
+			"description": "Quan s'activa, l'assistent pot generar música i clips d'àudio a partir de descripcions de text."
+		},
+		"TXT2VIDEO": {
+			"name": "Text-a-Vídeo (txt2video)",
+			"description": "Quan s'activa, l'assistent pot generar clips de vídeo curts a partir de descripcions de text."
+		},
+		"MULTI_TAB": {
+			"name": "Interfície experimental de múltiples pestanyes",
+			"description": "Quan s'activa, ofereix un espai de treball de múltiples pestanyes semblant a un navegador per canviar entre diverses tasques i executar-les simultàniament dins d'una sessió."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1047,36 @@
 			"nameInvalid": "El nom ha de tenir entre 1 i 64 caràcters, només lletres minúscules, números o guions",
 			"descriptionRequired": "La descripció és obligatòria",
 			"descriptionTooLong": "La descripció ha de tenir com a màxim 1024 caràcters"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "Com funciona la generació d'imatges",
+		"guideDescription": "Cada tipus de generació (txt2img, img2img, etc.) utilitza un pipeline: un flux de treball de ComfyUI que defineix com el model processa les entrades. Activa un tipus, tria un proveïdor (ComfyUI local o OpenRouter al núvol) i després selecciona un pipeline o model.",
+		"imagePipelines": "Pipelines d'imatges",
+		"imagePipelinesDescription": "Genera, edita i transforma imatges mitjançant fluxos de treball de ComfyUI o models d'OpenRouter.",
+		"mediaPipelines": "Pipelines de mitjans",
+		"mediaPipelinesDescription": "Genera contingut d'àudio i vídeo mitjançant pipelines dedicats.",
+		"pipelineSettings": "Configuració dels pipelines",
+		"pipelineSettingsDescription": "Gestiona els pipelines de flux de treball de ComfyUI per a la generació d'imatges. Puja fluxos de treball personalitzats o defineix valors predeterminats per tipus de tasca.",
+		"pipelineSummary": "S'han descobert {{count}} pipeline(s)",
+		"importPipeline": "Importa el pipeline",
+		"inlineImportTooltip": "Importa un JSON de flux de treball de ComfyUI per a aquest tipus de pipeline",
+		"noPipelinesFound": "No s'han trobat pipelines. Importa un JSON de flux de treball de ComfyUI per començar.",
+		"alreadyDefault": "Ja està definit com a predeterminat per a aquest tipus",
+		"setAsDefault": "Defineix com a predeterminat per a aquest tipus",
+		"deletePipeline": "Elimina el pipeline",
+		"deleteDialog": {
+			"title": "Elimina el pipeline",
+			"description": "Segur que vols eliminar el pipeline \"{{name}}\"? Aquesta acció no es pot desfer.",
+			"confirm": "Elimina",
+			"cancel": "Cancel·la"
+		},
+		"importDialog": {
+			"title": "Importa el pipeline",
+			"description": "Enganxa un JSON de flux de treball de ComfyUI per importar-lo com a pipeline nou.",
+			"confirm": "Importa",
+			"cancel": "Cancel·la",
+			"importing": "Important..."
 		}
 	}
 }

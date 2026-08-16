@@ -41,7 +41,9 @@
 		"experimental": "Expérimental",
 		"language": "Langue",
 		"about": "À propos de Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Génération d'images",
+		"pipelines": "Pipelines"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Effectuer automatiquement des requêtes jusqu'à ces limites avant de demander une autorisation pour continuer."
+		},
+		"autonomousMode": {
+			"label": "Mode autonome",
+			"description": "Lorsqu'il est activé, toutes les commandes d'exécution et les opérations sur fichiers en dehors de l'espace de travail sont automatiquement approuvées sans autorisation. C'est un mode de confiance totale — à utiliser avec précaution."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Lorsqu'il est activé, les commandes git (commit, push, add, pull, merge, rebase, etc.) sont automatiquement approuvées. Lorsqu'il est désactivé, l'assistant doit demander l'approbation avant d'exécuter toute opération git."
+		},
+		"browser": {
+			"label": "Navigateur",
+			"description": "Autorise automatiquement l'assistant à contrôler le navigateur (naviguer, cliquer, saisir, faire défiler, capturer) sans exiger d'approbation"
 		}
 	},
 	"providers": {
@@ -815,6 +829,42 @@
 			"refreshSuccess": "Outils actualisés avec succès",
 			"refreshError": "Échec de l'actualisation des outils",
 			"toolParameters": "Paramètres"
+		},
+		"TXT2IMG": {
+			"name": "Texte-vers-Image (txt2img)",
+			"description": "Lorsqu'il est activé, l'assistant peut générer des images à partir de descriptions textuelles à l'aide de ce type de pipeline."
+		},
+		"IMG2IMG": {
+			"name": "Image-vers-Image (img2img)",
+			"description": "Lorsqu'il est activé, l'assistant peut transformer des images existantes à l'aide de modifications guidées par du texte."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "Lorsqu'il est activé, l'assistant peut remplacer ou réparer des régions spécifiques d'une image."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "Lorsqu'il est activé, l'assistant peut étendre une image au-delà de ses limites d'origine."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "Lorsqu'il est activé, l'assistant peut augmenter la résolution d'une image."
+		},
+		"REMOVE_BG": {
+			"name": "Supprimer l'arrière-plan",
+			"description": "Lorsqu'il est activé, l'assistant peut supprimer l'arrière-plan d'une image."
+		},
+		"TXT2AUDIO": {
+			"name": "Texte-vers-Audio (txt2audio)",
+			"description": "Lorsqu'il est activé, l'assistant peut générer de la musique et des clips audio à partir de descriptions textuelles."
+		},
+		"TXT2VIDEO": {
+			"name": "Texte-vers-Vidéo (txt2video)",
+			"description": "Lorsqu'il est activé, l'assistant peut générer de courts clips vidéo à partir de descriptions textuelles."
+		},
+		"MULTI_TAB": {
+			"name": "Interface multi-onglets expérimentale",
+			"description": "Lorsqu'il est activé, fournit un espace de travail multi-onglets semblable à un navigateur pour basculer entre plusieurs tâches et les exécuter simultanément dans une session."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1047,36 @@
 			"nameInvalid": "Le nom doit contenir entre 1 et 64 lettres minuscules, chiffres ou tirets",
 			"descriptionRequired": "La description est obligatoire",
 			"descriptionTooLong": "La description doit contenir au maximum 1024 caractères"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "Comment fonctionne la génération d'images",
+		"guideDescription": "Chaque type de génération (txt2img, img2img, etc.) utilise un pipeline : un flux de travail ComfyUI qui définit comment le modèle traite les entrées. Activez un type, choisissez un fournisseur (ComfyUI local ou OpenRouter cloud), puis sélectionnez un pipeline ou un modèle.",
+		"imagePipelines": "Pipelines d'images",
+		"imagePipelinesDescription": "Générez, modifiez et transformez des images à l'aide de flux de travail ComfyUI ou de modèles OpenRouter.",
+		"mediaPipelines": "Pipelines médias",
+		"mediaPipelinesDescription": "Générez du contenu audio et vidéo à l'aide de pipelines dédiés.",
+		"pipelineSettings": "Paramètres des pipelines",
+		"pipelineSettingsDescription": "Gérez les pipelines de flux de travail ComfyUI pour la génération d'images. Importez des flux de travail personnalisés ou définissez des valeurs par défaut par type de tâche.",
+		"pipelineSummary": "{{count}} pipeline(s) découverts",
+		"importPipeline": "Importer un pipeline",
+		"inlineImportTooltip": "Importer un JSON de flux de travail ComfyUI pour ce type de pipeline",
+		"noPipelinesFound": "Aucun pipeline trouvé. Importez un JSON de flux de travail ComfyUI pour commencer.",
+		"alreadyDefault": "Déjà défini comme valeur par défaut pour ce type",
+		"setAsDefault": "Définir comme valeur par défaut pour ce type",
+		"deletePipeline": "Supprimer le pipeline",
+		"deleteDialog": {
+			"title": "Supprimer le pipeline",
+			"description": "Voulez-vous vraiment supprimer le pipeline \"{{name}}\" ? Cette action est irréversible.",
+			"confirm": "Supprimer",
+			"cancel": "Annuler"
+		},
+		"importDialog": {
+			"title": "Importer un pipeline",
+			"description": "Collez un JSON de flux de travail ComfyUI pour l'importer comme nouveau pipeline.",
+			"confirm": "Importer",
+			"cancel": "Annuler",
+			"importing": "Importation en cours..."
 		}
 	}
 }

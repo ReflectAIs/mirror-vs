@@ -54,5 +54,11 @@
 	"subtaskTag": "Teilaufgabe",
 	"deleteWithSubtasks": "Dies löscht auch {{count}} Teilaufgabe(n). Bist du sicher?",
 	"expandSubtasks": "Teilaufgaben erweitern",
-	"collapseSubtasks": "Teilaufgaben einklappen"
+	"collapseSubtasks": "Teilaufgaben einklappen",
+	"session": "Sitzung",
+	"renameSession": "Sitzung umbenennen",
+	"renameSave": "Speichern",
+	"renameCancel": "Abbrechen",
+	"tasks_one": "{{count}} Aufgabe",
+	"tasks_other": "{{count}} Aufgaben"
 }

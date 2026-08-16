@@ -54,5 +54,11 @@
 	"subtaskTag": "Sous-tâche",
 	"deleteWithSubtasks": "Cela supprimera aussi {{count}} sous-tâche(s). Êtes-vous sûr ?",
 	"expandSubtasks": "Développer les sous-tâches",
-	"collapseSubtasks": "Réduire les sous-tâches"
+	"collapseSubtasks": "Réduire les sous-tâches",
+	"session": "Session",
+	"renameSession": "Renommer la session",
+	"renameSave": "Enregistrer",
+	"renameCancel": "Annuler",
+	"tasks_one": "{{count}} tâche",
+	"tasks_other": "{{count}} tâches"
 }

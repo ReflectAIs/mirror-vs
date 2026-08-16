@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Avvia nuova attività",
 				"description": "Avvia una nuova attività con il tuo input. Disponibile nella palette dei comandi."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Migliora il prompt dell'immagine",
+				"description": "Migliora i tuoi prompt per immagini con dettagli, elementi di illuminazione, colori e descrittori adatti a generatori testo-immagine come Stable Diffusion e FLUX. Viene usato automaticamente in modalità Designer quando fai clic su ✨."
 			}
 		}
 	},

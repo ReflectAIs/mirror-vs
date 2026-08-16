@@ -43,5 +43,18 @@
 	"settings.debug.description": "Schakel debug-modus in om extra knoppen te tonen voor het bekijken van API-conversatiegeschiedenis en UI-berichten als opgemaakte JSON in tijdelijke bestanden.",
 	"settings.debugProxy.enabled.description": "**Debug Proxy inschakelen** — Leid alle uitgaande netwerkverzoeken via een proxy voor MITM-debugging. Alleen actief wanneer je in debugmodus (F5) draait.",
 	"settings.debugProxy.serverUrl.description": "Proxy-URL (bijv. `http://127.0.0.1:8888`). Wordt alleen gebruikt wanneer **Debug Proxy** is ingeschakeld.",
-	"settings.debugProxy.tlsInsecure.description": "Accepteer zelfondertekende certificaten van de proxy. **Vereist voor MITM-inspectie.** ⚠️ Onveilig — gebruik dit alleen voor lokale debugging."
+	"settings.debugProxy.tlsInsecure.description": "Accepteer zelfondertekende certificaten van de proxy. **Vereist voor MITM-inspectie.** ⚠️ Onveilig — gebruik dit alleen voor lokale debugging.",
+	"command.newTab.title": "Nieuw tabblad",
+	"command.newSession.title": "Nieuwe sessie",
+	"command.closeTab.title": "Tabblad sluiten",
+	"command.generateTests.title": "Unittests genereren",
+	"command.refactorFunction.title": "Functie refactoren",
+	"command.toggleAutonomousMode.title": "Autonome modus wisselen",
+	"command.acceptReview.title": "Wijzigingen accepteren",
+	"command.rejectReview.title": "Wijzigingen afwijzen",
+	"command.acceptAllReviews.title": "Alle wijzigingen accepteren",
+	"command.diffReview.title": "Wijzigingen vergelijken",
+	"command.prevChange.title": "Vorige wijziging bij beoordeling",
+	"command.nextChange.title": "Volgende wijziging bij beoordeling",
+	"settings.autoApproveBrowser.description": "Browseracties automatisch goedkeuren (navigeren, klikken, typen, screenshots, enz.)"
 }

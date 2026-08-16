@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "无法确定提供商 '{{provider}}' 的模型 '{{modelId}}' 的向量维度。请确保在 OpenAI 兼容提供商设置中正确设置了「嵌入维度」。",
 		"vectorDimensionNotDetermined": "无法确定提供商 '{{provider}}' 的模型 '{{modelId}}' 的向量维度。请检查模型配置文件或配置。",
 		"qdrantUrlMissing": "创建向量存储缺少 Qdrant URL",
-		"codeIndexingNotConfigured": "无法创建服务：代码索引未正确配置"
+		"codeIndexingNotConfigured": "无法创建服务：代码索引未正确配置",
+		"anthropicConfigMissing": "创建嵌入器需要 Anthropic 配置，但配置缺失",
+		"cohereConfigMissing": "创建嵌入器需要 Cohere 配置，但配置缺失",
+		"jinaConfigMissing": "创建嵌入器需要 Jina 配置，但配置缺失",
+		"voyageConfigMissing": "创建嵌入器需要 Voyage 配置，但配置缺失"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "索引失败：没有代码块被成功索引。这通常表示 Embedder 配置问题。",

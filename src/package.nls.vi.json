@@ -43,5 +43,18 @@
 	"settings.debug.description": "Bật chế độ gỡ lỗi để hiển thị các nút bổ sung cho việc xem lịch sử trò chuyện API và tin nhắn UI dưới dạng JSON được định dạng đẹp trong các tệp tạm thời.",
 	"settings.debugProxy.enabled.description": "**Bật Debug Proxy** — Định tuyến tất cả các yêu cầu mạng đi qua proxy để gỡ lỗi MITM. Chỉ hoạt động khi chạy ở chế độ gỡ lỗi (F5).",
 	"settings.debugProxy.serverUrl.description": "URL proxy (ví dụ: `http://127.0.0.1:8888`). Chỉ được sử dụng khi **Debug Proxy** được bật.",
-	"settings.debugProxy.tlsInsecure.description": "Chấp nhận chứng chỉ tự ký từ proxy. **Cần thiết cho kiểm tra MITM.** ⚠️ Không an toàn — chỉ sử dụng để gỡ lỗi cục bộ."
+	"settings.debugProxy.tlsInsecure.description": "Chấp nhận chứng chỉ tự ký từ proxy. **Cần thiết cho kiểm tra MITM.** ⚠️ Không an toàn — chỉ sử dụng để gỡ lỗi cục bộ.",
+	"command.newTab.title": "Tab mới",
+	"command.newSession.title": "Phiên mới",
+	"command.closeTab.title": "Đóng Tab",
+	"command.generateTests.title": "Tạo Bài kiểm tra Đơn vị",
+	"command.refactorFunction.title": "Tái cấu trúc Hàm",
+	"command.toggleAutonomousMode.title": "Chuyển đổi Chế độ Tự động",
+	"command.acceptReview.title": "Chấp nhận Thay đổi",
+	"command.rejectReview.title": "Từ chối Thay đổi",
+	"command.acceptAllReviews.title": "Chấp nhận Tất cả Thay đổi",
+	"command.diffReview.title": "So sánh Thay đổi",
+	"command.prevChange.title": "Thay đổi Rà soát Trước",
+	"command.nextChange.title": "Thay đổi Rà soát Tiếp theo",
+	"settings.autoApproveBrowser.description": "Tự động phê duyệt hành động của trình duyệt (điều hướng, bấm, nhập, chụp màn hình, v.v.)"
 }

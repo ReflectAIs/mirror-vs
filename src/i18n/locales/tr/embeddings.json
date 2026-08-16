@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "'{{provider}}' sağlayıcısı ile '{{modelId}}' modeli için vektör boyutu belirlenemedi. OpenAI uyumlu sağlayıcı ayarlarında 'Gömme Boyutu'nun doğru ayarlandığından emin ol.",
 		"vectorDimensionNotDetermined": "'{{provider}}' sağlayıcısı ile '{{modelId}}' modeli için vektör boyutu belirlenemedi. Model profillerini veya yapılandırmayı kontrol et.",
 		"qdrantUrlMissing": "Vektör deposu oluşturmak için Qdrant URL'si eksik",
-		"codeIndexingNotConfigured": "Hizmetler oluşturulamıyor: Kod indeksleme düzgün yapılandırılmamış"
+		"codeIndexingNotConfigured": "Hizmetler oluşturulamıyor: Kod indeksleme düzgün yapılandırılmamış",
+		"anthropicConfigMissing": "Embedder oluşturmak için Anthropic yapılandırması eksik",
+		"cohereConfigMissing": "Embedder oluşturmak için Cohere yapılandırması eksik",
+		"jinaConfigMissing": "Embedder oluşturmak için Jina yapılandırması eksik",
+		"voyageConfigMissing": "Embedder oluşturmak için Voyage yapılandırması eksik"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "İndeksleme başarısız: Hiçbir kod bloğu başarıyla indekslenemedi. Bu genellikle bir embedder yapılandırma sorunu olduğunu gösterir.",

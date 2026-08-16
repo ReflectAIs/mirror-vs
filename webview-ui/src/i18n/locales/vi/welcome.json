@@ -1,29 +1,34 @@
 {
-    "routers": {
-        "requesty": {
-            "description": "Bộ định tuyến LLM được tối ưu hóa của bạn",
-            "incentive": "Tín dụng miễn phí $1"
-        },
-        "openrouter": {
-            "description": "Giao diện thống nhất cho LLM"
-        }
-    },
-    "landing": {
-        "greeting": "Chào mừng đến với Mirror VS!",
-        "introduction": "Với nhiều Chế độ tích hợp và có thể mở rộng, Mirror VS cho phép bạn lập kế hoạch, thiết kế kiến trúc, viết mã, gỡ lỗi và tăng năng suất như chưa từng có trước đây.",
-        "getStarted": "Tạo tài khoản Mirror VS"
-    },
-    "providerSignup": {
-        "heading": "Chọn nhà cung cấp của bạn",
-        "chooseProvider": "trợ lý cần một nhà cung cấp LLM để hoạt động. Chọn một để bắt đầu, bạn có thể thêm nhiều hơn sau.",
-        "learnMore": "Tìm hiểu thêm",
-        "useAnotherProvider": "Nhà cung cấp bên thứ ba",
-        "useAnotherProviderDescription": "Nhập khóa API và bắt đầu.",
-        "noApiKeys": "Bạn không muốn xử lý các khóa API và tài khoản riêng biệt?",
-        "goBack": "Quay lại",
-        "finish": "Hoàn thành"
-    },
-    "startRouter": "Chúng tôi khuyên bạn nên sử dụng bộ định tuyến LLM:",
-    "startCustom": "Hoặc bạn có thể mang theo khóa API của riêng mình:",
-    "importSettings": "Nhập Cài đặt"
+	"routers": {
+		"requesty": {
+			"description": "Bộ định tuyến LLM được tối ưu hóa của bạn",
+			"incentive": "Tín dụng miễn phí $1"
+		},
+		"openrouter": {
+			"description": "Giao diện thống nhất cho LLM"
+		}
+	},
+	"landing": {
+		"greeting": "Chào mừng đến với Mirror VS!",
+		"introduction": "Với nhiều Chế độ tích hợp và có thể mở rộng, Mirror VS cho phép bạn lập kế hoạch, thiết kế kiến trúc, viết mã, gỡ lỗi và tăng năng suất như chưa từng có trước đây.",
+		"getStarted": "Tạo tài khoản Mirror VS"
+	},
+	"providerSignup": {
+		"heading": "Chọn nhà cung cấp của bạn",
+		"chooseProvider": "trợ lý cần một nhà cung cấp LLM để hoạt động. Chọn một để bắt đầu, bạn có thể thêm nhiều hơn sau.",
+		"learnMore": "Tìm hiểu thêm",
+		"useAnotherProvider": "Nhà cung cấp bên thứ ba",
+		"useAnotherProviderDescription": "Nhập khóa API và bắt đầu.",
+		"noApiKeys": "Bạn không muốn xử lý các khóa API và tài khoản riêng biệt?",
+		"goBack": "Quay lại",
+		"finish": "Hoàn thành"
+	},
+	"startRouter": "Chúng tôi khuyên bạn nên sử dụng bộ định tuyến LLM:",
+	"startCustom": "Hoặc bạn có thể mang theo khóa API của riêng mình:",
+	"importSettings": "Nhập Cài đặt",
+	"complete": {
+		"heading": "Bạn đã sẵn sàng!",
+		"description": "Nhà cung cấp của bạn đã được cấu hình và Mirror VS sẵn sàng giúp bạn lập kế hoạch, thiết kế, viết mã và gỡ lỗi thông minh hơn.",
+		"startExploring": "Bắt đầu khám phá"
+	}
 }

@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "Không thể xác định kích thước vector cho mô hình '{{modelId}}' với nhà cung cấp '{{provider}}'. Hãy đảm bảo 'Kích thước Embedding' được cài đặt đúng trong cài đặt nhà cung cấp tương thích OpenAI.",
 		"vectorDimensionNotDetermined": "Không thể xác định kích thước vector cho mô hình '{{modelId}}' với nhà cung cấp '{{provider}}'. Kiểm tra hồ sơ mô hình hoặc cấu hình.",
 		"qdrantUrlMissing": "Thiếu URL Qdrant để tạo kho lưu trữ vector",
-		"codeIndexingNotConfigured": "Không thể tạo dịch vụ: Lập chỉ mục mã không được cấu hình đúng cách"
+		"codeIndexingNotConfigured": "Không thể tạo dịch vụ: Lập chỉ mục mã không được cấu hình đúng cách",
+		"anthropicConfigMissing": "Thiếu cấu hình Anthropic để tạo embedder",
+		"cohereConfigMissing": "Thiếu cấu hình Cohere để tạo embedder",
+		"jinaConfigMissing": "Thiếu cấu hình Jina để tạo embedder",
+		"voyageConfigMissing": "Thiếu cấu hình Voyage để tạo embedder"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "Lập chỉ mục thất bại: Không có khối mã nào được lập chỉ mục thành công. Điều này thường cho thấy vấn đề cấu hình embedder.",
