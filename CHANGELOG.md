@@ -2,6 +2,12 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.6.10] - 2026-08-16
+
+### Fixed
+
+- **DeepSeek Thinking Mode Lost on Resume**: Fixed serialization of DeepSeek `reasoning_content` when rebuilding the conversation history on task resume. The thinking blocks are now preserved for assistant messages in [`TaskApiRequest`](src/core/task/TaskApiRequest.ts:972), so DeepSeek reasoning is restored correctly after a resume.
+
 ## [0.6.8] - 2026-08-07
 
 ### Added
