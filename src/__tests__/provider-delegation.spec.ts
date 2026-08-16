@@ -3,6 +3,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { MirrorVSEventName } from "@mirror-vs/types"
 import { MirrorProvider } from "../core/webview/MirrorProvider"
+import { DelegationManager } from "../core/webview/MirrorProviderDelegation"
 
 describe("MirrorProvider.delegateParentAndOpenChild()", () => {
 	it("persists parent delegation metadata and emits TaskDelegated", async () => {
@@ -57,7 +58,7 @@ describe("MirrorProvider.delegateParentAndOpenChild()", () => {
 			mode: "code",
 		}
 
-		const child = await (MirrorProvider.prototype as any).delegateParentAndOpenChild.call(provider, params)
+		const child = await (DelegationManager.prototype as any).delegateParentAndOpenChild.call({ provider }, params)
 
 		expect(child.taskId).toBe("child-1")
 
@@ -132,12 +133,15 @@ describe("MirrorProvider.delegateParentAndOpenChild()", () => {
 			log: vi.fn(),
 		} as unknown as MirrorProvider
 
-		await (MirrorProvider.prototype as any).delegateParentAndOpenChild.call(provider, {
-			parentTaskId: "parent-1",
-			message: "Do something",
-			initialTodos: [],
-			mode: "code",
-		})
+		await (DelegationManager.prototype as any).delegateParentAndOpenChild.call(
+			{ provider },
+			{
+				parentTaskId: "parent-1",
+				message: "Do something",
+				initialTodos: [],
+				mode: "code",
+			},
+		)
 
 		// Verify ordering: createTask → updateTaskHistory → child.start
 		expect(callOrder).toEqual(["createTask", "updateTaskHistory", "child.start"])

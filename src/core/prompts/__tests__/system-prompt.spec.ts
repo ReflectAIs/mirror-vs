@@ -555,8 +555,8 @@ describe("SYSTEM_PROMPT", () => {
 		expect(prompt).not.toContain("<actual_tool_name>")
 		expect(prompt).not.toContain("</actual_tool_name>")
 
-		// Should contain Tool Use Guidelines section
-		expect(prompt).toContain("Tool Use Guidelines")
+		// Should contain Tool Selection Guidelines section
+		expect(prompt).toContain("Tool Selection Guidelines")
 
 		// Should NOT contain a tool catalog / XML examples
 		expect(prompt).not.toContain("# Tools")

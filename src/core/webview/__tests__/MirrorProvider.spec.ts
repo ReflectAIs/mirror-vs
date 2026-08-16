@@ -193,9 +193,19 @@ vi.mock("../../task/Task", () => ({
 		setTaskNumber: vi.fn(),
 		setParentTask: vi.fn(),
 		setMirrortTask: vi.fn(),
+		saveMirrorMessages: vi.fn(),
 		taskId: options?.historyItem?.id || "test-task-id",
 		emit: vi.fn(),
+		metadata: { task: options?.historyItem?.task || "Test task" },
 	})),
+	TaskState: {
+		Idle: "idle",
+		Streaming: "streaming",
+		WaitingApproval: "interactive",
+		Completed: "completed",
+		Error: "error",
+		Aborted: "aborted",
+	},
 }))
 
 vi.mock("../../../integrations/misc/extract-text", () => ({
@@ -309,8 +319,10 @@ describe("MirrorProvider", () => {
 				setTaskNumber: vi.fn(),
 				setParentTask: vi.fn(),
 				setMirrortTask: vi.fn(),
+				saveMirrorMessages: vi.fn(),
 				taskId: options?.historyItem?.id || "test-task-id",
 				emit: vi.fn(),
+				metadata: { task: options?.historyItem?.task || "Test task" },
 			}
 
 			Object.defineProperty(task, "messageManager", {
@@ -623,16 +635,18 @@ describe("MirrorProvider", () => {
 			await provider.resolveWebviewView(mockWebviewView)
 		})
 
-		test("calls clearTask (delegation handled via metadata)", async () => {
+		test("clears current task (drains stack, creates new task, starts new chat)", async () => {
 			// Setup a single task without parent
 			const mockMirror = new Task(defaultTaskOptions)
 
-			// Mock the provider methods
-			const clearTaskSpy = vi.spyOn(provider, "clearTask").mockResolvedValue(undefined)
+			// Mock the provider methods invoked by the clearTask handler
+			const createTaskSpy = vi.spyOn(provider, "createTask").mockResolvedValue(undefined as any)
 			const postStateToWebviewSpy = vi.spyOn(provider, "postStateToWebview").mockResolvedValue(undefined)
+			const postMessageSpy = vi.spyOn(provider, "postMessageToWebview").mockResolvedValue(undefined)
 
 			// Add task to stack
 			await provider.addMirrorToStack(mockMirror)
+			expect(provider.getTaskStackSize()).toBe(1)
 
 			// Get the message handler
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
@@ -640,12 +654,16 @@ describe("MirrorProvider", () => {
 			// Trigger clearTask message
 			await messageHandler({ type: "clearTask" })
 
-			// Verify clearTask was called
-			expect(clearTaskSpy).toHaveBeenCalled()
+			// The current task is aborted and removed from the stack
+			expect(mockMirror.abortTask).toHaveBeenCalled()
+			expect(provider.getTaskStackSize()).toBe(0)
+			// A fresh task is created for the new chat
+			expect(createTaskSpy).toHaveBeenCalledWith("", [])
 			expect(postStateToWebviewSpy).toHaveBeenCalled()
+			expect(postMessageSpy).toHaveBeenCalledWith({ type: "invoke", invoke: "newChat" })
 		})
 
-		test("calls clearTask even with parent task (delegation via metadata)", async () => {
+		test("clears task even with parent task in stack (delegation via metadata)", async () => {
 			// Setup parent and child tasks
 			const parentTask = new Task(defaultTaskOptions)
 			const childTask = new Task(defaultTaskOptions)
@@ -654,13 +672,14 @@ describe("MirrorProvider", () => {
 			;(childTask as any).parentTask = parentTask
 			;(childTask as any).rootTask = parentTask
 
-			// Mock the provider methods
-			const clearTaskSpy = vi.spyOn(provider, "clearTask").mockResolvedValue(undefined)
+			// Mock the provider methods invoked by the clearTask handler
+			const createTaskSpy = vi.spyOn(provider, "createTask").mockResolvedValue(undefined as any)
 			const postStateToWebviewSpy = vi.spyOn(provider, "postStateToWebview").mockResolvedValue(undefined)
 
 			// Add both tasks to stack (parent first, then child)
 			await provider.addMirrorToStack(parentTask)
 			await provider.addMirrorToStack(childTask)
+			expect(provider.getTaskStackSize()).toBe(2)
 
 			// Get the message handler
 			const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]
@@ -668,16 +687,17 @@ describe("MirrorProvider", () => {
 			// Trigger clearTask message
 			await messageHandler({ type: "clearTask" })
 
-			// Verify clearTask was called (delegation happens via metadata, not finishSubTask)
-			expect(clearTaskSpy).toHaveBeenCalled()
+			// Both parent and child are removed from the stack (delegation via metadata)
+			expect(provider.getTaskStackSize()).toBe(0)
+			expect(createTaskSpy).toHaveBeenCalledWith("", [])
 			expect(postStateToWebviewSpy).toHaveBeenCalled()
 		})
 
 		test("handles case when no current task exists", async () => {
 			// Don't add any tasks to the stack
 
-			// Mock the provider methods
-			const clearTaskSpy = vi.spyOn(provider, "clearTask").mockResolvedValue(undefined)
+			// Mock the provider methods invoked by the clearTask handler
+			const createTaskSpy = vi.spyOn(provider, "createTask").mockResolvedValue(undefined as any)
 			const postStateToWebviewSpy = vi.spyOn(provider, "postStateToWebview").mockResolvedValue(undefined)
 
 			// Get the message handler
@@ -686,19 +706,20 @@ describe("MirrorProvider", () => {
 			// Trigger clearTask message
 			await messageHandler({ type: "clearTask" })
 
-			// When there's no current task, clearTask is still called (it handles the no-task case internally)
-			expect(clearTaskSpy).toHaveBeenCalled()
+			// With no current task the handler still creates a fresh task and posts state
+			expect(provider.getTaskStackSize()).toBe(0)
+			expect(createTaskSpy).toHaveBeenCalledWith("", [])
 			expect(postStateToWebviewSpy).toHaveBeenCalled()
 		})
 
 		test("correctly identifies task scenario for issue #4602", async () => {
 			// This test validates the fix for issue #4602
-			// where canceling during API retry correctly uses clearTask
+			// where canceling during API retry correctly clears the current task
 
 			const mockMirror = new Task(defaultTaskOptions)
 
-			// Mock the provider methods
-			const clearTaskSpy = vi.spyOn(provider, "clearTask").mockResolvedValue(undefined)
+			// Mock the provider methods invoked by the clearTask handler
+			const createTaskSpy = vi.spyOn(provider, "createTask").mockResolvedValue(undefined as any)
 
 			// Add only one task to stack
 			await provider.addMirrorToStack(mockMirror)
@@ -712,8 +733,10 @@ describe("MirrorProvider", () => {
 			// Trigger clearTask message (simulating cancel during API retry)
 			await messageHandler({ type: "clearTask" })
 
-			// clearTask should be called (delegation handled via metadata)
-			expect(clearTaskSpy).toHaveBeenCalled()
+			// The current task is aborted and removed (delegation handled via metadata)
+			expect(mockMirror.abortTask).toHaveBeenCalled()
+			expect(provider.getTaskStackSize()).toBe(0)
+			expect(createTaskSpy).toHaveBeenCalledWith("", [])
 		})
 	})
 

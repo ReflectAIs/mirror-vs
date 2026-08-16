@@ -38,6 +38,7 @@ vi.mock("../core/task-persistence", () => ({
 import { MirrorProvider } from "../core/webview/MirrorProvider"
 import { readTaskMessages } from "../core/task-persistence/taskMessages"
 import { readApiMessages, saveApiMessages, saveTaskMessages } from "../core/task-persistence"
+import { DelegationManager } from "../core/webview/MirrorProviderDelegation"
 
 describe("History resume delegation - parent metadata transitions", () => {
 	beforeEach(() => {
@@ -85,11 +86,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue([])
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "parent-1",
-			childTaskId: "child-1",
-			completionResultSummary: "Child done",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "parent-1",
+				childTaskId: "child-1",
+				completionResultSummary: "Child done",
+			},
+		)
 
 		// Assert: metadata updated BEFORE createTaskWithHistoryItem
 		expect(updateTaskHistory).toHaveBeenCalledWith(
@@ -154,11 +158,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue(existingUiMessages as any)
 		vi.mocked(readApiMessages).mockResolvedValue(existingApiMessages as any)
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "p1",
-			childTaskId: "c1",
-			completionResultSummary: "Subtask completed successfully",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "p1",
+				childTaskId: "c1",
+				completionResultSummary: "Subtask completed successfully",
+			},
+		)
 
 		// Verify UI history injection (say: subtask_result)
 		expect(saveTaskMessages).toHaveBeenCalledWith(
@@ -251,11 +258,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue(existingUiMessages as any)
 		vi.mocked(readApiMessages).mockResolvedValue(existingApiMessages as any)
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "p-tool",
-			childTaskId: "c-tool",
-			completionResultSummary: "Subtask completed via tool_result",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "p-tool",
+				childTaskId: "c-tool",
+				completionResultSummary: "Subtask completed via tool_result",
+			},
+		)
 
 		// Verify API history injection uses tool_result (not text fallback)
 		expect(saveApiMessages).toHaveBeenCalledWith(
@@ -323,11 +333,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue(existingUiMessages as any)
 		vi.mocked(readApiMessages).mockResolvedValue(existingApiMessages as any)
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "p-no-tool",
-			childTaskId: "c-no-tool",
-			completionResultSummary: "Subtask completed without tool_use",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "p-no-tool",
+				childTaskId: "c-no-tool",
+				completionResultSummary: "Subtask completed without tool_use",
+			},
+		)
 
 		const apiCall = vi.mocked(saveApiMessages).mock.calls[0][0]
 		// Should append a user text note
@@ -374,11 +387,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue([])
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "parent-2",
-			childTaskId: "child-2",
-			completionResultSummary: "Done",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "parent-2",
+				childTaskId: "child-2",
+				completionResultSummary: "Done",
+			},
+		)
 
 		// Critical: verify skipPrevResponseIdOnce set to true by resumeAfterDelegation
 		expect(parentInstance.skipPrevResponseIdOnce).toBe(true)
@@ -418,11 +434,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue([])
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "p3",
-			childTaskId: "c3",
-			completionResultSummary: "Summary",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "p3",
+				childTaskId: "c3",
+				completionResultSummary: "Summary",
+			},
+		)
 
 		// Verify both events emitted
 		const eventNames = emitSpy.mock.calls.map((c) => c[0])
@@ -497,11 +516,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
 		await expect(
-			(MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-				parentTaskId: "parent-rpd06",
-				childTaskId: "child-rpd06",
-				completionResultSummary: "Subtask finished despite overwrite failures",
-			}),
+			(DelegationManager.prototype as any).reopenParentFromDelegation.call(
+				{ provider },
+				{
+					parentTaskId: "parent-rpd06",
+					childTaskId: "child-rpd06",
+					completionResultSummary: "Subtask finished despite overwrite failures",
+				},
+			),
 		).resolves.toBeUndefined()
 
 		expect(parentInstance.overwriteMirrorMessages).toHaveBeenCalledTimes(1)
@@ -554,11 +576,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue([])
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "p4",
-			childTaskId: "c4",
-			completionResultSummary: "S",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "p4",
+				childTaskId: "c4",
+				completionResultSummary: "S",
+			},
+		)
 
 		// CRITICAL: verify legacy pause/unpause events NOT emitted
 		const eventNames = emitSpy.mock.calls.map((c) => c[0])
@@ -618,11 +643,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readTaskMessages).mockResolvedValue([])
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
-		await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-			parentTaskId: "parent-rpd02",
-			childTaskId: "child-rpd02",
-			completionResultSummary: "Child done without being current",
-		})
+		await (DelegationManager.prototype as any).reopenParentFromDelegation.call(
+			{ provider },
+			{
+				parentTaskId: "parent-rpd02",
+				childTaskId: "child-rpd02",
+				completionResultSummary: "Child done without being current",
+			},
+		)
 
 		expect(removeMirrorFromStack).not.toHaveBeenCalled()
 		expect(updateTaskHistory).toHaveBeenCalledWith(
@@ -700,11 +728,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
 		await expect(
-			(MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-				parentTaskId: "parent-rpd04",
-				childTaskId: "child-rpd04",
-				completionResultSummary: "Child completion with persistence failure",
-			}),
+			(DelegationManager.prototype as any).reopenParentFromDelegation.call(
+				{ provider },
+				{
+					parentTaskId: "parent-rpd04",
+					childTaskId: "child-rpd04",
+					completionResultSummary: "Child completion with persistence failure",
+				},
+			),
 		).resolves.toBeUndefined()
 
 		expect(logSpy).toHaveBeenCalledWith(
@@ -755,11 +786,14 @@ describe("History resume delegation - parent metadata transitions", () => {
 		vi.mocked(readApiMessages).mockResolvedValue([])
 
 		await expect(
-			(MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, {
-				parentTaskId: "p5",
-				childTaskId: "c5",
-				completionResultSummary: "Result",
-			}),
+			(DelegationManager.prototype as any).reopenParentFromDelegation.call(
+				{ provider },
+				{
+					parentTaskId: "p5",
+					childTaskId: "c5",
+					completionResultSummary: "Result",
+				},
+			),
 		).resolves.toBeUndefined()
 
 		// Verify saves still occurred with just the injected message

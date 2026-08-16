@@ -67,7 +67,9 @@ describe("DirectoryScanner", () => {
 
 	beforeEach(async () => {
 		mockEmbedder = {
-			createEmbeddings: vi.fn().mockResolvedValue({ embeddings: [[0.1, 0.2, 0.3]] }),
+			createEmbeddings: vi.fn().mockImplementation((texts: string[]) => ({
+				embeddings: texts.map(() => [0.1, 0.2, 0.3]),
+			})),
 			embedderInfo: { name: "mock-embedder", dimensions: 384 },
 		}
 		mockVectorStore = {

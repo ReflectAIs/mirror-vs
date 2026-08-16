@@ -105,6 +105,7 @@ vi.mock("../../task/Task", () => ({
 			overwriteApiConversationHistory: vi.fn(),
 			taskId: options?.historyItem?.id || "test-task-id",
 			emit: vi.fn(),
+			metadata: { task: options?.historyItem?.task || "Test task" },
 			updateApiConfiguration: vi.fn().mockImplementation(function (this: any, newConfig: any) {
 				this.apiConfiguration = newConfig
 			}),
@@ -117,6 +118,14 @@ vi.mock("../../task/Task", () => ({
 		})
 		return mockTask
 	}),
+	TaskState: {
+		Idle: "idle",
+		Streaming: "streaming",
+		WaitingApproval: "interactive",
+		Completed: "completed",
+		Error: "error",
+		Aborted: "aborted",
+	},
 }))
 
 describe("MirrorProvider - API Handler Rebuild Guard", () => {

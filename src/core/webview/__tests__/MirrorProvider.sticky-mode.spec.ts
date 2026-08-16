@@ -73,7 +73,16 @@ vi.mock("../../task/Task", () => ({
 		emit: vi.fn(),
 		parentTask: options.parentTask,
 		updateApiConfiguration: vi.fn(),
+		metadata: { task: options.task || "Test task" },
 	})),
+	TaskState: {
+		Idle: "idle",
+		Streaming: "streaming",
+		WaitingApproval: "interactive",
+		Completed: "completed",
+		Error: "error",
+		Aborted: "aborted",
+	},
 }))
 
 vi.mock("../../prompts/sections/custom-instructions")
@@ -322,6 +331,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -770,6 +780,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -837,6 +848,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -889,6 +901,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -924,6 +937,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -980,6 +994,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -1027,6 +1042,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Task 1" },
 			}
 
 			const task2 = {
@@ -1037,6 +1053,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Task 2" },
 			}
 
 			const task3 = {
@@ -1047,6 +1064,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Task 3" },
 			}
 
 			// Add tasks to provider stack
@@ -1189,6 +1207,7 @@ describe("MirrorProvider - Sticky Mode", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: `Task ${i + 1}` },
 			}))
 
 			// Add all tasks to provider

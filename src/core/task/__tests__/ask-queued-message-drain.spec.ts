@@ -64,23 +64,37 @@ describe("Task.ask queued message drain", () => {
 
 	// ── Basic drain: followup ask ──────────────────────────────────────
 
-	it("consumes queued message while blocked on followup ask", async () => {
+	it("does not auto-drain queued message while blocked on followup ask", async () => {
 		const task = await makeTaskWithQueue()
 		const askPromise = task.ask("followup", "Q?", false)
 		;(task as any).messageQueueService.addMessage("picked answer")
-		task.tryDrainQueuedMessage()
+		const drained = task.tryDrainQueuedMessage()
+		// Interactive asks are deliberately NOT auto-drained; the user must
+		// respond explicitly (see TaskUserInteraction.tryDrainQueuedMessage).
+		expect(drained).toBe(false)
+		expect((task as any).messageQueueService.messages.length).toBe(1)
+
+		// Resolve the ask explicitly and verify the queued text flows through.
+		task.handleWebviewAskResponse("messageResponse", "picked answer")
 		const result = await askPromise
 		expect(result.response).toBe("messageResponse")
 		expect(result.text).toBe("picked answer")
 	})
 
-	it("consumes queued message via stateChanged handler", async () => {
+	it("does not auto-drain queued message via stateChanged handler", async () => {
 		const task = await makeTaskWithQueue()
 		;(task as any).messageQueueService.on("stateChanged", () => {
 			task.tryDrainQueuedMessage()
 		})
 		const askPromise = task.ask("followup", "Q?", false)
 		;(task as any).messageQueueService.addMessage("picked answer")
+		// Allow the stateChanged handler to run: the interactive ask must NOT
+		// be drained, so the queue keeps its message.
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		expect((task as any).messageQueueService.messages.length).toBe(1)
+
+		// Resolve the ask explicitly and verify the queued text flows through.
+		task.handleWebviewAskResponse("messageResponse", "picked answer")
 		const result = await askPromise
 		expect(result.response).toBe("messageResponse")
 		expect(result.text).toBe("picked answer")
@@ -235,29 +249,37 @@ describe("Task.ask queued message drain", () => {
 		expect((task as any).messageQueueService.messages.length).toBe(1)
 	})
 
-	// ── Other ask types drain inline ───────────────────────────────────
+	// ── Interactive ask types do NOT auto-drain ───────────────────────
 
-	it("drains queued message inline for tool ask", async () => {
+	it("does not auto-drain queued message inline for tool ask", async () => {
 		const task = await makeTaskWithQueue()
 
 		const askPromise = task.ask("tool", '{"tool":"readFile","path":"/tmp"}', false)
 		;(task as any).messageQueueService.addMessage("approve")
 		const drained = task.tryDrainQueuedMessage()
-		expect(drained).toBe(true)
+		// tool ask is interactive, so it must NOT be auto-drained.
+		expect(drained).toBe(false)
+		expect((task as any).messageQueueService.messages.length).toBe(1)
 
+		// Approve the tool ask explicitly and verify the queued text flows through.
+		task.handleWebviewAskResponse("messageResponse", "approve")
 		const result = await askPromise
 		expect(result.response).toBe("messageResponse")
 		expect(result.text).toBe("approve")
 	})
 
-	it("drains queued message inline for resume_task ask", async () => {
+	it("does not auto-drain queued message inline for resume_task ask", async () => {
 		const task = await makeTaskWithQueue()
 
 		const askPromise = task.ask("resume_task", "", false)
 		;(task as any).messageQueueService.addMessage("yes continue")
 		const drained = task.tryDrainQueuedMessage()
-		expect(drained).toBe(true)
+		// resume_task ask is interactive, so it must NOT be auto-drained.
+		expect(drained).toBe(false)
+		expect((task as any).messageQueueService.messages.length).toBe(1)
 
+		// Resume the task explicitly and verify the queued text flows through.
+		task.handleWebviewAskResponse("messageResponse", "yes continue")
 		const result = await askPromise
 		expect(result.response).toBe("messageResponse")
 		expect(result.text).toBe("yes continue")

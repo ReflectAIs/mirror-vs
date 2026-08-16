@@ -208,7 +208,7 @@ describe("truncateOutput", () => {
 			"line1",
 			"line2",
 			"",
-			"[...15 lines omitted...]",
+			"[...15 lines omitted. Use read_command_output with artifact_id to search or read the full output in parts using offset and limit...]",
 			"",
 			"line18",
 			"line19",
@@ -303,7 +303,16 @@ describe("truncateOutput", () => {
 		// Should keep first line (20% of 5 = 1) and last 4 lines (80% of 5 = 4)
 		// Split result by either \r\n or \n to normalize line endings
 		const resultLines = result.split(/\r?\n/)
-		const expectedLines = ["line1", "", "[...10 lines omitted...]", "", "line12", "line13", "line14", "line15"]
+		const expectedLines = [
+			"line1",
+			"",
+			"[...10 lines omitted. Use read_command_output with artifact_id to search or read the full output in parts using offset and limit...]",
+			"",
+			"line12",
+			"line13",
+			"line14",
+			"line15",
+		]
 		expect(resultLines).toEqual(expectedLines)
 	})
 
@@ -331,7 +340,10 @@ describe("truncateOutput", () => {
 			// - Omission indicator in between
 			const expectedStart = "a".repeat(20)
 			const expectedEnd = "a".repeat(80)
-			const expected = expectedStart + "\n[...900 characters omitted...]\n" + expectedEnd
+			const expected =
+				expectedStart +
+				"\n[...900 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n" +
+				expectedEnd
 
 			expect(result).toBe(expected)
 		})
@@ -348,7 +360,10 @@ describe("truncateOutput", () => {
 			const expectedStart = "a".repeat(20)
 			const expectedEnd = "a".repeat(80)
 			// Total content: 1502 chars, limit: 100, so 1402 chars omitted
-			const expected = expectedStart + "\n[...1402 characters omitted...]\n" + expectedEnd
+			const expected =
+				expectedStart +
+				"\n[...1402 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n" +
+				expectedEnd
 
 			expect(result).toBe(expected)
 		})
@@ -366,7 +381,7 @@ describe("truncateOutput", () => {
 				"line1",
 				"line2",
 				"",
-				"[...15 lines omitted...]",
+				"[...15 lines omitted. Use read_command_output with artifact_id to search or read the full output in parts using offset and limit...]",
 				"",
 				"line18",
 				"line19",
@@ -391,7 +406,9 @@ describe("truncateOutput", () => {
 			const result = truncateOutput(content, undefined, 10)
 
 			// 20% of 10 = 2, 80% of 10 = 8
-			const expected = "aa\n[...990 characters omitted...]\n" + "a".repeat(8)
+			const expected =
+				"aa\n[...990 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n" +
+				"a".repeat(8)
 			expect(result).toBe(expected)
 		})
 
@@ -403,7 +420,10 @@ describe("truncateOutput", () => {
 			const expectedStart = content.slice(0, 10) // "Hello worl"
 			const expectedEnd = content.slice(-40) // last 40 chars
 			const omittedChars = content.length - 50
-			const expected = expectedStart + `\n[...${omittedChars} characters omitted...]\n` + expectedEnd
+			const expected =
+				expectedStart +
+				`\n[...${omittedChars} characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n` +
+				expectedEnd
 
 			expect(result).toBe(expected)
 		})
@@ -416,7 +436,8 @@ describe("truncateOutput", () => {
 				// 20% of 1 = 0.2 (floor = 0), so beforeLimit = 0
 				// afterLimit = 1 - 0 = 1
 				// Should keep 0 chars from start and 1 char from end
-				const expected = "\n[...25 characters omitted...]\nz"
+				const expected =
+					"\n[...25 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\nz"
 				expect(result).toBe(expected)
 			})
 
@@ -427,7 +448,8 @@ describe("truncateOutput", () => {
 				// 20% of 2 = 0.4 (floor = 0), so beforeLimit = 0
 				// afterLimit = 2 - 0 = 2
 				// Should keep 0 chars from start and 2 chars from end
-				const expected = "\n[...24 characters omitted...]\nyz"
+				const expected =
+					"\n[...24 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\nyz"
 				expect(result).toBe(expected)
 			})
 
@@ -438,7 +460,8 @@ describe("truncateOutput", () => {
 				// 20% of 5 = 1, so beforeLimit = 1
 				// afterLimit = 5 - 1 = 4
 				// Should keep 1 char from start and 4 chars from end
-				const expected = "a\n[...21 characters omitted...]\nwxyz"
+				const expected =
+					"a\n[...21 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\nwxyz"
 				expect(result).toBe(expected)
 			})
 
@@ -450,7 +473,8 @@ describe("truncateOutput", () => {
 				// 20% of 10 = 2, 80% of 10 = 8
 				// Note: In JavaScript, each emoji is actually 2 characters (surrogate pair)
 				// So the content is actually 20 characters long, not 10
-				const expected = "🚀\n[...10 characters omitted...]\n🎯🎪🎭🎬"
+				const expected =
+					"🚀\n[...10 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n🎯🎪🎭🎬"
 				expect(result).toBe(expected)
 			})
 
@@ -462,7 +486,8 @@ describe("truncateOutput", () => {
 				// 20% of 15 = 3, 80% of 15 = 12
 				// The slice will take first 3 chars: "lin"
 				// And last 12 chars: "e4\nline5" (counting backwards)
-				const expected = "lin\n[...14 characters omitted...]\n\nline4\nline5"
+				const expected =
+					"lin\n[...14 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n\nline4\nline5"
 				expect(result).toBe(expected)
 			})
 
@@ -481,7 +506,8 @@ describe("truncateOutput", () => {
 
 				// 20% of 3 = 0.6 (floor = 0), so beforeLimit = 0
 				// afterLimit = 3 - 0 = 3
-				const expected = "\n[...97 characters omitted...]\naaa"
+				const expected =
+					"\n[...97 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\naaa"
 				expect(result).toBe(expected)
 			})
 
@@ -492,7 +518,10 @@ describe("truncateOutput", () => {
 				// Character limit should still apply despite high line limit
 				const expectedStart = "a".repeat(10) // 20% of 50
 				const expectedEnd = "a".repeat(40) // 80% of 50
-				const expected = expectedStart + "\n[...950 characters omitted...]\n" + expectedEnd
+				const expected =
+					expectedStart +
+					"\n[...950 characters omitted. Use read_command_output with artifact_id to search or read remaining output in parts using offset/limit...]\n" +
+					expectedEnd
 				expect(result).toBe(expected)
 			})
 		})

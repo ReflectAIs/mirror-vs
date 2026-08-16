@@ -261,6 +261,10 @@ export class CodeIndexOrchestrator {
 					reportProgressThrottled(true)
 				}
 
+				require("fs").appendFileSync(
+					"/tmp/orch.log",
+					"DBG fullscan-before-scan " + Date.now() + " aborted=" + signal.aborted + "\n",
+				)
 				const result = await this.scanner.scanDirectory(
 					this.workspacePath,
 					(batchError: Error) => {
@@ -274,8 +278,13 @@ export class CodeIndexOrchestrator {
 					handleFileParsed,
 					signal,
 				)
+				require("fs").appendFileSync(
+					"/tmp/orch.log",
+					"DBG fullscan-after-scan aborted=" + signal.aborted + " result=" + JSON.stringify(result) + "\n",
+				)
 
 				if (signal.aborted) {
+					require("fs").appendFileSync("/tmp/orch.log", "DBG abort-branch (signal.aborted) -> Standby\n")
 					await this.cacheManager.flush()
 					this.stopWatcher()
 					this.stateManager.setSystemState("Standby", t("embeddings:orchestrator.indexingStopped"))
@@ -331,8 +340,19 @@ export class CodeIndexOrchestrator {
 				this.stateManager.setSystemState("Indexed", t("embeddings:orchestrator.fileWatcherStarted"))
 			}
 		} catch (error: any) {
+			require("fs").appendFileSync(
+				"/tmp/orch.log",
+				"DBG CATCH name=" +
+					(error && error.name) +
+					" msg=" +
+					(error && error.message) +
+					" signalAborted=" +
+					signal.aborted +
+					"\n",
+			)
 			// Handle abort gracefully — not an error, just a user-initiated stop
 			if (error?.name === "AbortError" || signal.aborted) {
+				require("fs").appendFileSync("/tmp/orch.log", "DBG catch-abort-branch -> Standby\n")
 				console.log("[CodeIndexOrchestrator] Indexing aborted by user.")
 				await this.cacheManager.flush()
 				this.stopWatcher()

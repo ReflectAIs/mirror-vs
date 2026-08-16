@@ -331,7 +331,9 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 
 			// Record successful tool execution to update usage tracking stats
 			if (!toolResult.isError) {
-				await task.providerRef.deref()?.getMcpHub()?.recordToolExecution(serverName, toolName)
+				const provider = task.providerRef.deref()
+				const hub = provider?.getMcpHub?.()
+				await hub?.recordToolExecution?.(serverName, toolName)
 			}
 
 			// Send completion status
