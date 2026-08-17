@@ -2,6 +2,23 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.0] - 2026-08-17
+
+### Added
+
+- **DeepInfra Provider**: New chat provider using Anthropic's compatible endpoint (`https://api.deepinfra.com/anthropic`) with prompt-cache-hit support. Sends `cache_control` on the system prompt and last two user messages, parses `cache_creation`/`cache_read` input tokens, and computes cost via `calculateApiCostAnthropic`. Registered across the types package, API factory, [`ProfileValidator`](src/shared/ProfileValidator.ts), webview settings (constants, provider component, ApiOptions, useSelectedModel), and all 18 i18n locales (reactivated from the retired list). Backed by [`deepinfra.ts`](src/api/providers/deepinfra.ts) and [`DeepInfra.tsx`](webview-ui/src/components/settings/providers/DeepInfra.tsx).
+- **Session Context Sharing**: New [`SessionContextManager`](src/core/session/SessionContextManager.ts) that persists a compact summary per `sessionId` and exposes it to sibling sessions via the `read_session_context` tool, giving the model awareness of sibling sessions when context is shared.
+- **Inline Free-Form Model Selection**: Added a free-form model selection input near the chat text area for the Custom API provider, letting users type any model name without opening settings in [`ChatTextArea.tsx`](webview-ui/src/components/chat/ChatTextArea.tsx).
+- **Marketing Page**: Added the Mirror VS product advertising page under [`marketing/mirror-vs-product-advertising.md`](marketing/mirror-vs-product-advertising.md).
+
+### Fixed
+
+- **Complete Translations Across All Locales**: Finished translations for every locale file and removed unused files — all locales now carry the full key set (including DeepInfra entries and missing settings keys).
+
+### Changed
+
+- **Full Test Suite Green**: Made the complete test suite pass (5687 passing, 0 failures), including new coverage for DeepInfra and the inline model selector.
+
 ## [0.6.10] - 2026-08-16
 
 ### Fixed
