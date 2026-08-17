@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "Kan de vectordimensie voor model '{{modelId}}' met provider '{{provider}}' niet bepalen. Zorg ervoor dat de 'Embedding Dimensie' correct is ingesteld in de OpenAI-compatibele provider-instellingen.",
 		"vectorDimensionNotDetermined": "Kan de vectordimensie voor model '{{modelId}}' met provider '{{provider}}' niet bepalen. Controleer modelprofielen of configuratie.",
 		"qdrantUrlMissing": "Qdrant URL ontbreekt voor het maken van vectoropslag",
-		"codeIndexingNotConfigured": "Kan geen services maken: Code-indexering is niet correct geconfigureerd"
+		"codeIndexingNotConfigured": "Kan geen services maken: Code-indexering is niet correct geconfigureerd",
+		"anthropicConfigMissing": "Anthropic-configuratie ontbreekt voor het maken van de embedder",
+		"cohereConfigMissing": "Cohere-configuratie ontbreekt voor het maken van de embedder",
+		"jinaConfigMissing": "Jina-configuratie ontbreekt voor het maken van de embedder",
+		"voyageConfigMissing": "Voyage-configuratie ontbreekt voor het maken van de embedder"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "Indexering mislukt: Geen codeblokken werden succesvol geïndexeerd. Dit duidt meestal op een embedder configuratieprobleem.",

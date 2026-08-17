@@ -555,8 +555,8 @@ describe("SYSTEM_PROMPT", () => {
 		expect(prompt).not.toContain("<actual_tool_name>")
 		expect(prompt).not.toContain("</actual_tool_name>")
 
-		// Should contain Tool Use Guidelines section
-		expect(prompt).toContain("Tool Use Guidelines")
+		// Should contain Tool Selection Guidelines section
+		expect(prompt).toContain("Tool Selection Guidelines")
 
 		// Should NOT contain a tool catalog / XML examples
 		expect(prompt).not.toContain("# Tools")
@@ -573,6 +573,57 @@ describe("SYSTEM_PROMPT", () => {
 		expect(prompt).toContain("RULES")
 		expect(prompt).toContain("SYSTEM INFORMATION")
 		expect(prompt).toContain("OBJECTIVE")
+	})
+
+	it("should append session shared context to the system prompt when provided", async () => {
+		const sessionSharedContext = "# Session Shared Context\n- sibling tab: other-task"
+
+		const prompt = await SYSTEM_PROMPT(
+			mockContext,
+			"/test/path",
+			false,
+			undefined, // mcpHub
+			undefined, // diffStrategy
+			defaultModeSlug, // mode
+			undefined, // customModePrompts
+			undefined, // customModes
+			undefined, // globalCustomInstructions
+			experiments,
+			undefined, // language
+			undefined, // mirrorIgnoreInstructions
+			undefined, // settings
+			undefined, // todoList
+			undefined, // modelId
+			undefined, // skillsManager
+			sessionSharedContext, // sessionSharedContext
+		)
+
+		expect(prompt).toContain("# Session Shared Context")
+		expect(prompt).toContain("- sibling tab: other-task")
+	})
+
+	it("should not include a session shared context section when not provided", async () => {
+		const prompt = await SYSTEM_PROMPT(
+			mockContext,
+			"/test/path",
+			false,
+			undefined, // mcpHub
+			undefined, // diffStrategy
+			defaultModeSlug, // mode
+			undefined, // customModePrompts
+			undefined, // customModes
+			undefined, // globalCustomInstructions
+			experiments,
+			undefined, // language
+			undefined, // mirrorIgnoreInstructions
+			undefined, // settings
+			undefined, // todoList
+			undefined, // modelId
+			undefined, // skillsManager
+			undefined, // sessionSharedContext
+		)
+
+		expect(prompt).not.toContain("# Session Shared Context")
 	})
 
 	afterAll(() => {

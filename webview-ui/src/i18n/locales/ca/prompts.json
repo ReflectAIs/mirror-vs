@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Iniciar nova tasca",
 				"description": "Inicieu una nova tasca amb l'entrada proporcionada. Disponible a la paleta de comandes."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Millora el prompt d'imatge",
+				"description": "Millora els teus prompts d'imatge amb detalls, elements d'il·luminació, colors i descriptors adequats per a generadors text-a-imatge com Stable Diffusion i FLUX. S'utilitza automàticament en mode Dissenyador quan fas clic a ✨."
 			}
 		}
 	},

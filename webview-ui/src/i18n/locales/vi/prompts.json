@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Bắt đầu tác vụ mới",
 				"description": "Bắt đầu tác vụ mới với nội dung đã nhập. Có sẵn trong bảng lệnh."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Nâng cao Prompt Hình ảnh",
+				"description": "Nâng cao prompt hình ảnh của bạn với chi tiết, yếu tố ánh sáng, màu sắc và bộ mô tả phù hợp với các trình tạo văn bản thành hình ảnh như Stable Diffusion và FLUX. Được sử dụng tự động trong chế độ Nhà thiết kế khi bạn bấm ✨."
 			}
 		}
 	},

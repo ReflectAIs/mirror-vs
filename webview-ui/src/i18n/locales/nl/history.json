@@ -47,5 +47,12 @@
 	"subtaskTag": "Subtaak",
 	"deleteWithSubtasks": "Dit zal ook {{count}} subtaak(en) verwijderen. Weet je het zeker?",
 	"expandSubtasks": "Subtaken uitvouwen",
-	"collapseSubtasks": "Subtaken samenvouwen"
+	"collapseSubtasks": "Subtaken samenvouwen",
+	"session": "Sessie",
+	"renameSession": "Sessie hernoemen",
+	"renameSave": "Opslaan",
+	"renameCancel": "Annuleren",
+	"tasks_one": "{{count}} taak",
+	"tasks_other": "{{count}} taken",
+	"tokens": "tokens"
 }

@@ -13,6 +13,7 @@ import { experimentsSchema } from "./experiment.js"
 import { modeConfigSchema } from "./mode.js"
 import { customModePromptsSchema, customSupportPromptsSchema } from "./mode.js"
 import { toolNamesSchema } from "./tool.js"
+import { sharedSessionContextSchema } from "./session.js"
 import { languagesSchema } from "./vscode.js"
 
 /**
@@ -263,6 +264,13 @@ export const globalSettingsSchema = z.object({
 	 * Closed tabs are excluded from session tab restoration on next startup.
 	 */
 	sessionClosedTabs: z.record(z.string(), z.array(z.string())).optional(),
+
+	/**
+	 * Shared selective context between tabs in the same session:
+	 * auto-extracted knowledge notes and user-curated notes.
+	 * Keyed by sessionId UUID. See `SharedSessionContext` in session.ts.
+	 */
+	sessionSharedContexts: z.record(z.string(), sharedSessionContextSchema).optional(),
 
 	activeSearchProvider: z.string().optional(),
 	userBraveApiKey: z.string().optional(),

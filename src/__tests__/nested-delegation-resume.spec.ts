@@ -39,6 +39,7 @@ vi.mock("../core/task-persistence", () => ({
 
 import { attemptCompletionTool } from "../core/tools/AttemptCompletionTool"
 import { MirrorProvider } from "../core/webview/MirrorProvider"
+import { DelegationManager } from "../core/webview/MirrorProviderDelegation"
 import type { Task } from "../core/task/Task"
 import { readTaskMessages } from "../core/task-persistence/taskMessages"
 import { readApiMessages, saveApiMessages, saveTaskMessages } from "../core/task-persistence"
@@ -146,7 +147,7 @@ describe("Nested delegation resume (A → B → C)", () => {
 			updateTaskHistory,
 			// Wire through provider method so attemptCompletionTool can call it
 			reopenParentFromDelegation: vi.fn(async (params: any) => {
-				return await (MirrorProvider.prototype as any).reopenParentFromDelegation.call(provider, params)
+				return await (DelegationManager.prototype as any).reopenParentFromDelegation.call({ provider }, params)
 			}),
 		} as unknown as MirrorProvider
 
@@ -162,6 +163,7 @@ describe("Nested delegation resume (A → B → C)", () => {
 			historyItem: { parentTaskId: "B" },
 			providerRef: { deref: () => provider },
 			say: vi.fn().mockResolvedValue(undefined),
+			ask: vi.fn().mockResolvedValue({ response: "yesButtonClicked", text: "", images: [] }),
 			emit: vi.fn(),
 			getTokenUsage: vi.fn(() => ({})),
 			toolUsage: {},
@@ -209,6 +211,7 @@ describe("Nested delegation resume (A → B → C)", () => {
 			historyItem: { parentTaskId: "A" },
 			providerRef: { deref: () => provider },
 			say: vi.fn().mockResolvedValue(undefined),
+			ask: vi.fn().mockResolvedValue({ response: "yesButtonClicked", text: "", images: [] }),
 			emit: vi.fn(),
 			getTokenUsage: vi.fn(() => ({})),
 			toolUsage: {},

@@ -6,6 +6,7 @@ import {
 	type RouterModels,
 	anthropicModels,
 	bedrockModels,
+	deepInfraModels,
 	deepSeekModels,
 	moonshotModels,
 	minimaxModels,
@@ -307,6 +308,11 @@ function getSelectedModel({
 		case "sambanova": {
 			const id = apiConfiguration.apiModelId ?? defaultModelId
 			const info = sambaNovaModels[id as keyof typeof sambaNovaModels]
+			return { id, info }
+		}
+		case "deepinfra": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = deepInfraModels[id as keyof typeof deepInfraModels]
 			return { id, info }
 		}
 		case "fireworks": {

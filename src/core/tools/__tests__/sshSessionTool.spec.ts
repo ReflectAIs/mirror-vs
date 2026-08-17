@@ -31,6 +31,9 @@ describe("sshSessionTool", () => {
 			recordToolError: vi.fn(),
 			sayAndCreateMissingParamError: vi.fn().mockResolvedValue("Missing parameter error"),
 			say: vi.fn().mockResolvedValue(undefined),
+			providerRef: {
+				deref: vi.fn().mockResolvedValue({ context: undefined }),
+			},
 		}
 
 		mockPushToolResult = vi.fn((result) => {

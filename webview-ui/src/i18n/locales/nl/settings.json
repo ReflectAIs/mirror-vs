@@ -41,7 +41,9 @@
 		"experimental": "Experimenteel",
 		"language": "Taal",
 		"about": "Over Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Afbeeldingsgeneratie",
+		"pipelines": "Pipelines"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Automatisch verzoeken indienen tot aan deze limieten voordat om goedkeuring wordt gevraagd om door te gaan."
+		},
+		"autonomousMode": {
+			"label": "Autonome modus",
+			"description": "Wanneer ingeschakeld, worden alle uitvoeringsopdrachten en bestandsbewerkingen buiten de werkruimte automatisch goedgekeurd zonder toestemming. Dit is een modus voor volledig vertrouwen — gebruik met voorzichtigheid."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Wanneer ingeschakeld, worden git-opdrachten (commit, push, add, pull, merge, rebase, enz.) automatisch goedgekeurd. Wanneer uitgeschakeld, moet de assistent om goedkeuring vragen voordat hij een git-bewerking uitvoert."
+		},
+		"browser": {
+			"label": "Browser",
+			"description": "De assistent automatisch toestaan om de browser te bedienen (navigeren, klikken, typen, scrollen, screenshots) zonder goedkeuring te vragen"
 		}
 	},
 	"providers": {
@@ -392,6 +406,8 @@
 		"geminiApiKey": "Gemini API-sleutel",
 		"getSambaNovaApiKey": "SambaNova API-sleutel ophalen",
 		"sambaNovaApiKey": "SambaNova API-sleutel",
+		"deepInfraApiKey": "DeepInfra API-sleutel",
+		"getDeepInfraApiKey": "DeepInfra API-sleutel ophalen",
 		"getGeminiApiKey": "Gemini API-sleutel ophalen",
 		"apiKey": "API-sleutel",
 		"openAiApiKey": "OpenAI API-sleutel",
@@ -815,6 +831,42 @@
 			"refreshSuccess": "Tools succesvol vernieuwd",
 			"refreshError": "Fout bij vernieuwen van tools",
 			"toolParameters": "Parameters"
+		},
+		"TXT2IMG": {
+			"name": "Tekst-naar-Afbeelding (txt2img)",
+			"description": "Wanneer ingeschakeld, kan de assistent afbeeldingen genereren uit tekstbeschrijvingen met behulp van dit pipelinetype."
+		},
+		"IMG2IMG": {
+			"name": "Afbeelding-naar-Afbeelding (img2img)",
+			"description": "Wanneer ingeschakeld, kan de assistent bestaande afbeeldingen transformeren met tekstgestuurde bewerkingen."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "Wanneer ingeschakeld, kan de assistent specifieke gebieden van een afbeelding vervangen of repareren."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "Wanneer ingeschakeld, kan de assistent een afbeelding buiten de oorspronkelijke grenzen uitbreiden."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "Wanneer ingeschakeld, kan de assistent de resolutie van een afbeelding verhogen."
+		},
+		"REMOVE_BG": {
+			"name": "Achtergrond verwijderen",
+			"description": "Wanneer ingeschakeld, kan de assistent de achtergrond van een afbeelding verwijderen."
+		},
+		"TXT2AUDIO": {
+			"name": "Tekst-naar-Audio (txt2audio)",
+			"description": "Wanneer ingeschakeld, kan de assistent muziek en audioclips genereren uit tekstbeschrijvingen."
+		},
+		"TXT2VIDEO": {
+			"name": "Tekst-naar-Video (txt2video)",
+			"description": "Wanneer ingeschakeld, kan de assistent korte videoclips genereren uit tekstbeschrijvingen."
+		},
+		"MULTI_TAB": {
+			"name": "Experimentele interface met meerdere tabbladen",
+			"description": "Wanneer ingeschakeld, biedt het een browserachtige werkruimte met meerdere tabbladen om te schakelen tussen meerdere taken en deze tegelijkertijd binnen een sessie uit te voeren."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "Naam moet 1-64 kleine letters, cijfers of streepjes zijn",
 			"descriptionRequired": "Beschrijving is verplicht",
 			"descriptionTooLong": "Beschrijving moet maximaal 1024 tekens zijn"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "Hoe afbeeldingsgeneratie werkt",
+		"guideDescription": "Elk generatietype (txt2img, img2img, enz.) gebruikt een pipeline — een ComfyUI-workflow die definieert hoe het model invoer verwerkt. Schakel een type in, kies een provider (lokale ComfyUI of cloud OpenRouter) en selecteer daarna een pipeline of model.",
+		"imagePipelines": "Afbeeldingspipelines",
+		"imagePipelinesDescription": "Genereer, bewerk en transformeer afbeeldingen met ComfyUI-workflows of OpenRouter-modellen.",
+		"mediaPipelines": "Mediapipelines",
+		"mediaPipelinesDescription": "Genereer audio- en video-inhoud met speciale pipelines.",
+		"pipelineSettings": "Pipeline-instellingen",
+		"pipelineSettingsDescription": "Beheer ComfyUI-workflowpipelines voor afbeeldingsgeneratie. Upload aangepaste workflows of stel standaardwaarden in per taaktype.",
+		"pipelineSummary": "{{count}} pipeline(s) ontdekt",
+		"importPipeline": "Pipeline importeren",
+		"inlineImportTooltip": "Importeer een ComfyUI-workflow-JSON voor dit pipelinetype",
+		"noPipelinesFound": "Geen pipelines gevonden. Importeer een ComfyUI-workflow-JSON om te beginnen.",
+		"alreadyDefault": "Al ingesteld als standaard voor dit type",
+		"setAsDefault": "Instellen als standaard voor dit type",
+		"deletePipeline": "Pipeline verwijderen",
+		"deleteDialog": {
+			"title": "Pipeline verwijderen",
+			"description": "Weet je zeker dat je de pipeline \"{{name}}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+			"confirm": "Verwijderen",
+			"cancel": "Annuleren"
+		},
+		"importDialog": {
+			"title": "Pipeline importeren",
+			"description": "Plak een ComfyUI-workflow-JSON om deze als nieuwe pipeline te importeren.",
+			"confirm": "Importeren",
+			"cancel": "Annuleren",
+			"importing": "Bezig met importeren..."
 		}
 	}
 }

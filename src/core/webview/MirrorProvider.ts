@@ -55,6 +55,7 @@ import { forceFullModelDetailsLoad, hasLoadedFullDetails } from "../../api/provi
 import { ContextProxy } from "../config/ContextProxy"
 import { ProviderSettingsManager } from "../config/ProviderSettingsManager"
 import { CustomModesManager } from "../config/CustomModesManager"
+import { SessionContextManager } from "../session/SessionContextManager"
 import { Task } from "../task/Task"
 
 import { webviewMessageHandler } from "./webviewMessageHandler"
@@ -204,6 +205,13 @@ export class MirrorProvider
 	 */
 	public readonly helpers: Helpers
 
+	/**
+	 * Delegated session context manager — owns the shared selective context
+	 * between tabs in the same session (sibling awareness, auto knowledge,
+	 * curated notes). Lazily initialized on first access.
+	 */
+	public sessionContextManager?: SessionContextManager
+
 	constructor(
 		readonly context: vscode.ExtensionContext,
 		private readonly outputChannel: vscode.OutputChannel,
@@ -277,6 +285,17 @@ export class MirrorProvider
 						`currentSessionId=${this.currentSessionId}`,
 				)
 				this.emit(MirrorVSEventName.TaskCompleted, taskId, tokenUsage, toolUsage)
+
+				// Extract distilled knowledge from the completed task into the
+				// session's shared context (no-op for tasks without a sessionId).
+				try {
+					await this.getSessionContextManager().extractKnowledgeFromTask(instance)
+				} catch (error) {
+					this.log(
+						`[onTaskCompleted] Failed to extract session knowledge: ${error instanceof Error ? error.message : String(error)}`,
+					)
+				}
+
 				this.postStateToWebviewWithoutMirrorMessages()
 
 				// If this is a background task, clean it up automatically to prevent memory leaks.
@@ -2125,6 +2144,32 @@ export class MirrorProvider
 		}
 
 		return this.mirrorStack[this.mirrorStack.length - 1]
+	}
+
+	/**
+	 * Returns a lazily-initialized SessionContextManager for this provider.
+	 */
+	public getSessionContextManager(): SessionContextManager {
+		if (!this.sessionContextManager) {
+			this.sessionContextManager = new SessionContextManager(this)
+		}
+		return this.sessionContextManager
+	}
+
+	/**
+	 * Builds the compact `# Session Shared Context` section for the given task's
+	 * session. Falls back to the current task when no taskId is supplied.
+	 * Returns "" when the task has no session, so callers inject nothing.
+	 */
+	public async buildSessionSharedContext(taskId?: string): Promise<string> {
+		const task = taskId
+			? (this.mirrorStack.find((t) => t.taskId === taskId) ??
+				[...this.backgroundTasks.values()].find((t) => t.taskId === taskId))
+			: this.getCurrentTask()
+		if (!task?.sessionId) {
+			return ""
+		}
+		return this.getSessionContextManager().buildCompactSummary(task.sessionId, task.taskId)
 	}
 
 	public getRecentTasks(): string[] {

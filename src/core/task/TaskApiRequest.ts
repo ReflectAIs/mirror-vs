@@ -125,6 +125,7 @@ export class TaskApiRequest {
 				undefined, // todoList
 				this.task.api.getModel().id,
 				provider.getSkillsManager(),
+				await provider.buildSessionSharedContext(this.task.taskId),
 			)
 		})()
 	}

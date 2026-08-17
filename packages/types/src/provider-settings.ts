@@ -6,6 +6,7 @@ import {
 	anthropicModels,
 	basetenModels,
 	bedrockModels,
+	deepInfraModels,
 	deepSeekModels,
 	fireworksModels,
 	geminiModels,
@@ -105,6 +106,7 @@ export const providerNames = [
 	"anthropic",
 	"bedrock",
 	"baseten",
+	"deepinfra",
 	"deepseek",
 	"fireworks",
 	"gemini",
@@ -135,7 +137,6 @@ export const isProviderName = (key: unknown): key is ProviderName =>
 export const retiredProviderNames = [
 	"cerebras",
 	"chutes",
-	"deepinfra",
 	"doubao",
 	"featherless",
 	"groq",
@@ -365,6 +366,10 @@ const sambaNovaSchema = apiModelIdProviderModelSchema.extend({
 	sambaNovaApiKey: z.string().optional(),
 })
 
+const deepInfraSchema = apiModelIdProviderModelSchema.extend({
+	deepInfraApiKey: z.string().optional(),
+})
+
 export const zaiApiLineSchema = z.enum(["international_coding", "china_coding", "international_api", "china_api"])
 
 export type ZaiApiLine = z.infer<typeof zaiApiLineSchema>
@@ -421,6 +426,7 @@ export const providerSettingsSchemaDiscriminated = z.discriminatedUnion("apiProv
 	basetenSchema.merge(z.object({ apiProvider: z.literal("baseten") })),
 	litellmSchema.merge(z.object({ apiProvider: z.literal("litellm") })),
 	sambaNovaSchema.merge(z.object({ apiProvider: z.literal("sambanova") })),
+	deepInfraSchema.merge(z.object({ apiProvider: z.literal("deepinfra") })),
 	zaiSchema.merge(z.object({ apiProvider: z.literal("zai") })),
 	fireworksSchema.merge(z.object({ apiProvider: z.literal("fireworks") })),
 	qwenCodeSchema.merge(z.object({ apiProvider: z.literal("qwen-code") })),
@@ -455,6 +461,7 @@ export const providerSettingsSchema = z.object({
 	...basetenSchema.shape,
 	...litellmSchema.shape,
 	...sambaNovaSchema.shape,
+	...deepInfraSchema.shape,
 	...zaiSchema.shape,
 	...fireworksSchema.shape,
 	...qwenCodeSchema.shape,
@@ -531,6 +538,7 @@ export const modelIdKeysByProvider: Record<TypicalProvider, ModelIdKey> = {
 	baseten: "apiModelId",
 	litellm: "litellmModelId",
 	sambanova: "apiModelId",
+	deepinfra: "apiModelId",
 	zai: "apiModelId",
 	fireworks: "apiModelId",
 	"vercel-ai-gateway": "vercelAiGatewayModelId",
@@ -541,7 +549,7 @@ export const modelIdKeysByProvider: Record<TypicalProvider, ModelIdKey> = {
  */
 
 // Providers that use Anthropic-style API protocol.
-export const ANTHROPIC_STYLE_PROVIDERS: ProviderName[] = ["anthropic", "bedrock", "minimax"]
+export const ANTHROPIC_STYLE_PROVIDERS: ProviderName[] = ["anthropic", "bedrock", "minimax", "deepinfra"]
 
 export const getApiProtocol = (provider: ProviderName | undefined, modelId?: string): "anthropic" | "openai" => {
 	if (provider && ANTHROPIC_STYLE_PROVIDERS.includes(provider)) {
@@ -623,6 +631,11 @@ export const MODELS_BY_PROVIDER: Record<
 		id: "sambanova",
 		label: "SambaNova",
 		models: Object.keys(sambaNovaModels),
+	},
+	deepinfra: {
+		id: "deepinfra",
+		label: "DeepInfra",
+		models: Object.keys(deepInfraModels),
 	},
 	vertex: {
 		id: "vertex",

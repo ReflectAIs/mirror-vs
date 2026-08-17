@@ -3,6 +3,7 @@ import {
 	type ModelInfo,
 	anthropicModels,
 	bedrockModels,
+	deepInfraModels,
 	deepSeekModels,
 	moonshotModels,
 	geminiModels,
@@ -22,6 +23,7 @@ import {
 export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, ModelInfo>>> = {
 	anthropic: anthropicModels,
 	bedrock: bedrockModels,
+	deepinfra: deepInfraModels,
 	deepseek: deepSeekModels,
 	moonshot: moonshotModels,
 	gemini: geminiModels,
@@ -42,6 +44,7 @@ export const PROVIDERS = [
 	{ value: "openrouter", label: "OpenRouter", proxy: false },
 	{ value: "anthropic", label: "Anthropic", proxy: false },
 	{ value: "gemini", label: "Google Gemini", proxy: false },
+	{ value: "deepinfra", label: "DeepInfra", proxy: false },
 	{ value: "deepseek", label: "DeepSeek", proxy: false },
 	{ value: "moonshot", label: "Moonshot", proxy: false },
 	{ value: "openai-native", label: "OpenAI", proxy: false },

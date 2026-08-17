@@ -43,5 +43,18 @@
 	"settings.debug.description": "Activa el modo de depuración para mostrar botones adicionales para ver el historial de conversación de API y los mensajes de la interfaz de usuario como JSON embellecido en archivos temporales.",
 	"settings.debugProxy.enabled.description": "**Activar Debug Proxy** — Redirige todas las solicitudes de red salientes a través de un proxy para depuración MITM. Solo está activo cuando se ejecuta en modo depuración (F5).",
 	"settings.debugProxy.serverUrl.description": "URL del proxy (p. ej., `http://127.0.0.1:8888`). Solo se usa cuando **Debug Proxy** está activado.",
-	"settings.debugProxy.tlsInsecure.description": "Aceptar certificados autofirmados del proxy. **Necesario para la inspección MITM.** ⚠️ Inseguro: úsalo solo para depuración local."
+	"settings.debugProxy.tlsInsecure.description": "Aceptar certificados autofirmados del proxy. **Necesario para la inspección MITM.** ⚠️ Inseguro: úsalo solo para depuración local.",
+	"command.newTab.title": "Nueva pestaña",
+	"command.newSession.title": "Nueva sesión",
+	"command.closeTab.title": "Cerrar pestaña",
+	"command.generateTests.title": "Generar pruebas unitarias",
+	"command.refactorFunction.title": "Refactorizar función",
+	"command.toggleAutonomousMode.title": "Alternar modo autónomo",
+	"command.acceptReview.title": "Aceptar cambios",
+	"command.rejectReview.title": "Rechazar cambios",
+	"command.acceptAllReviews.title": "Aceptar todos los cambios",
+	"command.diffReview.title": "Comparar cambios",
+	"command.prevChange.title": "Cambio de revisión anterior",
+	"command.nextChange.title": "Cambio de revisión siguiente",
+	"settings.autoApproveBrowser.description": "Aprobar automáticamente las acciones del navegador (navegar, hacer clic, escribir, tomar capturas, etc.)"
 }

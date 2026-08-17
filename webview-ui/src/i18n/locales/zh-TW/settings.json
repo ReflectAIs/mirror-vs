@@ -41,7 +41,9 @@
 		"experimental": "實驗性",
 		"language": "語言",
 		"about": "關於 Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "影像產生",
+		"pipelines": "管線"
 	},
 	"about": {
 		"bugReport": {
@@ -287,7 +289,19 @@
 		},
 		"toggleAriaLabel": "切換自動核准狀態",
 		"disabledAriaLabel": "自動核准已停用 - 請先選取下方選項",
-		"selectOptionsFirst": "請先選取下方至少一個選項以啟用自動核准"
+		"selectOptionsFirst": "請先選取下方至少一個選項以啟用自動核准",
+		"autonomousMode": {
+			"label": "自主模式",
+			"description": "啟用後，工作區之外的所有執行命令和檔案作業都會自動獲得核准，無需權限。這是完全信任模式——請謹慎使用。"
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "啟用後，git 命令（commit、push、add、pull、merge、rebase 等）會自動獲得核准。停用後，助手必須在執行任何 git 作業之前要求核准。"
+		},
+		"browser": {
+			"label": "瀏覽器",
+			"description": "自動允許助手控制瀏覽器（導覽、點擊、輸入、捲動、截圖），無需獲得核准"
+		}
 	},
 	"providers": {
 		"providerDocumentation": "{{provider}} 說明文件",
@@ -402,6 +416,8 @@
 		"geminiApiKey": "Gemini API 金鑰",
 		"getSambaNovaApiKey": "取得 SambaNova API 金鑰",
 		"sambaNovaApiKey": "SambaNova API 金鑰",
+		"deepInfraApiKey": "DeepInfra API 金鑰",
+		"getDeepInfraApiKey": "取得 DeepInfra API 金鑰",
 		"getGeminiApiKey": "取得 Gemini API 金鑰",
 		"openAiApiKey": "OpenAI API 金鑰",
 		"apiKey": "API 金鑰",
@@ -825,6 +841,42 @@
 			"refreshSuccess": "工具重新整理成功",
 			"refreshError": "工具重新整理失敗",
 			"toolParameters": "參數"
+		},
+		"TXT2IMG": {
+			"name": "文字轉影像 (txt2img)",
+			"description": "啟用後，助手可以使用此管線類型根據文字描述產生影像。"
+		},
+		"IMG2IMG": {
+			"name": "影像轉影像 (img2img)",
+			"description": "啟用後，助手可以使用文字引導的編輯來轉換現有影像。"
+		},
+		"INPAINT": {
+			"name": "修復（Inpaint）",
+			"description": "啟用後，助手可以取代或修復影像的特定區域。"
+		},
+		"OUTPAINT": {
+			"name": "擴圖（Outpaint）",
+			"description": "啟用後，助手可以將影像延伸到其原始邊界之外。"
+		},
+		"UPSCALE": {
+			"name": "放大（Upscale）",
+			"description": "啟用後，助手可以提高影像的解析度。"
+		},
+		"REMOVE_BG": {
+			"name": "移除背景",
+			"description": "啟用後，助手可以從影像中移除背景。"
+		},
+		"TXT2AUDIO": {
+			"name": "文字轉音訊 (txt2audio)",
+			"description": "啟用後，助手可以根據文字描述產生音樂和音訊片段。"
+		},
+		"TXT2VIDEO": {
+			"name": "文字轉影片 (txt2video)",
+			"description": "啟用後，助手可以根據文字描述產生短影片片段。"
+		},
+		"MULTI_TAB": {
+			"name": "實驗性多索引標籤介面",
+			"description": "啟用後，提供類似瀏覽器的多索引標籤工作區，可在工作階段內切換並同時執行多個工作。"
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "名稱必須為1-64個小寫字母、數字或連字號",
 			"descriptionRequired": "說明為必填",
 			"descriptionTooLong": "說明不得超過1024個字元"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "影像產生的運作方式",
+		"guideDescription": "每種產生類型（txt2img、img2img 等）都使用一條管線——一個 ComfyUI 工作流程，定義模型如何處理輸入。啟用一種類型，選擇提供者（本機 ComfyUI 或雲端 OpenRouter），然後選擇一條管線或模型。",
+		"imagePipelines": "影像管線",
+		"imagePipelinesDescription": "使用 ComfyUI 工作流程或 OpenRouter 模型產生、編輯和轉換影像。",
+		"mediaPipelines": "媒體管線",
+		"mediaPipelinesDescription": "使用專用管線產生音訊和影片內容。",
+		"pipelineSettings": "管線設定",
+		"pipelineSettingsDescription": "管理用於影像產生的 ComfyUI 工作流程管線。上傳自訂工作流程或依工作類型設定預設值。",
+		"pipelineSummary": "發現 {{count}} 條管線",
+		"importPipeline": "匯入管線",
+		"inlineImportTooltip": "為此管線類型匯入 ComfyUI 工作流程 JSON",
+		"noPipelinesFound": "找不到管線。匯入 ComfyUI 工作流程 JSON 以開始使用。",
+		"alreadyDefault": "已設定為此類型的預設值",
+		"setAsDefault": "設定為此類型的預設值",
+		"deletePipeline": "刪除管線",
+		"deleteDialog": {
+			"title": "刪除管線",
+			"description": "確定要刪除管線 \"{{name}}\" 嗎？此操作無法復原。",
+			"confirm": "刪除",
+			"cancel": "取消"
+		},
+		"importDialog": {
+			"title": "匯入管線",
+			"description": "貼上 ComfyUI 工作流程 JSON，將其匯入為新管線。",
+			"confirm": "匯入",
+			"cancel": "取消",
+			"importing": "正在匯入..."
 		}
 	}
 }

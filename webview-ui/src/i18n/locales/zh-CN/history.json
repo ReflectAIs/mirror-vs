@@ -47,5 +47,12 @@
 	"subtaskTag": "子任务",
 	"deleteWithSubtasks": "这也将删除 {{count}} 个子任务。您确定吗？",
 	"expandSubtasks": "展开子任务",
-	"collapseSubtasks": "收起子任务"
+	"collapseSubtasks": "收起子任务",
+	"session": "会话",
+	"renameSession": "重命名会话",
+	"renameSave": "保存",
+	"renameCancel": "取消",
+	"tasks_one": "{{count}} 个任务",
+	"tasks_other": "{{count}} 个任务",
+	"tokens": "令牌"
 }

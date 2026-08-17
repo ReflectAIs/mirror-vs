@@ -43,5 +43,18 @@
 	"settings.debug.description": "启用调试模式以显示额外按钮，用于在临时文件中以格式化 JSON 查看 API 对话历史和 UI 消息。",
 	"settings.debugProxy.enabled.description": "**启用 Debug Proxy** — 通过代理转发所有出站网络请求，用于 MITM 调试。只在调试模式 (F5) 运行时生效。",
 	"settings.debugProxy.serverUrl.description": "代理 URL（例如 `http://127.0.0.1:8888`）。仅在启用 **Debug Proxy** 时使用。",
-	"settings.debugProxy.tlsInsecure.description": "接受来自代理的 self-signed 证书。**MITM 检查所必需。** ⚠️ 不安全——只在本地调试时使用。"
+	"settings.debugProxy.tlsInsecure.description": "接受来自代理的 self-signed 证书。**MITM 检查所必需。** ⚠️ 不安全——只在本地调试时使用。",
+	"command.newTab.title": "新建标签页",
+	"command.newSession.title": "新建会话",
+	"command.closeTab.title": "关闭标签页",
+	"command.generateTests.title": "生成单元测试",
+	"command.refactorFunction.title": "重构函数",
+	"command.toggleAutonomousMode.title": "切换自主模式",
+	"command.acceptReview.title": "接受更改",
+	"command.rejectReview.title": "拒绝更改",
+	"command.acceptAllReviews.title": "接受所有更改",
+	"command.diffReview.title": "比较更改",
+	"command.prevChange.title": "上一处审查更改",
+	"command.nextChange.title": "下一处审查更改",
+	"settings.autoApproveBrowser.description": "自动批准浏览器操作（导航、点击、输入、截图等）"
 }

@@ -126,6 +126,11 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const [searchLoading, setSearchLoading] = useState(false)
 		const [searchRequestId, setSearchRequestId] = useState<string>("")
 
+		// Free-form model input (Custom API, OpenAI Compatible, VS Code LM, etc.) buffers
+		// the draft in local state and commits on Enter/blur to avoid firing a message per keystroke.
+		const [modelInputFocused, setModelInputFocused] = useState(false)
+		const [modelDraft, setModelDraft] = useState<string>(modelId ?? "")
+
 		// Close dropdown when clicking outside.
 		useEffect(() => {
 			const handleClickOutside = () => {
@@ -137,6 +142,21 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			document.addEventListener("mousedown", handleClickOutside)
 			return () => document.removeEventListener("mousedown", handleClickOutside)
 		}, [showDropdown])
+
+		// Keep the draft in sync with the persisted model id while not editing.
+		useEffect(() => {
+			if (!modelInputFocused) {
+				setModelDraft(modelId ?? "")
+			}
+		}, [modelId, modelInputFocused])
+
+		const commitModelDraft = useCallback(() => {
+			const trimmed = modelDraft.trim()
+			if (trimmed && onModelChange && trimmed !== modelId) {
+				onModelChange(trimmed)
+			}
+			setModelInputFocused(false)
+		}, [modelDraft, onModelChange, modelId])
 
 		// Handle enhanced prompt response and search results.
 		useEffect(() => {
@@ -1329,25 +1349,52 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							customModes={customModes}
 							customModePrompts={customModePrompts}
 						/>
-						{modelOptions && modelOptions.length > 0 && modelId !== undefined && onModelChange && (
-							<select
-								value={modelId}
-								onChange={(e) => onModelChange(e.target.value)}
-								className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
-								style={{
-									backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-									backgroundPosition: "right 4px center",
-									backgroundRepeat: "no-repeat",
-									backgroundSize: "14px 14px",
-									paddingRight: "20px",
-								}}>
-								{modelOptions.map((opt) => (
-									<option key={opt.value} value={opt.value}>
-										{opt.label}
-									</option>
-								))}
-							</select>
-						)}
+						{modelId !== undefined &&
+							onModelChange &&
+							(modelOptions && modelOptions.length > 0 ? (
+								<select
+									data-testid="model-selector"
+									value={modelId}
+									onChange={(e) => onModelChange(e.target.value)}
+									className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
+									style={{
+										backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+										backgroundPosition: "right 4px center",
+										backgroundRepeat: "no-repeat",
+										backgroundSize: "14px 14px",
+										paddingRight: "20px",
+									}}>
+									{modelOptions.map((opt) => (
+										<option key={opt.value} value={opt.value}>
+											{opt.label}
+										</option>
+									))}
+								</select>
+							) : (
+								<input
+									type="text"
+									data-testid="model-input"
+									value={modelInputFocused ? modelDraft : (modelId ?? "")}
+									onFocus={() => {
+										setModelDraft(modelId ?? "")
+										setModelInputFocused(true)
+									}}
+									onChange={(e) => setModelDraft(e.target.value)}
+									onBlur={commitModelDraft}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault()
+											commitModelDraft()
+											e.currentTarget.blur()
+										} else if (e.key === "Escape") {
+											e.currentTarget.blur()
+										}
+									}}
+									placeholder="model id"
+									title="Model"
+									className="min-w-0 w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via"
+								/>
+							))}
 						<AutoApproveDropdown triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
 						<TerminalStatusBadge />
 						<SessionArtifacts triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />

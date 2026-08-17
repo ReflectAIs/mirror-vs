@@ -5,43 +5,45 @@ describe("getObjectiveSection", () => {
 		const objective = getObjectiveSection()
 
 		// Check that all numbered items are present
-		expect(objective).toContain("1. Analyze the user's task")
-		expect(objective).toContain("2. Work through these goals sequentially")
-		expect(objective).toContain("3. Remember, you have extensive capabilities")
-		expect(objective).toContain("4. Once you've completed the user's task")
-		expect(objective).toContain("5. The user may provide feedback")
+		expect(objective).toContain("1. Analyze the task, set achievable goals, and prioritize them.")
+		expect(objective).toContain("2. Work through each goal methodically, using one tool at a time.")
+		expect(objective).toContain("3. Before calling a tool, examine environment_details for context.")
+		expect(objective).toContain("4. Use attempt_completion to present the final result once done.")
+		expect(objective).toContain(
+			"5. User feedback may be incorporated, but do not end responses with questions or further offers.",
+		)
 	})
 
-	it("should include analysis guidance", () => {
+	it("should include iterative-work guidance", () => {
 		const objective = getObjectiveSection()
 
-		expect(objective).toContain("Before calling a tool, do some analysis")
-		expect(objective).toContain("analyze the file structure provided in environment_details")
-		expect(objective).toContain("think about which of the provided tools is the most relevant")
+		expect(objective).toContain(
+			"Work iteratively: break tasks into clear steps, prioritize logically, and complete them sequentially.",
+		)
+		expect(objective).toContain("Outcomes of each step inform the next.")
 	})
 
 	it("should include parameter inference guidance", () => {
 		const objective = getObjectiveSection()
 
-		expect(objective).toContain("Go through each of the required parameters")
 		expect(objective).toContain(
-			"determine if the user has directly provided or given enough information to infer a value",
+			"Pick the most relevant tool and verify all required parameters can be inferred from available information",
 		)
-		expect(objective).toContain("DO NOT invoke the tool (not even with fillers for the missing params)")
-		expect(objective).toContain("ask_followup_question tool")
+		expect(objective).toContain("If any required parameter is missing, DO NOT invoke the tool")
+		expect(objective).toContain("use ask_followup_question instead")
+		expect(objective).toContain("Never request optional params")
 	})
 
 	it("should include guidance about not engaging in back and forth conversations", () => {
 		const objective = getObjectiveSection()
 
-		expect(objective).toContain("DO NOT continue in pointless back and forth conversations")
-		expect(objective).toContain("don't end your responses with questions or offers for further assistance")
+		expect(objective).toContain("do not end responses with questions or further offers")
 	})
 
 	it("should include the OBJECTIVE header", () => {
 		const objective = getObjectiveSection()
 
 		expect(objective).toContain("OBJECTIVE")
-		expect(objective).toContain("You accomplish a given task iteratively")
+		expect(objective).toContain("Work iteratively")
 	})
 })

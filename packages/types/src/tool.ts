@@ -67,6 +67,8 @@ export const toolNames = [
 	"get_git_status",
 	"search_mcp_tools",
 	"activate_mcp_tool",
+	// Session shared context (intersession context sharing)
+	"read_session_context",
 ] as const
 
 export const toolNamesSchema = z.enum(toolNames)

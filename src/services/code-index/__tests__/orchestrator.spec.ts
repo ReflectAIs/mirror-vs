@@ -53,6 +53,7 @@ describe("CodeIndexOrchestrator - error path cleanup gating", () => {
 
 		configManager = {
 			isFeatureConfigured: true,
+			getConfig: () => ({ qdrantUrl: "http://localhost:6333" }),
 		}
 
 		// Minimal state manager that tracks state transitions
@@ -166,6 +167,7 @@ describe("CodeIndexOrchestrator - stopIndexing", () => {
 
 		configManager = {
 			isFeatureConfigured: true,
+			getConfig: () => ({ qdrantUrl: "http://localhost:6333" }),
 		}
 
 		let currentState = "Standby"

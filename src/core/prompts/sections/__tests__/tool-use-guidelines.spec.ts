@@ -1,39 +1,44 @@
 import { getToolUseGuidelinesSection } from "../tool-use-guidelines"
 
 describe("getToolUseGuidelinesSection", () => {
-	it("should include proper numbered guidelines", () => {
+	it("should include tool selection guidelines", () => {
 		const guidelines = getToolUseGuidelinesSection()
 
-		expect(guidelines).toContain("1. Assess what information")
-		expect(guidelines).toContain("2. Choose the most appropriate tool")
-		expect(guidelines).toContain("3. If multiple actions are needed")
+		expect(guidelines).toContain("## Tool Selection Guidelines")
+		expect(guidelines).toContain("Read code:")
+		expect(guidelines).toContain("Search code:")
+		expect(guidelines).toContain("Edit code:")
+		expect(guidelines).toContain("Web info:")
+		expect(guidelines).toContain("Refresh context:")
 	})
 
-	it("should include multiple-tools-per-message guidance", () => {
+	it("should include truncation handling guidance", () => {
 		const guidelines = getToolUseGuidelinesSection()
 
-		expect(guidelines).toContain("you may use multiple tools in a single message")
-		expect(guidelines).not.toContain("use one tool at a time per message")
+		expect(guidelines).toContain("Truncated files:")
+		expect(guidelines).toContain("Truncated terminal output:")
+		expect(guidelines).toContain("read_command_output")
 	})
 
-	it("should use simplified footer without step-by-step language", () => {
+	it("should include batching rules", () => {
 		const guidelines = getToolUseGuidelinesSection()
 
-		expect(guidelines).toContain("carefully considering the user's response after tool executions")
-		expect(guidelines).not.toContain("It is crucial to proceed step-by-step")
-		expect(guidelines).not.toContain("ALWAYS wait for user confirmation after each tool use")
+		expect(guidelines).toContain("## Batching Rules")
+		expect(guidelines).toContain("can be batched in parallel")
+		expect(guidelines).toContain("writes must be sequential")
 	})
 
-	it("should include common guidance", () => {
+	it("should include non-interactive execution guidance", () => {
 		const guidelines = getToolUseGuidelinesSection()
-		expect(guidelines).toContain("Assess what information you already have")
-		expect(guidelines).toContain("Choose the most appropriate tool")
+
+		expect(guidelines).toContain("Non-interactive execution")
+		expect(guidelines).toContain("--progress=plain")
+	})
+
+	it("should not reference placeholder tool names or per-tool confirmation guidelines", () => {
+		const guidelines = getToolUseGuidelinesSection()
+
 		expect(guidelines).not.toContain("<actual_tool_name>")
-	})
-
-	it("should not include per-tool confirmation guidelines", () => {
-		const guidelines = getToolUseGuidelinesSection()
-
 		expect(guidelines).not.toContain("After each tool use, the user will respond with the result")
 	})
 })

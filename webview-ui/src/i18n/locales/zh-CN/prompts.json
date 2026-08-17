@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "新任务",
 				"description": "控制开始新任务时的用户提示词。可在首页对话框中使用。"
+			},
+			"ENHANCE_IMAGE": {
+				"label": "增强图像提示词",
+				"description": "使用适合 Stable Diffusion 和 FLUX 等文本转图像生成器的细节、光照元素、颜色和描述符来增强你的图像提示词。在 Designer 模式下点击 ✨ 时自动使用。"
 			}
 		}
 	},

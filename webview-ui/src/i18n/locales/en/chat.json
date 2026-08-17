@@ -1,5 +1,11 @@
 {
 	"greeting": "Welcome to Mirror VS!",
+	"sessionNotes": {
+		"title": "Session Notes",
+		"placeholder": "Share important context, goals, and decisions with all tabs in this session…",
+		"hint": "Shared with every tab in this session via the system prompt & read_session_context tool.",
+		"save": "Save Notes"
+	},
 	"task": {
 		"title": "Session",
 		"expand": "Expand session",

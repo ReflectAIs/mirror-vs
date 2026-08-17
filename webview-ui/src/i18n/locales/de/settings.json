@@ -41,7 +41,9 @@
 		"experimental": "Experimentell",
 		"language": "Sprache",
 		"about": "Über Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Bildgenerierung",
+		"pipelines": "Pipelines"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Anfragen bis zu diesen Grenzwerten automatisch stellen, bevor um Genehmigung zur Fortsetzung gebeten wird."
+		},
+		"autonomousMode": {
+			"label": "Autonomer Modus",
+			"description": "Wenn aktiviert, werden alle ausgeführten Befehle und Dateioperationen außerhalb des Arbeitsbereichs automatisch ohne Genehmigung freigegeben. Dies ist ein Vollvertrauensmodus – mit Vorsicht verwenden."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Wenn aktiviert, werden Git-Befehle (commit, push, add, pull, merge, rebase usw.) automatisch genehmigt. Wenn deaktiviert, muss der Assistent vor jeder Git-Operation um Genehmigung bitten."
+		},
+		"browser": {
+			"label": "Browser",
+			"description": "Dem Assistenten automatisch erlauben, den Browser zu steuern (navigieren, klicken, eingeben, scrollen, Screenshots) ohne Genehmigung zu benötigen"
 		}
 	},
 	"providers": {
@@ -392,6 +406,8 @@
 		"geminiApiKey": "Gemini API-Schlüssel",
 		"getSambaNovaApiKey": "SambaNova API-Schlüssel erhalten",
 		"sambaNovaApiKey": "SambaNova API-Schlüssel",
+		"deepInfraApiKey": "DeepInfra API-Schlüssel",
+		"getDeepInfraApiKey": "DeepInfra API-Schlüssel erhalten",
 		"getGeminiApiKey": "Gemini API-Schlüssel erhalten",
 		"openAiApiKey": "OpenAI API-Schlüssel",
 		"apiKey": "API-Schlüssel",
@@ -815,6 +831,42 @@
 			"refreshSuccess": "Tools erfolgreich aktualisiert",
 			"refreshError": "Fehler beim Aktualisieren der Tools",
 			"toolParameters": "Parameter"
+		},
+		"TXT2IMG": {
+			"name": "Text-zu-Bild (txt2img)",
+			"description": "Wenn aktiviert, kann der Assistent mithilfe dieses Pipeline-Typs Bilder aus Textbeschreibungen generieren."
+		},
+		"IMG2IMG": {
+			"name": "Bild-zu-Bild (img2img)",
+			"description": "Wenn aktiviert, kann der Assistent vorhandene Bilder mithilfe textgesteuerter Bearbeitungen transformieren."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "Wenn aktiviert, kann der Assistent bestimmte Bereiche eines Bildes ersetzen oder reparieren."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "Wenn aktiviert, kann der Assistent ein Bild über seine ursprünglichen Grenzen hinaus erweitern."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "Wenn aktiviert, kann der Assistent die Auflösung eines Bildes erhöhen."
+		},
+		"REMOVE_BG": {
+			"name": "Hintergrund entfernen",
+			"description": "Wenn aktiviert, kann der Assistent den Hintergrund eines Bildes entfernen."
+		},
+		"TXT2AUDIO": {
+			"name": "Text-zu-Audio (txt2audio)",
+			"description": "Wenn aktiviert, kann der Assistent Musik und Audio-Clips aus Textbeschreibungen generieren."
+		},
+		"TXT2VIDEO": {
+			"name": "Text-zu-Video (txt2video)",
+			"description": "Wenn aktiviert, kann der Assistent kurze Videoclips aus Textbeschreibungen generieren."
+		},
+		"MULTI_TAB": {
+			"name": "Experimentelle Multi-Tab-Oberfläche",
+			"description": "Wenn aktiviert, bietet einen browserähnlichen Multi-Tab-Arbeitsbereich, um zwischen mehreren Aufgaben zu wechseln und sie gleichzeitig in einer Sitzung auszuführen."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "Name muss 1-64 Kleinbuchstaben, Zahlen oder Bindestriche sein",
 			"descriptionRequired": "Beschreibung ist erforderlich",
 			"descriptionTooLong": "Beschreibung muss 1024 Zeichen oder weniger sein"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "So funktioniert die Bildgenerierung",
+		"guideDescription": "Jeder Generierungstyp (txt2img, img2img usw.) verwendet eine Pipeline – einen ComfyUI-Workflow, der definiert, wie das Modell Eingaben verarbeitet. Aktiviere einen Typ, wähle einen Anbieter (Lokales ComfyUI oder Cloud OpenRouter) und wähle dann eine Pipeline oder ein Modell aus.",
+		"imagePipelines": "Bild-Pipelines",
+		"imagePipelinesDescription": "Generiere, bearbeite und transformiere Bilder mit ComfyUI-Workflows oder OpenRouter-Modellen.",
+		"mediaPipelines": "Medien-Pipelines",
+		"mediaPipelinesDescription": "Generiere Audio- und Videoinhalte mit dedizierten Pipelines.",
+		"pipelineSettings": "Pipeline-Einstellungen",
+		"pipelineSettingsDescription": "Verwalte ComfyUI-Workflow-Pipelines für die Bildgenerierung. Lade benutzerdefinierte Workflows hoch oder lege Standardwerte pro Aufgabentyp fest.",
+		"pipelineSummary": "{{count}} Pipeline(s) gefunden",
+		"importPipeline": "Pipeline importieren",
+		"inlineImportTooltip": "Importiere einen ComfyUI-Workflow-JSON für diesen Pipeline-Typ",
+		"noPipelinesFound": "Keine Pipelines gefunden. Importiere einen ComfyUI-Workflow-JSON, um loszulegen.",
+		"alreadyDefault": "Bereits als Standard für diesen Typ festgelegt",
+		"setAsDefault": "Als Standard für diesen Typ festlegen",
+		"deletePipeline": "Pipeline löschen",
+		"deleteDialog": {
+			"title": "Pipeline löschen",
+			"description": "Möchtest du die Pipeline \"{{name}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+			"confirm": "Löschen",
+			"cancel": "Abbrechen"
+		},
+		"importDialog": {
+			"title": "Pipeline importieren",
+			"description": "Füge einen ComfyUI-Workflow-JSON ein, um ihn als neue Pipeline zu importieren.",
+			"confirm": "Importieren",
+			"cancel": "Abbrechen",
+			"importing": "Wird importiert..."
 		}
 	}
 }

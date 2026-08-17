@@ -3,6 +3,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { MirrorVSEventName } from "@mirror-vs/types"
 import { Task } from "../core/task/Task"
+import { TaskLifecycle } from "../core/task/TaskLifecycle"
 
 describe("Task.startSubtask() metadata-driven delegation", () => {
 	it("Routes to provider.delegateParentAndOpenChild without pausing parent", async () => {
@@ -21,7 +22,12 @@ describe("Task.startSubtask() metadata-driven delegation", () => {
 		;(parent as any).providerRef = { deref: () => provider }
 		;(parent as any).emit = vi.fn()
 
-		const child = await (Task.prototype as any).startSubtask.call(parent, "Do something", [], "code")
+		const child = await (TaskLifecycle.prototype as any).startSubtask.call(
+			{ task: parent },
+			"Do something",
+			[],
+			"code",
+		)
 
 		expect(provider.delegateParentAndOpenChild).toHaveBeenCalledWith({
 			parentTaskId: "parent-1",

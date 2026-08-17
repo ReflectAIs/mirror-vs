@@ -47,5 +47,12 @@
 	"subtaskTag": "Sottoattività",
 	"deleteWithSubtasks": "Questo eliminerà anche {{count}} sottoattività. Sei sicuro?",
 	"expandSubtasks": "Espandi sottoattività",
-	"collapseSubtasks": "Comprimi sottoattività"
+	"collapseSubtasks": "Comprimi sottoattività",
+	"session": "Sessione",
+	"renameSession": "Rinomina sessione",
+	"renameSave": "Salva",
+	"renameCancel": "Annulla",
+	"tasks_one": "{{count}} attività",
+	"tasks_other": "{{count}} attività",
+	"tokens": "token"
 }

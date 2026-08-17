@@ -38,6 +38,7 @@ import { applyDiffTool as applyDiffToolClass } from "../tools/ApplyDiffTool"
 import { getWorkspaceFileTreeTool } from "../tools/GetWorkspaceFileTreeTool"
 import { getWorkspacePulseTool } from "../tools/GetWorkspacePulseTool"
 import { getGitStatusTool } from "../tools/GetGitStatusTool"
+import { readSessionContextTool } from "../tools/ReadSessionContextTool"
 import { searchMcpToolsTool } from "../tools/SearchMcpToolsTool"
 import { activateMcpToolTool } from "../tools/ActivateMcpToolTool"
 import { isValidToolName, validateToolUse } from "../tools/validateToolUse"
@@ -80,6 +81,7 @@ const READ_TOOLS = new Set([
 	"get_workspace_file_tree",
 	"get_workspace_pulse",
 	"get_git_status",
+	"read_session_context",
 	"read_command_output",
 ])
 
@@ -118,6 +120,7 @@ const READ_TOOL_MAP: Record<string, { handle: (task: Task, block: any, callbacks
 	get_workspace_file_tree: getWorkspaceFileTreeTool,
 	get_workspace_pulse: getWorkspacePulseTool,
 	get_git_status: getGitStatusTool,
+	read_session_context: readSessionContextTool,
 	read_command_output: readCommandOutputTool,
 }
 
@@ -472,6 +475,8 @@ export async function presentAssistantMessage(mirror: Task) {
 						return `[${block.name}]`
 					case "get_git_status":
 						return `[${block.name}${block.nativeArgs?.maxFiles ? ` (max ${block.nativeArgs.maxFiles} files)` : ""}]`
+					case "read_session_context":
+						return `[${block.name}${block.nativeArgs?.scope ? ` (${block.nativeArgs.scope})` : ""}]`
 					default:
 						return `[${block.name}]`
 				}
@@ -1107,6 +1112,13 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "get_workspace_pulse":
 					await getWorkspacePulseTool.handle(mirror, block as ToolUse<"get_workspace_pulse">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "read_session_context":
+					await readSessionContextTool.handle(mirror, block as ToolUse<"read_session_context">, {
 						askApproval,
 						handleError,
 						pushToolResult,

@@ -47,5 +47,12 @@
 	"subtaskTag": "サブタスク",
 	"deleteWithSubtasks": "これにより {{count}} サブタスクも削除されます。よろしいですか?",
 	"expandSubtasks": "サブタスクを展開",
-	"collapseSubtasks": "サブタスクを折りたたむ"
+	"collapseSubtasks": "サブタスクを折りたたむ",
+	"session": "セッション",
+	"renameSession": "セッション名を変更",
+	"renameSave": "保存",
+	"renameCancel": "キャンセル",
+	"tasks_one": "{{count}} 件のタスク",
+	"tasks_other": "{{count}} 件のタスク",
+	"tokens": "トークン"
 }

@@ -41,7 +41,9 @@
 		"experimental": "Eksperimental",
 		"language": "Bahasa",
 		"about": "Tentang Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Pembuatan Gambar",
+		"pipelines": "Pipeline"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Secara otomatis membuat permintaan hingga batas ini sebelum meminta persetujuan untuk melanjutkan."
+		},
+		"autonomousMode": {
+			"label": "Mode Otonom",
+			"description": "Saat diaktifkan, semua perintah eksekusi dan operasi file di luar ruang kerja disetujui secara otomatis tanpa izin. Ini adalah mode kepercayaan penuh — gunakan dengan hati-hati."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Saat diaktifkan, perintah git (commit, push, add, pull, merge, rebase, dll.) disetujui secara otomatis. Saat dinonaktifkan, asisten harus meminta persetujuan sebelum menjalankan operasi git apa pun."
+		},
+		"browser": {
+			"label": "Peramban",
+			"description": "Secara otomatis mengizinkan asisten mengontrol peramban (navigasi, klik, ketik, gulir, tangkapan layar) tanpa memerlukan persetujuan"
 		}
 	},
 	"providers": {
@@ -392,6 +406,8 @@
 		"geminiApiKey": "Gemini API Key",
 		"getSambaNovaApiKey": "Dapatkan SambaNova API Key",
 		"sambaNovaApiKey": "SambaNova API Key",
+		"deepInfraApiKey": "DeepInfra API Key",
+		"getDeepInfraApiKey": "Dapatkan DeepInfra API Key",
 		"getGeminiApiKey": "Dapatkan Gemini API Key",
 		"openAiApiKey": "OpenAI API Key",
 		"apiKey": "API Key",
@@ -815,6 +831,42 @@
 			"refreshSuccess": "Tool berhasil direfresh",
 			"refreshError": "Gagal merefresh tool",
 			"toolParameters": "Parameter"
+		},
+		"TXT2IMG": {
+			"name": "Teks-ke-Gambar (txt2img)",
+			"description": "Saat diaktifkan, asisten dapat menghasilkan gambar dari deskripsi teks menggunakan jenis pipeline ini."
+		},
+		"IMG2IMG": {
+			"name": "Gambar-ke-Gambar (img2img)",
+			"description": "Saat diaktifkan, asisten dapat mengubah gambar yang ada menggunakan edit yang dipandu teks."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "Saat diaktifkan, asisten dapat mengganti atau memperbaiki area tertentu pada sebuah gambar."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "Saat diaktifkan, asisten dapat memperluas gambar melampaui batas aslinya."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "Saat diaktifkan, asisten dapat meningkatkan resolusi gambar."
+		},
+		"REMOVE_BG": {
+			"name": "Hapus Latar Belakang",
+			"description": "Saat diaktifkan, asisten dapat menghapus latar belakang dari sebuah gambar."
+		},
+		"TXT2AUDIO": {
+			"name": "Teks-ke-Audio (txt2audio)",
+			"description": "Saat diaktifkan, asisten dapat menghasilkan musik dan klip audio dari deskripsi teks."
+		},
+		"TXT2VIDEO": {
+			"name": "Teks-ke-Video (txt2video)",
+			"description": "Saat diaktifkan, asisten dapat menghasilkan klip video pendek dari deskripsi teks."
+		},
+		"MULTI_TAB": {
+			"name": "Antarmuka Multi-Tab Eksperimental",
+			"description": "Saat diaktifkan, menyediakan ruang kerja multi-tab mirip peramban untuk berpindah antar beberapa tugas dan menjalankannya secara bersamaan dalam satu sesi."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "Nama harus 1-64 huruf kecil, angka, atau tanda hubung",
 			"descriptionRequired": "Deskripsi diperlukan",
 			"descriptionTooLong": "Deskripsi harus 1024 karakter atau kurang"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "Cara Kerja Pembuatan Gambar",
+		"guideDescription": "Setiap jenis pembuatan (txt2img, img2img, dll.) menggunakan pipeline — alur kerja ComfyUI yang mendefinisikan bagaimana model memproses input. Aktifkan jenis, pilih penyedia (ComfyUI lokal atau OpenRouter cloud), lalu pilih pipeline atau model.",
+		"imagePipelines": "Pipeline Gambar",
+		"imagePipelinesDescription": "Hasilkan, edit, dan ubah gambar menggunakan alur kerja ComfyUI atau model OpenRouter.",
+		"mediaPipelines": "Pipeline Media",
+		"mediaPipelinesDescription": "Hasilkan konten audio dan video menggunakan pipeline khusus.",
+		"pipelineSettings": "Pengaturan Pipeline",
+		"pipelineSettingsDescription": "Kelola pipeline alur kerja ComfyUI untuk pembuatan gambar. Unggah alur kerja kustom atau atur default per jenis tugas.",
+		"pipelineSummary": "{{count}} pipeline ditemukan",
+		"importPipeline": "Impor Pipeline",
+		"inlineImportTooltip": "Impor JSON alur kerja ComfyUI untuk jenis pipeline ini",
+		"noPipelinesFound": "Tidak ada pipeline ditemukan. Impor JSON alur kerja ComfyUI untuk memulai.",
+		"alreadyDefault": "Sudah ditetapkan sebagai default untuk jenis ini",
+		"setAsDefault": "Tetapkan sebagai default untuk jenis ini",
+		"deletePipeline": "Hapus pipeline",
+		"deleteDialog": {
+			"title": "Hapus Pipeline",
+			"description": "Apakah Anda yakin ingin menghapus pipeline \"{{name}}\"? Tindakan ini tidak dapat dibatalkan.",
+			"confirm": "Hapus",
+			"cancel": "Batal"
+		},
+		"importDialog": {
+			"title": "Impor Pipeline",
+			"description": "Tempel JSON alur kerja ComfyUI untuk diimpor sebagai pipeline baru.",
+			"confirm": "Impor",
+			"cancel": "Batal",
+			"importing": "Mengimpor..."
 		}
 	}
 }

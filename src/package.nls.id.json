@@ -43,5 +43,18 @@
 	"settings.debug.description": "Aktifkan mode debug untuk menampilkan tombol tambahan untuk melihat riwayat percakapan API dan pesan UI sebagai JSON yang diformat dalam file sementara.",
 	"settings.debugProxy.enabled.description": "**Aktifkan Debug Proxy** — Arahkan semua permintaan jaringan keluar lewat proxy untuk debugging MITM. Hanya aktif saat kamu berjalan dalam mode debug (F5).",
 	"settings.debugProxy.serverUrl.description": "URL proxy (mis. `http://127.0.0.1:8888`). Hanya digunakan ketika **Debug Proxy** diaktifkan.",
-	"settings.debugProxy.tlsInsecure.description": "Terima sertifikat self-signed dari proxy. **Diperlukan untuk inspeksi MITM.** ⚠️ Tidak aman — gunakan hanya untuk debugging lokal."
+	"settings.debugProxy.tlsInsecure.description": "Terima sertifikat self-signed dari proxy. **Diperlukan untuk inspeksi MITM.** ⚠️ Tidak aman — gunakan hanya untuk debugging lokal.",
+	"command.newTab.title": "Tab Baru",
+	"command.newSession.title": "Sesi Baru",
+	"command.closeTab.title": "Tutup Tab",
+	"command.generateTests.title": "Hasilkan Tes Unit",
+	"command.refactorFunction.title": "Refaktor Fungsi",
+	"command.toggleAutonomousMode.title": "Alihkan Mode Otonom",
+	"command.acceptReview.title": "Terima Perubahan",
+	"command.rejectReview.title": "Tolak Perubahan",
+	"command.acceptAllReviews.title": "Terima Semua Perubahan",
+	"command.diffReview.title": "Bandingkan Perubahan",
+	"command.prevChange.title": "Perubahan Tinjauan Sebelumnya",
+	"command.nextChange.title": "Perubahan Tinjauan Berikutnya",
+	"settings.autoApproveBrowser.description": "Secara otomatis menyetujui tindakan peramban (navigasi, klik, ketik, tangkapan layar, dll.)"
 }

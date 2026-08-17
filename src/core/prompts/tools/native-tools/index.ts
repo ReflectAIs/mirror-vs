@@ -37,6 +37,7 @@ import writeToFile from "./write_to_file"
 import getWorkspaceFileTree from "./get_workspace_file_tree"
 import getWorkspacePulse from "./get_workspace_pulse"
 import getGitStatus from "./get_git_status"
+import readSessionContext from "./read_session_context"
 import searchMcpTools from "./searchMcpTools"
 import activateMcpTool from "./activateMcpTool"
 
@@ -108,6 +109,7 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		getGitStatus,
 		searchMcpTools,
 		activateMcpTool,
+		readSessionContext,
 	] satisfies OpenAI.Chat.ChatCompletionTool[]
 }
 

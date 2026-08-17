@@ -429,8 +429,8 @@ describe("getEnvironmentDetails", () => {
 		expect(getGitStatus).not.toHaveBeenCalled()
 	})
 
-	it("should show tool hint instead of inline git status when includeFileDetails is false", async () => {
-		;(getGitStatus as Mock).mockResolvedValue(null)
+	it("should include git status even when includeFileDetails is false if maxGitStatusFiles > 0", async () => {
+		;(getGitStatus as Mock).mockResolvedValue("## main\nM  file1.ts")
 		mockProvider.getState.mockResolvedValue({
 			...mockState,
 			maxGitStatusFiles: 10,
@@ -438,10 +438,10 @@ describe("getEnvironmentDetails", () => {
 
 		const result = await getEnvironmentDetails(mockMirror as Task)
 
-		// Should show tool hint rather than calling getGitStatus
+		// Git status is gated by maxGitStatusFiles, independent of includeFileDetails
 		expect(result).toContain("# Git Status")
-		expect(result).toContain("Use `get_git_status`")
-		expect(getGitStatus).not.toHaveBeenCalled()
+		expect(result).toContain("## main")
+		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 10)
 	})
 
 	it("should show tool hint instead of inline workspace pulse when includeFileDetails is false", async () => {

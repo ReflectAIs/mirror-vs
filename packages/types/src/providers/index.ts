@@ -1,6 +1,7 @@
 export * from "./anthropic.js"
 export * from "./baseten.js"
 export * from "./bedrock.js"
+export * from "./deepinfra.js"
 export * from "./deepseek.js"
 export * from "./fireworks.js"
 export * from "./gemini.js"
@@ -29,6 +30,7 @@ export * from "./custom.js"
 import { anthropicDefaultModelId } from "./anthropic.js"
 import { basetenDefaultModelId } from "./baseten.js"
 import { bedrockDefaultModelId } from "./bedrock.js"
+import { deepInfraDefaultModelId } from "./deepinfra.js"
 import { deepSeekDefaultModelId } from "./deepseek.js"
 import { fireworksDefaultModelId } from "./fireworks.js"
 import { geminiDefaultModelId } from "./gemini.js"
@@ -81,6 +83,8 @@ export function getProviderDefaultModelId(
 			return geminiDefaultModelId
 		case "deepseek":
 			return deepSeekDefaultModelId
+		case "deepinfra":
+			return deepInfraDefaultModelId
 		case "moonshot":
 			return moonshotDefaultModelId
 		case "minimax":

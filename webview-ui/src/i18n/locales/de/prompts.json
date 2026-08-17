@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Neue Aufgabe starten",
 				"description": "Starte eine neue Aufgabe mit deiner Eingabe. Verfügbar in der Befehlspalette."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Bild-Prompt verbessern",
+				"description": "Verbessert deine Bild-Prompts mit Details, Lichtelementen, Farben und Beschreibungen, die für Text-zu-Bild-Generatoren wie Stable Diffusion und FLUX geeignet sind. Wird automatisch im Designer-Modus verwendet, wenn du auf ✨ klickst."
 			}
 		}
 	},

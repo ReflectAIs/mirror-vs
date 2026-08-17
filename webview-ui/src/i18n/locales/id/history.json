@@ -56,5 +56,11 @@
 	"subtaskTag": "Subtask",
 	"deleteWithSubtasks": "Ini juga akan menghapus {{count}} subtask. Apakah Anda yakin?",
 	"expandSubtasks": "Perluas subtask",
-	"collapseSubtasks": "Tutup subtask"
+	"collapseSubtasks": "Tutup subtask",
+	"session": "Sesi",
+	"renameSession": "Ubah nama sesi",
+	"renameSave": "Simpan",
+	"renameCancel": "Batal",
+	"tasks_one": "{{count}} tugas",
+	"tasks_other": "{{count}} tugas"
 }

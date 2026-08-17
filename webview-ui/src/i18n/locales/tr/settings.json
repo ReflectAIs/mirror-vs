@@ -41,7 +41,9 @@
 		"experimental": "Deneysel",
 		"language": "Dil",
 		"about": "Mirror VS Hakkında",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "Görüntü Üretimi",
+		"pipelines": "Pipelines"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "Bu sınırlara ulaşana kadar otomatik olarak istekleri yap, sonrasında devam etmek için onay iste."
+		},
+		"autonomousMode": {
+			"label": "Otonom Mod",
+			"description": "Etkinleştirildiğinde, çalışma alanı dışındaki tüm yürütme komutları ve dosya işlemleri izinsiz olarak otomatik onaylanır. Bu tam güven modudur — dikkatli kullanın."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "Etkinleştirildiğinde, git komutları (commit, push, add, pull, merge, rebase vb.) otomatik olarak onaylanır. Devre dışı bırakıldığında, asistan herhangi bir git işlemi çalıştırmadan önce onay istemelidir."
+		},
+		"browser": {
+			"label": "Tarayıcı",
+			"description": "Asistanın onay gerektirmeden tarayıcıyı (gezinme, tıklama, yazma, kaydırma, ekran görüntüsü) kontrol etmesine otomatik olarak izin ver"
 		}
 	},
 	"providers": {
@@ -392,6 +406,8 @@
 		"geminiApiKey": "Gemini API Anahtarı",
 		"getSambaNovaApiKey": "SambaNova API Anahtarı Al",
 		"sambaNovaApiKey": "SambaNova API Anahtarı",
+		"deepInfraApiKey": "DeepInfra API Anahtarı",
+		"getDeepInfraApiKey": "DeepInfra API Anahtarı Al",
 		"getGeminiApiKey": "Gemini API Anahtarı Al",
 		"openAiApiKey": "OpenAI API Anahtarı",
 		"apiKey": "API Anahtarı",
@@ -815,6 +831,42 @@
 			"refreshSuccess": "Araçlar başarıyla yenilendi",
 			"refreshError": "Araçlar yenilenemedi",
 			"toolParameters": "Parametreler"
+		},
+		"TXT2IMG": {
+			"name": "Metinden Görüntüye (txt2img)",
+			"description": "Etkinleştirildiğinde, asistan bu pipeline türünü kullanarak metin açıklamalarından görüntüler üretebilir."
+		},
+		"IMG2IMG": {
+			"name": "Görüntüden Görüntüye (img2img)",
+			"description": "Etkinleştirildiğinde, asistan metin güdümlü düzenlemeler kullanarak mevcut görüntüleri dönüştürebilir."
+		},
+		"INPAINT": {
+			"name": "Inpaint",
+			"description": "Etkinleştirildiğinde, asistan bir görüntünün belirli bölgelerini değiştirebilir veya onarabilir."
+		},
+		"OUTPAINT": {
+			"name": "Outpaint",
+			"description": "Etkinleştirildiğinde, asistan bir görüntüyü orijinal sınırlarının ötesine genişletebilir."
+		},
+		"UPSCALE": {
+			"name": "Upscale",
+			"description": "Etkinleştirildiğinde, asistan bir görüntünün çözünürlüğünü artırabilir."
+		},
+		"REMOVE_BG": {
+			"name": "Arka Planı Kaldır",
+			"description": "Etkinleştirildiğinde, asistan bir görüntüden arka planı kaldırabilir."
+		},
+		"TXT2AUDIO": {
+			"name": "Metinden Sese (txt2audio)",
+			"description": "Etkinleştirildiğinde, asistan metin açıklamalarından müzik ve ses klipleri üretebilir."
+		},
+		"TXT2VIDEO": {
+			"name": "Metinden Videoya (txt2video)",
+			"description": "Etkinleştirildiğinde, asistan metin açıklamalarından kısa video klipleri üretebilir."
+		},
+		"MULTI_TAB": {
+			"name": "Deneysel Çok Sekmeli Arayüz",
+			"description": "Etkinleştirildiğinde, bir oturum içinde birden çok görev arasında geçiş yapmak ve bunları aynı anda çalıştırmak için tarayıcı benzeri çok sekmeli bir çalışma alanı sağlar."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "Ad 1-64 küçük harf, rakam veya kısa çizgi olmalıdır",
 			"descriptionRequired": "Açıklama gereklidir",
 			"descriptionTooLong": "Açıklama en fazla 1024 karakter olmalıdır"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "Görüntü Üretimi Nasıl Çalışır",
+		"guideDescription": "Her üretim türü (txt2img, img2img vb.) bir pipeline kullanır — modelin girdileri nasıl işlediğini tanımlayan bir ComfyUI iş akışı. Bir türü etkinleştirin, bir sağlayıcı seçin (yerel ComfyUI veya bulut OpenRouter) ve ardından bir pipeline veya model seçin.",
+		"imagePipelines": "Görüntü Pipelineları",
+		"imagePipelinesDescription": "ComfyUI iş akışlarını veya OpenRouter modellerini kullanarak görüntüler üretin, düzenleyin ve dönüştürün.",
+		"mediaPipelines": "Medya Pipelineları",
+		"mediaPipelinesDescription": "Özel pipelinelar kullanarak ses ve video içeriği üretin.",
+		"pipelineSettings": "Pipeline Ayarları",
+		"pipelineSettingsDescription": "Görüntü üretimi için ComfyUI iş akışı pipelinelarını yönetin. Özel iş akışları yükleyin veya görev türü başına varsayılanları ayarlayın.",
+		"pipelineSummary": "{{count}} pipeline keşfedildi",
+		"importPipeline": "Pipeline İçe Aktar",
+		"inlineImportTooltip": "Bu pipeline türü için bir ComfyUI iş akışı JSON'u içe aktarın",
+		"noPipelinesFound": "Pipeline bulunamadı. Başlamak için bir ComfyUI iş akışı JSON'u içe aktarın.",
+		"alreadyDefault": "Bu tür için varsayılan olarak zaten ayarlı",
+		"setAsDefault": "Bu tür için varsayılan olarak ayarla",
+		"deletePipeline": "Pipeline'ı sil",
+		"deleteDialog": {
+			"title": "Pipeline'ı Sil",
+			"description": "\"{{name}}\" pipeline'ını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+			"confirm": "Sil",
+			"cancel": "İptal"
+		},
+		"importDialog": {
+			"title": "Pipeline İçe Aktar",
+			"description": "Yeni bir pipeline olarak içe aktarmak için bir ComfyUI iş akışı JSON'u yapıştırın.",
+			"confirm": "İçe Aktar",
+			"cancel": "İptal",
+			"importing": "İçe aktarılıyor..."
 		}
 	}
 }

@@ -2,6 +2,7 @@ import type { ProviderName, ModelInfo, ProviderSettings } from "@mirror-vs/types
 import {
 	anthropicDefaultModelId,
 	bedrockDefaultModelId,
+	deepInfraDefaultModelId,
 	deepSeekDefaultModelId,
 	moonshotDefaultModelId,
 	geminiDefaultModelId,
@@ -28,6 +29,7 @@ export interface ProviderServiceConfig {
 export const PROVIDER_SERVICE_CONFIG: Partial<Record<ProviderName, ProviderServiceConfig>> = {
 	anthropic: { serviceName: "Anthropic", serviceUrl: "https://console.anthropic.com" },
 	bedrock: { serviceName: "Amazon Bedrock", serviceUrl: "https://aws.amazon.com/bedrock" },
+	deepinfra: { serviceName: "DeepInfra", serviceUrl: "https://deepinfra.com" },
 	deepseek: { serviceName: "DeepSeek", serviceUrl: "https://platform.deepseek.com" },
 	moonshot: { serviceName: "Moonshot", serviceUrl: "https://platform.moonshot.cn" },
 	gemini: { serviceName: "Google Gemini", serviceUrl: "https://ai.google.dev" },
@@ -52,6 +54,7 @@ export const PROVIDER_SERVICE_CONFIG: Partial<Record<ProviderName, ProviderServi
 export const PROVIDER_DEFAULT_MODEL_IDS: Partial<Record<ProviderName, string>> = {
 	anthropic: anthropicDefaultModelId,
 	bedrock: bedrockDefaultModelId,
+	deepinfra: deepInfraDefaultModelId,
 	deepseek: deepSeekDefaultModelId,
 	moonshot: moonshotDefaultModelId,
 	gemini: geminiDefaultModelId,

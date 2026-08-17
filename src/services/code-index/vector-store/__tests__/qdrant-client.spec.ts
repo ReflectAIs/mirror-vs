@@ -1064,6 +1064,16 @@ describe("QdrantVectorStore", () => {
 	})
 
 	describe("upsertPoints", () => {
+		beforeEach(() => {
+			// The mock points below use dimension-3 vectors. Align the store's
+			// vectorSize so the self-healing dimension-mismatch pre-check in
+			// upsertPoints is a no-op, keeping these tests focused on the plain
+			// upsert path (pathSegments processing, error propagation, etc.).
+			// The recreation logic itself is covered by the initialize()
+			// dimension-mismatch tests above.
+			;(vectorStore as any).vectorSize = 3
+		})
+
 		it("should correctly call qdrantClient.upsert with processed points", async () => {
 			const mockPoints = [
 				{

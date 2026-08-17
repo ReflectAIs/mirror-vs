@@ -140,6 +140,10 @@
 			"NEW_TASK": {
 				"label": "開始新工作",
 				"description": "根據使用者輸入開始一個新的任務。可在命令選擇區使用。"
+			},
+			"ENHANCE_IMAGE": {
+				"label": "增強影像提示詞",
+				"description": "使用適合 Stable Diffusion 和 FLUX 等文字轉影像產生器的細節、光線元素、色彩和描述詞來增強你的影像提示詞。在設計師模式下按一下 ✨ 時會自動使用。"
 			}
 		}
 	},

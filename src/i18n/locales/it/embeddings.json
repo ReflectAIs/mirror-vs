@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "Impossibile determinare la dimensione del vettore per il modello '{{modelId}}' con il provider '{{provider}}'. Assicurati che la 'Dimensione di embedding' sia impostata correttamente nelle impostazioni del provider compatibile con OpenAI.",
 		"vectorDimensionNotDetermined": "Impossibile determinare la dimensione del vettore per il modello '{{modelId}}' con il provider '{{provider}}'. Controlla i profili del modello o la configurazione.",
 		"qdrantUrlMissing": "URL Qdrant mancante per la creazione dello storage vettoriale",
-		"codeIndexingNotConfigured": "Impossibile creare i servizi: L'indicizzazione del codice non è configurata correttamente"
+		"codeIndexingNotConfigured": "Impossibile creare i servizi: L'indicizzazione del codice non è configurata correttamente",
+		"anthropicConfigMissing": "Configurazione Anthropic mancante per la creazione dell'embedder",
+		"cohereConfigMissing": "Configurazione Cohere mancante per la creazione dell'embedder",
+		"jinaConfigMissing": "Configurazione Jina mancante per la creazione dell'embedder",
+		"voyageConfigMissing": "Configurazione Voyage mancante per la creazione dell'embedder"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "Indicizzazione fallita: Nessun blocco di codice è stato indicizzato con successo. Questo di solito indica un problema di configurazione dell'embedder.",

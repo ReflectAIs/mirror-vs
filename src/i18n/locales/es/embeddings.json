@@ -60,7 +60,11 @@
 		"vectorDimensionNotDeterminedOpenAiCompatible": "No se pudo determinar la dimensión del vector para el modelo '{{modelId}}' con el proveedor '{{provider}}'. Asegúrate de que la 'Dimensión de incrustación' esté configurada correctamente en los ajustes del proveedor compatible con OpenAI.",
 		"vectorDimensionNotDetermined": "No se pudo determinar la dimensión del vector para el modelo '{{modelId}}' con el proveedor '{{provider}}'. Verifica los perfiles del modelo o la configuración.",
 		"qdrantUrlMissing": "Falta la URL de Qdrant para crear el almacén de vectores",
-		"codeIndexingNotConfigured": "No se pueden crear servicios: La indexación de código no está configurada correctamente"
+		"codeIndexingNotConfigured": "No se pueden crear servicios: La indexación de código no está configurada correctamente",
+		"anthropicConfigMissing": "Falta la configuración de Anthropic para crear el embedder",
+		"cohereConfigMissing": "Falta la configuración de Cohere para crear el embedder",
+		"jinaConfigMissing": "Falta la configuración de Jina para crear el embedder",
+		"voyageConfigMissing": "Falta la configuración de Voyage para crear el embedder"
 	},
 	"orchestrator": {
 		"indexingFailedNoBlocks": "Indexación fallida: No se indexaron exitosamente bloques de código. Esto usualmente indica un problema de configuración del incrustador.",

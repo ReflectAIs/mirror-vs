@@ -41,7 +41,9 @@
 		"experimental": "실험적",
 		"language": "언어",
 		"about": "Mirror VS 정보",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "이미지 생성",
+		"pipelines": "파이프라인"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "이러한 한도까지 자동으로 요청을 수행한 후, 계속 진행하기 위한 승인을 요청합니다."
+		},
+		"autonomousMode": {
+			"label": "자율 모드",
+			"description": "활성화하면 작업 영역 외부의 모든 실행 명령과 파일 작업이 허가 없이 자동 승인됩니다. 완전 신뢰 모드입니다 — 주의해서 사용하세요."
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "활성화하면 git 명령(commit, push, add, pull, merge, rebase 등)이 자동 승인됩니다. 비활성화하면 어시스턴트가 git 작업을 실행하기 전에 승인을 요청해야 합니다."
+		},
+		"browser": {
+			"label": "브라우저",
+			"description": "승인 없이 어시스턴트가 브라우저(이동, 클릭, 입력, 스크롤, 스크린샷)를 제어하도록 자동으로 허용합니다"
 		}
 	},
 	"providers": {
@@ -392,6 +406,8 @@
 		"geminiApiKey": "Gemini API 키",
 		"getSambaNovaApiKey": "SambaNova API 키 받기",
 		"sambaNovaApiKey": "SambaNova API 키",
+		"deepInfraApiKey": "DeepInfra API 키",
+		"getDeepInfraApiKey": "DeepInfra API 키 받기",
 		"getGeminiApiKey": "Gemini API 키 받기",
 		"apiKey": "API 키",
 		"openAiApiKey": "OpenAI API 키",
@@ -815,6 +831,42 @@
 			"refreshSuccess": "도구가 성공적으로 새로고침되었습니다",
 			"refreshError": "도구 새로고침에 실패했습니다",
 			"toolParameters": "매개변수"
+		},
+		"TXT2IMG": {
+			"name": "텍스트-이미지 (txt2img)",
+			"description": "활성화하면 어시스턴트가 이 파이프라인 유형을 사용하여 텍스트 설명에서 이미지를 생성할 수 있습니다."
+		},
+		"IMG2IMG": {
+			"name": "이미지-이미지 (img2img)",
+			"description": "활성화하면 어시스턴트가 텍스트로 안내된 편집을 사용하여 기존 이미지를 변환할 수 있습니다."
+		},
+		"INPAINT": {
+			"name": "인페인트",
+			"description": "활성화하면 어시스턴트가 이미지의 특정 영역을 교체하거나 복구할 수 있습니다."
+		},
+		"OUTPAINT": {
+			"name": "아웃페인트",
+			"description": "활성화하면 어시스턴트가 이미지를 원래 경계를 넘어 확장할 수 있습니다."
+		},
+		"UPSCALE": {
+			"name": "업스케일",
+			"description": "활성화하면 어시스턴트가 이미지의 해상도를 높일 수 있습니다."
+		},
+		"REMOVE_BG": {
+			"name": "배경 제거",
+			"description": "활성화하면 어시스턴트가 이미지에서 배경을 제거할 수 있습니다."
+		},
+		"TXT2AUDIO": {
+			"name": "텍스트-오디오 (txt2audio)",
+			"description": "활성화하면 어시스턴트가 텍스트 설명에서 음악과 오디오 클립을 생성할 수 있습니다."
+		},
+		"TXT2VIDEO": {
+			"name": "텍스트-비디오 (txt2video)",
+			"description": "활성화하면 어시스턴트가 텍스트 설명에서 짧은 비디오 클립을 생성할 수 있습니다."
+		},
+		"MULTI_TAB": {
+			"name": "실험적 멀티탭 인터페이스",
+			"description": "활성화하면 세션 내에서 여러 작업을 전환하고 동시에 실행할 수 있는 브라우저와 같은 멀티탭 작업 영역을 제공합니다."
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "이름은 1-64자의 소문자, 숫자 또는 하이픈이어야 합니다",
 			"descriptionRequired": "설명은 필수입니다",
 			"descriptionTooLong": "설명은 1024자 이하여야 합니다"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "이미지 생성의 작동 방식",
+		"guideDescription": "각 생성 유형(txt2img, img2img 등)은 파이프라인을 사용합니다 — 모델이 입력을 처리하는 방법을 정의하는 ComfyUI 워크플로입니다. 유형을 활성화하고 공급자(로컬 ComfyUI 또는 클라우드 OpenRouter)를 선택한 다음 파이프라인 또는 모델을 선택하세요.",
+		"imagePipelines": "이미지 파이프라인",
+		"imagePipelinesDescription": "ComfyUI 워크플로 또는 OpenRouter 모델을 사용하여 이미지를 생성, 편집, 변환합니다.",
+		"mediaPipelines": "미디어 파이프라인",
+		"mediaPipelinesDescription": "전용 파이프라인을 사용하여 오디오 및 비디오 콘텐츠를 생성합니다.",
+		"pipelineSettings": "파이프라인 설정",
+		"pipelineSettingsDescription": "이미지 생성을 위한 ComfyUI 워크플로 파이프라인을 관리합니다. 사용자 지정 워크플로를 업로드하거나 작업 유형별 기본값을 설정하세요.",
+		"pipelineSummary": "파이프라인 {{count}}개 발견됨",
+		"importPipeline": "파이프라인 가져오기",
+		"inlineImportTooltip": "이 파이프라인 유형에 대한 ComfyUI 워크플로 JSON 가져오기",
+		"noPipelinesFound": "파이프라인을 찾을 수 없습니다. 시작하려면 ComfyUI 워크플로 JSON을 가져오세요.",
+		"alreadyDefault": "이 유형의 기본값으로 이미 설정됨",
+		"setAsDefault": "이 유형의 기본값으로 설정",
+		"deletePipeline": "파이프라인 삭제",
+		"deleteDialog": {
+			"title": "파이프라인 삭제",
+			"description": "파이프라인 \"{{name}}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+			"confirm": "삭제",
+			"cancel": "취소"
+		},
+		"importDialog": {
+			"title": "파이프라인 가져오기",
+			"description": "새 파이프라인으로 가져오려면 ComfyUI 워크플로 JSON을 붙여넣으세요.",
+			"confirm": "가져오기",
+			"cancel": "취소",
+			"importing": "가져오는 중..."
 		}
 	}
 }

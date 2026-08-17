@@ -2,11 +2,20 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { MirrorProvider } from "../core/webview/MirrorProvider"
+import { TaskLifecycleManager } from "../core/webview/MirrorProviderTaskLifecycle"
 import { API } from "../extension/api"
 import * as ProfileValidatorMod from "../shared/ProfileValidator"
 
 // Mock Task class used by MirrorProvider to avoid heavy startup
 vi.mock("../core/task/Task", () => {
+	const TaskState = {
+		Idle: "idle",
+		Streaming: "streaming",
+		WaitingApproval: "interactive",
+		Completed: "completed",
+		Error: "error",
+		Aborted: "aborted",
+	}
 	class TaskStub {
 		public taskId: string
 		public instanceId = "inst"
@@ -23,8 +32,9 @@ vi.mock("../core/task/Task", () => {
 		on() {}
 		off() {}
 		emit() {}
+		async saveMirrorMessages() {}
 	}
-	return { Task: TaskStub }
+	return { Task: TaskStub, TaskState }
 })
 
 describe("Single-open-task invariant", () => {
@@ -32,11 +42,11 @@ describe("Single-open-task invariant", () => {
 		vi.restoreAllMocks()
 	})
 
-	it("User-initiated create: closes existing before opening new", async () => {
+	it("User-initiated create: parks existing before opening new", async () => {
 		// Allow profile
 		vi.spyOn(ProfileValidatorMod.ProfileValidator, "isProfileAllowed").mockReturnValue(true)
 
-		const removeMirrorFromStack = vi.fn().mockResolvedValue(undefined)
+		const parkCurrentTask = vi.fn().mockResolvedValue(undefined)
 		const addMirrorToStack = vi.fn().mockResolvedValue(undefined)
 
 		const provider = {
@@ -50,7 +60,12 @@ describe("Single-open-task invariant", () => {
 				checkpointTimeout: 60,
 				cloudUserInfo: null,
 			}),
-			removeMirrorFromStack,
+			// Refactored createTask (TaskLifecycleManager) parks the current non-idle task
+			getCurrentTask: vi.fn(() => ({ taskId: "existing-1", state: "streaming" })),
+			parkCurrentTask,
+			getAllTasksSorted: vi.fn(() => []),
+			currentSessionId: "sess-1",
+			removeMirrorFromStack: vi.fn().mockResolvedValue(undefined),
 			addMirrorToStack,
 			setProviderProfile: vi.fn(),
 			log: vi.fn(),
@@ -67,10 +82,12 @@ describe("Single-open-task invariant", () => {
 			},
 		} as unknown as MirrorProvider
 
-		await (MirrorProvider.prototype as any).createTask.call(provider, "New task")
+		await (TaskLifecycleManager.prototype as any).createTask.call({ provider }, "New task")
 
-		expect(removeMirrorFromStack).toHaveBeenCalledTimes(1)
+		// Existing task is parked (removed from focus) before the new task is added
+		expect(parkCurrentTask).toHaveBeenCalledTimes(1)
 		expect(addMirrorToStack).toHaveBeenCalledTimes(1)
+		expect(parkCurrentTask.mock.invocationCallOrder[0]).toBeLessThan(addMirrorToStack.mock.invocationCallOrder[0])
 	})
 
 	it("History resume path always closes current before rehydration (non-rehydrating case)", async () => {

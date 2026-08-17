@@ -43,5 +43,18 @@
 	"settings.debug.description": "Active le mode debug pour afficher des boutons supplémentaires permettant de visualiser l'historique de conversation de l'API et les messages de l'interface utilisateur sous forme de JSON formaté dans des fichiers temporaires.",
 	"settings.debugProxy.enabled.description": "**Activer le Debug Proxy** — Redirige toutes les requêtes réseau sortantes via un proxy pour le debug MITM. Actif uniquement quand tu es en mode debug (F5).",
 	"settings.debugProxy.serverUrl.description": "URL du proxy (par ex. `http://127.0.0.1:8888`). Utilisée uniquement quand le **Debug Proxy** est activé.",
-	"settings.debugProxy.tlsInsecure.description": "Accepter les certificats auto-signés du proxy. **Requis pour l'inspection MITM.** ⚠️ Non sécurisé — à utiliser uniquement pour le debug local."
+	"settings.debugProxy.tlsInsecure.description": "Accepter les certificats auto-signés du proxy. **Requis pour l'inspection MITM.** ⚠️ Non sécurisé — à utiliser uniquement pour le debug local.",
+	"command.newTab.title": "Nouvel onglet",
+	"command.newSession.title": "Nouvelle session",
+	"command.closeTab.title": "Fermer l'onglet",
+	"command.generateTests.title": "Générer des tests unitaires",
+	"command.refactorFunction.title": "Refactoriser la fonction",
+	"command.toggleAutonomousMode.title": "Basculer le mode autonome",
+	"command.acceptReview.title": "Accepter les modifications",
+	"command.rejectReview.title": "Rejeter les modifications",
+	"command.acceptAllReviews.title": "Accepter toutes les modifications",
+	"command.diffReview.title": "Comparer les modifications",
+	"command.prevChange.title": "Modification de révision précédente",
+	"command.nextChange.title": "Modification de révision suivante",
+	"settings.autoApproveBrowser.description": "Approuver automatiquement les actions du navigateur (naviguer, cliquer, saisir, capturer, etc.)"
 }

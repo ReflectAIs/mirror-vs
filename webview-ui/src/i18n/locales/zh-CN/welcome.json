@@ -1,29 +1,34 @@
 {
-    "routers": {
-        "requesty": {
-            "description": "您优化的 LLM 路由器",
-            "incentive": "$1 免费额度"
-        },
-        "openrouter": {
-            "description": "LLM 统一接口"
-        }
-    },
-    "landing": {
-        "greeting": "欢迎使用 Mirror VS！",
-        "introduction": "通过一系列内置和可扩展的模式，Mirror VS 让你能够以前所未有的方式进行规划、架构设计、编码、调试并提升工作效率。",
-        "getStarted": "Get Started"
-    },
-    "providerSignup": {
-        "heading": "选择你的供应商",
-        "chooseProvider": "助手 需要 LLM 提供商才能工作。选择一个开始使用，你可以稍后添加更多。",
-        "learnMore": "了解更多",
-        "useAnotherProvider": "第三方供应商",
-        "useAnotherProviderDescription": "输入 API 密钥开始使用。",
-        "noApiKeys": "不想处理 API 密钥和单独的账户？",
-        "goBack": "返回",
-        "finish": "完成"
-    },
-    "startRouter": "我们建议使用 LLM 路由器：",
-    "startCustom": "或者你可以带上自己的 API 密钥：",
-    "importSettings": "导入设置"
+	"routers": {
+		"requesty": {
+			"description": "您优化的 LLM 路由器",
+			"incentive": "$1 免费额度"
+		},
+		"openrouter": {
+			"description": "LLM 统一接口"
+		}
+	},
+	"landing": {
+		"greeting": "欢迎使用 Mirror VS！",
+		"introduction": "通过一系列内置和可扩展的模式，Mirror VS 让你能够以前所未有的方式进行规划、架构设计、编码、调试并提升工作效率。",
+		"getStarted": "Get Started"
+	},
+	"providerSignup": {
+		"heading": "选择你的供应商",
+		"chooseProvider": "助手 需要 LLM 提供商才能工作。选择一个开始使用，你可以稍后添加更多。",
+		"learnMore": "了解更多",
+		"useAnotherProvider": "第三方供应商",
+		"useAnotherProviderDescription": "输入 API 密钥开始使用。",
+		"noApiKeys": "不想处理 API 密钥和单独的账户？",
+		"goBack": "返回",
+		"finish": "完成"
+	},
+	"startRouter": "我们建议使用 LLM 路由器：",
+	"startCustom": "或者你可以带上自己的 API 密钥：",
+	"importSettings": "导入设置",
+	"complete": {
+		"heading": "一切就绪！",
+		"description": "你的提供商已配置完成，Mirror VS 已准备好帮助你更智能地规划、设计、编码和调试。",
+		"startExploring": "开始探索"
+	}
 }

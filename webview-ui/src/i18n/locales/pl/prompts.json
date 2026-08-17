@@ -141,6 +141,10 @@
 			"NEW_TASK": {
 				"label": "Rozpocznij nowe zadanie",
 				"description": "Rozpocznij nowe zadanie z wprowadzonymi danymi. Dostępne w palecie poleceń."
+			},
+			"ENHANCE_IMAGE": {
+				"label": "Ulepsz prompt obrazu",
+				"description": "Ulepsza Twoje prompty obrazów o szczegóły, elementy oświetlenia, kolory i deskryptory odpowiednie dla generatorów tekst-na-obraz, takich jak Stable Diffusion i FLUX. Używane automatycznie w trybie Projektanta po kliknięciu ✨."
 			}
 		}
 	},

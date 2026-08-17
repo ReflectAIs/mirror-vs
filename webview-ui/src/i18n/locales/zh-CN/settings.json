@@ -41,7 +41,9 @@
 		"experimental": "实验性",
 		"language": "语言",
 		"about": "关于 Mirror VS",
-		"skills": "Skills"
+		"skills": "Skills",
+		"imageGeneration": "图像生成",
+		"pipelines": "流水线"
 	},
 	"about": {
 		"bugReport": {
@@ -277,6 +279,18 @@
 		},
 		"maxLimits": {
 			"description": "在请求批准继续之前，自动发出请求，最多不超过这些限制。"
+		},
+		"autonomousMode": {
+			"label": "自主模式",
+			"description": "启用后，工作区之外的所有执行命令和文件操作都会自动获得批准，无需许可。这是完全信任模式——请谨慎使用。"
+		},
+		"gitCommit": {
+			"label": "Git",
+			"description": "启用后，git 命令（commit、push、add、pull、merge、rebase 等）会自动获得批准。禁用后，助手必须在运行任何 git 操作之前请求批准。"
+		},
+		"browser": {
+			"label": "浏览器",
+			"description": "自动允许助手控制浏览器（导航、点击、输入、滚动、截图），无需获得批准"
 		}
 	},
 	"providers": {
@@ -392,6 +406,8 @@
 		"geminiApiKey": "Gemini API 密钥",
 		"getSambaNovaApiKey": "获取 SambaNova API 密钥",
 		"sambaNovaApiKey": "SambaNova API 密钥",
+		"deepInfraApiKey": "DeepInfra API 密钥",
+		"getDeepInfraApiKey": "获取 DeepInfra API 密钥",
 		"getGeminiApiKey": "获取 Gemini API 密钥",
 		"openAiApiKey": "OpenAI API 密钥",
 		"apiKey": "API 密钥",
@@ -815,6 +831,42 @@
 			"refreshSuccess": "工具刷新成功",
 			"refreshError": "工具刷新失败",
 			"toolParameters": "参数"
+		},
+		"TXT2IMG": {
+			"name": "文本转图像 (txt2img)",
+			"description": "启用后，助手可以使用此流水线类型根据文本描述生成图像。"
+		},
+		"IMG2IMG": {
+			"name": "图像转图像 (img2img)",
+			"description": "启用后，助手可以使用文本引导的编辑来转换现有图像。"
+		},
+		"INPAINT": {
+			"name": "修复（Inpaint）",
+			"description": "启用后，助手可以替换或修复图像的特定区域。"
+		},
+		"OUTPAINT": {
+			"name": "扩图（Outpaint）",
+			"description": "启用后，助手可以将图像扩展到其原始边界之外。"
+		},
+		"UPSCALE": {
+			"name": "放大（Upscale）",
+			"description": "启用后，助手可以提高图像的分辨率。"
+		},
+		"REMOVE_BG": {
+			"name": "移除背景",
+			"description": "启用后，助手可以从图像中移除背景。"
+		},
+		"TXT2AUDIO": {
+			"name": "文本转音频 (txt2audio)",
+			"description": "启用后，助手可以根据文本描述生成音乐和音频片段。"
+		},
+		"TXT2VIDEO": {
+			"name": "文本转视频 (txt2video)",
+			"description": "启用后，助手可以根据文本描述生成短视频片段。"
+		},
+		"MULTI_TAB": {
+			"name": "实验性多标签页界面",
+			"description": "启用后，提供类似浏览器的多标签页工作区，可在会话内切换并在多个任务之间同时运行。"
 		}
 	},
 	"promptCaching": {
@@ -997,6 +1049,36 @@
 			"nameInvalid": "名称必须为1-64个小写字母、数字或连字符",
 			"descriptionRequired": "描述为必填项",
 			"descriptionTooLong": "描述不得超过1024个字符"
+		}
+	},
+	"imageGeneration": {
+		"guideTitle": "图像生成的工作原理",
+		"guideDescription": "每种生成类型（txt2img、img2img 等）都使用一条流水线——一个 ComfyUI 工作流，定义模型如何处理输入。启用一种类型，选择提供商（本地 ComfyUI 或云端 OpenRouter），然后选择一条流水线或模型。",
+		"imagePipelines": "图像流水线",
+		"imagePipelinesDescription": "使用 ComfyUI 工作流或 OpenRouter 模型生成、编辑和转换图像。",
+		"mediaPipelines": "媒体流水线",
+		"mediaPipelinesDescription": "使用专用流水线生成音频和视频内容。",
+		"pipelineSettings": "流水线设置",
+		"pipelineSettingsDescription": "管理用于图像生成的 ComfyUI 工作流流水线。上传自定义工作流或按任务类型设置默认值。",
+		"pipelineSummary": "发现 {{count}} 条流水线",
+		"importPipeline": "导入流水线",
+		"inlineImportTooltip": "为此流水线类型导入 ComfyUI 工作流 JSON",
+		"noPipelinesFound": "未找到流水线。导入 ComfyUI 工作流 JSON 以开始使用。",
+		"alreadyDefault": "已设置为该类型的默认值",
+		"setAsDefault": "设置为该类型的默认值",
+		"deletePipeline": "删除流水线",
+		"deleteDialog": {
+			"title": "删除流水线",
+			"description": "确定要删除流水线 \"{{name}}\" 吗？此操作无法撤销。",
+			"confirm": "删除",
+			"cancel": "取消"
+		},
+		"importDialog": {
+			"title": "导入流水线",
+			"description": "粘贴 ComfyUI 工作流 JSON 以将其导入为新流水线。",
+			"confirm": "导入",
+			"cancel": "取消",
+			"importing": "正在导入..."
 		}
 	}
 }

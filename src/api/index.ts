@@ -17,6 +17,7 @@ import {
 	LmStudioHandler,
 	GeminiHandler,
 	OpenAiNativeHandler,
+	DeepInfraHandler,
 	DeepSeekHandler,
 	MoonshotHandler,
 	MistralHandler,
@@ -147,6 +148,8 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 				return new OpenAiNativeHandler(options)
 			case "deepseek":
 				return new DeepSeekHandler(options)
+			case "deepinfra":
+				return new DeepInfraHandler(options)
 			case "qwen-code":
 				return new QwenCodeHandler(options)
 			case "moonshot":

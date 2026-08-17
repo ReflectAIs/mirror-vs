@@ -75,7 +75,16 @@ vi.mock("../../task/Task", () => ({
 		setTaskApiConfigName: vi.fn(),
 		_taskApiConfigName: options.historyItem?.apiConfigName,
 		taskApiConfigName: options.historyItem?.apiConfigName,
+		metadata: { task: options.historyItem?.task || "Test task" },
 	})),
+	TaskState: {
+		Idle: "idle",
+		Streaming: "streaming",
+		WaitingApproval: "interactive",
+		Completed: "completed",
+		Error: "error",
+		Aborted: "aborted",
+	},
 }))
 
 vi.mock("../../prompts/sections/custom-instructions")
@@ -288,6 +297,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -349,6 +359,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack
@@ -405,6 +416,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			await provider.addMirrorToStack(mockTask as any)
@@ -659,6 +671,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Populate the store so persistStickyProviderProfileToCurrentTask finds the task
@@ -722,6 +735,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Task 1" },
 			}
 
 			// Create task 2 with profile B
@@ -736,6 +750,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Task 2" },
 			}
 
 			// Add task 1 to stack
@@ -823,6 +838,7 @@ describe("MirrorProvider - Sticky Provider Profile", () => {
 				mirrorMessages: [],
 				apiConversationHistory: [],
 				updateApiConfiguration: vi.fn(),
+				metadata: { task: "Test task" },
 			}
 
 			// Add task to provider stack

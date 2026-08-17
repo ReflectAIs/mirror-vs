@@ -43,5 +43,18 @@
 	"settings.debug.description": "Włącz tryb debugowania, aby wyświetlić dodatkowe przyciski do przeglądania historii rozmów API i komunikatów interfejsu użytkownika jako sformatowany JSON w plikach tymczasowych.",
 	"settings.debugProxy.enabled.description": "**Włącz Debug Proxy** — Kieruj wszystkie wychodzące żądania sieciowe przez proxy na potrzeby debugowania MITM. Aktywne tylko wtedy, gdy uruchamiasz w trybie debugowania (F5).",
 	"settings.debugProxy.serverUrl.description": "URL proxy (np. `http://127.0.0.1:8888`). Używany tylko wtedy, gdy **Debug Proxy** jest włączony.",
-	"settings.debugProxy.tlsInsecure.description": "Akceptuj certyfikaty self-signed z proxy. **Wymagane do inspekcji MITM.** ⚠️ Niezabezpieczone — używaj tylko do lokalnego debugowania."
+	"settings.debugProxy.tlsInsecure.description": "Akceptuj certyfikaty self-signed z proxy. **Wymagane do inspekcji MITM.** ⚠️ Niezabezpieczone — używaj tylko do lokalnego debugowania.",
+	"command.newTab.title": "Nowa zakładka",
+	"command.newSession.title": "Nowa sesja",
+	"command.closeTab.title": "Zamknij zakładkę",
+	"command.generateTests.title": "Generuj testy jednostkowe",
+	"command.refactorFunction.title": "Refaktoryzuj funkcję",
+	"command.toggleAutonomousMode.title": "Przełącz tryb autonomiczny",
+	"command.acceptReview.title": "Akceptuj zmiany",
+	"command.rejectReview.title": "Odrzuć zmiany",
+	"command.acceptAllReviews.title": "Akceptuj wszystkie zmiany",
+	"command.diffReview.title": "Porównaj zmiany",
+	"command.prevChange.title": "Poprzednia zmiana przeglądu",
+	"command.nextChange.title": "Następna zmiana przeglądu",
+	"settings.autoApproveBrowser.description": "Automatycznie zatwierdzaj działania przeglądarki (nawigacja, kliknięcia, wpisywanie, zrzuty ekranu itp.)"
 }

@@ -43,5 +43,18 @@
 	"settings.debug.description": "啟用偵錯模式以顯示額外按鈕，用於在暫存檔案中以格式化 JSON 檢視 API 對話歷史和 UI 訊息。",
 	"settings.debugProxy.enabled.description": "**啟用 Debug Proxy** — 透過代理轉發所有出站網路請求，用於 MITM 偵錯。只在偵錯模式 (F5) 執行時生效。",
 	"settings.debugProxy.serverUrl.description": "代理 URL（例如 `http://127.0.0.1:8888`）。僅在啟用 **Debug Proxy** 時使用。",
-	"settings.debugProxy.tlsInsecure.description": "接受來自代理的 self-signed 證書。**MITM 檢查所必需。** ⚠️ 不安全——只在本地偵錯時使用。"
+	"settings.debugProxy.tlsInsecure.description": "接受來自代理的 self-signed 證書。**MITM 檢查所必需。** ⚠️ 不安全——只在本地偵錯時使用。",
+	"command.newTab.title": "新增索引標籤",
+	"command.newSession.title": "新增工作階段",
+	"command.closeTab.title": "關閉索引標籤",
+	"command.generateTests.title": "產生單元測試",
+	"command.refactorFunction.title": "重構函式",
+	"command.toggleAutonomousMode.title": "切換自主模式",
+	"command.acceptReview.title": "接受變更",
+	"command.rejectReview.title": "拒絕變更",
+	"command.acceptAllReviews.title": "接受所有變更",
+	"command.diffReview.title": "比較變更",
+	"command.prevChange.title": "上一處審查變更",
+	"command.nextChange.title": "下一處審查變更",
+	"settings.autoApproveBrowser.description": "自動核准瀏覽器操作（導覽、點擊、輸入、截圖等）"
 }
