@@ -1,5 +1,11 @@
 {
 	"greeting": "Benvingut a Mirror VS",
+	"sessionNotes": {
+		"title": "Notes de sessió",
+		"placeholder": "Comparteix context, objectius i decisions importants amb totes les pestanyes d'aquesta sessió…",
+		"hint": "Compartit amb cada pestanya d'aquesta sessió mitjançant la indicació del sistema i l'eina read_session_context.",
+		"save": "Desa les notes"
+	},
 	"task": {
 		"title": "Tasca",
 		"expand": "Expandir tasca",

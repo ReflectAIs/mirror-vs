@@ -64,6 +64,7 @@ export const generateSystemPrompt = async (provider: MirrorProvider, message: We
 		undefined, // todoList
 		undefined, // modelId
 		provider.getSkillsManager(),
+		await provider.buildSessionSharedContext(provider.getCurrentTask()?.taskId),
 	)
 
 	return systemPrompt

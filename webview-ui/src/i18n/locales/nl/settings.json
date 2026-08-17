@@ -406,6 +406,8 @@
 		"geminiApiKey": "Gemini API-sleutel",
 		"getSambaNovaApiKey": "SambaNova API-sleutel ophalen",
 		"sambaNovaApiKey": "SambaNova API-sleutel",
+		"deepInfraApiKey": "DeepInfra API-sleutel",
+		"getDeepInfraApiKey": "DeepInfra API-sleutel ophalen",
 		"getGeminiApiKey": "Gemini API-sleutel ophalen",
 		"apiKey": "API-sleutel",
 		"openAiApiKey": "OpenAI API-sleutel",

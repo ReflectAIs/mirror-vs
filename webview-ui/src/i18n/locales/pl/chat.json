@@ -1,5 +1,11 @@
 {
 	"greeting": "Witamy w Mirror VS",
+	"sessionNotes": {
+		"title": "Notatki sesji",
+		"placeholder": "Udostępnij ważny kontekst, cele i decyzje wszystkim kartom w tej sesji…",
+		"hint": "Udostępniane każdej karcie w tej sesji za pomocą promptu systemowego i narzędzia read_session_context.",
+		"save": "Zapisz notatki"
+	},
 	"task": {
 		"title": "Zadanie",
 		"expand": "Rozwiń zadanie",

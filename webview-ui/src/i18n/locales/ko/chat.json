@@ -1,5 +1,11 @@
 {
 	"greeting": "Mirror VS에 오신 것을 환영합니다",
+	"sessionNotes": {
+		"title": "세션 메모",
+		"placeholder": "이 세션의 모든 탭과 중요한 맥락, 목표, 결정 사항을 공유하세요…",
+		"hint": "시스템 프롬프트와 read_session_context 도구를 통해 이 세션의 모든 탭과 공유됩니다.",
+		"save": "메모 저장"
+	},
 	"task": {
 		"title": "작업",
 		"expand": "작업 펼치기",

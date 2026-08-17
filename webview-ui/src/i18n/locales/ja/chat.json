@@ -1,5 +1,11 @@
 {
 	"greeting": "Mirror VS へようこそ",
+	"sessionNotes": {
+		"title": "セッションノート",
+		"placeholder": "重要なコンテキスト、目標、決定事項をこのセッションのすべてのタブと共有…",
+		"hint": "システムプロンプトと read_session_context ツールを通じて、このセッションのすべてのタブと共有されます。",
+		"save": "ノートを保存"
+	},
 	"task": {
 		"title": "タスク",
 		"expand": "タスクを展開",

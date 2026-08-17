@@ -1,5 +1,11 @@
 {
 	"greeting": "Welkom bij Mirror VS",
+	"sessionNotes": {
+		"title": "Sessienotities",
+		"placeholder": "Deel belangrijke context, doelen en beslissingen met alle tabbladen in deze sessie…",
+		"hint": "Gedeeld met elk tabblad in deze sessie via de systeemprompt en de read_session_context-tool.",
+		"save": "Notities opslaan"
+	},
 	"task": {
 		"title": "Taak",
 		"expand": "Taak uitvouwen",

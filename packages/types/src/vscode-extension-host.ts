@@ -360,6 +360,7 @@ export type ExtensionState = Pick<
 	| "sessionNames"
 	| "taskNames"
 	| "sessionClosedTabs"
+	| "sessionSharedContexts"
 	| "currentApiConfigName"
 	| "listApiConfigMeta"
 	| "pinnedApiConfigs"
@@ -508,6 +509,8 @@ export type ExtensionState = Pick<
 	tabs: TabInfo[]
 	/** Currently active tab's taskId */
 	activeTabId: string
+	/** User-curated notes for the current session (derived from sessionSharedContexts). */
+	sessionNotes?: string
 	activeTerminalCount: number
 	activeTerminals: TerminalInfo[]
 }
@@ -724,6 +727,7 @@ export interface WebviewMessage {
 		| "deleteComfyuiWorkflow"
 		// Session messages
 		| "renameSession"
+		| "updateSessionNotes"
 		// Task/tab rename
 		| "renameTask"
 		// Model change messages
@@ -732,6 +736,8 @@ export interface WebviewMessage {
 	sessionId?: string
 	/** New name for the session (for renameSession message) */
 	sessionName?: string
+	/** User-curated markdown notes for the session (for updateSessionNotes message) */
+	sessionNotes?: string
 	/** Session mode: "continueOrCreate" means create a new task within the current session */
 	sessionMode?: "continueOrCreate"
 	text?: string

@@ -406,6 +406,8 @@
 		"geminiApiKey": "Khóa API Gemini",
 		"getSambaNovaApiKey": "Lấy khóa API SambaNova",
 		"sambaNovaApiKey": "Khóa API SambaNova",
+		"deepInfraApiKey": "Khóa API DeepInfra",
+		"getDeepInfraApiKey": "Lấy khóa API DeepInfra",
 		"getGeminiApiKey": "Lấy khóa API Gemini",
 		"openAiApiKey": "Khóa API OpenAI",
 		"apiKey": "Khóa API",

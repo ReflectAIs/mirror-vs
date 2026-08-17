@@ -1195,4 +1195,122 @@ describe("ChatTextArea", () => {
 			expect(sendButton).toHaveClass("pointer-events-auto")
 		})
 	})
+
+	describe("model selection near input", () => {
+		const modelOptions = [
+			{ value: "claude-sonnet-4-5", label: "claude-sonnet-4-5" },
+			{ value: "claude-opus-4-5", label: "claude-opus-4-5" },
+		]
+
+		it("should show a free-form model input when no model options exist (e.g. Custom API)", () => {
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="my-custom-model"
+					modelOptions={undefined}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			const input = screen.getByTestId("model-input")
+			expect(input).toBeInTheDocument()
+			expect(input).toHaveValue("my-custom-model")
+			expect(screen.queryByTestId("model-selector")).not.toBeInTheDocument()
+		})
+
+		it("should render the dropdown when model options exist", () => {
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="claude-sonnet-4-5"
+					modelOptions={modelOptions}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			const select = screen.getByTestId("model-selector")
+			expect(select).toBeInTheDocument()
+			expect(select).toHaveValue("claude-sonnet-4-5")
+			expect(screen.queryByTestId("model-input")).not.toBeInTheDocument()
+		})
+
+		it("should commit the typed model on Enter", () => {
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="my-custom-model"
+					modelOptions={undefined}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			const input = screen.getByTestId("model-input")
+			fireEvent.focus(input)
+			fireEvent.change(input, { target: { value: "gpt-4o" } })
+			fireEvent.keyDown(input, { key: "Enter" })
+
+			expect(onModelChange).toHaveBeenCalledTimes(1)
+			expect(onModelChange).toHaveBeenCalledWith("gpt-4o")
+		})
+
+		it("should commit the typed model on blur", () => {
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="my-custom-model"
+					modelOptions={undefined}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			const input = screen.getByTestId("model-input")
+			fireEvent.focus(input)
+			fireEvent.change(input, { target: { value: "gpt-4o" } })
+			fireEvent.blur(input)
+
+			expect(onModelChange).toHaveBeenCalledTimes(1)
+			expect(onModelChange).toHaveBeenCalledWith("gpt-4o")
+		})
+
+		it("should not commit an empty or whitespace-only model", () => {
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="my-custom-model"
+					modelOptions={undefined}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			const input = screen.getByTestId("model-input")
+			fireEvent.focus(input)
+			fireEvent.change(input, { target: { value: "   " } })
+			fireEvent.blur(input)
+
+			expect(onModelChange).not.toHaveBeenCalled()
+		})
+
+		it("should select an option from the dropdown via onChange", () => {
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="claude-sonnet-4-5"
+					modelOptions={modelOptions}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			const select = screen.getByTestId("model-selector")
+			fireEvent.change(select, { target: { value: "claude-opus-4-5" } })
+
+			expect(onModelChange).toHaveBeenCalledTimes(1)
+			expect(onModelChange).toHaveBeenCalledWith("claude-opus-4-5")
+		})
+	})
 })

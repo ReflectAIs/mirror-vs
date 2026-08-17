@@ -1,5 +1,11 @@
 {
 	"greeting": "Chào mừng đến với Mirror VS",
+	"sessionNotes": {
+		"title": "Ghi chú phiên",
+		"placeholder": "Chia sẻ ngữ cảnh, mục tiêu và quyết định quan trọng với tất cả tab trong phiên này…",
+		"hint": "Được chia sẻ với mọi tab trong phiên này qua lời nhắc hệ thống và công cụ read_session_context.",
+		"save": "Lưu ghi chú"
+	},
 	"task": {
 		"title": "Nhiệm vụ",
 		"expand": "Mở rộng nhiệm vụ",

@@ -7,6 +7,7 @@ export function getToolUseGuidelinesSection(): string {
 - Non-interactive execution: always use non-interactive flags (-y, --no-input, -d) and '--progress=plain' with 'docker compose' commands to prevent TTY progress spinners from hanging.
 - Web info: \`web_search\` or \`read_url\` | List files: \`list_files\`
 - Refresh context: \`get_workspace_file_tree\`, \`get_workspace_pulse\`, \`get_git_status\`
+- Session shared context: use \`read_session_context\` to pull sibling-tab awareness, shared knowledge notes, and user-curated session notes on demand
 
 ## Batching Rules
 - Read-only tools (\`read_file\`, \`search_files\`, \`list_files\`, context retrieval tools) can be batched in parallel.

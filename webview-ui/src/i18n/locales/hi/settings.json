@@ -406,6 +406,8 @@
 		"geminiApiKey": "Gemini API कुंजी",
 		"getSambaNovaApiKey": "SambaNova API कुंजी प्राप्त करें",
 		"sambaNovaApiKey": "SambaNova API कुंजी",
+		"deepInfraApiKey": "DeepInfra API कुंजी",
+		"getDeepInfraApiKey": "DeepInfra API कुंजी प्राप्त करें",
 		"getGeminiApiKey": "Gemini API कुंजी प्राप्त करें",
 		"openAiApiKey": "OpenAI API कुंजी",
 		"apiKey": "API कुंजी",

@@ -149,6 +149,8 @@ export type NativeToolArgs = {
 	get_workspace_file_tree: Record<string, never>
 	get_workspace_pulse: Record<string, never>
 	get_git_status: { maxFiles?: number }
+	// Session shared context (intersession context sharing)
+	read_session_context: { scope?: "siblings" | "knowledge" | "notes" | "all" }
 	// Add more tools as they are migrated to native protocol
 }
 
@@ -342,6 +344,7 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	get_git_status: "get git status",
 	search_mcp_tools: "search mcp tools",
 	activate_mcp_tool: "activate mcp tool",
+	read_session_context: "read session shared context",
 } as const
 
 // Define available tool groups.
@@ -361,6 +364,7 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 			"get_workspace_file_tree",
 			"get_workspace_pulse",
 			"get_git_status",
+			"read_session_context",
 		],
 	},
 	edit: {
@@ -411,6 +415,7 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"get_git_status",
 	"search_mcp_tools",
 	"activate_mcp_tool",
+	"read_session_context",
 ] as const
 
 /**

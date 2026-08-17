@@ -1,5 +1,11 @@
 {
 	"greeting": "Bienvenue sur Mirror VS",
+	"sessionNotes": {
+		"title": "Notes de session",
+		"placeholder": "Partagez le contexte, les objectifs et les décisions importants avec tous les onglets de cette session…",
+		"hint": "Partagé avec chaque onglet de cette session via l'invite système et l'outil read_session_context.",
+		"save": "Enregistrer les notes"
+	},
 	"task": {
 		"title": "Tâche",
 		"expand": "Développer la tâche",

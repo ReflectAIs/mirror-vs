@@ -406,6 +406,8 @@
 		"geminiApiKey": "Gemini API-ключ",
 		"getSambaNovaApiKey": "Получить SambaNova API-ключ",
 		"sambaNovaApiKey": "SambaNova API-ключ",
+		"deepInfraApiKey": "DeepInfra API-ключ",
+		"getDeepInfraApiKey": "Получить DeepInfra API-ключ",
 		"getGeminiApiKey": "Получить Gemini API-ключ",
 		"apiKey": "API-ключ",
 		"openAiApiKey": "OpenAI API-ключ",

@@ -1,6 +1,7 @@
 export { AnthropicVertexHandler } from "./anthropic-vertex"
 export { AnthropicHandler } from "./anthropic"
 export { AwsBedrockHandler } from "./bedrock"
+export { DeepInfraHandler } from "./deepinfra"
 export { DeepSeekHandler } from "./deepseek"
 export { MoonshotHandler } from "./moonshot"
 export { FakeAIHandler } from "./fake-ai"

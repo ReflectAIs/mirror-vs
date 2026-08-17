@@ -1,5 +1,11 @@
 {
 	"greeting": "Benvenuto a Mirror VS",
+	"sessionNotes": {
+		"title": "Note di sessione",
+		"placeholder": "Condividi contesto, obiettivi e decisioni importanti con tutte le schede di questa sessione…",
+		"hint": "Condiviso con ogni scheda di questa sessione tramite il prompt di sistema e lo strumento read_session_context.",
+		"save": "Salva note"
+	},
 	"task": {
 		"title": "Attività",
 		"expand": "Espandi attività",

@@ -18,6 +18,7 @@ import {
 	anthropicDefaultModelId,
 	qwenCodeDefaultModelId,
 	geminiDefaultModelId,
+	deepInfraDefaultModelId,
 	deepSeekDefaultModelId,
 	moonshotDefaultModelId,
 	mistralDefaultModelId,
@@ -69,6 +70,7 @@ import {
 	Anthropic,
 	Baseten,
 	Bedrock,
+	DeepInfra,
 	DeepSeek,
 	Gemini,
 	LMStudio,
@@ -341,6 +343,7 @@ const ApiOptions = ({
 				"qwen-code": { field: "apiModelId", default: qwenCodeDefaultModelId },
 				"openai-native": { field: "apiModelId", default: openAiNativeDefaultModelId },
 				gemini: { field: "apiModelId", default: geminiDefaultModelId },
+				deepinfra: { field: "apiModelId", default: deepInfraDefaultModelId },
 				deepseek: { field: "apiModelId", default: deepSeekDefaultModelId },
 				moonshot: { field: "apiModelId", default: moonshotDefaultModelId },
 				minimax: { field: "apiModelId", default: minimaxDefaultModelId },
@@ -666,6 +669,13 @@ const ApiOptions = ({
 
 					{selectedProvider === "sambanova" && (
 						<SambaNova
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "deepinfra" && (
+						<DeepInfra
 							apiConfiguration={apiConfiguration}
 							setApiConfigurationField={setApiConfigurationField}
 						/>

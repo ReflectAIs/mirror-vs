@@ -120,6 +120,19 @@ export class TaskContextManagement {
 		}
 		await this.task.conversationHistory.overwriteApiConversationHistory(messages)
 
+		// Extract distilled knowledge from this task into the session's shared
+		// context (condense runs are a key knowledge-extraction event). No-op for
+		// tasks without a sessionId; failures are non-fatal.
+		if (provider) {
+			try {
+				await provider.getSessionContextManager().extractKnowledgeFromTask(this.task)
+			} catch (extractError) {
+				console.error(
+					`[condenseContext] Failed to extract session knowledge: ${extractError instanceof Error ? extractError.message : String(extractError)}`,
+				)
+			}
+		}
+
 		const contextCondense: ContextCondense = {
 			summary,
 			cost,

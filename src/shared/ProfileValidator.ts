@@ -60,6 +60,7 @@ export class ProfileValidator {
 			case "gemini":
 			case "mistral":
 			case "deepseek":
+			case "deepinfra":
 			case "xai":
 			case "sambanova":
 			case "fireworks":

@@ -1,5 +1,11 @@
 {
 	"greeting": "欢迎使用 Mirror VS",
+	"sessionNotes": {
+		"title": "会话笔记",
+		"placeholder": "与本次会话中的所有标签页共享重要的上下文、目标和决策…",
+		"hint": "通过系统提示词和 read_session_context 工具与本次会话中的每个标签页共享。",
+		"save": "保存笔记"
+	},
 	"task": {
 		"title": "任务",
 		"expand": "展开任务",

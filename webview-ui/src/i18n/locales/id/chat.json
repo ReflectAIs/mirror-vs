@@ -1,5 +1,11 @@
 {
 	"greeting": "Selamat datang di Mirror VS",
+	"sessionNotes": {
+		"title": "Catatan Sesi",
+		"placeholder": "Bagikan konteks, tujuan, dan keputusan penting dengan semua tab di sesi ini…",
+		"hint": "Dibagikan dengan setiap tab di sesi ini melalui prompt sistem dan alat read_session_context.",
+		"save": "Simpan Catatan"
+	},
 	"task": {
 		"title": "Tugas",
 		"expand": "Perluas tugas",

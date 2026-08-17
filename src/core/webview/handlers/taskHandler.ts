@@ -202,6 +202,22 @@ export async function handleRenameTask(provider: MirrorProvider, taskId?: string
 }
 
 /**
+ * Handles the updateSessionNotes message — persists user-curated notes for a
+ * session via SessionContextManager.setSessionNotes.
+ */
+export async function handleUpdateSessionNotes(
+	provider: MirrorProvider,
+	sessionId?: string,
+	notes?: string,
+): Promise<void> {
+	if (sessionId && notes !== undefined) {
+		await provider.getSessionContextManager().setSessionNotes(sessionId, notes)
+		// Refresh the webview so the saved notes are reflected in the UI.
+		await provider.postStateToWebview()
+	}
+}
+
+/**
  * Handles the customInstructions message.
  */
 export async function handleCustomInstructions(provider: MirrorProvider, text?: string): Promise<void> {

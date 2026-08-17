@@ -406,6 +406,8 @@
 		"geminiApiKey": "Gemini API Anahtarı",
 		"getSambaNovaApiKey": "SambaNova API Anahtarı Al",
 		"sambaNovaApiKey": "SambaNova API Anahtarı",
+		"deepInfraApiKey": "DeepInfra API Anahtarı",
+		"getDeepInfraApiKey": "DeepInfra API Anahtarı Al",
 		"getGeminiApiKey": "Gemini API Anahtarı Al",
 		"openAiApiKey": "OpenAI API Anahtarı",
 		"apiKey": "API Anahtarı",

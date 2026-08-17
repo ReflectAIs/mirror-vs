@@ -55,6 +55,7 @@ async function generatePrompt(
 	todoList?: TodoItem[],
 	modelId?: string,
 	skillsManager?: SkillsManager,
+	sessionSharedContext?: string,
 ): Promise<string> {
 	if (!context) {
 		throw new Error("Extension context is required for generating system prompt")
@@ -104,7 +105,7 @@ ${await addCustomInstructions(baseInstructions, globalCustomInstructions || "", 
 	language: language ?? formatLanguage(vscode.env.language),
 	mirrorIgnoreInstructions,
 	settings,
-})}`
+})}${sessionSharedContext ? `\n\n${sessionSharedContext}` : ""}`
 
 	return basePrompt
 }
@@ -126,6 +127,7 @@ export const SYSTEM_PROMPT = async (
 	todoList?: TodoItem[],
 	modelId?: string,
 	skillsManager?: SkillsManager,
+	sessionSharedContext?: string,
 ): Promise<string> => {
 	if (!context) {
 		throw new Error("Extension context is required for generating system prompt")
@@ -154,5 +156,6 @@ export const SYSTEM_PROMPT = async (
 		todoList,
 		modelId,
 		skillsManager,
+		sessionSharedContext,
 	)
 }

@@ -406,6 +406,8 @@
 		"geminiApiKey": "Gemini APIキー",
 		"getSambaNovaApiKey": "SambaNova APIキーを取得",
 		"sambaNovaApiKey": "SambaNova APIキー",
+		"deepInfraApiKey": "DeepInfra APIキー",
+		"getDeepInfraApiKey": "DeepInfra APIキーを取得",
 		"getGeminiApiKey": "Gemini APIキーを取得",
 		"openAiApiKey": "OpenAI APIキー",
 		"apiKey": "APIキー",

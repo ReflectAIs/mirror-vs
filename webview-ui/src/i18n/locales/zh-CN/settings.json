@@ -406,6 +406,8 @@
 		"geminiApiKey": "Gemini API 密钥",
 		"getSambaNovaApiKey": "获取 SambaNova API 密钥",
 		"sambaNovaApiKey": "SambaNova API 密钥",
+		"deepInfraApiKey": "DeepInfra API 密钥",
+		"getDeepInfraApiKey": "获取 DeepInfra API 密钥",
 		"getGeminiApiKey": "获取 Gemini API 密钥",
 		"openAiApiKey": "OpenAI API 密钥",
 		"apiKey": "API 密钥",

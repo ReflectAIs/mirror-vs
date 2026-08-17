@@ -1,5 +1,11 @@
 {
 	"greeting": "Mirror VS'a Hoş Geldiniz",
+	"sessionNotes": {
+		"title": "Oturum Notları",
+		"placeholder": "Önemli bağlamı, hedefleri ve kararları bu oturumdaki tüm sekmelerle paylaşın…",
+		"hint": "Sistem istemi ve read_session_context aracı aracılığıyla bu oturumdaki her sekmeyle paylaşılır.",
+		"save": "Notları Kaydet"
+	},
 	"task": {
 		"title": "Görev",
 		"expand": "Görevi genişlet",

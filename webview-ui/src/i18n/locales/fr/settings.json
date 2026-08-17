@@ -406,6 +406,8 @@
 		"geminiApiKey": "Clé API Gemini",
 		"getSambaNovaApiKey": "Obtenir la clé API SambaNova",
 		"sambaNovaApiKey": "Clé API SambaNova",
+		"deepInfraApiKey": "Clé API DeepInfra",
+		"getDeepInfraApiKey": "Obtenir la clé API DeepInfra",
 		"getGeminiApiKey": "Obtenir la clé API Gemini",
 		"openAiApiKey": "Clé API OpenAI",
 		"apiKey": "Clé API",

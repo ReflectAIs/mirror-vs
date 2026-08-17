@@ -230,6 +230,7 @@ export class StateManager {
 			currentSessionId,
 			sessionNames,
 			taskNames,
+			sessionNotes,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels,
@@ -463,6 +464,7 @@ export class StateManager {
 			currentSessionId,
 			sessionNames: sessionNames ?? {},
 			taskNames: taskNames ?? {},
+			sessionNotes,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels: atlasCloudModels ?? {},
@@ -614,6 +616,10 @@ export class StateManager {
 			currentSessionId: stateValues.currentSessionId,
 			sessionNames: stateValues.sessionNames ?? {},
 			taskNames: stateValues.taskNames ?? {},
+			sessionNotes:
+				stateValues.currentSessionId && stateValues.sessionSharedContexts?.[stateValues.currentSessionId]
+					? stateValues.sessionSharedContexts[stateValues.currentSessionId].notes
+					: undefined,
 			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
 			userBraveApiKey: stateValues.userBraveApiKey,
 			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},

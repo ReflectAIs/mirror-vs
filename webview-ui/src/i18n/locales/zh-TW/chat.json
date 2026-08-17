@@ -1,5 +1,11 @@
 {
 	"greeting": "歡迎使用 Mirror VS！",
+	"sessionNotes": {
+		"title": "工作階段筆記",
+		"placeholder": "與此工作階段中的所有分頁分享重要的上下文、目標與決策…",
+		"hint": "透過系統提示詞與 read_session_context 工具，與此工作階段中的每個分頁共享。",
+		"save": "儲存筆記"
+	},
 	"task": {
 		"title": "工作",
 		"expand": "展開工作",

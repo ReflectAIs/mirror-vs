@@ -20,6 +20,7 @@ You have access to a set of tools that are executed upon the user's approval. Us
 - Non-interactive execution: always use non-interactive flags (-y, --no-input, -d) and '--progress=plain' with 'docker compose' commands to prevent TTY progress spinners from hanging.
 - Web info: `web_search` or `read_url` | List files: `list_files`
 - Refresh context: `get_workspace_file_tree`, `get_workspace_pulse`, `get_git_status`
+- Session shared context: use `read_session_context` to pull sibling-tab awareness, shared knowledge notes, and user-curated session notes on demand
 
 ## Batching Rules
 - Read-only tools (`read_file`, `search_files`, `list_files`, context retrieval tools) can be batched in parallel.
@@ -33,6 +34,7 @@ CAPABILITIES
 - Tools for CLI commands, file listing, regex search, read/write files, and follow-up questions.
 - `generate_image`: Create/edit images or generate audio. Use `pipeline` param for variant (txt2img, txt2img-flash, img2img, txt2audio). To edit an existing image, pass its file path as `image`.
 - `environment_details` provides workspace context at '/test/path'. Use `get_workspace_file_tree` for full tree refresh, `get_workspace_pulse` for project health, and `get_git_status` for detailed git status when needed.
+- `read_session_context` retrieves shared selective context between tabs in your current session (sibling awareness, auto-extracted knowledge, user notes).
 - Commands run in the user's VSCode terminal — prefer complex CLI commands over scripts.
 - You have access to MCP servers that may provide additional tools and resources.
 
