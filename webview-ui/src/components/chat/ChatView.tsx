@@ -374,7 +374,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							key={task.ts}
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
-							increaseViewportBy={{ top: 3_000, bottom: 1000 }}
+							increaseViewportBy={{ top: 800, bottom: 400 }}
 							data={displayedMessages}
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}
@@ -430,8 +430,15 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				onForceSend={(index) => {
 					if (effectiveQueue[index]) {
 						const queuedMsg = effectiveQueue[index]
-						vscode.postMessage({ type: "removeQueuedMessage", text: queuedMsg.id })
-						handleSendMessage(queuedMsg.text, queuedMsg.images || [], true)
+						vscode.postMessage({
+							type: "forceSendQueuedMessage",
+							text: queuedMsg.id,
+							payload: {
+								id: queuedMsg.id,
+								text: queuedMsg.text,
+								images: queuedMsg.images,
+							},
+						})
 					}
 				}}
 			/>

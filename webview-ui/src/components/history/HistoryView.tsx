@@ -49,6 +49,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		tasks,
 		searchQuery,
 		sessionNames ?? {},
+		sortOption,
 	)
 
 	// Handle tab rename

@@ -474,6 +474,12 @@ export class TaskUserInteraction {
 			this.task.terminalProcess?.continue()
 		} else if (terminalOperation === "abort") {
 			this.task.terminalProcess?.abort()
+			try {
+				const { TerminalRegistry } = await import("../../integrations/terminal/TerminalRegistry")
+				TerminalRegistry.abortTerminalsForTask(this.task.taskId)
+			} catch (e) {
+				console.error("[TaskUserInteraction] Error aborting terminals for task:", e)
+			}
 		}
 	}
 

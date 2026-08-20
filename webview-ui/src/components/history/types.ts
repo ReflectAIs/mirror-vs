@@ -17,12 +17,16 @@ export interface SessionGroup {
 	sessionId: string
 	/** User-assigned name or auto-generated "Session N" */
 	sessionName: string
-	/** Flat list of tasks in this session, sorted by timestamp ascending */
+	/** Primary workspace directory for tasks in this session */
+	workspace?: string
+	/** Flat list of tasks in this session, sorted according to active sort */
 	tabs: DisplayHistoryItem[]
 	/** Total number of tabs in this session */
 	taskCount: number
 	/** Timestamp of the newest task (used for sorting sessions) */
 	newestTs: number
+	/** Timestamp of the oldest task (used for sorting sessions) */
+	oldestTs?: number
 	/** Whether this session is expanded in the UI */
 	isExpanded: boolean
 }

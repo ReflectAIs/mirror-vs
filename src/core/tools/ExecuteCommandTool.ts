@@ -1,4 +1,5 @@
 import fs from "fs/promises"
+import * as os from "os"
 import * as path from "path"
 import * as vscode from "vscode"
 
@@ -104,12 +105,24 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 						return "Destructive command blocked: Deleting the workspace root directory recursively is prohibited."
 					}
 
+					// Allow temporary directory and scratch folder deletions
+					const isTempPath =
+						resolvedPath.startsWith(os.tmpdir()) ||
+						resolvedPath.startsWith("/tmp") ||
+						resolvedPath.startsWith("/private/tmp") ||
+						resolvedPath.startsWith("/var/tmp") ||
+						cleanPart.startsWith("/tmp") ||
+						cleanPart.startsWith("/private/tmp") ||
+						cleanPart.includes("scratch") ||
+						cleanPart.includes(".cache") ||
+						cleanPart.includes(".tmp")
+
 					// If resolvedPath goes outside the workspace (starts with '..')
-					if (relative.startsWith("..")) {
-						return `Destructive command blocked: Deleting directories outside the workspace ('${cleanPart}') is prohibited.`
+					if (relative.startsWith("..") && !isTempPath) {
+						return `Destructive command blocked: Deleting non-temporary directories outside the workspace ('${cleanPart}') is prohibited.`
 					}
 				} catch (e) {
-					if (cleanPart.startsWith("..") || cleanPart.startsWith("/")) {
+					if ((cleanPart.startsWith("..") || cleanPart.startsWith("/")) && !cleanPart.startsWith("/tmp")) {
 						return "Destructive command blocked: Path resolves outside the workspace."
 					}
 				}
@@ -226,7 +239,7 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			const provider = await task.providerRef.deref()
 			const providerState = await provider?.getState()
 
-			const { terminalShellIntegrationDisabled = true } = providerState ?? {}
+			const { terminalShellIntegrationDisabled = false } = providerState ?? {}
 
 			// Get command execution timeout from VSCode configuration (in seconds)
 			const commandExecutionTimeoutSeconds = vscode.workspace
@@ -318,7 +331,7 @@ export async function executeCommandInTerminal(
 		executionId,
 		command,
 		customCwd,
-		terminalShellIntegrationDisabled = true,
+		terminalShellIntegrationDisabled = false,
 		commandExecutionTimeout = 0,
 		agentTimeout = 0,
 	}: ExecuteCommandOptions,
@@ -435,6 +448,27 @@ export async function executeCommandInTerminal(
 		resolveOnCompleted = resolve
 	})
 
+	let hasEmittedBackgroundCompletion = false
+
+	const checkAndNotifyBackgroundCompletion = () => {
+		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
+			return
+		}
+
+		if (completed && exitDetails !== undefined) {
+			hasEmittedBackgroundCompletion = true
+			const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
+			const exitStatus = formatExitStatus(exitDetails)
+			const previewSnippet = result.length > 0 ? (result.length > 2000 ? result.slice(-2000) : result) : ""
+			const notification = [
+				`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus}]`,
+				previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
+			].join("")
+
+			void task.injectInBetweenMessage(notification, undefined, "terminal_callback")
+		}
+	}
+
 	const callbacks: MirrorTerminalCallbacks = {
 		onLine: async (lines: string, process: MirrorTerminalProcess) => {
 			accumulatedOutput += lines
@@ -497,6 +531,7 @@ export async function executeCommandInTerminal(
 			} finally {
 				// Signal that onCompleted has finished, so the main code can safely use persistedResult
 				resolveOnCompleted?.()
+				checkAndNotifyBackgroundCompletion()
 			}
 		},
 		onShellExecutionStarted: (pid: number | undefined) => {
@@ -507,6 +542,7 @@ export async function executeCommandInTerminal(
 			const status: CommandExecutionStatus = { executionId, status: "exited", exitCode: details.exitCode }
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			exitDetails = details
+			checkAndNotifyBackgroundCompletion()
 		},
 	}
 

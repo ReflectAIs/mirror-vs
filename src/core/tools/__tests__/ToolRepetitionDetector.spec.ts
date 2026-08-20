@@ -540,5 +540,31 @@ describe("ToolRepetitionDetector", () => {
 			expect(result.allowExecution).toBe(false)
 			expect(result.askUser).toBeDefined()
 		})
+
+		it("should not trigger CLI loop detection on sleep and echo polling commands", () => {
+			const detector = new ToolRepetitionDetector(2)
+
+			// Running multiple sleep/echo calls while polling should be allowed
+			for (let i = 0; i < 8; i++) {
+				const sleepCmd = createToolUse("execute_command", "execute_command", { command: `sleep ${i + 1}` })
+				expect(detector.check(sleepCmd).allowExecution).toBe(true)
+			}
+		})
+
+		it("should detect repeated execution loops on heavy interactive CLI commands like firebase", () => {
+			const detector = new ToolRepetitionDetector(2)
+
+			for (let i = 0; i < 5; i++) {
+				const firebaseCmd = createToolUse("execute_command", "execute_command", {
+					command: `firebase deploy --only hosting:${i}`,
+				})
+				expect(detector.check(firebaseCmd).allowExecution).toBe(true)
+			}
+
+			const failingAttempt = createToolUse("execute_command", "execute_command", { command: "firebase deploy" })
+			const result = detector.check(failingAttempt)
+			expect(result.allowExecution).toBe(false)
+			expect(result.askUser?.messageDetail).toContain("firebase")
+		})
 	})
 })

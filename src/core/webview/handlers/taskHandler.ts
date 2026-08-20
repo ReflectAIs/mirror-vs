@@ -23,6 +23,12 @@ export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<
 	// so no AI loop runs — the user can interact with it by clicking.
 	await provider.restoreSessionTabs()
 
+	// If no tabs were restored (e.g. fresh session or all tabs were closed),
+	// ensure a clean idle task exists ready to receive user messages.
+	if (provider.mirrorStack.length === 0) {
+		await provider.createTask("", [], undefined, {}, {})
+	}
+
 	provider.postStateToWebview()
 	provider.workspaceTracker?.initializeFilePaths() // Don't await.
 
@@ -172,10 +178,7 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 				message.taskConfiguration,
 			)
 		}
-
-		await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 	} catch (error) {
-		await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 		vscode.window.showErrorMessage(
 			`Failed to create task: ${error instanceof Error ? error.message : String(error)}`,
 		)
@@ -198,6 +201,37 @@ export async function handleRenameSession(
 export async function handleRenameTask(provider: MirrorProvider, taskId?: string, taskName?: string): Promise<void> {
 	if (taskId && taskName !== undefined) {
 		await provider.renameTask(taskId, taskName)
+	}
+}
+
+/**
+ * Handles the branchTaskToWorkspace message.
+ */
+export async function handleBranchTaskToWorkspace(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
+	const payload = message.payload as { taskId?: string; targetWorkspacePath?: string; title?: string } | undefined
+	let targetPath = payload?.targetWorkspacePath || message.text
+
+	// If no target path was passed, prompt user with VS Code folder picker
+	if (!targetPath) {
+		const selected = await vscode.window.showOpenDialog({
+			canSelectFiles: false,
+			canSelectFolders: true,
+			canSelectMany: false,
+			openLabel: "Select Workspace for Branch",
+		})
+		if (!selected || selected.length === 0) return
+		targetPath = selected[0].fsPath
+	}
+
+	const sourceTaskId = payload?.taskId || provider.getCurrentTask()?.taskId
+	if (!sourceTaskId) return
+
+	try {
+		await provider.branchTaskToWorkspace(sourceTaskId, targetPath, payload?.title)
+	} catch (error) {
+		vscode.window.showErrorMessage(
+			`Failed to branch task to workspace: ${error instanceof Error ? error.message : String(error)}`,
+		)
 	}
 }
 
@@ -229,7 +263,20 @@ export async function handleCustomInstructions(provider: MirrorProvider, text?: 
  */
 export async function handleAskResponse(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
-	provider.getCurrentTask()?.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+	const currentTask = provider.getCurrentTask()
+	if (currentTask) {
+		if (
+			!currentTask.isStreaming &&
+			!currentTask.idleAsk &&
+			!currentTask.resumableAsk &&
+			!currentTask.interactiveAsk &&
+			!(currentTask as any)._started
+		) {
+			await currentTask.startWithContent(resolved.text, resolved.images)
+		} else {
+			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+		}
+	}
 }
 
 /**

@@ -402,90 +402,76 @@ export function useScrollLifecycle({
 
 	useEffect(() => {
 		let rafId: number | null = null
+		let lastPollTime = 0
 
-		const pollAnchor = () => {
+		const pollAnchor = (now: number) => {
 			const phase = scrollPhaseRef.current
 			const scroller = scrollContainerRef.current
 
 			if (phase === "USER_BROWSING_HISTORY" && scroller) {
-				const msSinceUserInput = performance.now() - lastUserScrollInputRef.current
-				const activelyScrolling = msSinceUserInput < 150
+				// Throttle layout queries to at most once every ~32ms (~30fps) to eliminate layout thrashing
+				if (now - lastPollTime >= 32) {
+					lastPollTime = now
+					const msSinceUserInput = performance.now() - lastUserScrollInputRef.current
+					const activelyScrolling = msSinceUserInput < 150
 
-				// 1. Snapshot raw float positions of all [data-index] elements
-				const scrollerTop = scroller.getBoundingClientRect().top
-				const currentAnchors = new Map<string, number>()
-				const items = scroller.querySelectorAll<HTMLElement>("[data-index]")
-				for (let i = 0; i < items.length; i++) {
-					const el = items[i]
-					const inner = el.querySelector("[data-ts]")
-					const key = inner ? inner.getAttribute("data-ts") : el.getAttribute("data-index")
-					if (key !== null) {
-						currentAnchors.set(key, el.getBoundingClientRect().top - scrollerTop)
-					}
-				}
-
-				const prevAnchors = prevVisualAnchorRef.current
-				let compensated = false
-
-				// 2. Compare against previous frame's positions
-				if (!activelyScrolling && prevAnchors && prevAnchors.size > 0 && currentAnchors.size > 0) {
-					let matchCount = 0
-					let sumDelta = 0
-
-					for (const [idx, prevTop] of prevAnchors) {
-						const currentTop = currentAnchors.get(idx)
-						if (currentTop !== undefined) {
-							matchCount++
-							const delta = currentTop - prevTop
-							sumDelta += delta
+					// 1. Snapshot raw float positions of all [data-index] elements
+					const scrollerTop = scroller.getBoundingClientRect().top
+					const currentAnchors = new Map<string, number>()
+					const items = scroller.querySelectorAll<HTMLElement>("[data-index]")
+					for (let i = 0; i < items.length; i++) {
+						const el = items[i]
+						const inner = el.querySelector("[data-ts]")
+						const key = inner ? inner.getAttribute("data-ts") : el.getAttribute("data-index")
+						if (key !== null) {
+							currentAnchors.set(key, el.getBoundingClientRect().top - scrollerTop)
 						}
 					}
 
-					if (matchCount > 0) {
-						// 3. Compute average drift across ALL matching elements.
-						// This smooths out measurement noise and gets sub-pixel
-						// precision.
-						const avgDelta = sumDelta / matchCount
+					const prevAnchors = prevVisualAnchorRef.current
+					let compensated = false
 
-						// 4. Accumulate the fractional drift. Content grows at
-						// sub-pixel rates (e.g. 0.033px/frame = 2px/s). A simple
-						// threshold would never fire. The accumulator builds up
-						// drift until it crosses ±1px, then compensates.
-						const accumulator = driftAccumulatorRef.current + avgDelta
-						driftAccumulatorRef.current = accumulator
+					// 2. Compare against previous frame's positions
+					if (!activelyScrolling && prevAnchors && prevAnchors.size > 0 && currentAnchors.size > 0) {
+						let matchCount = 0
+						let sumDelta = 0
 
-						const intDelta = Math.round(accumulator)
-						if (intDelta !== 0) {
-							// 5. Apply inverse compensation (integer pixel amount)
-							scroller.scrollTop += intDelta
-
-							// 6. Remove compensated amount from accumulator
-							driftAccumulatorRef.current -= intDelta
-
-							// 7. Anti-oscillation: re-query DOM with post-compensation
-							// positions as new baseline
-							const postItems = scroller.querySelectorAll<HTMLElement>("[data-index]")
-							const postAnchors = new Map<string, number>()
-							const postScrollerTop = scroller.getBoundingClientRect().top
-							for (let i = 0; i < postItems.length; i++) {
-								const el = postItems[i]
-								const inner = el.querySelector("[data-ts]")
-								const key = inner ? inner.getAttribute("data-ts") : el.getAttribute("data-index")
-								if (key !== null) {
-									postAnchors.set(key, el.getBoundingClientRect().top - postScrollerTop)
-								}
+						for (const [idx, prevTop] of prevAnchors) {
+							const currentTop = currentAnchors.get(idx)
+							if (currentTop !== undefined) {
+								matchCount++
+								const delta = currentTop - prevTop
+								sumDelta += delta
 							}
-							prevVisualAnchorRef.current = postAnchors
-							compensated = true
 						}
-					}
-				} else if (activelyScrolling) {
-					// Reset accumulator when user actively scrolls
-					driftAccumulatorRef.current = 0
-				}
 
-				if (!compensated) {
-					prevVisualAnchorRef.current = currentAnchors
+						if (matchCount > 0) {
+							// 3. Compute average drift across ALL matching elements.
+							const avgDelta = sumDelta / matchCount
+
+							// 4. Accumulate the fractional drift.
+							const accumulator = driftAccumulatorRef.current + avgDelta
+							driftAccumulatorRef.current = accumulator
+
+							const intDelta = Math.round(accumulator)
+							if (intDelta !== 0) {
+								// 5. Apply inverse compensation (integer pixel amount)
+								scroller.scrollTop += intDelta
+
+								// 6. Remove compensated amount from accumulator
+								driftAccumulatorRef.current -= intDelta
+								prevVisualAnchorRef.current = null
+								compensated = true
+							}
+						}
+					} else if (activelyScrolling) {
+						// Reset accumulator when user actively scrolls
+						driftAccumulatorRef.current = 0
+					}
+
+					if (!compensated) {
+						prevVisualAnchorRef.current = currentAnchors
+					}
 				}
 			} else {
 				if (prevVisualAnchorRef.current !== null) {

@@ -173,6 +173,7 @@ export const mirrorSays = [
 	"too_many_tools_warning",
 	"tool",
 	"progress",
+	"terminal_callback",
 ] as const
 
 export const mirrorSaySchema = z.enum(mirrorSays)

@@ -45,6 +45,7 @@ describe("Model Validation Functions", () => {
 		lmstudio: {},
 		"vercel-ai-gateway": {},
 		poe: {},
+		fireworks: {},
 	}
 
 	const allowAllOrganization: OrganizationAllowList = {

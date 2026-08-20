@@ -148,14 +148,20 @@ export const StyledPre = styled.div<{
 
 	pre > code {
 		.hljs-deletion {
-			background-color: var(--vscode-diffEditor-removedTextBackground);
+			background-color: rgba(239, 68, 68, 0.2);
+			color: #f87171;
 			display: inline-block;
 			width: 100%;
+			border-left: 2px solid #ef4444;
+			padding-left: 4px;
 		}
 		.hljs-addition {
-			background-color: var(--vscode-diffEditor-insertedTextBackground);
+			background-color: rgba(34, 197, 94, 0.2);
+			color: #4ade80;
 			display: inline-block;
 			width: 100%;
+			border-left: 2px solid #22c55e;
+			padding-left: 4px;
 		}
 	}
 

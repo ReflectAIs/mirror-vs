@@ -18,17 +18,20 @@ const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 const DropdownMenuContent = React.forwardRef<
 	React.ElementRef<typeof DropdownMenuPrimitive.Content>,
 	React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & Pick<PortalProps, "container">
->(({ className, sideOffset = 4, container, ...props }, ref) => (
+>(({ className, sideOffset = 4, container, style, ...props }, ref) => (
 	<DropdownMenuPrimitive.Portal container={container}>
 		<DropdownMenuPrimitive.Content
 			ref={ref}
 			sideOffset={sideOffset}
+			style={{
+				backgroundColor: "var(--vscode-menu-background, var(--vscode-dropdown-background, #1e1e2e))",
+				...style,
+			}}
 			className={cn(
-				"z-50 min-w-[8rem] overflow-hidden rounded-xs p-1 shadow-xs",
+				"z-50 min-w-[10rem] overflow-hidden rounded-md p-1.5 shadow-2xl backdrop-blur-2xl",
 				"data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-				"border border-vscode-focusBorder",
-				"bg-vscode-dropdown-background bg-opacity-100",
-				"text-vscode-dropdown-foreground",
+				"border border-vscode-menu-border/80 border-vscode-editorGroup-border",
+				"text-vscode-menu-foreground text-vscode-dropdown-foreground",
 				className,
 			)}
 			{...props}
@@ -46,10 +49,10 @@ const DropdownMenuItem = React.forwardRef<
 	<DropdownMenuPrimitive.Item
 		ref={ref}
 		className={cn(
-			"relative flex select-none items-center gap-2 px-2 py-1.5 outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0",
-			"focus:bg-vscode-list-activeSelectionBackground focus:text-vscode-list-activeSelectionForeground",
-			"text-vscode-dropdown-foreground text-sm",
-			"rounded-xs active:opacity-90 cursor-pointer",
+			"relative flex select-none items-center gap-2 px-2.5 py-1.5 outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-3.5 [&>svg]:shrink-0",
+			"hover:bg-vscode-menu-selectionBackground hover:text-vscode-menu-selectionForeground focus:bg-vscode-menu-selectionBackground focus:text-vscode-menu-selectionForeground",
+			"text-vscode-menu-foreground text-vscode-dropdown-foreground text-xs",
+			"rounded-sm active:opacity-90 cursor-pointer",
 			inset && "pl-8",
 			className,
 		)}

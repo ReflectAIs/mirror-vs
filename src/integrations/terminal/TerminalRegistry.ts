@@ -324,6 +324,32 @@ export class TerminalRegistry {
 	}
 
 	/**
+	 * Aborts all running processes in terminals associated with a task.
+	 */
+	public static abortTerminalsForTask(taskId: string): void {
+		this.terminals.forEach((terminal) => {
+			if (terminal.taskId === taskId) {
+				if (terminal.process) {
+					terminal.process.abort()
+				}
+				if (terminal instanceof Terminal) {
+					terminal.terminal.sendText("\x03")
+					Promise.resolve(terminal.terminal.processId)
+						.then((shellPid) => {
+							if (shellPid) {
+								import("./processTreeKiller").then(({ killProcessTree }) => {
+									killProcessTree(shellPid, { includeRoot: false, signal: "SIGKILL" }).catch(() => {})
+								})
+							}
+						})
+						.catch(() => {})
+				}
+				terminal.busy = false
+			}
+		})
+	}
+
+	/**
 	 * Kills a specific terminal by ID — aborts its running process and
 	 * removes it from the registry.
 	 */
@@ -334,6 +360,22 @@ export class TerminalRegistry {
 		}
 		if (terminal.process) {
 			terminal.process.abort()
+		}
+		if (terminal instanceof Terminal) {
+			Promise.resolve(terminal.terminal.processId)
+				.then((shellPid) => {
+					if (shellPid) {
+						import("./processTreeKiller").then(({ killProcessTree }) => {
+							killProcessTree(shellPid, { includeRoot: true, signal: "SIGKILL" }).catch(() => {})
+						})
+					}
+				})
+				.catch(() => {})
+			try {
+				terminal.terminal.dispose()
+			} catch {
+				// Ignore if already disposed
+			}
 		}
 		terminal.busy = false
 		terminal.taskId = undefined

@@ -1,4 +1,4 @@
-import { memo, useState, useMemo } from "react"
+import { memo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ChevronUp, ChevronDown, RotateCcw, CircleUser } from "lucide-react"
 
@@ -6,7 +6,6 @@ import type { MirrorMessage } from "@mirror-vs/types"
 
 import { cn } from "@src/lib/utils"
 import { StandardTooltip } from "@src/components/ui"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { vscode } from "@src/utils/vscode"
 import Thumbnails from "../common/Thumbnails"
 import { Mention } from "./Mention"
@@ -19,21 +18,10 @@ export interface TaskHeaderProps {
 
 const TaskHeader = ({ task, buttonsDisabled }: TaskHeaderProps) => {
 	const { t } = useTranslation()
-	const { mirrorMessages } = useExtensionState()
 	const [isTaskExpanded, setIsTaskExpanded] = useState(false)
 
-	const latestUserMsg = useMemo(() => {
-		for (let i = mirrorMessages.length - 1; i >= 0; i--) {
-			const msg = mirrorMessages[i]
-			if (msg.say === "user_feedback" && msg.text) {
-				return msg
-			}
-		}
-		return null
-	}, [mirrorMessages])
-
-	const displayText = latestUserMsg?.text || task.text
-	const displayImages = latestUserMsg?.images || task.images
+	const displayText = task.text
+	const displayImages = task.images
 
 	return (
 		<div className="group pt-2 pb-1 px-3 shrink-0" data-ts={task.ts}>
@@ -52,13 +40,13 @@ const TaskHeader = ({ task, buttonsDisabled }: TaskHeaderProps) => {
 						<span style={{ fontWeight: "bold" }}>{t("chat:feedback.youSaid")}</span>
 					</div>
 					<div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-						{latestUserMsg && (
+						{task.ts && (
 							<StandardTooltip content="Revert session to before this message">
 								<button
 									onClick={() => {
 										vscode.postMessage({
 											type: "revertHistory",
-											messageTs: latestUserMsg.ts,
+											messageTs: task.ts,
 											inclusive: false,
 										})
 									}}

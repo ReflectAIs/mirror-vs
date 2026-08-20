@@ -17,6 +17,7 @@ import type { MirrorProvider } from "./MirrorProvider"
 import {
 	handleWebviewDidLaunch,
 	handleNewTask,
+	handleBranchTaskToWorkspace,
 	handleRenameSession,
 	handleRenameTask,
 	handleUpdateSessionNotes,
@@ -164,7 +165,12 @@ import { handleCheckpointDiff, handleCheckpointRestore } from "./handlers/checkp
 import { handleOpenDebugHistory, handleDownloadErrorDiagnostics } from "./handlers/debugHandler"
 
 // ── Queue handlers ─────────────────────────────────────────────
-import { handleQueueMessage, handleRemoveQueuedMessage, handleEditQueuedMessage } from "./handlers/queueHandler"
+import {
+	handleQueueMessage,
+	handleRemoveQueuedMessage,
+	handleEditQueuedMessage,
+	handleForceSendQueuedMessage,
+} from "./handlers/queueHandler"
 
 // ── Upsell handlers ────────────────────────────────────────────
 import { handleDismissUpsell, handleGetDismissedUpsells } from "./handlers/upsellHandler"
@@ -227,6 +233,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		// ── Tasks ───────────────────────────────────────────
 		case "newTask":
 			await handleNewTask(provider, message)
+			break
+		case "branchTaskToWorkspace":
+			await handleBranchTaskToWorkspace(provider, message)
 			break
 		case "renameSession":
 			await handleRenameSession(provider, message.sessionId, message.sessionName)
@@ -780,6 +789,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "editQueuedMessage":
 			await handleEditQueuedMessage(provider, message)
+			break
+		case "forceSendQueuedMessage":
+			await handleForceSendQueuedMessage(provider, message)
 			break
 
 		// ── Upsell ──────────────────────────────────────────

@@ -1065,18 +1065,15 @@ describe("ChatView - Message Queueing Tests", () => {
 			fireEvent.click(forceSendBtn)
 		})
 
-		// Verify it removed the message from the queue first
+		// Verify it called forceSendQueuedMessage
 		expect(vscode.postMessage).toHaveBeenCalledWith({
-			type: "removeQueuedMessage",
+			type: "forceSendQueuedMessage",
 			text: "msg123",
-		})
-
-		// Verify it immediately sent it as askResponse (forceSend = true logic bypasses queue)
-		expect(vscode.postMessage).toHaveBeenCalledWith({
-			type: "askResponse",
-			askResponse: "messageResponse",
-			text: "this message should be force sent",
-			images: [],
+			payload: {
+				id: "msg123",
+				text: "this message should be force sent",
+				images: [],
+			},
 		})
 	})
 })

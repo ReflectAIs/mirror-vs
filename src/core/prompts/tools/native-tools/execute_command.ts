@@ -1,16 +1,16 @@
 import type OpenAI from "openai"
 
-const EXECUTE_COMMAND_DESCRIPTION = `Execute a CLI command. Tailor commands to the user's system and explain what each does. Use shell chaining syntax; prefer complex CLI commands over scripts. Use relative paths. Always use non-interactive flags (e.g. -y, --no-input) and pass '--progress=plain' with 'docker compose' commands (e.g. 'docker compose --progress=plain up -d') to prevent TTY progress spinners from hanging.
+const EXECUTE_COMMAND_DESCRIPTION = `Execute a CLI command. Tailor commands to the user's system and explain what each does. Use shell chaining syntax; prefer complex CLI commands over scripts. Use relative paths. Always use non-interactive flags (e.g. -y, --no-input, and '--non-interactive' for Firebase CLI commands such as 'firebase deploy --non-interactive') and pass '--progress=plain' with 'docker compose' commands to prevent interactive prompts or TTY progress spinners from hanging. When executing long-running commands, dev servers, or builds, provide a timeout parameter (in seconds) to transition them to background execution. You do NOT need to poll with sleep or echo; the terminal callback will automatically wake you up with a notification when the background command finishes with its exit code and output. If a command fails due to missing authentication or interactive credentials, do not repeatedly retry it—diagnose or inform the user.
 
-Params: command (required), cwd (optional), timeout (optional, in seconds — for long-running processes like dev servers).
+Params: command (required), cwd (optional), timeout (optional, in seconds — for long-running processes like dev servers or builds).
 
-Example: { "command": "npm run dev", "cwd": null, "timeout": null }`
+Example: { "command": "npm run dev", "cwd": null, "timeout": 5 }`
 
 const COMMAND_PARAMETER_DESCRIPTION = `Shell command to execute`
 
 const CWD_PARAMETER_DESCRIPTION = `Optional working directory, relative or absolute`
 
-const TIMEOUT_PARAMETER_DESCRIPTION = `Timeout in seconds. The command runs in background after timeout; use for dev servers, watchers, etc.`
+const TIMEOUT_PARAMETER_DESCRIPTION = `Timeout in seconds. The command moves to background after timeout and will automatically notify and wake you up upon completion; use for builds, test suites, dev servers, etc.`
 
 export default {
 	type: "function",

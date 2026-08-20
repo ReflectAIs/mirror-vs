@@ -286,6 +286,20 @@ export class TaskMainLoop {
 				)
 			}
 
+			// Drain any in-between steering messages sent by the user during execution
+			while (this.task.inBetweenMessages.length > 0) {
+				const inBetween = this.task.inBetweenMessages.shift()
+				if (inBetween) {
+					currentUserContent.push(
+						{
+							type: "text" as const,
+							text: `<user_message>\n${inBetween.text}\n</user_message>`,
+						},
+						...formatResponse.imageBlocks(inBetween.images),
+					)
+				}
+			}
+
 			if (
 				this.task.consecutiveMistakeLimit > 0 &&
 				this.task.consecutiveMistakeCount >= this.task.consecutiveMistakeLimit

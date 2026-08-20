@@ -1,13 +1,24 @@
 import { memo, useState, useCallback, useRef, useEffect } from "react"
-import { ArrowRight, Folder } from "lucide-react"
+import { ArrowRight, Folder, GitBranch, FolderSymlink } from "lucide-react"
 import type { DisplayHistoryItem } from "./types"
 
 import { vscode } from "@/utils/vscode"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useExtensionState } from "@/context/ExtensionStateContext"
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 import TaskItemFooter from "./TaskItemFooter"
-import { StandardTooltip } from "../ui"
+import { StandardTooltip, Button } from "../ui"
 
 interface TaskItemProps {
 	item: DisplayHistoryItem
@@ -38,10 +49,20 @@ const TaskItem = ({
 	onRenameTab,
 	className,
 }: TaskItemProps) => {
+	const { cwd, currentWorkspacePath } = useExtensionState()
 	const [isRenaming, setIsRenaming] = useState(false)
 	const [renameValue, setRenameValue] = useState(displayName || "")
+	const [showCrossWorkspaceDialog, setShowCrossWorkspaceDialog] = useState(false)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const blurTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+
+	const activeCwd = currentWorkspacePath || cwd || ""
+	const isCrossWorkspace = Boolean(
+		item.workspace &&
+			activeCwd &&
+			item.workspace.replace(/\\/g, "/").toLowerCase().trim() !==
+				activeCwd.replace(/\\/g, "/").toLowerCase().trim(),
+	)
 
 	// Keep rename value in sync when displayName changes externally
 	useEffect(() => {
@@ -61,9 +82,28 @@ const TaskItem = ({
 	const handleClick = () => {
 		if (isSelectionMode && onToggleSelection) {
 			onToggleSelection(item.id, !isSelected)
+		} else if (isCrossWorkspace) {
+			setShowCrossWorkspaceDialog(true)
 		} else {
 			vscode.postMessage({ type: "showTaskWithId", text: item.id })
 		}
+	}
+
+	const handleBranchIntoCurrentWorkspace = () => {
+		setShowCrossWorkspaceDialog(false)
+		vscode.postMessage({
+			type: "branchTaskToWorkspace",
+			payload: {
+				taskId: item.id,
+				targetWorkspacePath: activeCwd,
+			},
+		})
+		vscode.postMessage({ type: "switchTab", tab: "chat" })
+	}
+
+	const handleOpenOriginalWorkspace = () => {
+		setShowCrossWorkspaceDialog(false)
+		vscode.postMessage({ type: "showTaskWithId", text: item.id })
 	}
 
 	const handleDoubleClick = useCallback(() => {
@@ -193,6 +233,68 @@ const TaskItem = ({
 					</div>
 				</div>
 			</div>
+
+			{/* Cross-Workspace Session Choice Dialog */}
+			<AlertDialog
+				open={showCrossWorkspaceDialog}
+				onOpenChange={(open) => !open && setShowCrossWorkspaceDialog(false)}>
+				<AlertDialogContent className="max-w-md">
+					<AlertDialogHeader>
+						<AlertDialogTitle className="flex items-center gap-2">
+							<GitBranch className="size-4 text-mirror-brand-via" />
+							<span>Cross-Workspace Session</span>
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs leading-relaxed space-y-2">
+							<p>
+								This session was originally created in workspace{" "}
+								<strong className="text-vscode-foreground font-mono">
+									{item.workspace
+										? item.workspace.split("/").pop() || item.workspace
+										: "another workspace"}
+								</strong>
+								.
+							</p>
+							<p>
+								Choose whether to <strong>branch</strong> this conversation into your current workspace
+								(
+								<span className="text-vscode-foreground font-mono">
+									{activeCwd.split("/").pop() || "current"}
+								</span>
+								) to continue working here without modifying the other workspace, or open it in its
+								original workspace.
+							</p>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="flex-col sm:flex-row gap-2 mt-2">
+						<AlertDialogCancel
+							onClick={(e) => {
+								e.stopPropagation()
+								setShowCrossWorkspaceDialog(false)
+							}}>
+							Cancel
+						</AlertDialogCancel>
+						<Button
+							variant="secondary"
+							className="text-xs h-8"
+							onClick={(e) => {
+								e.stopPropagation()
+								handleOpenOriginalWorkspace()
+							}}>
+							<FolderSymlink className="size-3.5 mr-1" />
+							Open Original
+						</Button>
+						<AlertDialogAction
+							className="bg-mirror-brand-via hover:bg-mirror-brand-via/90 text-xs h-8"
+							onClick={(e) => {
+								e.stopPropagation()
+								handleBranchIntoCurrentWorkspace()
+							}}>
+							<GitBranch className="size-3.5 mr-1" />
+							Branch into Current
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	)
 }

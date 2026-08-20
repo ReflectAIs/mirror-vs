@@ -265,6 +265,9 @@ export class TaskLifecycleManager {
 			console.log(`[clearTask] clearing task ${task.taskId}.${task.instanceId}`)
 			await this.provider.removeMirrorFromStack()
 		}
+		// Create a brand new session and notify webview
+		await this.provider.sessionManager.createSession()
+		await this.provider.postStateToWebview()
 	}
 
 	// ── Resume ─────────────────────────────────────────────────────────────────

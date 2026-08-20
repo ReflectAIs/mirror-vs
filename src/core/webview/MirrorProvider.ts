@@ -60,7 +60,13 @@ import { Task } from "../task/Task"
 
 import { webviewMessageHandler } from "./webviewMessageHandler"
 import type { TodoItem } from "@mirror-vs/types"
-import { TaskHistoryStore } from "../task-persistence"
+import {
+	TaskHistoryStore,
+	readApiMessages,
+	saveApiMessages,
+	readTaskMessages,
+	saveTaskMessages,
+} from "../task-persistence"
 import { StateManager } from "./MirrorProviderState"
 import { SessionManager } from "./MirrorProviderSessions"
 import { WebviewManager } from "./MirrorProviderWebview"
@@ -1344,6 +1350,11 @@ export class MirrorProvider
 			)
 		}
 
+		if (historyItem.sessionId && !options?.skipGlobalStateChanges) {
+			this.setCurrentSessionId(historyItem.sessionId)
+			await this.contextProxy.setValue("currentSessionId", historyItem.sessionId)
+		}
+
 		const { apiConfiguration, enableCheckpoints, checkpointTimeout, experiments } = await this.getState()
 
 		const task = new Task({
@@ -1684,6 +1695,13 @@ export class MirrorProvider
 			return
 		}
 
+		const { historyItem } = await this.getTaskWithId(id)
+
+		if (historyItem.sessionId) {
+			this.setCurrentSessionId(historyItem.sessionId)
+			await this.contextProxy.setValue("currentSessionId", historyItem.sessionId)
+		}
+
 		// Check if this task is already running in the background
 		if (this.backgroundTasks.has(id)) {
 			// Swap focus: park current → focus background task
@@ -1693,11 +1711,11 @@ export class MirrorProvider
 			await this.parkCurrentTask()
 
 			// Create a fresh task from history for the requested chat
-			const { historyItem } = await this.getTaskWithId(id)
 			await this.createTaskWithHistoryItem(historyItem)
 		}
 
 		await this.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
+		await this.postStateToWebview()
 	}
 
 	/**
@@ -2202,6 +2220,91 @@ export class MirrorProvider
 		}
 
 		return this.createTaskWithHistoryItem(historyItem, options)
+	}
+
+	/**
+	 * Branches a task into another workspace folder, creating a dedicated session,
+	 * cloning its complete conversation history with model context notice,
+	 * while allowing the current conversation to continue uninterrupted.
+	 */
+	public async branchTaskToWorkspace(
+		sourceTaskId: string,
+		targetWorkspacePath: string,
+		taskTitle?: string,
+	): Promise<Task | null> {
+		const { historyItem } = await this.getTaskWithId(sourceTaskId)
+		const globalStoragePath = this.context.globalStorageUri.fsPath
+
+		// 1. Create a dedicated session for the target branch
+		const branchSessionId = await this.sessionManager.createSession(targetWorkspacePath)
+		const sessionNames = (await this.contextProxy.getValue("sessionNames")) || {}
+		const sourceSessionName = historyItem.sessionId ? sessionNames[historyItem.sessionId] : "Session"
+		const targetWorkspaceName = path.basename(targetWorkspacePath)
+		const branchSessionName = `${sourceSessionName || "Session"} (Branch - ${targetWorkspaceName})`
+		await this.sessionManager.setSessionName(branchSessionId, branchSessionName)
+
+		// 2. Generate new task ID and clone conversation history
+		const newTaskId = Date.now().toString()
+		const cleanTitle = taskTitle || `${historyItem.task ? historyItem.task.slice(0, 30) : "Task"} (Branch)`
+
+		const sourceName = historyItem.workspace ? path.basename(historyItem.workspace) : path.basename(this.cwd)
+		const branchBanner = {
+			ts: Date.now(),
+			type: "say" as const,
+			say: "text" as const,
+			text: `🌿 Branched conversation from workspace "${sourceName}" to "${targetWorkspaceName}". Context and history transferred.`,
+		}
+		const sourceUiMessages = await readTaskMessages({ taskId: sourceTaskId, globalStoragePath })
+		const clonedUiMessages = [...sourceUiMessages, branchBanner]
+
+		const sourceApiMessages = await readApiMessages({ taskId: sourceTaskId, globalStoragePath })
+		const branchNotice = {
+			role: "user" as const,
+			content: [
+				{
+					type: "text" as const,
+					text: `[System Notice: This conversation was branched from workspace "${sourceName}" to "${targetWorkspaceName}". Context and previous history have been transferred. You are now operating in workspace "${targetWorkspaceName}".]`,
+				},
+			],
+		}
+		const clonedApiMessages = [...sourceApiMessages, branchNotice]
+
+		// Save cloned files for the new task
+		await saveTaskMessages({ messages: clonedUiMessages, taskId: newTaskId, globalStoragePath })
+		await saveApiMessages({ messages: clonedApiMessages, taskId: newTaskId, globalStoragePath })
+
+		// 3. Create and add the new HistoryItem in target workspace
+		const newHistoryItem: HistoryItem = {
+			id: newTaskId,
+			number: this.taskHistoryStore.getAll().length + 1,
+			ts: Date.now(),
+			task: cleanTitle,
+			tokensIn: historyItem.tokensIn,
+			tokensOut: historyItem.tokensOut,
+			totalCost: 0,
+			workspace: targetWorkspacePath,
+			sessionId: branchSessionId,
+			status: "active",
+		}
+		await this.taskHistoryStore.upsert(newHistoryItem)
+
+		// 4. If branching to a different workspace, keep current active conversation uninterrupted
+		if (path.resolve(targetWorkspacePath) !== path.resolve(this.cwd)) {
+			vscode.window.showInformationMessage(
+				`🌿 Branched conversation to workspace "${targetWorkspaceName}". Your current chat continues uninterrupted here.`,
+			)
+			await this.postStateToWebview()
+			return null
+		}
+
+		// If branching within the same workspace, switch to the new session
+		this.currentSessionId = branchSessionId
+		await this.contextProxy.setValue("currentSessionId", branchSessionId)
+		const newTask = await this.createTaskWithHistoryItem(newHistoryItem, { startTask: false })
+		await newTask.startRestoredTask()
+
+		await this.postStateToWebview()
+		return newTask
 	}
 
 	public async cancelTask(): Promise<void> {

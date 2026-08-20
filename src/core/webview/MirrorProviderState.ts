@@ -231,6 +231,7 @@ export class StateManager {
 			sessionNames,
 			taskNames,
 			sessionNotes,
+			sessionSharedContexts,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels,
@@ -269,8 +270,27 @@ export class StateManager {
 			}
 		}
 
-		// Build tabs array from all live tasks
-		const allTasks = this.provider.getAllTasksSorted()
+		// Build tabs array from live tasks belonging to the active session
+		const activeSessionId = currentTask?.sessionId || this.provider.getCurrentSessionId() || currentSessionId
+
+		const allTasks = this.provider.getAllTasksSorted().filter((task) => {
+			// Only show tabs for the active session
+			return activeSessionId ? task.sessionId === activeSessionId : true
+		})
+
+		// Extract knowledge from active tasks so the shared session context stays up to date
+		for (const t of allTasks) {
+			if (t.sessionId) {
+				try {
+					await this.provider.getSessionContextManager().extractKnowledgeFromTask(t)
+				} catch {
+					// non-fatal
+				}
+			}
+		}
+
+		const rawSharedContexts =
+			(await this.provider.contextProxy.getValue("sessionSharedContexts")) ?? sessionSharedContexts ?? {}
 		const tabs: TabInfo[] = allTasks.map((task) => {
 			// Determine hasPendingApproval — task has an ask that's pending user response
 			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
@@ -364,7 +384,7 @@ export class StateManager {
 			soundVolume: soundVolume ?? 0.5,
 			writeDelayMs: writeDelayMs ?? DEFAULT_WRITE_DELAY_MS,
 			terminalShellIntegrationTimeout: terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
-			terminalShellIntegrationDisabled: terminalShellIntegrationDisabled ?? true,
+			terminalShellIntegrationDisabled: terminalShellIntegrationDisabled ?? false,
 			terminalCommandDelay: terminalCommandDelay ?? 0,
 			terminalPowershellCounter: terminalPowershellCounter ?? false,
 			terminalZshClearEolMark: terminalZshClearEolMark ?? true,
@@ -461,10 +481,11 @@ export class StateManager {
 					type: "ssh" as const,
 				})),
 			],
-			currentSessionId,
+			currentSessionId: activeSessionId || currentSessionId,
 			sessionNames: sessionNames ?? {},
 			taskNames: taskNames ?? {},
 			sessionNotes,
+			sessionSharedContexts: rawSharedContexts,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels: atlasCloudModels ?? {},
@@ -545,7 +566,7 @@ export class StateManager {
 			writeDelayMs: stateValues.writeDelayMs ?? DEFAULT_WRITE_DELAY_MS,
 			terminalShellIntegrationTimeout:
 				stateValues.terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
-			terminalShellIntegrationDisabled: stateValues.terminalShellIntegrationDisabled ?? true,
+			terminalShellIntegrationDisabled: stateValues.terminalShellIntegrationDisabled ?? false,
 			terminalCommandDelay: stateValues.terminalCommandDelay ?? 0,
 			terminalPowershellCounter: stateValues.terminalPowershellCounter ?? false,
 			terminalZshClearEolMark: stateValues.terminalZshClearEolMark ?? true,
@@ -620,6 +641,7 @@ export class StateManager {
 				stateValues.currentSessionId && stateValues.sessionSharedContexts?.[stateValues.currentSessionId]
 					? stateValues.sessionSharedContexts[stateValues.currentSessionId].notes
 					: undefined,
+			sessionSharedContexts: stateValues.sessionSharedContexts ?? {},
 			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
 			userBraveApiKey: stateValues.userBraveApiKey,
 			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},
@@ -630,6 +652,9 @@ export class StateManager {
 			generationProviders: stateValues.generationProviders ?? {},
 			openRouterModels: stateValues.openRouterModels ?? {},
 			atlasCloudModels: stateValues.atlasCloudModels ?? {},
+			workspaceFolders:
+				vscode.workspace.workspaceFolders?.map((f) => ({ name: f.name, path: f.uri.fsPath })) ?? [],
+			currentWorkspacePath: provider.cwd,
 		}
 	}
 }

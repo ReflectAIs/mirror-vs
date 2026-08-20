@@ -97,6 +97,8 @@ export interface CreateTaskOptions {
 	/** Session grouping key. Tasks with the same sessionId are grouped together
 	 *  in history view and share a common session lifecycle. */
 	sessionId?: string
+	/** Custom workspace directory path for multi-root or cross-workspace branching */
+	workspacePath?: string
 }
 
 export enum TaskStatus {

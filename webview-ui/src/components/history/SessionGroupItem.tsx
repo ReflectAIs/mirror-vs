@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useEffect } from "react"
-import { ChevronRight, Trash2 } from "lucide-react"
+import { ChevronRight, Trash2, Folder } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatTimeAgo } from "@/utils/format"
 import type { SessionGroup } from "./types"
@@ -98,9 +98,10 @@ const SessionGroupItem = ({
 
 	// Compute timestamp range for display
 	const newestTs = session.newestTs
-	const oldestTs = tabs.length > 0 ? tabs[0].ts : newestTs
+	const oldestTs = session.oldestTs || (tabs.length > 0 ? tabs[0].ts : newestTs)
 	const timeLabel =
 		tabs.length > 0 ? `${formatTimeAgo(oldestTs)} – ${formatTimeAgo(newestTs)}` : formatTimeAgo(newestTs)
+	const sessionWorkspace = session.workspace || tabs.find((t) => t.workspace)?.workspace
 
 	return (
 		<div
@@ -156,6 +157,16 @@ const SessionGroupItem = ({
 						onDoubleClick={handleDoubleClick}
 						title={`${tabs.length > 0 ? timeLabel : ""}`}>
 						{sessionName}
+					</span>
+				)}
+
+				{/* Workspace badge in 'All' mode */}
+				{showWorkspace && sessionWorkspace && (
+					<span
+						className="shrink-0 text-[10px] font-mono text-vscode-descriptionForeground/75 bg-vscode-sideBar-background/60 border border-vscode-panel-border/30 rounded px-1.5 py-0.5 flex items-center gap-1 max-w-[130px] truncate"
+						title={sessionWorkspace}>
+						<Folder className="size-2.5 shrink-0" />
+						<span className="truncate">{sessionWorkspace.split("/").pop() || sessionWorkspace}</span>
 					</span>
 				)}
 
