@@ -260,7 +260,20 @@ export async function handleCustomInstructions(provider: MirrorProvider, text?: 
  */
 export async function handleAskResponse(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
-	provider.getCurrentTask()?.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+	const currentTask = provider.getCurrentTask()
+	if (currentTask) {
+		if (
+			!currentTask.isStreaming &&
+			!currentTask.idleAsk &&
+			!currentTask.resumableAsk &&
+			!currentTask.interactiveAsk &&
+			!(currentTask as any)._started
+		) {
+			await currentTask.startWithContent(resolved.text, resolved.images)
+		} else {
+			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+		}
+	}
 }
 
 /**

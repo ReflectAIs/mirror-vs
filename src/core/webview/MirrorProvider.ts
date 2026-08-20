@@ -60,7 +60,13 @@ import { Task } from "../task/Task"
 
 import { webviewMessageHandler } from "./webviewMessageHandler"
 import type { TodoItem } from "@mirror-vs/types"
-import { TaskHistoryStore } from "../task-persistence"
+import {
+	TaskHistoryStore,
+	readApiMessages,
+	saveApiMessages,
+	readTaskMessages,
+	saveTaskMessages,
+} from "../task-persistence"
 import { StateManager } from "./MirrorProviderState"
 import { SessionManager } from "./MirrorProviderSessions"
 import { WebviewManager } from "./MirrorProviderWebview"
@@ -2205,7 +2211,8 @@ export class MirrorProvider
 	}
 
 	/**
-	 * Branches a task into another workspace folder, cloning its conversation context.
+	 * Branches a task into another workspace folder, creating a dedicated session,
+	 * cloning its complete conversation history, and resuming the task in active state.
 	 */
 	public async branchTaskToWorkspace(
 		sourceTaskId: string,
@@ -2213,26 +2220,57 @@ export class MirrorProvider
 		taskTitle?: string,
 	): Promise<Task> {
 		const { historyItem } = await this.getTaskWithId(sourceTaskId)
+		const globalStoragePath = this.context.globalStorageUri.fsPath
+
+		// 1. Create a dedicated session for the branch
+		const branchSessionId = await this.sessionManager.createSession()
+		const sessionNames = (await this.contextProxy.getValue("sessionNames")) || {}
+		const sourceSessionName = historyItem.sessionId ? sessionNames[historyItem.sessionId] : "Session"
+		const targetWorkspaceName = path.basename(targetWorkspacePath)
+		const branchSessionName = `${sourceSessionName || "Session"} (Branch - ${targetWorkspaceName})`
+		await this.sessionManager.setSessionName(branchSessionId, branchSessionName)
+		this.currentSessionId = branchSessionId
+		await this.contextProxy.setValue("currentSessionId", branchSessionId)
+
+		// 2. Generate new task ID and clone conversation history
+		const newTaskId = Date.now().toString()
 		const cleanTitle = taskTitle || `${historyItem.task ? historyItem.task.slice(0, 30) : "Task"} (Branch)`
 
-		// Create a new task tied to the target workspace folder
-		const newTask = await this.createTask("", [], undefined, {
-			workspacePath: targetWorkspacePath,
-			startTask: false,
-		})
-
-		newTask.name = cleanTitle
-		await this.renameTask(newTask.taskId, cleanTitle)
-
-		// Seed the new task with branch origin info
 		const sourceName = historyItem.workspace ? path.basename(historyItem.workspace) : path.basename(this.cwd)
-		const targetName = path.basename(targetWorkspacePath)
-		await newTask.say(
-			"user_feedback",
-			`🌿 Branched from workspace "${sourceName}" to "${targetName}". Ready to continue work in this workspace!`,
-		)
+		const branchBanner = {
+			ts: Date.now(),
+			type: "say" as const,
+			say: "user_feedback" as const,
+			text: `🌿 Branched conversation from workspace "${sourceName}" to "${targetWorkspaceName}". Context and history transferred.`,
+		}
+		const sourceUiMessages = await readTaskMessages({ taskId: sourceTaskId, globalStoragePath })
+		const clonedUiMessages = [...sourceUiMessages, branchBanner]
 
-		await this.switchToTask(newTask.taskId)
+		const sourceApiMessages = await readApiMessages({ taskId: sourceTaskId, globalStoragePath })
+
+		// Save cloned files for the new task
+		await saveTaskMessages({ messages: clonedUiMessages, taskId: newTaskId, globalStoragePath })
+		await saveApiMessages({ messages: sourceApiMessages, taskId: newTaskId, globalStoragePath })
+
+		// 3. Create and add the new HistoryItem
+		const newHistoryItem: HistoryItem = {
+			id: newTaskId,
+			number: this.taskHistoryStore.getAll().length + 1,
+			ts: Date.now(),
+			task: cleanTitle,
+			tokensIn: historyItem.tokensIn,
+			tokensOut: historyItem.tokensOut,
+			totalCost: 0,
+			workspace: targetWorkspacePath,
+			sessionId: branchSessionId,
+			status: "active",
+		}
+		await this.taskHistoryStore.upsert(newHistoryItem)
+
+		// 4. Create and start restored task so it is active and accepts subsequent messages
+		const newTask = await this.createTaskWithHistoryItem(newHistoryItem, { startTask: false })
+		await newTask.startRestoredTask()
+
 		await this.postStateToWebview()
 		return newTask
 	}
