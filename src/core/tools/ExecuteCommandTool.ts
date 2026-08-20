@@ -448,6 +448,27 @@ export async function executeCommandInTerminal(
 		resolveOnCompleted = resolve
 	})
 
+	let hasEmittedBackgroundCompletion = false
+
+	const checkAndNotifyBackgroundCompletion = () => {
+		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
+			return
+		}
+
+		if (completed && exitDetails !== undefined) {
+			hasEmittedBackgroundCompletion = true
+			const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
+			const exitStatus = formatExitStatus(exitDetails)
+			const previewSnippet = result.length > 0 ? (result.length > 2000 ? result.slice(-2000) : result) : ""
+			const notification = [
+				`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus}]`,
+				previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
+			].join("")
+
+			void task.injectInBetweenMessage(notification)
+		}
+	}
+
 	const callbacks: MirrorTerminalCallbacks = {
 		onLine: async (lines: string, process: MirrorTerminalProcess) => {
 			accumulatedOutput += lines
@@ -510,6 +531,7 @@ export async function executeCommandInTerminal(
 			} finally {
 				// Signal that onCompleted has finished, so the main code can safely use persistedResult
 				resolveOnCompleted?.()
+				checkAndNotifyBackgroundCompletion()
 			}
 		},
 		onShellExecutionStarted: (pid: number | undefined) => {
@@ -520,6 +542,7 @@ export async function executeCommandInTerminal(
 			const status: CommandExecutionStatus = { executionId, status: "exited", exitCode: details.exitCode }
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			exitDetails = details
+			checkAndNotifyBackgroundCompletion()
 		},
 	}
 
