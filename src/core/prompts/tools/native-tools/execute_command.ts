@@ -1,6 +1,6 @@
 import type OpenAI from "openai"
 
-const EXECUTE_COMMAND_DESCRIPTION = `Execute a CLI command. Tailor commands to the user's system and explain what each does. Use shell chaining syntax; prefer complex CLI commands over scripts. Use relative paths. Always use non-interactive flags (e.g. -y, --no-input, and '--non-interactive' for Firebase CLI commands such as 'firebase deploy --non-interactive') and pass '--progress=plain' with 'docker compose' commands to prevent interactive prompts or TTY progress spinners from hanging. If a command fails due to missing authentication or interactive credentials, do not repeatedly retry it—diagnose or inform the user.
+const EXECUTE_COMMAND_DESCRIPTION = `Execute a CLI command. Tailor commands to the user's system and explain what each does. Use shell chaining syntax; prefer complex CLI commands over scripts. Use relative paths. Always use non-interactive flags (e.g. -y, --no-input, and '--non-interactive' for Firebase CLI commands such as 'firebase deploy --non-interactive') and pass '--progress=plain' with 'docker compose' commands to prevent interactive prompts or TTY progress spinners from hanging. When waiting for asynchronous/background process completion, use the timeout parameter or reasonable sleep intervals rather than spamming rapid polling loops. If a command fails due to missing authentication or interactive credentials, do not repeatedly retry it—diagnose or inform the user.
 
 Params: command (required), cwd (optional), timeout (optional, in seconds — for long-running processes like dev servers).
 
