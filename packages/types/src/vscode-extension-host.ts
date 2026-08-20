@@ -352,6 +352,8 @@ export interface TabInfo {
 	lastActivity: number
 	/** Timestamp of task creation — used for stable tab ordering (createdAt ASC) */
 	createdAt: number
+	/** Optional one-line summary of the tab's current activity or goal */
+	oneLiner?: string
 }
 
 export type ExtensionState = Pick<
@@ -450,6 +452,8 @@ export type ExtensionState = Pick<
 	shouldShowAnnouncement: boolean
 
 	taskHistory: HistoryItem[]
+	workspaceFolders?: { name: string; path: string }[]
+	currentWorkspacePath?: string
 
 	writeDelayMs: number
 
@@ -669,6 +673,8 @@ export interface WebviewMessage {
 		| "queueMessage"
 		| "removeQueuedMessage"
 		| "editQueuedMessage"
+		| "forceSendQueuedMessage"
+		| "branchTaskToWorkspace"
 		| "dismissUpsell"
 		| "getDismissedUpsells"
 		| "openMarkdownPreview"
@@ -885,6 +891,12 @@ export interface IndexClearedPayload {
 	error?: string
 }
 
+export interface BranchTaskToWorkspacePayload {
+	taskId?: string
+	targetWorkspacePath?: string
+	title?: string
+}
+
 export type WebViewMessagePayload =
 	| CheckpointDiffPayload
 	| CheckpointRestorePayload
@@ -892,6 +904,7 @@ export type WebViewMessagePayload =
 	| IndexClearedPayload
 	| UpdateTodoListPayload
 	| EditQueuedMessagePayload
+	| BranchTaskToWorkspacePayload
 
 export interface IndexingStatus {
 	systemStatus: string

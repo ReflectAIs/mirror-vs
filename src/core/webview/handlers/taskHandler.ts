@@ -202,6 +202,37 @@ export async function handleRenameTask(provider: MirrorProvider, taskId?: string
 }
 
 /**
+ * Handles the branchTaskToWorkspace message.
+ */
+export async function handleBranchTaskToWorkspace(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
+	const payload = message.payload as { taskId?: string; targetWorkspacePath?: string; title?: string } | undefined
+	let targetPath = payload?.targetWorkspacePath || message.text
+
+	// If no target path was passed, prompt user with VS Code folder picker
+	if (!targetPath) {
+		const selected = await vscode.window.showOpenDialog({
+			canSelectFiles: false,
+			canSelectFolders: true,
+			canSelectMany: false,
+			openLabel: "Select Workspace for Branch",
+		})
+		if (!selected || selected.length === 0) return
+		targetPath = selected[0].fsPath
+	}
+
+	const sourceTaskId = payload?.taskId || provider.getCurrentTask()?.taskId
+	if (!sourceTaskId) return
+
+	try {
+		await provider.branchTaskToWorkspace(sourceTaskId, targetPath, payload?.title)
+	} catch (error) {
+		vscode.window.showErrorMessage(
+			`Failed to branch task to workspace: ${error instanceof Error ? error.message : String(error)}`,
+		)
+	}
+}
+
+/**
  * Handles the updateSessionNotes message — persists user-curated notes for a
  * session via SessionContextManager.setSessionNotes.
  */

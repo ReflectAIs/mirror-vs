@@ -335,6 +335,22 @@ export class TerminalRegistry {
 		if (terminal.process) {
 			terminal.process.abort()
 		}
+		if (terminal instanceof Terminal) {
+			Promise.resolve(terminal.terminal.processId)
+				.then((shellPid) => {
+					if (shellPid) {
+						import("./processTreeKiller").then(({ killProcessTree }) => {
+							killProcessTree(shellPid, { includeRoot: true, signal: "SIGKILL" }).catch(() => {})
+						})
+					}
+				})
+				.catch(() => {})
+			try {
+				terminal.terminal.dispose()
+			} catch {
+				// Ignore if already disposed
+			}
+		}
 		terminal.busy = false
 		terminal.taskId = undefined
 		this.removeTerminal(id)

@@ -256,10 +256,19 @@ export class TerminalProcess extends BaseTerminalProcess {
 	}
 
 	public override abort() {
-		if (this.isListening) {
-			// Send SIGINT using CTRL+C
-			this.terminal.terminal.sendText("\x03")
-		}
+		// Always send SIGINT using CTRL+C
+		this.terminal.terminal.sendText("\x03")
+
+		// Force-kill any stubborn child processes spawned in this terminal
+		Promise.resolve(this.terminal.terminal.processId)
+			.then((shellPid) => {
+				if (shellPid) {
+					import("./processTreeKiller").then(({ killProcessTree }) => {
+						killProcessTree(shellPid, { includeRoot: false, signal: "SIGKILL" }).catch(() => {})
+					})
+				}
+			})
+			.catch(() => {})
 	}
 
 	public override hasUnretrievedOutput(): boolean {

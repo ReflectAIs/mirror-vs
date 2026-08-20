@@ -35,7 +35,15 @@ export const DEFAULT_CONSECUTIVE_MISTAKE_LIMIT = 3
  * Dynamic provider requires external API calls in order to get the model list.
  */
 
-export const dynamicProviders = ["openrouter", "vercel-ai-gateway", "litellm", "requesty", "unbound", "poe"] as const
+export const dynamicProviders = [
+	"openrouter",
+	"vercel-ai-gateway",
+	"litellm",
+	"requesty",
+	"unbound",
+	"poe",
+	"fireworks",
+] as const
 
 export type DynamicProvider = (typeof dynamicProviders)[number]
 
@@ -108,7 +116,6 @@ export const providerNames = [
 	"baseten",
 	"deepinfra",
 	"deepseek",
-	"fireworks",
 	"gemini",
 	"gemini-cli",
 	"mistral",

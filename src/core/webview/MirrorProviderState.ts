@@ -630,6 +630,9 @@ export class StateManager {
 			generationProviders: stateValues.generationProviders ?? {},
 			openRouterModels: stateValues.openRouterModels ?? {},
 			atlasCloudModels: stateValues.atlasCloudModels ?? {},
+			workspaceFolders:
+				vscode.workspace.workspaceFolders?.map((f) => ({ name: f.name, path: f.uri.fsPath })) ?? [],
+			currentWorkspacePath: provider.cwd,
 		}
 	}
 }

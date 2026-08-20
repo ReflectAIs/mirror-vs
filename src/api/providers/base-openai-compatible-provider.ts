@@ -7,6 +7,7 @@ import { type ApiHandlerOptions, getModelMaxOutputTokens } from "../../shared/ap
 import { TagMatcher } from "../../utils/tag-matcher"
 import { ApiStream, ApiStreamUsageChunk } from "../transform/stream"
 import { convertToOpenAiMessages } from "../transform/openai-format"
+import { StreamDegenerationDetector } from "../transform/StreamDegenerationDetector"
 
 import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from "../index"
 import { DEFAULT_HEADERS } from "./constants"
@@ -128,6 +129,7 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 
 		let lastUsage: OpenAI.CompletionUsage | undefined
 		const activeToolCallIds = new Set<string>()
+		const degenerationDetector = new StreamDegenerationDetector()
 
 		for await (const chunk of stream) {
 			// Check for provider-specific error responses (e.g., MiniMax base_resp)
@@ -142,6 +144,16 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 			const finishReason = chunk.choices?.[0]?.finish_reason
 
 			if (delta?.content) {
+				if (degenerationDetector.check(delta.content)) {
+					console.warn(
+						`[${this.providerName}] Token degeneration loop detected. Terminating stream generation.`,
+					)
+					yield {
+						type: "text",
+						text: "\n\n[Generation stopped: Repetitive token loop detected from provider stream.]",
+					}
+					break
+				}
 				for (const processedChunk of matcher.update(delta.content)) {
 					yield processedChunk
 				}

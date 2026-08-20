@@ -19,6 +19,9 @@ export class ToolRepetitionDetector {
 		this.consecutiveIdenticalToolCallLimit = limit
 	}
 
+	private previousBaseCommand: string | null = null
+	private consecutiveBaseCommandCount: number = 0
+
 	/**
 	 * Checks if the current tool call is identical to the previous one
 	 * and determines if execution should be allowed
@@ -44,21 +47,49 @@ export class ToolRepetitionDetector {
 			this.previousToolCallJson = currentToolCallJson
 		}
 
+		// Also check repeated CLI command execution (e.g., repeating firebase/npm/docker commands)
+		if (currentToolCallBlock.name === "execute_command") {
+			const rawCommand =
+				(currentToolCallBlock.params as any)?.command || (currentToolCallBlock.nativeArgs as any)?.command || ""
+			const baseCommand = typeof rawCommand === "string" ? rawCommand.trim().split(/\s+/)[0]?.toLowerCase() : ""
+
+			if (baseCommand && baseCommand === this.previousBaseCommand) {
+				this.consecutiveBaseCommandCount++
+			} else {
+				this.consecutiveBaseCommandCount = 0
+				this.previousBaseCommand = baseCommand || null
+			}
+		} else {
+			this.consecutiveBaseCommandCount = 0
+			this.previousBaseCommand = null
+		}
+
 		// Check if limit is reached (0 means unlimited)
-		if (
+		const reachedIdenticalLimit =
 			this.consecutiveIdenticalToolCallLimit > 0 &&
 			this.consecutiveIdenticalToolCallCount >= this.consecutiveIdenticalToolCallLimit
-		) {
+
+		const reachedCliLoopLimit =
+			this.consecutiveIdenticalToolCallLimit > 0 &&
+			this.consecutiveBaseCommandCount >= Math.max(this.consecutiveIdenticalToolCallLimit + 1, 4)
+
+		if (reachedIdenticalLimit || reachedCliLoopLimit) {
 			// Reset counters to allow recovery if user guides the AI past this point
 			this.consecutiveIdenticalToolCallCount = 0
 			this.previousToolCallJson = null
+			this.consecutiveBaseCommandCount = 0
+			this.previousBaseCommand = null
+
+			const loopDetail = reachedCliLoopLimit
+				? `Repeated CLI execution loop detected for '${this.previousBaseCommand || "command"}'. If the command requires non-interactive flags (e.g., '--non-interactive' for Firebase), browser authentication, or is stuck waiting for input, please guide the model or provide the required input.`
+				: t("tools:toolRepetitionLimitReached", { toolName: currentToolCallBlock.name })
 
 			// Return result indicating execution should not be allowed
 			return {
 				allowExecution: false,
 				askUser: {
 					messageKey: "mistake_limit_reached",
-					messageDetail: t("tools:toolRepetitionLimitReached", { toolName: currentToolCallBlock.name }),
+					messageDetail: loopDetail,
 				},
 			}
 		}

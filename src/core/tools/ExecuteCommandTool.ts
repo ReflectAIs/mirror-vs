@@ -1,4 +1,5 @@
 import fs from "fs/promises"
+import * as os from "os"
 import * as path from "path"
 import * as vscode from "vscode"
 
@@ -104,12 +105,24 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 						return "Destructive command blocked: Deleting the workspace root directory recursively is prohibited."
 					}
 
+					// Allow temporary directory and scratch folder deletions
+					const isTempPath =
+						resolvedPath.startsWith(os.tmpdir()) ||
+						resolvedPath.startsWith("/tmp") ||
+						resolvedPath.startsWith("/private/tmp") ||
+						resolvedPath.startsWith("/var/tmp") ||
+						cleanPart.startsWith("/tmp") ||
+						cleanPart.startsWith("/private/tmp") ||
+						cleanPart.includes("scratch") ||
+						cleanPart.includes(".cache") ||
+						cleanPart.includes(".tmp")
+
 					// If resolvedPath goes outside the workspace (starts with '..')
-					if (relative.startsWith("..")) {
-						return `Destructive command blocked: Deleting directories outside the workspace ('${cleanPart}') is prohibited.`
+					if (relative.startsWith("..") && !isTempPath) {
+						return `Destructive command blocked: Deleting non-temporary directories outside the workspace ('${cleanPart}') is prohibited.`
 					}
 				} catch (e) {
-					if (cleanPart.startsWith("..") || cleanPart.startsWith("/")) {
+					if ((cleanPart.startsWith("..") || cleanPart.startsWith("/")) && !cleanPart.startsWith("/tmp")) {
 						return "Destructive command blocked: Path resolves outside the workspace."
 					}
 				}

@@ -19,11 +19,12 @@ export type FireworksModelId =
 	| "accounts/fireworks/models/glm-4p7"
 	| "accounts/fireworks/models/gpt-oss-20b"
 	| "accounts/fireworks/models/gpt-oss-120b"
+	| "accounts/fireworks/models/qwen2p5-coder-32b-instruct"
 	| "accounts/fireworks/models/llama-v3p3-70b-instruct"
 	| "accounts/fireworks/models/llama4-maverick-instruct-basic"
 	| "accounts/fireworks/models/llama4-scout-instruct-basic"
 
-export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/kimi-k2-instruct-0905"
+export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/kimi-k2p5"
 
 export const fireworksModels = {
 	"accounts/fireworks/models/kimi-k2-instruct-0905": {
@@ -209,6 +210,16 @@ export const fireworksModels = {
 		outputPrice: 2.19,
 		description:
 			"Z.ai GLM-4.7 is the latest coding model with exceptional performance on complex programming tasks. Features improved reasoning capabilities and enhanced code generation quality.",
+	},
+	"accounts/fireworks/models/qwen2p5-coder-32b-instruct": {
+		maxTokens: 32768,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: true,
+		inputPrice: 0.9,
+		outputPrice: 0.9,
+		description:
+			"Qwen 2.5 Coder 32B Instruct is Alibaba's flagship code-specialized model with state-of-the-art coding and agentic capabilities.",
 	},
 	"accounts/fireworks/models/llama-v3p3-70b-instruct": {
 		maxTokens: 16384,

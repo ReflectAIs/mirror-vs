@@ -180,6 +180,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	todoList?: TodoItem[]
 
+	/** In-between steering messages to inject directly into the ongoing agent loop. */
+	public inBetweenMessages: { text: string; images?: string[] }[] = []
+
 	readonly rootTask: Task | undefined = undefined
 	readonly parentTask: Task | undefined = undefined
 	readonly taskNumber: number
@@ -1063,6 +1066,23 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	public handleWebviewAskResponse(askResponse: MirrorAskResponse, text?: string, images?: string[]) {
 		return this.userInteractionManager.handleWebviewAskResponse(askResponse, text, images)
+	}
+
+	/**
+	 * Injects an urgent steering message directly into the active loop.
+	 * If the task is waiting on an ask, it immediately answers it;
+	 * otherwise, the message is queued to be included in the very next model iteration.
+	 */
+	public async injectInBetweenMessage(text: string, images?: string[]): Promise<void> {
+		this.inBetweenMessages.push({ text, images })
+		await this.say("user_feedback", text, images)
+
+		if (this.askResponse === undefined) {
+			const lastMessage = this.mirrorMessages.at(-1)
+			if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {
+				this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
+			}
+		}
 	}
 
 	/**

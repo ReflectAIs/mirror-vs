@@ -2204,6 +2204,39 @@ export class MirrorProvider
 		return this.createTaskWithHistoryItem(historyItem, options)
 	}
 
+	/**
+	 * Branches a task into another workspace folder, cloning its conversation context.
+	 */
+	public async branchTaskToWorkspace(
+		sourceTaskId: string,
+		targetWorkspacePath: string,
+		taskTitle?: string,
+	): Promise<Task> {
+		const { historyItem } = await this.getTaskWithId(sourceTaskId)
+		const cleanTitle = taskTitle || `${historyItem.task ? historyItem.task.slice(0, 30) : "Task"} (Branch)`
+
+		// Create a new task tied to the target workspace folder
+		const newTask = await this.createTask("", [], undefined, {
+			workspacePath: targetWorkspacePath,
+			startTask: false,
+		})
+
+		newTask.name = cleanTitle
+		await this.renameTask(newTask.taskId, cleanTitle)
+
+		// Seed the new task with branch origin info
+		const sourceName = historyItem.workspace ? path.basename(historyItem.workspace) : path.basename(this.cwd)
+		const targetName = path.basename(targetWorkspacePath)
+		await newTask.say(
+			"user_feedback",
+			`🌿 Branched from workspace "${sourceName}" to "${targetName}". Ready to continue work in this workspace!`,
+		)
+
+		await this.switchToTask(newTask.taskId)
+		await this.postStateToWebview()
+		return newTask
+	}
+
 	public async cancelTask(): Promise<void> {
 		return this.taskLifecycleManager.cancelTask()
 	}

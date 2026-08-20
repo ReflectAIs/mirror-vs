@@ -30,3 +30,24 @@ export async function handleEditQueuedMessage(provider: MirrorProvider, message:
 		provider.getCurrentTask()?.messageQueueService.updateMessage(id, text, images)
 	}
 }
+
+/**
+ * Handles force-sending a queued message as an in-between steering message.
+ */
+export async function handleForceSendQueuedMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
+	const currentTask = provider.getCurrentTask()
+	if (!currentTask) return
+
+	// Remove from queue if message.text represents an ID or if payload.id is provided
+	const payload = message.payload as { id?: string; text?: string; images?: string[] } | undefined
+	const idToRemove = payload?.id || message.text
+	if (idToRemove) {
+		currentTask.messageQueueService.removeMessage(idToRemove)
+	}
+
+	const text = payload?.text ?? message.text ?? ""
+	const images = payload?.images ?? message.images
+
+	const resolved = await resolveIncomingImages(provider, { text, images })
+	await currentTask.injectInBetweenMessage(resolved.text, resolved.images)
+}

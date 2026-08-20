@@ -192,13 +192,27 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 									)
 								}
 
-								// Use VSCode's built-in diff editor color variables as classes for gutters
-								const gutterBgClass =
+								// Enhanced vivid diff styling for additions and deletions
+								const rowBgClass =
 									line.type === "addition"
-										? "bg-[var(--vscode-diffEditor-insertedTextBackground)]"
+										? "bg-green-500/15 dark:bg-green-500/20"
 										: line.type === "deletion"
-											? "bg-[var(--vscode-diffEditor-removedTextBackground)]"
-											: "bg-[var(--vscode-editorGroup-border)]"
+											? "bg-red-500/15 dark:bg-red-500/20"
+											: "bg-transparent hover:bg-vscode-list-hoverBackground/30"
+
+								const gutterTextClass =
+									line.type === "addition"
+										? "text-green-500 dark:text-green-400 font-semibold"
+										: line.type === "deletion"
+											? "text-red-500 dark:text-red-400 font-semibold"
+											: "text-vscode-descriptionForeground/60"
+
+								const borderAccentClass =
+									line.type === "addition"
+										? "border-l-2 border-green-500"
+										: line.type === "deletion"
+											? "border-l-2 border-red-500"
+											: "border-l-2 border-transparent"
 
 								const contentBgClass =
 									line.type === "addition"
@@ -210,25 +224,25 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 								const sign = line.type === "addition" ? "+" : line.type === "deletion" ? "-" : ""
 
 								return (
-									<tr key={globalIndex}>
+									<tr key={globalIndex} className={rowBgClass}>
 										{/* Old line number */}
 										<td
-											className={`w-[45px] text-right pr-1 pl-1 select-none align-top whitespace-nowrap ${gutterBgClass}`}>
+											className={`w-[45px] text-right pr-1 pl-1 select-none align-top whitespace-nowrap ${gutterTextClass} ${borderAccentClass}`}>
 											{line.oldLineNum || ""}
 										</td>
 										{/* New line number */}
 										<td
-											className={`w-[45px] text-right pr-1 select-none align-top whitespace-nowrap ${gutterBgClass}`}>
+											className={`w-[45px] text-right pr-1 select-none align-top whitespace-nowrap ${gutterTextClass}`}>
 											{line.newLineNum || ""}
 										</td>
 										{/* Narrow colored gutter */}
-										<td className={`w-[12px] ${gutterBgClass} align-top`} />
-										{/* +/- fixed column to prevent wrapping into it */}
+										<td className="w-[8px] align-top" />
+										{/* +/- fixed column */}
 										<td
-											className={`w-[16px] text-center select-none whitespace-nowrap px-1 ${gutterBgClass}`}>
+											className={`w-[16px] text-center select-none whitespace-nowrap px-1 font-bold ${gutterTextClass}`}>
 											{sign}
 										</td>
-										{/* Code content (no +/- prefix here) */}
+										{/* Code content */}
 										<td
 											className={`pl-1 pr-3 whitespace-pre-wrap break-words w-full ${contentBgClass}`}>
 											{renderContent(line, hunk, lineIndex)}

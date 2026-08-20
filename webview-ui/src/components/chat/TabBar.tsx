@@ -1,10 +1,11 @@
 import { memo, useCallback, useState } from "react"
-import { Plus, Loader2, Circle, CheckCircle2, AlertCircle, Ban, X } from "lucide-react"
+import { Plus, X, HelpCircle, Share2, GitBranch } from "lucide-react"
 
 import type { TabInfo, TabStatus } from "@mirror-vs/types"
 
 import { cn } from "@src/lib/utils"
 import { vscode } from "@src/utils/vscode"
+import { useExtensionState } from "@src/context/ExtensionStateContext"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -15,6 +16,9 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@src/components/ui/alert-dialog"
+import SessionTutorialModal from "./SessionTutorialModal"
+import SharedContextDialog from "./SharedContextDialog"
+import BranchWorkspaceDialog from "./BranchWorkspaceDialog"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,9 +27,9 @@ import {
 function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 	if (hasPendingApproval || status === "interactive") {
 		return {
-			symbol: "(•_•;)",
-			className: "text-yellow-400 font-mono text-[10px] font-bold tracking-tighter shrink-0 animate-pulse",
-			title: "Model asks a followup / waiting approval",
+			symbol: "(◕ᴗ◕✿)?",
+			className: "text-yellow-400 font-mono text-[10px] font-bold tracking-tighter shrink-0 animate-bounce",
+			title: "Waiting for your input / approval",
 		}
 	}
 	switch (status) {
@@ -37,15 +41,15 @@ function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 			}
 		case "completed":
 			return {
-				symbol: "(★‿★)",
-				className: "text-green-500 font-mono text-[10px] font-bold tracking-tighter shrink-0",
-				title: "Task complete",
+				symbol: "(★‿★)v",
+				className: "text-green-400 font-mono text-[10px] font-bold tracking-tighter shrink-0",
+				title: "Task complete!",
 			}
 		case "error":
 			return {
-				symbol: "(x_x)",
-				className: "text-red-500 font-mono text-[10px] font-bold tracking-tighter shrink-0",
-				title: "Model is stuck / error",
+				symbol: "(っ- ‸ - ς)",
+				className: "text-red-400 font-mono text-[10px] font-bold tracking-tighter shrink-0",
+				title: "Encountered an issue",
 			}
 		case "idle":
 		default:
@@ -53,7 +57,7 @@ function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 				symbol: "(•‿•)",
 				className:
 					"text-vscode-descriptionForeground font-mono text-[10px] font-medium tracking-tighter shrink-0 opacity-80",
-				title: "Idle",
+				title: "Ready",
 			}
 	}
 }
@@ -86,9 +90,20 @@ export interface TabBarProps {
 }
 
 const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
+	const {
+		currentSessionId,
+		sessionNames,
+		sessionNotes,
+		sessionSharedContexts,
+		workspaceFolders,
+		currentWorkspacePath,
+	} = useExtensionState()
 	const [closeConfirm, setCloseConfirm] = useState<CloseConfirmState>(initialCloseConfirm)
 	const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
 	const [editingTabTitle, setEditingTabTitle] = useState("")
+	const [showTutorial, setShowTutorial] = useState(false)
+	const [showSharedContext, setShowSharedContext] = useState(false)
+	const [showBranchDialog, setShowBranchDialog] = useState(false)
 
 	const handleTabClick = useCallback(
 		(taskId: string) => {
@@ -150,91 +165,143 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 
 	return (
 		<>
-			<div className="flex items-center gap-0 overflow-x-auto border-b border-vscode-panel-border bg-vscode-sideBar-background shrink-0 select-none">
-				{/* "+" button to create a new task/tab */}
-				<button
-					onClick={handleNewTab}
-					className={cn(
-						"flex items-center justify-center px-2 py-2 text-xs cursor-pointer border-r border-vscode-panel-border transition-colors shrink-0",
-						"bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground",
-					)}
-					title="New tab"
-					aria-label="New tab">
-					<Plus className="w-4 h-4" />
-				</button>
-				{tabs.map((tab) => {
-					const isActive = tab.taskId === activeTabId
-					const mascot = getMascotForTab(tab.status, tab.hasPendingApproval)
-					const isEditingThisTab = editingTaskId === tab.taskId
+			<div className="flex items-center justify-between border-b border-vscode-panel-border bg-vscode-sideBar-background shrink-0 select-none">
+				{/* Tabs scroll area */}
+				<div className="flex items-center gap-0 overflow-x-auto min-w-0 flex-1">
+					{/* "+" button to create a new task/tab */}
+					<button
+						onClick={handleNewTab}
+						className={cn(
+							"flex items-center justify-center px-2.5 py-2 text-xs cursor-pointer border-r border-vscode-panel-border transition-colors shrink-0",
+							"bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground",
+						)}
+						title="New tab in this session (Cmd/Ctrl+N)"
+						aria-label="New tab">
+						<Plus className="w-4 h-4" />
+					</button>
+					{tabs.map((tab) => {
+						const isActive = tab.taskId === activeTabId
+						const mascot = getMascotForTab(tab.status, tab.hasPendingApproval)
+						const isEditingThisTab = editingTaskId === tab.taskId
 
-					return (
-						<div
-							key={tab.taskId}
-							className={cn(
-								"flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-vscode-panel-border transition-colors whitespace-nowrap shrink-0 min-w-0 max-w-[200px]",
-								isActive
-									? "bg-vscode-sideBarSticky-background text-vscode-foreground border-b-2 border-b-vscode-focusBorder"
-									: "bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground",
-							)}
-							title={tab.title}>
-							{/* Clickable area: icon + title (or edit input) */}
+						return (
 							<div
-								onClick={() => handleTabClick(tab.taskId)}
-								onDoubleClick={(e) => {
-									e.stopPropagation()
-									setEditingTaskId(tab.taskId)
-									setEditingTabTitle(tab.title)
-								}}
-								className="flex items-center gap-1.5 flex-1 min-w-0 text-left bg-transparent border-none cursor-pointer p-0 text-inherit">
-								<span className={mascot.className}>{mascot.symbol}</span>
-								{isEditingThisTab ? (
-									<input
-										type="text"
-										value={editingTabTitle}
-										onChange={(e) => setEditingTabTitle(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") handleSaveTabTitle(tab.taskId)
-											if (e.key === "Escape") setEditingTaskId(null)
-										}}
-										onBlur={() => handleSaveTabTitle(tab.taskId)}
-										autoFocus
-										onClick={(e) => e.stopPropagation()}
-										className="text-xs px-1 py-0 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none w-full"
-									/>
-								) : (
-									<span className="truncate flex-1">{tab.title}</span>
+								key={tab.taskId}
+								className={cn(
+									"flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-vscode-panel-border transition-colors whitespace-nowrap shrink-0 min-w-0 max-w-[200px]",
+									isActive
+										? "bg-vscode-sideBarSticky-background text-vscode-foreground border-b-2 border-b-vscode-focusBorder"
+										: "bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground",
 								)}
-								{tab.hasPendingApproval && (
-									<span className="w-1.5 h-1.5 rounded-full bg-vscode-testing-iconFailed shrink-0" />
-								)}
-							</div>
-							{/* Close button - separate from clickable area */}
-							<span
-								onMouseDown={(e) => {
-									e.stopPropagation()
-									e.preventDefault()
-									handleCloseClick(e, tab)
-								}}
-								onClick={(e) => {
-									e.stopPropagation()
-									e.preventDefault()
-								}}
-								className="shrink-0 p-0.5 rounded hover:bg-vscode-toolbar-activeBackground text-vscode-descriptionForeground hover:text-vscode-foreground ml-1 cursor-pointer"
-								role="button"
-								aria-label={`Close ${tab.title}`}
-								tabIndex={0}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
+								title={tab.title}>
+								{/* Clickable area: icon + title (or edit input) */}
+								<div
+									onClick={() => handleTabClick(tab.taskId)}
+									onDoubleClick={(e) => {
+										e.stopPropagation()
+										setEditingTaskId(tab.taskId)
+										setEditingTabTitle(tab.title)
+									}}
+									className="flex items-center gap-1.5 flex-1 min-w-0 text-left bg-transparent border-none cursor-pointer p-0 text-inherit">
+									<span className={mascot.className}>{mascot.symbol}</span>
+									{isEditingThisTab ? (
+										<input
+											type="text"
+											value={editingTabTitle}
+											onChange={(e) => setEditingTabTitle(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") handleSaveTabTitle(tab.taskId)
+												if (e.key === "Escape") setEditingTaskId(null)
+											}}
+											onBlur={() => handleSaveTabTitle(tab.taskId)}
+											autoFocus
+											onClick={(e) => e.stopPropagation()}
+											className="text-xs px-1 py-0 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none w-full"
+										/>
+									) : (
+										<span className="truncate flex-1">{tab.title}</span>
+									)}
+									{tab.hasPendingApproval && (
+										<span className="w-1.5 h-1.5 rounded-full bg-vscode-testing-iconFailed shrink-0" />
+									)}
+								</div>
+								{/* Close button - separate from clickable area */}
+								<span
+									onMouseDown={(e) => {
+										e.stopPropagation()
 										e.preventDefault()
 										handleCloseClick(e, tab)
-									}
-								}}>
-								<X className="w-3 h-3" />
-							</span>
-						</div>
-					)
-				})}
+									}}
+									onClick={(e) => {
+										e.stopPropagation()
+										e.preventDefault()
+									}}
+									className="shrink-0 p-0.5 rounded hover:bg-vscode-toolbar-activeBackground text-vscode-descriptionForeground hover:text-vscode-foreground ml-1 cursor-pointer"
+									role="button"
+									aria-label={`Close ${tab.title}`}
+									tabIndex={0}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault()
+											handleCloseClick(e, tab)
+										}
+									}}>
+									<X className="w-3 h-3" />
+								</span>
+							</div>
+						)
+					})}
+				</div>
+
+				{/* Right action icons: Branch to Workspace, Shared Context Inspector & Tutorial button */}
+				<div className="flex items-center gap-1 px-2 shrink-0 border-l border-vscode-panel-border bg-vscode-sideBar-background">
+					<button
+						onClick={() => setShowBranchDialog(true)}
+						className="p-1 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground cursor-pointer transition-colors"
+						title="Branch Active Chat to Another Workspace..."
+						aria-label="Branch Chat to Workspace">
+						<GitBranch className="w-3.5 h-3.5" />
+					</button>
+					<button
+						onClick={() => setShowSharedContext(true)}
+						className="p-1 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground cursor-pointer transition-colors"
+						title="Inspect Shared Session Context"
+						aria-label="Shared Session Context">
+						<Share2 className="w-3.5 h-3.5" />
+					</button>
+					<button
+						onClick={() => setShowTutorial(true)}
+						className="p-1 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground cursor-pointer transition-colors"
+						title="How Sessions & Tabs Work (Tutorial)"
+						aria-label="How Tabs Work Tutorial">
+						<HelpCircle className="w-3.5 h-3.5" />
+					</button>
+				</div>
 			</div>
+
+			{/* Branch Chat to Workspace Dialog */}
+			<BranchWorkspaceDialog
+				isOpen={showBranchDialog}
+				onClose={() => setShowBranchDialog(false)}
+				currentTaskId={activeTabId}
+				workspaceFolders={workspaceFolders}
+				currentWorkspacePath={currentWorkspacePath}
+			/>
+
+			{/* Session Tutorial Modal */}
+			<SessionTutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
+
+			{/* Shared Context Inspector Dialog */}
+			<SharedContextDialog
+				isOpen={showSharedContext}
+				onClose={() => setShowSharedContext(false)}
+				tabs={tabs}
+				activeTabId={activeTabId}
+				currentSessionId={currentSessionId}
+				sessionNames={sessionNames}
+				sessionNotes={sessionNotes}
+				sessionSharedContexts={sessionSharedContexts}
+			/>
 
 			{/* Close confirmation dialog for active streaming/interactive tasks */}
 			<AlertDialog
