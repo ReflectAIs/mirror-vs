@@ -23,6 +23,12 @@ export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<
 	// so no AI loop runs — the user can interact with it by clicking.
 	await provider.restoreSessionTabs()
 
+	// If no tabs were restored (e.g. fresh session or all tabs were closed),
+	// ensure a clean idle task exists ready to receive user messages.
+	if (provider.mirrorStack.length === 0) {
+		await provider.createTask("", [], undefined, {}, {})
+	}
+
 	provider.postStateToWebview()
 	provider.workspaceTracker?.initializeFilePaths() // Don't await.
 
@@ -172,10 +178,7 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 				message.taskConfiguration,
 			)
 		}
-
-		await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 	} catch (error) {
-		await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 		vscode.window.showErrorMessage(
 			`Failed to create task: ${error instanceof Error ? error.message : String(error)}`,
 		)
