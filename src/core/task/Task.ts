@@ -1073,9 +1073,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 * If the task is waiting on an ask, it immediately answers it;
 	 * otherwise, the message is queued to be included in the very next model iteration.
 	 */
-	public async injectInBetweenMessage(text: string, images?: string[]): Promise<void> {
+	public async injectInBetweenMessage(
+		text: string,
+		images?: string[],
+		sayType: "user_feedback" | "terminal_callback" = "user_feedback",
+	): Promise<void> {
 		this.inBetweenMessages.push({ text, images })
-		await this.say("user_feedback", text, images)
+		await this.say(sayType as any, text, images)
 
 		if (this.askResponse === undefined) {
 			const lastMessage = this.mirrorMessages.at(-1)

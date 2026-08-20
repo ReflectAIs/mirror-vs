@@ -465,7 +465,7 @@ export async function executeCommandInTerminal(
 				previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
 			].join("")
 
-			void task.injectInBetweenMessage(notification)
+			void task.injectInBetweenMessage(notification, undefined, "terminal_callback")
 		}
 	}
 

@@ -46,6 +46,7 @@ import { ImageProgressRow } from "./ImageProgressRow"
 import { Markdown } from "./Markdown"
 import { CommandExecution } from "./CommandExecution"
 import { CommandExecutionError } from "./CommandExecutionError"
+import { TerminalCallbackNudge } from "./TerminalCallbackNudge"
 import { AutoApprovedRequestLimitWarning } from "./AutoApprovedRequestLimitWarning"
 import { InProgressRow, CondensationResultRow, CondensationErrorRow, TruncationResultRow } from "./context-management"
 import CodebaseSearchResultsDisplay from "./CodebaseSearchResultsDisplay"
@@ -1422,19 +1423,22 @@ export const ChatRowContent = ({
 				}
 				case "api_req_finished":
 					return null // we should never see this message type
+				case "terminal_callback":
+					return <TerminalCallbackNudge text={message.text} />
 				case "text":
 					return (
-						<div className="group">
-							<div style={headerStyle}>
-								<Sparkles
-									className="w-4 shrink-0 text-vscode-button-background/80"
-									aria-label="Sparkles icon"
-								/>
-								<span style={{ fontWeight: "bold" }}>{t("chat:text.mirrorSaid")}</span>
-								<div style={{ flexGrow: 1 }} />
+						<div className="group my-2 p-1 transition-all">
+							<div className="flex items-center gap-2 mb-1.5">
+								<div className="size-5 rounded-full bg-gradient-to-tr from-mirror-brand-from/20 to-mirror-brand-to/20 flex items-center justify-center text-mirror-brand-via shrink-0">
+									<Sparkles className="size-3 animate-pulse" aria-label="Sparkles icon" />
+								</div>
+								<span className="text-xs font-bold bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent">
+									{t("chat:text.mirrorSaid")}
+								</span>
+								<div className="flex-grow" />
 								<OpenMarkdownPreviewButton markdown={message.text} />
 							</div>
-							<div className="pl-6">
+							<div className="pl-7 leading-relaxed">
 								<Markdown markdown={message.text} partial={message.partial} />
 								{message.images && message.images.length > 0 && (
 									<div style={{ marginTop: "10px" }}>
@@ -1446,42 +1450,46 @@ export const ChatRowContent = ({
 							</div>
 						</div>
 					)
-				case "user_feedback":
+				case "user_feedback": {
+					if (message.text?.startsWith("[Terminal Callback:")) {
+						return <TerminalCallbackNudge text={message.text} />
+					}
 					return (
 						<div
 							className={cn(
-								"group my-2 p-3 rounded-lg transition-all",
+								"group my-2.5 p-3 rounded-xl transition-all relative overflow-hidden",
 								isSticky
-									? "border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03]"
-									: "border border-dashed border-vscode-button-background/15 bg-vscode-button-background/[0.03] hover:bg-vscode-button-background/[0.06] hover:border-vscode-button-background/25",
+									? "border border-vscode-button-background/25 bg-vscode-sideBar-background/90 backdrop-blur-md shadow-md"
+									: "border border-vscode-editorGroup-border/60 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 hover:border-mirror-brand-via/35 shadow-xs",
 							)}
 							style={
 								isSticky
 									? {
 											background:
-												"color-mix(in srgb, var(--vscode-sideBar-background) 90%, transparent)",
-											backdropFilter: "blur(12px)",
-											WebkitBackdropFilter: "blur(12px)",
-											border: "1px solid color-mix(in srgb, var(--vscode-button-background) 20%, transparent)",
+												"color-mix(in srgb, var(--vscode-sideBar-background) 92%, transparent)",
+											backdropFilter: "blur(14px)",
+											WebkitBackdropFilter: "blur(14px)",
+											border: "1px solid color-mix(in srgb, var(--vscode-button-background) 25%, transparent)",
 											borderBottom:
-												"2px solid color-mix(in srgb, var(--vscode-button-background) 35%, transparent)",
+												"2px solid color-mix(in srgb, var(--vscode-button-background) 45%, transparent)",
 											boxShadow:
 												"0 8px 24px rgba(0,0,0,0.2), 0 2px 8px color-mix(in srgb, var(--vscode-button-background) 5%, transparent)",
 										}
 									: undefined
 							}>
-							<div className="flex justify-between items-center ml-1 w-full">
-								<div style={headerStyle}>
-									<CircleUser
-										className="w-3.5 h-3.5 shrink-0 text-vscode-button-background/80 group-hover:text-vscode-button-background"
-										aria-label="User icon"
-									/>
-									<span style={{ fontWeight: "bold" }}>{t("chat:feedback.youSaid")}</span>
+							<div className="flex justify-between items-center w-full mb-1">
+								<div className="flex items-center gap-2">
+									<div className="size-5 rounded-full bg-vscode-button-background/15 flex items-center justify-center text-vscode-button-background shrink-0">
+										<CircleUser className="size-3.5" aria-label="User icon" />
+									</div>
+									<span className="text-xs font-bold text-vscode-foreground tracking-wide">
+										{t("chat:feedback.youSaid")}
+									</span>
 								</div>
 								{!isEditing && !isStreaming && (
-									<div className="flex gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-2 shrink-0">
+									<div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-1 shrink-0">
 										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors shrink-0"
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
 											title="Revert chat to this message"
 											onClick={(e) => {
 												e.stopPropagation()
@@ -1491,25 +1499,25 @@ export const ChatRowContent = ({
 													inclusive: false,
 												})
 											}}>
-											<RotateCcw className="w-3.5 h-3.5" aria-label="Revert to here icon" />
+											<RotateCcw className="size-3.5" aria-label="Revert to here icon" />
 										</button>
 										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded transition-colors shrink-0"
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
 											title="Edit message"
 											onClick={(e) => {
 												e.stopPropagation()
 												handleEditClick()
 											}}>
-											<Edit className="w-3.5 h-3.5" aria-label="Edit message icon" />
+											<Edit className="size-3.5" aria-label="Edit message icon" />
 										</button>
 										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-0.5 rounded transition-colors shrink-0"
+											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
 											title="Delete message"
 											onClick={(e) => {
 												e.stopPropagation()
 												vscode.postMessage({ type: "deleteMessage", value: message.ts })
 											}}>
-											<Trash2 className="w-3.5 h-3.5" aria-label="Delete message icon" />
+											<Trash2 className="size-3.5" aria-label="Delete message icon" />
 										</button>
 									</div>
 								)}
@@ -1563,6 +1571,7 @@ export const ChatRowContent = ({
 							)}
 						</div>
 					)
+				}
 				case "user_feedback_diff":
 					const tool = safeJsonParse<MirrorSayTool>(message.text)
 					return (
