@@ -96,8 +96,8 @@ export interface UseChatMessagesReturn {
 	primaryButtonText: string | undefined
 	secondaryButtonText: string | undefined
 	expandedRows: Record<number, boolean>
-	activeHeaderPanel: "stats" | "todos" | "notes" | "none"
-	setActiveHeaderPanel: React.Dispatch<React.SetStateAction<"stats" | "todos" | "notes" | "none">>
+	activeHeaderPanel: "stats" | "todos" | "none"
+	setActiveHeaderPanel: React.Dispatch<React.SetStateAction<"stats" | "todos" | "none">>
 	checkpointWarning: { type: "WAIT_TIMEOUT" | "INIT_TIMEOUT"; timeout: number } | undefined
 	isCondensing: boolean
 	isFollowUpAutoApprovalPaused: boolean
@@ -326,7 +326,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 
 	// ── UI State ──
 	const [showRetiredProviderWarning, setShowRetiredProviderWarning] = useState(false)
-	const [activeHeaderPanel, setActiveHeaderPanel] = useState<"stats" | "todos" | "notes" | "none">("none")
+	const [activeHeaderPanel, setActiveHeaderPanel] = useState<"stats" | "todos" | "none">("none")
 	const [messageLimit, setMessageLimit] = useState(120)
 
 	const providerName = apiConfiguration?.apiProvider
