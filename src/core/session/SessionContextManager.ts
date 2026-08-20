@@ -291,9 +291,9 @@ export class SessionContextManager {
 	}
 
 	/**
-	 * Distills a completed/condensed task into 2–5 concise knowledge notes.
-	 * Uses the task's todo list (status + content), attempt_completion text,
-	 * and first user prompt — no extra LLM round-trip in this phase.
+	 * Distills a task into concise knowledge notes.
+	 * Uses the task's user prompt, todo list (status + content), modified files,
+	 * and attempt_completion text — no extra LLM round-trip needed.
 	 */
 	private distillNotes(task: Task): SessionKnowledgeNote[] {
 		const notes: SessionKnowledgeNote[] = []
@@ -311,30 +311,40 @@ export class SessionContextManager {
 			}
 		}
 
-		// Goal from the original prompt.
-		const original = task.metadata?.task
+		// Goal from the original prompt or first user message
+		const original =
+			task.metadata?.task ||
+			task.mirrorMessages?.find((m) => m.type === "say" && (m.say === "user_feedback" || m.say === "text"))?.text
 		if (original) {
-			push(`Goal: ${original.split("\n")[0].slice(0, 300)}`)
+			push(`🎯 Goal: ${original.split("\n")[0].slice(0, 300)}`)
 		}
 
-		// Key actions from the todo list (completed items show what was done).
+		// Key actions from the todo list (completed/in_progress items show progress).
 		if (task.todoList && task.todoList.length > 0) {
 			for (const todo of task.todoList.slice(0, 5)) {
 				if (todo?.content) {
-					push(`[${todo.status}] ${todo.content}`)
+					const prefix = todo.status === "completed" ? "✓" : todo.status === "in_progress" ? "⏳" : "•"
+					push(`${prefix} [${todo.status}] ${todo.content}`)
 				}
 			}
 		}
 
-		// Final summary from the last attempt_completion message, if any.
+		// Key file modifications
+		if (task.fileEdits && task.fileEdits.length > 0) {
+			const filePaths = task.fileEdits.map((f) => f.path.split("/").pop() || f.path)
+			const uniqueFiles = Array.from(new Set(filePaths)).slice(0, 4)
+			push(`📁 Modified: ${uniqueFiles.join(", ")}`)
+		}
+
+		// Final summary from the last attempt_completion or task completion message.
 		const completion = task.mirrorMessages
 			?.filter((m) => m.say === "completion_result" && m.text)
 			.slice(-1)[0]?.text
 		if (completion) {
-			push(`Completed: ${completion.slice(0, 500)}`)
+			push(`✨ Completed: ${completion.slice(0, 500)}`)
 		}
 
-		return notes.slice(0, 5)
+		return notes.slice(0, 8)
 	}
 }
 

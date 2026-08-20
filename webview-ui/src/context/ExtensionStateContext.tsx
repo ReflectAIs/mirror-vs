@@ -253,6 +253,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		lockApiConfigAcrossModes: false,
 		tabs: [],
 		activeTabId: "",
+		sessionSharedContexts: {},
 		activeTerminalCount: 0,
 		activeTerminals: [],
 	})

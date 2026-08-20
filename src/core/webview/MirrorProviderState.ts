@@ -231,6 +231,7 @@ export class StateManager {
 			sessionNames,
 			taskNames,
 			sessionNotes,
+			sessionSharedContexts,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels,
@@ -276,6 +277,20 @@ export class StateManager {
 			// Only show tabs for the active session
 			return activeSessionId ? task.sessionId === activeSessionId : true
 		})
+
+		// Extract knowledge from active tasks so the shared session context stays up to date
+		for (const t of allTasks) {
+			if (t.sessionId) {
+				try {
+					await this.provider.getSessionContextManager().extractKnowledgeFromTask(t)
+				} catch {
+					// non-fatal
+				}
+			}
+		}
+
+		const rawSharedContexts =
+			(await this.provider.contextProxy.getValue("sessionSharedContexts")) ?? sessionSharedContexts ?? {}
 		const tabs: TabInfo[] = allTasks.map((task) => {
 			// Determine hasPendingApproval — task has an ask that's pending user response
 			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
@@ -470,6 +485,7 @@ export class StateManager {
 			sessionNames: sessionNames ?? {},
 			taskNames: taskNames ?? {},
 			sessionNotes,
+			sessionSharedContexts: rawSharedContexts,
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels: atlasCloudModels ?? {},
@@ -625,6 +641,7 @@ export class StateManager {
 				stateValues.currentSessionId && stateValues.sessionSharedContexts?.[stateValues.currentSessionId]
 					? stateValues.sessionSharedContexts[stateValues.currentSessionId].notes
 					: undefined,
+			sessionSharedContexts: stateValues.sessionSharedContexts ?? {},
 			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
 			userBraveApiKey: stateValues.userBraveApiKey,
 			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},
