@@ -209,6 +209,7 @@ export class StateManager {
 			historyPreviewCollapsed,
 			reasoningBlockCollapsed,
 			enterBehavior,
+			disableTabBar,
 			organizationAllowList,
 			customCondensingPrompt,
 			codebaseIndexConfig,
@@ -420,6 +421,7 @@ export class StateManager {
 			historyPreviewCollapsed: historyPreviewCollapsed ?? false,
 			reasoningBlockCollapsed: reasoningBlockCollapsed ?? true,
 			enterBehavior: enterBehavior ?? "send",
+			disableTabBar: disableTabBar ?? false,
 			organizationAllowList,
 			customCondensingPrompt,
 			codebaseIndexModels: codebaseIndexModels ?? EMBEDDING_MODEL_PROFILES,
@@ -452,6 +454,8 @@ export class StateManager {
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
 			comfyuiAutoSetup,
+			imageAutoSetupRunning: (await import("../../services/image-runtime")).isAutoSetupRunning(),
+			imageAutoSetupStatus: (await import("../../services/image-runtime")).getLastAutoSetupStatus(),
 			openAiCodexIsAuthenticated: await (async () => {
 				try {
 					const { openAiCodexOAuthManager } = await import("../../integrations/openai-codex/oauth")
@@ -600,6 +604,7 @@ export class StateManager {
 			historyPreviewCollapsed: stateValues.historyPreviewCollapsed ?? false,
 			reasoningBlockCollapsed: stateValues.reasoningBlockCollapsed ?? true,
 			enterBehavior: stateValues.enterBehavior ?? "send",
+			disableTabBar: stateValues.disableTabBar ?? false,
 			organizationAllowList,
 			customCondensingPrompt: stateValues.customCondensingPrompt,
 			codebaseIndexModels: stateValues.codebaseIndexModels ?? EMBEDDING_MODEL_PROFILES,

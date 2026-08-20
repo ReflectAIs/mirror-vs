@@ -13,12 +13,16 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **In-Between Message Steering**: When tasks are streaming, queued messages can be force-sent to steer the model mid-execution.
 - **Super-Cute Mascot Expressions & Polish**: Expanded lively Kaomoji micro-expressions, reactive animations, and developer humor across status modes.
 - **Firebase & CLI Loop Breakers**: Enhanced repetition detector and execution prompt to prevent models from looping on repeated failing or interactive CLI commands like Firebase, with exemptions for polling utilities (`sleep`, `echo`, `cat`, `ps`).
+- **ComfyUI Server Startup & Copy Tools**: Added a **Start ComfyUI Server** button and browser link to launch ComfyUI directly from the Workflow Browser, along with an error copy action button with checkmark status feedback.
 
 ### Fixed
 
 - **Session Tab Isolation & Dynamic Header Title**: Fixed TabBar scoping so switching sessions cleanly isolates tabs to the active session and dynamically updates the session header title in the chat toolbar.
 - **Terminal Run/Deny Button Suppression**: Suppressed unnecessary Run/Deny action buttons when a terminal command has already started running and is streaming output.
 - **File Changes Panel Height & Scroll**: Added a `max-h-[300px]` height boundary with vertical scroll in the file changes panel to prevent expanded diffs from taking up the entire screen.
+- **ComfyUI Auto-Setup Duplicate Runs**: Added a backend execution mutex lock and persistent extension state synchronization to prevent concurrent setups and retain progress indicators when switching settings tabs.
+- **Mascot Speech Bubble Clipping & Layering**: Increased quote speech bubble z-index to `z-[99999]` and adjusted container overflow rules to prevent the mascot text from getting hidden or clipped behind windows on Windows.
+- **Restoration of Previous Active Tab**: Prevented automatically spawning blank new tabs on startup, ensuring the last active task tab is properly restored instead.
 
 ### Changed
 
@@ -26,6 +30,9 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Git Diff Visuals**: Upgraded unified diffs with high-contrast vivid green background/borders for additions and vivid red for removals across both dark and light themes.
 - **Modernized Fireworks AI**: Integrated dynamic model discovery and updated default model to `kimi-k2p5`.
 - **Force Process Tree Termination**: Guaranteed robust cleanup of hung child processes and terminals using comprehensive process-tree termination.
+- **Default Multi-Tab UI Interface**: Promoted the `multiTab` experiment to core features; enabled it by default and added a global setting checkbox to let users "Disable multi-tab interface".
+- **Tab Terminology Update**: Rebranded destructive prompts and buttons from "Delete Session" to "Delete Tab" to match the actual tabbed chat interface.
+- **Mascot Speech Bubble Hover Duration**: Increased Click Quote persistence duration from `1400ms` to `4500ms` to let users read mascot comments comfortably.
 
 ## [0.7.0] - 2026-08-17
 

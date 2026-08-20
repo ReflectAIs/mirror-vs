@@ -202,6 +202,7 @@ import {
 	handleScanComfyuiWorkflows,
 	handleImportComfyuiWorkflows,
 	handleDeleteComfyuiWorkflow,
+	handleStartComfyuiServer,
 } from "./handlers/pipelineMessageHandler"
 
 // ── Worktree handlers ──────────────────────────────────────────
@@ -720,6 +721,10 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 
 		case "deleteComfyuiWorkflow":
 			await handleDeleteComfyuiWorkflow(provider, message)
+			break
+
+		case "startComfyuiServer":
+			await handleStartComfyuiServer(provider)
 			break
 
 		case "openCommandFile":

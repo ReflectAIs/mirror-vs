@@ -1081,6 +1081,16 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.inBetweenMessages.push({ text, images })
 		await this.say(sayType as any, text, images)
 
+		// If a terminal command is actively running in the foreground, interrupt/continue it
+		// so the loop immediately yields back to the model with this steering message.
+		if (this.terminalProcess) {
+			try {
+				this.terminalProcess.continue()
+			} catch (e) {
+				console.error("[Task#injectInBetweenMessage] Failed to continue terminalProcess:", e)
+			}
+		}
+
 		if (this.askResponse === undefined) {
 			const lastMessage = this.mirrorMessages.at(-1)
 			if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {

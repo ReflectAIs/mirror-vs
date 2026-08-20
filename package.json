@@ -52,7 +52,14 @@
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [
-			"@vscode/ripgrep"
+			"@vscode/ripgrep",
+			"esbuild",
+			"@tailwindcss/oxide",
+			"@vscode/vsce-sign",
+			"core-js",
+			"keytar",
+			"puppeteer-chromium-resolver",
+			"tesseract.js"
 		],
 		"overrides": {
 			"tar-fs": ">=3.1.1",

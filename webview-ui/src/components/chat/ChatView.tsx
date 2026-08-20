@@ -74,7 +74,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		currentSessionId,
 		sessionNames,
 		sessionNotes,
-		experiments,
+		disableTabBar,
 	} = useExtensionState()
 
 	// ── Use the extracted hook for all message state, effects, and handlers ──
@@ -350,7 +350,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				sessionNames={sessionNames}
 				sessionNotes={sessionNotes}
 			/>
-			{experiments?.multiTab && <TabBar tabs={tabs} activeTabId={activeTabId} />}
+			{!disableTabBar && <TabBar tabs={tabs} activeTabId={activeTabId} />}
 
 			{task ? (
 				<>

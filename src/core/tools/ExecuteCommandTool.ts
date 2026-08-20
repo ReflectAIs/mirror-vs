@@ -639,6 +639,11 @@ export async function executeCommandInTerminal(
 		await onCompletedPromise
 	}
 
+	// Double-check background notification in case onCompleted resolved after onShellExecutionComplete
+	if (runInBackground && !hasEmittedBackgroundCompletion) {
+		checkAndNotifyBackgroundCompletion()
+	}
+
 	if (message) {
 		const { text, images } = message
 		await task.say("user_feedback", text, images)
@@ -647,9 +652,10 @@ export async function executeCommandInTerminal(
 			true,
 			formatResponse.toolResult(
 				[
-					`Command is still running in terminal from '${terminal.getCurrentWorkingDirectory().toPosix()}'.`,
-					result.length > 0 ? `Here's the output so far:\n${result}\n` : "\n",
+					`Command is still running in background in terminal from '${terminal.getCurrentWorkingDirectory().toPosix()}'.`,
+					result.length > 0 ? `Output so far:\n${result}\n` : "\n",
 					`<user_message>\n${text}\n</user_message>`,
+					`IMPORTANT: The user sent an urgent message while this command was executing. Address the user's message immediately. Do not poll with sleep or echo.`,
 				].join("\n"),
 				images,
 			),
@@ -695,9 +701,9 @@ export async function executeCommandInTerminal(
 		return [
 			false,
 			[
-				`Command is still running in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
-				result.length > 0 ? `Here's the output so far:\n${result}\n` : "\n",
-				"You will be updated on the terminal status and new output in the future.",
+				`Command is running in background in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
+				result.length > 0 ? `Output so far:\n${result}\n` : "\n",
+				"The terminal callback will automatically notify and wake you up when the command finishes. Do NOT run sleep, wait, or echo polling commands. Proceed with other work or patiently wait.",
 			].join("\n"),
 		]
 	}
