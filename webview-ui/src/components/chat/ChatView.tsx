@@ -373,7 +373,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							key={task.ts}
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
-							increaseViewportBy={{ top: 3_000, bottom: 1000 }}
+							increaseViewportBy={{ top: 800, bottom: 400 }}
 							data={displayedMessages}
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}

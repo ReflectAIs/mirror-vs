@@ -1,3 +1,4 @@
+import path from "path"
 import crypto from "crypto"
 
 import type { Task } from "../task/Task"
@@ -16,39 +17,72 @@ import type { MirrorProvider } from "./MirrorProvider"
 export class SessionManager {
 	constructor(private provider: MirrorProvider) {}
 
+	// ── Persistence Helpers ──────────────────────────────────────────────────
+
+	private getWorkspaceKey(workspacePath?: string): string {
+		return path.resolve(workspacePath || this.provider.cwd || "").toLowerCase()
+	}
+
+	private async getWorkspaceSessionMap(): Promise<Record<string, string>> {
+		return (await this.provider.contextProxy.getValue("workspaceSessionMap")) || {}
+	}
+
+	private async setWorkspaceSession(sessionId: string | undefined, workspacePath?: string): Promise<void> {
+		const key = this.getWorkspaceKey(workspacePath)
+		if (!key) return
+		const map = await this.getWorkspaceSessionMap()
+		if (sessionId) {
+			map[key] = sessionId
+		} else {
+			delete map[key]
+		}
+		await this.provider.contextProxy.setValue("workspaceSessionMap", map)
+	}
+
 	// ── Public API ───────────────────────────────────────────────────────────
 
 	/**
 	 * Creates a new session, persists it via contextProxy, and returns the id.
 	 */
-	public async createSession(): Promise<string> {
+	public async createSession(workspacePath?: string): Promise<string> {
 		const sessionId = crypto.randomUUID()
-		this.provider.setCurrentSessionId(sessionId)
-		await this.provider.contextProxy.setValue("currentSessionId", sessionId)
-		this.provider.log(`[createSession] Created new session ${sessionId}`)
+		const targetKey = this.getWorkspaceKey(workspacePath)
+
+		// If creating for the active workspace, set in-memory currentSessionId
+		if (!workspacePath || path.resolve(workspacePath) === path.resolve(this.provider.cwd || "")) {
+			this.provider.setCurrentSessionId(sessionId)
+			await this.provider.contextProxy.setValue("currentSessionId", sessionId)
+		}
+
+		// Persist in workspace map
+		await this.setWorkspaceSession(sessionId, workspacePath)
+		this.provider.log(`[createSession] Created new session ${sessionId} for workspace ${targetKey}`)
 		return sessionId
 	}
 
 	/**
 	 * Returns the existing session if present, otherwise restores from
-	 * persisted state, or creates a brand-new one as a last resort.
+	 * workspace persisted state, or creates a brand-new one as a last resort.
 	 */
 	public async getOrCreateSession(): Promise<string> {
 		const existing = this.provider.getCurrentSessionId()
 		if (existing) {
-			console.log(`[SESSION-DBG] getOrCreateSession: returning cached=${existing}`)
 			return existing
 		}
 
-		const persistedSessionId = await this.provider.contextProxy.getValue("currentSessionId")
-		if (persistedSessionId) {
-			this.provider.setCurrentSessionId(persistedSessionId)
-			console.log(`[SESSION-DBG] getOrCreateSession: restored persisted=${persistedSessionId}`)
-			return persistedSessionId
+		const key = this.getWorkspaceKey()
+		const map = await this.getWorkspaceSessionMap()
+		const workspaceSessionId = map[key]
+
+		if (workspaceSessionId) {
+			this.provider.setCurrentSessionId(workspaceSessionId)
+			await this.provider.contextProxy.setValue("currentSessionId", workspaceSessionId)
+			this.provider.log(`[getOrCreateSession] Restored workspace session ${workspaceSessionId} for ${key}`)
+			return workspaceSessionId
 		}
 
 		const newSessionId = await this.createSession()
-		console.log(`[SESSION-DBG] getOrCreateSession: created new=${newSessionId}`)
+		this.provider.log(`[getOrCreateSession] Created fresh session ${newSessionId} for workspace ${key}`)
 		return newSessionId
 	}
 
@@ -58,6 +92,7 @@ export class SessionManager {
 	public async clearSession(): Promise<void> {
 		this.provider.setCurrentSessionId(undefined)
 		await this.provider.contextProxy.setValue("currentSessionId", undefined)
+		await this.setWorkspaceSession(undefined)
 		this.provider.log("[clearSession] Session cleared")
 	}
 

@@ -239,7 +239,7 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			const provider = await task.providerRef.deref()
 			const providerState = await provider?.getState()
 
-			const { terminalShellIntegrationDisabled = true } = providerState ?? {}
+			const { terminalShellIntegrationDisabled = false } = providerState ?? {}
 
 			// Get command execution timeout from VSCode configuration (in seconds)
 			const commandExecutionTimeoutSeconds = vscode.workspace
@@ -331,7 +331,7 @@ export async function executeCommandInTerminal(
 		executionId,
 		command,
 		customCwd,
-		terminalShellIntegrationDisabled = true,
+		terminalShellIntegrationDisabled = false,
 		commandExecutionTimeout = 0,
 		agentTimeout = 0,
 	}: ExecuteCommandOptions,

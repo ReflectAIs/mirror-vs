@@ -247,6 +247,12 @@ export const globalSettingsSchema = z.object({
 	currentSessionId: z.string().optional(),
 
 	/**
+	 * Maps workspace paths to their respective active sessionId.
+	 * Isolates sessions per workspace.
+	 */
+	workspaceSessionMap: z.record(z.string(), z.string()).optional(),
+
+	/**
 	 * User-assigned or auto-generated names for sessions.
 	 * Keyed by sessionId UUID.
 	 */

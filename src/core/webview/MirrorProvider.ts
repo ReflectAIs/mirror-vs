@@ -2236,7 +2236,7 @@ export class MirrorProvider
 		const globalStoragePath = this.context.globalStorageUri.fsPath
 
 		// 1. Create a dedicated session for the target branch
-		const branchSessionId = await this.sessionManager.createSession()
+		const branchSessionId = await this.sessionManager.createSession(targetWorkspacePath)
 		const sessionNames = (await this.contextProxy.getValue("sessionNames")) || {}
 		const sourceSessionName = historyItem.sessionId ? sessionNames[historyItem.sessionId] : "Session"
 		const targetWorkspaceName = path.basename(targetWorkspacePath)

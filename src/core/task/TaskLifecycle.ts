@@ -559,9 +559,9 @@ export class TaskLifecycle {
 			console.error("Error removing event listeners:", error)
 		}
 
-		// Release any terminals associated with this task.
+		// Abort and release any terminals associated with this task.
 		try {
-			// Release any terminals associated with this task.
+			TerminalRegistry.abortTerminalsForTask(this.task.taskId)
 			TerminalRegistry.releaseTerminalsForTask(this.task.taskId)
 		} catch (error) {
 			console.error("Error releasing terminals:", error)
