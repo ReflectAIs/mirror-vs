@@ -348,6 +348,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				t={t}
 				currentSessionId={currentSessionId}
 				sessionNames={sessionNames}
+				sessionNotes={sessionNotes}
 			/>
 			{experiments?.multiTab && <TabBar tabs={tabs} activeTabId={activeTabId} />}
 

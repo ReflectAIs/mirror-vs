@@ -29,8 +29,8 @@ export interface ChatToolbarProps {
 	currentTaskItem: any
 	apiMetrics: ReturnType<typeof import("@shared/getApiMetrics").getApiMetrics>
 	aggregatedCostsMap: Map<string, { totalCost: number; ownCost: number; childrenCost: number }>
-	activeHeaderPanel: "stats" | "todos" | "none"
-	setActiveHeaderPanel: React.Dispatch<React.SetStateAction<"stats" | "todos" | "none">>
+	activeHeaderPanel: "stats" | "todos" | "notes" | "none"
+	setActiveHeaderPanel: React.Dispatch<React.SetStateAction<"stats" | "todos" | "notes" | "none">>
 	latestTodos: any[] | undefined
 	sendingDisabled: boolean
 	modelId: string | undefined
@@ -41,6 +41,7 @@ export interface ChatToolbarProps {
 	t: (key: string) => string
 	currentSessionId?: string
 	sessionNames?: Record<string, string>
+	sessionNotes?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +66,7 @@ const ChatToolbar = ({
 	t,
 	currentSessionId,
 	sessionNames,
+	sessionNotes,
 }: ChatToolbarProps) => {
 	const activeSessionName = currentSessionId
 		? sessionNames?.[currentSessionId] ||
@@ -73,6 +75,28 @@ const ChatToolbar = ({
 
 	const [isEditingSession, setIsEditingSession] = useState(false)
 	const [editingSessionName, setEditingSessionName] = useState("")
+
+	// Session notes are buffered in local state (per AGENTS.md rule: inputs bind
+	// to a local cachedState, NOT the live extension state) and only persisted
+	// when the user clicks Save.
+	const [notesBuffer, setNotesBuffer] = useState("")
+
+	// Sync the buffer whenever the persisted notes change (e.g. different session
+	// selected, or notes saved elsewhere).
+	useEffect(() => {
+		setNotesBuffer(sessionNotes ?? "")
+	}, [sessionNotes])
+
+	const handleSaveSessionNotes = useCallback(() => {
+		if (currentSessionId) {
+			vscode.postMessage({
+				type: "updateSessionNotes",
+				sessionId: currentSessionId,
+				sessionNotes: notesBuffer,
+			})
+			setActiveHeaderPanel("none")
+		}
+	}, [currentSessionId, notesBuffer, setActiveHeaderPanel])
 
 	const handleSaveSessionName = useCallback(() => {
 		setIsEditingSession(false)
@@ -238,7 +262,11 @@ const ChatToolbar = ({
 				<div className="shrink-0 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background px-4 py-3 flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-150">
 					<div className="flex items-center justify-between border-b border-vscode-editorGroup-border/50 pb-1.5">
 						<span className="font-bold text-[10px] uppercase tracking-wider text-vscode-descriptionForeground">
-							{activeHeaderPanel === "stats" ? "Session Statistics" : "Active Todo List"}
+							{activeHeaderPanel === "stats"
+								? "Session Statistics"
+								: activeHeaderPanel === "notes"
+									? t("chat:sessionNotes.title")
+									: "Active Todo List"}
 						</span>
 						<div className="flex items-center gap-2">
 							{activeHeaderPanel === "stats" && task && (
@@ -369,6 +397,28 @@ const ChatToolbar = ({
 									)}
 								</tbody>
 							</table>
+						</div>
+					) : activeHeaderPanel === "notes" ? (
+						<div className="flex flex-col gap-2">
+							<textarea
+								value={notesBuffer}
+								onChange={(e) => setNotesBuffer(e.target.value)}
+								placeholder={t("chat:sessionNotes.placeholder")}
+								rows={4}
+								className="w-full resize-y rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-editorGroup-border/50 focus:border-vscode-focusBorder outline-none px-2.5 py-2 text-xs leading-relaxed placeholder:text-vscode-descriptionForeground"
+							/>
+							<div className="flex items-center justify-between gap-2">
+								<span className="text-[10px] text-vscode-descriptionForeground">
+									{t("chat:sessionNotes.hint")}
+								</span>
+								<Button
+									variant="primary"
+									className="px-3 py-1 h-auto text-[11px]"
+									disabled={!currentSessionId}
+									onClick={handleSaveSessionNotes}>
+									{t("chat:sessionNotes.save")}
+								</Button>
+							</div>
 						</div>
 					) : (
 						<div className="max-h-48 overflow-y-auto pr-1">
