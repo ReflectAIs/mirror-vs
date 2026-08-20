@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react"
-import { FoldVertical, HardDriveDownload, HardDriveUpload, ListTodo, Pencil, StickyNote, GitBranch } from "lucide-react"
+import { FoldVertical, HardDriveDownload, HardDriveUpload, ListTodo, Pencil, StickyNote } from "lucide-react"
 
 import type { ModelActivity } from "@src/components/welcome/MirrorHero"
 import MirrorHero from "@src/components/welcome/MirrorHero"
@@ -8,11 +8,9 @@ import { StandardTooltip, Button } from "@src/components/ui"
 import { getModelMaxOutputTokens } from "@shared/api"
 import { formatLargeNumber } from "@src/utils/format"
 import { vscode } from "@src/utils/vscode"
-import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { ContextWindowProgress } from "./ContextWindowProgress"
 import { TodoListDisplay } from "./TodoListDisplay"
 import { MascotBadge, type MascotStatus } from "./MascotBadge"
-import BranchWorkspaceDialog from "./BranchWorkspaceDialog"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,12 +61,10 @@ const ChatToolbar = ({
 	sessionNames,
 	sessionNotes,
 }: ChatToolbarProps) => {
-	const { workspaceFolders, currentWorkspacePath } = useExtensionState()
 	const activeSessionName = currentSessionId ? (sessionNames?.[currentSessionId] ?? "New Session") : "New Session"
 
 	const [isEditingSession, setIsEditingSession] = useState(false)
 	const [editingSessionName, setEditingSessionName] = useState("")
-	const [showBranchDialog, setShowBranchDialog] = useState(false)
 
 	// Session notes are buffered in local state (per AGENTS.md rule: inputs bind
 	// to a local cachedState, NOT the live extension state) and only persisted
@@ -210,13 +206,6 @@ const ChatToolbar = ({
 					<Button
 						variant="ghost"
 						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
-						onClick={() => setShowBranchDialog(true)}
-						title="Branch Chat to Workspace...">
-						<GitBranch className="size-3.5 text-vscode-descriptionForeground hover:text-vscode-foreground" />
-					</Button>
-					<Button
-						variant="ghost"
-						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
 						onClick={() => {
 							setShowRetiredProviderWarning(false)
 							vscode.postMessage({ type: "clearTask" })
@@ -254,15 +243,6 @@ const ChatToolbar = ({
 					</Button>
 				</div>
 			</div>
-
-			{/* Branch Chat Dialog */}
-			<BranchWorkspaceDialog
-				isOpen={showBranchDialog}
-				onClose={() => setShowBranchDialog(false)}
-				currentTaskId={currentTaskItem?.id}
-				workspaceFolders={workspaceFolders}
-				currentWorkspacePath={currentWorkspacePath}
-			/>
 
 			{activeHeaderPanel !== "none" && (
 				<div className="shrink-0 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background px-4 py-3 flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-150">
