@@ -5,6 +5,13 @@ import type { ModelActivity } from "@src/components/welcome/MirrorHero"
 import MirrorHero from "@src/components/welcome/MirrorHero"
 import { getCostBreakdownIfNeeded } from "@src/utils/costFormatting"
 import { StandardTooltip, Button } from "@src/components/ui"
+import {
+	DropdownMenu,
+	DropdownMenuTrigger,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+} from "@src/components/ui/dropdown-menu"
 import { getModelMaxOutputTokens } from "@shared/api"
 import { formatLargeNumber } from "@src/utils/format"
 import { vscode } from "@src/utils/vscode"
@@ -94,15 +101,16 @@ const ChatToolbar = ({
 	return (
 		<>
 			{/* Top Header Area */}
-			<div className="flex items-center justify-between px-4 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none">
-				<div className="flex items-center gap-2 min-w-0">
-					<MirrorHero activity={activity as any} size="small" />
-					<div className="flex flex-col min-w-0">
-						<div className="flex items-center gap-1.5">
-							<span className="font-bold text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent shrink-0">
-								Mirror VS
-							</span>
-						</div>
+			<div className="flex items-center justify-between px-3 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none overflow-hidden gap-2">
+				{/* Left Brand + Title Area */}
+				<div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+					<div className="shrink-0">
+						<MirrorHero activity={activity as any} size="small" />
+					</div>
+					<div className="flex flex-col min-w-0 overflow-hidden">
+						<span className="font-bold text-xs sm:text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent shrink-0">
+							Mirror VS
+						</span>
 						{isEditingSession ? (
 							<input
 								type="text"
@@ -114,7 +122,7 @@ const ChatToolbar = ({
 								}}
 								onBlur={handleSaveSessionName}
 								autoFocus
-								className="text-[11px] px-1.5 py-0.5 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none max-w-[180px]"
+								className="text-[11px] px-1.5 py-0.5 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none max-w-[150px]"
 							/>
 						) : (
 							<div
@@ -122,7 +130,7 @@ const ChatToolbar = ({
 									setEditingSessionName(activeSessionName)
 									setIsEditingSession(true)
 								}}
-								className="group flex items-center gap-1 cursor-pointer max-w-[220px]"
+								className="group flex items-center gap-1 cursor-pointer min-w-0"
 								title="Click to rename session">
 								<span className="text-[11px] font-medium text-vscode-descriptionForeground group-hover:text-vscode-foreground truncate transition-colors">
 									{activeSessionName}
@@ -132,14 +140,16 @@ const ChatToolbar = ({
 						)}
 					</div>
 				</div>
-				<div className="flex items-center gap-1.5">
+
+				{/* Right Action Buttons */}
+				<div className="flex items-center gap-1 shrink-0 ml-auto">
 					{task && (
 						<button
 							onClick={() => setActiveHeaderPanel((prev) => (prev === "stats" ? "none" : "stats"))}
-							className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-vscode-button-background/10 text-vscode-button-background hover:bg-vscode-button-background/20 transition-colors border border-vscode-button-background/20 cursor-pointer mr-1"
+							className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-vscode-button-background/10 text-vscode-button-background hover:bg-vscode-button-background/20 transition-colors border border-vscode-button-background/20 cursor-pointer shrink-0"
 							title="View Session Statistics">
 							<span>⚡</span>
-							<span>
+							<span className="truncate max-w-[55px]">
 								$
 								{(
 									(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
@@ -149,13 +159,6 @@ const ChatToolbar = ({
 							</span>
 						</button>
 					)}
-					<Button
-						variant="ghost"
-						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
-						onClick={() => setActiveHeaderPanel((prev) => (prev === "todos" ? "none" : "todos"))}
-						title="View Task Todo List">
-						<ListTodo className="size-3.5 text-vscode-descriptionForeground hover:text-vscode-foreground" />
-					</Button>
 					{currentTaskItem?.parentTaskId && (
 						<Button
 							variant="ghost"
@@ -184,27 +187,50 @@ const ChatToolbar = ({
 						title="Task History">
 						<span className="codicon codicon-history text-xs flex items-center justify-center" />
 					</Button>
-					<Button
-						variant="ghost"
-						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
-						onClick={() => vscode.postMessage({ type: "switchTab", tab: "brain" })}
-						title="Brain (Context Memory)">
-						<span className="codicon codicon-database text-xs flex items-center justify-center" />
-					</Button>
-					<Button
-						variant="ghost"
-						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
-						onClick={() => vscode.postMessage({ type: "switchTab", tab: "analytics" })}
-						title="Cost & Token Analytics">
-						<span className="codicon codicon-graph text-xs flex items-center justify-center" />
-					</Button>
-					<Button
-						variant="ghost"
-						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
-						onClick={() => vscode.postMessage({ type: "switchTab", tab: "settings" })}
-						title="Settings">
-						<span className="codicon codicon-settings-gear text-xs flex items-center justify-center" />
-					</Button>
+
+					{/* More Actions Dropdown Menu */}
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button
+								variant="ghost"
+								className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
+								title="More Actions">
+								<span className="codicon codicon-ellipsis text-xs flex items-center justify-center" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-48">
+							<DropdownMenuItem
+								onClick={() => setActiveHeaderPanel((prev) => (prev === "todos" ? "none" : "todos"))}
+								className="flex items-center gap-2 text-xs">
+								<ListTodo className="size-3.5 text-vscode-descriptionForeground" />
+								<span>Active Todo List</span>
+								{latestTodos && latestTodos.length > 0 && (
+									<span className="ml-auto text-[10px] bg-vscode-badge-background text-vscode-badge-foreground px-1.5 py-0.2 rounded-full font-mono">
+										{latestTodos.filter((t: any) => t.status !== "completed").length}
+									</span>
+								)}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() => vscode.postMessage({ type: "switchTab", tab: "brain" })}
+								className="flex items-center gap-2 text-xs">
+								<span className="codicon codicon-database text-xs" />
+								<span>Brain (Memory)</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() => vscode.postMessage({ type: "switchTab", tab: "analytics" })}
+								className="flex items-center gap-2 text-xs">
+								<span className="codicon codicon-graph text-xs" />
+								<span>Analytics & Tokens</span>
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem
+								onClick={() => vscode.postMessage({ type: "switchTab", tab: "settings" })}
+								className="flex items-center gap-2 text-xs">
+								<span className="codicon codicon-settings-gear text-xs" />
+								<span>Settings</span>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 			</div>
 

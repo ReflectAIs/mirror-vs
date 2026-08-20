@@ -10,6 +10,31 @@ interface MirrorHeroProps {
 
 type Mood = "happy" | "curious" | "sleepy" | "excited" | "silly" | "love" | "surprised" | "cool" | "cheeky"
 
+export type ClickExpression =
+	| "wink"
+	| "heart"
+	| "stars"
+	| "sunglasses"
+	| "surprised"
+	| "cheer"
+	| "silly"
+	| "cat"
+	| "fire"
+	| "hyped"
+
+const CLICK_EXPRESSIONS: { expression: ClickExpression; quote: string }[] = [
+	{ expression: "wink", quote: "Hey there! Ready to code something epic? 😉✨" },
+	{ expression: "heart", quote: "I love coding with you! You're awesome! 💖🥰" },
+	{ expression: "stars", quote: "WOAH! Your code is literally out of this world! 🤩⭐" },
+	{ expression: "sunglasses", quote: "Deal with it. Zero bugs in sight. 😎🔥" },
+	{ expression: "cheer", quote: "Yay! Let's crush this sprint together! 😆🎉" },
+	{ expression: "surprised", quote: "Wait, it compiled on the first try?! 😮⚡" },
+	{ expression: "silly", quote: "Bleep bloop! Boop the snoot again! 😜🐾" },
+	{ expression: "cat", quote: "Purr-fect logic detected! Nyan~ 😺🐾" },
+	{ expression: "fire", quote: "COOKING AT 100% MAXIMUM POWER! 🔥⚡" },
+	{ expression: "hyped", quote: "OVER 9000 LINES OF PURE BRILLIANCE! ⚡🚀" },
+]
+
 const MOOD_CYCLE: Mood[] = ["happy", "curious", "sleepy", "excited", "silly", "love", "surprised", "cool", "cheeky"]
 
 const FUNNY_DEVELOPER_QUOTES = [
@@ -86,11 +111,14 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 	const [isHovered, setIsHovered] = useState(false)
 	const [isClicked, setIsClicked] = useState(false)
 	const [isDoubleClicked, setIsDoubleClicked] = useState(false)
+	const [activeClickExpression, setActiveClickExpression] = useState<ClickExpression | null>(null)
+	const [clickQuote, setClickQuote] = useState<string>("")
 	const [isBlinking, setIsBlinking] = useState(false)
 	const [moodIndex, setMoodIndex] = useState(0)
 	const [quoteIndex, setQuoteIndex] = useState(0)
 	const clickTimerRef = useRef<ReturnType<typeof setTimeout>>()
 	const clickCountRef = useRef(0)
+	const clickExpressionIndexRef = useRef(0)
 	const moodCycleRef = useRef<ReturnType<typeof setInterval>>()
 	const blinkTimerRef = useRef<ReturnType<typeof setTimeout>>()
 	const containerRef = useRef<HTMLDivElement>(null)
@@ -196,32 +224,21 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 
 	const handleClick = useCallback(() => {
 		resetSleepTimer()
-		clickCountRef.current += 1
-
-		if (clickCountRef.current === 1) {
-			setIsClicked(true)
-			if (clickTimerRef.current) {
-				clearTimeout(clickTimerRef.current)
-			}
-			clickTimerRef.current = setTimeout(() => {
-				setIsClicked(false)
-				clickCountRef.current = 0
-			}, 700)
-		} else if (clickCountRef.current >= 2) {
-			setIsDoubleClicked(true)
-			setIsClicked(false)
-			if (clickTimerRef.current) {
-				clearTimeout(clickTimerRef.current)
-			}
-			clickTimerRef.current = setTimeout(() => {
-				setIsDoubleClicked(false)
-				clickCountRef.current = 0
-			}, 1200)
+		if (clickTimerRef.current) {
+			clearTimeout(clickTimerRef.current)
 		}
 
-		setTimeout(() => {
-			clickCountRef.current = 0
-		}, 300)
+		const item = CLICK_EXPRESSIONS[clickExpressionIndexRef.current % CLICK_EXPRESSIONS.length]
+		clickExpressionIndexRef.current += 1
+		setActiveClickExpression(item.expression)
+		setClickQuote(item.quote)
+		setIsClicked(true)
+
+		clickTimerRef.current = setTimeout(() => {
+			setIsClicked(false)
+			setActiveClickExpression(null)
+			setClickQuote("")
+		}, 1400)
 	}, [resetSleepTimer])
 
 	const activeState = activity === "sleeping" || isSleeping ? "sleeping" : activity
@@ -257,6 +274,28 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 	const currentMood = getIdleMood()
 
 	const getMouthPath = (): string => {
+		if (activeClickExpression) {
+			switch (activeClickExpression) {
+				case "wink":
+				case "sunglasses":
+					return "M 39 54 Q 48 58 58 51"
+				case "heart":
+					return "M 40 53 Q 48 62 56 53"
+				case "stars":
+				case "cheer":
+				case "fire":
+				case "hyped":
+					return "M 36 50 Q 48 68 60 50"
+				case "surprised":
+					return "M 43 54 Q 48 48 53 54 Q 48 60 43 54"
+				case "silly":
+					return "M 39 53 Q 48 65 57 53"
+				case "cat":
+					return "M 38 52 Q 43 57 48 52 Q 53 57 58 52"
+				default:
+					return "M 36 50 Q 48 65 60 50"
+			}
+		}
 		if (isDoubleClicked) {
 			return "M 34 48 Q 48 70 62 48"
 		}
@@ -308,8 +347,10 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 
 	// Cheeks blush opacity
 	const getBlushOpacity = (): number => {
+		if (activeClickExpression === "heart") return 0.75
+		if (activeClickExpression === "stars" || activeClickExpression === "cheer") return 0.65
 		if (isDoubleClicked) return 0.65
-		if (isClicked) return 0.5
+		if (isClicked) return 0.55
 		const mood = getIdleMood()
 		switch (mood) {
 			case "love":
@@ -333,7 +374,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		const rightCx = 65
 		const cy = 37
 
-		if (isBlinking) {
+		if (isBlinking && !activeClickExpression) {
 			return (
 				<>
 					<path
@@ -352,6 +393,163 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					/>
 				</>
 			)
+		}
+
+		// Interactive Click Expression Rendering
+		if (activeClickExpression) {
+			switch (activeClickExpression) {
+				case "wink":
+					return (
+						<>
+							<path
+								d={`M ${leftCx - 5.5} ${cy + 1} Q ${leftCx} ${cy - 4} ${leftCx + 5.5} ${cy + 1}`}
+								fill="none"
+								stroke={colors.eyes}
+								strokeWidth="4.5"
+								strokeLinecap="round"
+								filter="url(#neon-glow)"
+							/>
+							<circle cx={rightCx} cy={cy} r="6.2" fill={colors.eyes} filter="url(#neon-glow)" />
+						</>
+					)
+				case "heart":
+					return (
+						<>
+							<path
+								d={`M ${leftCx} ${cy + 3} L ${leftCx - 4} ${cy - 1} Q ${leftCx - 6.5} ${cy - 5.5} ${leftCx - 3} ${cy - 5.5} Q ${leftCx} ${cy - 2.5} ${leftCx} ${cy - 2.5} Q ${leftCx} -2.5 ${leftCx + 3} ${cy - 5.5} Q ${leftCx + 6.5} ${cy - 5.5} ${leftCx + 4} ${cy - 1} Z`}
+								fill={colors.blush}
+								filter="url(#neon-glow)"
+							/>
+							<path
+								d={`M ${rightCx} ${cy + 3} L ${rightCx - 4} ${cy - 1} Q ${rightCx - 6.5} ${cy - 5.5} ${rightCx - 3} ${cy - 5.5} Q ${rightCx} ${cy - 2.5} ${rightCx} ${cy - 2.5} Q ${rightCx} -2.5 ${rightCx + 3} ${cy - 5.5} Q ${rightCx + 6.5} ${cy - 5.5} ${rightCx + 4} ${cy - 1} Z`}
+								fill={colors.blush}
+								filter="url(#neon-glow)"
+							/>
+						</>
+					)
+				case "stars":
+					return (
+						<>
+							<path
+								d={`M ${leftCx} ${cy - 6.5} Q ${leftCx} ${cy} ${leftCx + 6} ${cy} Q ${leftCx} ${cy} ${leftCx} ${cy + 6.5} Q ${leftCx} ${cy} ${leftCx - 6} ${cy} Q ${leftCx} ${cy} ${leftCx} ${cy - 6.5} Z`}
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
+							<path
+								d={`M ${rightCx} ${cy - 6.5} Q ${rightCx} ${cy} ${rightCx + 6} ${cy} Q ${rightCx} ${cy} ${rightCx} ${cy + 6.5} Q ${rightCx} ${cy} ${rightCx - 6} ${cy} Q ${rightCx} ${cy} ${rightCx} ${cy - 6.5} Z`}
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
+						</>
+					)
+				case "sunglasses":
+					return (
+						<>
+							<path
+								d={`M 22 ${cy - 3} L 42 ${cy - 3} L 39 ${cy + 5} L 25 ${cy + 5} Z M 54 ${cy - 3} L 74 ${cy - 3} L 71 ${cy + 5} L 57 ${cy + 5} Z M 42 ${cy - 1} L 54 ${cy - 1}`}
+								stroke={colors.eyes}
+								strokeWidth="2.5"
+								fill="#09090b"
+								filter="url(#neon-glow)"
+							/>
+							<path
+								d={`M 26 ${cy - 1} L 38 ${cy - 1} M 58 ${cy - 1} L 70 ${cy - 1}`}
+								stroke="#ffffff"
+								strokeWidth="1.2"
+								opacity={0.6}
+							/>
+						</>
+					)
+				case "surprised":
+					return (
+						<>
+							<circle cx={leftCx} cy={cy} r="7" fill={colors.eyes} filter="url(#neon-glow)" />
+							<circle cx={rightCx} cy={cy} r="7" fill={colors.eyes} filter="url(#neon-glow)" />
+						</>
+					)
+				case "cheer":
+					return (
+						<>
+							<path
+								d={`M ${leftCx - 4.5} ${cy - 4} L ${leftCx + 3.5} ${cy} L ${leftCx - 4.5} ${cy + 4}`}
+								fill="none"
+								stroke={colors.eyes}
+								strokeWidth="4"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								filter="url(#neon-glow)"
+							/>
+							<path
+								d={`M ${rightCx + 4.5} ${cy - 4} L ${rightCx - 3.5} ${cy} L ${rightCx + 4.5} ${cy + 4}`}
+								fill="none"
+								stroke={colors.eyes}
+								strokeWidth="4"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								filter="url(#neon-glow)"
+							/>
+						</>
+					)
+				case "silly":
+					return (
+						<>
+							<path
+								d={`M ${leftCx - 5} ${cy} L ${leftCx + 5} ${cy}`}
+								stroke={colors.eyes}
+								strokeWidth="4.5"
+								strokeLinecap="round"
+								filter="url(#neon-glow)"
+							/>
+							<ellipse
+								cx={rightCx}
+								cy={cy}
+								rx="5.5"
+								ry="7.5"
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
+						</>
+					)
+				case "cat":
+					return (
+						<>
+							<path
+								d={`M ${leftCx - 5} ${cy + 2} L ${leftCx} ${cy - 3.5} L ${leftCx + 5} ${cy + 2}`}
+								fill="none"
+								stroke={colors.eyes}
+								strokeWidth="4"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								filter="url(#neon-glow)"
+							/>
+							<path
+								d={`M ${rightCx - 5} ${cy + 2} L ${rightCx} ${cy - 3.5} L ${rightCx + 5} ${cy + 2}`}
+								fill="none"
+								stroke={colors.eyes}
+								strokeWidth="4"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								filter="url(#neon-glow)"
+							/>
+						</>
+					)
+				case "fire":
+				case "hyped":
+					return (
+						<>
+							<path
+								d={`M ${leftCx + 1} ${cy - 5.5} L ${leftCx - 3.5} ${cy} L ${leftCx + 1} ${cy} L ${leftCx - 1} ${cy + 5.5} L ${leftCx + 3.5} ${cy} L ${leftCx - 1} ${cy} Z`}
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
+							<path
+								d={`M ${rightCx + 1} ${cy - 5.5} L ${rightCx - 3.5} ${cy} L ${rightCx + 1} ${cy} L ${rightCx - 1} ${cy + 5.5} L ${rightCx + 3.5} ${cy} L ${rightCx - 1} ${cy} Z`}
+								fill={colors.eyes}
+								filter="url(#neon-glow)"
+							/>
+						</>
+					)
+			}
 		}
 
 		if (activeState === "error") {
@@ -565,8 +763,9 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 		return (
 			<div
 				ref={containerRef}
-				className="relative cursor-pointer active:scale-95 transition-transform"
-				onClick={handleClick}>
+				className="relative cursor-pointer active:scale-95 transition-transform select-none"
+				onClick={handleClick}
+				title={clickQuote || "Mirror VS mascot — click for reactions!"}>
 				<style>{`
 					@keyframes mirror-float-z {
 						0% { transform: translateY(0px) scale(0.6); opacity: 0; }
@@ -577,6 +776,11 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 						animation: mirror-float-z 2s ease-in-out infinite;
 					}
 				`}</style>
+				{activeClickExpression && clickQuote && (
+					<div className="absolute top-full left-0 mt-1 z-50 pointer-events-none whitespace-nowrap bg-purple-900/95 text-purple-100 text-[10px] font-mono px-2.5 py-1 rounded-full shadow-2xl border border-purple-400/50 animate-bounce">
+						{clickQuote}
+					</div>
+				)}
 				{activeState === "sleeping" && (
 					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
 						<span
@@ -692,9 +896,9 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 				}
 			`}</style>
 
-			{isHovered && size === "normal" && (
-				<div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap bg-purple-900/90 text-purple-100 text-[10.5px] font-mono px-3 py-1 rounded-full shadow-xl border border-purple-400/40 animate-bounce">
-					{FUNNY_DEVELOPER_QUOTES[quoteIndex % FUNNY_DEVELOPER_QUOTES.length]}
+			{(isHovered || (activeClickExpression && clickQuote)) && size === "normal" && (
+				<div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap bg-purple-900/95 text-purple-100 text-[10.5px] font-mono px-3 py-1 rounded-full shadow-2xl border border-purple-400/50 animate-bounce">
+					{clickQuote || FUNNY_DEVELOPER_QUOTES[quoteIndex % FUNNY_DEVELOPER_QUOTES.length]}
 				</div>
 			)}
 

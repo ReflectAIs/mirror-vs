@@ -47,6 +47,7 @@ import { Markdown } from "./Markdown"
 import { CommandExecution } from "./CommandExecution"
 import { CommandExecutionError } from "./CommandExecutionError"
 import { TerminalCallbackNudge } from "./TerminalCallbackNudge"
+import { MIRROR_LOGO_DATA_URI } from "@/assets/logoData"
 import { AutoApprovedRequestLimitWarning } from "./AutoApprovedRequestLimitWarning"
 import { InProgressRow, CondensationResultRow, CondensationErrorRow, TruncationResultRow } from "./context-management"
 import CodebaseSearchResultsDisplay from "./CodebaseSearchResultsDisplay"
@@ -1429,8 +1430,8 @@ export const ChatRowContent = ({
 					return (
 						<div className="group my-2 p-1 transition-all">
 							<div className="flex items-center gap-2 mb-1.5">
-								<div className="size-5 rounded-full bg-gradient-to-tr from-mirror-brand-from/20 to-mirror-brand-to/20 flex items-center justify-center text-mirror-brand-via shrink-0">
-									<Sparkles className="size-3 animate-pulse" aria-label="Sparkles icon" />
+								<div className="size-6.5 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+									<img src={MIRROR_LOGO_DATA_URI} alt="Mirror VS" className="size-6 object-contain" />
 								</div>
 								<span className="text-xs font-bold bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent">
 									{t("chat:text.mirrorSaid")}
