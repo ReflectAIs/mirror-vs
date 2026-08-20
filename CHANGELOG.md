@@ -6,12 +6,19 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Added
 
-- **Cross-Workspace Sessions & Chat Branching**: Users can now branch/fork an active chat from one workspace into another workspace folder seamlessly without losing valuable architectural and conversation context.
+- **Cross-Workspace Sessions & Chat Branching**: Users can now branch/fork an active chat or past history item into another workspace folder seamlessly without losing valuable architectural and conversation context, with an interactive choice prompt in Task History.
+- **Reactive Terminal Background Completion**: Added automatic background process completion callbacks to wake up the model via `task.injectInBetweenMessage()` when long-running terminal processes exit.
 - **Fireworks AI Token Loop Breaker**: Real-time `StreamDegenerationDetector` that intercepts infinite single-token and n-gram phrase repetition loops during streaming, plus frequency and presence penalties for Fireworks inference.
 - **Session Tutorial & Shared Context Inspector**: Interactive tutorial modal on how Sessions and SubSession Tabs work, plus an Inspector dialog showing shared notes and sibling tab summaries.
 - **In-Between Message Steering**: When tasks are streaming, queued messages can be force-sent to steer the model mid-execution.
 - **Super-Cute Mascot Expressions & Polish**: Expanded lively Kaomoji micro-expressions, reactive animations, and developer humor across status modes.
-- **Firebase & CLI Loop Breakers**: Enhanced repetition detector and execution prompt to prevent models from looping on repeated failing or interactive CLI commands like Firebase.
+- **Firebase & CLI Loop Breakers**: Enhanced repetition detector and execution prompt to prevent models from looping on repeated failing or interactive CLI commands like Firebase, with exemptions for polling utilities (`sleep`, `echo`, `cat`, `ps`).
+
+### Fixed
+
+- **Session Tab Isolation & Dynamic Header Title**: Fixed TabBar scoping so switching sessions cleanly isolates tabs to the active session and dynamically updates the session header title in the chat toolbar.
+- **Terminal Run/Deny Button Suppression**: Suppressed unnecessary Run/Deny action buttons when a terminal command has already started running and is streaming output.
+- **File Changes Panel Height & Scroll**: Added a `max-h-[300px]` height boundary with vertical scroll in the file changes panel to prevent expanded diffs from taking up the entire screen.
 
 ### Changed
 

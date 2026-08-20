@@ -27,7 +27,7 @@ import { isRetiredProvider, type ProviderName, type RouterModels } from "@mirror
 
 import { findLast, findLastIndex } from "@shared/array"
 import { combineApiRequests } from "@shared/combineApiRequests"
-import { combineCommandSequences } from "@shared/combineCommandSequences"
+import { combineCommandSequences, COMMAND_OUTPUT_STRING } from "@shared/combineCommandSequences"
 import { getApiMetrics } from "@shared/getApiMetrics"
 import { getAllModes } from "@shared/modes"
 import { ProfileValidator } from "@shared/ProfileValidator"
@@ -581,13 +581,23 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 									break
 							}
 							break
-						case "command":
-							setSendingDisabled(isPartial)
-							setMirrorAsk("command")
-							setEnableButtons(!isPartial)
-							setPrimaryButtonText(t("chat:runCommand.title"))
-							setSecondaryButtonText(t("chat:reject.title"))
+						case "command": {
+							const isExecuting = lastMessage.text?.includes(COMMAND_OUTPUT_STRING)
+							if (isExecuting) {
+								setSendingDisabled(false)
+								setMirrorAsk(undefined)
+								setEnableButtons(false)
+								setPrimaryButtonText(undefined)
+								setSecondaryButtonText(undefined)
+							} else {
+								setSendingDisabled(isPartial)
+								setMirrorAsk("command")
+								setEnableButtons(!isPartial)
+								setPrimaryButtonText(t("chat:runCommand.title"))
+								setSecondaryButtonText(t("chat:reject.title"))
+							}
 							break
+						}
 						case "command_output":
 							setSendingDisabled(false)
 							setMirrorAsk("command_output")

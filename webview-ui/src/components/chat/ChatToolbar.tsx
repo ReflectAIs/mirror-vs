@@ -59,7 +59,10 @@ const ChatToolbar = ({
 	currentSessionId,
 	sessionNames,
 }: ChatToolbarProps) => {
-	const activeSessionName = currentSessionId ? (sessionNames?.[currentSessionId] ?? "New Session") : "New Session"
+	const activeSessionName = currentSessionId
+		? sessionNames?.[currentSessionId] ||
+			(currentTaskItem?.task ? currentTaskItem.task.slice(0, 40) : "New Session")
+		: "New Session"
 
 	const [isEditingSession, setIsEditingSession] = useState(false)
 	const [editingSessionName, setEditingSessionName] = useState("")

@@ -1350,6 +1350,11 @@ export class MirrorProvider
 			)
 		}
 
+		if (historyItem.sessionId && !options?.skipGlobalStateChanges) {
+			this.setCurrentSessionId(historyItem.sessionId)
+			await this.contextProxy.setValue("currentSessionId", historyItem.sessionId)
+		}
+
 		const { apiConfiguration, enableCheckpoints, checkpointTimeout, experiments } = await this.getState()
 
 		const task = new Task({
@@ -1690,6 +1695,13 @@ export class MirrorProvider
 			return
 		}
 
+		const { historyItem } = await this.getTaskWithId(id)
+
+		if (historyItem.sessionId) {
+			this.setCurrentSessionId(historyItem.sessionId)
+			await this.contextProxy.setValue("currentSessionId", historyItem.sessionId)
+		}
+
 		// Check if this task is already running in the background
 		if (this.backgroundTasks.has(id)) {
 			// Swap focus: park current → focus background task
@@ -1699,11 +1711,11 @@ export class MirrorProvider
 			await this.parkCurrentTask()
 
 			// Create a fresh task from history for the requested chat
-			const { historyItem } = await this.getTaskWithId(id)
 			await this.createTaskWithHistoryItem(historyItem)
 		}
 
 		await this.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
+		await this.postStateToWebview()
 	}
 
 	/**

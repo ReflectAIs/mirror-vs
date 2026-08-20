@@ -161,7 +161,7 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 				)}
 			</div>
 			<CollapsibleContent>
-				<div className="flex flex-col gap-1 pb-2 pl-6">
+				<div className="flex flex-col gap-1 pb-2 pl-6 max-h-[300px] overflow-y-auto pr-1">
 					{Array.from(byPath.entries()).map(([path, entries]) => {
 						const originalContent = entries[0].originalContent
 						const lookupPath = path.startsWith("./") ? path.slice(2) : path

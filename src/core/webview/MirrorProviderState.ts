@@ -269,8 +269,13 @@ export class StateManager {
 			}
 		}
 
-		// Build tabs array from all live tasks
-		const allTasks = this.provider.getAllTasksSorted()
+		// Build tabs array from live tasks belonging to the active session
+		const activeSessionId = currentTask?.sessionId || this.provider.getCurrentSessionId() || currentSessionId
+
+		const allTasks = this.provider.getAllTasksSorted().filter((task) => {
+			// Only show tabs for the active session
+			return activeSessionId ? task.sessionId === activeSessionId : true
+		})
 		const tabs: TabInfo[] = allTasks.map((task) => {
 			// Determine hasPendingApproval — task has an ask that's pending user response
 			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
@@ -461,7 +466,7 @@ export class StateManager {
 					type: "ssh" as const,
 				})),
 			],
-			currentSessionId,
+			currentSessionId: activeSessionId || currentSessionId,
 			sessionNames: sessionNames ?? {},
 			taskNames: taskNames ?? {},
 			sessionNotes,
