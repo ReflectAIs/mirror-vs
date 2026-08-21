@@ -149,6 +149,8 @@ export type NativeToolArgs = {
 	get_workspace_file_tree: Record<string, never>
 	get_workspace_pulse: Record<string, never>
 	get_git_status: { maxFiles?: number }
+	search_mcp_tools: { query?: string }
+	activate_mcp_tool: { server_name: string; tool_name: string }
 	// Session shared context (intersession context sharing)
 	read_session_context: { scope?: "siblings" | "knowledge" | "notes" | "all" }
 	// Add more tools as they are migrated to native protocol

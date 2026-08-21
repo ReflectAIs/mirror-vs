@@ -765,6 +765,38 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "get_workspace_file_tree":
+			case "get_workspace_pulse":
+				nativeArgs = {}
+				break
+
+			case "get_git_status":
+				nativeArgs = {
+					maxFiles: partialArgs.maxFiles,
+				}
+				break
+
+			case "search_mcp_tools":
+				nativeArgs = {
+					query: partialArgs.query,
+				}
+				break
+
+			case "activate_mcp_tool":
+				if (partialArgs.server_name !== undefined || partialArgs.tool_name !== undefined) {
+					nativeArgs = {
+						server_name: partialArgs.server_name,
+						tool_name: partialArgs.tool_name,
+					}
+				}
+				break
+
+			case "read_session_context":
+				nativeArgs = {
+					scope: partialArgs.scope,
+				}
+				break
+
 			default:
 				break
 		}
@@ -1241,6 +1273,38 @@ export class NativeToolCallParser {
 							value: args.value,
 						} as NativeArgsFor<TName>
 					}
+					break
+
+				case "get_workspace_file_tree":
+				case "get_workspace_pulse":
+					nativeArgs = {} as NativeArgsFor<TName>
+					break
+
+				case "get_git_status":
+					nativeArgs = {
+						maxFiles: args.maxFiles,
+					} as NativeArgsFor<TName>
+					break
+
+				case "search_mcp_tools":
+					nativeArgs = {
+						query: args.query,
+					} as NativeArgsFor<TName>
+					break
+
+				case "activate_mcp_tool":
+					if (args.server_name !== undefined && args.tool_name !== undefined) {
+						nativeArgs = {
+							server_name: args.server_name,
+							tool_name: args.tool_name,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "read_session_context":
+					nativeArgs = {
+						scope: args.scope,
+					} as NativeArgsFor<TName>
 					break
 
 				default:
