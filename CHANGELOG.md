@@ -2,6 +2,19 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.3] - 2026-08-21
+
+### Added
+
+- **One-Click Codebase Indexing Auto-Setup**: Clicking the ⚡ One-Click Auto-Setup button in the Code Index panel now automatically downloads and starts the local Qdrant vector database with zero manual prerequisites — the local DB is bootstrapped on demand and the index begins immediately.
+
+### Fixed
+
+- **Code Index Startup Crash (`fd: null` stdio)**: Fixed a crash that occurred during codebase indexing initialization where spawning the local Qdrant process with a `WriteStream` whose file descriptor was still `null` (not yet opened) caused `TypeError: The argument 'stdio' is invalid`. The fix awaits the stream's `open` event before spawning so the fd is always valid; falls back to `"ignore"` if the log file can't be created.
+- **Missing `nativeArgs` for Parameter-less Tools**: Tools that take no required parameters (`get_workspace_file_tree`, `get_workspace_pulse`) and tools with all-optional parameters (`get_git_status`, `read_session_context`, `search_mcp_tools`) were incorrectly failing with `Invalid tool call: missing nativeArgs` when called by some LLMs (e.g. Fireworks DeepSeek) that stream empty argument payloads. Added explicit parser cases in `NativeToolCallParser` for all six affected tools so they default to `{}` instead of crashing.
+- **First Message Edit via Enter Key**: Fixed the first-message edit mode in `TaskHeader` where pressing Enter did not submit — only clicking the send button did. Added an explicit early-return for `isEditMode` in the `handleKeyDown` handler.
+- **Message Queue During Tool Execution**: Fixed a race condition where messages typed while the model was executing a tool call (reading files, running commands) would bypass the queue and interrupt the active tool instead of being deferred. Messages are now always queued when `isStreaming` is `true`.
+
 ## [0.7.2] - 2026-08-21
 
 ### Added
