@@ -4,6 +4,11 @@ import * as path from "path"
 import { diffLines } from "../utils/diff"
 import { revertCheckpoint } from "../utils/editor-utils"
 
+export interface DeletedLineInfo {
+	proposedLineIndex: number
+	originalText: string
+}
+
 export interface ActiveReview {
 	filePath: string
 	originalContent: string
@@ -13,6 +18,7 @@ export interface ActiveReview {
 	checkpointId?: string
 	addedLineIndices: number[]
 	removedLineIndices: number[]
+	deletedLinesInfo?: DeletedLineInfo[]
 	resolve: (accepted: boolean) => void
 }
 
@@ -39,24 +45,19 @@ export class ReviewManager implements vscode.CodeLensProvider {
 	private _nextStatusBarItem: vscode.StatusBarItem | undefined
 
 	private _addedDecorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: "rgba(74, 137, 74, 0.15)", // Glassmorphic green highlight
+		backgroundColor: "rgba(74, 137, 74, 0.15)",
 		isWholeLine: true,
 		overviewRulerColor: "rgba(74, 137, 74, 0.6)",
 		overviewRulerLane: vscode.OverviewRulerLane.Left,
 	})
 
 	private _deletedDecorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: "rgba(239, 68, 68, 0.15)", // Glassmorphic red highlight
-		isWholeLine: true,
-		overviewRulerColor: "rgba(239, 68, 68, 0.6)",
-		overviewRulerLane: vscode.OverviewRulerLane.Left,
 		gutterIconPath: vscode.Uri.parse(
 			'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" stroke="%23ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>',
 		),
 		gutterIconSize: "contain",
-		borderWidth: "1px 0 0 0",
-		borderStyle: "solid",
-		borderColor: "rgba(239, 68, 68, 0.8)",
+		overviewRulerColor: "rgba(239, 68, 68, 0.6)",
+		overviewRulerLane: vscode.OverviewRulerLane.Left,
 	})
 
 	public getActiveReviewsCount(): number {
@@ -569,21 +570,10 @@ export class ReviewManager implements vscode.CodeLensProvider {
 		this._onDidChangeActiveReviews.fire()
 		this.updateStatusBar()
 
-		// Apply decorations to all visible editors showing this file
-		for (const editor of vscode.window.visibleTextEditors) {
-			if (this.normalizePath(editor.document.uri.fsPath) === normPath) {
-				this.applyDecorations(editor)
-			}
-		}
-
-		// Open the file in the editor with decorations (preserve focus)
-		vscode.workspace.openTextDocument(filePath).then(
-			(doc) => {
-				vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
-					this.applyDecorations(editor)
-				})
-			},
+		// Automatically open the visual side-by-side/inline diff editor (vscode.diff)
+		vscode.commands.executeCommand("mirror-vs.diffReview", filePath).then(
 			() => {},
+			(err) => console.warn("Failed to automatically open visual diff in showReviewDecorations:", err),
 		)
 
 		// Show non-blocking notification toast

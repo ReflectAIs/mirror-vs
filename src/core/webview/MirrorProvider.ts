@@ -1848,9 +1848,11 @@ export class MirrorProvider
 			await this.performPreparationTasks(task)
 
 			// Start the focused restored task to show Resume banner and accept messages
-			task.startRestoredTask().catch((error) => {
+			try {
+				await task.startRestoredTask()
+			} catch (error) {
 				this.log(`[restoreSessionTabs] Failed to start restored active task: ${error}`)
-			})
+			}
 
 			this.log(
 				`[restoreSessionTabs] Restored ${restoredTasks.length + 1} tabs (${restoredTasks.length} background + 1 focused) for session ${sessionId}`,

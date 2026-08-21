@@ -303,6 +303,8 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		onUserExpandedRow,
 	} = options
 
+	const { activeTerminals = [] } = useExtensionState()
+
 	// ── Constants ──
 	const [audioBaseUri] = useState(() => {
 		return (window as unknown as { AUDIO_BASE_URI?: string }).AUDIO_BASE_URI || ""
@@ -583,7 +585,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 							break
 						case "command": {
 							const isExecuting = lastMessage.text?.includes(COMMAND_OUTPUT_STRING)
-							if (isExecuting) {
+							// Check if the command is currently in the active terminals list to prevent showing buttons after start
+							const cmdStr = lastMessage.text || ""
+							const isCurrentlyRunning =
+								activeTerminals.some((t) => t.command && cmdStr.includes(t.command)) || isExecuting
+
+							if (isCurrentlyRunning) {
 								setSendingDisabled(false)
 								setMirrorAsk(undefined)
 								setEnableButtons(false)
@@ -675,7 +682,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					break
 			}
 		}
-	}, [lastMessage, secondLastMessage])
+	}, [lastMessage, secondLastMessage, activeTerminals])
 
 	// Update button text when messages change for subtasks in resume_task state
 	useEffect(() => {

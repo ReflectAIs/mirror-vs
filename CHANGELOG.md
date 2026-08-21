@@ -2,6 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.2] - 2026-08-21
+
+### Added
+
+- **Automatic Visual Diff Review Tab**: Integrated automatic visual diff editor (`vscode.diff`) for proposed file modifications so deletions and additions are cleanly rendered in side-by-side / inline red and green views without overlapping or offset text decorations.
+
+### Fixed
+
+- **Sidebar Live Run/Deny Button Visibility**: Synchronized `activeTerminals` execution state with deep-compare effect dependencies in `useChatMessages` to ensure interactive terminal buttons disappear immediately when autonomous commands start executing.
+- **Startup Blank Chat View on Session Restore**: Awaited `task.startRestoredTask()` before webview state posting to resolve intermittent blank chat panel loading on extension restart.
+- **Diff Editor Line Alignment**: Cleaned up inline file review decorations to eliminate spurious red background tinting across unaffected code lines.
+
 ## [0.7.1] - 2026-08-20
 
 ### Added
