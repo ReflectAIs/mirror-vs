@@ -787,7 +787,8 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (!(inputValue.trim() || selectedImages.length > 0)) {
 			return false
 		}
-		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command" && mirrorAsk !== "command_output"
+		const isRespondingToAsk =
+			!isStreaming && mirrorAsk !== undefined && mirrorAsk !== "command" && mirrorAsk !== "command_output"
 		if (isRespondingToAsk) {
 			return false
 		}
@@ -879,6 +880,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				}
 
 				const isRespondingToAsk =
+					!isStreaming &&
 					mirrorAskRef.current !== undefined &&
 					mirrorAskRef.current !== "command" &&
 					mirrorAskRef.current !== "command_output"
