@@ -291,17 +291,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		acceptInput: () => {
 			const hasInput = inputValue.trim() || selectedImages.length > 0
 
-			// Special case: during command_output, queue the message
-			if (mirrorAskRef.current === "command_output" && hasInput) {
-				vscode.postMessage({ type: "queueMessage", text: inputValue.trim(), images: selectedImages })
-				setInputValue("")
-				setSelectedImages([])
-				return
-			}
-
-			if (enableButtons && primaryButtonText) {
+			if (enableButtons && primaryButtonText && mirrorAskRef.current !== "command_output") {
 				handlePrimaryButtonClick(inputValue, selectedImages)
-			} else if (!sendingDisabled && !isProfileDisabled && hasInput) {
+			} else if (!isProfileDisabled && hasInput) {
 				handleSendMessage(inputValue, selectedImages)
 			}
 		},

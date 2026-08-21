@@ -787,8 +787,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (!(inputValue.trim() || selectedImages.length > 0)) {
 			return false
 		}
-		const isRespondingToAsk =
-			!isStreaming && mirrorAsk !== undefined && mirrorAsk !== "command" && mirrorAsk !== "command_output"
+		const isRespondingToAsk = !isStreaming && mirrorAsk !== undefined && mirrorAsk !== "command"
 		if (isRespondingToAsk) {
 			return false
 		}
@@ -880,10 +879,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				}
 
 				const isRespondingToAsk =
-					!isStreaming &&
-					mirrorAskRef.current !== undefined &&
-					mirrorAskRef.current !== "command" &&
-					mirrorAskRef.current !== "command_output"
+					!isStreaming && mirrorAskRef.current !== undefined && mirrorAskRef.current !== "command"
 				// If the chat is empty (first message in a new tab), never queue —
 				// send directly as a newTask. The queue check below can false-positive
 				// because handleChatReset() sets sendingDisabled=true when the idle
@@ -933,6 +929,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 						case "followup":
 						case "tool":
 						case "command":
+						case "command_output":
 						case "use_mcp_server":
 						case "completion_result":
 						case "resume_task":

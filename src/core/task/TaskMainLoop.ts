@@ -1201,22 +1201,29 @@ export class TaskMainLoop {
 						(block) => block.type === "tool_use" || block.type === "mcp_tool_use",
 					)
 
+					const isBackgroundRunning = this.task.terminalProcess !== undefined
 					if (!didToolUse) {
-						// Increment consecutive no-tool-use counter
-						this.task.consecutiveNoToolUseCount++
+						// If background commands are running or model was conversing/answering without tools,
+						// don't force a tool error loop. Let the model wait or complete the turn.
+						if (isBackgroundRunning || this.task.consecutiveNoToolUseCount >= 1) {
+							this.task.consecutiveNoToolUseCount = 0
+						} else {
+							// Increment consecutive no-tool-use counter
+							this.task.consecutiveNoToolUseCount++
 
-						// Only show error and count toward mistake limit after 2 consecutive failures
-						if (this.task.consecutiveNoToolUseCount >= 2) {
-							await this.task.say("error", "MODEL_NO_TOOLS_USED")
-							// Only count toward mistake limit after second consecutive failure
-							this.task.consecutiveMistakeCount++
+							// Only show error and count toward mistake limit after 2 consecutive failures
+							if (this.task.consecutiveNoToolUseCount >= 2) {
+								await this.task.say("error", "MODEL_NO_TOOLS_USED")
+								// Only count toward mistake limit after second consecutive failure
+								this.task.consecutiveMistakeCount++
+							}
+
+							// Use the task's locked protocol for consistent behavior
+							this.task.userMessageContent.push({
+								type: "text",
+								text: formatResponse.noToolsUsed(),
+							})
 						}
-
-						// Use the task's locked protocol for consistent behavior
-						this.task.userMessageContent.push({
-							type: "text",
-							text: formatResponse.noToolsUsed(),
-						})
 					} else {
 						// Reset counter when tools are used successfully
 						this.task.consecutiveNoToolUseCount = 0
@@ -1333,8 +1340,8 @@ export class TaskMainLoop {
 					}
 				}
 
-				// If we reach here without continuing, return false (will always be false for now)
-				return false
+				// If we reach here without continuing, return true (turn ended normally)
+				return true
 			} catch (error) {
 				// This should never happen since the only thing that can throw an
 				// error is the attemptApiRequest, which is wrapped in a try catch
@@ -1346,7 +1353,7 @@ export class TaskMainLoop {
 			}
 		}
 
-		// If we exit the while loop normally (stack is empty), return false
-		return false
+		// If we exit the while loop normally (stack is empty), return true (turn ended normally)
+		return true
 	}
 }
