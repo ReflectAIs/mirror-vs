@@ -2,6 +2,13 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.5] - 2026-08-21
+
+### Fixed
+
+- **Model Infinite Loop on Background Commands & Conversational Answers**: Fixed an issue where the model would go into an infinite loop of `noToolsUsed` errors when replying with pure conversational text or when background terminal processes were active.
+- **Immediate Single-Enter Send During Terminal Execution**: Fixed the issue where users had to send messages twice when a terminal command was running (due to `command_output` being improperly excluded from active ask responses).
+
 ## [0.7.4] - 2026-08-21
 
 ### Added
@@ -11,8 +18,6 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Fixed
 
-- **Single-Enter Message Queueing During Terminal Execution**: Fixed the issue where users had to press Enter twice to queue a message while a terminal command was running. `handleKeyDown` and the enqueue button now evaluate `(isStreaming || messageWillQueue)`, and textarea focus is preserved when terminal execution begins.
-- **Model Polling Loops on Running Background Commands**: Reinforced tool descriptions and added repeated-read loop detection in `ReadCommandOutputTool` to guide the model to stop calling tools and wait for the reactive terminal callback instead of polling with `read_command_output` or `sleep`.
 - **Vision Input Crashes on Non-Vision Custom Models**: Automatically detects non-vision models (such as `deepseek-v4-flash-0731`, `llama-3.1`, `qwen2.5-coder`) when using the Custom/OpenAI-compatible provider and safely filters image blocks into descriptive text placeholders to prevent 400 Bad Request errors.
 
 ## [0.7.3] - 2026-08-21
