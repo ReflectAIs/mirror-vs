@@ -1483,6 +1483,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		[isHidden, sendingDisabled, enableButtons],
 	)
 
+	// Ensure textarea remains focused when a command starts outputting / enters background queue mode
+	useEffect(() => {
+		if (mirrorAsk === "command_output" && !isHidden) {
+			textAreaRef.current?.focus()
+		}
+	}, [mirrorAsk, isHidden])
+
 	// TTS effect
 	useEffect(() => {
 		if (lastMessage && messages.length > 1) {

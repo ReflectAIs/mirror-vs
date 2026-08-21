@@ -2,6 +2,19 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.4] - 2026-08-21
+
+### Added
+
+- **One-Step Ollama Auto-Setup**: Automatically downloads and pulls the required embedding model (`nomic-embed-text`) via the local Ollama instance during One-Click Auto-Setup if not already installed, complete with VS Code progress status.
+- **10-Minute Background Process Alert**: Automatically wakes up the model with a progress notice if a long-running detached background terminal process continues running past 10 minutes.
+
+### Fixed
+
+- **Single-Enter Message Queueing During Terminal Execution**: Fixed the issue where users had to press Enter twice to queue a message while a terminal command was running. `handleKeyDown` and the enqueue button now evaluate `(isStreaming || messageWillQueue)`, and textarea focus is preserved when terminal execution begins.
+- **Model Polling Loops on Running Background Commands**: Reinforced tool descriptions and added repeated-read loop detection in `ReadCommandOutputTool` to guide the model to stop calling tools and wait for the reactive terminal callback instead of polling with `read_command_output` or `sleep`.
+- **Vision Input Crashes on Non-Vision Custom Models**: Automatically detects non-vision models (such as `deepseek-v4-flash-0731`, `llama-3.1`, `qwen2.5-coder`) when using the Custom/OpenAI-compatible provider and safely filters image blocks into descriptive text placeholders to prevent 400 Bad Request errors.
+
 ## [0.7.3] - 2026-08-21
 
 ### Added

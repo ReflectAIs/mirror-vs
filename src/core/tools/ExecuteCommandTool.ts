@@ -449,8 +449,25 @@ export async function executeCommandInTerminal(
 	})
 
 	let hasEmittedBackgroundCompletion = false
+	const BACKGROUND_NOTICE_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+	let backgroundNoticeTimer: NodeJS.Timeout | undefined
+
+	const startBackgroundNoticeTimer = () => {
+		if (backgroundNoticeTimer || completed || hasEmittedBackgroundCompletion) return
+		backgroundNoticeTimer = setTimeout(() => {
+			if (!completed && !hasEmittedBackgroundCompletion && !task.abandoned) {
+				const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
+				const notice = `[Terminal Notice: Background process for '${command}' in '${currentWorkingDir}' has been running for 10 minutes. It is still active.]`
+				void task.injectInBetweenMessage(notice, undefined, "terminal_callback")
+			}
+		}, BACKGROUND_NOTICE_TIMEOUT_MS)
+	}
 
 	const checkAndNotifyBackgroundCompletion = () => {
+		if (backgroundNoticeTimer) {
+			clearTimeout(backgroundNoticeTimer)
+			backgroundNoticeTimer = undefined
+		}
 		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
 			return
 		}
@@ -498,6 +515,7 @@ export async function executeCommandInTerminal(
 			try {
 				const { response, text, images } = await task.ask("command_output", "")
 				runInBackground = true
+				startBackgroundNoticeTimer()
 
 				if (response === "messageResponse") {
 					message = { text, images }
@@ -578,6 +596,7 @@ export async function executeCommandInTerminal(
 				new Promise<void>((resolve) => {
 					agentTimeoutId = setTimeout(() => {
 						runInBackground = true
+						startBackgroundNoticeTimer()
 						process.continue()
 						task.supersedePendingAsk()
 						resolve()
@@ -703,7 +722,7 @@ export async function executeCommandInTerminal(
 			[
 				`Command is running in background in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
 				result.length > 0 ? `Output so far:\n${result}\n` : "\n",
-				"The terminal callback will automatically notify and wake you up when the command finishes. Do NOT run sleep, wait, or echo polling commands. Proceed with other work or patiently wait.",
+				"IMPORTANT: The command has moved to the background. The terminal callback will automatically notify and wake you up when the command finishes. If you have no other independent tasks to perform right now, END YOUR TURN IMMEDIATELY WITHOUT CALLING ANY TOOLS. Do NOT call read_command_output, sleep, or check on the terminal in a loop — wait patiently for the callback.",
 			].join("\n"),
 		]
 	}

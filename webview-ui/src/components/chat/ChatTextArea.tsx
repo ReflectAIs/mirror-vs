@@ -536,7 +536,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						}
 						return
 					}
-					const sendAction = isStreaming && onEnqueueMessage ? onEnqueueMessage : onSend
+					const sendAction = (isStreaming || messageWillQueue) && onEnqueueMessage ? onEnqueueMessage : onSend
 					if (enterBehavior === "newline") {
 						// New behavior: Enter = newline, Shift+Enter or Ctrl+Enter = send
 						if (event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -1282,7 +1282,11 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 														: t("chat:pressToSend", { keyCombination: sendKeyCombination })
 											}
 											disabled={!isStreaming && !hasInputContent}
-											onClick={isStreaming && onEnqueueMessage ? onEnqueueMessage : onSend}
+											onClick={
+												(isStreaming || messageWillQueue) && onEnqueueMessage
+													? onEnqueueMessage
+													: onSend
+											}
 											className={cn(
 												"relative inline-flex items-center justify-center",
 												"bg-transparent border-none p-1.5",
