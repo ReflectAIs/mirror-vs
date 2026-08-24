@@ -259,16 +259,21 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
 	const currentTask = provider.getCurrentTask()
 	if (currentTask) {
-		if (
-			!currentTask.isStreaming &&
-			!currentTask.idleAsk &&
-			!currentTask.resumableAsk &&
-			!currentTask.interactiveAsk &&
-			!(currentTask as any)._started
-		) {
+		const hasPendingAsk =
+			currentTask.idleAsk !== undefined ||
+			currentTask.resumableAsk !== undefined ||
+			currentTask.interactiveAsk !== undefined
+
+		if (hasPendingAsk) {
+			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+		} else if (!(currentTask as any)._started) {
 			await currentTask.startWithContent(resolved.text, resolved.images)
 		} else {
-			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+			// If task is started and has no active ask (e.g. background terminal running),
+			// inject as an in-between steering message so the model receives and considers it immediately.
+			if (resolved.text || (resolved.images && resolved.images.length > 0)) {
+				await currentTask.injectInBetweenMessage(resolved.text ?? "", resolved.images, "user_feedback")
+			}
 		}
 	}
 }

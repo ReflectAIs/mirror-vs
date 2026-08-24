@@ -2,6 +2,12 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.6] - 2026-08-24
+
+### Fixed
+
+- **Terminal Background Steering Fix**: Fixed an issue where sending messages while a terminal process was running in the background would be silently dropped or ignored by the model. Messages sent without an active pending ask are now automatically injected as in-between steering feedback so the model processes them immediately.
+
 ## [0.7.5] - 2026-08-24
 
 ### Added
