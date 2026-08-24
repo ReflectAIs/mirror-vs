@@ -477,6 +477,13 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "sleep":
+				nativeArgs = {
+					seconds: typeof partialArgs.seconds === "number" ? partialArgs.seconds : undefined,
+					reason: typeof partialArgs.reason === "string" ? partialArgs.reason : undefined,
+				}
+				break
+
 			case "write_to_file":
 				if (partialArgs.path || partialArgs.content) {
 					nativeArgs = {
@@ -964,6 +971,13 @@ export class NativeToolCallParser {
 							timeout: args.timeout,
 						} as NativeArgsFor<TName>
 					}
+					break
+
+				case "sleep":
+					nativeArgs = {
+						seconds: typeof args.seconds === "number" ? args.seconds : undefined,
+						reason: typeof args.reason === "string" ? args.reason : undefined,
+					} as NativeArgsFor<TName>
 					break
 
 				case "apply_diff":

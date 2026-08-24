@@ -58,6 +58,7 @@ import { gitHubSearchTool } from "../tools/GitHubSearchTool"
 import { docsSearchTool } from "../tools/DocsSearchTool"
 import { packageSearchTool } from "../tools/PackageSearchTool"
 import { readUrlTool } from "../tools/ReadUrlTool"
+import { sleepTool } from "../tools/SleepTool"
 import { checkpointSave } from "../checkpoints"
 
 import { formatResponse } from "../prompts/responses"
@@ -78,6 +79,7 @@ const READ_TOOLS = new Set([
 	"package_search",
 	"codebase_search",
 	"read_url",
+	"sleep",
 	"get_workspace_file_tree",
 	"get_workspace_pulse",
 	"get_git_status",
@@ -912,6 +914,13 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "ssh_session":
 					await sshSessionTool.handle(mirror, block as ToolUse<"ssh_session">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "sleep":
+					await sleepTool.handle(mirror, block as ToolUse<"sleep">, {
 						askApproval,
 						handleError,
 						pushToolResult,
