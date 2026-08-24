@@ -259,12 +259,21 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
 	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
+		const lastMsg = currentTask.mirrorMessages?.at(-1)
+		const isWaitingOnAsk = lastMsg?.type === "ask" && currentTask.askResponse === undefined
+		const isButtonResponse = message.askResponse === "yesButtonClicked" || message.askResponse === "noButtonClicked"
 		const hasPendingAsk =
 			currentTask.idleAsk !== undefined ||
 			currentTask.resumableAsk !== undefined ||
 			currentTask.interactiveAsk !== undefined
 
-		if (hasPendingAsk || !currentTask.startWithContent) {
+		console.log(
+			`[handleAskResponse] taskId=${currentTask.taskId} askResponse=${message.askResponse} ` +
+				`isWaitingOnAsk=${isWaitingOnAsk} isButtonResponse=${isButtonResponse} hasPendingAsk=${hasPendingAsk} ` +
+				`lastMsgType=${lastMsg?.type} lastMsgAsk=${lastMsg?.ask} started=${(currentTask as any)._started}`,
+		)
+
+		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk || !currentTask.startWithContent) {
 			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
 		} else if (!(currentTask as any)._started) {
 			await currentTask.startWithContent(resolved.text, resolved.images)

@@ -397,14 +397,6 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 							newMirrorMessages[lastIndex] = mirrorMessage
 							return { ...prevState, mirrorMessages: newMirrorMessages }
 						}
-						// Log a warning if messageUpdated arrives for a timestamp not in the
-						// frontend's mirrorMessages. With the sequence guard in place,
-						// (layers 1+2), this should not happen under normal conditions. If it
-						// does, it signals a state synchronization issue worth investigating.
-						console.warn(
-							`[messageUpdated] Received update for unknown message ts=${mirrorMessage.ts}, dropping. ` +
-								`Frontend has ${prevState.mirrorMessages.length} messages.`,
-						)
 						return prevState
 					})
 					break

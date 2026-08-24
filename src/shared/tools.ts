@@ -89,6 +89,22 @@ export const toolParamNames = [
 	"direction",
 	"option_value",
 	"value",
+	// ssh_session parameters
+	"host",
+	"port",
+	"password",
+	// image / preview parameters
+	"width",
+	"height",
+	"aspect_ratio",
+	// read_url / search parameters
+	"max_characters",
+	"plain_text",
+	"registry",
+	"detail",
+	// git parameters
+	"branch",
+	"commit",
 ] as const
 
 export type ToolParamName = (typeof toolParamNames)[number]
