@@ -418,13 +418,17 @@ export async function executeCommandInTerminal(
 	}
 
 	const schedulePartialCommandOutputUpdate = () => {
-		if (!latestCompressedOutput || completed) {
+		if (completed) {
 			return
 		}
 
 		const emitUpdate = () => {
 			pendingCommandOutputEmitTimer = undefined
 			lastCommandOutputEmitAt = Date.now()
+			const compressedOutput = Terminal.compressTerminalOutput(accumulatedOutput)
+			latestCompressedOutput = compressedOutput
+			const status: CommandExecutionStatus = { executionId, status: "output", output: compressedOutput }
+			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			void queueCommandOutputMessage(latestCompressedOutput, true)
 		}
 
@@ -449,23 +453,28 @@ export async function executeCommandInTerminal(
 	})
 
 	let hasEmittedBackgroundCompletion = false
-	const BACKGROUND_NOTICE_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+	const BACKGROUND_NOTICE_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 	let backgroundNoticeTimer: NodeJS.Timeout | undefined
 
 	const startBackgroundNoticeTimer = () => {
 		if (backgroundNoticeTimer || completed || hasEmittedBackgroundCompletion) return
-		backgroundNoticeTimer = setTimeout(() => {
-			if (!completed && !hasEmittedBackgroundCompletion && !task.abandoned) {
+		backgroundNoticeTimer = setInterval(() => {
+			if (!completed && !hasEmittedBackgroundCompletion && !task.abandoned && runInBackground) {
 				const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
-				const notice = `[Terminal Notice: Background process for '${command}' in '${currentWorkingDir}' has been running for 10 minutes. It is still active.]`
+				const notice = `[Terminal Notice: Background process for '${command}' in '${currentWorkingDir}' is still running (5+ minutes). You can check its status or continue with other tasks.]`
 				void task.injectInBetweenMessage(notice, undefined, "terminal_callback")
+			} else if (completed || hasEmittedBackgroundCompletion || task.abandoned) {
+				if (backgroundNoticeTimer) {
+					clearInterval(backgroundNoticeTimer)
+					backgroundNoticeTimer = undefined
+				}
 			}
-		}, BACKGROUND_NOTICE_TIMEOUT_MS)
+		}, BACKGROUND_NOTICE_INTERVAL_MS)
 	}
 
 	const checkAndNotifyBackgroundCompletion = () => {
 		if (backgroundNoticeTimer) {
-			clearTimeout(backgroundNoticeTimer)
+			clearInterval(backgroundNoticeTimer)
 			backgroundNoticeTimer = undefined
 		}
 		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
@@ -498,11 +507,7 @@ export async function executeCommandInTerminal(
 			// Write to interceptor for persisted output
 			interceptor?.write(lines)
 
-			// Continue sending compressed output to webview for UI display (unchanged behavior)
-			const compressedOutput = Terminal.compressTerminalOutput(accumulatedOutput)
-			latestCompressedOutput = compressedOutput
-			const status: CommandExecutionStatus = { executionId, status: "output", output: compressedOutput }
-			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
+			// Throttled UI status emit (to prevent 100% CPU spikes during heavy terminal output)
 			schedulePartialCommandOutputUpdate()
 
 			if (runInBackground || hasAskedForCommandOutput) {

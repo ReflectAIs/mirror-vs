@@ -2,16 +2,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.7.6] - 2026-08-24
+## [0.7.5] - 2026-08-24
+
+### Added
+
+- **Sleek Compact Terminal Nudge with Jump-to-Command**: Redesigned the terminal background completion nudge into a modern, 30px compact status bar with status pills, copyable collapsible preview, and direct click-to-scroll navigation to the terminal command in chat.
+- **Active Terminals Navigation**: Clicking any running terminal in the Active Terminals popover automatically scrolls the chat to that command's location with a highlight pulse.
+
+### Changed
+
+- **Smart Nudge Filtering & Background Health-Check**: Synchronous commands no longer produce intrusive callback nudges. Long-running background processes trigger recurring 5-minute health check reminders so the model never gets stuck without polling.
+- **CPU & IPC Stream Throttling**: Terminal line output compression and webview status broadcasting are throttled to 150ms windows, eliminating CPU spikes during high-volume stdout logging.
+- **Model Autonomy Prompt**: Enhanced tool instructions informing the model that backgrounded processes do not block execution and it can continue other tasks or complete turns peacefully without polling.
 
 ### Fixed
 
 - **Tab Switching Queue Fix**: Fixed an issue where switching to a newly created empty tab while another task was active in a different tab would incorrectly route messages to the queue instead of sending them as a new task.
-
-## [0.7.5] - 2026-08-21
-
-### Fixed
-
 - **Model Infinite Loop on Background Commands & Conversational Answers**: Fixed an issue where the model would go into an infinite loop of `noToolsUsed` errors when replying with pure conversational text or when background terminal processes were active.
 - **Immediate Single-Enter Send During Terminal Execution**: Fixed the issue where users had to send messages twice when a terminal command was running (due to `command_output` being improperly excluded from active ask responses).
 

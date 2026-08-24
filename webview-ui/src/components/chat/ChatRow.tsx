@@ -1425,7 +1425,13 @@ export const ChatRowContent = ({
 				case "api_req_finished":
 					return null // we should never see this message type
 				case "terminal_callback":
-					return <TerminalCallbackNudge text={message.text} />
+					return (
+						<TerminalCallbackNudge
+							text={message.text}
+							onNavigateToMessage={onNavigateToMessage}
+							messageTs={message.ts}
+						/>
+					)
 				case "text":
 					return (
 						<div className="group my-2 p-1 transition-all">
@@ -1452,8 +1458,17 @@ export const ChatRowContent = ({
 						</div>
 					)
 				case "user_feedback": {
-					if (message.text?.startsWith("[Terminal Callback:")) {
-						return <TerminalCallbackNudge text={message.text} />
+					if (
+						message.text?.startsWith("[Terminal Callback:") ||
+						message.text?.startsWith("[Terminal Notice:")
+					) {
+						return (
+							<TerminalCallbackNudge
+								text={message.text}
+								onNavigateToMessage={onNavigateToMessage}
+								messageTs={message.ts}
+							/>
+						)
 					}
 					return (
 						<div
