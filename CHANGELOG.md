@@ -2,6 +2,12 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.6] - 2026-08-24
+
+### Fixed
+
+- **Tab Switching Queue Fix**: Fixed an issue where switching to a newly created empty tab while another task was active in a different tab would incorrectly route messages to the queue instead of sending them as a new task.
+
 ## [0.7.5] - 2026-08-21
 
 ### Fixed

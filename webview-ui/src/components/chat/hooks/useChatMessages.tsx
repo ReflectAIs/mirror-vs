@@ -787,12 +787,16 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (!(inputValue.trim() || selectedImages.length > 0)) {
 			return false
 		}
+		const isFirstMessage = messages.length === 0
+		if (isFirstMessage) {
+			return false
+		}
 		const isRespondingToAsk = !isStreaming && mirrorAsk !== undefined && mirrorAsk !== "command"
 		if (isRespondingToAsk) {
 			return false
 		}
 		return sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAsk !== undefined
-	}, [inputValue, selectedImages, mirrorAsk, sendingDisabled, isStreaming, messageQueue.length])
+	}, [inputValue, selectedImages, mirrorAsk, sendingDisabled, isStreaming, messageQueue.length, messages.length])
 
 	const modelActivity = useMemo((): ModelActivity => {
 		if (!isStreaming) {
