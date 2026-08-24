@@ -163,14 +163,27 @@ export const mergeExtensionState = (prevState: ExtensionState, newState: Partial
 	// concurrent state pushes. If a stale push arrives after a newer one, its mirrorMessages
 	// would overwrite the newer messages. The sequence number prevents this by only applying
 	// mirrorMessages when the incoming seq is strictly greater than the last applied seq.
-	if (
-		newState.mirrorMessagesSeq !== undefined &&
-		prevState.mirrorMessagesSeq !== undefined &&
-		newState.mirrorMessagesSeq <= prevState.mirrorMessagesSeq &&
-		newState.mirrorMessages !== undefined
-	) {
-		rest.mirrorMessages = prevState.mirrorMessages
-		rest.mirrorMessagesSeq = prevState.mirrorMessagesSeq
+	//
+	// CRITICAL: When switching tasks (different currentTaskId or activeTabId), sequence numbering
+	// must NOT block the new task's messages from replacing the previous task's messages.
+	const isTaskSwitch =
+		(newState.currentTaskId !== undefined &&
+			prevState.currentTaskId !== undefined &&
+			newState.currentTaskId !== prevState.currentTaskId) ||
+		(newState.activeTabId !== undefined &&
+			prevState.activeTabId !== undefined &&
+			newState.activeTabId !== prevState.activeTabId)
+
+	if (!isTaskSwitch) {
+		if (
+			newState.mirrorMessagesSeq !== undefined &&
+			prevState.mirrorMessagesSeq !== undefined &&
+			newState.mirrorMessagesSeq <= prevState.mirrorMessagesSeq &&
+			newState.mirrorMessages !== undefined
+		) {
+			rest.mirrorMessages = prevState.mirrorMessages
+			rest.mirrorMessagesSeq = prevState.mirrorMessagesSeq
+		}
 	}
 
 	// Note that we completely replace the previous apiConfiguration and customSupportPrompts objects
@@ -371,7 +384,12 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 				}
 				case "messageUpdated": {
 					const mirrorMessage = message.mirrorMessage!
+					const updateTaskId = (message as any).taskId
 					setState((prevState) => {
+						// If update belongs to a different task than the currently active view, ignore it
+						if (updateTaskId && prevState.currentTaskId && updateTaskId !== prevState.currentTaskId) {
+							return prevState
+						}
 						// worth noting it will never be possible for a more up-to-date message to be sent here or in normal messages post since the presentAssistantContent function uses lock
 						const lastIndex = findLastIndex(prevState.mirrorMessages, (msg) => msg.ts === mirrorMessage.ts)
 						if (lastIndex !== -1) {

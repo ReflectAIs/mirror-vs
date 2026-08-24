@@ -254,7 +254,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleAskResponse(provider, message)
 			break
 		case "terminalOperation":
-			await handleTerminalOperation(provider, message.terminalOperation)
+			await handleTerminalOperation(provider, message.terminalOperation, message)
 			break
 		case "killTerminal":
 			await handleKillTerminal(provider, message.terminalId, message.terminalType)

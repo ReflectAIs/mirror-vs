@@ -118,6 +118,7 @@ export interface ExtensionMessage {
 		| "deleteComfyuiWorkflowResult"
 		| "startComfyuiServerResult"
 	text?: string
+	taskId?: string
 	/** For fileContent: { path, content, error? } */
 	fileContent?: { path: string; content: string | null; error?: string }
 	payload?: any // eslint-disable-line @typescript-eslint/no-explicit-any

@@ -71,6 +71,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		routerModels,
 		tabs,
 		activeTabId,
+		currentTaskId,
 		currentSessionId,
 		sessionNames,
 		sessionNotes,
@@ -404,13 +405,20 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				queue={effectiveQueue}
 				onRemove={(index) => {
 					if (effectiveQueue[index]) {
-						vscode.postMessage({ type: "removeQueuedMessage", text: effectiveQueue[index].id })
+						const targetTaskId = activeTabId || currentTaskId
+						vscode.postMessage({
+							type: "removeQueuedMessage",
+							text: effectiveQueue[index].id,
+							...(targetTaskId ? { taskId: targetTaskId } : {}),
+						})
 					}
 				}}
 				onUpdate={(index, newText) => {
 					if (effectiveQueue[index]) {
+						const targetTaskId = activeTabId || currentTaskId
 						vscode.postMessage({
 							type: "editQueuedMessage",
+							...(targetTaskId ? { taskId: targetTaskId } : {}),
 							payload: {
 								id: effectiveQueue[index].id,
 								text: newText,
@@ -421,10 +429,12 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				}}
 				onForceSend={(index) => {
 					if (effectiveQueue[index]) {
+						const targetTaskId = activeTabId || currentTaskId
 						const queuedMsg = effectiveQueue[index]
 						vscode.postMessage({
 							type: "forceSendQueuedMessage",
 							text: queuedMsg.id,
+							...(targetTaskId ? { taskId: targetTaskId } : {}),
 							payload: {
 								id: queuedMsg.id,
 								text: queuedMsg.text,

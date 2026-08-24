@@ -450,6 +450,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	// Streaming
 	isWaitingForFirstChunk = false
 	isStreaming = false
+	isLoopActive = false
 	currentStreamingContentIndex = 0
 	currentStreamingDidCheckpoint = false
 	assistantMessageContent: AssistantMessageContent[] = []
@@ -1096,6 +1097,18 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {
 				this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
 			}
+		}
+
+		// If the task loop is not currently running (e.g. previous turn completed or idle while background task runs),
+		// reactivate initiateTaskLoop so the model immediately receives and acts on the user's steering message.
+		if (!this.isLoopActive && !this.abort && this._started) {
+			const { formatResponse } = await import("../prompts/responses")
+			const imageBlocks = formatResponse.imageBlocks(images)
+			const userContent = [
+				{ type: "text" as const, text: `<user_message>\n${text}\n</user_message>` },
+				...imageBlocks,
+			]
+			void this.initiateTaskLoop(userContent)
 		}
 	}
 

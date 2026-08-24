@@ -610,6 +610,24 @@ export class MirrorProvider
 	}
 
 	/**
+	 * Returns the live task with the given taskId from either mirrorStack or backgroundTasks.
+	 * If no taskId is provided or found, falls back to the current task.
+	 */
+	getLiveTask(taskId?: string): Task | undefined {
+		if (!taskId) {
+			return this.getCurrentTask()
+		}
+		if (this.backgroundTasks.has(taskId)) {
+			return this.backgroundTasks.get(taskId)
+		}
+		const inStack = this.mirrorStack.find((t) => t.taskId === taskId)
+		if (inStack) {
+			return inStack
+		}
+		return this.getCurrentTask()
+	}
+
+	/**
 	 * Returns true if the given taskId is currently running in the background.
 	 */
 	isBackgroundTask(taskId: string): boolean {

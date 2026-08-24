@@ -8,9 +8,25 @@ import { resolveIncomingImages } from "./_helpers"
  */
 export async function handleQueueMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
-	const currentTask = provider.getCurrentTask()
+	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
 		currentTask.messageQueueService.addMessage(resolved.text, resolved.images)
+
+		// If the task is already started and the loop is not currently active (e.g. idle or background terminal running),
+		// immediately dequeue and start the task loop so the queued message is acted upon without delay.
+		if (!currentTask.isLoopActive && !currentTask.abort && (currentTask as any)._started) {
+			const queued = currentTask.messageQueueService.dequeueMessage()
+			if (queued) {
+				await currentTask.say("user_feedback", queued.text, queued.images)
+				const { formatResponse } = await import("../../prompts/responses")
+				const imageBlocks = formatResponse.imageBlocks(queued.images)
+				const userContent = [
+					{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
+					...imageBlocks,
+				]
+				void currentTask.initiateTaskLoop(userContent)
+			}
+		}
 	}
 }
 
@@ -18,7 +34,8 @@ export async function handleQueueMessage(provider: MirrorProvider, message: Webv
  * Handles removing a message from the chat queue.
  */
 export async function handleRemoveQueuedMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
-	provider.getCurrentTask()?.messageQueueService.removeMessage(message.text ?? "")
+	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
+	currentTask?.messageQueueService.removeMessage(message.text ?? "")
 }
 
 /**
@@ -27,7 +44,8 @@ export async function handleRemoveQueuedMessage(provider: MirrorProvider, messag
 export async function handleEditQueuedMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	if (message.payload) {
 		const { id, text, images } = message.payload as EditQueuedMessagePayload
-		provider.getCurrentTask()?.messageQueueService.updateMessage(id, text, images)
+		const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
+		currentTask?.messageQueueService.updateMessage(id, text, images)
 	}
 }
 
@@ -35,7 +53,7 @@ export async function handleEditQueuedMessage(provider: MirrorProvider, message:
  * Handles force-sending a queued message as an in-between steering message.
  */
 export async function handleForceSendQueuedMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
-	const currentTask = provider.getCurrentTask()
+	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (!currentTask) return
 
 	// Remove from queue if message.text represents an ID or if payload.id is provided

@@ -303,7 +303,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		onUserExpandedRow,
 	} = options
 
-	const { activeTerminals = [] } = useExtensionState()
+	const { activeTerminals = [], currentTaskId, activeTabId } = useExtensionState()
+
+	// ── Tab Drafts & State Isolation ──
+	const currentTabId = activeTabId || currentTaskId || undefined
+	const tabDraftsRef = useRef<Map<string, { text: string; images: string[] }>>(new Map())
+	const prevTabIdRef = useRef<string | undefined>(currentTabId)
 
 	// ── Constants ──
 	const [audioBaseUri] = useState(() => {
@@ -363,6 +368,23 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const textAreaRef = useRef<HTMLTextAreaElement>(null)
 	const [sendingDisabled, setSendingDisabled] = useState(false)
 	const [selectedImages, setSelectedImages] = useState<string[]>([])
+
+	// Sync per-tab input drafts when switching tabs
+	useEffect(() => {
+		if (prevTabIdRef.current !== currentTabId) {
+			if (prevTabIdRef.current) {
+				tabDraftsRef.current.set(prevTabIdRef.current, {
+					text: inputValueRef.current,
+					images: selectedImages,
+				})
+			}
+			const newDraft = currentTabId ? tabDraftsRef.current.get(currentTabId) : undefined
+			setInputValue(newDraft?.text || "")
+			setSelectedImages(newDraft?.images || [])
+			prevTabIdRef.current = currentTabId
+			setOptimisticQueue([])
+		}
+	}, [currentTabId, selectedImages])
 
 	const [mirrorAsk, setMirrorAsk] = useState<MirrorAsk | undefined>(undefined)
 	const [enableButtons, setEnableButtons] = useState<boolean>(false)
@@ -883,7 +905,10 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				}
 
 				const isRespondingToAsk =
-					!isStreaming && mirrorAskRef.current !== undefined && mirrorAskRef.current !== "command"
+					!isStreaming &&
+					mirrorAskRef.current !== undefined &&
+					mirrorAskRef.current !== "command" &&
+					mirrorAskRef.current !== "command_output"
 				// If the chat is empty (first message in a new tab), never queue —
 				// send directly as a newTask. The queue check below can false-positive
 				// because handleChatReset() sets sendingDisabled=true when the idle
@@ -897,7 +922,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				) {
 					try {
 						console.log("queueMessage", text, images)
-						vscode.postMessage({ type: "queueMessage", text, images })
+						vscode.postMessage({
+							type: "queueMessage",
+							text,
+							images,
+							...(currentTabId ? { taskId: currentTabId } : {}),
+						})
 
 						setOptimisticQueue((prev) => [
 							...prev,
@@ -923,7 +953,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				userRespondedRef.current = true
 
 				if (messagesRef.current.length === 0) {
-					vscode.postMessage({ type: "newTask", text, images, sessionMode: "continueOrCreate" })
+					vscode.postMessage({
+						type: "newTask",
+						text,
+						images,
+						sessionMode: "continueOrCreate",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 				} else if (mirrorAskRef.current) {
 					if (mirrorAskRef.current === "followup") {
 						markFollowUpAsAnswered()
@@ -944,11 +980,18 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 								askResponse: "messageResponse",
 								text,
 								images,
+								...(currentTabId ? { taskId: currentTabId } : {}),
 							})
 							break
 					}
 				} else {
-					vscode.postMessage({ type: "askResponse", askResponse: "messageResponse", text, images })
+					vscode.postMessage({
+						type: "askResponse",
+						askResponse: "messageResponse",
+						text,
+						images,
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 				}
 
 				handleChatReset()
@@ -961,6 +1004,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			isStreaming,
 			messageQueue.length,
 			apiConfiguration?.apiProvider,
+			currentTabId,
 		],
 	)
 
@@ -979,9 +1023,9 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	)
 
 	const handleStopTask = useCallback(() => {
-		vscode.postMessage({ type: "cancelTask" })
+		vscode.postMessage({ type: "cancelTask", ...(currentTabId ? { taskId: currentTabId } : {}) })
 		setDidClickCancel(true)
-	}, [setDidClickCancel])
+	}, [setDidClickCancel, currentTabId])
 
 	const handleEnqueueCurrentMessage = useCallback(() => {
 		const text = inputValue.trim()
@@ -990,6 +1034,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				type: "queueMessage",
 				text,
 				images: selectedImages,
+				...(currentTabId ? { taskId: currentTabId } : {}),
 			})
 
 			setOptimisticQueue((prev) => [
@@ -1005,7 +1050,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			setInputValue("")
 			setSelectedImages([])
 		}
-	}, [inputValue, selectedImages])
+	}, [inputValue, selectedImages, currentTabId])
 
 	const handlePrimaryButtonClick = useCallback(
 		(text?: string, images?: string[]) => {
@@ -1019,7 +1064,11 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				case "tool":
 				case "use_mcp_server":
 				case "mistake_limit_reached":
-					vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+					vscode.postMessage({
+						type: "askResponse",
+						askResponse: "yesButtonClicked",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					break
 				case "resume_task":
 					const isCompletedSubtaskForClick =
@@ -1028,19 +1077,28 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 							(msg) => msg.ask === "completion_result" || msg.say === "completion_result",
 						)
 					if (!isCompletedSubtaskForClick) {
-						vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+						vscode.postMessage({
+							type: "askResponse",
+							askResponse: "yesButtonClicked",
+							...(currentTabId ? { taskId: currentTabId } : {}),
+						})
 					}
 					break
 				case "completion_result":
 				case "resume_completed_task":
 					break
 				case "command_output":
-					vscode.postMessage({ type: "terminalOperation", terminalOperation: "continue" })
+					vscode.postMessage({
+						type: "terminalOperation",
+						terminalOperation: "continue",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					if (trimmedInput || (images && images.length > 0)) {
 						vscode.postMessage({
 							type: "queueMessage",
 							text: trimmedInput || "",
 							images: images || [],
+							...(currentTabId ? { taskId: currentTabId } : {}),
 						})
 
 						setOptimisticQueue((prev) => [
@@ -1065,7 +1123,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			setPrimaryButtonText(undefined)
 			setSecondaryButtonText(undefined)
 		},
-		[mirrorAsk, currentTaskItem?.parentTaskId],
+		[mirrorAsk, currentTaskItem?.parentTaskId, currentTabId],
 	)
 
 	const handleSecondaryButtonClick = useCallback(
@@ -1075,7 +1133,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			const trimmedInput = text?.trim()
 
 			if (isStreaming) {
-				vscode.postMessage({ type: "cancelTask" })
+				vscode.postMessage({ type: "cancelTask", ...(currentTabId ? { taskId: currentTabId } : {}) })
 				setDidClickCancel(true)
 				return
 			}
@@ -1088,17 +1146,25 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				case "command":
 				case "tool":
 				case "use_mcp_server":
-					vscode.postMessage({ type: "askResponse", askResponse: "noButtonClicked" })
+					vscode.postMessage({
+						type: "askResponse",
+						askResponse: "noButtonClicked",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					break
 				case "command_output":
-					vscode.postMessage({ type: "terminalOperation", terminalOperation: "abort" })
+					vscode.postMessage({
+						type: "terminalOperation",
+						terminalOperation: "abort",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					break
 			}
 			setSendingDisabled(true)
 			setMirrorAsk(undefined)
 			setEnableButtons(false)
 		},
-		[mirrorAsk, isStreaming, setDidClickCancel],
+		[mirrorAsk, isStreaming, setDidClickCancel, currentTabId],
 	)
 
 	// ── Model picker ──

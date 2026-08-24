@@ -213,48 +213,53 @@ export class TaskMainLoop {
 		let includeFileDetails = true
 
 		this.task.emit(MirrorVSEventName.TaskStarted)
+		this.task.isLoopActive = true
 
-		while (!this.task.abort) {
-			const didEndLoop = await this.recursivelyMakeMirrorRequests(nextUserContent, includeFileDetails)
-			includeFileDetails = false // We only need file details the first time.
+		try {
+			while (!this.task.abort) {
+				const didEndLoop = await this.recursivelyMakeMirrorRequests(nextUserContent, includeFileDetails)
+				includeFileDetails = false // We only need file details the first time.
 
-			// The way this agentic loop works is that mirror will be given a
-			// task that he then calls tools to complete. Unless there's an
-			// attempt_completion call, we keep responding back to him with his
-			// tool's responses until he either attempt_completion or does not
-			// use anymore tools. If he does not use anymore tools, we ask him
-			// to consider if he's completed the task and then call
-			// attempt_completion, otherwise proceed with completing the task.
-			// There is a MAX_REQUESTS_PER_TASK limit to prevent infinite
-			// requests, but Mirror is prompted to finish the task as efficiently
-			// as he can.
+				// The way this agentic loop works is that mirror will be given a
+				// task that he then calls tools to complete. Unless there's an
+				// attempt_completion call, we keep responding back to him with his
+				// tool's responses until he either attempt_completion or does not
+				// use anymore tools. If he does not use anymore tools, we ask him
+				// to consider if he's completed the task and then call
+				// attempt_completion, otherwise proceed with completing the task.
+				// There is a MAX_REQUESTS_PER_TASK limit to prevent infinite
+				// requests, but Mirror is prompted to finish the task as efficiently
+				// as he can.
 
-			if (didEndLoop) {
-				// Process one queued message at a time after each task loop
-				// completes. Instead of draining all messages at once, we take
-				// one, submit it as a new user message, and continue the loop.
-				// Subsequent queued messages are handled on the next iteration,
-				// preventing mid-workflow interruptions while ensuring all
-				// messages eventually get processed.
-				const queued = this.task.messageQueueService.dequeueMessage()
-				if (queued) {
-					await this.task.say("user_feedback", queued.text, queued.images)
+				if (didEndLoop) {
+					// Process one queued message at a time after each task loop
+					// completes. Instead of draining all messages at once, we take
+					// one, submit it as a new user message, and continue the loop.
+					// Subsequent queued messages are handled on the next iteration,
+					// preventing mid-workflow interruptions while ensuring all
+					// messages eventually get processed.
+					const queued = this.task.messageQueueService.dequeueMessage()
+					if (queued) {
+						await this.task.say("user_feedback", queued.text, queued.images)
 
-					const imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(queued.images)
-					nextUserContent = [
-						{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
-						...imageBlocks,
-					]
-					includeFileDetails = true
-					continue
+						const imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(queued.images)
+						nextUserContent = [
+							{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
+							...imageBlocks,
+						]
+						includeFileDetails = true
+						continue
+					}
+
+					// For now a task never 'completes'. This will only happen if
+					// the user hits max requests and denies resetting the count.
+					break
+				} else {
+					nextUserContent = [{ type: "text", text: formatResponse.noToolsUsed() }]
 				}
-
-				// For now a task never 'completes'. This will only happen if
-				// the user hits max requests and denies resetting the count.
-				break
-			} else {
-				nextUserContent = [{ type: "text", text: formatResponse.noToolsUsed() }]
 			}
+		} finally {
+			this.task.isLoopActive = false
 		}
 	}
 

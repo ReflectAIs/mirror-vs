@@ -257,14 +257,14 @@ export async function handleCustomInstructions(provider: MirrorProvider, text?: 
  */
 export async function handleAskResponse(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
-	const currentTask = provider.getCurrentTask()
+	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
 		const hasPendingAsk =
 			currentTask.idleAsk !== undefined ||
 			currentTask.resumableAsk !== undefined ||
 			currentTask.interactiveAsk !== undefined
 
-		if (hasPendingAsk) {
+		if (hasPendingAsk || !currentTask.startWithContent) {
 			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
 		} else if (!(currentTask as any)._started) {
 			await currentTask.startWithContent(resolved.text, resolved.images)
@@ -284,9 +284,11 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 export async function handleTerminalOperation(
 	provider: MirrorProvider,
 	terminalOp?: "continue" | "abort",
+	message?: WebviewMessage,
 ): Promise<void> {
 	if (terminalOp) {
-		provider.getCurrentTask()?.handleTerminalOperation(terminalOp)
+		const targetTask = provider.getLiveTask ? provider.getLiveTask(message?.taskId) : provider.getCurrentTask?.()
+		targetTask?.handleTerminalOperation(terminalOp)
 	}
 }
 
