@@ -309,11 +309,11 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 				onOpenChange={(open) => !open && setCloseConfirm(initialCloseConfirm)}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Close Task</AlertDialogTitle>
+						<AlertDialogTitle>Close Tab</AlertDialogTitle>
 						<AlertDialogDescription>
 							{closeConfirm.status === "streaming"
 								? `"${closeConfirm.title}" is currently streaming. Closing it will abort the in-progress operation. Are you sure?`
-								: `"${closeConfirm.title}" is waiting for your approval. Closing it will abort the task. Are you sure?`}
+								: `"${closeConfirm.title}" is waiting for your approval. Closing it will abort the tab. Are you sure?`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
