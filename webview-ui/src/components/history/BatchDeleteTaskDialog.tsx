@@ -34,11 +34,9 @@ export const BatchDeleteTaskDialog = ({ taskIds, ...props }: BatchDeleteTaskDial
 			<AlertDialogContent className="max-w-md">
 				<AlertDialogHeader>
 					<AlertDialogTitle>{t("history:deleteTasks")}</AlertDialogTitle>
-					<AlertDialogDescription className="text-vscode-foreground">
-						<div className="mb-2">{t("history:confirmDeleteTasks", { count: taskIds.length })}</div>
-						<div className="text-vscode-editor-foreground bg-vscode-editor-background p-2 rounded text-sm">
-							{t("history:deleteTasksWarning")}
-						</div>
+					<AlertDialogDescription className="text-vscode-descriptionForeground text-xs flex flex-col gap-1.5 mt-1">
+						<span>{t("history:confirmDeleteTasks", { count: taskIds.length })}</span>
+						<span className="text-vscode-descriptionForeground/80">{t("history:deleteTasksWarning")}</span>
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

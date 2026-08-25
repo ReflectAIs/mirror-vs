@@ -24,7 +24,6 @@ AGENTS.local.md
 
 # Test environment
 .test_env
-.vscode-test/
 
 # Docs
 docs/_site/
@@ -61,3 +60,4 @@ mirror-cli-*.tar.gz*
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
+.gitignore

@@ -191,8 +191,19 @@ export class ReadCommandOutputTool extends BaseTool<"read_command_output"> {
 				}),
 			)
 
+			// Track consecutive reads to prevent infinite polling loops
+			const readKey = `${task.taskId}:${artifact_id}`
+			const currentCount = (this.consecutiveReadCount.get(readKey) || 0) + 1
+			this.consecutiveReadCount.set(readKey, currentCount)
+
+			let finalResult = result
+			if (currentCount >= 2 && task.terminalProcess) {
+				finalResult +=
+					"\n\n[System Notice: The background command is still running. You do NOT need to poll with read_command_output. Stop calling tools and END YOUR TURN now. The terminal callback will wake you up automatically when it completes.]"
+			}
+
 			task.consecutiveMistakeCount = 0
-			pushToolResult(result)
+			pushToolResult(finalResult)
 		} catch (error) {
 			const errorMsg = error instanceof Error ? error.message : String(error)
 			await task.say("error", `Error reading command output: ${errorMsg}`)
@@ -200,6 +211,8 @@ export class ReadCommandOutputTool extends BaseTool<"read_command_output"> {
 			pushToolResult(`Error reading command output: ${errorMsg}`)
 		}
 	}
+
+	private consecutiveReadCount: Map<string, number> = new Map()
 
 	/**
 	 * Validate artifact_id format to prevent path traversal attacks.

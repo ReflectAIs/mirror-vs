@@ -61,6 +61,7 @@ export const toolNames = [
 	"package_search",
 	"read_url",
 	"ssh_session",
+	"sleep",
 	// On-demand context retrieval tools (cost optimization - reduces inline context size)
 	"get_workspace_file_tree",
 	"get_workspace_pulse",
