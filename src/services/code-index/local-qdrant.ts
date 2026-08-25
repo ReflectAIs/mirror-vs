@@ -126,13 +126,26 @@ export class LocalQdrantManager {
 		await this.install(onProgress)
 
 		console.log(`[LocalQdrantManager] Launching Qdrant from ${this.getBinaryPath()}...`)
-		let logStream: any = "ignore"
-		try {
-			const logFile = path.join(this.installPath, "qdrant.log")
-			logStream = require("fs").createWriteStream(logFile, { flags: "a" })
-		} catch (e) {
-			console.error("[LocalQdrantManager] Failed to create log file:", e)
-		}
+
+		// createWriteStream returns with fd=null initially — the OS hasn't opened the
+		// file yet. Passing a stream with fd=null to spawn's stdio array causes:
+		//   TypeError: The argument 'stdio' is invalid. Received WriteStream { fd: null, ... }
+		// We must wait for the 'open' event (which sets fd to a valid integer) before
+		// spawning the child process. Fall back to 'ignore' if the stream errors.
+		const logStream = await (async (): Promise<any> => {
+			try {
+				const logFile = path.join(this.installPath, "qdrant.log")
+				const stream = require("fs").createWriteStream(logFile, { flags: "a" })
+				await new Promise<void>((resolve, reject) => {
+					stream.once("open", resolve)
+					stream.once("error", reject)
+				})
+				return stream
+			} catch (e) {
+				console.error("[LocalQdrantManager] Failed to open log stream, falling back to 'ignore':", e)
+				return "ignore"
+			}
+		})()
 
 		this.process = spawn(this.getBinaryPath(), [], {
 			cwd: this.getCwd(),
