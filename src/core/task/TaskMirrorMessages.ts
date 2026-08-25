@@ -118,13 +118,11 @@ export class TaskMirrorMessages {
 
 	async updateMirrorMessage(message: MirrorMessage) {
 		const provider = this.task.providerRef.deref()
-		if (!provider?.getCurrentTask || provider.getCurrentTask()?.taskId === this.taskId) {
-			await provider?.postMessageToWebview?.({
-				type: "messageUpdated",
-				taskId: this.taskId,
-				mirrorMessage: message,
-			})
-		}
+		await provider?.postMessageToWebview?.({
+			type: "messageUpdated",
+			taskId: this.taskId,
+			mirrorMessage: message,
+		})
 		this.task.emit(MirrorVSEventName.Message, { action: "updated", message })
 		this.debouncedSaveMirrorMessages()
 	}
