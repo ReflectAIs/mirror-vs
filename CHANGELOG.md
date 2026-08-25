@@ -6,6 +6,8 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Fixed
 
+- **Question Ask & Queued Message Fix**: Fixed an issue where answering follow-up questions erroneously queued the user's message instead of immediately responding to the ask, and resolved duplicate message injection when force-sending.
+- **Terminal Send Button State**: Fixed chat send button incorrectly showing active streaming state while background terminal commands were running.
 - **Startup Lifecycle & Tab Restoration**: Replaced automatic background tab preloading on launch with clean lazy restoration so extensions initialize immediately without locking state broadcasts.
 - **Task Instance Deduplication**: Fixed duplicate task instances causing users to have to click close multiple times; `closeTask` now disposes and cleans all instances of a closed task ID in a single pass.
 - **Chat Queue Alignment**: Fixed a false-positive queue condition that erroneously marked user messages in idle tasks as "Queued Messages", and added automatic optimistic queue clearing when user feedback messages are rendered in the conversation.

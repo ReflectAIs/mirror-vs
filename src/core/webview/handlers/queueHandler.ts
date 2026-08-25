@@ -67,5 +67,23 @@ export async function handleForceSendQueuedMessage(provider: MirrorProvider, mes
 	const images = payload?.images ?? message.images
 
 	const resolved = await resolveIncomingImages(provider, { text, images })
-	await currentTask.injectInBetweenMessage(resolved.text, resolved.images)
+
+	// If the task is currently waiting on an ask (e.g. question/approval), answer the ask with this message
+	if (currentTask.taskAsk && !currentTask.taskAsk.isAnswered) {
+		currentTask.handleWebviewAskResponse("messageResponse", resolved.text, resolved.images)
+		return
+	}
+
+	if (currentTask.isLoopActive) {
+		await currentTask.injectInBetweenMessage(resolved.text, resolved.images)
+	} else if ((currentTask as any)._started) {
+		await currentTask.say("user_feedback", resolved.text, resolved.images)
+		const { formatResponse } = await import("../../prompts/responses")
+		const imageBlocks = formatResponse.imageBlocks(resolved.images)
+		const userContent = [
+			{ type: "text" as const, text: `<user_message>\n${resolved.text}\n</user_message>` },
+			...imageBlocks,
+		]
+		void currentTask.initiateTaskLoop(userContent)
+	}
 }

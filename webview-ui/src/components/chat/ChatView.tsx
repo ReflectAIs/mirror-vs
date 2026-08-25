@@ -478,7 +478,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				mode={mode}
 				setMode={setMode}
 				modeShortcutText={modeShortcutText}
-				isStreaming={isStreaming || mirrorAsk === "command_output"}
+				isStreaming={isStreaming}
 				messageWillQueue={messageWillQueue}
 				onStop={handleStopTask}
 				onEnqueueMessage={handleEnqueueCurrentMessage}

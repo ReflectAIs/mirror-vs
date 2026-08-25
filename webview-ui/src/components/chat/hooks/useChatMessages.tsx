@@ -781,23 +781,21 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 
 	// ── Computed values ──
 	const isStreaming = useMemo(() => {
-		const isLastAsk = !!modifiedMessages.at(-1)?.ask
-		const isToolCurrentlyAsking =
-			isLastAsk && mirrorAsk !== undefined && enableButtons && primaryButtonText !== undefined
+		const lastMsg = modifiedMessages.at(-1)
+		const isLastAsk = !!lastMsg?.ask && !lastMsg?.partial
 
-		if (isToolCurrentlyAsking) {
+		// If waiting on user response to an ask (followup question, tool approval, resume, etc.), it is NOT streaming
+		if (isLastAsk || (mirrorAsk !== undefined && mirrorAsk !== "command_output" && !lastMsg?.partial)) {
 			return false
 		}
 
 		// Check if active tab status from backend is "streaming" (e.g. executing tool or streaming response)
 		const activeTab = tabs.find((t) => t.taskId === currentTabId)
-		if (activeTab && activeTab.status === "streaming" && !isToolCurrentlyAsking) {
+		if (activeTab && activeTab.status === "streaming" && mirrorAsk === undefined) {
 			return true
 		}
 
-		const isLastMessagePartial = modifiedMessages.at(-1)?.partial === true
-
-		if (isLastMessagePartial) {
+		if (lastMsg?.partial === true) {
 			return true
 		} else {
 			const lastApiReqStarted = findLast(
@@ -811,16 +809,17 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				lastApiReqStarted.text !== undefined &&
 				lastApiReqStarted.say === "api_req_started"
 			) {
-				const cost = JSON.parse(lastApiReqStarted.text).cost
-
-				if (cost === undefined) {
-					return true
-				}
+				try {
+					const cost = JSON.parse(lastApiReqStarted.text).cost
+					if (cost === undefined) {
+						return true
+					}
+				} catch {}
 			}
 		}
 
 		return false
-	}, [modifiedMessages, mirrorAsk, enableButtons, primaryButtonText, tabs, currentTabId])
+	}, [modifiedMessages, mirrorAsk, tabs, currentTabId])
 
 	const messageWillQueue = useMemo(() => {
 		if (!(inputValue.trim() || selectedImages.length > 0)) {
@@ -830,12 +829,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (isFirstMessage) {
 			return false
 		}
-		const isRespondingToAsk = !isStreaming && mirrorAsk !== undefined && mirrorAsk !== "command"
+		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command" && mirrorAsk !== "command_output"
 		if (isRespondingToAsk) {
 			return false
 		}
-		return sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAsk !== undefined
-	}, [inputValue, selectedImages, mirrorAsk, sendingDisabled, isStreaming, messageQueue.length, messages.length])
+		return isStreaming || messageQueue.length > 0
+	}, [inputValue, selectedImages, mirrorAsk, isStreaming, messageQueue.length, messages.length])
 
 	const modelActivity = useMemo((): ModelActivity => {
 		if (!isStreaming) {
