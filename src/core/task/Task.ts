@@ -1082,7 +1082,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		sayType: "user_feedback" | "terminal_callback" = "user_feedback",
 	): Promise<void> {
 		this.inBetweenMessages.push({ text, images })
-
 		// If the task is currently waiting on an ask (askResponse is undefined),
 		// answer it immediately so the waiting ask promise unblocks.
 		const wasWaitingOnAsk = this.askResponse === undefined

@@ -48,6 +48,9 @@ export class FireworksHandler extends BaseOpenAiCompatibleProvider<FireworksMode
 			model,
 			max_tokens,
 			temperature,
+			// Apply penalties to prevent infinite repetition / degeneration loops on Fireworks models
+			frequency_penalty: 0.1,
+			presence_penalty: 0.05,
 			messages: [{ role: "system", content: systemPrompt }, ...convertToOpenAiMessages(messages)],
 			stream: true,
 			stream_options: { include_usage: true },
