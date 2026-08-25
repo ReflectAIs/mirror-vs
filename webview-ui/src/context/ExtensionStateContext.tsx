@@ -387,17 +387,27 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 					const updateTaskId = (message as any).taskId
 					setState((prevState) => {
 						// If update belongs to a different task than the currently active view, ignore it
-						if (updateTaskId && prevState.currentTaskId && updateTaskId !== prevState.currentTaskId) {
+						const activeId = prevState.activeTabId || prevState.currentTaskId
+						if (updateTaskId && activeId && updateTaskId !== activeId) {
 							return prevState
 						}
-						// worth noting it will never be possible for a more up-to-date message to be sent here or in normal messages post since the presentAssistantContent function uses lock
+						// Find by timestamp first
 						const lastIndex = findLastIndex(prevState.mirrorMessages, (msg) => msg.ts === mirrorMessage.ts)
 						if (lastIndex !== -1) {
 							const newMirrorMessages = [...prevState.mirrorMessages]
 							newMirrorMessages[lastIndex] = mirrorMessage
 							return { ...prevState, mirrorMessages: newMirrorMessages }
 						}
-						return prevState
+						// Fallback: If not found by exact ts, check for an existing partial message of the same type
+						const lastPartialIndex = findLastIndex(prevState.mirrorMessages, (msg) =>
+							Boolean(msg.partial && msg.say === mirrorMessage.say),
+						)
+						if (lastPartialIndex !== -1) {
+							const newMirrorMessages = [...prevState.mirrorMessages]
+							newMirrorMessages[lastPartialIndex] = mirrorMessage
+							return { ...prevState, mirrorMessages: newMirrorMessages }
+						}
+						return { ...prevState, mirrorMessages: [...prevState.mirrorMessages, mirrorMessage] }
 					})
 					break
 				}
