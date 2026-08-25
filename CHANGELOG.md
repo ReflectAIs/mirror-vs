@@ -2,6 +2,15 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.8] - 2026-08-25
+
+### Fixed
+
+- **Model Selection & Fireworks Fix**: Fixed model picker selection snap-back in settings, synchronized settings-configured model changes to the chat input dropdown selector, and fixed 404 Model Not Found errors on Fireworks AI by preserving custom/user-selected model IDs.
+- **Git Auto-Approval Settings Integration**: Wired git auto-approval toggle in extension settings to the chat input auto-approve dropdown.
+- **Tab Mascot State & Designs**: Fixed completed task mascot status so it transitions immediately from the working/streaming state to completed, and updated kaomojis/styles with modern expressive designs (`(★‿★)✨` for completed, `(•̀ω•́)⚡` for streaming/working, `(◕ᴗ◕✿)?` for user interaction).
+- **Session Deletion Confirmation**: Added confirmation popup dialogs when deleting an entire session from history, warning that all associated tabs and subtasks will be closed/deleted, and fixed left-aligned spacing/gaps in batch deletion warning text.
+
 ## [0.7.7] - 2026-08-25
 
 ### Fixed

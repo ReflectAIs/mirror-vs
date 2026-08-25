@@ -3,7 +3,7 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "DipeshMajithia",
-	"version": "0.7.7",
+	"version": "0.7.8",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#1a1a2e",
