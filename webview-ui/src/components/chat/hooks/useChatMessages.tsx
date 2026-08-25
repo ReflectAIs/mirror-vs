@@ -1328,9 +1328,21 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				deleted = JSON.parse(saved)
 			}
 		} catch {}
-		const allKeys = [...new Set([...builtIn, ...custom])].filter((key) => !deleted.includes(key))
-		return allKeys.map((key) => ({ value: key, label: key }))
-	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider, apiConfiguration])
+		const currentId = (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
+		const allKeys = [...new Set([...(currentId ? [currentId] : []), ...builtIn, ...custom])].filter(
+			(key) => !deleted.includes(key) || key === currentId,
+		)
+		return allKeys.map((key) => ({
+			value: key,
+			label: key.includes("/") ? key.split("/").pop() || key : key,
+		}))
+	}, [
+		modelPickerConfig?.models,
+		modelPickerConfig?.modelIdKey,
+		apiConfiguration?.apiProvider,
+		apiConfiguration,
+		modelId,
+	])
 
 	const handleModelChange = useCallback(
 		(newModelId: string) => {

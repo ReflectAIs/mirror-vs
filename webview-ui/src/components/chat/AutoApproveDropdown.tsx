@@ -34,6 +34,7 @@ export const AutoApproveDropdown = ({ disabled = false, triggerClassName = "" }:
 		setAlwaysAllowReadOnly,
 		setAlwaysAllowWrite,
 		setAlwaysAllowExecute,
+		setAlwaysAllowGitCommit,
 		setAlwaysAllowMcp,
 		setAlwaysAllowModeSwitch,
 		setAlwaysAllowSubtasks,
@@ -56,6 +57,9 @@ export const AutoApproveDropdown = ({ disabled = false, triggerClassName = "" }:
 					break
 				case "alwaysAllowExecute":
 					setAlwaysAllowExecute(value)
+					break
+				case "alwaysAllowGitCommit":
+					setAlwaysAllowGitCommit(value)
 					break
 				case "alwaysAllowMcp":
 					setAlwaysAllowMcp(value)

@@ -482,7 +482,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				messageWillQueue={messageWillQueue}
 				onStop={handleStopTask}
 				onEnqueueMessage={handleEnqueueCurrentMessage}
-				modelId={modelPickerConfig ? modelId : undefined}
+				modelId={
+					modelPickerConfig
+						? (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
+						: undefined
+				}
 				modelOptions={modelOptions}
 				onModelChange={handleModelChange}
 			/>
