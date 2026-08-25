@@ -477,6 +477,13 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "sleep":
+				nativeArgs = {
+					seconds: typeof partialArgs.seconds === "number" ? partialArgs.seconds : undefined,
+					reason: typeof partialArgs.reason === "string" ? partialArgs.reason : undefined,
+				}
+				break
+
 			case "write_to_file":
 				if (partialArgs.path || partialArgs.content) {
 					nativeArgs = {
@@ -765,6 +772,38 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "get_workspace_file_tree":
+			case "get_workspace_pulse":
+				nativeArgs = {}
+				break
+
+			case "get_git_status":
+				nativeArgs = {
+					maxFiles: partialArgs.maxFiles,
+				}
+				break
+
+			case "search_mcp_tools":
+				nativeArgs = {
+					query: partialArgs.query,
+				}
+				break
+
+			case "activate_mcp_tool":
+				if (partialArgs.server_name !== undefined || partialArgs.tool_name !== undefined) {
+					nativeArgs = {
+						server_name: partialArgs.server_name,
+						tool_name: partialArgs.tool_name,
+					}
+				}
+				break
+
+			case "read_session_context":
+				nativeArgs = {
+					scope: partialArgs.scope,
+				}
+				break
+
 			default:
 				break
 		}
@@ -932,6 +971,13 @@ export class NativeToolCallParser {
 							timeout: args.timeout,
 						} as NativeArgsFor<TName>
 					}
+					break
+
+				case "sleep":
+					nativeArgs = {
+						seconds: typeof args.seconds === "number" ? args.seconds : undefined,
+						reason: typeof args.reason === "string" ? args.reason : undefined,
+					} as NativeArgsFor<TName>
 					break
 
 				case "apply_diff":
@@ -1241,6 +1287,38 @@ export class NativeToolCallParser {
 							value: args.value,
 						} as NativeArgsFor<TName>
 					}
+					break
+
+				case "get_workspace_file_tree":
+				case "get_workspace_pulse":
+					nativeArgs = {} as NativeArgsFor<TName>
+					break
+
+				case "get_git_status":
+					nativeArgs = {
+						maxFiles: args.maxFiles,
+					} as NativeArgsFor<TName>
+					break
+
+				case "search_mcp_tools":
+					nativeArgs = {
+						query: args.query,
+					} as NativeArgsFor<TName>
+					break
+
+				case "activate_mcp_tool":
+					if (args.server_name !== undefined && args.tool_name !== undefined) {
+						nativeArgs = {
+							server_name: args.server_name,
+							tool_name: args.tool_name,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "read_session_context":
+					nativeArgs = {
+						scope: args.scope,
+					} as NativeArgsFor<TName>
 					break
 
 				default:

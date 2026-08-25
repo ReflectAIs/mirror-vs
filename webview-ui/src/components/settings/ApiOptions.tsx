@@ -210,7 +210,7 @@ const ApiOptions = ({
 			return
 		}
 
-		if (selectedModelId && apiConfiguration.apiModelId !== selectedModelId) {
+		if (!apiConfiguration.apiModelId && selectedModelId) {
 			// Pass false as third parameter to indicate this is not a user action
 			// This is an internal sync, not a user-initiated change
 			setApiConfigurationField("apiModelId", selectedModelId, false)

@@ -708,8 +708,9 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 									One-Click Auto-Setup
 								</Button>
 								<p className="text-[11px] text-vscode-descriptionForeground mt-1 mb-0 leading-normal">
-									Automatically configures indexing using your active API key and default embedding
-									model (requires Qdrant running on localhost:6333).
+									Automatically configures codebase indexing using your active API key or local Ollama
+									(downloading embedding models automatically). The local vector database will be
+									downloaded and started automatically — no manual setup needed.
 								</p>
 							</div>
 						) : (
