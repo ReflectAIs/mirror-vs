@@ -9,7 +9,7 @@ import fs from "fs/promises"
  */
 export function getGlobalMirrorDirectory(): string {
 	const homeDir = os.homedir()
-	return path.join(homeDir, ".mirror")
+	return path.join(homeDir, ".mirror-vs")
 }
 
 /**
@@ -41,9 +41,8 @@ export function getProjectAgentsDirectoryForCwd(cwd: string): string {
  * @returns The absolute path to the project-local .mirror directory
  */
 export function getProjectMirrorDirectoryForCwd(cwd: string): string {
-	return path.join(cwd, ".mirror")
+	return path.join(cwd, ".mirror-vs")
 }
-
 
 /**
  * Checks if a directory exists
@@ -105,7 +104,7 @@ export async function discoverSubfolderMirrorDirectories(cwd: string): Promise<s
 			"--hidden",
 			"--follow",
 			"-g",
-			"**/.mirror/**",
+			"**/.mirror-vs/**",
 			"-g",
 			"!node_modules/**",
 			"-g",
@@ -116,12 +115,12 @@ export async function discoverSubfolderMirrorDirectories(cwd: string): Promise<s
 		const results = await executeRipgrep({ args, workspacePath: cwd })
 
 		const mirrorDirs = new Set<string>()
-		const rootMirrorDir = path.join(cwd, ".mirror")
+		const rootMirrorDir = path.join(cwd, ".mirror-vs")
 
 		for (const result of results) {
-			const match = result.path.match(/^(.+?)[/\\]\.mirror[/\\]/)
+			const match = result.path.match(/^(.+?)[/\\]\.mirror-vs[/\\]/)
 			if (match) {
-				const mirrorDir = path.join(cwd, match[1], ".mirror")
+				const mirrorDir = path.join(cwd, match[1], ".mirror-vs")
 				if (mirrorDir !== rootMirrorDir) {
 					mirrorDirs.add(mirrorDir)
 				}
@@ -133,7 +132,6 @@ export async function discoverSubfolderMirrorDirectories(cwd: string): Promise<s
 		return []
 	}
 }
-
 
 /**
  * Gets the ordered list of .mirror directories to check (global first, then project-local)
@@ -147,7 +145,6 @@ export function getMirrorDirectoriesForCwd(cwd: string): string[] {
 	directories.push(getProjectMirrorDirectoryForCwd(cwd))
 	return directories
 }
-
 
 /**
  * Gets the ordered list of all .mirror directories including subdirectories
@@ -165,7 +162,6 @@ export async function getAllMirrorDirectoriesForCwd(cwd: string): Promise<string
 
 	return directories
 }
-
 
 /**
  * Gets parent directories containing .mirror folders, in order from root to subfolders

@@ -4,7 +4,12 @@ import * as vscode from "vscode"
 import matter from "gray-matter"
 
 import type { MirrorProvider } from "../../core/webview/MirrorProvider"
-import { getGlobalMirrorDirectory, getGlobalAgentsDirectory, getProjectAgentsDirectoryForCwd } from "../mirror-config"
+import {
+	getGlobalMirrorDirectory,
+	getGlobalAgentsDirectory,
+	getProjectAgentsDirectoryForCwd,
+	getProjectMirrorDirectoryForCwd,
+} from "../mirror-config"
 import { directoryExists, fileExists } from "../mirror-config"
 import { SkillMetadata, SkillContent } from "../../shared/skills"
 import { modes, getAllModes } from "../../shared/modes"
@@ -372,7 +377,7 @@ export class SkillsManager {
 			if (!provider?.cwd) {
 				throw new Error(t("skills:errors.no_workspace"))
 			}
-			baseDir = path.join(provider.cwd, ".mirror")
+			baseDir = getProjectMirrorDirectoryForCwd(provider.cwd)
 		}
 
 		// Always use the generic skills directory (mode info stored in frontmatter now)
@@ -481,7 +486,7 @@ Add your skill instructions here.
 			if (!provider?.cwd) {
 				throw new Error(t("skills:errors.no_workspace"))
 			}
-			baseDir = path.join(provider.cwd, ".mirror")
+			baseDir = getProjectMirrorDirectoryForCwd(provider.cwd)
 		}
 
 		// Determine source and destination directories
@@ -575,7 +580,7 @@ Add your skill instructions here.
 		const globalMirrorDir = getGlobalMirrorDirectory()
 		const globalAgentsDir = getGlobalAgentsDirectory()
 		const provider = this.providerRef.deref()
-		const projectMirrorDir = provider?.cwd ? path.join(provider.cwd, ".mirror") : null
+		const projectMirrorDir = provider?.cwd ? getProjectMirrorDirectoryForCwd(provider.cwd) : null
 		const projectAgentsDir = provider?.cwd ? getProjectAgentsDirectoryForCwd(provider.cwd) : null
 
 		// Get list of modes to check for mode-specific skills
@@ -657,7 +662,7 @@ Add your skill instructions here.
 		// Watch for changes in skills directories
 		const globalMirrorDir = getGlobalMirrorDirectory()
 		const globalAgentsDir = getGlobalAgentsDirectory()
-		const projectMirrorDir = path.join(provider.cwd, ".mirror")
+		const projectMirrorDir = getProjectMirrorDirectoryForCwd(provider.cwd)
 		const projectAgentsDir = getProjectAgentsDirectoryForCwd(provider.cwd)
 
 		// Watch global .mirror skills directory

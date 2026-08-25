@@ -61,6 +61,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 	const [isSelectionMode, setIsSelectionMode] = useState(false)
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
 	const [showBatchDeleteDialog, setShowBatchDeleteDialog] = useState<boolean>(false)
+	const [deleteSessionTaskIds, setDeleteSessionTaskIds] = useState<string[] | null>(null)
 
 	// Handle delete
 	const handleDelete = useCallback((taskId: string) => {
@@ -323,7 +324,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 								onDelete={handleDelete}
 								onDeleteSession={() => {
 									const ids = session.tabs.map((t) => t.id)
-									vscode.postMessage({ type: "deleteMultipleTasksWithIds", ids })
+									setDeleteSessionTaskIds(ids)
 								}}
 								onToggleExpand={() => toggleSessionExpand(session.sessionId)}
 								onRenameSession={(name) => setSessionName(session.sessionId, name)}
@@ -353,7 +354,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 				</div>
 			)}
 
-			{/* Delete dialog */}
+			{/* Delete single tab dialog */}
 			{deleteTaskId && (
 				<DeleteTaskDialog
 					taskId={deleteTaskId}
@@ -376,6 +377,19 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 							setShowBatchDeleteDialog(false)
 							setSelectedTaskIds(new Set())
 							setIsSelectionMode(false)
+						}
+					}}
+				/>
+			)}
+
+			{/* Session delete dialog */}
+			{deleteSessionTaskIds && (
+				<BatchDeleteTaskDialog
+					taskIds={deleteSessionTaskIds}
+					open={Boolean(deleteSessionTaskIds)}
+					onOpenChange={(open) => {
+						if (!open) {
+							setDeleteSessionTaskIds(null)
 						}
 					}}
 				/>
