@@ -331,6 +331,17 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		}
 	}, [messageQueue])
 
+	useEffect(() => {
+		if (optimisticQueue.length > 0) {
+			const hasMatchingFeedback = messages.some(
+				(m) => m.say === "user_feedback" && optimisticQueue.some((q) => q.text === m.text),
+			)
+			if (hasMatchingFeedback) {
+				setOptimisticQueue([])
+			}
+		}
+	}, [messages, optimisticQueue])
+
 	// ── UI State ──
 	const [showRetiredProviderWarning, setShowRetiredProviderWarning] = useState(false)
 	const [activeHeaderPanel, setActiveHeaderPanel] = useState<"stats" | "todos" | "notes" | "none">("none")
@@ -916,16 +927,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					mirrorAskRef.current !== "command" &&
 					mirrorAskRef.current !== "command_output"
 				// If the chat is empty (first message in a new tab), never queue —
-				// send directly as a newTask. The queue check below can false-positive
-				// because handleChatReset() sets sendingDisabled=true when the idle
-				// tab is created, before the user has typed anything.
+				// send directly as a newTask.
 				const isFirstMessageInTab = messagesRef.current.length === 0
-				if (
-					!forceSend &&
-					!isRespondingToAsk &&
-					!isFirstMessageInTab &&
-					(sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAskRef.current !== undefined)
-				) {
+				const shouldQueue =
+					!forceSend && !isRespondingToAsk && !isFirstMessageInTab && (isStreaming || messageQueue.length > 0)
+
+				if (shouldQueue) {
 					try {
 						console.log("queueMessage", text, images)
 						vscode.postMessage({
