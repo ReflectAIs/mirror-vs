@@ -71,10 +71,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		routerModels,
 		tabs,
 		activeTabId,
+		currentTaskId,
 		currentSessionId,
 		sessionNames,
 		sessionNotes,
-		experiments,
+		disableTabBar,
 	} = useExtensionState()
 
 	// ── Use the extracted hook for all message state, effects, and handlers ──
@@ -291,17 +292,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		acceptInput: () => {
 			const hasInput = inputValue.trim() || selectedImages.length > 0
 
-			// Special case: during command_output, queue the message
-			if (mirrorAskRef.current === "command_output" && hasInput) {
-				vscode.postMessage({ type: "queueMessage", text: inputValue.trim(), images: selectedImages })
-				setInputValue("")
-				setSelectedImages([])
-				return
-			}
-
-			if (enableButtons && primaryButtonText) {
+			if (enableButtons && primaryButtonText && mirrorAskRef.current !== "command_output") {
 				handlePrimaryButtonClick(inputValue, selectedImages)
-			} else if (!sendingDisabled && !isProfileDisabled && hasInput) {
+			} else if (!isProfileDisabled && hasInput) {
 				handleSendMessage(inputValue, selectedImages)
 			}
 		},
@@ -350,7 +343,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				sessionNames={sessionNames}
 				sessionNotes={sessionNotes}
 			/>
-			{experiments?.multiTab && <TabBar tabs={tabs} activeTabId={activeTabId} />}
+			{!disableTabBar && <TabBar tabs={tabs} activeTabId={activeTabId} />}
 
 			{task ? (
 				<>
@@ -412,13 +405,20 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				queue={effectiveQueue}
 				onRemove={(index) => {
 					if (effectiveQueue[index]) {
-						vscode.postMessage({ type: "removeQueuedMessage", text: effectiveQueue[index].id })
+						const targetTaskId = activeTabId || currentTaskId
+						vscode.postMessage({
+							type: "removeQueuedMessage",
+							text: effectiveQueue[index].id,
+							...(targetTaskId ? { taskId: targetTaskId } : {}),
+						})
 					}
 				}}
 				onUpdate={(index, newText) => {
 					if (effectiveQueue[index]) {
+						const targetTaskId = activeTabId || currentTaskId
 						vscode.postMessage({
 							type: "editQueuedMessage",
+							...(targetTaskId ? { taskId: targetTaskId } : {}),
 							payload: {
 								id: effectiveQueue[index].id,
 								text: newText,
@@ -429,10 +429,12 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				}}
 				onForceSend={(index) => {
 					if (effectiveQueue[index]) {
+						const targetTaskId = activeTabId || currentTaskId
 						const queuedMsg = effectiveQueue[index]
 						vscode.postMessage({
 							type: "forceSendQueuedMessage",
 							text: queuedMsg.id,
+							...(targetTaskId ? { taskId: targetTaskId } : {}),
 							payload: {
 								id: queuedMsg.id,
 								text: queuedMsg.text,
@@ -476,11 +478,15 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				mode={mode}
 				setMode={setMode}
 				modeShortcutText={modeShortcutText}
-				isStreaming={isStreaming || mirrorAsk === "command_output"}
+				isStreaming={isStreaming}
 				messageWillQueue={messageWillQueue}
 				onStop={handleStopTask}
 				onEnqueueMessage={handleEnqueueCurrentMessage}
-				modelId={modelPickerConfig ? modelId : undefined}
+				modelId={
+					modelPickerConfig
+						? (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
+						: undefined
+				}
 				modelOptions={modelOptions}
 				onModelChange={handleModelChange}
 			/>

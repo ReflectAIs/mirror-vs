@@ -263,18 +263,32 @@ export async function handleCustomInstructions(provider: MirrorProvider, text?: 
  */
 export async function handleAskResponse(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
-	const currentTask = provider.getCurrentTask()
+	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
-		if (
-			!currentTask.isStreaming &&
-			!currentTask.idleAsk &&
-			!currentTask.resumableAsk &&
-			!currentTask.interactiveAsk &&
-			!(currentTask as any)._started
-		) {
+		const lastMsg = currentTask.mirrorMessages?.at(-1)
+		const isWaitingOnAsk = currentTask.askResponse === undefined
+		const isButtonResponse = message.askResponse === "yesButtonClicked" || message.askResponse === "noButtonClicked"
+		const hasPendingAsk =
+			currentTask.idleAsk !== undefined ||
+			currentTask.resumableAsk !== undefined ||
+			currentTask.interactiveAsk !== undefined
+
+		console.log(
+			`[handleAskResponse] taskId=${currentTask.taskId} askResponse=${message.askResponse} ` +
+				`isWaitingOnAsk=${isWaitingOnAsk} isButtonResponse=${isButtonResponse} hasPendingAsk=${hasPendingAsk} ` +
+				`lastMsgType=${lastMsg?.type} lastMsgAsk=${lastMsg?.ask} started=${(currentTask as any)._started}`,
+		)
+
+		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk || !currentTask.startWithContent) {
+			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+		} else if (!(currentTask as any)._started) {
 			await currentTask.startWithContent(resolved.text, resolved.images)
 		} else {
-			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+			// If task is started and has no active ask (e.g. background terminal running),
+			// inject as an in-between steering message so the model receives and considers it immediately.
+			if (resolved.text || (resolved.images && resolved.images.length > 0)) {
+				await currentTask.injectInBetweenMessage(resolved.text ?? "", resolved.images, "user_feedback")
+			}
 		}
 	}
 }
@@ -285,9 +299,11 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 export async function handleTerminalOperation(
 	provider: MirrorProvider,
 	terminalOp?: "continue" | "abort",
+	message?: WebviewMessage,
 ): Promise<void> {
 	if (terminalOp) {
-		provider.getCurrentTask()?.handleTerminalOperation(terminalOp)
+		const targetTask = provider.getLiveTask ? provider.getLiveTask(message?.taskId) : provider.getCurrentTask?.()
+		targetTask?.handleTerminalOperation(terminalOp)
 	}
 }
 

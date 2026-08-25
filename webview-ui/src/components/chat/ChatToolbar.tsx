@@ -125,10 +125,10 @@ const ChatToolbar = ({
 	return (
 		<>
 			{/* Top Header Area */}
-			<div className="flex items-center justify-between px-3 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none overflow-hidden gap-2">
+			<div className="flex items-center justify-between px-3 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none overflow-visible gap-2 relative z-10">
 				{/* Left Brand + Title Area */}
-				<div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-					<div className="shrink-0">
+				<div className="flex items-center gap-2 min-w-0 flex-1 overflow-visible">
+					<div className="shrink-0 relative z-20">
 						<MirrorHero activity={activity as any} size="small" />
 					</div>
 					<div className="flex flex-col min-w-0 overflow-hidden">

@@ -57,6 +57,9 @@ export function toolResultToText(block: Anthropic.Messages.ToolResultBlockParam)
 			.join("\n")
 	}
 
+	// Strip ANSI control codes & terminal formatting sequences
+	contentText = contentText.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
+
 	// Smart truncation for summarizer efficiency: limit very large tool outputs
 	const MAX_SUMMARY_TOOL_LEN = 1500
 	if (contentText.length > MAX_SUMMARY_TOOL_LEN) {

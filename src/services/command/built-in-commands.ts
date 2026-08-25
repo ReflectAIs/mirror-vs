@@ -42,10 +42,10 @@ Please analyze this codebase and create an AGENTS.md file containing:
     1. Check for existing AGENTS.md files
        CRITICAL - Check these EXACT paths IN THE PROJECT MIRRORT:
        - AGENTS.md (in project root directory)
-       - .mirror/rules-code/AGENTS.md (relative to project root)
-       - .mirror/rules-debug/AGENTS.md (relative to project root)
-       - .mirror/rules-ask/AGENTS.md (relative to project root)
-       - .mirror/rules-architect/AGENTS.md (relative to project root)
+       - .mirror-vs/rules-code/AGENTS.md (relative to project root)
+       - .mirror-vs/rules-debug/AGENTS.md (relative to project root)
+       - .mirror-vs/rules-ask/AGENTS.md (relative to project root)
+       - .mirror-vs/rules-architect/AGENTS.md (relative to project root)
        
        IMPORTANT: All paths are relative to the project/workspace root, NOT system root!
        
@@ -107,12 +107,12 @@ Please analyze this codebase and create an AGENTS.md file containing:
   1. **Discovery Phase**:
      CRITICAL - First check for existing AGENTS.md files at these EXACT locations IN PROJECT MIRRORT:
      - AGENTS.md (in project/workspace root)
-     - .mirror/rules-code/AGENTS.md (relative to project root)
-     - .mirror/rules-debug/AGENTS.md (relative to project root)
-     - .mirror/rules-ask/AGENTS.md (relative to project root)
-     - .mirror/rules-architect/AGENTS.md (relative to project root)
+     - .mirror-vs/rules-code/AGENTS.md (relative to project root)
+     - .mirror-vs/rules-debug/AGENTS.md (relative to project root)
+     - .mirror-vs/rules-ask/AGENTS.md (relative to project root)
+     - .mirror-vs/rules-architect/AGENTS.md (relative to project root)
      
-     IMPORTANT: The .mirror folder should be created in the PROJECT MIRRORT, not system root!
+     IMPORTANT: The .mirror-vs folder should be created in the PROJECT MIRRORT, not system root!
      
      If found, perform CRITICAL analysis:
      - What information is OBVIOUS and must be DELETED?
@@ -170,12 +170,12 @@ Please analyze this codebase and create an AGENTS.md file containing:
     Create or deeply improve mode-specific AGENTS.md files IN THE PROJECT MIRRORT.
     
     CRITICAL: For each of these paths (RELATIVE TO PROJECT MIRRORT), check if the file exists FIRST:
-    - .mirror/rules-code/AGENTS.md (create .mirror in project root, not system root!)
-    - .mirror/rules-debug/AGENTS.md (relative to project root)
-    - .mirror/rules-ask/AGENTS.md (relative to project root)
-    - .mirror/rules-architect/AGENTS.md (relative to project root)
+    - .mirror-vs/rules-code/AGENTS.md (create .mirror-vs in project root, not system root!)
+    - .mirror-vs/rules-debug/AGENTS.md (relative to project root)
+    - .mirror-vs/rules-ask/AGENTS.md (relative to project root)
+    - .mirror-vs/rules-architect/AGENTS.md (relative to project root)
     
-    IMPORTANT: The .mirror directory must be created in the current project/workspace root directory,
+    IMPORTANT: The .mirror-vs directory must be created in the current project/workspace root directory,
     NOT at the system root (/) or home directory. All paths are relative to where the project is located.
     
     If files exist:
@@ -190,7 +190,7 @@ Please analyze this codebase and create an AGENTS.md file containing:
     \`\`\`
     project-root/
     ├── AGENTS.md                    # General project guidance
-    ├── .mirror/                        # IN PROJECT MIRRORT, NOT SYSTEM MIRRORT!
+    ├── .mirror-vs/                        # IN PROJECT MIRRORT, NOT SYSTEM MIRRORT!
     │   ├── rules-code/
     │   │   └── AGENTS.md           # Code mode specific instructions
     │   ├── rules-debug/
@@ -204,7 +204,7 @@ Please analyze this codebase and create an AGENTS.md file containing:
     └── ... other project files
     \`\`\`
     
-    .mirror/rules-code/AGENTS.md - ONLY non-obvious coding rules discovered by reading files:
+    .mirror-vs/rules-code/AGENTS.md - ONLY non-obvious coding rules discovered by reading files:
     - Custom utilities that replace standard approaches
     - Non-standard patterns unique to this project
     - Hidden dependencies or coupling between components
@@ -219,7 +219,7 @@ Please analyze this codebase and create an AGENTS.md file containing:
     - Test files must be in same directory as source for vitest to work (not in separate test folder)
     \`\`\`
     
-    .mirror/rules-debug/AGENTS.md - ONLY non-obvious debugging discoveries:
+    .mirror-vs/rules-debug/AGENTS.md - ONLY non-obvious debugging discoveries:
     - Hidden log locations not mentioned in docs
     - Non-standard debugging tools or flags
     - Gotchas that cause silent failures
@@ -234,7 +234,7 @@ Please analyze this codebase and create an AGENTS.md file containing:
     - Extension logs only visible in "Extension Host" output channel, not Debug Console
     \`\`\`
     
-    .mirror/rules-ask/AGENTS.md - ONLY non-obvious documentation context:
+    .mirror-vs/rules-ask/AGENTS.md - ONLY non-obvious documentation context:
     - Hidden or misnamed documentation
     - Counterintuitive code organization
     - Misleading folder names or structures
@@ -250,7 +250,7 @@ Please analyze this codebase and create an AGENTS.md file containing:
     - Locales in root are for extension, webview-ui/src/i18n for UI (two separate systems)
     \`\`\`
     
-    .mirror/rules-architect/AGENTS.md - ONLY non-obvious architectural constraints:
+    .mirror-vs/rules-architect/AGENTS.md - ONLY non-obvious architectural constraints:
     - Hidden coupling between components
     - Undocumented architectural decisions
     - Non-standard patterns that must be followed
