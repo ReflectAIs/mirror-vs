@@ -404,7 +404,7 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			secretKey = ""
 			secretKeyName = ""
 
-			// Auto-detect installed embedding models from local Ollama service
+			// Auto-detect or auto-pull embedding models from local Ollama service
 			try {
 				const response = await fetch("http://localhost:11434/api/tags")
 				if (response.ok) {
@@ -424,6 +424,29 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 						})
 						if (foundEmbedModel) {
 							modelId = foundEmbedModel.name
+						} else {
+							// One-step auto-pull: download nomic-embed-text automatically with progress
+							await vscode.window.withProgress(
+								{
+									location: vscode.ProgressLocation.Notification,
+									title: "Ollama: Pulling nomic-embed-text for Codebase Indexing...",
+									cancellable: false,
+								},
+								async () => {
+									try {
+										const pullRes = await fetch("http://localhost:11434/api/pull", {
+											method: "POST",
+											headers: { "Content-Type": "application/json" },
+											body: JSON.stringify({ name: "nomic-embed-text", stream: false }),
+										})
+										if (pullRes.ok) {
+											modelId = "nomic-embed-text"
+										}
+									} catch (pullErr) {
+										provider.log(`Failed to auto-pull nomic-embed-text: ${pullErr}`)
+									}
+								},
+							)
 						}
 					}
 				}
