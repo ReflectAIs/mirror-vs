@@ -24,9 +24,9 @@
 	"selectedItems": "Selected {{selected}}/{{total}} items",
 	"clearSelection": "Clear Selection",
 	"deleteSelected": "Delete Selected",
-	"deleteTasks": "Delete Sessions",
-	"confirmDeleteTasks": "Are you sure you want to delete {{count}} sessions?",
-	"deleteTasksWarning": "Deleting selected sessions will delete all tabs and subtasks associated with them. This action cannot be undone.",
+	"deleteTasks": "Delete Session",
+	"confirmDeleteTasks": "Are you sure you want to delete this session with {{count}} tab(s)?",
+	"deleteTasksWarning": "Deleting this session will close and delete all associated tabs and subtasks. This action cannot be undone.",
 	"deleteItems": "Delete {{count}} Items",
 	"workspace": {
 		"prefix": "Workspace:",
