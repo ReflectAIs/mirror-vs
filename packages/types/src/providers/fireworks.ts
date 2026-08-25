@@ -32,7 +32,7 @@ export type FireworksModelId =
 	| "accounts/fireworks/models/mixtral-8x22b-instruct"
 	| "accounts/fireworks/models/yi-large"
 
-export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/kimi-k2p5"
+export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/deepseek-v3"
 
 export const fireworksModels = {
 	"accounts/fireworks/models/kimi-k2-instruct-0905": {
