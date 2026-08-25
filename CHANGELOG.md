@@ -2,10 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.7.6] - 2026-08-24
+## [0.7.6] - 2026-08-25
+
+### Added
+
+- **Fireworks AI Model Suite**: Added modern models to Fireworks AI provider configuration including DeepSeek-V3, DeepSeek-R1, Qwen 2.5 Coder, Llama 3.3 70B, and updated provider endpoints with smooth tool-calling support.
 
 ### Fixed
 
+- **Streaming Messages Glitching & Disappearing**: Fixed a bug where partial streaming chunks (reasoning, tool executions, text) overwrote preceding messages in-place in the webview state, causing messages to blink or vanish. Messages are now strictly indexed by timestamp and cleanly appended.
+- **Restored Tab Streaming & Auto-Scroll**: Fixed an issue where restored tabs loaded from history remained anchored to old messages in browsing mode during new streaming sessions; the viewport now automatically anchors and follows active streaming tokens and tool calls.
+- **Terminal Callback Width Bounds**: Resolved terminal background callback prompt width escaping the viewport with responsive truncation and max-width clamping.
+- **Loaded Tab Input Responsiveness**: Pre-emptively unblocked input acceptance and state reconciliation when resuming restored tabs or continuing approval requests.
 - **Terminal Background Steering Fix**: Fixed an issue where sending messages while a terminal process was running in the background would be silently dropped or ignored by the model. Messages sent without an active pending ask are now automatically injected as in-between steering feedback so the model processes them immediately.
 
 ## [0.7.5] - 2026-08-24

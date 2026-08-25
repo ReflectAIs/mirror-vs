@@ -1866,11 +1866,9 @@ export class MirrorProvider
 			await this.performPreparationTasks(task)
 
 			// Start the focused restored task to show Resume banner and accept messages
-			try {
-				await task.startRestoredTask()
-			} catch (error) {
+			task.startRestoredTask().catch((error) => {
 				this.log(`[restoreSessionTabs] Failed to start restored active task: ${error}`)
-			}
+			})
 
 			this.log(
 				`[restoreSessionTabs] Restored ${restoredTasks.length + 1} tabs (${restoredTasks.length} background + 1 focused) for session ${sessionId}`,
@@ -2321,7 +2319,9 @@ export class MirrorProvider
 		this.currentSessionId = branchSessionId
 		await this.contextProxy.setValue("currentSessionId", branchSessionId)
 		const newTask = await this.createTaskWithHistoryItem(newHistoryItem, { startTask: false })
-		await newTask.startRestoredTask()
+		newTask.startRestoredTask().catch((error) => {
+			this.log(`[branchTaskToWorkspace] Failed to start restored task: ${error}`)
+		})
 
 		await this.postStateToWebview()
 		return newTask
