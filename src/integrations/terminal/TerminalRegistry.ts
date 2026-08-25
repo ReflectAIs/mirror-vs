@@ -99,7 +99,21 @@ export class TerminalRegistry {
 					// When a command fails (non-zero exit code) for a user-initiated command
 					// (one that Mirror VS didn't start directly, i.e. terminal.running is false),
 					// offer an AI-powered auto-fix suggestion.
-					if (exitDetails.exitCode !== undefined && exitDetails.exitCode !== 0 && !terminal.running) {
+					// Ignore normal termination signals like SIGINT (130 / Ctrl+C) and SIGTERM (143).
+					const isUserCancelled =
+						exitDetails.exitCode === 130 ||
+						exitDetails.exitCode === 143 ||
+						exitDetails.signal === 2 ||
+						exitDetails.signal === 15 ||
+						exitDetails.signalName === "SIGINT" ||
+						exitDetails.signalName === "SIGTERM"
+
+					if (
+						exitDetails.exitCode !== undefined &&
+						exitDetails.exitCode !== 0 &&
+						!isUserCancelled &&
+						!terminal.running
+					) {
 						const commandLine = e.execution?.commandLine?.value ?? ""
 						const output = terminal.getUnretrievedOutput() || ""
 

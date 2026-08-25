@@ -39,13 +39,16 @@ export class MirrorProtectedController {
 	 */
 	isWriteProtected(filePath: string): boolean {
 		try {
+			if (!filePath || typeof filePath !== "string") {
+				return false
+			}
 			// Normalize path to be relative to cwd and use forward slashes
 			const absolutePath = path.resolve(this.cwd, filePath)
 			const relativePath = path.relative(this.cwd, absolutePath).toPosix()
 
 			// Paths outside the cwd start with ".." and can't match any protected pattern.
-			// The ignore library throws RangeError for such paths, so skip them early.
-			if (relativePath.startsWith("..")) {
+			// Empty relativePath or "." refers to root directory.
+			if (!relativePath || relativePath === "." || relativePath.startsWith("..")) {
 				return false
 			}
 
