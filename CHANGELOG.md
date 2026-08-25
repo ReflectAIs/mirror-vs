@@ -2,6 +2,16 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.7] - 2026-08-25
+
+### Fixed
+
+- **Startup Lifecycle & Tab Restoration**: Replaced automatic background tab preloading on launch with clean lazy restoration so extensions initialize immediately without locking state broadcasts.
+- **Task Instance Deduplication**: Fixed duplicate task instances causing users to have to click close multiple times; `closeTask` now disposes and cleans all instances of a closed task ID in a single pass.
+- **Chat Queue Alignment**: Fixed a false-positive queue condition that erroneously marked user messages in idle tasks as "Queued Messages", and added automatic optimistic queue clearing when user feedback messages are rendered in the conversation.
+- **Empty Path Protection Guard**: Resolved `TypeError: path must not be empty` in `MirrorProtectedController` when checking protection rules for root or empty path expressions.
+- **History Workspace Normalization**: Tolerant path matching in the History panel prevents sessions and tasks from disappearing due to trailing slashes or workspace metadata differences.
+
 ## [0.7.6] - 2026-08-25
 
 ### Added
