@@ -208,7 +208,7 @@ export const ModelPicker = ({
 
 			// Apply value transform if provided (e.g., for VSCodeLM selector)
 			const valueToStore = valueTransform ? valueTransform(modelId) : modelId
-			setApiConfigurationField(modelIdKey, valueToStore as ProviderSettings[ModelIdKey])
+			setApiConfigurationField(modelIdKey, valueToStore as ProviderSettings[ModelIdKey], true)
 
 			// Call the optional change callback
 			onModelChange?.(modelId)
@@ -230,6 +230,7 @@ export const ModelPicker = ({
 			activeProvider,
 			organizationAllowList,
 			deletedDefaultModels,
+			apiConfiguration?.apiProvider,
 		],
 	)
 
@@ -326,7 +327,7 @@ export const ModelPicker = ({
 										<CommandItem
 											key={model}
 											value={model}
-											onSelect={onSelect}
+											onSelect={() => onSelect(model)}
 											data-testid={`model-option-${model}`}>
 											<span className="truncate" title={model}>
 												{model}
@@ -337,7 +338,10 @@ export const ModelPicker = ({
 							</CommandList>
 							{searchValue && !modelIds.includes(searchValue) && (
 								<div className="p-1 border-t border-vscode-input-border">
-									<CommandItem data-testid="use-custom-model" value={searchValue} onSelect={onSelect}>
+									<CommandItem
+										data-testid="use-custom-model"
+										value={searchValue}
+										onSelect={() => onSelect(searchValue)}>
 										{t("settings:modelPicker.useCustomModel", { modelId: searchValue })}
 									</CommandItem>
 								</div>
