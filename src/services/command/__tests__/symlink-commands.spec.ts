@@ -6,8 +6,8 @@ import { getCommand, getCommands } from "../commands"
 // Mock fs and path modules
 vi.mock("fs/promises")
 vi.mock("../mirror-config", () => ({
-	getGlobalMirrorDirectory: vi.fn(() => "/mock/global/.mirror"),
-	getProjectMirrorDirectoryForCwd: vi.fn(() => "/mock/project/.mirror"),
+	getGlobalMirrorDirectory: vi.fn(() => "/mock/global/.mirror-vs"),
+	getProjectMirrorDirectoryForCwd: vi.fn(() => "/mock/project/.mirror-vs"),
 }))
 vi.mock("../built-in-commands", () => ({
 	getBuiltInCommands: vi.fn(() => Promise.resolve([])),

@@ -15,7 +15,21 @@ import {
 	ImageGenerationProvider,
 } from "@mirror-vs/types"
 import { EXPERIMENT_IDS } from "@shared/experiments"
-import { Upload, Info, Scan, Plus, X, CheckCircle2, Loader2, ChevronDown, Trash2 } from "lucide-react"
+import {
+	Upload,
+	Info,
+	Scan,
+	Plus,
+	X,
+	CheckCircle2,
+	Loader2,
+	ChevronDown,
+	Trash2,
+	Play,
+	ExternalLink,
+	Copy,
+	Check,
+} from "lucide-react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import {
 	AlertDialog,
@@ -215,6 +229,10 @@ export const ImageGenerationSettings = ({
 	const [selectedWorkflows, setSelectedWorkflows] = useState<Set<string>>(new Set())
 	const [importingWorkflows, setImportingWorkflows] = useState(false)
 	const [deletingWorkflow, setDeletingWorkflow] = useState<string | null>(null)
+	const [startingServer, setStartingServer] = useState(false)
+	const [serverUrl, setServerUrl] = useState<string | null>(null)
+	const [serverError, setServerError] = useState<string | null>(null)
+	const [copiedError, setCopiedError] = useState(false)
 
 	/* ── Pipeline deletion state ────────────────────────────── */
 
@@ -234,6 +252,18 @@ export const ImageGenerationSettings = ({
 			setScanResults({ workflows: message.workflows, workflowDir: message.workflowDir })
 			setScanning(false)
 			setSelectedWorkflows(new Set())
+		}
+		if (message.type === "startComfyuiServerResult") {
+			setStartingServer(false)
+			if (message.success) {
+				setServerUrl(message.text || "http://127.0.0.1:8188")
+				setServerError(null)
+			} else {
+				setServerError(message.error || "Failed to start ComfyUI server")
+				if (message.text) {
+					setServerUrl(message.text)
+				}
+			}
 		}
 		if (message.type === "importComfyuiWorkflows" && message.slugs) {
 			setImportingWorkflows(false)
@@ -297,6 +327,16 @@ export const ImageGenerationSettings = ({
 		vscode.postMessage({ type: "scanComfyuiWorkflows" } as any)
 		onScanComfyuiWorkflows?.()
 	}, [onScanComfyuiWorkflows])
+
+	const handleStartServer = useCallback(() => {
+		setStartingServer(true)
+		setServerError(null)
+		vscode.postMessage({ type: "startComfyuiServer" } as any)
+	}, [])
+
+	const handleOpenServerUrl = useCallback((url: string) => {
+		vscode.postMessage({ type: "openExternal", text: url } as any)
+	}, [])
 
 	const handleToggleWorkflowSelection = useCallback((filename: string) => {
 		setSelectedWorkflows((prev) => {
@@ -633,162 +673,241 @@ export const ImageGenerationSettings = ({
 			)}
 
 			{/* ─── Section: ComfyUI Workflow Browser ─────────────── */}
-			<div className="border border-vscode-editorGroup-border/50 rounded-md p-3">
-				<div
-					className="cursor-pointer font-medium text-sm select-none flex items-center gap-1.5"
-					onClick={() => setWorkflowBrowserOpen((prev) => !prev)}>
-					<ChevronDown
-						className={`w-4 h-4 transition-transform ${workflowBrowserOpen ? "" : "-rotate-90"}`}
-					/>
-					<Scan className="w-4 h-4" />
-					ComfyUI Workflow Browser
-					{scanResults && (
-						<span className="ml-auto text-[10px] text-vscode-descriptionForeground bg-vscode-badge-background px-1.5 py-0.5 rounded-full">
-							{scanResults.workflows.length}
-						</span>
-					)}
-				</div>
-				{workflowBrowserOpen && (
-					<div className="mt-3 space-y-3">
-						<p className="text-xs text-vscode-descriptionForeground">
-							Scan your ComfyUI installation for user workflows and import them as pipelines. Workflows
-							found in <code className="text-vscode-textLink-foreground">user/default/workflows/</code>{" "}
-							will be listed below.
-						</p>
-
-						{/* Scan button */}
-						<VSCodeButton appearance="secondary" onClick={handleScanWorkflows} disabled={scanning}>
-							{scanning ? (
-								<>
-									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-									Scanning...
-								</>
-							) : (
-								<>
-									<Scan className="w-3.5 h-3.5 mr-1.5" />
-									Scan for Workflows
-								</>
-							)}
-						</VSCodeButton>
-
-						{/* Scan results */}
+			{configuredProviders?.has("comfyui") && (
+				<div className="border border-vscode-editorGroup-border/50 rounded-md p-3">
+					<div
+						className="cursor-pointer font-medium text-sm select-none flex items-center gap-1.5"
+						onClick={() => setWorkflowBrowserOpen((prev) => !prev)}>
+						<ChevronDown
+							className={`w-4 h-4 transition-transform ${workflowBrowserOpen ? "" : "-rotate-90"}`}
+						/>
+						<Scan className="w-4 h-4" />
+						ComfyUI Workflow Browser
 						{scanResults && (
-							<div className="space-y-2">
-								<div className="flex items-center justify-between">
-									<span className="text-xs font-medium text-vscode-descriptionForeground">
-										Found {scanResults.workflows.length} workflow
-										{scanResults.workflows.length !== 1 ? "s" : ""}
-									</span>
-									<span className="text-[10px] text-vscode-descriptionForeground">
-										{scanResults.workflowDir}
-									</span>
-								</div>
-								{scanResults.workflows.length === 0 ? (
-									<p className="text-xs text-vscode-descriptionForeground italic">
-										No workflows found in the scanned directory.
-									</p>
-								) : (
-									<>
-										{/* Batch selection controls */}
-										<div className="flex items-center gap-2">
-											<VSCodeButton
-												appearance="secondary"
-												onClick={() =>
-													setSelectedWorkflows(
-														new Set(scanResults.workflows.map((wf) => wf.filename)),
-													)
-												}
-												disabled={selectedWorkflows.size === scanResults.workflows.length}>
-												Select All
-											</VSCodeButton>
-											{selectedWorkflows.size === scanResults.workflows.length && (
-												<VSCodeButton
-													appearance="secondary"
-													onClick={() => setSelectedWorkflows(new Set())}>
-													Deselect All
-												</VSCodeButton>
-											)}
-										</div>
-										<div className="border border-vscode-editorGroup-border/50 rounded-md overflow-hidden">
-											{scanResults.workflows.map((wf) => (
-												<div
-													key={wf.filename}
-													className="flex items-center gap-2 px-3 py-2 hover:bg-vscode-list-hoverBackground border-b border-vscode-editorGroup-border/30 last:border-b-0">
-													<VSCodeCheckbox
-														checked={selectedWorkflows.has(wf.filename)}
-														onChange={() => handleToggleWorkflowSelection(wf.filename)}>
-														<span className="text-sm">{wf.name}</span>
-													</VSCodeCheckbox>
-													<div className="ml-auto">
-														<VSCodeButton
-															appearance="icon"
-															onClick={() => handleDeleteWorkflow(wf.filename)}
-															disabled={deletingWorkflow === wf.filename}
-															title="Delete this workflow">
-															{deletingWorkflow === wf.filename ? (
-																<Loader2 className="w-3.5 h-3.5 animate-spin" />
-															) : (
-																<Trash2 className="w-3.5 h-3.5" />
-															)}
-														</VSCodeButton>
-													</div>
-												</div>
-											))}
-										</div>
-									</>
-								)}
-								{selectedWorkflows.size > 0 && (
-									<div className="flex items-center gap-2">
-										{selectedWorkflows.size === scanResults.workflows.length && (
-											<VSCodeButton
-												onClick={handleImportSelectedWorkflows}
-												disabled={importingWorkflows}>
-												{importingWorkflows ? (
-													<>
-														<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-														Importing...
-													</>
-												) : (
-													<>
-														<Plus className="w-3.5 h-3.5 mr-1.5" />
-														Import All ({selectedWorkflows.size})
-													</>
-												)}
-											</VSCodeButton>
-										)}
-										{selectedWorkflows.size < scanResults.workflows.length && (
-											<VSCodeButton
-												onClick={handleImportSelectedWorkflows}
-												disabled={importingWorkflows}>
-												{importingWorkflows ? (
-													<>
-														<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-														Importing...
-													</>
-												) : (
-													<>
-														<Plus className="w-3.5 h-3.5 mr-1.5" />
-														Import Selected ({selectedWorkflows.size})
-													</>
-												)}
-											</VSCodeButton>
-										)}
-										<VSCodeButton
-											appearance="secondary"
-											onClick={() => {
-												setScanResults(null)
-												setSelectedWorkflows(new Set())
-											}}>
-											<X className="w-3.5 h-3.5 mr-1.5" />
-											Dismiss
-										</VSCodeButton>
-									</div>
-								)}
-							</div>
+							<span className="ml-auto text-[10px] text-vscode-descriptionForeground bg-vscode-badge-background px-1.5 py-0.5 rounded-full">
+								{scanResults.workflows.length}
+							</span>
 						)}
 					</div>
-				)}
-			</div>
+					{workflowBrowserOpen && (
+						<div className="mt-3 space-y-3">
+							<p className="text-xs text-vscode-descriptionForeground">
+								Scan your ComfyUI installation for user workflows and import them as pipelines.
+								Workflows found in{" "}
+								<code className="text-vscode-textLink-foreground">user/default/workflows/</code> will be
+								listed below.
+							</p>
+
+							{/* Action buttons */}
+							<div className="flex flex-wrap items-center gap-2">
+								<VSCodeButton appearance="secondary" onClick={handleScanWorkflows} disabled={scanning}>
+									{scanning ? (
+										<>
+											<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+											Scanning...
+										</>
+									) : (
+										<>
+											<Scan className="w-3.5 h-3.5 mr-1.5" />
+											Scan for Workflows
+										</>
+									)}
+								</VSCodeButton>
+
+								<VSCodeButton
+									appearance="secondary"
+									onClick={handleStartServer}
+									disabled={startingServer}>
+									{startingServer ? (
+										<>
+											<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+											Starting Server...
+										</>
+									) : (
+										<>
+											<Play className="w-3.5 h-3.5 mr-1.5" />
+											Start ComfyUI Server
+										</>
+									)}
+								</VSCodeButton>
+
+								{serverUrl && (
+									<button
+										type="button"
+										onClick={() => handleOpenServerUrl(serverUrl)}
+										className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs text-vscode-textLink-foreground hover:text-vscode-textLink-activeForeground bg-vscode-textLink-foreground/10 hover:bg-vscode-textLink-foreground/15 border border-vscode-textLink-foreground/30 cursor-pointer transition-colors">
+										<ExternalLink className="w-3.5 h-3.5" />
+										Open ComfyUI ({serverUrl})
+									</button>
+								)}
+							</div>
+
+							{serverError && (
+								<div className="flex items-start gap-2 text-xs text-vscode-editorWarning-foreground bg-vscode-editorWarning-background/20 p-2 rounded border border-vscode-editorWarning-border/40">
+									<span className="mt-0.5 select-none">⚠️</span>
+									<p className="flex-1 m-0 leading-relaxed">{serverError}</p>
+									<button
+										type="button"
+										onClick={() => {
+											navigator.clipboard.writeText(serverError)
+											setCopiedError(true)
+											setTimeout(() => setCopiedError(false), 2000)
+										}}
+										className="p-1 rounded text-vscode-descriptionForeground hover:bg-vscode-toolbar-hoverBackground hover:text-vscode-foreground cursor-pointer transition-colors"
+										title="Copy error message">
+										{copiedError ? (
+											<Check className="w-3.5 h-3.5 text-vscode-charts-green" />
+										) : (
+											<Copy className="w-3.5 h-3.5" />
+										)}
+									</button>
+								</div>
+							)}
+
+							{/* Scan results */}
+							{scanResults && (
+								<div className="space-y-2">
+									<div className="flex items-center justify-between">
+										<span className="text-xs font-medium text-vscode-descriptionForeground">
+											Found {scanResults.workflows.length} workflow
+											{scanResults.workflows.length !== 1 ? "s" : ""}
+										</span>
+										<span className="text-[10px] text-vscode-descriptionForeground truncate max-w-[280px]">
+											{scanResults.workflowDir}
+										</span>
+									</div>
+									{scanResults.workflows.length === 0 ? (
+										<div className="p-3 border border-dashed border-vscode-editorGroup-border/50 rounded-md bg-vscode-sideBar-background/30 space-y-2">
+											<p className="text-xs text-vscode-descriptionForeground m-0 italic">
+												No workflows found in the scanned directory.
+											</p>
+											<p className="text-xs text-vscode-descriptionForeground m-0">
+												Start the ComfyUI server, build or save your workflows in the ComfyUI
+												web interface, then click <strong>Scan for Workflows</strong> to import
+												them.
+											</p>
+											<div className="flex items-center gap-2 pt-1">
+												<VSCodeButton
+													appearance="secondary"
+													onClick={handleStartServer}
+													disabled={startingServer}>
+													<Play className="w-3.5 h-3.5 mr-1.5" />
+													Start Server & Open UI
+												</VSCodeButton>
+												<button
+													type="button"
+													onClick={() =>
+														handleOpenServerUrl(serverUrl || "http://127.0.0.1:8188")
+													}
+													className="inline-flex items-center gap-1.5 text-xs text-vscode-textLink-foreground hover:text-vscode-textLink-activeForeground bg-transparent border-none cursor-pointer p-0 underline">
+													<ExternalLink className="w-3 h-3" />
+													http://127.0.0.1:8188
+												</button>
+											</div>
+										</div>
+									) : (
+										<>
+											{/* Batch selection controls */}
+											<div className="flex items-center gap-2">
+												<VSCodeButton
+													appearance="secondary"
+													onClick={() =>
+														setSelectedWorkflows(
+															new Set(scanResults.workflows.map((wf) => wf.filename)),
+														)
+													}
+													disabled={selectedWorkflows.size === scanResults.workflows.length}>
+													Select All
+												</VSCodeButton>
+												{selectedWorkflows.size === scanResults.workflows.length && (
+													<VSCodeButton
+														appearance="secondary"
+														onClick={() => setSelectedWorkflows(new Set())}>
+														Deselect All
+													</VSCodeButton>
+												)}
+											</div>
+											<div className="border border-vscode-editorGroup-border/50 rounded-md overflow-hidden">
+												{scanResults.workflows.map((wf) => (
+													<div
+														key={wf.filename}
+														className="flex items-center gap-2 px-3 py-2 hover:bg-vscode-list-hoverBackground border-b border-vscode-editorGroup-border/30 last:border-b-0">
+														<VSCodeCheckbox
+															checked={selectedWorkflows.has(wf.filename)}
+															onChange={() => handleToggleWorkflowSelection(wf.filename)}>
+															<span className="text-sm">{wf.name}</span>
+														</VSCodeCheckbox>
+														<div className="ml-auto">
+															<VSCodeButton
+																appearance="icon"
+																onClick={() => handleDeleteWorkflow(wf.filename)}
+																disabled={deletingWorkflow === wf.filename}
+																title="Delete this workflow">
+																{deletingWorkflow === wf.filename ? (
+																	<Loader2 className="w-3.5 h-3.5 animate-spin" />
+																) : (
+																	<Trash2 className="w-3.5 h-3.5" />
+																)}
+															</VSCodeButton>
+														</div>
+													</div>
+												))}
+											</div>
+										</>
+									)}
+									{selectedWorkflows.size > 0 && (
+										<div className="flex items-center gap-2">
+											{selectedWorkflows.size === scanResults.workflows.length && (
+												<VSCodeButton
+													onClick={handleImportSelectedWorkflows}
+													disabled={importingWorkflows}>
+													{importingWorkflows ? (
+														<>
+															<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+															Importing...
+														</>
+													) : (
+														<>
+															<Plus className="w-3.5 h-3.5 mr-1.5" />
+															Import All ({selectedWorkflows.size})
+														</>
+													)}
+												</VSCodeButton>
+											)}
+											{selectedWorkflows.size < scanResults.workflows.length && (
+												<VSCodeButton
+													onClick={handleImportSelectedWorkflows}
+													disabled={importingWorkflows}>
+													{importingWorkflows ? (
+														<>
+															<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+															Importing...
+														</>
+													) : (
+														<>
+															<Plus className="w-3.5 h-3.5 mr-1.5" />
+															Import Selected ({selectedWorkflows.size})
+														</>
+													)}
+												</VSCodeButton>
+											)}
+											<VSCodeButton
+												appearance="secondary"
+												onClick={() => {
+													setScanResults(null)
+													setSelectedWorkflows(new Set())
+												}}>
+												<X className="w-3.5 h-3.5 mr-1.5" />
+												Dismiss
+											</VSCodeButton>
+										</div>
+									)}
+								</div>
+							)}
+						</div>
+					)}
+				</div>
+			)}
 
 			{/* ─── Import Pipeline Dialog ─────────────────────────── */}
 			<AlertDialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

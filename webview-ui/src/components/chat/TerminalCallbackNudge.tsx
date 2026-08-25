@@ -1,29 +1,48 @@
-import { memo, useState, useMemo } from "react"
-import { ChevronDown, CheckCircle2, XCircle, Zap, Folder } from "lucide-react"
+import { memo, useState, useMemo, useCallback } from "react"
+import { ChevronDown, CheckCircle2, XCircle, Terminal, ArrowUpRight, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui"
 
 interface TerminalCallbackNudgeProps {
 	text?: string
+	onNavigateToMessage?: (ts: number) => void
+	messageTs?: number
 }
 
-export const TerminalCallbackNudge = memo(({ text }: TerminalCallbackNudgeProps) => {
+export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageTs }: TerminalCallbackNudgeProps) => {
 	const [isExpanded, setIsExpanded] = useState(false)
+	const [copied, setCopied] = useState(false)
 
 	const parsed = useMemo(() => {
-		if (!text) return { command: "", cwd: "", exitStatus: "", output: "" }
+		if (!text) return { command: "", cwd: "", exitStatus: "", output: "", isNotice: false }
+
+		const isNotice = text.includes("[Terminal Notice:")
 
 		// Matches "[Terminal Callback: Background process for '<command>' finished in '<cwd>'. <exitStatus>]\nOutput:\n<output>"
-		const match = text.match(
+		const callbackMatch = text.match(
 			/\[Terminal Callback: Background process for '([^']+)' finished in '([^']*)'\.\s*([^\]]+)\](?:\s*Output:\s*([\s\S]*))?/,
 		)
 
-		if (match) {
+		if (callbackMatch) {
 			return {
-				command: match[1] || "",
-				cwd: match[2] || "",
-				exitStatus: match[3] || "",
-				output: (match[4] || "").trim(),
+				command: callbackMatch[1] || "",
+				cwd: callbackMatch[2] || "",
+				exitStatus: callbackMatch[3] || "",
+				output: (callbackMatch[4] || "").trim(),
+				isNotice: false,
+			}
+		}
+
+		// Matches "[Terminal Notice: Background process for '<command>' in '<cwd>' ...]"
+		const noticeMatch = text.match(/\[Terminal Notice: Background process for '([^']+)' in '([^']*)'\s*([^\]]+)\]/)
+
+		if (noticeMatch) {
+			return {
+				command: noticeMatch[1] || "",
+				cwd: noticeMatch[2] || "",
+				exitStatus: "Running",
+				output: "",
+				isNotice: true,
 			}
 		}
 
@@ -33,75 +52,121 @@ export const TerminalCallbackNudge = memo(({ text }: TerminalCallbackNudgeProps)
 		const output = outputIndex !== -1 ? text.slice(outputIndex + "Output:\n".length).trim() : ""
 
 		return {
-			command: header.replace(/^\[Terminal Callback:\s*/, "").replace(/\]$/, ""),
+			command: header.replace(/^\[Terminal (?:Callback|Notice):\s*/, "").replace(/\]$/, ""),
 			cwd: "",
 			exitStatus: "Completed",
 			output,
+			isNotice,
 		}
 	}, [text])
 
 	const isSuccess =
 		!parsed.exitStatus.toLowerCase().includes("fail") &&
 		!parsed.exitStatus.toLowerCase().includes("error") &&
-		!parsed.exitStatus.includes("Exit 1")
+		!parsed.exitStatus.includes("Exit 1") &&
+		parsed.exitStatus !== "Running"
+
+	const isRunning = parsed.exitStatus === "Running"
+
+	const handleJumpToCommand = useCallback(() => {
+		// Try to find the closest previous command DOM element or scroll up
+		if (messageTs && onNavigateToMessage) {
+			onNavigateToMessage(messageTs)
+		} else {
+			// Find previous row in DOM
+			const target = document.querySelector(`[data-ts='${messageTs}']`)?.previousElementSibling
+			if (target && "scrollIntoView" in target) {
+				;(target as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" })
+			}
+		}
+	}, [messageTs, onNavigateToMessage])
+
+	const handleCopy = useCallback(() => {
+		if (parsed.output) {
+			navigator.clipboard.writeText(parsed.output)
+			setCopied(true)
+			setTimeout(() => setCopied(false), 2000)
+		}
+	}, [parsed.output])
 
 	return (
-		<div className="my-2 rounded-lg bg-vscode-editor-background/60 border border-vscode-panel-border/50 hover:border-mirror-brand-via/30 transition-all p-2.5 shadow-xs backdrop-blur-xs group">
-			<div className="flex items-center justify-between gap-2">
-				<div className="flex items-center gap-2 min-w-0 flex-1">
-					<div className="flex items-center justify-center size-6 rounded-md bg-mirror-brand-via/10 text-mirror-brand-via shrink-0">
-						<Zap className="size-3.5 animate-pulse" />
-					</div>
-					<div className="flex items-center gap-1.5 flex-wrap min-w-0">
-						<span className="text-[11px] font-bold text-vscode-foreground tracking-wide">
-							Terminal Nudge
-						</span>
-						{parsed.command && (
-							<span
-								className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-vscode-badge-background/30 text-vscode-foreground max-w-[240px] truncate border border-vscode-panel-border/30"
-								title={parsed.command}>
-								{parsed.command}
-							</span>
+		<div className="my-1.5 w-full max-w-full overflow-hidden box-border rounded-md bg-vscode-sideBar-background/60 border border-vscode-panel-border/40 hover:border-mirror-brand-via/30 transition-all text-xs shadow-2xs backdrop-blur-xs group">
+			<div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 min-h-[30px] w-full min-w-0 max-w-full overflow-hidden box-border">
+				<div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+					<Terminal
+						className={cn(
+							"size-3.5 shrink-0",
+							isRunning
+								? "text-amber-400 animate-pulse"
+								: isSuccess
+									? "text-emerald-400"
+									: "text-red-400",
 						)}
-						{parsed.exitStatus && (
-							<span
-								className={cn(
-									"text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border inline-flex items-center gap-1",
-									isSuccess
+					/>
+					<span className="text-[10px] font-semibold text-vscode-descriptionForeground tracking-wider uppercase shrink-0">
+						{parsed.isNotice ? "Terminal Active" : "Terminal Done"}
+					</span>
+					{parsed.command && (
+						<span
+							className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-vscode-badge-background/20 text-vscode-foreground min-w-0 max-w-[140px] xs:max-w-[200px] sm:max-w-[280px] truncate border border-vscode-panel-border/30 shrink"
+							title={parsed.command}>
+							{parsed.command}
+						</span>
+					)}
+					{parsed.exitStatus && (
+						<span
+							className={cn(
+								"text-[10px] font-mono font-medium px-1.5 py-0.2 rounded border inline-flex items-center gap-1 shrink-0 whitespace-nowrap",
+								isRunning
+									? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+									: isSuccess
 										? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
 										: "bg-red-500/10 text-red-400 border-red-500/20",
-								)}>
-								{isSuccess ? <CheckCircle2 className="size-2.5" /> : <XCircle className="size-2.5" />}
-								{parsed.exitStatus}
-							</span>
-						)}
-					</div>
+							)}>
+							{!isRunning &&
+								(isSuccess ? <CheckCircle2 className="size-2.5" /> : <XCircle className="size-2.5" />)}
+							{parsed.exitStatus}
+						</span>
+					)}
 				</div>
 
-				{parsed.output && (
+				<div className="flex items-center gap-1 shrink-0">
+					{parsed.output && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setIsExpanded(!isExpanded)}
+							className="h-5 text-[10px] px-1.5 text-vscode-descriptionForeground hover:text-vscode-foreground flex items-center gap-1 cursor-pointer">
+							<span>{isExpanded ? "Hide" : "View Output"}</span>
+							<ChevronDown
+								className={cn("size-2.5 transition-transform duration-200", isExpanded && "rotate-180")}
+							/>
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={() => setIsExpanded(!isExpanded)}
-						className="h-6 text-[11px] px-2 text-vscode-descriptionForeground hover:text-vscode-foreground shrink-0 flex items-center gap-1">
-						<span>{isExpanded ? "Hide Output" : "View Output"}</span>
-						<ChevronDown
-							className={cn("size-3 transition-transform duration-200", isExpanded && "rotate-180")}
-						/>
+						onClick={handleJumpToCommand}
+						className="h-5 text-[10px] px-1.5 text-vscode-descriptionForeground hover:text-vscode-foreground flex items-center gap-0.5 cursor-pointer opacity-70 group-hover:opacity-100 transition-opacity"
+						title="Scroll to terminal command in chat">
+						<span>Jump</span>
+						<ArrowUpRight className="size-2.5" />
 					</Button>
-				)}
+				</div>
 			</div>
 
-			{parsed.cwd && (
-				<div className="flex items-center gap-1 text-[10px] text-vscode-descriptionForeground font-mono mt-1 pl-8">
-					<Folder className="size-2.5" />
-					<span className="truncate">{parsed.cwd}</span>
-				</div>
-			)}
-
 			{isExpanded && parsed.output && (
-				<div className="mt-2 pl-8">
-					<pre className="text-[11px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/40 overflow-x-auto max-h-[220px] overflow-y-auto whitespace-pre-wrap text-vscode-editor-foreground">
+				<div className="px-2.5 pb-2 pt-1 border-t border-vscode-panel-border/20 w-full max-w-full overflow-hidden box-border">
+					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono mb-1 min-w-0">
+						<span className="truncate mr-2">{parsed.cwd ? `cwd: ${parsed.cwd}` : "Output"}</span>
+						<button
+							onClick={handleCopy}
+							className="flex items-center gap-1 hover:text-vscode-foreground cursor-pointer transition-colors shrink-0">
+							{copied ? <Check className="size-2.5 text-emerald-400" /> : <Copy className="size-2.5" />}
+							<span>{copied ? "Copied" : "Copy"}</span>
+						</button>
+					</div>
+					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full max-w-full box-border">
 						{parsed.output}
 					</pre>
 				</div>

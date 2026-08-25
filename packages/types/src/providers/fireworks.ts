@@ -9,6 +9,7 @@ export type FireworksModelId =
 	| "accounts/fireworks/models/minimax-m2p1"
 	| "accounts/fireworks/models/qwen3-235b-a22b-instruct-2507"
 	| "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct"
+	| "accounts/fireworks/models/deepseek-r1"
 	| "accounts/fireworks/models/deepseek-r1-0528"
 	| "accounts/fireworks/models/deepseek-v3"
 	| "accounts/fireworks/models/deepseek-v3p1"
@@ -21,10 +22,17 @@ export type FireworksModelId =
 	| "accounts/fireworks/models/gpt-oss-120b"
 	| "accounts/fireworks/models/qwen2p5-coder-32b-instruct"
 	| "accounts/fireworks/models/llama-v3p3-70b-instruct"
+	| "accounts/fireworks/models/llama-v3p1-405b-instruct"
+	| "accounts/fireworks/models/llama-v3p1-70b-instruct"
+	| "accounts/fireworks/models/llama-v3p1-8b-instruct"
 	| "accounts/fireworks/models/llama4-maverick-instruct-basic"
 	| "accounts/fireworks/models/llama4-scout-instruct-basic"
+	| "accounts/fireworks/models/phi-4"
+	| "accounts/fireworks/models/mistral-large-2407"
+	| "accounts/fireworks/models/mixtral-8x22b-instruct"
+	| "accounts/fireworks/models/yi-large"
 
-export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/kimi-k2p5"
+export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/deepseek-v3"
 
 export const fireworksModels = {
 	"accounts/fireworks/models/kimi-k2-instruct-0905": {
@@ -83,6 +91,16 @@ export const fireworksModels = {
 		description:
 			"MiniMax M2 is a high-performance language model with 204.8K context window, optimized for long-context understanding and generation tasks.",
 	},
+	"accounts/fireworks/models/minimax-m2p1": {
+		maxTokens: 4096,
+		contextWindow: 204800,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.3,
+		outputPrice: 1.2,
+		description:
+			"MiniMax M2.1 is an upgraded version of M2 with improved performance on complex reasoning, coding, and long-context understanding tasks.",
+	},
 	"accounts/fireworks/models/qwen3-235b-a22b-instruct-2507": {
 		maxTokens: 32768,
 		contextWindow: 256000,
@@ -101,6 +119,17 @@ export const fireworksModels = {
 		outputPrice: 1.8,
 		description: "Qwen3's most agentic code model to date.",
 	},
+	"accounts/fireworks/models/deepseek-r1": {
+		maxTokens: 32768,
+		contextWindow: 160000,
+		supportsImages: false,
+		supportsPromptCache: true,
+		inputPrice: 0.55,
+		outputPrice: 2.19,
+		cacheReadsPrice: 0.14,
+		description:
+			"DeepSeek R1 is an open-weights reasoning model that achieves state-of-the-art results on math, coding, and logic benchmarks via large-scale reinforcement learning.",
+	},
 	"accounts/fireworks/models/deepseek-r1-0528": {
 		maxTokens: 20480,
 		contextWindow: 160000,
@@ -109,27 +138,40 @@ export const fireworksModels = {
 		inputPrice: 3,
 		outputPrice: 8,
 		description:
-			"05/28 updated checkpoint of Deepseek R1. Its overall performance is now approaching that of leading models, such as O3 and Gemini 2.5 Pro. Compared to the previous version, the upgraded model shows significant improvements in handling complex reasoning tasks, and this version also offers a reduced hallucination rate, enhanced support for function calling, and better experience for vibe coding. Note that fine-tuning for this model is only available through contacting fireworks at https://fireworks.ai/company/contact-us.",
+			"05/28 updated checkpoint of Deepseek R1. Its overall performance is now approaching that of leading models, such as O3 and Gemini 2.5 Pro. Compared to the previous version, the upgraded model shows significant improvements in handling complex reasoning tasks, and this version also offers a reduced hallucination rate, enhanced support for function calling, and better experience for vibe coding.",
 	},
 	"accounts/fireworks/models/deepseek-v3": {
 		maxTokens: 16384,
 		contextWindow: 128000,
 		supportsImages: false,
-		supportsPromptCache: false,
-		inputPrice: 0.9,
-		outputPrice: 0.9,
+		supportsPromptCache: true,
+		inputPrice: 0.55,
+		outputPrice: 2.19,
+		cacheReadsPrice: 0.14,
 		description:
-			"A strong Mixture-of-Experts (MoE) language model with 671B total parameters with 37B activated for each token from Deepseek. Note that fine-tuning for this model is only available through contacting fireworks at https://fireworks.ai/company/contact-us.",
+			"A strong Mixture-of-Experts (MoE) language model with 671B total parameters with 37B activated for each token from Deepseek.",
 	},
 	"accounts/fireworks/models/deepseek-v3p1": {
 		maxTokens: 16384,
 		contextWindow: 163840,
 		supportsImages: false,
-		supportsPromptCache: false,
+		supportsPromptCache: true,
 		inputPrice: 0.56,
 		outputPrice: 1.68,
+		cacheReadsPrice: 0.14,
 		description:
-			"DeepSeek v3.1 is an improved version of the v3 model with enhanced performance, better reasoning capabilities, and improved code generation. This Mixture-of-Experts (MoE) model maintains the same 671B total parameters with 37B activated per token.",
+			"DeepSeek v3.1 is an improved version of the v3 model with enhanced performance, better reasoning capabilities, and improved code generation.",
+	},
+	"accounts/fireworks/models/deepseek-v3p2": {
+		maxTokens: 16384,
+		contextWindow: 163840,
+		supportsImages: false,
+		supportsPromptCache: true,
+		inputPrice: 0.56,
+		outputPrice: 1.68,
+		cacheReadsPrice: 0.14,
+		description:
+			"DeepSeek V3.2 is the latest iteration of the V3 model family with enhanced reasoning capabilities, improved code generation, and better instruction following.",
 	},
 	"accounts/fireworks/models/glm-4p5": {
 		maxTokens: 16384,
@@ -159,7 +201,17 @@ export const fireworksModels = {
 		inputPrice: 0.55,
 		outputPrice: 2.19,
 		description:
-			"Z.ai GLM-4.6 is an advanced coding model with exceptional performance on complex programming tasks. Features improved reasoning capabilities and enhanced code generation quality, making it ideal for software development workflows.",
+			"Z.ai GLM-4.6 is an advanced coding model with exceptional performance on complex programming tasks. Features improved reasoning capabilities and enhanced code generation quality.",
+	},
+	"accounts/fireworks/models/glm-4p7": {
+		maxTokens: 25344,
+		contextWindow: 198000,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.55,
+		outputPrice: 2.19,
+		description:
+			"Z.ai GLM-4.7 is the latest coding model with exceptional performance on complex programming tasks. Features improved reasoning capabilities and enhanced code generation quality.",
 	},
 	"accounts/fireworks/models/gpt-oss-20b": {
 		maxTokens: 16384,
@@ -181,36 +233,6 @@ export const fireworksModels = {
 		description:
 			"OpenAI gpt-oss-120b: Production-grade, general-purpose model that fits on a single H100 GPU. Features complex reasoning, configurable effort, full chain-of-thought transparency, and supports function calling, tool use, and structured outputs.",
 	},
-	"accounts/fireworks/models/minimax-m2p1": {
-		maxTokens: 4096,
-		contextWindow: 204800,
-		supportsImages: false,
-		supportsPromptCache: false,
-		inputPrice: 0.3,
-		outputPrice: 1.2,
-		description:
-			"MiniMax M2.1 is an upgraded version of M2 with improved performance on complex reasoning, coding, and long-context understanding tasks.",
-	},
-	"accounts/fireworks/models/deepseek-v3p2": {
-		maxTokens: 16384,
-		contextWindow: 163840,
-		supportsImages: false,
-		supportsPromptCache: false,
-		inputPrice: 0.56,
-		outputPrice: 1.68,
-		description:
-			"DeepSeek V3.2 is the latest iteration of the V3 model family with enhanced reasoning capabilities, improved code generation, and better instruction following.",
-	},
-	"accounts/fireworks/models/glm-4p7": {
-		maxTokens: 25344,
-		contextWindow: 198000,
-		supportsImages: false,
-		supportsPromptCache: false,
-		inputPrice: 0.55,
-		outputPrice: 2.19,
-		description:
-			"Z.ai GLM-4.7 is the latest coding model with exceptional performance on complex programming tasks. Features improved reasoning capabilities and enhanced code generation quality.",
-	},
 	"accounts/fireworks/models/qwen2p5-coder-32b-instruct": {
 		maxTokens: 32768,
 		contextWindow: 131072,
@@ -231,6 +253,36 @@ export const fireworksModels = {
 		description:
 			"Meta Llama 3.3 70B Instruct is a highly capable instruction-tuned model with strong reasoning, coding, and general task performance.",
 	},
+	"accounts/fireworks/models/llama-v3p1-405b-instruct": {
+		maxTokens: 16384,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 3.0,
+		outputPrice: 3.0,
+		description:
+			"Meta Llama 3.1 405B Instruct is Meta's flagship frontier model with state-of-the-art reasoning, coding, and multilingual knowledge capabilities.",
+	},
+	"accounts/fireworks/models/llama-v3p1-70b-instruct": {
+		maxTokens: 16384,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.9,
+		outputPrice: 0.9,
+		description:
+			"Meta Llama 3.1 70B Instruct offers strong performance for complex tasks, reasoning, and code generation.",
+	},
+	"accounts/fireworks/models/llama-v3p1-8b-instruct": {
+		maxTokens: 16384,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.2,
+		outputPrice: 0.2,
+		description:
+			"Meta Llama 3.1 8B Instruct is a fast and lightweight model suited for high-throughput and low-latency tasks.",
+	},
 	"accounts/fireworks/models/llama4-maverick-instruct-basic": {
 		maxTokens: 16384,
 		contextWindow: 131072,
@@ -250,5 +302,45 @@ export const fireworksModels = {
 		outputPrice: 0.6,
 		description:
 			"Llama 4 Scout is a smaller, faster variant of Llama 4 with multimodal capabilities, ideal for quick iterations and cost-effective deployments.",
+	},
+	"accounts/fireworks/models/phi-4": {
+		maxTokens: 16384,
+		contextWindow: 16384,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.2,
+		outputPrice: 0.2,
+		description:
+			"Microsoft Phi-4 is a 14B parameter state-of-the-art small language model with outstanding reasoning capabilities in math and code.",
+	},
+	"accounts/fireworks/models/mistral-large-2407": {
+		maxTokens: 32768,
+		contextWindow: 128000,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 2.0,
+		outputPrice: 6.0,
+		description:
+			"Mistral Large 2 (2407) is Mistral AI's flagship model with top-tier reasoning, math, and code capabilities across 80+ languages.",
+	},
+	"accounts/fireworks/models/mixtral-8x22b-instruct": {
+		maxTokens: 16384,
+		contextWindow: 65536,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.9,
+		outputPrice: 0.9,
+		description:
+			"Mixtral 8x22B Instruct is a high-performance open sparse Mixture-of-Experts model from Mistral AI.",
+	},
+	"accounts/fireworks/models/yi-large": {
+		maxTokens: 4096,
+		contextWindow: 32768,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 3.0,
+		outputPrice: 3.0,
+		description:
+			"01.AI's Yi-Large model with strong reasoning, instruction following, and multilingual capabilities.",
 	},
 } as const satisfies Record<string, ModelInfo>

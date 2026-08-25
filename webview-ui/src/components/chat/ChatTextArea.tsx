@@ -529,12 +529,20 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 				// Handle Enter key based on enterBehavior setting
 				if (event.key === "Enter" && !isComposing) {
+					if (isEditMode) {
+						if (!event.shiftKey) {
+							event.preventDefault()
+							onSend()
+						}
+						return
+					}
+					const sendAction = (isStreaming || messageWillQueue) && onEnqueueMessage ? onEnqueueMessage : onSend
 					if (enterBehavior === "newline") {
 						// New behavior: Enter = newline, Shift+Enter or Ctrl+Enter = send
 						if (event.shiftKey || event.ctrlKey || event.metaKey) {
 							event.preventDefault()
 							resetHistoryNavigation()
-							onSend()
+							sendAction()
 						}
 						// Otherwise, let Enter create newline (don't preventDefault)
 					} else {
@@ -542,7 +550,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						if (!event.shiftKey) {
 							event.preventDefault()
 							resetHistoryNavigation()
-							onSend()
+							sendAction()
 						}
 					}
 				}
@@ -1274,7 +1282,11 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 														: t("chat:pressToSend", { keyCombination: sendKeyCombination })
 											}
 											disabled={!isStreaming && !hasInputContent}
-											onClick={isStreaming && onEnqueueMessage ? onEnqueueMessage : onSend}
+											onClick={
+												(isStreaming || messageWillQueue) && onEnqueueMessage
+													? onEnqueueMessage
+													: onSend
+											}
 											className={cn(
 												"relative inline-flex items-center justify-center",
 												"bg-transparent border-none p-1.5",
