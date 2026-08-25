@@ -89,6 +89,24 @@ export const toolParamNames = [
 	"direction",
 	"option_value",
 	"value",
+	// ssh_session parameters
+	"host",
+	"port",
+	"password",
+	// image / preview parameters
+	"width",
+	"height",
+	"aspect_ratio",
+	// read_url / search parameters
+	"max_characters",
+	"plain_text",
+	"registry",
+	"detail",
+	// git parameters
+	"branch",
+	"commit",
+	// sleep parameters
+	"seconds",
 ] as const
 
 export type ToolParamName = (typeof toolParamNames)[number]
@@ -103,6 +121,7 @@ export type NativeToolArgs = {
 	read_command_output: { artifact_id: string; search?: string; offset?: number; limit?: number }
 	attempt_completion: { result: string }
 	execute_command: { command: string; cwd?: string; timeout?: number | null }
+	sleep: { seconds?: number; reason?: string }
 	ssh_session: {
 		action: "connect" | "execute" | "disconnect"
 		host: string
@@ -149,6 +168,8 @@ export type NativeToolArgs = {
 	get_workspace_file_tree: Record<string, never>
 	get_workspace_pulse: Record<string, never>
 	get_git_status: { maxFiles?: number }
+	search_mcp_tools: { query?: string }
+	activate_mcp_tool: { server_name: string; tool_name: string }
 	// Session shared context (intersession context sharing)
 	read_session_context: { scope?: "siblings" | "knowledge" | "notes" | "all" }
 	// Add more tools as they are migrated to native protocol
@@ -339,6 +360,7 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	package_search: "search package registries",
 	read_url: "read URL content",
 	ssh_session: "manage SSH server sessions",
+	sleep: "pause and wait for background terminal operations or async processes",
 	get_workspace_file_tree: "get workspace file tree",
 	get_workspace_pulse: "get workspace pulse",
 	get_git_status: "get git status",
@@ -372,7 +394,7 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 		customTools: ["edit", "search_replace", "edit_file", "apply_patch"],
 	},
 	command: {
-		tools: ["execute_command", "read_command_output", "ssh_session"],
+		tools: ["execute_command", "read_command_output", "ssh_session", "sleep"],
 	},
 	mcp: {
 		tools: ["use_mcp_tool", "access_mcp_resource"],
@@ -408,6 +430,7 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"update_todo_list",
 	"run_slash_command",
 	"skill",
+	"sleep",
 	"generate_image",
 	// On-demand context retrieval tools — available in all modes, cost-optimized
 	"get_workspace_file_tree",
@@ -431,6 +454,8 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 export const TOOL_ALIASES: Record<string, ToolName> = {
 	write_file: "write_to_file",
 	search_and_replace: "edit",
+	pause: "sleep",
+	wait: "sleep",
 } as const
 
 export type DiffResult =

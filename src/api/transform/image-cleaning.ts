@@ -88,7 +88,7 @@ export async function maybeRemoveImageBlocks(messages: ApiMessage[], apiHandler:
 									(TesseractModule as any)?.default?.recognize
 
 								// Specify explicit writable cache path and bundled worker script path.
-								const cachePath = path.join(os.homedir(), ".mirror", "tessdata")
+								const cachePath = path.join(os.homedir(), ".mirror-vs", "tessdata")
 								try {
 									if (!fs.existsSync(cachePath)) {
 										fs.mkdirSync(cachePath, { recursive: true })

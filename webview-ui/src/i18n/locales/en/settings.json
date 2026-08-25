@@ -156,6 +156,10 @@
 		"requireCtrlEnterToSend": {
 			"label": "Require {{primaryMod}}+Enter to send messages",
 			"description": "When enabled, you must press {{primaryMod}}+Enter to send messages instead of just Enter"
+		},
+		"disableTabBar": {
+			"label": "Disable multi-tab interface",
+			"description": "When enabled, hides the tab bar and returns to single-task mode. Multi-tab is on by default."
 		}
 	},
 	"prompts": {
@@ -925,10 +929,6 @@
 			"refreshSuccess": "Tools refreshed successfully",
 			"refreshError": "Failed to refresh tools",
 			"toolParameters": "Parameters"
-		},
-		"MULTI_TAB": {
-			"name": "Experimental Multi-Tab Interface",
-			"description": "When enabled, provides a browser-like multi-tab workspace to switch between and run multiple tasks simultaneously inside a session."
 		}
 	},
 	"imageGeneration": {

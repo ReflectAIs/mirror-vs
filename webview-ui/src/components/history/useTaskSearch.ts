@@ -26,7 +26,13 @@ export const useTaskSearch = () => {
 	const presentableTasks = useMemo(() => {
 		let tasks = taskHistory.filter((item) => item.ts && item.task)
 		if (!showAllWorkspaces) {
-			tasks = tasks.filter((item) => item.workspace === cwd)
+			tasks = tasks.filter(
+				(item) =>
+					!item.workspace ||
+					!cwd ||
+					item.workspace === cwd ||
+					item.workspace.replace(/\/+$/, "") === cwd.replace(/\/+$/, ""),
+			)
 		}
 		return tasks
 	}, [taskHistory, showAllWorkspaces, cwd])

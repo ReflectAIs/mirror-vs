@@ -114,7 +114,12 @@ export async function handleOpenMention(provider: MirrorProvider, message: Webvi
  * Handles opening an external URL.
  */
 export async function handleOpenExternal(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
-	if (message.url) {
-		vscode.env.openExternal(vscode.Uri.parse(message.url))
+	const urlStr = message.url || message.text
+	if (urlStr) {
+		try {
+			await vscode.env.openExternal(vscode.Uri.parse(urlStr))
+		} catch (e) {
+			provider.log(`Error opening external URL "${urlStr}": ${e}`)
+		}
 	}
 }

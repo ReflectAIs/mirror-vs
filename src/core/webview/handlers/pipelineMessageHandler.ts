@@ -655,3 +655,57 @@ export async function handleDeleteComfyuiWorkflow(provider: MirrorProvider, mess
 		})
 	}
 }
+
+/**
+ * Handle a "startComfyuiServer" message.
+ * Launches the local ComfyUI server if not already running and returns the server URL.
+ */
+export async function handleStartComfyuiServer(provider: MirrorProvider): Promise<void> {
+	try {
+		const { getComfyUIManager, registerComfyUIProvider } = await import("../../../services/image-runtime")
+		const manager = getComfyUIManager()
+
+		const isAlive = await manager.healthCheck()
+		if (isAlive) {
+			registerComfyUIProvider()
+			await provider.postMessageToWebview({
+				type: "startComfyuiServerResult",
+				success: true,
+				text: "http://127.0.0.1:8188",
+			})
+			return
+		}
+
+		await manager.launch()
+
+		// Wait up to 15 seconds for startup
+		for (let i = 0; i < 15; i++) {
+			await new Promise((r) => setTimeout(r, 1000))
+			const alive = await manager.healthCheck()
+			if (alive) {
+				registerComfyUIProvider()
+				await provider.postMessageToWebview({
+					type: "startComfyuiServerResult",
+					success: true,
+					text: "http://127.0.0.1:8188",
+				})
+				return
+			}
+		}
+
+		await provider.postMessageToWebview({
+			type: "startComfyuiServerResult",
+			success: false,
+			text: "http://127.0.0.1:8188",
+			error: "ComfyUI server launched but did not respond within 15 seconds. Please open http://127.0.0.1:8188 in your browser to check.",
+		})
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error)
+		provider.log(`[pipelineMessageHandler] Error starting ComfyUI server: ${errorMessage}`)
+		await provider.postMessageToWebview({
+			type: "startComfyuiServerResult",
+			success: false,
+			error: errorMessage,
+		})
+	}
+}

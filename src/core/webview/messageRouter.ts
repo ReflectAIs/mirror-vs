@@ -202,6 +202,7 @@ import {
 	handleScanComfyuiWorkflows,
 	handleImportComfyuiWorkflows,
 	handleDeleteComfyuiWorkflow,
+	handleStartComfyuiServer,
 } from "./handlers/pipelineMessageHandler"
 
 // ── Worktree handlers ──────────────────────────────────────────
@@ -253,7 +254,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			await handleAskResponse(provider, message)
 			break
 		case "terminalOperation":
-			await handleTerminalOperation(provider, message.terminalOperation)
+			await handleTerminalOperation(provider, message.terminalOperation, message)
 			break
 		case "killTerminal":
 			await handleKillTerminal(provider, message.terminalId, message.terminalType)
@@ -720,6 +721,10 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 
 		case "deleteComfyuiWorkflow":
 			await handleDeleteComfyuiWorkflow(provider, message)
+			break
+
+		case "startComfyuiServer":
+			await handleStartComfyuiServer(provider)
 			break
 
 		case "openCommandFile":

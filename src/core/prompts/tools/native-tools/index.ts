@@ -26,6 +26,7 @@ import readUrl from "./read_url"
 import renderPreview from "./render_preview"
 import runSlashCommand from "./run_slash_command"
 import sshSession from "./ssh_session"
+import sleep from "./sleep"
 import skill from "./skill"
 import searchReplace from "./search_replace"
 import edit_file from "./edit_file"
@@ -94,6 +95,7 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		readUrl,
 		renderPreview,
 		sshSession,
+		sleep,
 		runSlashCommand,
 		skill,
 		searchReplace,

@@ -264,13 +264,16 @@ export interface ConvertToOpenAiMessagesOptions {
 	 */
 	normalizeToolCallId?: (id: string) => string
 	/**
-	 * If true, merge text content after tool_results into the last tool message
-	 * instead of creating a separate user message. This is critical for providers
-	 * with reasoning/thinking models (like DeepSeek-reasoner, GLM-4.7, etc.) where
+	 * For thinking/reasoning models (e.g. DeepSeek-R1, QwQ, Gemini 2.0 Flash Thinking),
 	 * a user message after tool results causes the model to drop all previous
 	 * reasoning_content. Default is false for backward compatibility.
 	 */
 	mergeToolResultText?: boolean
+	/**
+	 * Whether the target model supports image inputs. When false, image blocks
+	 * are replaced with descriptive text instead of image_url payloads.
+	 */
+	supportsImages?: boolean
 }
 
 export function convertToOpenAiMessages(
@@ -422,6 +425,9 @@ export function convertToOpenAiMessages(
 							role: "user",
 							content: filteredNonToolMessages.map((part) => {
 								if (part.type === "image") {
+									if (options?.supportsImages === false) {
+										return { type: "text", text: "[Attached image — not supported by this model]" }
+									}
 									return {
 										type: "image_url",
 										image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` },

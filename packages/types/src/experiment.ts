@@ -24,7 +24,6 @@ export const experimentIds = [
 	"customTools",
 	"browser",
 	"parallelToolReads",
-	"multiTab",
 ] as const
 
 export const experimentIdsSchema = z.enum(experimentIds)
@@ -55,7 +54,6 @@ export const experimentsSchema = z
 		customTools: z.boolean().optional(),
 		browser: z.boolean().optional(),
 		parallelToolReads: z.boolean().optional(),
-		multiTab: z.boolean().optional(),
 	})
 	.transform((data) => {
 		// Strip the legacy field so it does not appear in the output type

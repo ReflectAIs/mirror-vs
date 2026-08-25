@@ -238,7 +238,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			setIsClicked(false)
 			setActiveClickExpression(null)
 			setClickQuote("")
-		}, 1400)
+		}, 4500)
 	}, [resetSleepTimer])
 
 	const activeState = activity === "sleeping" || isSleeping ? "sleeping" : activity
@@ -777,7 +777,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					}
 				`}</style>
 				{activeClickExpression && clickQuote && (
-					<div className="absolute top-full left-0 mt-1 z-50 pointer-events-none whitespace-nowrap bg-purple-900/95 text-purple-100 text-[10px] font-mono px-2.5 py-1 rounded-full shadow-2xl border border-purple-400/50 animate-bounce">
+					<div className="absolute top-full left-0 mt-1 z-[99999] pointer-events-none whitespace-nowrap bg-purple-900/95 text-purple-100 text-[10px] font-mono px-2.5 py-1 rounded-full shadow-2xl border border-purple-400/50 animate-bounce">
 						{clickQuote}
 					</div>
 				)}
@@ -897,7 +897,7 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			`}</style>
 
 			{(isHovered || (activeClickExpression && clickQuote)) && size === "normal" && (
-				<div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none whitespace-nowrap bg-purple-900/95 text-purple-100 text-[10.5px] font-mono px-3 py-1 rounded-full shadow-2xl border border-purple-400/50 animate-bounce">
+				<div className="absolute -top-7 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none whitespace-nowrap bg-purple-900/95 text-purple-100 text-[10.5px] font-mono px-3 py-1 rounded-full shadow-2xl border border-purple-400/50 animate-bounce">
 					{clickQuote || FUNNY_DEVELOPER_QUOTES[quoteIndex % FUNNY_DEVELOPER_QUOTES.length]}
 				</div>
 			)}
@@ -1045,9 +1045,6 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 					/>
 				</div>
 			)}
-
-			<div className="z-4 bg-gradient-to-r from-transparent to-vscode-sideBar-background absolute top-0 right-0 bottom-0 w-10 opacity-100" />
-			<div className="z-3 bg-gradient-to-l from-transparent to-vscode-sideBar-background absolute top-0 left-0 bottom-0 w-10 opacity-100" />
 		</div>
 	)
 }

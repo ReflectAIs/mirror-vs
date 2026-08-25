@@ -384,135 +384,142 @@ export class TaskApiRequest {
 				lastMessageTokens,
 			})
 
-			// Send condenseTaskContextStarted BEFORE manageContext to show in-progress indicator
-			// This notification must be sent here (not earlier) because the early check uses stale token count
-			// (before user message is added to history), which could incorrectly skip showing the indicator
-			if (contextManagementWillRun && autoCondenseContext) {
-				await this.task.providerRef
-					.deref()
-					?.postMessageToWebview({ type: "condenseTaskContextStarted", text: this.task.taskId })
-			}
+			if (contextManagementWillRun) {
+				const isHardOverflow = maxTokens !== undefined ? contextTokens >= maxTokens : false
+				const runInBackground = autoCondenseContext && !isHardOverflow
 
-			// Build tools for condensing metadata (same tools used for normal API calls)
-			// This ensures the condensing API call includes tool definitions for providers that need them
-			let contextMgmtTools: import("openai").default.Chat.ChatCompletionTool[] = []
-			{
-				const provider = this.task.providerRef.deref()
-				if (provider) {
-					const toolsResult = await buildNativeToolsArrayWithRestrictions({
-						provider,
-						cwd: this.task.cwd,
-						mode,
-						customModes: state?.customModes,
-						experiments: state?.experiments,
-						apiConfiguration,
-						disabledTools: state?.disabledTools,
-						modelInfo,
-						includeAllToolsWithRestrictions: false,
-					})
-					contextMgmtTools = toolsResult.tools
-				}
-			}
+				const executeContextMgmt = async () => {
+					if (contextManagementWillRun && autoCondenseContext) {
+						await this.task.providerRef
+							.deref()
+							?.postMessageToWebview({ type: "condenseTaskContextStarted", text: this.task.taskId })
+					}
 
-			// Build metadata with tools and taskId for the condensing API call
-			const contextMgmtMetadata: ApiHandlerCreateMessageMetadata = {
-				mode,
-				taskId: this.task.taskId,
-				...(contextMgmtTools.length > 0
-					? {
-							tools: contextMgmtTools,
-							tool_choice: "auto",
-							parallelToolCalls: true,
+					let contextMgmtTools: import("openai").default.Chat.ChatCompletionTool[] = []
+					{
+						const provider = this.task.providerRef.deref()
+						if (provider) {
+							const toolsResult = await buildNativeToolsArrayWithRestrictions({
+								provider,
+								cwd: this.task.cwd,
+								mode,
+								customModes: state?.customModes,
+								experiments: state?.experiments,
+								apiConfiguration,
+								disabledTools: state?.disabledTools,
+								modelInfo,
+								includeAllToolsWithRestrictions: false,
+							})
+							contextMgmtTools = toolsResult.tools
 						}
-					: {}),
-			}
-
-			// Only generate environment details when context management will actually run.
-			// getEnvironmentDetails(this, true) triggers a recursive workspace listing which
-			// adds overhead - avoid this for the common case where context is below threshold.
-			const contextMgmtEnvironmentDetails = contextManagementWillRun
-				? await getEnvironmentDetails(this.task, true)
-				: undefined
-
-			// Get files read by Mirror VS for code folding - only when context management will run
-			const contextMgmtFilesReadByMirror =
-				contextManagementWillRun && autoCondenseContext
-					? await this.task.getFilesReadByMirrorSafely("attemptApiRequest")
-					: undefined
-
-			try {
-				const truncateResult = await manageContext({
-					messages: this.task.apiConversationHistory,
-					totalTokens: contextTokens,
-					maxTokens,
-					contextWindow,
-					apiHandler: this.task.api,
-					autoCondenseContext,
-					autoCondenseContextPercent,
-					systemPrompt,
-					taskId: this.task.taskId,
-					customCondensingPrompt,
-					profileThresholds,
-					currentProfileId,
-					metadata: contextMgmtMetadata,
-					environmentDetails: contextMgmtEnvironmentDetails,
-					filesReadByMirror: contextMgmtFilesReadByMirror,
-					cwd: this.task.cwd,
-					mirrorIgnoreController: this.task.mirrorIgnoreController,
-				})
-				if (truncateResult.messages !== this.task.apiConversationHistory) {
-					await this.task.overwriteApiConversationHistory(truncateResult.messages)
-				}
-				if (truncateResult.error) {
-					await this.task.say("condense_context_error", truncateResult.error)
-				}
-				if (truncateResult.summary) {
-					const { summary, cost, prevContextTokens, newContextTokens = 0, condenseId } = truncateResult
-					const contextCondense: ContextCondense = {
-						summary,
-						cost,
-						newContextTokens,
-						prevContextTokens,
-						condenseId,
 					}
-					await this.task.say(
-						"condense_context",
-						undefined /* text */,
-						undefined /* images */,
-						false /* partial */,
-						undefined /* checkpoint */,
-						undefined /* progressStatus */,
-						{ isNonInteractive: true } /* options */,
-						contextCondense,
-					)
-				} else if (truncateResult.truncationId) {
-					// Sliding window truncation occurred (fallback when condensing fails or is disabled)
-					const contextTruncation: ContextTruncation = {
-						truncationId: truncateResult.truncationId,
-						messagesRemoved: truncateResult.messagesRemoved ?? 0,
-						prevContextTokens: truncateResult.prevContextTokens,
-						newContextTokens: truncateResult.newContextTokensAfterTruncation ?? 0,
+
+					const contextMgmtMetadata: ApiHandlerCreateMessageMetadata = {
+						mode,
+						taskId: this.task.taskId,
+						...(contextMgmtTools.length > 0
+							? {
+									tools: contextMgmtTools,
+									tool_choice: "auto",
+									parallelToolCalls: true,
+								}
+							: {}),
 					}
-					await this.task.say(
-						"sliding_window_truncation",
-						undefined /* text */,
-						undefined /* images */,
-						false /* partial */,
-						undefined /* checkpoint */,
-						undefined /* progressStatus */,
-						{ isNonInteractive: true } /* options */,
-						undefined /* contextCondense */,
-						contextTruncation,
-					)
+
+					const contextMgmtEnvironmentDetails = contextManagementWillRun
+						? await getEnvironmentDetails(this.task, true)
+						: undefined
+
+					const contextMgmtFilesReadByMirror =
+						contextManagementWillRun && autoCondenseContext
+							? await this.task.getFilesReadByMirrorSafely("attemptApiRequest")
+							: undefined
+
+					try {
+						const truncateResult = await manageContext({
+							messages: this.task.apiConversationHistory,
+							totalTokens: contextTokens,
+							maxTokens,
+							contextWindow,
+							apiHandler: this.task.api,
+							autoCondenseContext,
+							autoCondenseContextPercent,
+							systemPrompt,
+							taskId: this.task.taskId,
+							customCondensingPrompt,
+							profileThresholds,
+							currentProfileId,
+							metadata: contextMgmtMetadata,
+							environmentDetails: contextMgmtEnvironmentDetails,
+							filesReadByMirror: contextMgmtFilesReadByMirror,
+							cwd: this.task.cwd,
+							mirrorIgnoreController: this.task.mirrorIgnoreController,
+						})
+						if (truncateResult.messages !== this.task.apiConversationHistory) {
+							await this.task.overwriteApiConversationHistory(truncateResult.messages)
+						}
+						if (truncateResult.error) {
+							await this.task.say("condense_context_error", truncateResult.error)
+						}
+						if (truncateResult.summary) {
+							const {
+								summary,
+								cost,
+								prevContextTokens,
+								newContextTokens = 0,
+								condenseId,
+							} = truncateResult
+							const contextCondense: ContextCondense = {
+								summary,
+								cost,
+								newContextTokens,
+								prevContextTokens,
+								condenseId,
+							}
+							await this.task.say(
+								"condense_context",
+								undefined /* text */,
+								undefined /* images */,
+								false /* partial */,
+								undefined /* checkpoint */,
+								undefined /* progressStatus */,
+								{ isNonInteractive: true } /* options */,
+								contextCondense,
+							)
+						} else if (truncateResult.truncationId) {
+							const contextTruncation: ContextTruncation = {
+								truncationId: truncateResult.truncationId,
+								messagesRemoved: truncateResult.messagesRemoved ?? 0,
+								prevContextTokens: truncateResult.prevContextTokens,
+								newContextTokens: truncateResult.newContextTokensAfterTruncation ?? 0,
+							}
+							await this.task.say(
+								"sliding_window_truncation",
+								undefined /* text */,
+								undefined /* images */,
+								false /* partial */,
+								undefined /* checkpoint */,
+								undefined /* progressStatus */,
+								{ isNonInteractive: true } /* options */,
+								undefined /* contextCondense */,
+								contextTruncation,
+							)
+						}
+					} finally {
+						if (contextManagementWillRun && autoCondenseContext) {
+							await this.task.providerRef
+								.deref()
+								?.postMessageToWebview({ type: "condenseTaskContextResponse", text: this.task.taskId })
+						}
+					}
 				}
-			} finally {
-				// Notify webview that context management is complete (sets isCondensing = false)
-				// This removes the in-progress spinner and allows the completed result to show
-				// IMPORTANT: Must always be sent to dismiss the spinner, even on error
-				if (contextManagementWillRun && autoCondenseContext) {
-					await this.task.providerRef
-						.deref()
-						?.postMessageToWebview({ type: "condenseTaskContextResponse", text: this.task.taskId })
+
+				if (runInBackground) {
+					void executeContextMgmt().catch((err) =>
+						console.error("[TaskApiRequest] Background context condensation error:", err),
+					)
+				} else {
+					await executeContextMgmt()
 				}
 			}
 		}
