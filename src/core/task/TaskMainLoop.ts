@@ -177,6 +177,50 @@ export const RECOVERY_STRATEGIES: Record<string, RecoveryStrategy> = {
 			}
 		},
 	},
+	module_not_found: {
+		pattern: /cannot find module|no module named|module_not_found|pkg_resources\.distributionnotfound/i,
+		action: async (
+			errorMessage: string,
+			_toolName: string,
+			_toolArgs: Record<string, unknown>,
+			ledger: StruggleLedger,
+		) => {
+			const { shouldEscalate } = ledger.record("module_not_found")
+			if (shouldEscalate) {
+				return {
+					type: "escalate" as const,
+					message:
+						"Missing dependency could not be resolved automatically. Please check your package dependencies.",
+				}
+			}
+			return {
+				type: "retry" as const,
+				message: `Missing dependency detected: ${errorMessage.slice(0, 300)}. Please install the required package or verify your environment configuration rather than repeating the failing command.`,
+			}
+		},
+	},
+	port_in_use: {
+		pattern: /EADDRINUSE|address already in use|port.*already in use/i,
+		action: async (
+			errorMessage: string,
+			_toolName: string,
+			_toolArgs: Record<string, unknown>,
+			ledger: StruggleLedger,
+		) => {
+			const { shouldEscalate } = ledger.record("port_in_use")
+			if (shouldEscalate) {
+				return {
+					type: "escalate" as const,
+					message:
+						"Port is already in use by another process. Please terminate the conflicting process or choose another port.",
+				}
+			}
+			return {
+				type: "retry" as const,
+				message: `Port conflict detected: ${errorMessage.slice(0, 200)}. Use a different port or check running terminals/processes.`,
+			}
+		},
+	},
 }
 
 /**
