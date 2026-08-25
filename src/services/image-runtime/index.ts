@@ -11,10 +11,13 @@ export { WorkflowEngine } from "./workflows/engine"
 export type { WorkflowType } from "./workflows/engine"
 export {
 	autoSetupComfyUI,
+	isAutoSetupRunning,
+	getLastAutoSetupStatus,
 	initializeImageProviders,
 	connectProviderSelectorToSettings,
 	ensureProviderRegistered,
 	registerComfyUIProvider,
+	getComfyUIManager,
 } from "./auto-setup"
 export type { SetupStep, SetupCallback } from "./auto-setup"
 export * from "./platform"
