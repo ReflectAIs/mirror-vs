@@ -634,7 +634,7 @@ export class PipelineRegistry {
 	}
 
 	private static getProjectPipelinesDir(cwd: string): string {
-		return path.join(cwd, ".mirror", PIPELINES_SUBDIR)
+		return path.join(cwd, ".mirror-vs", PIPELINES_SUBDIR)
 	}
 
 	/**

@@ -57,6 +57,7 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setAlwaysAllowWrite: (value: boolean) => void
 	setAlwaysAllowWriteOutsideWorkspace: (value: boolean) => void
 	setAlwaysAllowExecute: (value: boolean) => void
+	setAlwaysAllowGitCommit: (value: boolean) => void
 	setAlwaysAllowMcp: (value: boolean) => void
 	setAlwaysAllowModeSwitch: (value: boolean) => void
 	setAlwaysAllowSubtasks: (value: boolean) => void
@@ -115,6 +116,8 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setReasoningBlockCollapsed: (value: boolean) => void
 	enterBehavior?: "send" | "newline"
 	setEnterBehavior: (value: "send" | "newline") => void
+	disableTabBar?: boolean
+	setDisableTabBar: (value: boolean) => void
 	autoCondenseContext: boolean
 	setAutoCondenseContext: (value: boolean) => void
 	autoCondenseContextPercent: number
@@ -161,14 +164,27 @@ export const mergeExtensionState = (prevState: ExtensionState, newState: Partial
 	// concurrent state pushes. If a stale push arrives after a newer one, its mirrorMessages
 	// would overwrite the newer messages. The sequence number prevents this by only applying
 	// mirrorMessages when the incoming seq is strictly greater than the last applied seq.
-	if (
-		newState.mirrorMessagesSeq !== undefined &&
-		prevState.mirrorMessagesSeq !== undefined &&
-		newState.mirrorMessagesSeq <= prevState.mirrorMessagesSeq &&
-		newState.mirrorMessages !== undefined
-	) {
-		rest.mirrorMessages = prevState.mirrorMessages
-		rest.mirrorMessagesSeq = prevState.mirrorMessagesSeq
+	//
+	// CRITICAL: When switching tasks (different currentTaskId or activeTabId), sequence numbering
+	// must NOT block the new task's messages from replacing the previous task's messages.
+	const isTaskSwitch =
+		(newState.currentTaskId !== undefined &&
+			prevState.currentTaskId !== undefined &&
+			newState.currentTaskId !== prevState.currentTaskId) ||
+		(newState.activeTabId !== undefined &&
+			prevState.activeTabId !== undefined &&
+			newState.activeTabId !== prevState.activeTabId)
+
+	if (!isTaskSwitch) {
+		if (
+			newState.mirrorMessagesSeq !== undefined &&
+			prevState.mirrorMessagesSeq !== undefined &&
+			newState.mirrorMessagesSeq <= prevState.mirrorMessagesSeq &&
+			newState.mirrorMessages !== undefined
+		) {
+			rest.mirrorMessages = prevState.mirrorMessages
+			rest.mirrorMessagesSeq = prevState.mirrorMessagesSeq
+		}
 	}
 
 	// Note that we completely replace the previous apiConfiguration and customSupportPrompts objects
@@ -230,6 +246,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		historyPreviewCollapsed: false, // Initialize the new state (default to expanded)
 		reasoningBlockCollapsed: true, // Default to collapsed
 		enterBehavior: "send", // Default: Enter sends, Shift+Enter creates newline
+		disableTabBar: false, // Default: multi-tab is enabled
 		organizationAllowList: ORGANIZATION_ALLOW_ALL,
 		autoCondenseContext: true,
 		autoCondenseContextPercent: 100,
@@ -368,23 +385,22 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 				}
 				case "messageUpdated": {
 					const mirrorMessage = message.mirrorMessage!
+					const updateTaskId = (message as any).taskId
 					setState((prevState) => {
-						// worth noting it will never be possible for a more up-to-date message to be sent here or in normal messages post since the presentAssistantContent function uses lock
+						// If update belongs to a different task than the currently active view, ignore it
+						const activeId = prevState.activeTabId || prevState.currentTaskId
+						if (updateTaskId && activeId && updateTaskId !== activeId) {
+							return prevState
+						}
+						// Find by timestamp and update in place
 						const lastIndex = findLastIndex(prevState.mirrorMessages, (msg) => msg.ts === mirrorMessage.ts)
 						if (lastIndex !== -1) {
 							const newMirrorMessages = [...prevState.mirrorMessages]
 							newMirrorMessages[lastIndex] = mirrorMessage
 							return { ...prevState, mirrorMessages: newMirrorMessages }
 						}
-						// Log a warning if messageUpdated arrives for a timestamp not in the
-						// frontend's mirrorMessages. With the sequence guard in place,
-						// (layers 1+2), this should not happen under normal conditions. If it
-						// does, it signals a state synchronization issue worth investigating.
-						console.warn(
-							`[messageUpdated] Received update for unknown message ts=${mirrorMessage.ts}, dropping. ` +
-								`Frontend has ${prevState.mirrorMessages.length} messages.`,
-						)
-						return prevState
+						// If not found by timestamp yet (e.g. streaming update arrived before full state push), append cleanly
+						return { ...prevState, mirrorMessages: [...prevState.mirrorMessages, mirrorMessage] }
 					})
 					break
 				}
@@ -492,6 +508,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		setAlwaysAllowWriteOutsideWorkspace: (value) =>
 			setState((prevState) => ({ ...prevState, alwaysAllowWriteOutsideWorkspace: value })),
 		setAlwaysAllowExecute: (value) => setState((prevState) => ({ ...prevState, alwaysAllowExecute: value })),
+		setAlwaysAllowGitCommit: (value) => setState((prevState) => ({ ...prevState, alwaysAllowGitCommit: value })),
 		setAlwaysAllowMcp: (value) => setState((prevState) => ({ ...prevState, alwaysAllowMcp: value })),
 		setAlwaysAllowModeSwitch: (value) => setState((prevState) => ({ ...prevState, alwaysAllowModeSwitch: value })),
 		setAlwaysAllowSubtasks: (value) => setState((prevState) => ({ ...prevState, alwaysAllowSubtasks: value })),
@@ -558,6 +575,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 			setState((prevState) => ({ ...prevState, reasoningBlockCollapsed: value })),
 		enterBehavior: state.enterBehavior ?? "send",
 		setEnterBehavior: (value) => setState((prevState) => ({ ...prevState, enterBehavior: value })),
+		disableTabBar: state.disableTabBar ?? false,
+		setDisableTabBar: (value) => setState((prevState) => ({ ...prevState, disableTabBar: value })),
 		setHasOpenedModeSelector: (value) => setState((prevState) => ({ ...prevState, hasOpenedModeSelector: value })),
 		setAutoCondenseContext: (value) => setState((prevState) => ({ ...prevState, autoCondenseContext: value })),
 		setAutoCondenseContextPercent: (value) =>

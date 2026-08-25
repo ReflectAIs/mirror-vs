@@ -21,7 +21,7 @@
 		"closeAndStart": "Close session and start a new one",
 		"export": "Export session history",
 		"share": "Share session",
-		"delete": "Delete Session (Shift + Click to skip confirmation)",
+		"delete": "Delete Tab (Shift + Click to skip confirmation)",
 		"shareSuccessPublic": "Public link copied to clipboard",
 		"openApiHistory": "Open API History",
 		"openUiHistory": "Open UI History",

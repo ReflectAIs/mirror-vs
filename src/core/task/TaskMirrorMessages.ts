@@ -88,9 +88,16 @@ export class TaskMirrorMessages {
 	async addToMirrorMessages(message: MirrorMessage) {
 		this.mirrorMessages.push(message)
 		const provider = this.task.providerRef.deref()
-		// Avoid resending large, mostly-static fields (notably taskHistory) on every chat message update.
-		// taskHistory is maintained in-memory in the webview and updated via taskHistoryItemUpdated.
-		await provider?.postStateToWebviewWithoutTaskHistory()
+		if (provider) {
+			// If this task is the currently focused tab, post the updated chat state.
+			// If it's a background task, post state WITHOUT mirrorMessages so tab indicators/mascots
+			// update without replacing or interfering with the active tab's chat.
+			if (!provider.getCurrentTask || provider.getCurrentTask()?.taskId === this.taskId) {
+				await provider.postStateToWebviewWithoutTaskHistory?.()
+			} else {
+				await provider.postStateToWebviewWithoutMirrorMessages?.()
+			}
+		}
 		this.task.emit(MirrorVSEventName.Message, { action: "created", message })
 		await this.saveMirrorMessages()
 	}
@@ -111,7 +118,11 @@ export class TaskMirrorMessages {
 
 	async updateMirrorMessage(message: MirrorMessage) {
 		const provider = this.task.providerRef.deref()
-		await provider?.postMessageToWebview({ type: "messageUpdated", mirrorMessage: message })
+		await provider?.postMessageToWebview?.({
+			type: "messageUpdated",
+			taskId: this.taskId,
+			mirrorMessage: message,
+		})
 		this.task.emit(MirrorVSEventName.Message, { action: "updated", message })
 		this.debouncedSaveMirrorMessages()
 	}

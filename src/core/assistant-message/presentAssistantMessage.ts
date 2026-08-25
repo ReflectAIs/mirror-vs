@@ -58,6 +58,7 @@ import { gitHubSearchTool } from "../tools/GitHubSearchTool"
 import { docsSearchTool } from "../tools/DocsSearchTool"
 import { packageSearchTool } from "../tools/PackageSearchTool"
 import { readUrlTool } from "../tools/ReadUrlTool"
+import { sleepTool } from "../tools/SleepTool"
 import { checkpointSave } from "../checkpoints"
 
 import { formatResponse } from "../prompts/responses"
@@ -78,6 +79,7 @@ const READ_TOOLS = new Set([
 	"package_search",
 	"codebase_search",
 	"read_url",
+	"sleep",
 	"get_workspace_file_tree",
 	"get_workspace_pulse",
 	"get_git_status",
@@ -582,6 +584,9 @@ export async function presentAssistantMessage(mirror: Task) {
 					mirror.userMessageContent.push(...imageBlocks)
 				}
 
+				mirror.isExecutingTool = false
+				void mirror.providerRef.deref()?.postStateToWebview()
+
 				hasToolResult = true
 			}
 
@@ -600,6 +605,8 @@ export async function presentAssistantMessage(mirror: Task) {
 				)
 
 				if (response !== "yesButtonClicked") {
+					mirror.isExecutingTool = false
+					void mirror.providerRef.deref()?.postStateToWebview()
 					// Handle both messageResponse and noButtonClicked with text.
 					if (text) {
 						await mirror.say("user_feedback", text, images)
@@ -618,6 +625,10 @@ export async function presentAssistantMessage(mirror: Task) {
 					await mirror.say("user_feedback", text, images)
 					approvalFeedback = { text, images }
 				}
+
+				mirror.isExecutingTool = true
+				mirror.emit(MirrorVSEventName.TaskActive, mirror.taskId)
+				void mirror.providerRef.deref()?.postStateToWebview()
 
 				return true
 			}
@@ -912,6 +923,13 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "ssh_session":
 					await sshSessionTool.handle(mirror, block as ToolUse<"ssh_session">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "sleep":
+					await sleepTool.handle(mirror, block as ToolUse<"sleep">, {
 						askApproval,
 						handleError,
 						pushToolResult,

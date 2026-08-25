@@ -2,6 +2,104 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.9] - 2026-08-25
+
+### Added & Improved
+
+- **Non-Blocking Background Context Compression Engine**: Transformed context summarization into a non-blocking background worker that runs asynchronously when thresholds are reached, eliminating turn latency for active model requests while preserving 95%+ prompt cache hit rates.
+- **Directory Path Standardization**: Standardized all global and workspace configuration, skills, and rules paths to `.mirror-vs` across the extension.
+- **Tool Output ANSI Cleaning**: Automatically strip terminal ANSI control codes and escape sequences prior to tool result summarization.
+
+## [0.7.8] - 2026-08-25
+
+### Fixed
+
+- **Model Selection & Fireworks Fix**: Fixed model picker selection snap-back in settings, synchronized settings-configured model changes to the chat input dropdown selector, and fixed 404 Model Not Found errors on Fireworks AI by preserving custom/user-selected model IDs.
+- **Git Auto-Approval Settings Integration**: Wired git auto-approval toggle in extension settings to the chat input auto-approve dropdown.
+- **Tab Mascot State & Designs**: Fixed completed task mascot status so it transitions immediately from the working/streaming state to completed, and updated kaomojis/styles with modern expressive designs (`(★‿★)✨` for completed, `(•̀ω•́)⚡` for streaming/working, `(◕ᴗ◕✿)?` for user interaction).
+- **Session Deletion Confirmation**: Added confirmation popup dialogs when deleting an entire session from history, warning that all associated tabs and subtasks will be closed/deleted, and fixed left-aligned spacing/gaps in batch deletion warning text.
+
+## [0.7.7] - 2026-08-25
+
+### Fixed
+
+- **Question Ask & Queued Message Fix**: Fixed an issue where answering follow-up questions erroneously queued the user's message instead of immediately responding to the ask, and resolved duplicate message injection when force-sending.
+- **Terminal Send Button State**: Fixed chat send button incorrectly showing active streaming state while background terminal commands were running.
+- **Startup Lifecycle & Tab Restoration**: Replaced automatic background tab preloading on launch with clean lazy restoration so extensions initialize immediately without locking state broadcasts.
+- **Task Instance Deduplication**: Fixed duplicate task instances causing users to have to click close multiple times; `closeTask` now disposes and cleans all instances of a closed task ID in a single pass.
+- **Chat Queue Alignment**: Fixed a false-positive queue condition that erroneously marked user messages in idle tasks as "Queued Messages", and added automatic optimistic queue clearing when user feedback messages are rendered in the conversation.
+- **Empty Path Protection Guard**: Resolved `TypeError: path must not be empty` in `MirrorProtectedController` when checking protection rules for root or empty path expressions.
+- **History Workspace Normalization**: Tolerant path matching in the History panel prevents sessions and tasks from disappearing due to trailing slashes or workspace metadata differences.
+
+## [0.7.6] - 2026-08-25
+
+### Added
+
+- **Fireworks AI Model Suite**: Added modern models to Fireworks AI provider configuration including DeepSeek-V3, DeepSeek-R1, Qwen 2.5 Coder, Llama 3.3 70B, and updated provider endpoints with smooth tool-calling support.
+
+### Fixed
+
+- **Streaming Messages Glitching & Disappearing**: Fixed a bug where partial streaming chunks (reasoning, tool executions, text) overwrote preceding messages in-place in the webview state, causing messages to blink or vanish. Messages are now strictly indexed by timestamp and cleanly appended.
+- **Restored Tab Streaming & Auto-Scroll**: Fixed an issue where restored tabs loaded from history remained anchored to old messages in browsing mode during new streaming sessions; the viewport now automatically anchors and follows active streaming tokens and tool calls.
+- **Terminal Callback Width Bounds**: Resolved terminal background callback prompt width escaping the viewport with responsive truncation and max-width clamping.
+- **Loaded Tab Input Responsiveness**: Pre-emptively unblocked input acceptance and state reconciliation when resuming restored tabs or continuing approval requests.
+- **Terminal Background Steering Fix**: Fixed an issue where sending messages while a terminal process was running in the background would be silently dropped or ignored by the model. Messages sent without an active pending ask are now automatically injected as in-between steering feedback so the model processes them immediately.
+
+## [0.7.5] - 2026-08-24
+
+### Added
+
+- **Sleek Compact Terminal Nudge with Jump-to-Command**: Redesigned the terminal background completion nudge into a modern, 30px compact status bar with status pills, copyable collapsible preview, and direct click-to-scroll navigation to the terminal command in chat.
+- **Active Terminals Navigation**: Clicking any running terminal in the Active Terminals popover automatically scrolls the chat to that command's location with a highlight pulse.
+
+### Changed
+
+- **Smart Nudge Filtering & Background Health-Check**: Synchronous commands no longer produce intrusive callback nudges. Long-running background processes trigger recurring 5-minute health check reminders so the model never gets stuck without polling.
+- **CPU & IPC Stream Throttling**: Terminal line output compression and webview status broadcasting are throttled to 150ms windows, eliminating CPU spikes during high-volume stdout logging.
+- **Model Autonomy Prompt**: Enhanced tool instructions informing the model that backgrounded processes do not block execution and it can continue other tasks or complete turns peacefully without polling.
+
+### Fixed
+
+- **Tab Switching Queue Fix**: Fixed an issue where switching to a newly created empty tab while another task was active in a different tab would incorrectly route messages to the queue instead of sending them as a new task.
+- **Model Infinite Loop on Background Commands & Conversational Answers**: Fixed an issue where the model would go into an infinite loop of `noToolsUsed` errors when replying with pure conversational text or when background terminal processes were active.
+- **Immediate Single-Enter Send During Terminal Execution**: Fixed the issue where users had to send messages twice when a terminal command was running (due to `command_output` being improperly excluded from active ask responses).
+
+## [0.7.4] - 2026-08-21
+
+### Added
+
+- **One-Step Ollama Auto-Setup**: Automatically downloads and pulls the required embedding model (`nomic-embed-text`) via the local Ollama instance during One-Click Auto-Setup if not already installed, complete with VS Code progress status.
+- **10-Minute Background Process Alert**: Automatically wakes up the model with a progress notice if a long-running detached background terminal process continues running past 10 minutes.
+
+### Fixed
+
+- **Vision Input Crashes on Non-Vision Custom Models**: Automatically detects non-vision models (such as `deepseek-v4-flash-0731`, `llama-3.1`, `qwen2.5-coder`) when using the Custom/OpenAI-compatible provider and safely filters image blocks into descriptive text placeholders to prevent 400 Bad Request errors.
+
+## [0.7.3] - 2026-08-21
+
+### Added
+
+- **One-Click Codebase Indexing Auto-Setup**: Clicking the ⚡ One-Click Auto-Setup button in the Code Index panel now automatically downloads and starts the local Qdrant vector database with zero manual prerequisites — the local DB is bootstrapped on demand and the index begins immediately.
+
+### Fixed
+
+- **Code Index Startup Crash (`fd: null` stdio)**: Fixed a crash that occurred during codebase indexing initialization where spawning the local Qdrant process with a `WriteStream` whose file descriptor was still `null` (not yet opened) caused `TypeError: The argument 'stdio' is invalid`. The fix awaits the stream's `open` event before spawning so the fd is always valid; falls back to `"ignore"` if the log file can't be created.
+- **Missing `nativeArgs` for Parameter-less Tools**: Tools that take no required parameters (`get_workspace_file_tree`, `get_workspace_pulse`) and tools with all-optional parameters (`get_git_status`, `read_session_context`, `search_mcp_tools`) were incorrectly failing with `Invalid tool call: missing nativeArgs` when called by some LLMs (e.g. Fireworks DeepSeek) that stream empty argument payloads. Added explicit parser cases in `NativeToolCallParser` for all six affected tools so they default to `{}` instead of crashing.
+- **First Message Edit via Enter Key**: Fixed the first-message edit mode in `TaskHeader` where pressing Enter did not submit — only clicking the send button did. Added an explicit early-return for `isEditMode` in the `handleKeyDown` handler.
+- **Message Queue During Tool Execution**: Fixed a race condition where messages typed while the model was executing a tool call (reading files, running commands) would bypass the queue and interrupt the active tool instead of being deferred. Messages are now always queued when `isStreaming` is `true`.
+
+## [0.7.2] - 2026-08-21
+
+### Added
+
+- **Automatic Visual Diff Review Tab**: Integrated automatic visual diff editor (`vscode.diff`) for proposed file modifications so deletions and additions are cleanly rendered in side-by-side / inline red and green views without overlapping or offset text decorations.
+
+### Fixed
+
+- **Sidebar Live Run/Deny Button Visibility**: Synchronized `activeTerminals` execution state with deep-compare effect dependencies in `useChatMessages` to ensure interactive terminal buttons disappear immediately when autonomous commands start executing.
+- **Startup Blank Chat View on Session Restore**: Awaited `task.startRestoredTask()` before webview state posting to resolve intermittent blank chat panel loading on extension restart.
+- **Diff Editor Line Alignment**: Cleaned up inline file review decorations to eliminate spurious red background tinting across unaffected code lines.
+
 ## [0.7.1] - 2026-08-20
 
 ### Added
@@ -13,12 +111,16 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **In-Between Message Steering**: When tasks are streaming, queued messages can be force-sent to steer the model mid-execution.
 - **Super-Cute Mascot Expressions & Polish**: Expanded lively Kaomoji micro-expressions, reactive animations, and developer humor across status modes.
 - **Firebase & CLI Loop Breakers**: Enhanced repetition detector and execution prompt to prevent models from looping on repeated failing or interactive CLI commands like Firebase, with exemptions for polling utilities (`sleep`, `echo`, `cat`, `ps`).
+- **ComfyUI Server Startup & Copy Tools**: Added a **Start ComfyUI Server** button and browser link to launch ComfyUI directly from the Workflow Browser, along with an error copy action button with checkmark status feedback.
 
 ### Fixed
 
 - **Session Tab Isolation & Dynamic Header Title**: Fixed TabBar scoping so switching sessions cleanly isolates tabs to the active session and dynamically updates the session header title in the chat toolbar.
 - **Terminal Run/Deny Button Suppression**: Suppressed unnecessary Run/Deny action buttons when a terminal command has already started running and is streaming output.
 - **File Changes Panel Height & Scroll**: Added a `max-h-[300px]` height boundary with vertical scroll in the file changes panel to prevent expanded diffs from taking up the entire screen.
+- **ComfyUI Auto-Setup Duplicate Runs**: Added a backend execution mutex lock and persistent extension state synchronization to prevent concurrent setups and retain progress indicators when switching settings tabs.
+- **Mascot Speech Bubble Clipping & Layering**: Increased quote speech bubble z-index to `z-[99999]` and adjusted container overflow rules to prevent the mascot text from getting hidden or clipped behind windows on Windows.
+- **Restoration of Previous Active Tab**: Prevented automatically spawning blank new tabs on startup, ensuring the last active task tab is properly restored instead.
 
 ### Changed
 
@@ -26,6 +128,9 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Git Diff Visuals**: Upgraded unified diffs with high-contrast vivid green background/borders for additions and vivid red for removals across both dark and light themes.
 - **Modernized Fireworks AI**: Integrated dynamic model discovery and updated default model to `kimi-k2p5`.
 - **Force Process Tree Termination**: Guaranteed robust cleanup of hung child processes and terminals using comprehensive process-tree termination.
+- **Default Multi-Tab UI Interface**: Promoted the `multiTab` experiment to core features; enabled it by default and added a global setting checkbox to let users "Disable multi-tab interface".
+- **Tab Terminology Update**: Rebranded destructive prompts and buttons from "Delete Session" to "Delete Tab" to match the actual tabbed chat interface.
+- **Mascot Speech Bubble Hover Duration**: Increased Click Quote persistence duration from `1400ms` to `4500ms` to let users read mascot comments comfortably.
 
 ## [0.7.0] - 2026-08-17
 

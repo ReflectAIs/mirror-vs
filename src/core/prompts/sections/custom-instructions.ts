@@ -206,7 +206,9 @@ function formatDirectoryContent(files: Array<{ filename: string; content: string
 export async function loadRuleFiles(cwd: string, enableSubfolderRules: boolean = false): Promise<string> {
 	const rules: string[] = []
 	// Use recursive discovery only if enableSubfolderRules is true
-	const mirrorDirectories = enableSubfolderRules ? await getAllMirrorDirectoriesForCwd(cwd) : getMirrorDirectoriesForCwd(cwd)
+	const mirrorDirectories = enableSubfolderRules
+		? await getAllMirrorDirectoriesForCwd(cwd)
+		: getMirrorDirectoriesForCwd(cwd)
 
 	// Check for .mirror/rules/ directories in order (global, project-local, and optionally subfolders)
 	for (const mirrorDir of mirrorDirectories) {
@@ -461,7 +463,10 @@ export async function addCustomInstructions(
 
 	// Add mode-specific rules first if they exist
 	if (modeRuleContent && modeRuleContent.trim()) {
-		if (usedRuleFile.includes(path.join(".mirror", `rules-${mode}`))) {
+		if (
+			usedRuleFile.includes(path.join(".mirror-vs", `rules-${mode}`)) ||
+			usedRuleFile.includes(path.join(".mirror", `rules-${mode}`))
+		) {
 			rules.push(modeRuleContent.trim())
 		} else {
 			rules.push(`# Rules from ${usedRuleFile}:\n${modeRuleContent}`)

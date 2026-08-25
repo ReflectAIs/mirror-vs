@@ -418,13 +418,17 @@ export async function executeCommandInTerminal(
 	}
 
 	const schedulePartialCommandOutputUpdate = () => {
-		if (!latestCompressedOutput || completed) {
+		if (completed) {
 			return
 		}
 
 		const emitUpdate = () => {
 			pendingCommandOutputEmitTimer = undefined
 			lastCommandOutputEmitAt = Date.now()
+			const compressedOutput = Terminal.compressTerminalOutput(accumulatedOutput)
+			latestCompressedOutput = compressedOutput
+			const status: CommandExecutionStatus = { executionId, status: "output", output: compressedOutput }
+			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			void queueCommandOutputMessage(latestCompressedOutput, true)
 		}
 
@@ -449,8 +453,30 @@ export async function executeCommandInTerminal(
 	})
 
 	let hasEmittedBackgroundCompletion = false
+	const BACKGROUND_NOTICE_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+	let backgroundNoticeTimer: NodeJS.Timeout | undefined
+
+	const startBackgroundNoticeTimer = () => {
+		if (backgroundNoticeTimer || completed || hasEmittedBackgroundCompletion) return
+		backgroundNoticeTimer = setInterval(() => {
+			if (!completed && !hasEmittedBackgroundCompletion && !task.abandoned && runInBackground) {
+				const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
+				const notice = `[Terminal Notice: Background process for '${command}' in '${currentWorkingDir}' is still running (5+ minutes). You can check its status or continue with other tasks.]`
+				void task.injectInBetweenMessage(notice, undefined, "terminal_callback")
+			} else if (completed || hasEmittedBackgroundCompletion || task.abandoned) {
+				if (backgroundNoticeTimer) {
+					clearInterval(backgroundNoticeTimer)
+					backgroundNoticeTimer = undefined
+				}
+			}
+		}, BACKGROUND_NOTICE_INTERVAL_MS)
+	}
 
 	const checkAndNotifyBackgroundCompletion = () => {
+		if (backgroundNoticeTimer) {
+			clearInterval(backgroundNoticeTimer)
+			backgroundNoticeTimer = undefined
+		}
 		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
 			return
 		}
@@ -481,11 +507,7 @@ export async function executeCommandInTerminal(
 			// Write to interceptor for persisted output
 			interceptor?.write(lines)
 
-			// Continue sending compressed output to webview for UI display (unchanged behavior)
-			const compressedOutput = Terminal.compressTerminalOutput(accumulatedOutput)
-			latestCompressedOutput = compressedOutput
-			const status: CommandExecutionStatus = { executionId, status: "output", output: compressedOutput }
-			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
+			// Throttled UI status emit (to prevent 100% CPU spikes during heavy terminal output)
 			schedulePartialCommandOutputUpdate()
 
 			if (runInBackground || hasAskedForCommandOutput) {
@@ -498,6 +520,7 @@ export async function executeCommandInTerminal(
 			try {
 				const { response, text, images } = await task.ask("command_output", "")
 				runInBackground = true
+				startBackgroundNoticeTimer()
 
 				if (response === "messageResponse") {
 					message = { text, images }
@@ -578,6 +601,7 @@ export async function executeCommandInTerminal(
 				new Promise<void>((resolve) => {
 					agentTimeoutId = setTimeout(() => {
 						runInBackground = true
+						startBackgroundNoticeTimer()
 						process.continue()
 						task.supersedePendingAsk()
 						resolve()
@@ -639,6 +663,11 @@ export async function executeCommandInTerminal(
 		await onCompletedPromise
 	}
 
+	// Double-check background notification in case onCompleted resolved after onShellExecutionComplete
+	if (runInBackground && !hasEmittedBackgroundCompletion) {
+		checkAndNotifyBackgroundCompletion()
+	}
+
 	if (message) {
 		const { text, images } = message
 		await task.say("user_feedback", text, images)
@@ -647,9 +676,10 @@ export async function executeCommandInTerminal(
 			true,
 			formatResponse.toolResult(
 				[
-					`Command is still running in terminal from '${terminal.getCurrentWorkingDirectory().toPosix()}'.`,
-					result.length > 0 ? `Here's the output so far:\n${result}\n` : "\n",
+					`Command is still running in background in terminal from '${terminal.getCurrentWorkingDirectory().toPosix()}'.`,
+					result.length > 0 ? `Output so far:\n${result}\n` : "\n",
 					`<user_message>\n${text}\n</user_message>`,
+					`IMPORTANT: The user sent an urgent message while this command was executing. Address the user's message immediately. Do not poll with sleep or echo.`,
 				].join("\n"),
 				images,
 			),
@@ -695,9 +725,9 @@ export async function executeCommandInTerminal(
 		return [
 			false,
 			[
-				`Command is still running in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
-				result.length > 0 ? `Here's the output so far:\n${result}\n` : "\n",
-				"You will be updated on the terminal status and new output in the future.",
+				`Command is running in background in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
+				result.length > 0 ? `Output so far:\n${result}\n` : "\n",
+				"IMPORTANT: The command has moved to the background. The terminal callback will automatically notify and wake you up when the command finishes. If you have no other independent tasks to perform right now, END YOUR TURN IMMEDIATELY WITHOUT CALLING ANY TOOLS. Do NOT call read_command_output, sleep, or check on the terminal in a loop — wait patiently for the callback.",
 			].join("\n"),
 		]
 	}

@@ -6,6 +6,7 @@ describe("UISettings", () => {
 	const defaultProps = {
 		reasoningBlockCollapsed: false,
 		enterBehavior: "send" as const,
+		disableTabBar: false,
 		setCachedStateField: vi.fn(),
 	}
 

@@ -8,6 +8,8 @@ import { useAppTranslation } from "@/i18n/TranslationContext"
 import { cn } from "@/lib/utils"
 import { vscode } from "@/utils/vscode"
 
+import { useExtensionState } from "@/context/ExtensionStateContext"
+
 import { SetExperimentEnabled } from "./types"
 import { SectionHeader } from "./SectionHeader"
 import { Section } from "./Section"
@@ -68,11 +70,27 @@ export const ExperimentalSettings = ({
 	...props
 }: ExperimentalSettingsProps) => {
 	const { t } = useAppTranslation()
+	const { imageAutoSetupRunning = false, imageAutoSetupStatus } = useExtensionState()
 
-	// Auto-setup state
-	const [autoSetupRunning, setAutoSetupRunning] = useState(false)
-	const [autoSetupStatus, setAutoSetupStatus] = useState<string | undefined>(undefined)
-	const [autoSetupProgress, setAutoSetupProgress] = useState<number>(0)
+	// Auto-setup state - initialize with global state so tab switches preserve running state
+	const [autoSetupRunning, setAutoSetupRunning] = useState(imageAutoSetupRunning)
+	const [autoSetupStatus, setAutoSetupStatus] = useState<string | undefined>(
+		imageAutoSetupStatus?.message || imageAutoSetupStatus?.step,
+	)
+	const [autoSetupProgress, setAutoSetupProgress] = useState<number>(imageAutoSetupStatus?.progress ?? 0)
+
+	useEffect(() => {
+		if (imageAutoSetupRunning) {
+			setAutoSetupRunning(true)
+			if (imageAutoSetupStatus) {
+				setAutoSetupStatus(imageAutoSetupStatus.message || imageAutoSetupStatus.step)
+				if (imageAutoSetupStatus.progress !== undefined) {
+					setAutoSetupProgress(imageAutoSetupStatus.progress)
+				}
+			}
+		}
+	}, [imageAutoSetupRunning, imageAutoSetupStatus])
+
 	/** Tracks which local providers have been successfully set up this session */
 	const [configuredProviders, setConfiguredProviders] = useState<Set<"comfyui">>(() => {
 		const initial = new Set<"comfyui">()
@@ -95,6 +113,7 @@ export const ExperimentalSettings = ({
 					setAutoSetupStatus(message.text || "Setup failed")
 				}
 			} else {
+				setAutoSetupRunning(true)
 				setAutoSetupStatus(message.text || message.step || "Working...")
 			}
 			if (
@@ -113,12 +132,16 @@ export const ExperimentalSettings = ({
 		}
 	}, [handleMessage])
 
-	const handleAutoSetup = useCallback((provider: "comfyui") => {
-		setAutoSetupRunning(true)
-		setAutoSetupStatus("Starting...")
-		setAutoSetupProgress(0)
-		vscode.postMessage({ type: "imageAutoSetup", text: provider })
-	}, [])
+	const handleAutoSetup = useCallback(
+		(provider: "comfyui") => {
+			if (autoSetupRunning) return
+			setAutoSetupRunning(true)
+			setAutoSetupStatus("Starting...")
+			setAutoSetupProgress(0)
+			vscode.postMessage({ type: "imageAutoSetup", text: provider })
+		},
+		[autoSetupRunning],
+	)
 
 	// Filter entries — pipeline keys are rendered inside ImageGenerationSettings
 	const entries = Object.entries(experimentConfigsMap)
