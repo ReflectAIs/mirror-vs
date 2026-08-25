@@ -482,6 +482,18 @@ export const ChatRowContent = ({
 										? t("chat:fileOperations.wantsToEditOutsideWorkspace")
 										: t("chat:fileOperations.wantsToEdit")}
 							</span>
+							{message.isAnswered && (
+								<span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-normal">
+									{isStreaming ? (
+										<>
+											<ProgressIndicator />
+											<span className="text-mirror-brand-via animate-pulse">Running...</span>
+										</>
+									) : (
+										<span className="text-emerald-400">✓ Approved</span>
+									)}
+								</span>
+							)}
 						</div>
 						<div className="pl-6">
 							<CodeAccordion

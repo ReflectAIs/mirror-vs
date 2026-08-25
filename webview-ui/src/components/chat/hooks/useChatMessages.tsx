@@ -303,7 +303,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		onUserExpandedRow,
 	} = options
 
-	const { activeTerminals = [], currentTaskId, activeTabId } = useExtensionState()
+	const { activeTerminals = [], currentTaskId, activeTabId, tabs = [] } = useExtensionState()
 
 	// ── Tab Drafts & State Isolation ──
 	const currentTabId = activeTabId || currentTaskId || undefined
@@ -778,6 +778,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			return false
 		}
 
+		// Check if active tab status from backend is "streaming" (e.g. executing tool or streaming response)
+		const activeTab = tabs.find((t) => t.taskId === currentTabId)
+		if (activeTab && activeTab.status === "streaming" && !isToolCurrentlyAsking) {
+			return true
+		}
+
 		const isLastMessagePartial = modifiedMessages.at(-1)?.partial === true
 
 		if (isLastMessagePartial) {
@@ -803,7 +809,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		}
 
 		return false
-	}, [modifiedMessages, mirrorAsk, enableButtons, primaryButtonText])
+	}, [modifiedMessages, mirrorAsk, enableButtons, primaryButtonText, tabs, currentTabId])
 
 	const messageWillQueue = useMemo(() => {
 		if (!(inputValue.trim() || selectedImages.length > 0)) {

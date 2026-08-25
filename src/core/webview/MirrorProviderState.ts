@@ -298,7 +298,12 @@ export class StateManager {
 
 			// Derive TabStatus from live streaming/ask flags & TaskState
 			let status: TabStatus
-			if (task.isStreaming || task.isWaitingForFirstChunk) {
+			if (
+				task.isStreaming ||
+				task.isWaitingForFirstChunk ||
+				(task as any).isExecutingTool ||
+				(task.isLoopActive && !hasPendingApproval)
+			) {
 				status = "streaming"
 			} else if (hasPendingApproval) {
 				status = "interactive"

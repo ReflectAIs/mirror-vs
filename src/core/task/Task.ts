@@ -196,6 +196,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	public lastActivity: number = Date.now()
 	/** Single source of truth for task lifecycle state. Replaces scattered boolean checks. */
 	public state: TaskState = TaskState.Idle
+	/** Flag indicating if a tool is actively executing (between approval and result). */
+	public isExecutingTool = false
 
 	/**
 	 * The mode associated with this task. Persisted across sessions

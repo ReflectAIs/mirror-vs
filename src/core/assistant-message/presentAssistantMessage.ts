@@ -584,6 +584,9 @@ export async function presentAssistantMessage(mirror: Task) {
 					mirror.userMessageContent.push(...imageBlocks)
 				}
 
+				mirror.isExecutingTool = false
+				void mirror.providerRef.deref()?.postStateToWebview()
+
 				hasToolResult = true
 			}
 
@@ -602,6 +605,8 @@ export async function presentAssistantMessage(mirror: Task) {
 				)
 
 				if (response !== "yesButtonClicked") {
+					mirror.isExecutingTool = false
+					void mirror.providerRef.deref()?.postStateToWebview()
 					// Handle both messageResponse and noButtonClicked with text.
 					if (text) {
 						await mirror.say("user_feedback", text, images)
@@ -620,6 +625,10 @@ export async function presentAssistantMessage(mirror: Task) {
 					await mirror.say("user_feedback", text, images)
 					approvalFeedback = { text, images }
 				}
+
+				mirror.isExecutingTool = true
+				mirror.emit(MirrorVSEventName.TaskActive, mirror.taskId)
+				void mirror.providerRef.deref()?.postStateToWebview()
 
 				return true
 			}
