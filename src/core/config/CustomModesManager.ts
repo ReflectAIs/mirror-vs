@@ -666,7 +666,7 @@ export class CustomModesManager {
 				if (!workspacePath) {
 					return false
 				}
-				modeRulesDir = path.join(workspacePath, ".mirror", `rules-${slug}`)
+				modeRulesDir = path.join(workspacePath, ".mirror-vs", `rules-${slug}`)
 			}
 
 			try {
@@ -772,7 +772,7 @@ export class CustomModesManager {
 			// Check for .mirror/rules-{slug}/ directory (or rules-{slug}/ for global)
 			const modeRulesDir = isGlobalMode
 				? path.join(baseDir, `rules-${slug}`)
-				: path.join(baseDir, ".mirror", `rules-${slug}`)
+				: path.join(baseDir, ".mirror-vs", `rules-${slug}`)
 
 			let rulesFiles: RuleFile[] = []
 			try {
@@ -856,7 +856,7 @@ export class CustomModesManager {
 			rulesFolderPath = path.join(baseDir, `rules-${importMode.slug}`)
 		} else {
 			const workspacePath = getWorkspacePath()
-			baseDir = path.join(workspacePath, ".mirror")
+			baseDir = path.join(workspacePath, ".mirror-vs")
 			rulesFolderPath = path.join(baseDir, `rules-${importMode.slug}`)
 		}
 

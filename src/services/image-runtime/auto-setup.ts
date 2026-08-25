@@ -127,91 +127,130 @@ export function connectProviderSelectorToSettings(
 	})
 }
 
+/** Tracks if auto-setup is currently in progress across the extension */
+let _isAutoSetupRunning = false
+let _lastSetupStatus: { step: SetupStep; message?: string; progress?: number } | null = null
+
+export function isAutoSetupRunning(): boolean {
+	return _isAutoSetupRunning
+}
+
+export function getLastAutoSetupStatus(): { step: SetupStep; message?: string; progress?: number } | null {
+	return _lastSetupStatus
+}
+
 /**
  * Auto-setup ComfyUI from scratch.
  */
 export async function autoSetupComfyUI(onStep?: SetupCallback): Promise<void> {
-	emit(onStep, "detecting-hardware")
-	const hardware = await HardwareDetector.detect()
-	const recommendation = await HardwareDetector.recommendModel(hardware)
-
-	const manager = new ComfyUIManager()
-
-	// Check if already installed
-	const healthCheck = await manager.healthCheck()
-	if (healthCheck) {
-		// Already running — just register the provider
-		registerComfyUIProvider()
-		emit(onStep, "complete", "ComfyUI is already running")
+	if (_isAutoSetupRunning) {
+		emit(onStep, "installing-runtime", "Auto-setup is already running...", _lastSetupStatus?.progress ?? 50)
 		return
 	}
 
-	// Verify hardware support for recommended model
-	const hwCheck = await HardwareDetector.verifyHardwareSupport(recommendation.model, hardware)
-	if (!hwCheck.supported && hwCheck.warning) {
-		emit(onStep, "detecting-hardware", `Warning: ${hwCheck.warning}`)
-		// Sleep a moment to ensure user can see warning message, then proceed anyway
-		await new Promise((r) => setTimeout(r, 3000))
+	_isAutoSetupRunning = true
+	_lastSetupStatus = { step: "detecting-hardware", progress: 5 }
+
+	const wrappedOnStep: SetupCallback = (step, message, progress) => {
+		_lastSetupStatus = { step, message, progress }
+		onStep?.(step, message, progress)
 	}
 
-	// Install if not present
-	if (!manager.getState().installed) {
-		emit(onStep, "downloading-runtime")
-		await manager.install((step, msg, pct) => {
-			emit(onStep, "installing-runtime", msg, pct)
-		})
-	}
+	try {
+		emit(wrappedOnStep, "detecting-hardware")
+		const hardware = await HardwareDetector.detect()
+		const recommendation = await HardwareDetector.recommendModel(hardware)
 
-	// Seed default workflows and provision custom nodes
-	emit(onStep, "installing-runtime", "Seeding default workflows and custom nodes...", 65)
-	const { WorkflowScanner } = await import("./workflow-scanner")
-	await WorkflowScanner.seedDefaultWorkflows(manager.comfyUISrcPath)
-	await WorkflowScanner.provisionCustomNodes(manager.comfyUISrcPath)
+		const manager = new ComfyUIManager()
 
-	// Download default model
-	const defaultModel = modelRegistry.getModel(recommendation.model)
-	if (defaultModel?.downloadable && !defaultModel.installed) {
-		emit(onStep, "downloading-model", `Downloading ${defaultModel.displayName}...`)
-		const modelsDir = path.join(manager.comfyUISrcPath, "models", "checkpoints")
-		await fs.mkdir(modelsDir, { recursive: true })
-		const modelPath = path.join(modelsDir, `${defaultModel.id}.safetensors`)
-		await new Promise<void>((resolve, reject) => {
-			// Forward real download progress (0–100%) scaled into the 70–85 range
-			const onProgress = (p: { id: string; downloadedBytes: number; totalBytes: number; progress: number }) => {
-				const scaled = 70 + Math.round((p.progress / 100) * 15)
-				emit(onStep, "downloading-model", `Downloading ${defaultModel.displayName}... (${p.progress}%)`, scaled)
-			}
-			downloadManager.on("progress", onProgress)
-			downloadManager.once("complete", () => {
-				downloadManager.off("progress", onProgress)
-				resolve()
-			})
-			downloadManager.once("error", (e) => {
-				downloadManager.off("progress", onProgress)
-				reject(new Error(e.error))
-			})
-			downloadManager.enqueue(defaultModel.downloadUrl!, modelPath, defaultModel.checksum, defaultModel.size)
-		})
-		modelRegistry.markInstalled(defaultModel.id)
-	}
-
-	// Launch
-	emit(onStep, "launching")
-	await manager.launch()
-
-	// Health check
-	emit(onStep, "health-check")
-	for (let i = 0; i < 30; i++) {
-		await new Promise((r) => setTimeout(r, 1000))
-		const alive = await manager.healthCheck()
-		if (alive) {
+		// Check if already installed
+		const healthCheck = await manager.healthCheck()
+		if (healthCheck) {
+			// Already running — just register the provider
 			registerComfyUIProvider()
-			emit(onStep, "complete", "ComfyUI is ready")
+			emit(wrappedOnStep, "complete", "ComfyUI is already running")
 			return
 		}
-	}
 
-	emit(onStep, "error", "ComfyUI failed to start within 30 seconds")
+		// Verify hardware support for recommended model
+		const hwCheck = await HardwareDetector.verifyHardwareSupport(recommendation.model, hardware)
+		if (!hwCheck.supported && hwCheck.warning) {
+			emit(onStep, "detecting-hardware", `Warning: ${hwCheck.warning}`)
+			// Sleep a moment to ensure user can see warning message, then proceed anyway
+			await new Promise((r) => setTimeout(r, 3000))
+		}
+
+		// Install if not present
+		if (!manager.getState().installed) {
+			emit(onStep, "downloading-runtime")
+			await manager.install((step, msg, pct) => {
+				emit(onStep, "installing-runtime", msg, pct)
+			})
+		}
+
+		// Seed default workflows and provision custom nodes
+		emit(onStep, "installing-runtime", "Seeding default workflows and custom nodes...", 65)
+		const { WorkflowScanner } = await import("./workflow-scanner")
+		await WorkflowScanner.seedDefaultWorkflows(manager.comfyUISrcPath)
+		await WorkflowScanner.provisionCustomNodes(manager.comfyUISrcPath)
+
+		// Download default model
+		const defaultModel = modelRegistry.getModel(recommendation.model)
+		if (defaultModel?.downloadable && !defaultModel.installed) {
+			emit(onStep, "downloading-model", `Downloading ${defaultModel.displayName}...`)
+			const modelsDir = path.join(manager.comfyUISrcPath, "models", "checkpoints")
+			await fs.mkdir(modelsDir, { recursive: true })
+			const modelPath = path.join(modelsDir, `${defaultModel.id}.safetensors`)
+			await new Promise<void>((resolve, reject) => {
+				// Forward real download progress (0–100%) scaled into the 70–85 range
+				const onProgress = (p: {
+					id: string
+					downloadedBytes: number
+					totalBytes: number
+					progress: number
+				}) => {
+					const scaled = 70 + Math.round((p.progress / 100) * 15)
+					emit(
+						onStep,
+						"downloading-model",
+						`Downloading ${defaultModel.displayName}... (${p.progress}%)`,
+						scaled,
+					)
+				}
+				downloadManager.on("progress", onProgress)
+				downloadManager.once("complete", () => {
+					downloadManager.off("progress", onProgress)
+					resolve()
+				})
+				downloadManager.once("error", (e) => {
+					downloadManager.off("progress", onProgress)
+					reject(new Error(e.error))
+				})
+				downloadManager.enqueue(defaultModel.downloadUrl!, modelPath, defaultModel.checksum, defaultModel.size)
+			})
+			modelRegistry.markInstalled(defaultModel.id)
+		}
+
+		// Launch
+		emit(wrappedOnStep, "launching")
+		await manager.launch()
+
+		// Health check
+		emit(wrappedOnStep, "health-check")
+		for (let i = 0; i < 30; i++) {
+			await new Promise((r) => setTimeout(r, 1000))
+			const alive = await manager.healthCheck()
+			if (alive) {
+				registerComfyUIProvider()
+				emit(wrappedOnStep, "complete", "ComfyUI is ready")
+				return
+			}
+		}
+
+		emit(wrappedOnStep, "error", "ComfyUI failed to start within 30 seconds")
+	} finally {
+		_isAutoSetupRunning = false
+	}
 }
 
 function emit(cb: SetupCallback | undefined, step: SetupStep, message?: string, progress?: number): void {

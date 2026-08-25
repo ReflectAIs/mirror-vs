@@ -4,6 +4,11 @@ import * as path from "path"
 import { diffLines } from "../utils/diff"
 import { revertCheckpoint } from "../utils/editor-utils"
 
+export interface DeletedLineInfo {
+	proposedLineIndex: number
+	originalText: string
+}
+
 export interface ActiveReview {
 	filePath: string
 	originalContent: string
@@ -13,6 +18,7 @@ export interface ActiveReview {
 	checkpointId?: string
 	addedLineIndices: number[]
 	removedLineIndices: number[]
+	deletedLinesInfo?: DeletedLineInfo[]
 	resolve: (accepted: boolean) => void
 }
 
@@ -23,14 +29,18 @@ export interface ActiveReview {
  * Implements the "Accept All" feature via `acceptAllReviews` command.
  * Does NOT auto-accept git changes (user's explicit request).
  */
-export class ReviewManager implements vscode.CodeLensProvider {
+export class ReviewManager
+	implements vscode.CodeLensProvider, vscode.QuickDiffProvider, vscode.TextDocumentContentProvider
+{
 	private static _instance: ReviewManager
 	private _activeReviews = new Map<string, ActiveReview>()
 	private _onDidChangeCodeLenses = new vscode.EventEmitter<void>()
 	private _onDidChangeActiveReviews = new vscode.EventEmitter<void>()
+	private _onDidChangeDocument = new vscode.EventEmitter<vscode.Uri>()
 
 	public readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event
 	public readonly onDidChangeActiveReviews = this._onDidChangeActiveReviews.event
+	public readonly onDidChange = this._onDidChangeDocument.event
 
 	private _acceptStatusBarItem: vscode.StatusBarItem | undefined
 	private _rejectStatusBarItem: vscode.StatusBarItem | undefined
@@ -39,24 +49,10 @@ export class ReviewManager implements vscode.CodeLensProvider {
 	private _nextStatusBarItem: vscode.StatusBarItem | undefined
 
 	private _addedDecorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: "rgba(74, 137, 74, 0.15)", // Glassmorphic green highlight
+		backgroundColor: "rgba(74, 137, 74, 0.15)",
 		isWholeLine: true,
 		overviewRulerColor: "rgba(74, 137, 74, 0.6)",
 		overviewRulerLane: vscode.OverviewRulerLane.Left,
-	})
-
-	private _deletedDecorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: "rgba(239, 68, 68, 0.15)", // Glassmorphic red highlight
-		isWholeLine: true,
-		overviewRulerColor: "rgba(239, 68, 68, 0.6)",
-		overviewRulerLane: vscode.OverviewRulerLane.Left,
-		gutterIconPath: vscode.Uri.parse(
-			'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8" stroke="%23ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>',
-		),
-		gutterIconSize: "contain",
-		borderWidth: "1px 0 0 0",
-		borderStyle: "solid",
-		borderColor: "rgba(239, 68, 68, 0.8)",
 	})
 
 	public getActiveReviewsCount(): number {
@@ -78,9 +74,39 @@ export class ReviewManager implements vscode.CodeLensProvider {
 		return path.normalize(filePath).toLowerCase()
 	}
 
+	// ── TextDocumentContentProvider & QuickDiffProvider ─────────────────────────
+
+	public provideTextDocumentContent(uri: vscode.Uri): string {
+		const normPath = this.normalizePath(uri.fsPath)
+		const review = this._activeReviews.get(normPath)
+		return review ? review.originalContent : ""
+	}
+
+	public provideOriginalResource(
+		uri: vscode.Uri,
+		_token: vscode.CancellationToken,
+	): vscode.ProviderResult<vscode.Uri> {
+		const normPath = this.normalizePath(uri.fsPath)
+		if (this._activeReviews.has(normPath)) {
+			return vscode.Uri.from({ scheme: "mirror-original", path: uri.fsPath })
+		}
+		return undefined
+	}
+
 	public register(context: vscode.ExtensionContext) {
-		// Register the CodeLens Provider for all files
-		context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: "file" }, this))
+		// Register QuickDiff via SCM and TextDocumentContentProvider for native Git-style diff gutters & bubbles
+		try {
+			const scm = vscode.scm.createSourceControl("mirror-vs-review", "Mirror VS Review")
+			scm.quickDiffProvider = this
+			context.subscriptions.push(scm)
+		} catch (e) {
+			console.warn("[ReviewManager] Failed to register SCM QuickDiffProvider:", e)
+		}
+
+		context.subscriptions.push(
+			vscode.workspace.registerTextDocumentContentProvider("mirror-original", this),
+			vscode.languages.registerCodeLensProvider({ scheme: "file" }, this),
+		)
 
 		// Initialize Status Bar Items
 		this._acceptStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000)
@@ -168,12 +194,8 @@ export class ReviewManager implements vscode.CodeLensProvider {
 			vscode.commands.registerCommand("mirror-vs.diffReview", async (filePath: string) => {
 				const review = this._activeReviews.get(this.normalizePath(filePath))
 				if (review) {
-					const originalUri = review.tempOriginalPath
-						? vscode.Uri.file(review.tempOriginalPath)
-						: vscode.Uri.file(review.filePath)
-					const proposedUri = review.tempProposedPath
-						? vscode.Uri.file(review.tempProposedPath)
-						: vscode.Uri.file(review.filePath)
+					const originalUri = vscode.Uri.from({ scheme: "mirror-original", path: review.filePath })
+					const proposedUri = vscode.Uri.file(review.filePath)
 
 					await vscode.commands.executeCommand(
 						"vscode.diff",
@@ -221,12 +243,10 @@ export class ReviewManager implements vscode.CodeLensProvider {
 
 		if (!review) {
 			editor.setDecorations(this._addedDecorationType, [])
-			editor.setDecorations(this._deletedDecorationType, [])
 			return
 		}
 
 		const addedRanges: vscode.Range[] = []
-		const deletedRanges: vscode.Range[] = []
 
 		for (const lineIdx of review.addedLineIndices) {
 			if (lineIdx < editor.document.lineCount) {
@@ -234,14 +254,7 @@ export class ReviewManager implements vscode.CodeLensProvider {
 			}
 		}
 
-		for (const lineIdx of review.removedLineIndices) {
-			if (lineIdx < editor.document.lineCount) {
-				deletedRanges.push(editor.document.lineAt(lineIdx).range)
-			}
-		}
-
 		editor.setDecorations(this._addedDecorationType, addedRanges)
-		editor.setDecorations(this._deletedDecorationType, deletedRanges)
 	}
 
 	/**
@@ -348,6 +361,8 @@ export class ReviewManager implements vscode.CodeLensProvider {
 				resolve,
 			})
 
+			const origUri = vscode.Uri.from({ scheme: "mirror-original", path: filePath })
+			this._onDidChangeDocument.fire(origUri)
 			this._onDidChangeCodeLenses.fire()
 			this._onDidChangeActiveReviews.fire()
 			this.updateStatusBar()
@@ -410,6 +425,8 @@ export class ReviewManager implements vscode.CodeLensProvider {
 		if (!review) return
 
 		this._activeReviews.delete(normPath)
+		const origUri = vscode.Uri.from({ scheme: "mirror-original", path: filePath })
+		this._onDidChangeDocument.fire(origUri)
 		this._onDidChangeActiveReviews.fire()
 		this.updateStatusBar()
 
@@ -417,7 +434,6 @@ export class ReviewManager implements vscode.CodeLensProvider {
 		for (const editor of vscode.window.visibleTextEditors) {
 			if (this.normalizePath(editor.document.uri.fsPath) === normPath) {
 				editor.setDecorations(this._addedDecorationType, [])
-				editor.setDecorations(this._deletedDecorationType, [])
 			}
 		}
 
@@ -565,25 +581,23 @@ export class ReviewManager implements vscode.CodeLensProvider {
 			})
 		}
 
+		const origUri = vscode.Uri.from({ scheme: "mirror-original", path: filePath })
+		this._onDidChangeDocument.fire(origUri)
 		this._onDidChangeCodeLenses.fire()
 		this._onDidChangeActiveReviews.fire()
 		this.updateStatusBar()
 
-		// Apply decorations to all visible editors showing this file
+		// Apply green decorations to any visible editors showing this file
 		for (const editor of vscode.window.visibleTextEditors) {
 			if (this.normalizePath(editor.document.uri.fsPath) === normPath) {
 				this.applyDecorations(editor)
 			}
 		}
 
-		// Open the file in the editor with decorations (preserve focus)
-		vscode.workspace.openTextDocument(filePath).then(
-			(doc) => {
-				vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true }).then((editor) => {
-					this.applyDecorations(editor)
-				})
-			},
+		// Automatically open the visual side-by-side/inline diff editor (vscode.diff)
+		vscode.commands.executeCommand("mirror-vs.diffReview", filePath).then(
 			() => {},
+			(err) => console.warn("Failed to automatically open visual diff in showReviewDecorations:", err),
 		)
 
 		// Show non-blocking notification toast
