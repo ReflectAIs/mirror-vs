@@ -1001,6 +1001,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				}
 
 				handleChatReset()
+				virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" })
 			}
 		},
 		[
@@ -1128,6 +1129,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			setEnableButtons(false)
 			setPrimaryButtonText(undefined)
 			setSecondaryButtonText(undefined)
+			virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" })
 		},
 		[mirrorAsk, currentTaskItem?.parentTaskId, currentTabId],
 	)
