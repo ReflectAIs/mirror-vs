@@ -90,9 +90,9 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 	}, [parsed.output])
 
 	return (
-		<div className="my-1.5 rounded-md bg-vscode-sideBar-background/60 border border-vscode-panel-border/40 hover:border-mirror-brand-via/30 transition-all text-xs shadow-2xs backdrop-blur-xs group">
-			<div className="flex items-center justify-between gap-2 px-2.5 py-1.5 min-h-[30px]">
-				<div className="flex items-center gap-2 min-w-0 flex-1">
+		<div className="my-1.5 w-full max-w-full overflow-hidden box-border rounded-md bg-vscode-sideBar-background/60 border border-vscode-panel-border/40 hover:border-mirror-brand-via/30 transition-all text-xs shadow-2xs backdrop-blur-xs group">
+			<div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 min-h-[30px] w-full min-w-0 max-w-full overflow-hidden box-border">
+				<div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
 					<Terminal
 						className={cn(
 							"size-3.5 shrink-0",
@@ -108,7 +108,7 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 					</span>
 					{parsed.command && (
 						<span
-							className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-vscode-badge-background/20 text-vscode-foreground max-w-[200px] truncate border border-vscode-panel-border/30"
+							className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-vscode-badge-background/20 text-vscode-foreground min-w-0 max-w-[140px] xs:max-w-[200px] sm:max-w-[280px] truncate border border-vscode-panel-border/30 shrink"
 							title={parsed.command}>
 							{parsed.command}
 						</span>
@@ -116,7 +116,7 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 					{parsed.exitStatus && (
 						<span
 							className={cn(
-								"text-[10px] font-mono font-medium px-1.5 py-0.2 rounded border inline-flex items-center gap-1 shrink-0",
+								"text-[10px] font-mono font-medium px-1.5 py-0.2 rounded border inline-flex items-center gap-1 shrink-0 whitespace-nowrap",
 								isRunning
 									? "bg-amber-500/10 text-amber-300 border-amber-500/20"
 									: isSuccess
@@ -156,17 +156,17 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 			</div>
 
 			{isExpanded && parsed.output && (
-				<div className="px-2.5 pb-2 pt-1 border-t border-vscode-panel-border/20">
-					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono mb-1">
-						<span>{parsed.cwd ? `cwd: ${parsed.cwd}` : "Output"}</span>
+				<div className="px-2.5 pb-2 pt-1 border-t border-vscode-panel-border/20 w-full max-w-full overflow-hidden box-border">
+					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono mb-1 min-w-0">
+						<span className="truncate mr-2">{parsed.cwd ? `cwd: ${parsed.cwd}` : "Output"}</span>
 						<button
 							onClick={handleCopy}
-							className="flex items-center gap-1 hover:text-vscode-foreground cursor-pointer transition-colors">
+							className="flex items-center gap-1 hover:text-vscode-foreground cursor-pointer transition-colors shrink-0">
 							{copied ? <Check className="size-2.5 text-emerald-400" /> : <Copy className="size-2.5" />}
 							<span>{copied ? "Copied" : "Copy"}</span>
 						</button>
 					</div>
-					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap text-vscode-editor-foreground">
+					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full max-w-full box-border">
 						{parsed.output}
 					</pre>
 				</div>
