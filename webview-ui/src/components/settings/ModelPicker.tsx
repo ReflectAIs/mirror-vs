@@ -134,8 +134,8 @@ export const ModelPicker = ({
 			const storedValue = apiConfiguration[modelIdKey]
 			return storedValue ? displayTransform(storedValue) : undefined
 		}
-		return selectedModelId
-	}, [displayTransform, apiConfiguration, modelIdKey, selectedModelId])
+		return (apiConfiguration?.[modelIdKey] as string | undefined) || selectedModelId || defaultModelId
+	}, [displayTransform, apiConfiguration, modelIdKey, selectedModelId, defaultModelId])
 
 	const activeProvider =
 		apiConfiguration.apiProvider && isRetiredProvider(apiConfiguration.apiProvider)
