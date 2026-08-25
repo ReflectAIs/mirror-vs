@@ -116,7 +116,9 @@ export interface ExtensionMessage {
 		| "importComfyuiWorkflows"
 		| "importComfyuiWorkflowsResult"
 		| "deleteComfyuiWorkflowResult"
+		| "startComfyuiServerResult"
 	text?: string
+	taskId?: string
 	/** For fileContent: { path, content, error? } */
 	fileContent?: { path: string; content: string | null; error?: string }
 	payload?: any // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -420,6 +422,7 @@ export type ExtensionState = Pick<
 	| "includeTaskHistoryInEnhance"
 	| "reasoningBlockCollapsed"
 	| "enterBehavior"
+	| "disableTabBar"
 	| "includeCurrentTime"
 	| "includeCurrentCost"
 	| "maxGitStatusFiles"
@@ -517,6 +520,8 @@ export type ExtensionState = Pick<
 	sessionNotes?: string
 	activeTerminalCount: number
 	activeTerminals: TerminalInfo[]
+	imageAutoSetupRunning?: boolean
+	imageAutoSetupStatus?: { step: string; message?: string; progress?: number } | null
 }
 
 export interface Command {
@@ -669,6 +674,7 @@ export interface WebviewMessage {
 		| "insertTextIntoTextarea"
 		| "imageGenerationSettings"
 		| "imageAutoSetup"
+		| "startComfyuiServer"
 		| "requestImageProviderModels"
 		| "queueMessage"
 		| "removeQueuedMessage"

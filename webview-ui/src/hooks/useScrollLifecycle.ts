@@ -320,13 +320,21 @@ export function useScrollLifecycle({
 		})
 	}, [cancelReanchorFrame, enterAnchoredFollowing, scrollToBottomAuto])
 
+	// Auto-anchor and follow when streaming is active on the current tab
+	useEffect(() => {
+		if (isStreaming && !isHidden) {
+			enterAnchoredFollowing()
+			scrollToBottomAuto()
+		}
+	}, [isStreaming, isHidden, enterAnchoredFollowing, scrollToBottomAuto])
+
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: followOutput
 	// -----------------------------------------------------------------------
 
 	const followOutputCallback = useCallback((): "auto" | false => {
-		return scrollPhase === "USER_BROWSING_HISTORY" ? false : "auto"
-	}, [scrollPhase])
+		return scrollPhase === "USER_BROWSING_HISTORY" && !isStreaming ? false : "auto"
+	}, [scrollPhase, isStreaming])
 
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: atBottomStateChange

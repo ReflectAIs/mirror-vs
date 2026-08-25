@@ -18,6 +18,12 @@ export class ComfyUIManager extends RuntimeManager {
 	 * Cloned into `installPath/ComfyUI` or extracted into root.
 	 */
 	public get comfyUISrcPath(): string {
+		if (this.isWindows) {
+			const portableSubDir = path.join(this.installPath, "ComfyUI_windows_portable", "ComfyUI")
+			if (existsSync(portableSubDir)) {
+				return portableSubDir
+			}
+		}
 		const subDir = path.join(this.installPath, "ComfyUI")
 		if (existsSync(subDir)) {
 			return subDir
@@ -55,9 +61,14 @@ export class ComfyUIManager extends RuntimeManager {
 			return venvExec
 		}
 
-		const embeddedExec = path.join(this.installPath, "python_embeded", "python.exe")
+		const embeddedExec = path.join(this.installPath, "ComfyUI_windows_portable", "python_embeded", "python.exe")
 		if (this.isWindows && existsSync(embeddedExec)) {
 			return embeddedExec
+		}
+
+		const oldEmbeddedExec = path.join(this.installPath, "python_embeded", "python.exe")
+		if (this.isWindows && existsSync(oldEmbeddedExec)) {
+			return oldEmbeddedExec
 		}
 
 		const rootExec = path.join(this.installPath, this.executableName)

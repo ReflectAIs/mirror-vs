@@ -66,7 +66,7 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 						{activeTerminals.length > 0 ? (
 							<div className="flex flex-col">
 								{activeTerminals.map((term) => (
-									<TerminalRow key={term.id} terminal={term} />
+									<TerminalRow key={term.id} terminal={term} onClose={() => setOpen(false)} />
 								))}
 							</div>
 						) : (
@@ -87,6 +87,7 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 const TerminalRow = React.memo(
 	({
 		terminal,
+		onClose,
 	}: {
 		terminal: {
 			id: number
@@ -97,11 +98,13 @@ const TerminalRow = React.memo(
 			host?: string
 			port?: number
 		}
+		onClose?: () => void
 	}) => {
 		const displayCommand = terminal.command || (terminal.type === "ssh" ? "SSH Session" : "Ready")
 		const displayCwd = terminal.cwd || "—"
 
-		const handleKill = () => {
+		const handleKill = (e: React.MouseEvent) => {
+			e.stopPropagation()
 			vscode.postMessage({
 				type: "killTerminal",
 				terminalId: terminal.id,
@@ -109,8 +112,28 @@ const TerminalRow = React.memo(
 			})
 		}
 
+		const handleRowClick = () => {
+			if (terminal.command) {
+				const allRows = document.querySelectorAll("[data-ts]")
+				for (let i = allRows.length - 1; i >= 0; i--) {
+					const el = allRows[i] as HTMLElement
+					if (el.textContent?.includes(terminal.command)) {
+						el.scrollIntoView({ behavior: "smooth", block: "center" })
+						el.classList.add("ring-2", "ring-mirror-brand-via/60", "transition-all")
+						setTimeout(() => {
+							el.classList.remove("ring-2", "ring-mirror-brand-via/60", "transition-all")
+						}, 2000)
+						break
+					}
+				}
+			}
+			onClose?.()
+		}
+
 		return (
-			<div className="flex flex-col gap-0.5 px-3 py-2.5 border-b border-vscode-dropdown-border last:border-b-0 hover:bg-[rgba(255,255,255,0.03)] transition-colors group">
+			<div
+				onClick={handleRowClick}
+				className="flex flex-col gap-0.5 px-3 py-2.5 border-b border-vscode-dropdown-border last:border-b-0 hover:bg-[rgba(255,255,255,0.06)] cursor-pointer transition-colors group">
 				<div className="flex items-center gap-2">
 					{terminal.type === "ssh" ? (
 						<Server className="size-3 text-amber-500 shrink-0" />
@@ -130,7 +153,8 @@ const TerminalRow = React.memo(
 						variant="ghost"
 						size="icon"
 						className="size-5 opacity-0 group-hover:opacity-100 transition-opacity"
-						onClick={handleKill}>
+						onClick={handleKill}
+						title="Terminate process">
 						<OctagonX className="size-3.5 text-red-400 hover:text-red-300" />
 					</Button>
 				</div>

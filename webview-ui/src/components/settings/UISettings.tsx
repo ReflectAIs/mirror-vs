@@ -11,12 +11,14 @@ import { ExtensionStateContextType } from "@/context/ExtensionStateContext"
 interface UISettingsProps extends HTMLAttributes<HTMLDivElement> {
 	reasoningBlockCollapsed: boolean
 	enterBehavior: "send" | "newline"
+	disableTabBar: boolean
 	setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType>
 }
 
 export const UISettings = ({
 	reasoningBlockCollapsed,
 	enterBehavior,
+	disableTabBar,
 	setCachedStateField,
 	...props
 }: UISettingsProps) => {
@@ -35,6 +37,10 @@ export const UISettings = ({
 	const handleEnterBehaviorChange = (requireCtrlEnter: boolean) => {
 		const newBehavior = requireCtrlEnter ? "newline" : "send"
 		setCachedStateField("enterBehavior", newBehavior)
+	}
+
+	const handleDisableTabBarChange = (value: boolean) => {
+		setCachedStateField("disableTabBar", value)
 	}
 
 	return (
@@ -77,6 +83,24 @@ export const UISettings = ({
 							</VSCodeCheckbox>
 							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
 								{t("settings:ui.requireCtrlEnterToSend.description", { primaryMod })}
+							</div>
+						</div>
+					</SearchableSetting>
+
+					{/* Disable Multi-Tab Setting */}
+					<SearchableSetting
+						settingId="ui-disable-tab-bar"
+						section="ui"
+						label={t("settings:ui.disableTabBar.label")}>
+						<div className="flex flex-col gap-1">
+							<VSCodeCheckbox
+								checked={disableTabBar}
+								onChange={(e: any) => handleDisableTabBarChange(e.target.checked)}
+								data-testid="disable-tab-bar-checkbox">
+								<span className="font-medium">{t("settings:ui.disableTabBar.label")}</span>
+							</VSCodeCheckbox>
+							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
+								{t("settings:ui.disableTabBar.description")}
 							</div>
 						</div>
 					</SearchableSetting>

@@ -41,6 +41,9 @@ export class FireworksHandler extends BaseOpenAiCompatibleProvider<FireworksMode
 
 		const temperature = this.options.modelTemperature ?? info.defaultTemperature ?? this.defaultTemperature
 
+		const openAiTools = this.convertToolsForOpenAI(metadata?.tools)
+		const hasTools = Boolean(openAiTools && openAiTools.length > 0)
+
 		const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
 			model,
 			max_tokens,
@@ -51,9 +54,13 @@ export class FireworksHandler extends BaseOpenAiCompatibleProvider<FireworksMode
 			messages: [{ role: "system", content: systemPrompt }, ...convertToOpenAiMessages(messages)],
 			stream: true,
 			stream_options: { include_usage: true },
-			tools: this.convertToolsForOpenAI(metadata?.tools),
-			tool_choice: metadata?.tool_choice,
-			parallel_tool_calls: metadata?.parallelToolCalls ?? true,
+			...(hasTools
+				? {
+						tools: openAiTools,
+						tool_choice: metadata?.tool_choice ?? "auto",
+						parallel_tool_calls: metadata?.parallelToolCalls ?? true,
+					}
+				: {}),
 		}
 
 		if (this.options.enableReasoningEffort && info.supportsReasoningBinary) {

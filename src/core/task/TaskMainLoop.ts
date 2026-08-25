@@ -177,6 +177,50 @@ export const RECOVERY_STRATEGIES: Record<string, RecoveryStrategy> = {
 			}
 		},
 	},
+	module_not_found: {
+		pattern: /cannot find module|no module named|module_not_found|pkg_resources\.distributionnotfound/i,
+		action: async (
+			errorMessage: string,
+			_toolName: string,
+			_toolArgs: Record<string, unknown>,
+			ledger: StruggleLedger,
+		) => {
+			const { shouldEscalate } = ledger.record("module_not_found")
+			if (shouldEscalate) {
+				return {
+					type: "escalate" as const,
+					message:
+						"Missing dependency could not be resolved automatically. Please check your package dependencies.",
+				}
+			}
+			return {
+				type: "retry" as const,
+				message: `Missing dependency detected: ${errorMessage.slice(0, 300)}. Please install the required package or verify your environment configuration rather than repeating the failing command.`,
+			}
+		},
+	},
+	port_in_use: {
+		pattern: /EADDRINUSE|address already in use|port.*already in use/i,
+		action: async (
+			errorMessage: string,
+			_toolName: string,
+			_toolArgs: Record<string, unknown>,
+			ledger: StruggleLedger,
+		) => {
+			const { shouldEscalate } = ledger.record("port_in_use")
+			if (shouldEscalate) {
+				return {
+					type: "escalate" as const,
+					message:
+						"Port is already in use by another process. Please terminate the conflicting process or choose another port.",
+				}
+			}
+			return {
+				type: "retry" as const,
+				message: `Port conflict detected: ${errorMessage.slice(0, 200)}. Use a different port or check running terminals/processes.`,
+			}
+		},
+	},
 }
 
 /**
@@ -213,48 +257,53 @@ export class TaskMainLoop {
 		let includeFileDetails = true
 
 		this.task.emit(MirrorVSEventName.TaskStarted)
+		this.task.isLoopActive = true
 
-		while (!this.task.abort) {
-			const didEndLoop = await this.recursivelyMakeMirrorRequests(nextUserContent, includeFileDetails)
-			includeFileDetails = false // We only need file details the first time.
+		try {
+			while (!this.task.abort) {
+				const didEndLoop = await this.recursivelyMakeMirrorRequests(nextUserContent, includeFileDetails)
+				includeFileDetails = false // We only need file details the first time.
 
-			// The way this agentic loop works is that mirror will be given a
-			// task that he then calls tools to complete. Unless there's an
-			// attempt_completion call, we keep responding back to him with his
-			// tool's responses until he either attempt_completion or does not
-			// use anymore tools. If he does not use anymore tools, we ask him
-			// to consider if he's completed the task and then call
-			// attempt_completion, otherwise proceed with completing the task.
-			// There is a MAX_REQUESTS_PER_TASK limit to prevent infinite
-			// requests, but Mirror is prompted to finish the task as efficiently
-			// as he can.
+				// The way this agentic loop works is that mirror will be given a
+				// task that he then calls tools to complete. Unless there's an
+				// attempt_completion call, we keep responding back to him with his
+				// tool's responses until he either attempt_completion or does not
+				// use anymore tools. If he does not use anymore tools, we ask him
+				// to consider if he's completed the task and then call
+				// attempt_completion, otherwise proceed with completing the task.
+				// There is a MAX_REQUESTS_PER_TASK limit to prevent infinite
+				// requests, but Mirror is prompted to finish the task as efficiently
+				// as he can.
 
-			if (didEndLoop) {
-				// Process one queued message at a time after each task loop
-				// completes. Instead of draining all messages at once, we take
-				// one, submit it as a new user message, and continue the loop.
-				// Subsequent queued messages are handled on the next iteration,
-				// preventing mid-workflow interruptions while ensuring all
-				// messages eventually get processed.
-				const queued = this.task.messageQueueService.dequeueMessage()
-				if (queued) {
-					await this.task.say("user_feedback", queued.text, queued.images)
+				if (didEndLoop) {
+					// Process one queued message at a time after each task loop
+					// completes. Instead of draining all messages at once, we take
+					// one, submit it as a new user message, and continue the loop.
+					// Subsequent queued messages are handled on the next iteration,
+					// preventing mid-workflow interruptions while ensuring all
+					// messages eventually get processed.
+					const queued = this.task.messageQueueService.dequeueMessage()
+					if (queued) {
+						await this.task.say("user_feedback", queued.text, queued.images)
 
-					const imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(queued.images)
-					nextUserContent = [
-						{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
-						...imageBlocks,
-					]
-					includeFileDetails = true
-					continue
+						const imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(queued.images)
+						nextUserContent = [
+							{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
+							...imageBlocks,
+						]
+						includeFileDetails = true
+						continue
+					}
+
+					// For now a task never 'completes'. This will only happen if
+					// the user hits max requests and denies resetting the count.
+					break
+				} else {
+					nextUserContent = [{ type: "text", text: formatResponse.noToolsUsed() }]
 				}
-
-				// For now a task never 'completes'. This will only happen if
-				// the user hits max requests and denies resetting the count.
-				break
-			} else {
-				nextUserContent = [{ type: "text", text: formatResponse.noToolsUsed() }]
 			}
+		} finally {
+			this.task.isLoopActive = false
 		}
 	}
 
@@ -1201,22 +1250,29 @@ export class TaskMainLoop {
 						(block) => block.type === "tool_use" || block.type === "mcp_tool_use",
 					)
 
+					const isBackgroundRunning = this.task.terminalProcess !== undefined
 					if (!didToolUse) {
-						// Increment consecutive no-tool-use counter
-						this.task.consecutiveNoToolUseCount++
+						// If background commands are running or model was conversing/answering without tools,
+						// don't force a tool error loop. Let the model wait or complete the turn.
+						if (isBackgroundRunning || this.task.consecutiveNoToolUseCount >= 1) {
+							this.task.consecutiveNoToolUseCount = 0
+						} else {
+							// Increment consecutive no-tool-use counter
+							this.task.consecutiveNoToolUseCount++
 
-						// Only show error and count toward mistake limit after 2 consecutive failures
-						if (this.task.consecutiveNoToolUseCount >= 2) {
-							await this.task.say("error", "MODEL_NO_TOOLS_USED")
-							// Only count toward mistake limit after second consecutive failure
-							this.task.consecutiveMistakeCount++
+							// Only show error and count toward mistake limit after 2 consecutive failures
+							if (this.task.consecutiveNoToolUseCount >= 2) {
+								await this.task.say("error", "MODEL_NO_TOOLS_USED")
+								// Only count toward mistake limit after second consecutive failure
+								this.task.consecutiveMistakeCount++
+							}
+
+							// Use the task's locked protocol for consistent behavior
+							this.task.userMessageContent.push({
+								type: "text",
+								text: formatResponse.noToolsUsed(),
+							})
 						}
-
-						// Use the task's locked protocol for consistent behavior
-						this.task.userMessageContent.push({
-							type: "text",
-							text: formatResponse.noToolsUsed(),
-						})
 					} else {
 						// Reset counter when tools are used successfully
 						this.task.consecutiveNoToolUseCount = 0
@@ -1333,8 +1389,8 @@ export class TaskMainLoop {
 					}
 				}
 
-				// If we reach here without continuing, return false (will always be false for now)
-				return false
+				// If we reach here without continuing, return true (turn ended normally)
+				return true
 			} catch (error) {
 				// This should never happen since the only thing that can throw an
 				// error is the attemptApiRequest, which is wrapped in a try catch
@@ -1346,7 +1402,7 @@ export class TaskMainLoop {
 			}
 		}
 
-		// If we exit the while loop normally (stack is empty), return false
-		return false
+		// If we exit the while loop normally (stack is empty), return true (turn ended normally)
+		return true
 	}
 }
