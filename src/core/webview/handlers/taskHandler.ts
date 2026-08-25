@@ -260,7 +260,7 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
 		const lastMsg = currentTask.mirrorMessages?.at(-1)
-		const isWaitingOnAsk = lastMsg?.type === "ask" && currentTask.askResponse === undefined
+		const isWaitingOnAsk = currentTask.askResponse === undefined
 		const isButtonResponse = message.askResponse === "yesButtonClicked" || message.askResponse === "noButtonClicked"
 		const hasPendingAsk =
 			currentTask.idleAsk !== undefined ||

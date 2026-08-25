@@ -1080,6 +1080,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		sayType: "user_feedback" | "terminal_callback" = "user_feedback",
 	): Promise<void> {
 		this.inBetweenMessages.push({ text, images })
+
+		// If the task is currently waiting on an ask (askResponse is undefined),
+		// answer it immediately so the waiting ask promise unblocks.
+		const wasWaitingOnAsk = this.askResponse === undefined
+		if (wasWaitingOnAsk) {
+			this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
+		}
+
 		await this.say(sayType as any, text, images)
 
 		// If a terminal command is actively running in the foreground, interrupt/continue it
@@ -1092,16 +1100,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			}
 		}
 
-		if (this.askResponse === undefined) {
-			const lastMessage = this.mirrorMessages.at(-1)
-			if (lastMessage?.type === "ask" && lastMessage.ts === this.lastMessageTs) {
-				this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
-			}
-		}
-
-		// If the task loop is not currently running (e.g. previous turn completed or idle while background task runs),
+		// If the task loop is not currently running (and wasn't just unblocked via askResponse),
 		// reactivate initiateTaskLoop so the model immediately receives and acts on the user's steering message.
-		if (!this.isLoopActive && !this.abort && this._started) {
+		if (!this.isLoopActive && !this.abort && this._started && !wasWaitingOnAsk) {
 			const { formatResponse } = await import("../prompts/responses")
 			const imageBlocks = formatResponse.imageBlocks(images)
 			const userContent = [
