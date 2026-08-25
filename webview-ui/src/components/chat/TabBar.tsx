@@ -28,27 +28,27 @@ function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 	if (hasPendingApproval || status === "interactive") {
 		return {
 			symbol: "(◕ᴗ◕✿)?",
-			className: "text-yellow-400 font-mono text-[10px] font-bold tracking-tighter shrink-0 animate-bounce",
+			className: "text-amber-400 font-mono text-[10.5px] font-bold tracking-tight shrink-0 animate-bounce",
 			title: "Waiting for your input / approval",
 		}
 	}
 	switch (status) {
 		case "streaming":
 			return {
-				symbol: "(•̀ᴗ•́)⚡",
-				className: "text-purple-400 font-mono text-[10px] font-bold tracking-tighter shrink-0 animate-pulse",
+				symbol: "(•̀ω•́)⚡",
+				className: "text-purple-400 font-mono text-[10.5px] font-bold tracking-tight shrink-0 animate-pulse",
 				title: "Model is working",
 			}
 		case "completed":
 			return {
-				symbol: "(★‿★)v",
-				className: "text-green-400 font-mono text-[10px] font-bold tracking-tighter shrink-0",
+				symbol: "(★‿★)✨",
+				className: "text-emerald-400 font-mono text-[10.5px] font-semibold tracking-tight shrink-0",
 				title: "Task complete!",
 			}
 		case "error":
 			return {
-				symbol: "(っ- ‸ - ς)",
-				className: "text-red-400 font-mono text-[10px] font-bold tracking-tighter shrink-0",
+				symbol: "(｡•́︿•̀｡)",
+				className: "text-rose-400 font-mono text-[10.5px] font-semibold tracking-tight shrink-0",
 				title: "Encountered an issue",
 			}
 		case "idle":
@@ -56,7 +56,7 @@ function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 			return {
 				symbol: "(•‿•)",
 				className:
-					"text-vscode-descriptionForeground font-mono text-[10px] font-medium tracking-tighter shrink-0 opacity-80",
+					"text-vscode-descriptionForeground font-mono text-[10.5px] font-medium tracking-tight shrink-0 opacity-80",
 				title: "Ready",
 			}
 	}

@@ -293,39 +293,28 @@ export class StateManager {
 		const rawSharedContexts =
 			(await this.provider.contextProxy.getValue("sessionSharedContexts")) ?? sessionSharedContexts ?? {}
 		const tabs: TabInfo[] = allTasks.map((task) => {
-			// Determine hasPendingApproval — task has an ask that's pending user response
-			const hasPendingApproval = task.taskAsk !== undefined && task.taskAsk?.isAnswered === false
+			const isCompletionAsk =
+				task.taskAsk?.ask === "completion_result" || task.taskAsk?.ask === "resume_completed_task"
+			const hasPendingApproval = task.taskAsk !== undefined && !isCompletionAsk
 
 			// Derive TabStatus from live streaming/ask flags & TaskState
 			let status: TabStatus
-			if (
-				task.isStreaming ||
-				task.isWaitingForFirstChunk ||
-				(task as any).isExecutingTool ||
-				(task.isLoopActive && !hasPendingApproval)
-			) {
+			if (task.isStreaming || task.isWaitingForFirstChunk || (task as any).isExecutingTool) {
 				status = "streaming"
 			} else if (hasPendingApproval) {
 				status = "interactive"
+			} else if (isCompletionAsk || task.state === TaskState.Completed) {
+				status = "completed"
+			} else if (task.state === TaskState.Error || task.state === TaskState.Aborted) {
+				status = "error"
+			} else if (task.isLoopActive && !isCompletionAsk) {
+				status = "streaming"
+			} else if (task.state === TaskState.Streaming) {
+				status = "streaming"
+			} else if (task.state === TaskState.WaitingApproval) {
+				status = "interactive"
 			} else {
-				switch (task.state) {
-					case TaskState.Streaming:
-						status = "streaming"
-						break
-					case TaskState.WaitingApproval:
-						status = "interactive"
-						break
-					case TaskState.Completed:
-						status = "completed"
-						break
-					case TaskState.Error:
-					case TaskState.Aborted:
-						status = "error"
-						break
-					default:
-						status = "idle"
-						break
-				}
+				status = "idle"
 			}
 
 			return {
