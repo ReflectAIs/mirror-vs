@@ -81,7 +81,7 @@ vi.mock("vscode", () => ({
 }))
 
 // Global mirror directory - computed once
-const GLOBAL_MIRROR_DIR = p(HOME_DIR, ".mirror")
+const GLOBAL_MIRROR_DIR = p(HOME_DIR, ".mirror-vs")
 const GLOBAL_AGENTS_DIR = p(HOME_DIR, ".agents")
 
 // Mock mirror-config
@@ -89,6 +89,7 @@ vi.mock("../../mirror-config", () => ({
 	getGlobalMirrorDirectory: () => GLOBAL_MIRROR_DIR,
 	getGlobalAgentsDirectory: () => GLOBAL_AGENTS_DIR,
 	getProjectAgentsDirectoryForCwd: (cwd: string) => p(cwd, ".agents"),
+	getProjectMirrorDirectoryForCwd: (cwd: string) => p(cwd, ".mirror-vs"),
 	directoryExists: mockDirectoryExists,
 	fileExists: mockFileExists,
 }))
@@ -120,7 +121,7 @@ describe("SkillsManager", () => {
 	const globalSkillsDir = p(GLOBAL_MIRROR_DIR, "skills")
 	const globalSkillsCodeDir = p(GLOBAL_MIRROR_DIR, "skills-code")
 	const globalSkillsArchitectDir = p(GLOBAL_MIRROR_DIR, "skills-architect")
-	const projectMirrorDir = p(PROJECT_DIR, ".mirror")
+	const projectMirrorDir = p(PROJECT_DIR, ".mirror-vs")
 	const projectSkillsDir = p(projectMirrorDir, "skills")
 	// .agents directory paths
 	const globalAgentsSkillsDir = p(GLOBAL_AGENTS_DIR, "skills")
@@ -1243,7 +1244,7 @@ Instructions`)
 
 			const createdPath = await skillsManager.createSkill("project-skill", "project", "A project skill")
 
-			expect(createdPath).toBe(p(PROJECT_DIR, ".mirror", "skills", "project-skill", "SKILL.md"))
+			expect(createdPath).toBe(p(PROJECT_DIR, ".mirror-vs", "skills", "project-skill", "SKILL.md"))
 		})
 
 		it("should throw error for invalid skill name", async () => {

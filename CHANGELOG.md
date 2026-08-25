@@ -2,6 +2,14 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.9] - 2026-08-25
+
+### Added & Improved
+
+- **Non-Blocking Background Context Compression Engine**: Transformed context summarization into a non-blocking background worker that runs asynchronously when thresholds are reached, eliminating turn latency for active model requests while preserving 95%+ prompt cache hit rates.
+- **Directory Path Standardization**: Standardized all global and workspace configuration, skills, and rules paths to `.mirror-vs` across the extension.
+- **Tool Output ANSI Cleaning**: Automatically strip terminal ANSI control codes and escape sequences prior to tool result summarization.
+
 ## [0.7.8] - 2026-08-25
 
 ### Fixed
