@@ -54,13 +54,13 @@ describe("MirrorConfigService", () => {
 	describe("getGlobalMirrorDirectory", () => {
 		it("should return correct path for global .mirror directory", () => {
 			const result = getGlobalMirrorDirectory()
-			expect(result).toBe(path.join("/mock/home", ".mirror"))
+			expect(result).toBe(path.join("/mock/home", ".mirror-vs"))
 		})
 
 		it("should handle different home directories", () => {
 			mockHomedir.mockReturnValue("/different/home")
 			const result = getGlobalMirrorDirectory()
-			expect(result).toBe(path.join("/different/home", ".mirror"))
+			expect(result).toBe(path.join("/different/home", ".mirror-vs"))
 		})
 	})
 
@@ -68,7 +68,7 @@ describe("MirrorConfigService", () => {
 		it("should return correct path for given cwd", () => {
 			const cwd = "/custom/project/path"
 			const result = getProjectMirrorDirectoryForCwd(cwd)
-			expect(result).toBe(path.join(cwd, ".mirror"))
+			expect(result).toBe(path.join(cwd, ".mirror-vs"))
 		})
 	})
 
@@ -242,7 +242,7 @@ describe("MirrorConfigService", () => {
 
 			const result = getMirrorDirectoriesForCwd(cwd)
 
-			expect(result).toEqual([path.join("/mock/home", ".mirror"), path.join(cwd, ".mirror")])
+			expect(result).toEqual([path.join("/mock/home", ".mirror-vs"), path.join(cwd, ".mirror-vs")])
 		})
 	})
 
@@ -325,8 +325,11 @@ describe("MirrorConfigService", () => {
 
 			await loadConfiguration("rules/rules.md", "/project/path")
 
-			expect(mockReadFile).toHaveBeenCalledWith(path.join("/mock/home", ".mirror", "rules/rules.md"), "utf-8")
-			expect(mockReadFile).toHaveBeenCalledWith(path.join("/project/path", ".mirror", "rules/rules.md"), "utf-8")
+			expect(mockReadFile).toHaveBeenCalledWith(path.join("/mock/home", ".mirror-vs", "rules/rules.md"), "utf-8")
+			expect(mockReadFile).toHaveBeenCalledWith(
+				path.join("/project/path", ".mirror-vs", "rules/rules.md"),
+				"utf-8",
+			)
 		})
 	})
 
@@ -342,58 +345,58 @@ describe("MirrorConfigService", () => {
 		it("should discover .mirror directories from subfolders", async () => {
 			// Find any file inside .mirror directories
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "package-a/.mirror/rules/rule.md", type: "file" },
-				{ path: "package-b/.mirror/rules-code/rule.md", type: "file" },
+				{ path: "package-a/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "package-b/.mirror-vs/rules-code/rule.md", type: "file" },
 			])
 
 			const result = await discoverSubfolderMirrorDirectories("/project/path")
 
 			expect(result).toEqual([
-				path.join("/project/path", "package-a", ".mirror"),
-				path.join("/project/path", "package-b", ".mirror"),
+				path.join("/project/path", "package-a", ".mirror-vs"),
+				path.join("/project/path", "package-b", ".mirror-vs"),
 			])
 		})
 
 		it("should sort discovered directories alphabetically", async () => {
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "zebra/.mirror/rules/rule.md", type: "file" },
-				{ path: "apple/.mirror/rules/rule.md", type: "file" },
-				{ path: "mango/.mirror/rules/rule.md", type: "file" },
+				{ path: "zebra/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "apple/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "mango/.mirror-vs/rules/rule.md", type: "file" },
 			])
 
 			const result = await discoverSubfolderMirrorDirectories("/project/path")
 
 			expect(result).toEqual([
-				path.join("/project/path", "apple", ".mirror"),
-				path.join("/project/path", "mango", ".mirror"),
-				path.join("/project/path", "zebra", ".mirror"),
+				path.join("/project/path", "apple", ".mirror-vs"),
+				path.join("/project/path", "mango", ".mirror-vs"),
+				path.join("/project/path", "zebra", ".mirror-vs"),
 			])
 		})
 
 		it("should exclude root .mirror directory", async () => {
 			// This would match the root .mirror, which should be excluded
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: ".mirror/rules/rule.md", type: "file" }, // This is root - should be excluded
-				{ path: "subfolder/.mirror/rules/rule.md", type: "file" },
+				{ path: ".mirror-vs/rules/rule.md", type: "file" }, // This is root - should be excluded
+				{ path: "subfolder/.mirror-vs/rules/rule.md", type: "file" },
 			])
 
 			const result = await discoverSubfolderMirrorDirectories("/project/path")
 
 			// Should only include subfolder, not root
-			expect(result).toEqual([path.join("/project/path", "subfolder", ".mirror")])
+			expect(result).toEqual([path.join("/project/path", "subfolder", ".mirror-vs")])
 		})
 
 		it("should handle nested subdirectories", async () => {
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "packages/core/.mirror/rules/rule.md", type: "file" },
-				{ path: "packages/utils/.mirror/rules-code/rule.md", type: "file" },
+				{ path: "packages/core/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "packages/utils/.mirror-vs/rules-code/rule.md", type: "file" },
 			])
 
 			const result = await discoverSubfolderMirrorDirectories("/project/path")
 
 			expect(result).toEqual([
-				path.join("/project/path", "packages/core", ".mirror"),
-				path.join("/project/path", "packages/utils", ".mirror"),
+				path.join("/project/path", "packages/core", ".mirror-vs"),
+				path.join("/project/path", "packages/utils", ".mirror-vs"),
 			])
 		})
 
@@ -407,47 +410,47 @@ describe("MirrorConfigService", () => {
 
 		it("should deduplicate .mirror directories from multiple files", async () => {
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "package-a/.mirror/rules/rule1.md", type: "file" },
-				{ path: "package-a/.mirror/rules/rule2.md", type: "file" },
-				{ path: "package-a/.mirror/rules-code/rule3.md", type: "file" },
+				{ path: "package-a/.mirror-vs/rules/rule1.md", type: "file" },
+				{ path: "package-a/.mirror-vs/rules/rule2.md", type: "file" },
+				{ path: "package-a/.mirror-vs/rules-code/rule3.md", type: "file" },
 			])
 
 			const result = await discoverSubfolderMirrorDirectories("/project/path")
 
-			// Should only include package-a/.mirror once
-			expect(result).toEqual([path.join("/project/path", "package-a", ".mirror")])
+			// Should only include package-a/.mirror-vs once
+			expect(result).toEqual([path.join("/project/path", "package-a", ".mirror-vs")])
 		})
 
 		it("should discover .mirror directories with any content", async () => {
 			// Should find .mirror directories regardless of what's inside them
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "package-a/.mirror/rules/rule.md", type: "file" },
-				{ path: "package-b/.mirror/rules-code/code-rule.md", type: "file" },
-				{ path: "package-c/.mirror/rules-architect/arch-rule.md", type: "file" },
-				{ path: "package-d/.mirror/config/settings.json", type: "file" },
+				{ path: "package-a/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "package-b/.mirror-vs/rules-code/code-rule.md", type: "file" },
+				{ path: "package-c/.mirror-vs/rules-architect/arch-rule.md", type: "file" },
+				{ path: "package-d/.mirror-vs/config/settings.json", type: "file" },
 			])
 
 			const result = await discoverSubfolderMirrorDirectories("/project/path")
 
 			expect(result).toEqual([
-				path.join("/project/path", "package-a", ".mirror"),
-				path.join("/project/path", "package-b", ".mirror"),
-				path.join("/project/path", "package-c", ".mirror"),
-				path.join("/project/path", "package-d", ".mirror"),
+				path.join("/project/path", "package-a", ".mirror-vs"),
+				path.join("/project/path", "package-b", ".mirror-vs"),
+				path.join("/project/path", "package-c", ".mirror-vs"),
+				path.join("/project/path", "package-d", ".mirror-vs"),
 			])
 		})
 	})
 
 	describe("getAllMirrorDirectoriesForCwd", () => {
 		it("should return global, project, and subfolder directories", async () => {
-			mockExecuteRipgrep.mockResolvedValueOnce([{ path: "subfolder/.mirror/rules/rule.md", type: "file" }])
+			mockExecuteRipgrep.mockResolvedValueOnce([{ path: "subfolder/.mirror-vs/rules/rule.md", type: "file" }])
 
 			const result = await getAllMirrorDirectoriesForCwd("/project/path")
 
 			expect(result).toEqual([
-				path.join("/mock/home", ".mirror"), // global
-				path.join("/project/path", ".mirror"), // project
-				path.join("/project/path", "subfolder", ".mirror"), // subfolder
+				path.join("/mock/home", ".mirror-vs"), // global
+				path.join("/project/path", ".mirror-vs"), // project
+				path.join("/project/path", "subfolder", ".mirror-vs"), // subfolder
 			])
 		})
 
@@ -456,22 +459,22 @@ describe("MirrorConfigService", () => {
 
 			const result = await getAllMirrorDirectoriesForCwd("/project/path")
 
-			expect(result).toEqual([path.join("/mock/home", ".mirror"), path.join("/project/path", ".mirror")])
+			expect(result).toEqual([path.join("/mock/home", ".mirror-vs"), path.join("/project/path", ".mirror-vs")])
 		})
 
 		it("should maintain order: global, project, subfolders (alphabetically)", async () => {
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "zebra/.mirror/rules/rule.md", type: "file" },
-				{ path: "apple/.mirror/rules/rule.md", type: "file" },
+				{ path: "zebra/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "apple/.mirror-vs/rules/rule.md", type: "file" },
 			])
 
 			const result = await getAllMirrorDirectoriesForCwd("/project/path")
 
 			expect(result).toEqual([
-				path.join("/mock/home", ".mirror"), // global first
-				path.join("/project/path", ".mirror"), // project second
-				path.join("/project/path", "apple", ".mirror"), // subfolders alphabetically
-				path.join("/project/path", "zebra", ".mirror"),
+				path.join("/mock/home", ".mirror-vs"), // global first
+				path.join("/project/path", ".mirror-vs"), // project second
+				path.join("/project/path", "apple", ".mirror-vs"), // subfolders alphabetically
+				path.join("/project/path", "zebra", ".mirror-vs"),
 			])
 		})
 	})
