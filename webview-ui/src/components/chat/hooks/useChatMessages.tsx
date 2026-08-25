@@ -303,6 +303,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		onUserExpandedRow,
 	} = options
 
+	const { activeTerminals = [], currentTaskId, activeTabId, tabs = [] } = useExtensionState()
+
+	// ── Tab Drafts & State Isolation ──
+	const currentTabId = activeTabId || currentTaskId || undefined
+	const tabDraftsRef = useRef<Map<string, { text: string; images: string[] }>>(new Map())
+	const prevTabIdRef = useRef<string | undefined>(currentTabId)
+
 	// ── Constants ──
 	const [audioBaseUri] = useState(() => {
 		return (window as unknown as { AUDIO_BASE_URI?: string }).AUDIO_BASE_URI || ""
@@ -323,6 +330,17 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			setOptimisticQueue([])
 		}
 	}, [messageQueue])
+
+	useEffect(() => {
+		if (optimisticQueue.length > 0) {
+			const hasMatchingFeedback = messages.some(
+				(m) => m.say === "user_feedback" && optimisticQueue.some((q) => q.text === m.text),
+			)
+			if (hasMatchingFeedback) {
+				setOptimisticQueue([])
+			}
+		}
+	}, [messages, optimisticQueue])
 
 	// ── UI State ──
 	const [showRetiredProviderWarning, setShowRetiredProviderWarning] = useState(false)
@@ -361,6 +379,23 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const textAreaRef = useRef<HTMLTextAreaElement>(null)
 	const [sendingDisabled, setSendingDisabled] = useState(false)
 	const [selectedImages, setSelectedImages] = useState<string[]>([])
+
+	// Sync per-tab input drafts when switching tabs
+	useEffect(() => {
+		if (prevTabIdRef.current !== currentTabId) {
+			if (prevTabIdRef.current) {
+				tabDraftsRef.current.set(prevTabIdRef.current, {
+					text: inputValueRef.current,
+					images: selectedImages,
+				})
+			}
+			const newDraft = currentTabId ? tabDraftsRef.current.get(currentTabId) : undefined
+			setInputValue(newDraft?.text || "")
+			setSelectedImages(newDraft?.images || [])
+			prevTabIdRef.current = currentTabId
+			setOptimisticQueue([])
+		}
+	}, [currentTabId, selectedImages])
 
 	const [mirrorAsk, setMirrorAsk] = useState<MirrorAsk | undefined>(undefined)
 	const [enableButtons, setEnableButtons] = useState<boolean>(false)
@@ -583,7 +618,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 							break
 						case "command": {
 							const isExecuting = lastMessage.text?.includes(COMMAND_OUTPUT_STRING)
-							if (isExecuting) {
+							// Check if the command is currently in the active terminals list to prevent showing buttons after start
+							const cmdStr = lastMessage.text || ""
+							const isCurrentlyRunning =
+								activeTerminals.some((t) => t.command && cmdStr.includes(t.command)) || isExecuting
+
+							if (isCurrentlyRunning) {
 								setSendingDisabled(false)
 								setMirrorAsk(undefined)
 								setEnableButtons(false)
@@ -675,7 +715,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					break
 			}
 		}
-	}, [lastMessage, secondLastMessage])
+	}, [lastMessage, secondLastMessage, activeTerminals])
 
 	// Update button text when messages change for subtasks in resume_task state
 	useEffect(() => {
@@ -741,17 +781,21 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 
 	// ── Computed values ──
 	const isStreaming = useMemo(() => {
-		const isLastAsk = !!modifiedMessages.at(-1)?.ask
-		const isToolCurrentlyAsking =
-			isLastAsk && mirrorAsk !== undefined && enableButtons && primaryButtonText !== undefined
+		const lastMsg = modifiedMessages.at(-1)
+		const isLastAsk = !!lastMsg?.ask && !lastMsg?.partial
 
-		if (isToolCurrentlyAsking) {
+		// If waiting on user response to an ask (followup question, tool approval, resume, etc.), it is NOT streaming
+		if (isLastAsk || (mirrorAsk !== undefined && mirrorAsk !== "command_output" && !lastMsg?.partial)) {
 			return false
 		}
 
-		const isLastMessagePartial = modifiedMessages.at(-1)?.partial === true
+		// Check if active tab status from backend is "streaming" (e.g. executing tool or streaming response)
+		const activeTab = tabs.find((t) => t.taskId === currentTabId)
+		if (activeTab && activeTab.status === "streaming" && mirrorAsk === undefined) {
+			return true
+		}
 
-		if (isLastMessagePartial) {
+		if (lastMsg?.partial === true) {
 			return true
 		} else {
 			const lastApiReqStarted = findLast(
@@ -765,27 +809,32 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				lastApiReqStarted.text !== undefined &&
 				lastApiReqStarted.say === "api_req_started"
 			) {
-				const cost = JSON.parse(lastApiReqStarted.text).cost
-
-				if (cost === undefined) {
-					return true
-				}
+				try {
+					const cost = JSON.parse(lastApiReqStarted.text).cost
+					if (cost === undefined) {
+						return true
+					}
+				} catch {}
 			}
 		}
 
 		return false
-	}, [modifiedMessages, mirrorAsk, enableButtons, primaryButtonText])
+	}, [modifiedMessages, mirrorAsk, tabs, currentTabId])
 
 	const messageWillQueue = useMemo(() => {
 		if (!(inputValue.trim() || selectedImages.length > 0)) {
+			return false
+		}
+		const isFirstMessage = messages.length === 0
+		if (isFirstMessage) {
 			return false
 		}
 		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command" && mirrorAsk !== "command_output"
 		if (isRespondingToAsk) {
 			return false
 		}
-		return sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAsk !== undefined
-	}, [inputValue, selectedImages, mirrorAsk, sendingDisabled, isStreaming, messageQueue.length])
+		return isStreaming || messageQueue.length > 0
+	}, [inputValue, selectedImages, mirrorAsk, isStreaming, messageQueue.length, messages.length])
 
 	const modelActivity = useMemo((): ModelActivity => {
 		if (!isStreaming) {
@@ -872,23 +921,25 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				}
 
 				const isRespondingToAsk =
+					!isStreaming &&
 					mirrorAskRef.current !== undefined &&
 					mirrorAskRef.current !== "command" &&
 					mirrorAskRef.current !== "command_output"
 				// If the chat is empty (first message in a new tab), never queue —
-				// send directly as a newTask. The queue check below can false-positive
-				// because handleChatReset() sets sendingDisabled=true when the idle
-				// tab is created, before the user has typed anything.
+				// send directly as a newTask.
 				const isFirstMessageInTab = messagesRef.current.length === 0
-				if (
-					!forceSend &&
-					!isRespondingToAsk &&
-					!isFirstMessageInTab &&
-					(sendingDisabled || isStreaming || messageQueue.length > 0 || mirrorAskRef.current !== undefined)
-				) {
+				const shouldQueue =
+					!forceSend && !isRespondingToAsk && !isFirstMessageInTab && (isStreaming || messageQueue.length > 0)
+
+				if (shouldQueue) {
 					try {
 						console.log("queueMessage", text, images)
-						vscode.postMessage({ type: "queueMessage", text, images })
+						vscode.postMessage({
+							type: "queueMessage",
+							text,
+							images,
+							...(currentTabId ? { taskId: currentTabId } : {}),
+						})
 
 						setOptimisticQueue((prev) => [
 							...prev,
@@ -914,7 +965,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				userRespondedRef.current = true
 
 				if (messagesRef.current.length === 0) {
-					vscode.postMessage({ type: "newTask", text, images, sessionMode: "continueOrCreate" })
+					vscode.postMessage({
+						type: "newTask",
+						text,
+						images,
+						sessionMode: "continueOrCreate",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 				} else if (mirrorAskRef.current) {
 					if (mirrorAskRef.current === "followup") {
 						markFollowUpAsAnswered()
@@ -924,6 +981,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 						case "followup":
 						case "tool":
 						case "command":
+						case "command_output":
 						case "use_mcp_server":
 						case "completion_result":
 						case "resume_task":
@@ -934,14 +992,22 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 								askResponse: "messageResponse",
 								text,
 								images,
+								...(currentTabId ? { taskId: currentTabId } : {}),
 							})
 							break
 					}
 				} else {
-					vscode.postMessage({ type: "askResponse", askResponse: "messageResponse", text, images })
+					vscode.postMessage({
+						type: "askResponse",
+						askResponse: "messageResponse",
+						text,
+						images,
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 				}
 
 				handleChatReset()
+				virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" })
 			}
 		},
 		[
@@ -951,6 +1017,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			isStreaming,
 			messageQueue.length,
 			apiConfiguration?.apiProvider,
+			currentTabId,
 		],
 	)
 
@@ -969,9 +1036,9 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	)
 
 	const handleStopTask = useCallback(() => {
-		vscode.postMessage({ type: "cancelTask" })
+		vscode.postMessage({ type: "cancelTask", ...(currentTabId ? { taskId: currentTabId } : {}) })
 		setDidClickCancel(true)
-	}, [setDidClickCancel])
+	}, [setDidClickCancel, currentTabId])
 
 	const handleEnqueueCurrentMessage = useCallback(() => {
 		const text = inputValue.trim()
@@ -980,6 +1047,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				type: "queueMessage",
 				text,
 				images: selectedImages,
+				...(currentTabId ? { taskId: currentTabId } : {}),
 			})
 
 			setOptimisticQueue((prev) => [
@@ -995,7 +1063,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			setInputValue("")
 			setSelectedImages([])
 		}
-	}, [inputValue, selectedImages])
+	}, [inputValue, selectedImages, currentTabId])
 
 	const handlePrimaryButtonClick = useCallback(
 		(text?: string, images?: string[]) => {
@@ -1009,7 +1077,11 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				case "tool":
 				case "use_mcp_server":
 				case "mistake_limit_reached":
-					vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+					vscode.postMessage({
+						type: "askResponse",
+						askResponse: "yesButtonClicked",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					break
 				case "resume_task":
 					const isCompletedSubtaskForClick =
@@ -1018,19 +1090,28 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 							(msg) => msg.ask === "completion_result" || msg.say === "completion_result",
 						)
 					if (!isCompletedSubtaskForClick) {
-						vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
+						vscode.postMessage({
+							type: "askResponse",
+							askResponse: "yesButtonClicked",
+							...(currentTabId ? { taskId: currentTabId } : {}),
+						})
 					}
 					break
 				case "completion_result":
 				case "resume_completed_task":
 					break
 				case "command_output":
-					vscode.postMessage({ type: "terminalOperation", terminalOperation: "continue" })
+					vscode.postMessage({
+						type: "terminalOperation",
+						terminalOperation: "continue",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					if (trimmedInput || (images && images.length > 0)) {
 						vscode.postMessage({
 							type: "queueMessage",
 							text: trimmedInput || "",
 							images: images || [],
+							...(currentTabId ? { taskId: currentTabId } : {}),
 						})
 
 						setOptimisticQueue((prev) => [
@@ -1054,8 +1135,9 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			setEnableButtons(false)
 			setPrimaryButtonText(undefined)
 			setSecondaryButtonText(undefined)
+			virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" })
 		},
-		[mirrorAsk, currentTaskItem?.parentTaskId],
+		[mirrorAsk, currentTaskItem?.parentTaskId, currentTabId],
 	)
 
 	const handleSecondaryButtonClick = useCallback(
@@ -1065,7 +1147,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			const trimmedInput = text?.trim()
 
 			if (isStreaming) {
-				vscode.postMessage({ type: "cancelTask" })
+				vscode.postMessage({ type: "cancelTask", ...(currentTabId ? { taskId: currentTabId } : {}) })
 				setDidClickCancel(true)
 				return
 			}
@@ -1078,17 +1160,25 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				case "command":
 				case "tool":
 				case "use_mcp_server":
-					vscode.postMessage({ type: "askResponse", askResponse: "noButtonClicked" })
+					vscode.postMessage({
+						type: "askResponse",
+						askResponse: "noButtonClicked",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					break
 				case "command_output":
-					vscode.postMessage({ type: "terminalOperation", terminalOperation: "abort" })
+					vscode.postMessage({
+						type: "terminalOperation",
+						terminalOperation: "abort",
+						...(currentTabId ? { taskId: currentTabId } : {}),
+					})
 					break
 			}
 			setSendingDisabled(true)
 			setMirrorAsk(undefined)
 			setEnableButtons(false)
 		},
-		[mirrorAsk, isStreaming, setDidClickCancel],
+		[mirrorAsk, isStreaming, setDidClickCancel, currentTabId],
 	)
 
 	// ── Model picker ──
@@ -1238,9 +1328,21 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				deleted = JSON.parse(saved)
 			}
 		} catch {}
-		const allKeys = [...new Set([...builtIn, ...custom])].filter((key) => !deleted.includes(key))
-		return allKeys.map((key) => ({ value: key, label: key }))
-	}, [modelPickerConfig?.models, modelPickerConfig?.modelIdKey, apiConfiguration?.apiProvider, apiConfiguration])
+		const currentId = (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
+		const allKeys = [...new Set([...(currentId ? [currentId] : []), ...builtIn, ...custom])].filter(
+			(key) => !deleted.includes(key) || key === currentId,
+		)
+		return allKeys.map((key) => ({
+			value: key,
+			label: key.includes("/") ? key.split("/").pop() || key : key,
+		}))
+	}, [
+		modelPickerConfig?.models,
+		modelPickerConfig?.modelIdKey,
+		apiConfiguration?.apiProvider,
+		apiConfiguration,
+		modelId,
+	])
 
 	const handleModelChange = useCallback(
 		(newModelId: string) => {
@@ -1473,6 +1575,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		50,
 		[isHidden, sendingDisabled, enableButtons],
 	)
+
+	// Ensure textarea remains focused when a command starts outputting / enters background queue mode
+	useEffect(() => {
+		if (mirrorAsk === "command_output" && !isHidden) {
+			textAreaRef.current?.focus()
+		}
+	}, [mirrorAsk, isHidden])
 
 	// TTS effect
 	useEffect(() => {

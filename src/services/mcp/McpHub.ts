@@ -671,7 +671,7 @@ export class McpHub {
 	// Get project-level MCP configuration path
 	private async getProjectMcpPath(): Promise<string | null> {
 		const workspacePath = this.providerRef.deref()?.cwd ?? getWorkspacePath()
-		const projectMcpDir = path.join(workspacePath, ".mirror")
+		const projectMcpDir = path.join(workspacePath, ".mirror-vs")
 		const projectMcpPath = path.join(projectMcpDir, "mcp.json")
 
 		try {
