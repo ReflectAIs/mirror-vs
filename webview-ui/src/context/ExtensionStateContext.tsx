@@ -391,22 +391,14 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 						if (updateTaskId && activeId && updateTaskId !== activeId) {
 							return prevState
 						}
-						// Find by timestamp first
+						// Find by timestamp and update in place
 						const lastIndex = findLastIndex(prevState.mirrorMessages, (msg) => msg.ts === mirrorMessage.ts)
 						if (lastIndex !== -1) {
 							const newMirrorMessages = [...prevState.mirrorMessages]
 							newMirrorMessages[lastIndex] = mirrorMessage
 							return { ...prevState, mirrorMessages: newMirrorMessages }
 						}
-						// Fallback: If not found by exact ts, check for an existing partial message of the same type
-						const lastPartialIndex = findLastIndex(prevState.mirrorMessages, (msg) =>
-							Boolean(msg.partial && msg.say === mirrorMessage.say),
-						)
-						if (lastPartialIndex !== -1) {
-							const newMirrorMessages = [...prevState.mirrorMessages]
-							newMirrorMessages[lastPartialIndex] = mirrorMessage
-							return { ...prevState, mirrorMessages: newMirrorMessages }
-						}
+						// If not found by timestamp yet (e.g. streaming update arrived before full state push), append cleanly
 						return { ...prevState, mirrorMessages: [...prevState.mirrorMessages, mirrorMessage] }
 					})
 					break
