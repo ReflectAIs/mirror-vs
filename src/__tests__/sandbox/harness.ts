@@ -323,14 +323,14 @@ export class SandboxHarness {
 		let isCompletion = false
 
 		if (message.tool_calls && message.tool_calls.length > 0) {
-			for (const tc of message.tool_calls) {
-				const toolName = tc.function.name
+			for (const tc of message.tool_calls as any[]) {
+				const toolName = tc.function?.name || ""
 				let toolArgs: Record<string, unknown> = {}
 
 				try {
-					toolArgs = JSON.parse(tc.function.arguments || "{}")
+					toolArgs = JSON.parse(tc.function?.arguments || "{}")
 				} catch {
-					toolArgs = { _raw: tc.function.arguments }
+					toolArgs = { _raw: tc.function?.arguments }
 				}
 
 				// Execute the tool

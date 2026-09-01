@@ -1235,7 +1235,7 @@ function sum(a, b) {
 
 			const result = await strategy.applyDiff(original, diff)
 			expect(result.success).toBe(true)
-			expect(result.content).toContain("total += item.price * (1 + item.tax);")
+			expect((result as any).content).toContain("total += item.price * (1 + item.tax);")
 		})
 
 		it("should disambiguate between multiple similar functions using :start_line:", async () => {
@@ -1266,9 +1266,9 @@ function getSecond() {
 
 			const result = await strategy.applyDiff(original, diff)
 			expect(result.success).toBe(true)
-			expect(result.content).toContain("function getFirst() {\n    return 42;\n}")
-			expect(result.content).toContain("function getSecond() {\n    return 99;\n}")
-			expect(result.content).toContain("function getThird() {\n    return 42;\n}")
+			expect((result as any).content).toContain("function getFirst() {\n    return 42;\n}")
+			expect((result as any).content).toContain("function getSecond() {\n    return 99;\n}")
+			expect((result as any).content).toContain("function getThird() {\n    return 42;\n}")
 		})
 
 		it("should correctly handle duplicate lines when surrounded by unique context", async () => {
@@ -1310,9 +1310,9 @@ export class ServiceB {
 			const result = await strategy.applyDiff(original, diff)
 			expect(result.success).toBe(true)
 			// ServiceA should be untouched
-			expect(result.content).toContain("export class ServiceA {\n    private isReady = false;")
+			expect((result as any).content).toContain("export class ServiceA {\n    private isReady = false;")
 			// ServiceB should have the new property
-			expect(result.content).toContain(
+			expect((result as any).content).toContain(
 				"export class ServiceB {\n    private isReady = false;\n    private initializedAt = Date.now();",
 			)
 		})
@@ -1331,7 +1331,7 @@ const x = 999;
 
 			const result = await strategy.applyDiff(original, diff)
 			expect(result.success).toBe(false)
-			expect(result.content).toBeUndefined()
+			expect((result as any).content).toBeUndefined()
 		})
 	})
 })
