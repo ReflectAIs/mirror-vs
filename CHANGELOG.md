@@ -2,13 +2,38 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.7.9] - 2026-08-25
+## [0.7.10] - 2026-09-01
+
+### Added & Improved
+
+- **Fuzzy Diff Matcher with Trimmed-Line Fallback**: Upgraded `MultiSearchReplaceDiffStrategy` with normalized whitespace and trimmed-line fallback matching. Diff search blocks with minor indentation or whitespace variations match cleanly without failing or requiring costly re-read retry turns.
+- **Anti-Verification Optimization Directives**: Added prompt-level directives preventing models from executing redundant post-edit verification reads, eliminating 1–2 wasted turns after every file write.
+- **Aggressive Parallel Read Batching**: Optimized tool-use guidelines directing models to batch multiple read-only operations (`read_file`, `search_files`, `list_files`) together in a single turn.
+- **Real-Time Sandboxed Performance Test Suite**: Introduced an automated live benchmark harness in `src/__tests__/sandbox/` for real-time model evaluation, token profiling, latency tracking, and diff corner-case verification against live APIs.
+
+### Fixed
+
+- **Below-Threshold MatchIndex Propagation**: Resolved an issue where below-threshold fuzzy matches could retain invalid line indices, ensuring strict validation before applying multi-search replacements.
+
+## [0.7.9] - 2026-08-26
 
 ### Added & Improved
 
 - **Non-Blocking Background Context Compression Engine**: Transformed context summarization into a non-blocking background worker that runs asynchronously when thresholds are reached, eliminating turn latency for active model requests while preserving 95%+ prompt cache hit rates.
 - **Directory Path Standardization**: Standardized all global and workspace configuration, skills, and rules paths to `.mirror-vs` across the extension.
 - **Tool Output ANSI Cleaning**: Automatically strip terminal ANSI control codes and escape sequences prior to tool result summarization.
+- **One-Click Local Codebase Indexing Setup**: Added a single-button auto-setup flow that checks for Ollama, starts it if installed, pulls `nomic-embed-text`, downloads and launches a local Qdrant vector database, and persists all configuration — zero manual configuration required. Supports Windows and macOS.
+- **Setup Progress Bar**: Live animated progress bar in the codebase index popover shows real-time status during setup and redo, with per-stage labels (Ollama, model pull %, Qdrant download %, config save), green on completion, red on error, and auto-dismiss.
+- **Redo Setup Button**: Added a small "Redo" button next to the "Setup is complete" badge so users can re-run the one-click setup at any time without manually clearing settings.
+
+### Fixed
+
+- **Stop Button Loop & Ask Unblock**: Fixed model cancellation so that clicking the Stop button instantly aborts in-progress HTTP streams, rejects waiting `ask()` prompts with `AskIgnoredError`, and breaks out of the `TaskMainLoop` immediately. Active terminal commands are now aborted during task disposal.
+- **Stop Button UI State Transformation**: Fixed chat input send button not updating from the Stop icon back to the Send arrow after model cancellation. `isStreaming` now monitors `didClickCancel` state and checks active tab status from the backend to ensure immediate UI feedback.
+- **Message Edit Old Message Persistence**: Fixed a bug where editing or deleting a message in history left the old/deleted message visible in the UI alongside the newly submitted prompt. `mergeExtensionState` now only preserves active partial streaming messages (`m.partial === true`) during background state broadcasts, allowing completed, deleted, or rewound messages to be cleanly removed from webview state.
+- **Approved File Edit Status**: Fixed file edit cells showing "Running..." when another file was being edited; only the active streaming cell now displays "Running..." while previous ones show "✓ Approved".
+- **Message Edit Resumption**: Fixed chat vanishing when a message in history was edited by correctly appending the edited content and restarting the inactive task loop.
+- **Stopped Chat Resumption**: Fixed requiring two clicks of the Send button to continue after stopping execution by resetting task abort/stream statuses immediately on any new user message send.
 
 ## [0.7.8] - 2026-08-25
 

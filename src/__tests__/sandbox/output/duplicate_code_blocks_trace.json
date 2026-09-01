@@ -1,0 +1,91 @@
+{
+	"scenarioName": "duplicate_code_blocks",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://api.deepseek.com",
+		"model": "deepseek-v4-flash",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-zjN3Lv\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nsrc/handlers.ts\npackage.json",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1788232165045,
+			"responseTimestamp": 1788232166049,
+			"latencyMs": 1004.3496999999988,
+			"timeToFirstTokenMs": 1004.3496999999988,
+			"inputTokens": 1367,
+			"outputTokens": 55,
+			"totalTokens": 1422,
+			"assistantText": "",
+			"reasoningText": "Let me read the file first.",
+			"toolCalls": [
+				{
+					"name": "read_file",
+					"args": {
+						"path": "src/handlers.ts"
+					},
+					"result": "1 | export function handleGet() {\n2 |   console.log(\"Processing request\");\n3 |   return { status: 200, data: \"ok\" };\n4 | }\n5 | \n6 | export function handlePost() {\n7 |   console.log(\"Processing request\");\n8 |   return { status: 200, data: \"ok\" };\n9 | }\n10 | \n11 | export function handleDelete() {\n12 |   console.log(\"Processing request\");\n13 |   return { status: 200, data: \"ok\" };\n14 | }\n15 | ",
+					"durationMs": 0.34619999999995343,
+					"timestamp": 1788232166050
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1788232166050,
+			"responseTimestamp": 1788232167165,
+			"latencyMs": 1115.9307999999946,
+			"timeToFirstTokenMs": 1115.9307999999946,
+			"inputTokens": 1550,
+			"outputTokens": 138,
+			"totalTokens": 1688,
+			"assistantText": "",
+			"reasoningText": "Update only handlePost.",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "src/handlers.ts",
+						"diff": "<<<<<<< SEARCH\nexport function handlePost() {\n  console.log(\"Processing request\");\n  return { status: 200, data: \"ok\" };\n}\n=======\nexport function handlePost() {\n  console.log(\"Processing request\");\n  return { status: 201, data: \"created\" };\n}\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to src/handlers.ts.",
+					"durationMs": 0.985899999999674,
+					"timestamp": 1788232167167
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 2,
+			"requestTimestamp": 1788232167167,
+			"responseTimestamp": 1788232168337,
+			"latencyMs": 1170.3924999999945,
+			"timeToFirstTokenMs": 1170.3924999999945,
+			"inputTokens": 1714,
+			"outputTokens": 76,
+			"totalTokens": 1790,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Updated `handlePost` in src/handlers.ts to return status 201 and data \"created\". `handleGet` and `handleDelete` remain unchanged."
+					},
+					"result": "[TASK_COMPLETED] Updated `handlePost` in src/handlers.ts to return status 201 and data \"created\". `handleGet` and `handleDelete` remain unchanged.",
+					"durationMs": 0.0014999999984866008,
+					"timestamp": 1788232168337
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 3292.0846999999994,
+	"totalInputTokens": 4631,
+	"totalOutputTokens": 269,
+	"totalToolCalls": 3,
+	"completed": true
+}

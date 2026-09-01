@@ -1,0 +1,98 @@
+{
+	"scenarioName": "exploration",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://api.deepseek.com",
+		"model": "deepseek-v4-flash",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-bcCdQU\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nsrc/cache.ts\nsrc/index.ts\npackage.json",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1788232153127,
+			"responseTimestamp": 1788232154332,
+			"latencyMs": 1204.5913,
+			"timeToFirstTokenMs": 1204.5913,
+			"inputTokens": 1359,
+			"outputTokens": 127,
+			"totalTokens": 1486,
+			"assistantText": "",
+			"reasoningText": "The user wants an explanation of the cache module. Let me read the source files.",
+			"toolCalls": [
+				{
+					"name": "read_file",
+					"args": {
+						"path": "src/cache.ts"
+					},
+					"result": "1 | interface CacheEntry<T> {\n2 |   value: T\n3 |   expiresAt: number\n4 | }\n5 | \n6 | export class LRUCache<T> {\n7 |   private cache = new Map<string, CacheEntry<T>>()\n8 |   private maxSize: number\n9 | \n10 |   constructor(maxSize: number = 100) {\n11 |     this.maxSize = maxSize\n12 |   }\n13 | \n14 |   get(key: string): T | undefined {\n15 |     const entry = this.cache.get(key)\n16 |     if (!entry) return undefined\n17 |     if (Date.now() > entry.expiresAt) {\n18 |       this.cache.delete(key)\n19 |       return undefined\n20 |     }\n21 |     // Move to end (most recently used)\n22 |     this.cache.delete(key)\n23 |     this.cache.set(key, entry)\n24 |     return entry.value\n25 |   }\n26 | \n27 |   set(key: string, value: T, ttlMs: number = 60000): void {\n28 |     if (this.cache.size >= this.maxSize) {\n29 |       // Evict oldest (first entry)\n30 |       const firstKey = this.cache.keys().next().value\n31 |       if (firstKey !== undefined) this.cache.delete(firstKey)\n32 |     }\n33 |     this.cache.set(key, { value, expiresAt: Date.now() + ttlMs })\n34 |   }\n35 | \n36 |   clear(): void {\n37 |     this.cache.clear()\n38 |   }\n39 | \n40 |   get size(): number {\n41 |     return this.cache.size\n42 |   }\n43 | }\n44 | ",
+					"durationMs": 0.40790000000197324,
+					"timestamp": 1788232154332
+				},
+				{
+					"name": "read_file",
+					"args": {
+						"path": "src/index.ts"
+					},
+					"result": "1 | import { LRUCache } from \"./cache\"\n2 | \n3 | const cache = new LRUCache<string>(50)\n4 | cache.set(\"user:1\", \"Alice\", 30000)\n5 | console.log(cache.get(\"user:1\"))\n6 | ",
+					"durationMs": 0.2374999999992724,
+					"timestamp": 1788232154332
+				},
+				{
+					"name": "read_file",
+					"args": {
+						"path": "package.json"
+					},
+					"result": "1 | {\n2 |   \"name\": \"cache-lib\",\n3 |   \"version\": \"1.0.0\"\n4 | }\n5 | ",
+					"durationMs": 0.2102999999988242,
+					"timestamp": 1788232154332
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1788232154333,
+			"responseTimestamp": 1788232158345,
+			"latencyMs": 4012.072299999996,
+			"timeToFirstTokenMs": 4012.072299999996,
+			"inputTokens": 1979,
+			"outputTokens": 380,
+			"totalTokens": 2359,
+			"assistantText": "## Cache Module Summary\n\n**What it does:** `src/cache.ts` exports an `LRUCache<T>` class — a generic, in-memory key-value store that supports:\n- `get(key)` — returns the value, or `undefined` if missing/expired.\n- `set(key, value, ttlMs)` — stores a value with a TTL (defaults to 60,000 ms).\n- `clear()` — removes all entries.\n- `size` — number of currently held entries.\n\nInternally it uses a JS `Map`, which preserves insertion order. The default max capacity is 100 entries, and `src/index.ts` demonstrates a cache of 50 entries storing `\"Alice\"` under `\"user:1\"` for 30 seconds.\n\n**Eviction strategy (LRU):** The cache is capacity-limited. On `set()`, if the cache is at `maxSize`, it evicts the *oldest* entry — the first key in the Map — *before* inserting the new one. Additionally, each `get()` promotes the accessed entry to the end of the Map, making it the most recently used, so frequently accessed items survive eviction while least-recently-used items get removed first.\n\n**Expiration behavior (lazy / passive):** When a key's TTL elapses, nothing happens immediately — no background timer scans the cache. Expiration is checked lazily on `get()`: if `Date.now() > entry.expiresAt`, the entry is deleted and `undefined` is returned. Expired entries still count toward `size` until they are accessed (or evicted), but they are never returned to callers.",
+			"reasoningText": "I've read the files. Let me provide a short summary of what the cache module does, eviction strategy, and what happens on expiration.",
+			"toolCalls": [],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 2,
+			"requestTimestamp": 1788232158345,
+			"responseTimestamp": 1788232161725,
+			"latencyMs": 3380.224699999999,
+			"timeToFirstTokenMs": 3380.224699999999,
+			"inputTokens": 2745,
+			"outputTokens": 477,
+			"totalTokens": 3222,
+			"assistantText": "The files have been reviewed and the explanation provided. The task is complete.",
+			"reasoningText": "The user is telling me I haven't used tools yet, but I did use tools (read_file calls) in the previous turn. The system seems to think I haven't. Regardless, the task was to explain the cache module. I've already read the files and provided a summary. I should call attempt_completion since the analysis is complete.",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "## Cache Module Summary\n\n**What it does:** `src/cache.ts` exports an `LRUCache<T>` class — a generic, in-memory key-value store that supports:\n- `get(key)` — returns the value, or `undefined` if missing/expired.\n- `set(key, value, ttlMs)` — stores a value with a TTL (defaults to 60,000 ms).\n- `clear()` — removes all entries.\n- `size` — number of currently held entries.\n\nInternally it uses a JS `Map`, which preserves insertion order. The default max capacity is 100 entries, and `src/index.ts` demonstrates a cache of 50 entries storing `\"Alice\"` under `\"user:1\"` for 30 seconds.\n\n**Eviction strategy (LRU):** The cache is capacity-limited. On `set()`, if the cache is at `maxSize`, it evicts the *oldest* entry — the first key in the Map — *before* inserting the new one. Additionally, each `get()` promotes the accessed entry to the end of the Map, making it the most recently used, so frequently accessed items survive eviction while least-recently-used items get removed first.\n\n**Expiration behavior (lazy / passive):** When a key's TTL elapses, nothing happens immediately — no background timer scans the cache. Expiration is checked lazily on `get()`: if `Date.now() > entry.expiresAt`, the entry is deleted and `undefined` is returned. Expired entries still count toward `size` until they are accessed (or evicted), but they are never returned to callers."
+					},
+					"result": "[TASK_COMPLETED] ## Cache Module Summary\n\n**What it does:** `src/cache.ts` exports an `LRUCache<T>` class — a generic, in-memory key-value store that supports:\n- `get(key)` — returns the value, or `undefined` if missing/expired.\n- `set(key, value, ttlMs)` — stores a value with a TTL (defaults to 60,000 ms).\n- `clear()` — removes all entries.\n- `size` — number of currently held entries.\n\nInternally it uses a JS `Map`, which preserves insertion order. The default max capacity is 100 entries, and `src/index.ts` demonstrates a cache of 50 entries storing `\"Alice\"` under `\"user:1\"` for 30 seconds.\n\n**Eviction strategy (LRU):** The cache is capacity-limited. On `set()`, if the cache is at `maxSize`, it evicts the *oldest* entry — the first key in the Map — *before* inserting the new one. Additionally, each `get()` promotes the accessed entry to the end of the Map, making it the most recently used, so frequently accessed items survive eviction while least-recently-used items get removed first.\n\n**Expiration behavior (lazy / passive):** When a key's TTL elapses, nothing happens immediately — no background timer scans the cache. Expiration is checked lazily on `get()`: if `Date.now() > entry.expiresAt`, the entry is deleted and `undefined` is returned. Expired entries still count toward `size` until they are accessed (or evicted), but they are never returned to callers.",
+					"durationMs": 0.0014999999984866008,
+					"timestamp": 1788232161725
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 8597.881800000003,
+	"totalInputTokens": 6083,
+	"totalOutputTokens": 984,
+	"totalToolCalls": 4,
+	"completed": true
+}

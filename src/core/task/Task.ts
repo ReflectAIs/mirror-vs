@@ -1101,9 +1101,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			}
 		}
 
+		// If the user sends a steering message, they want to resume the task loop.
+		// Reset abort status to allow the loop to start/continue.
+		this.abort = false
+
 		// If the task loop is not currently running (and wasn't just unblocked via askResponse),
 		// reactivate initiateTaskLoop so the model immediately receives and acts on the user's steering message.
-		if (!this.isLoopActive && !this.abort && this._started && !wasWaitingOnAsk) {
+		if (!this.isLoopActive && this._started && !wasWaitingOnAsk) {
 			const { formatResponse } = await import("../prompts/responses")
 			const imageBlocks = formatResponse.imageBlocks(images)
 			const userContent = [

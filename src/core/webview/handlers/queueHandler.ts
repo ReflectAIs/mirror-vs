@@ -14,7 +14,8 @@ export async function handleQueueMessage(provider: MirrorProvider, message: Webv
 
 		// If the task is already started and the loop is not currently active (e.g. idle or background terminal running),
 		// immediately dequeue and start the task loop so the queued message is acted upon without delay.
-		if (!currentTask.isLoopActive && !currentTask.abort && (currentTask as any)._started) {
+		if (!currentTask.isLoopActive && (currentTask as any)._started) {
+			currentTask.abort = false
 			const queued = currentTask.messageQueueService.dequeueMessage()
 			if (queued) {
 				await currentTask.say("user_feedback", queued.text, queued.images)

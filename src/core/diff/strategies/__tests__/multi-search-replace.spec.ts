@@ -1204,4 +1204,134 @@ function sum(a, b) {
 			expect(result.error).toContain(":start_line:5    <-- Invalid location")
 		})
 	})
+
+	describe("Corner Cases & Similar Codes", () => {
+		let strategy: MultiSearchReplaceDiffStrategy
+
+		beforeEach(() => {
+			strategy = new MultiSearchReplaceDiffStrategy()
+		})
+
+		it("should match unique block with slight indentation difference", async () => {
+			const original = `function calculateTotal(items) {
+    let total = 0;
+    for (const item of items) {
+        total += item.price;
+    }
+    return total;
+}`
+			// Diff has 2-space indentation instead of 4-space
+			const diff = `<<<<<<< SEARCH
+  let total = 0;
+  for (const item of items) {
+      total += item.price;
+  }
+=======
+  let total = 0;
+  for (const item of items) {
+      total += item.price * (1 + item.tax);
+  }
+>>>>>>> REPLACE`
+
+			const result = await strategy.applyDiff(original, diff)
+			expect(result.success).toBe(true)
+			expect(result.content).toContain("total += item.price * (1 + item.tax);")
+		})
+
+		it("should disambiguate between multiple similar functions using :start_line:", async () => {
+			const original = `function getFirst() {
+    return 42;
+}
+
+function getSecond() {
+    return 42;
+}
+
+function getThird() {
+    return 42;
+}`
+
+			// Target getSecond (lines 5-7) specifically using start_line
+			const diff = `<<<<<<< SEARCH
+:start_line:5
+-------
+function getSecond() {
+    return 42;
+}
+=======
+function getSecond() {
+    return 99;
+}
+>>>>>>> REPLACE`
+
+			const result = await strategy.applyDiff(original, diff)
+			expect(result.success).toBe(true)
+			expect(result.content).toContain("function getFirst() {\n    return 42;\n}")
+			expect(result.content).toContain("function getSecond() {\n    return 99;\n}")
+			expect(result.content).toContain("function getThird() {\n    return 42;\n}")
+		})
+
+		it("should correctly handle duplicate lines when surrounded by unique context", async () => {
+			const original = `export class ServiceA {
+    private isReady = false;
+
+    init() {
+        this.isReady = true;
+    }
+}
+
+export class ServiceB {
+    private isReady = false;
+
+    init() {
+        this.isReady = true;
+    }
+}`
+
+			const diff = `<<<<<<< SEARCH
+export class ServiceB {
+    private isReady = false;
+
+    init() {
+        this.isReady = true;
+    }
+}
+=======
+export class ServiceB {
+    private isReady = false;
+    private initializedAt = Date.now();
+
+    init() {
+        this.isReady = true;
+    }
+}
+>>>>>>> REPLACE`
+
+			const result = await strategy.applyDiff(original, diff)
+			expect(result.success).toBe(true)
+			// ServiceA should be untouched
+			expect(result.content).toContain("export class ServiceA {\n    private isReady = false;")
+			// ServiceB should have the new property
+			expect(result.content).toContain(
+				"export class ServiceB {\n    private isReady = false;\n    private initializedAt = Date.now();",
+			)
+		})
+
+		it("should reject completely unmatched code without making random edits", async () => {
+			const original = `const a = 1;
+const b = 2;
+const c = 3;`
+
+			const diff = `<<<<<<< SEARCH
+const x = 100;
+const y = 200;
+=======
+const x = 999;
+>>>>>>> REPLACE`
+
+			const result = await strategy.applyDiff(original, diff)
+			expect(result.success).toBe(false)
+			expect(result.content).toBeUndefined()
+		})
+	})
 })

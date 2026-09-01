@@ -4,6 +4,7 @@ import { type WebviewMessage } from "@mirror-vs/types"
 
 import { MirrorProvider } from "../MirrorProvider"
 import { CodeIndexManager } from "../../../services/code-index/manager"
+import { type EmbedderProvider } from "../../../services/code-index/interfaces/manager"
 import { t } from "../../../i18n"
 import { getGlobalState, updateGlobalState } from "./_helpers"
 
@@ -362,148 +363,181 @@ export async function handleClearIndexData(provider: MirrorProvider): Promise<vo
  * Auto-configures Codebase Indexing based on active LLM settings.
  */
 export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promise<void> {
+	const sendProgress = (step: string, progress: number, label: string) => {
+		provider.postMessageToWebview({
+			type: "autoSetupProgress",
+			values: { step, progress, label },
+		} as any)
+	}
+
 	try {
-		const state = await provider.getState()
-		const apiConfig = state.apiConfiguration
+		const { spawn, execSync } = await import("child_process")
+		const { LocalQdrantManager } = await import("../../../services/code-index/local-qdrant")
 
-		let embedderProvider: any = "openai"
-		let modelId = ""
-		let secretKey = ""
-		let secretKeyName = ""
+		// 1. Setup Ollama
+		sendProgress("ollama", 0, "Checking Ollama...")
 
-		const providerName = apiConfig?.apiProvider
+		let ollamaRunning = false
+		try {
+			const res = await fetch("http://localhost:11434/api/tags")
+			ollamaRunning = res.ok
+		} catch {
+			ollamaRunning = false
+		}
 
-		if (providerName === "gemini") {
-			embedderProvider = "gemini"
-			modelId = "gemini-embedding-001"
-			secretKey = (await provider.context.secrets.get("geminiApiKey")) ?? ""
-			secretKeyName = "codebaseIndexGeminiApiKey"
-		} else if (providerName === "openai") {
-			embedderProvider = "openai"
-			modelId = "text-embedding-3-small"
-			secretKey = (await provider.context.secrets.get("openAiApiKey")) ?? ""
-			secretKeyName = "codeIndexOpenAiKey"
-		} else if (providerName === "openrouter") {
-			embedderProvider = "openrouter"
-			modelId = "openai/text-embedding-3-small"
-			secretKey = (await provider.context.secrets.get("openRouterApiKey")) ?? ""
-			secretKeyName = "codebaseIndexOpenRouterApiKey"
-		} else if (providerName === "mistral") {
-			embedderProvider = "mistral"
-			modelId = "codestral-embed-2505"
-			secretKey = (await provider.context.secrets.get("mistralApiKey")) ?? ""
-			secretKeyName = "codebaseIndexMistralApiKey"
-		} else if (providerName === "anthropic") {
-			embedderProvider = "anthropic"
-			modelId = "voyage-code-2"
-			secretKey = (await provider.context.secrets.get("apiKey")) ?? ""
-			secretKeyName = "codebaseIndexAnthropicApiKey"
-		} else if (providerName === "ollama") {
-			embedderProvider = "ollama"
-			modelId = "nomic-embed-text"
-			secretKey = ""
-			secretKeyName = ""
-
-			// Auto-detect or auto-pull embedding models from local Ollama service
+		if (!ollamaRunning) {
+			// Check if ollama command is available
+			let hasOllamaCmd = false
 			try {
-				const response = await fetch("http://localhost:11434/api/tags")
-				if (response.ok) {
-					const data = (await response.json()) as any
-					const models = data.models || []
-					const hasNomic = models.some((m: any) => m.name.startsWith("nomic-embed-text"))
-					if (!hasNomic) {
-						const foundEmbedModel = models.find((m: any) => {
-							const nameLower = m.name.toLowerCase()
-							const capabilities = m.capabilities || []
-							const families = m.details?.families || []
-							return (
-								nameLower.includes("embed") ||
-								capabilities.includes("embedding") ||
-								families.some((f: string) => f.toLowerCase().includes("embed"))
-							)
-						})
-						if (foundEmbedModel) {
-							modelId = foundEmbedModel.name
-						} else {
-							// One-step auto-pull: download nomic-embed-text automatically with progress
-							await vscode.window.withProgress(
-								{
-									location: vscode.ProgressLocation.Notification,
-									title: "Ollama: Pulling nomic-embed-text for Codebase Indexing...",
-									cancellable: false,
-								},
-								async () => {
-									try {
-										const pullRes = await fetch("http://localhost:11434/api/pull", {
-											method: "POST",
-											headers: { "Content-Type": "application/json" },
-											body: JSON.stringify({ name: "nomic-embed-text", stream: false }),
-										})
-										if (pullRes.ok) {
-											modelId = "nomic-embed-text"
-										}
-									} catch (pullErr) {
-										provider.log(`Failed to auto-pull nomic-embed-text: ${pullErr}`)
-									}
-								},
-							)
-						}
-					}
-				}
-			} catch (e) {
-				// Ignore error, fallback to default
+				execSync(process.platform === "win32" ? "where ollama" : "which ollama", { stdio: "ignore" })
+				hasOllamaCmd = true
+			} catch {
+				hasOllamaCmd = false
 			}
-		} else {
-			// Fallback: search for any available keys
-			const geminiKey = await provider.context.secrets.get("geminiApiKey")
-			const openAiKey = await provider.context.secrets.get("openAiApiKey")
-			const openRouterKey = await provider.context.secrets.get("openRouterApiKey")
-			const anthropicKey = await provider.context.secrets.get("apiKey")
 
-			if (geminiKey) {
-				embedderProvider = "gemini"
-				modelId = "gemini-embedding-001"
-				secretKey = geminiKey
-				secretKeyName = "codebaseIndexGeminiApiKey"
-			} else if (openAiKey) {
-				embedderProvider = "openai"
-				modelId = "text-embedding-3-small"
-				secretKey = openAiKey
-				secretKeyName = "codeIndexOpenAiKey"
-			} else if (openRouterKey) {
-				embedderProvider = "openrouter"
-				modelId = "openai/text-embedding-3-small"
-				secretKey = openRouterKey
-				secretKeyName = "codebaseIndexOpenRouterApiKey"
-			} else if (anthropicKey) {
-				embedderProvider = "anthropic"
-				modelId = "voyage-code-2"
-				secretKey = anthropicKey
-				secretKeyName = "codebaseIndexAnthropicApiKey"
+			if (hasOllamaCmd) {
+				sendProgress("ollama", 10, "Starting Ollama service...")
+				provider.log("Ollama is installed but not running. Launching 'ollama serve'...")
+				const proc = spawn("ollama", ["serve"], { detached: true, stdio: "ignore" })
+				proc.unref()
+
+				// Wait up to 10s for Ollama to start
+				for (let i = 0; i < 40; i++) {
+					await new Promise((resolve) => setTimeout(resolve, 250))
+					try {
+						const res = await fetch("http://localhost:11434/api/tags")
+						if (res.ok) {
+							ollamaRunning = true
+							break
+						}
+					} catch {}
+				}
 			}
 		}
 
-		if (!secretKey && embedderProvider !== "ollama") {
-			vscode.window.showErrorMessage("No active API keys found. Please configure an API key in settings first.")
+		if (!ollamaRunning) {
+			sendProgress("error", 0, "Ollama not found. Please install from https://ollama.com")
+			vscode.window.showErrorMessage(
+				"Ollama service is not running on http://localhost:11434. Please install and launch Ollama from https://ollama.com before continuing.",
+			)
 			return
 		}
 
+		sendProgress("ollama", 20, "Ollama running ✓")
+
+		// 2. Check and pull nomic-embed-text
+		let hasModel = false
+		try {
+			const res = await fetch("http://localhost:11434/api/tags")
+			if (res.ok) {
+				const data = (await res.json()) as any
+				const models = data.models || []
+				hasModel = models.some(
+					(m: any) =>
+						m.name === "nomic-embed-text" ||
+						m.name === "nomic-embed-text:latest" ||
+						m.name.startsWith("nomic-embed-text:"),
+				)
+			}
+		} catch (e) {
+			provider.log(`Error checking Ollama models: ${e}`)
+		}
+
+		if (!hasModel) {
+			sendProgress("model", 25, "Pulling nomic-embed-text...")
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: "Ollama: Pulling nomic-embed-text (this might take a few minutes)...",
+					cancellable: false,
+				},
+				async (progress) => {
+					const pullRes = await fetch("http://localhost:11434/api/pull", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ name: "nomic-embed-text" }),
+					})
+
+					if (!pullRes.ok) {
+						throw new Error(`Ollama model pull failed with status ${pullRes.status}`)
+					}
+
+					const reader = pullRes.body?.getReader()
+					if (!reader) {
+						throw new Error("Failed to read Ollama pull stream")
+					}
+
+					const decoder = new TextDecoder()
+					let buffer = ""
+					while (true) {
+						const { done, value } = await reader.read()
+						if (done) break
+
+						buffer += decoder.decode(value, { stream: true })
+						const lines = buffer.split("\n")
+						buffer = lines.pop() || ""
+
+						for (const line of lines) {
+							if (line.trim()) {
+								try {
+									const data = JSON.parse(line)
+									if (data.completed && data.total) {
+										const pct = Math.round((data.completed / data.total) * 100)
+										const webviewPct = 25 + Math.round(pct * 0.3) // maps 0-100% to 25-55%
+										progress.report({ message: `${data.status || "Downloading"}... ${pct}%` })
+										sendProgress("model", webviewPct, `Pulling nomic-embed-text... ${pct}%`)
+									} else if (data.status) {
+										progress.report({ message: data.status })
+										sendProgress("model", 30, data.status)
+									}
+								} catch {}
+							}
+						}
+					}
+				},
+			)
+		}
+
+		sendProgress("model", 55, "nomic-embed-text ready ✓")
+
+		// 3. Setup Qdrant
+		sendProgress("qdrant", 55, "Checking Qdrant...")
+		const localQdrant = LocalQdrantManager.getInstance(provider.context)
+		if (!(await localQdrant.isRunning())) {
+			sendProgress("qdrant", 60, "Starting local vector database...")
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: "Qdrant: Starting local vector database...",
+					cancellable: false,
+				},
+				async (progress) => {
+					await localQdrant.start((p) => {
+						progress.report({ message: `Downloading Qdrant database binary (${p}%)...` })
+						const webviewPct = 60 + Math.round(p * 0.3) // maps 0-100% to 60-90%
+						sendProgress("qdrant", webviewPct, `Downloading Qdrant... ${p}%`)
+					})
+				},
+			)
+		}
+
+		sendProgress("qdrant", 90, "Qdrant running ✓")
+
+		// 4. Save configuration settings
+		sendProgress("config", 92, "Saving configuration...")
 		const currentConfig = getGlobalState(provider, "codebaseIndexConfig") || {}
 		const globalStateConfig = {
 			...currentConfig,
 			codebaseIndexEnabled: true,
 			codebaseIndexQdrantUrl: "http://localhost:6333",
-			codebaseIndexEmbedderProvider: embedderProvider,
-			codebaseIndexEmbedderModelId: modelId,
-			codebaseIndexEmbedderModelDimension: undefined,
+			codebaseIndexEmbedderProvider: "ollama" as EmbedderProvider,
+			codebaseIndexEmbedderModelId: "nomic-embed-text",
+			codebaseIndexEmbedderModelDimension: 768,
 			codebaseIndexSearchMaxResults: 5,
 			codebaseIndexSearchMinScore: 0.3,
 		}
 
 		await updateGlobalState(provider, "codebaseIndexConfig", globalStateConfig)
-		if (secretKeyName) {
-			await provider.contextProxy.storeSecret(secretKeyName as any, secretKey)
-		}
 
 		await provider.postMessageToWebview({
 			type: "codeIndexSettingsSaved",
@@ -512,6 +546,8 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 		})
 
 		await provider.postStateToWebview()
+
+		sendProgress("indexing", 95, "Starting indexing...")
 
 		const currentCodeIndexManager = provider.getCurrentWorkspaceCodeIndexManager()
 		if (currentCodeIndexManager) {
@@ -522,8 +558,10 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			}
 		}
 
-		vscode.window.showInformationMessage("✅ Codebase Indexing auto-configured and started successfully!")
+		sendProgress("done", 100, "Setup complete ✓")
+		vscode.window.showInformationMessage("✅ Local Codebase Indexing auto-configured and started successfully!")
 	} catch (error: any) {
+		sendProgress("error", 0, `Setup failed: ${error.message || error}`)
 		provider.log(`Error auto setting up codebase indexing: ${error.message || error}`)
 		vscode.window.showErrorMessage(`Failed to auto-setup Codebase Indexing: ${error.message || error}`)
 	}

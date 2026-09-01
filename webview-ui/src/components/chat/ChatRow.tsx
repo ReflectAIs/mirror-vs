@@ -484,7 +484,7 @@ export const ChatRowContent = ({
 							</span>
 							{message.isAnswered && (
 								<span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-normal">
-									{isStreaming ? (
+									{isLast && isStreaming ? (
 										<>
 											<ProgressIndicator />
 											<span className="text-mirror-brand-via animate-pulse">Running...</span>

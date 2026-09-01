@@ -1,0 +1,134 @@
+{
+	"scenarioName": "feature_add",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://api.deepseek.com",
+		"model": "deepseek-v4-flash",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-cMgMBS\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nsrc/helpers.ts\nsrc/index.ts\npackage.json",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1788232137701,
+			"responseTimestamp": 1788232139032,
+			"latencyMs": 1330.8567999999996,
+			"timeToFirstTokenMs": 1330.8567999999996,
+			"inputTokens": 1389,
+			"outputTokens": 123,
+			"totalTokens": 1512,
+			"assistantText": "",
+			"reasoningText": "Let me start by reading the current files to understand the structure.",
+			"toolCalls": [
+				{
+					"name": "read_file",
+					"args": {
+						"path": "src/helpers.ts"
+					},
+					"result": "1 | export function capitalize(str: string): string {\n2 |   return str.charAt(0).toUpperCase() + str.slice(1)\n3 | }\n4 | \n5 | export function truncate(str: string, maxLength: number): string {\n6 |   if (str.length <= maxLength) return str\n7 |   return str.slice(0, maxLength) + \"...\"\n8 | }\n9 | ",
+					"durationMs": 0.40390000000115833,
+					"timestamp": 1788232139032
+				},
+				{
+					"name": "read_file",
+					"args": {
+						"path": "src/index.ts"
+					},
+					"result": "1 | import { capitalize, truncate } from \"./helpers\"\n2 | \n3 | console.log(capitalize(\"hello\"))\n4 | console.log(truncate(\"hello world\", 5))\n5 | ",
+					"durationMs": 0.290500000000975,
+					"timestamp": 1788232139032
+				},
+				{
+					"name": "read_file",
+					"args": {
+						"path": "package.json"
+					},
+					"result": "1 | {\n2 |   \"name\": \"string-utils\",\n3 |   \"version\": \"1.0.0\"\n4 | }\n5 | ",
+					"durationMs": 0.25760000000082073,
+					"timestamp": 1788232139033
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1788232139033,
+			"responseTimestamp": 1788232140897,
+			"latencyMs": 1864.4197999999997,
+			"timeToFirstTokenMs": 1864.4197999999997,
+			"inputTokens": 1701,
+			"outputTokens": 251,
+			"totalTokens": 1952,
+			"assistantText": "",
+			"reasoningText": "Now I'll add the `slugify` function to helpers.ts and an example usage in index.ts.",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "src/helpers.ts",
+						"diff": "<<<<<<< SEARCH\nexport function truncate(str: string, maxLength: number): string {\n  if (str.length <= maxLength) return str\n  return str.slice(0, maxLength) + \"...\"\n}\n=======\nexport function truncate(str: string, maxLength: number): string {\n  if (str.length <= maxLength) return str\n  return str.slice(0, maxLength) + \"...\"\n}\n\nexport function slugify(str: string): string {\n  return str\n    .toLowerCase()\n    .trim()\n    .replace(/\\s+/g, \"-\")\n    .replace(/[^a-z0-9-]/g, \"\")\n    .replace(/-+/g, \"-\")\n    .replace(/^-|-$/g, \"\")\n}\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to src/helpers.ts.",
+					"durationMs": 1.129799999998795,
+					"timestamp": 1788232140898
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 2,
+			"requestTimestamp": 1788232140898,
+			"responseTimestamp": 1788232142428,
+			"latencyMs": 1530.1690999999992,
+			"timeToFirstTokenMs": 1530.1690999999992,
+			"inputTokens": 1977,
+			"outputTokens": 156,
+			"totalTokens": 2133,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "src/index.ts",
+						"diff": "<<<<<<< SEARCH\nimport { capitalize, truncate } from \"./helpers\"\n\nconsole.log(capitalize(\"hello\"))\nconsole.log(truncate(\"hello world\", 5))\n=======\nimport { capitalize, truncate, slugify } from \"./helpers\"\n\nconsole.log(capitalize(\"hello\"))\nconsole.log(truncate(\"hello world\", 5))\nconsole.log(slugify(\"Hello World! This is a Test\"))\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to src/index.ts.",
+					"durationMs": 0.7505999999993946,
+					"timestamp": 1788232142429
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 3,
+			"requestTimestamp": 1788232142429,
+			"responseTimestamp": 1788232145176,
+			"latencyMs": 2746.4017999999996,
+			"timeToFirstTokenMs": 2746.4017999999996,
+			"inputTokens": 2157,
+			"outputTokens": 309,
+			"totalTokens": 2466,
+			"assistantText": "",
+			"reasoningText": "Let me verify by compiling/checking. There's no tsconfig or build setup. Let me quickly verify the code is correct by reading it. Actually, I shouldn't re-read files immediately after edits. But I could run a quick TypeScript check if available. Let me check if tsc is available... Actually, the package.json has no dependencies/scripts. I'll just verify with a quick node command perhaps using a simple check. But TypeScript isn't installed probably. Let me just attempt completion.\n\nActually, let me verify the files are correct by executing a quick check with node if possible. But the files are .ts. I could use npx tsc but no tsconfig. Simpler to just trust the edits. I'll complete.",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Added the `slugify(str: string): string` function to `src/helpers.ts`. It:\n- Lowercases the input\n- Trims whitespace\n- Replaces whitespace runs with hyphens\n- Removes non-alphanumeric chars except hyphens\n- Collapses repeated hyphens and trims leading/trailing hyphens\n\nAlso added an example usage in `src/index.ts`:\n```ts\nconsole.log(slugify(\"Hello World! This is a Test\"))\n// outputs: hello-world-this-is-a-test\n```"
+					},
+					"result": "[TASK_COMPLETED] Added the `slugify(str: string): string` function to `src/helpers.ts`. It:\n- Lowercases the input\n- Trims whitespace\n- Replaces whitespace runs with hyphens\n- Removes non-alphanumeric chars except hyphens\n- Collapses repeated hyphens and trims leading/trailing hyphens\n\nAlso added an example usage in `src/index.ts`:\n```ts\nconsole.log(slugify(\"Hello World! This is a Test\"))\n// outputs: hello-world-this-is-a-test\n```",
+					"durationMs": 0.010500000000320142,
+					"timestamp": 1788232145176
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 7475.0309,
+	"totalInputTokens": 7224,
+	"totalOutputTokens": 839,
+	"totalToolCalls": 6,
+	"completed": true
+}
