@@ -279,20 +279,18 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 				`lastMsgType=${lastMsg?.type} lastMsgAsk=${lastMsg?.ask} started=${(currentTask as any)._started}`,
 		)
 
-		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk || !currentTask.startWithContent) {
-			if (!currentTask.isLoopActive && message.askResponse === "messageResponse") {
-				currentTask.abort = false
-				await currentTask.say("user_feedback", resolved.text, resolved.images)
-				const { formatResponse } = await import("../../prompts/responses")
-				const imageBlocks = formatResponse.imageBlocks(resolved.images)
-				const userContent = [
-					{ type: "text" as const, text: `<user_message>\n${resolved.text}\n</user_message>` },
-					...imageBlocks,
-				]
-				void currentTask.initiateTaskLoop(userContent)
-			} else {
-				currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
-			}
+		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk) {
+			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+		} else if (!currentTask.isLoopActive && message.askResponse === "messageResponse") {
+			currentTask.abort = false
+			await currentTask.say("user_feedback", resolved.text, resolved.images)
+			const { formatResponse } = await import("../../prompts/responses")
+			const imageBlocks = formatResponse.imageBlocks(resolved.images)
+			const userContent = [
+				{ type: "text" as const, text: `<user_message>\n${resolved.text}\n</user_message>` },
+				...imageBlocks,
+			]
+			void currentTask.initiateTaskLoop(userContent)
 		} else if (!(currentTask as any)._started) {
 			await currentTask.startWithContent(resolved.text, resolved.images)
 		} else {

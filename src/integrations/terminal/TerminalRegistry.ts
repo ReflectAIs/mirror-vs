@@ -200,7 +200,7 @@ export class TerminalRegistry {
 	public static async getOrCreateTerminal(
 		cwd: string,
 		taskId?: string,
-		provider: MirrorTerminalProvider = "vscode",
+		provider: MirrorTerminalProvider = "execa",
 	): Promise<MirrorTerminal> {
 		const terminals = this.getAllTerminals()
 		let terminal: MirrorTerminal | undefined

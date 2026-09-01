@@ -331,7 +331,7 @@ export async function executeCommandInTerminal(
 		executionId,
 		command,
 		customCwd,
-		terminalShellIntegrationDisabled = false,
+		terminalShellIntegrationDisabled = true,
 		commandExecutionTimeout = 0,
 		agentTimeout = 0,
 	}: ExecuteCommandOptions,

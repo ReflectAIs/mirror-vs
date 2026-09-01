@@ -1074,7 +1074,7 @@ export class MirrorProvider
 		this.getState().then(
 			({
 				terminalShellIntegrationTimeout = Terminal.defaultShellIntegrationTimeout,
-				terminalShellIntegrationDisabled = false,
+				terminalShellIntegrationDisabled = true,
 				terminalCommandDelay = 0,
 				terminalZshClearEolMark = true,
 				terminalZshOhMy = false,

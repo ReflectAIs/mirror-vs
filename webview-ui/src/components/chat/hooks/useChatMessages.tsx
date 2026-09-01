@@ -833,7 +833,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (isRespondingToAsk) {
 			return false
 		}
-		return isStreaming || messageQueue.length > 0
+		return isStreaming || mirrorAsk === "command_output" || mirrorAsk === "command" || messageQueue.length > 0
 	}, [inputValue, selectedImages, mirrorAsk, isStreaming, messageQueue.length, messages.length])
 
 	const modelActivity = useMemo((): ModelActivity => {
@@ -928,8 +928,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				// If the chat is empty (first message in a new tab), never queue —
 				// send directly as a newTask.
 				const isFirstMessageInTab = messagesRef.current.length === 0
-				const shouldQueue =
-					!forceSend && !isRespondingToAsk && !isFirstMessageInTab && (isStreaming || messageQueue.length > 0)
+				const isTaskBusy =
+					isStreaming ||
+					mirrorAskRef.current === "command_output" ||
+					mirrorAskRef.current === "command" ||
+					messageQueue.length > 0
+				const shouldQueue = !forceSend && !isRespondingToAsk && !isFirstMessageInTab && isTaskBusy
 
 				if (shouldQueue) {
 					try {
