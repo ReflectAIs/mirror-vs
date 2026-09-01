@@ -312,6 +312,7 @@ export class TaskMainLoop {
 			}
 		} finally {
 			this.task.isLoopActive = false
+			this.task.contextManager.maybeTriggerBackgroundCondense()
 		}
 	}
 

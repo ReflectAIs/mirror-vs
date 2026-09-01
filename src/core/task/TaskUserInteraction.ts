@@ -241,6 +241,9 @@ export class TaskUserInteraction {
 		// Wait for askResponse to be set
 		await pWaitFor(
 			() => {
+				if (this.task.abort) {
+					return true
+				}
 				if (this.task.askResponse !== undefined || this.task.lastMessageTs !== askTs) {
 					return true
 				}
@@ -249,6 +252,10 @@ export class TaskUserInteraction {
 			},
 			{ interval: 100 },
 		)
+
+		if (this.task.abort) {
+			throw new Error(`[MirrorVS#ask] task ${this.task.taskId}.${this.task.instanceId} aborted`)
+		}
 
 		if (this.task.askResponse === undefined && this.task.lastMessageTs !== askTs) {
 			// Could happen if we send multiple un-answered asks in a row i.e. with

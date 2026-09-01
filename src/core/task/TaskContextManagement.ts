@@ -151,4 +151,38 @@ export class TaskContextManagement {
 			contextCondense,
 		)
 	}
+
+	private isBackgroundCondensing = false
+
+	/**
+	 * Automatically triggers non-blocking background context condensation if context token usage
+	 * reaches or exceeds the configured threshold.
+	 */
+	public maybeTriggerBackgroundCondense(): void {
+		if (this.isBackgroundCondensing || this.task.abort || this.task.isStreaming) {
+			return
+		}
+
+		const state = this.task.providerRef.deref()?.getState()
+		const autoCondense = state ? ((state as any).autoCondenseContext ?? true) : true
+		if (!autoCondense) {
+			return
+		}
+
+		const thresholdPercent = state ? ((state as any).autoCondenseContextPercent ?? 75) : 75
+		const { contextTokens } = this.task.getTokenUsage()
+		const contextWindow = this.task.api.getModel().info.contextWindow || 128000
+		const percentUsed = (contextTokens * 100) / contextWindow
+
+		if (percentUsed >= thresholdPercent && this.task.apiConversationHistory.length >= 6) {
+			this.isBackgroundCondensing = true
+			this.condenseContext()
+				.catch((err) => {
+					console.error("[TaskContextManagement] Background condense error:", err)
+				})
+				.finally(() => {
+					this.isBackgroundCondensing = false
+				})
+		}
+	}
 }

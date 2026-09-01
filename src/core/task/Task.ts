@@ -665,6 +665,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					this.tokenUsageSnapshotAt = this.mirrorMessages.at(-1)?.ts
 					// Deep copy tool usage for snapshot
 					this.toolUsageSnapshot = JSON.parse(JSON.stringify(toolUsage))
+					this.contextManager.maybeTriggerBackgroundCondense()
 				}
 			},
 			this.TOKEN_USAGE_EMIT_INTERVAL_MS,

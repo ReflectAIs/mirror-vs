@@ -6,6 +6,10 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Added & Improved
 
+- **Non-Blocking Background Context Summarizer**: Implemented non-blocking background context condensation at 75% threshold to pre-summarize older history without stalling active user turns.
+- **Message Edit Conversation Preservation**: Fixed root task prompt editing (`say: "text"`) and intermediate user message rewinding to prevent deleting conversation history or dropping messages to `[]`.
+- **Ask Callback Watchdog Guards**: Added non-blocking watchdog timeouts and cancellation cleanup to `ask()` and `pWaitFor` so task loop execution never hangs.
+- **Terminal Focus & Auto-Popup Removal**: Eliminated intrusive terminal panel auto-popups during command execution and default-enabled inline background execution (`ExecaTerminal`).
 - **Fuzzy Diff Matcher with Trimmed-Line Fallback**: Upgraded `MultiSearchReplaceDiffStrategy` with normalized whitespace and trimmed-line fallback matching. Diff search blocks with minor indentation or whitespace variations match cleanly without failing or requiring costly re-read retry turns.
 - **Anti-Verification Optimization Directives**: Added prompt-level directives preventing models from executing redundant post-edit verification reads, eliminating 1–2 wasted turns after every file write.
 - **Aggressive Parallel Read Batching**: Optimized tool-use guidelines directing models to batch multiple read-only operations (`read_file`, `search_files`, `list_files`) together in a single turn.

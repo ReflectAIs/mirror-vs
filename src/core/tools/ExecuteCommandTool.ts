@@ -239,7 +239,7 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			const provider = await task.providerRef.deref()
 			const providerState = await provider?.getState()
 
-			const { terminalShellIntegrationDisabled = false } = providerState ?? {}
+			const { terminalShellIntegrationDisabled = true } = providerState ?? {}
 
 			// Get command execution timeout from VSCode configuration (in seconds)
 			const commandExecutionTimeoutSeconds = vscode.workspace
@@ -572,8 +572,6 @@ export async function executeCommandInTerminal(
 	const terminal = await TerminalRegistry.getOrCreateTerminal(workingDir, task.taskId, terminalProvider)
 
 	if (terminal instanceof Terminal) {
-		terminal.terminal.show(true)
-
 		// Update the working directory in case the terminal we asked for has
 		// a different working directory so that the model will know where the
 		// command actually executed.
