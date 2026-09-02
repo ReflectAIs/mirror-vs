@@ -1575,23 +1575,10 @@ export const ChatRowContent = ({
 							) : (
 								<div className="flex justify-between items-start ml-1 mt-1">
 									<div
-										className={cn(
-											"flex-grow wrap-anywhere cursor-text text-vscode-foreground whitespace-pre-wrap",
-											isSticky ? "max-h-[4.5em] overflow-y-auto pr-1" : "",
-										)}
+										className="flex-grow wrap-anywhere text-vscode-foreground whitespace-pre-wrap select-text cursor-text"
 										onClick={(e) => {
 											e.stopPropagation()
-											if (isSticky && onNavigateToMessage) {
-												onNavigateToMessage(message.ts)
-											} else if (!isStreaming) {
-												handleEditClick()
-											}
-										}}
-										title={
-											isSticky
-												? t("chat:stickyMessage.clickToNavigate")
-												: t("chat:queuedMessages.clickToEdit")
-										}>
+										}}>
 										<Mention text={message.text} withShadow />
 									</div>
 								</div>

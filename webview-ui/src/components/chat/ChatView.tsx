@@ -212,6 +212,21 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		prevExpandedRef.current = expandedRows
 	}, [expandedRows, enterUserBrowsingHistory2])
 
+	const handleNavigateToMessageSafe = useCallback(
+		(ts: number) => {
+			enterUserBrowsingHistory2("keyboard-nav-up")
+			const messageIndex = displayedMessages.findIndex((msg) => msg.ts === ts)
+			if (messageIndex >= 0) {
+				virtuosoRef.current?.scrollToIndex({
+					index: messageIndex,
+					align: "center",
+					behavior: "smooth",
+				})
+			}
+		},
+		[displayedMessages, enterUserBrowsingHistory2],
+	)
+
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: MirrorMessage) => {
@@ -259,8 +274,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					}
 					hasCheckpoint={hasCheckpoint}
 					onJumpToPreviousCheckpoint={handleScrollToLatestCheckpoint}
-					isSticky={messageOrGroup.say === "user_feedback" && index === stickyUserIndex}
-					onNavigateToMessage={handleNavigateToMessage}
+					isSticky={false}
+					onNavigateToMessage={handleNavigateToMessageSafe}
 				/>
 			)
 		},

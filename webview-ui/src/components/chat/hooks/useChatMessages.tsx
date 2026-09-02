@@ -77,8 +77,6 @@ export interface UseChatMessagesReturn {
 	textAreaRef: React.RefObject<HTMLTextAreaElement | null>
 	inputValueRef: React.MutableRefObject<string>
 	stickyUserIndexRef: React.MutableRefObject<number | null>
-	stickyTopUserIndexRef?: React.MutableRefObject<number | null>
-	stickyBottomUserIndexRef?: React.MutableRefObject<number | null>
 	displayedMessagesRef: React.MutableRefObject<MirrorMessage[]>
 	checkpointJumpCursorRef: React.MutableRefObject<number | null>
 	mirrorAskRef: React.MutableRefObject<MirrorAsk | undefined>
@@ -110,8 +108,6 @@ export interface UseChatMessagesReturn {
 	setShowRetiredProviderWarning: React.Dispatch<React.SetStateAction<boolean>>
 	aggregatedCostsMap: Map<string, { totalCost: number; ownCost: number; childrenCost: number }>
 	stickyUserIndex: number | null
-	stickyTopUserIndex?: number | null
-	stickyBottomUserIndex?: number | null
 	showAnnouncementModal: boolean
 	setShowAnnouncementModal: React.Dispatch<React.SetStateAction<boolean>>
 	messageLimit: number
@@ -1785,88 +1781,48 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		return indices
 	}, [displayedMessages])
 
-	const [stickyTopUserIndex, setStickyTopUserIndex] = useState<number | null>(() => {
+	const [stickyUserIndex, setStickyUserIndex] = useState<number | null>(() => {
 		if (userFeedbackIndices.length > 0) {
 			return userFeedbackIndices[userFeedbackIndices.length - 1]
 		}
 		return null
 	})
-	const [stickyBottomUserIndex, setStickyBottomUserIndex] = useState<number | null>(null)
 
-	const stickyTopUserIndexRef = useRef(stickyTopUserIndex)
-	stickyTopUserIndexRef.current = stickyTopUserIndex
-	const stickyBottomUserIndexRef = useRef(stickyBottomUserIndex)
-	stickyBottomUserIndexRef.current = stickyBottomUserIndex
-
+	const stickyUserIndexRef = useRef(stickyUserIndex)
+	stickyUserIndexRef.current = stickyUserIndex
 	const displayedMessagesRef = useRef(displayedMessages)
 	displayedMessagesRef.current = displayedMessages
 
 	useEffect(() => {
 		if (userFeedbackIndices.length > 0) {
-			setStickyTopUserIndex((prev) => (prev !== null && userFeedbackIndices.includes(prev) ? prev : userFeedbackIndices[userFeedbackIndices.length - 1]))
+			setStickyUserIndex(userFeedbackIndices[userFeedbackIndices.length - 1])
 		} else {
-			setStickyTopUserIndex(null)
-			setStickyBottomUserIndex(null)
+			setStickyUserIndex(null)
 		}
 	}, [userFeedbackIndices])
 
-	const handleRangeChanged = useCallback(
-		({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
-			const indices = userFeedbackIndices
-			if (indices.length === 0) {
-				setStickyTopUserIndex(null)
-				setStickyBottomUserIndex(null)
-				return
-			}
-
-			// Top sticky: Find the user message that started the current section (highest index < startIndex)
-			let topIdx: number | null = null
-			for (let i = indices.length - 1; i >= 0; i--) {
-				if (indices[i] < startIndex) {
-					topIdx = indices[i]
-					break
-				}
-			}
-
-			// Bottom sticky: If user scrolled UP, find the first user message below the visible viewport (> endIndex)
-			let bottomIdx: number | null = null
-			for (let i = 0; i < indices.length; i++) {
-				if (indices[i] > endIndex) {
-					bottomIdx = indices[i]
-					break
-				}
-			}
-
-			setStickyTopUserIndex(topIdx)
-			setStickyBottomUserIndex(bottomIdx)
-		},
-		[userFeedbackIndices],
-	)
+	const handleRangeChanged = useCallback((_range: { startIndex: number; endIndex: number }) => {
+		// Intentionally no-op
+	}, [])
 
 	const virtuosoComponents = useMemo(
 		() => ({
 			Item: ({ children, ...props }: any) => {
 				const index = props["data-index"]
-				const isStickyTop = index === stickyTopUserIndexRef.current
-				const isStickyBottom = index === stickyBottomUserIndexRef.current
+				const msgs = displayedMessagesRef.current
+				const msg = msgs[index]
+				const isStickyUser = msg?.say === "user_feedback" && index === stickyUserIndexRef.current
 
 				const customStyle = {
 					...props.style,
-					...(isStickyTop
+					...(isStickyUser
 						? {
 								position: "sticky" as const,
 								top: 0,
-								zIndex: 10,
+								zIndex: 1,
 								background: "var(--vscode-sideBar-background)",
 							}
-						: isStickyBottom
-							? {
-									position: "sticky" as const,
-									bottom: 0,
-									zIndex: 10,
-									background: "var(--vscode-sideBar-background)",
-								}
-							: {}),
+						: {}),
 				}
 
 				return (
@@ -2019,8 +1975,8 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			if (messageIndex >= 0) {
 				virtuosoRef.current?.scrollToIndex({
 					index: messageIndex,
-					align: "center",
-					behavior: "smooth",
+					align: "start",
+					behavior: "auto",
 				})
 			}
 		},
@@ -2080,9 +2036,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		scrollContainerRef,
 		textAreaRef,
 		inputValueRef,
-		stickyUserIndexRef: stickyTopUserIndexRef,
-		stickyTopUserIndexRef,
-		stickyBottomUserIndexRef,
+		stickyUserIndexRef,
 		displayedMessagesRef,
 		checkpointJumpCursorRef,
 		mirrorAskRef,
@@ -2112,9 +2066,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		showRetiredProviderWarning,
 		setShowRetiredProviderWarning,
 		aggregatedCostsMap,
-		stickyUserIndex: stickyTopUserIndex,
-		stickyTopUserIndex,
-		stickyBottomUserIndex,
+		stickyUserIndex,
 		showAnnouncementModal,
 		setShowAnnouncementModal,
 		messageLimit,
