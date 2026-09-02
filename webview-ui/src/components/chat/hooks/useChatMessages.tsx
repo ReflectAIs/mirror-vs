@@ -1819,17 +1819,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				return
 			}
 
-			// Top sticky: Find the user message that started the current section (highest index <= startIndex)
+			// Top sticky: Find the user message that started the current section (highest index < startIndex)
 			let topIdx: number | null = null
 			for (let i = indices.length - 1; i >= 0; i--) {
-				if (indices[i] <= startIndex) {
+				if (indices[i] < startIndex) {
 					topIdx = indices[i]
 					break
 				}
-			}
-
-			if (topIdx === null && indices.length > 0 && startIndex <= indices[0]) {
-				topIdx = indices[0]
 			}
 
 			// Bottom sticky: If user scrolled UP, find the first user message below the visible viewport (> endIndex)
