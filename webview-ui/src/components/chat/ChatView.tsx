@@ -27,8 +27,6 @@ import ChatWelcomeContent from "./ChatWelcomeContent"
 // Types
 // ---------------------------------------------------------------------------
 
-import { CircleUser, ArrowUp, ArrowDown } from "lucide-react"
-
 import TabBar from "./TabBar"
 
 export interface ChatViewProps {
@@ -166,20 +164,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		handleScrollToLatestCheckpoint,
 		handleNavigateToMessage,
 		handleRangeChanged,
-		stickyTopUserIndex,
-		stickyBottomUserIndex,
 		virtuosoComponents,
 	} = msg
-
-	const topStickyMessage = useMemo(() => {
-		if (stickyTopUserIndex === null || stickyTopUserIndex === undefined) return null
-		return displayedMessages[stickyTopUserIndex] || null
-	}, [stickyTopUserIndex, displayedMessages])
-
-	const bottomStickyMessage = useMemo(() => {
-		if (stickyBottomUserIndex === null || stickyBottomUserIndex === undefined) return null
-		return displayedMessages[stickyBottomUserIndex] || null
-	}, [stickyBottomUserIndex, displayedMessages])
 
 	// ── Scroll lifecycle (needs refs from the hook) ──
 	const scrollLifecycle = useScrollLifecycle({
@@ -225,27 +211,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		}
 		prevExpandedRef.current = expandedRows
 	}, [expandedRows, enterUserBrowsingHistory2])
-
-	const lastUserMessage = useMemo(() => {
-		if (!messages || messages.length === 0) return null
-		for (let i = messages.length - 1; i >= 0; i--) {
-			const m = messages[i]
-			if (m.say === "user_feedback") {
-				return m
-			}
-		}
-		return task || null
-	}, [messages, task])
-
-	const handleScrollToMessage = useCallback(
-		(ts: number) => {
-			const index = displayedMessages.findIndex((m) => m.ts === ts)
-			if (index !== -1) {
-				virtuosoRef.current?.scrollToIndex({ index, align: "start", behavior: "smooth" })
-			}
-		},
-		[displayedMessages],
-	)
 
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
 	const itemContent = useCallback(
@@ -396,60 +361,21 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 			{task && (
 				<>
-					<div className="relative grow flex flex-col min-h-0 overflow-hidden">
-						{/* Bidirectional Top Sticky Message Overlay */}
-						{topStickyMessage && (
-							<div className="absolute top-0 left-0 right-0 z-30 px-3 pointer-events-auto">
-								<ChatRow
-									key={`sticky-top-${topStickyMessage.ts}`}
-									message={topStickyMessage}
-									isSticky={true}
-									onNavigateToMessage={handleNavigateToMessage}
-									isExpanded={false}
-									onToggleExpand={msg.toggleRowExpansion}
-									isLast={false}
-									isStreaming={false}
-									editable={false}
-									onHeightChange={handleRowHeightChange2}
-								/>
-							</div>
-						)}
-
-						<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
-							<Virtuoso
-								ref={virtuosoRef as any}
-								key={task.ts}
-								className="grow mb-1"
-								customScrollParent={scrollContainerRef.current || undefined}
-								increaseViewportBy={{ top: 800, bottom: 400 }}
-								data={displayedMessages}
-								itemContent={itemContent}
-								rangeChanged={handleRangeChanged}
-								followOutput={followOutputCallback2}
-								atBottomStateChange={atBottomStateChangeCallback2}
-								atBottomThreshold={10}
-								startReached={() => setMessageLimit((prev) => prev + 100)}
-								components={virtuosoComponents}
-							/>
-						</div>
-
-						{/* Bidirectional Bottom Sticky Message Overlay (when scrolled up into history) */}
-						{bottomStickyMessage && (
-							<div className="absolute bottom-0 left-0 right-0 z-30 px-3 pointer-events-auto">
-								<ChatRow
-									key={`sticky-bottom-${bottomStickyMessage.ts}`}
-									message={bottomStickyMessage}
-									isSticky={true}
-									onNavigateToMessage={handleNavigateToMessage}
-									isExpanded={false}
-									onToggleExpand={msg.toggleRowExpansion}
-									isLast={false}
-									isStreaming={false}
-									editable={false}
-									onHeightChange={handleRowHeightChange2}
-								/>
-							</div>
-						)}
+					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
+						<Virtuoso
+							ref={virtuosoRef as any}
+							key={task.ts}
+							className="grow mb-1"
+							customScrollParent={scrollContainerRef.current || undefined}
+							increaseViewportBy={{ top: 800, bottom: 400 }}
+							data={displayedMessages}
+							itemContent={itemContent}
+							followOutput={followOutputCallback2}
+							atBottomStateChange={atBottomStateChangeCallback2}
+							atBottomThreshold={10}
+							startReached={() => setMessageLimit((prev) => prev + 100)}
+							components={virtuosoComponents}
+						/>
 					</div>
 					<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />
 					{areButtonsVisible && (

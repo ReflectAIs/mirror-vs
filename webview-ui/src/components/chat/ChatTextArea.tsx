@@ -1358,7 +1358,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									data-testid="model-selector"
 									value={modelId}
 									onChange={(e) => onModelChange(e.target.value)}
-									className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
+									className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-[rgba(255,255,255,0.12)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
 									style={{
 										backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
 										backgroundPosition: "right 4px center",
@@ -1367,7 +1367,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 										paddingRight: "20px",
 									}}>
 									{modelOptions.map((opt) => (
-										<option key={opt.value} value={opt.value}>
+										<option key={opt.value} value={opt.value} className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 											{opt.label}
 										</option>
 									))}
