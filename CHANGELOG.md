@@ -6,7 +6,7 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Added & Improved
 
-- **Interactive Thinking Mode Selector**: Added real-time thinking / reasoning effort selection (`⚡ Low`, `⚖️ Medium`, `🧠 High`) directly in the chat control bar, providing instant level switching, tooltips, and state synchronization across tasks.
+- **Interactive Thinking Mode Selector & Prompt-Steered Reasoning Engine**: Added real-time thinking / reasoning effort selection (`Low`, `Medium`, `High`) directly in the chat control bar. For native reasoning models (Claude 3.7, o1/o3, DeepSeek R1, Gemini), effort parameters and token budgets are passed directly to the API; for custom and non-native models (Ollama, LM Studio, OpenAI Compatible, Mistral, Llama, Qwen), dynamic prompt directives actively steer chain-of-thought depth across Low (fast/concise), Medium (balanced), and High (deep step-by-step analysis and trade-off evaluation).
 - **Non-Blocking Background Context Summarizer**: Implemented non-blocking background context condensation at 75% threshold to pre-summarize older history without stalling active user turns.
 - **Message Edit Conversation Preservation**: Fixed root task prompt editing (`say: "text"`) and intermediate user message rewinding to prevent deleting conversation history or dropping messages to `[]`.
 - **Ask Callback Watchdog Guards**: Added non-blocking watchdog timeouts and cancellation cleanup to `ask()` and `pWaitFor` so task loop execution never hangs.

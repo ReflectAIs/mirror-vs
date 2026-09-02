@@ -121,6 +121,8 @@ export class TaskApiRequest {
 						.getConfiguration(Package.name)
 						.get<boolean>("newTaskRequireTodos", false),
 					isStealthModel: modelInfo?.isStealthModel,
+					reasoningEffort: apiConfiguration?.reasoningEffort,
+					supportsNativeReasoning: !!(modelInfo?.supportsReasoningBudget || modelInfo?.supportsReasoningEffort),
 				},
 				undefined, // todoList
 				this.task.api.getModel().id,

@@ -9,4 +9,8 @@ export interface SystemPromptSettings {
 	newTaskRequireTodos: boolean
 	/** When true, model should hide vendor/company identity in responses */
 	isStealthModel?: boolean
+	/** Selected reasoning effort level (low, medium, high) */
+	reasoningEffort?: string
+	/** When true, model supports native API reasoning parameters (budget_tokens, reasoning_effort) */
+	supportsNativeReasoning?: boolean
 }
