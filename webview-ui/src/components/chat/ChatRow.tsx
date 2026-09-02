@@ -1507,7 +1507,13 @@ export const ChatRowContent = ({
 										}
 									: undefined
 							}>
-							<div className="flex justify-between items-center w-full mb-1">
+							<div
+								className="flex justify-between items-center w-full mb-1 cursor-pointer select-none"
+								onClick={(e) => {
+									e.stopPropagation()
+									onNavigateToMessage?.(message.ts)
+								}}
+								title="Click to scroll to this message">
 								<div className="flex items-center gap-2">
 									<div className="size-5 rounded-full bg-vscode-button-background/15 flex items-center justify-center text-vscode-button-background shrink-0">
 										<CircleUser className="size-3.5" aria-label="User icon" />
@@ -1517,7 +1523,9 @@ export const ChatRowContent = ({
 									</span>
 								</div>
 								{!isEditing && !isStreaming && (
-									<div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-1 shrink-0">
+									<div
+										className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-1 shrink-0"
+										onClick={(e) => e.stopPropagation()}>
 										<button
 											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
 											title="Revert chat to this message"
@@ -1575,10 +1583,14 @@ export const ChatRowContent = ({
 							) : (
 								<div className="flex justify-between items-start ml-1 mt-1">
 									<div
-										className="flex-grow wrap-anywhere text-vscode-foreground whitespace-pre-wrap select-text cursor-text"
+										className="flex-grow wrap-anywhere text-vscode-foreground whitespace-pre-wrap select-text cursor-pointer"
 										onClick={(e) => {
-											e.stopPropagation()
-										}}>
+											const selection = window.getSelection()?.toString()
+											if (!selection) {
+												onNavigateToMessage?.(message.ts)
+											}
+										}}
+										title="Click to focus message">
 										<Mention text={message.text} withShadow />
 									</div>
 								</div>
