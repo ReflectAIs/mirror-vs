@@ -58,13 +58,13 @@ export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ className })
 						backgroundSize: "14px 14px",
 					}}>
 					<option key="low" value="low">
-						⚡ Low
+						Low
 					</option>
 					<option key="medium" value="medium">
-						⚖️ Medium
+						Medium
 					</option>
 					<option key="high" value="high">
-						🧠 High
+						High
 					</option>
 				</select>
 			</div>
