@@ -27,8 +27,8 @@ import BranchWorkspaceDialog from "./BranchWorkspaceDialog"
 function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 	if (hasPendingApproval || status === "interactive") {
 		return {
-			dotClass: "w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0",
-			ringClass: "w-2 h-2 rounded-full bg-amber-400/30 shrink-0",
+			dotClass: "w-2 h-2 rounded-full bg-amber-400 shrink-0",
+			ringClass: "w-2 h-2 rounded-full bg-amber-400/20 shrink-0",
 			title: "Waiting for your input / approval",
 		}
 	}

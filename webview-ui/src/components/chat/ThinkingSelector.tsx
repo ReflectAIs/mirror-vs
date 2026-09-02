@@ -55,20 +55,20 @@ export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ className })
 					value={currentEffort}
 					onChange={handleChange}
 					aria-label="Thinking Mode Selector"
-					className="min-w-0 h-6 pl-5 pr-5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
+					className="min-w-0 h-6 pl-5 pr-5 text-[11px] bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-[rgba(255,255,255,0.12)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
 					style={{
 						backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
 						backgroundPosition: "right 4px center",
 						backgroundRepeat: "no-repeat",
 						backgroundSize: "14px 14px",
 					}}>
-					<option key="low" value="low">
+					<option key="low" value="low" className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 						Low
 					</option>
-					<option key="medium" value="medium">
+					<option key="medium" value="medium" className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 						Medium
 					</option>
-					<option key="high" value="high">
+					<option key="high" value="high" className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 						High
 					</option>
 				</select>

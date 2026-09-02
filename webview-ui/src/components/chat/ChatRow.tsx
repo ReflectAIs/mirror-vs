@@ -1306,6 +1306,8 @@ export const ChatRowContent = ({
 							ts={message.ts}
 							isStreaming={isStreaming}
 							isLast={isLast}
+							isPartial={message.partial}
+							duration={(message as any).duration}
 						/>
 					)
 				case "api_req_started":

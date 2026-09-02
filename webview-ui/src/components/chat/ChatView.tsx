@@ -29,6 +29,8 @@ import ChatWelcomeContent from "./ChatWelcomeContent"
 
 import TabBar from "./TabBar"
 
+import { StickyUserMessage } from "./StickyUserMessage"
+
 export interface ChatViewProps {
 	isHidden: boolean
 	showAnnouncement: boolean
@@ -212,17 +214,40 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		prevExpandedRef.current = expandedRows
 	}, [expandedRows, enterUserBrowsingHistory2])
 
-	const chatMessagesOnly = useMemo(() => {
-		if (!task) return displayedMessages
-		if (displayedMessages.length > 0 && displayedMessages[0]?.ts === task.ts) {
-			return displayedMessages.slice(1)
+	const lastUserMessage = useMemo(() => {
+		if (!messages || messages.length === 0) return null
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const m = messages[i]
+			if (m.say === "user_feedback") {
+				return m
+			}
 		}
-		return displayedMessages
-	}, [displayedMessages, task])
+		return task || null
+	}, [messages, task])
+
+	const handleScrollToMessage = useCallback(
+		(ts: number) => {
+			const index = displayedMessages.findIndex((m) => m.ts === ts)
+			if (index !== -1) {
+				virtuosoRef.current?.scrollToIndex({ index, align: "start", behavior: "smooth" })
+			}
+		},
+		[displayedMessages],
+	)
 
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: MirrorMessage) => {
+			if (index === 0 && task) {
+				return (
+					<TaskHeader
+						task={task}
+						parentTaskId={currentTaskItem?.parentTaskId}
+						buttonsDisabled={sendingDisabled}
+					/>
+				)
+			}
+
 			const hasCheckpoint = modifiedMessages.some((message) => message.say === "checkpoint_saved")
 
 			return (
@@ -232,7 +257,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					isExpanded={expandedRows[messageOrGroup.ts] || false}
 					onToggleExpand={msg.toggleRowExpansion}
 					lastModifiedMessage={modifiedMessages.at(-1)}
-					isLast={index === chatMessagesOnly.length - 1}
+					isLast={index === displayedMessages.length - 1}
 					onHeightChange={handleRowHeightChange2}
 					isStreaming={isStreaming}
 					onSuggestionClick={handleSuggestionClickInRow}
@@ -342,14 +367,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				sessionNotes={sessionNotes}
 			/>
 			{!disableTabBar && <TabBar tabs={tabs} activeTabId={activeTabId} />}
+			{task && <StickyUserMessage message={lastUserMessage} onScrollToMessage={handleScrollToMessage} />}
 
 			{task ? (
 				<>
-					<TaskHeader
-						task={task}
-						parentTaskId={currentTaskItem?.parentTaskId}
-						buttonsDisabled={sendingDisabled}
-					/>
 					{checkpointWarning && (
 						<div className="px-3 shrink-0 mb-2">
 							<CheckpointWarning warning={checkpointWarning} />
@@ -371,7 +392,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 800, bottom: 400 }}
-							data={chatMessagesOnly}
+							data={displayedMessages}
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}
 							atBottomStateChange={atBottomStateChangeCallback2}

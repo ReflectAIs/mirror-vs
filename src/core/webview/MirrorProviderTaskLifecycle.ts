@@ -246,10 +246,31 @@ export class TaskLifecycleManager {
 		}
 
 		if (!historyItem) {
-			return
+			const taskText =
+				task.taskHistoryItem?.task ||
+				task.mirrorMessages.find((m) => m.say === "task")?.text ||
+				task.mirrorMessages[0]?.text ||
+				""
+			historyItem = {
+				id: task.taskId,
+				ts: task.taskHistoryItem?.ts || task.mirrorMessages[0]?.ts || Date.now(),
+				task: taskText,
+				tokensIn: task.tokensIn,
+				tokensOut: task.tokensOut,
+				cacheWrites: task.cacheWrites,
+				cacheReads: task.cacheReads,
+				totalCost: task.totalCost,
+				size: 0,
+				shadowGitConfigWorkTree: task.taskHistoryItem?.shadowGitConfigWorkTree,
+				conversationHistoryDeletedRange: task.taskHistoryItem?.conversationHistoryDeletedRange,
+				isFavorited: task.taskHistoryItem?.isFavorited,
+			}
 		}
 
-		// Clears task again, so we need to abortTask manually above.
+		// Ensure mirrorMessages are persisted to disk so rehydration finds them
+		await task.mirrorMessagesManager.saveMirrorMessages()
+
+		// Rehydrate task in place with full history
 		await this.provider.createTaskWithHistoryItem({ ...historyItem, rootTask, parentTask })
 	}
 

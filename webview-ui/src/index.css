@@ -987,3 +987,20 @@ input[cmdk-input]:focus {
 	padding-bottom: 12px;
 	margin-bottom: 12px;
 }
+
+/* Ensure all select, option, and optgroup elements have proper contrast across all themes */
+select {
+	color-scheme: dark;
+}
+
+select option,
+select optgroup {
+	background-color: var(--vscode-dropdown-background, #252526) !important;
+	color: var(--vscode-dropdown-foreground, #cccccc) !important;
+}
+
+select option:checked {
+	background-color: var(--vscode-list-activeSelectionBackground, #094771) !important;
+	color: var(--vscode-list-activeSelectionForeground, #ffffff) !important;
+}
+
