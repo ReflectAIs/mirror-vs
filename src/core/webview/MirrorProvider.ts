@@ -1219,8 +1219,7 @@ export class MirrorProvider
 		})
 		this.webviewDisposables.push(configDisposable)
 
-		// If the extension is starting a new session, clear previous task state.
-		// But don't clear if there's already an active task (e.g., resumed via IPC/bridge).
+		const currentTask = this.getCurrentTask()
 		if (currentTask?.abandoned) {
 			await this.removeMirrorFromStack()
 		}

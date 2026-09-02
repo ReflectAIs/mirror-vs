@@ -26,6 +26,7 @@ import { StandardTooltip } from "@src/components/ui"
 
 import Thumbnails from "../common/Thumbnails"
 import { ModeSelector } from "./ModeSelector"
+import { ThinkingSelector } from "./ThinkingSelector"
 import { AutoApproveDropdown } from "./AutoApproveDropdown"
 import { SessionArtifacts } from "./SessionArtifacts"
 import { TerminalStatusBadge } from "./TerminalStatusBadge"
@@ -1394,6 +1395,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									className="min-w-0 w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via"
 								/>
 							))}
+						<ThinkingSelector className="flex-shrink-0" />
 						<AutoApproveDropdown triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
 						<TerminalStatusBadge />
 						<SessionArtifacts triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
