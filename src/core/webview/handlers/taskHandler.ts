@@ -23,9 +23,14 @@ export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<
 	// so no AI loop runs — the user can interact with it by clicking.
 	await provider.restoreSessionTabs()
 
-	// If no tabs were restored (e.g. fresh session or all tabs were closed),
-	// ensure a clean idle task exists ready to receive user messages.
-	if (provider.mirrorStack.length === 0) {
+	// If no tasks exist at all across stack or background, ensure a clean idle task exists.
+	// Never stack multiple empty tabs or create a new tab if existing tasks are already present.
+	const allTasks = provider.getAllTasksSorted()
+	const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0 && !t._started)
+
+	if (emptyTask) {
+		await provider.switchToTask(emptyTask.taskId)
+	} else if (allTasks.length === 0) {
 		await provider.createTask("", [], undefined, {}, {})
 	}
 

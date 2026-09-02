@@ -1221,8 +1221,7 @@ export class MirrorProvider
 
 		// If the extension is starting a new session, clear previous task state.
 		// But don't clear if there's already an active task (e.g., resumed via IPC/bridge).
-		const currentTask = this.getCurrentTask()
-		if (!currentTask || currentTask.abandoned || currentTask.abort) {
+		if (currentTask?.abandoned) {
 			await this.removeMirrorFromStack()
 		}
 
