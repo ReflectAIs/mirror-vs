@@ -10,7 +10,6 @@ import Announcement from "./Announcement"
 import ChatRow from "./ChatRow"
 import WarningRow from "./WarningRow"
 import { ChatTextArea } from "./ChatTextArea"
-import TaskHeader from "./TaskHeader"
 import ProfileViolationWarning from "./ProfileViolationWarning"
 import { CheckpointWarning } from "./CheckpointWarning"
 import { QueuedMessages } from "./QueuedMessages"
@@ -185,6 +184,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		followOutputCallback: followOutputCallback2,
 		atBottomStateChangeCallback: atBottomStateChangeCallback2,
 		scrollToBottomAuto: scrollToBottomAuto2,
+		navigateToIndex: navigateToIndex2,
 		isAtBottomRef: isAtBottomRef2,
 		scrollPhaseRef: scrollPhaseRef2,
 	} = scrollLifecycle
@@ -214,32 +214,19 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 	const handleNavigateToMessageSafe = useCallback(
 		(ts: number) => {
-			enterUserBrowsingHistory2("keyboard-nav-up")
+			console.log("[ChatView] handleNavigateToMessageSafe triggered for ts:", ts)
 			const messageIndex = displayedMessages.findIndex((msg) => msg.ts === ts)
+			console.log("[ChatView] Target index:", messageIndex, "total displayedMessages:", displayedMessages.length)
 			if (messageIndex >= 0) {
-				virtuosoRef.current?.scrollToIndex({
-					index: messageIndex,
-					align: "center",
-					behavior: "smooth",
-				})
+				navigateToIndex2(messageIndex)
 			}
 		},
-		[displayedMessages, enterUserBrowsingHistory2],
+		[displayedMessages, navigateToIndex2],
 	)
 
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: MirrorMessage) => {
-			if (index === 0 && task) {
-				return (
-					<TaskHeader
-						task={task}
-						parentTaskId={currentTaskItem?.parentTaskId}
-						buttonsDisabled={sendingDisabled}
-					/>
-				)
-			}
-
 			const hasCheckpoint = modifiedMessages.some((message) => message.say === "checkpoint_saved")
 
 			return (
@@ -280,9 +267,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			)
 		},
 		[
-			task,
-			currentTaskItem?.parentTaskId,
-			sendingDisabled,
 			expandedRows,
 			msg.toggleRowExpansion,
 			modifiedMessages,
@@ -383,6 +367,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 800, bottom: 400 }}
+							initialTopMostItemIndex={displayedMessages.length > 0 ? displayedMessages.length - 1 : 0}
 							data={displayedMessages}
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}

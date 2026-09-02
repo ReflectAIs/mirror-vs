@@ -15,7 +15,7 @@ import { DIFF_VIEW_URI_SCHEME } from "../../integrations/editor/DiffViewProvider
 
 import { CheckpointServiceOptions, RepoPerTaskCheckpointService } from "../../services/checkpoints"
 
-const WARNING_THRESHOLD_MS = 20000
+const WARNING_THRESHOLD_MS = 5000
 
 function sendCheckpointInitWarn(task: Task, type?: "WAIT_TIMEOUT" | "INIT_TIMEOUT", timeout?: number) {
 	task.providerRef.deref()?.postMessageToWebview({

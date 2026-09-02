@@ -64,6 +64,7 @@ export interface UseScrollLifecycleReturn {
 	followOutputCallback: () => "auto" | false
 	atBottomStateChangeCallback: (isAtBottom: boolean) => void
 	scrollToBottomAuto: () => void
+	navigateToIndex: (index: number) => void
 	isAtBottomRef: React.MutableRefObject<boolean>
 	scrollPhaseRef: React.MutableRefObject<ScrollPhase>
 }
@@ -128,6 +129,13 @@ export function useScrollLifecycle({
 	const driftAccumulatorRef = useRef<number>(0)
 	const lastUserScrollInputRef = useRef<number>(0)
 
+	// --- Navigation lock ---
+	// When a programmatic scrollToIndex navigation is in progress, ALL
+	// auto-scroll-to-bottom paths must be suppressed. This timestamp
+	// records when the navigation started; any path that could snap to
+	// bottom checks (performance.now() - navigationStartedAtRef) < 2000.
+	const navigationStartedAtRef = useRef<number>(0)
+
 	// -----------------------------------------------------------------------
 	// Phase transitions
 	// -----------------------------------------------------------------------
@@ -140,28 +148,42 @@ export function useScrollLifecycle({
 		setScrollPhase(nextPhase)
 	}, [])
 
-	const enterAnchoredFollowing = useCallback(() => {
-		transitionScrollPhase("ANCHORED_FOLLOWING")
-		setShowScrollToBottom(false)
-	}, [transitionScrollPhase])
-
-	const enterUserBrowsingHistory = useCallback(
-		(_source: ScrollFollowDisengageSource) => {
-			transitionScrollPhase("USER_BROWSING_HISTORY")
-			// Always show the scroll-to-bottom CTA when the user explicitly
-			// disengages. If they happen to still be at the physical bottom,
-			// the next Virtuoso atBottomStateChange(true) will hide it.
-			setShowScrollToBottom(true)
-		},
-		[transitionScrollPhase],
-	)
-
 	const cancelReanchorFrame = useCallback(() => {
 		if (reanchorAnimationFrameRef.current !== null) {
 			cancelAnimationFrame(reanchorAnimationFrameRef.current)
 			reanchorAnimationFrameRef.current = null
 		}
 	}, [])
+
+	const clearHydrationWindow = useCallback(() => {
+		isHydratingRef.current = false
+		hydrationRetryUsedRef.current = false
+		if (hydrationTimeoutRef.current !== null) {
+			window.clearTimeout(hydrationTimeoutRef.current)
+			hydrationTimeoutRef.current = null
+		}
+	}, [])
+
+	const enterAnchoredFollowing = useCallback(() => {
+		scrollPhaseRef.current = "ANCHORED_FOLLOWING"
+		transitionScrollPhase("ANCHORED_FOLLOWING")
+		setShowScrollToBottom(false)
+	}, [transitionScrollPhase])
+
+	const enterUserBrowsingHistory = useCallback(
+		(_source: ScrollFollowDisengageSource) => {
+			scrollPhaseRef.current = "USER_BROWSING_HISTORY"
+			lastUserScrollInputRef.current = performance.now()
+			clearHydrationWindow()
+			cancelReanchorFrame()
+			transitionScrollPhase("USER_BROWSING_HISTORY")
+			// Always show the scroll-to-bottom CTA when the user explicitly
+			// disengages. If they happen to still be at the physical bottom,
+			// the next Virtuoso atBottomStateChange(true) will hide it.
+			setShowScrollToBottom(true)
+		},
+		[cancelReanchorFrame, clearHydrationWindow, transitionScrollPhase],
+	)
 
 	// -----------------------------------------------------------------------
 	// Scroll commands
@@ -184,15 +206,6 @@ export function useScrollLifecycle({
 			behavior: "auto",
 		})
 	}, [virtuosoRef])
-
-	const clearHydrationWindow = useCallback(() => {
-		isHydratingRef.current = false
-		hydrationRetryUsedRef.current = false
-		if (hydrationTimeoutRef.current !== null) {
-			window.clearTimeout(hydrationTimeoutRef.current)
-			hydrationTimeoutRef.current = null
-		}
-	}, [])
 
 	const finishHydrationWindow = useCallback(() => {
 		if (!isMountedRef.current || !isHydratingRef.current) {
@@ -288,6 +301,11 @@ export function useScrollLifecycle({
 				return
 			}
 
+			// Don't fight an in-progress programmatic navigation
+			if (performance.now() - navigationStartedAtRef.current < 2000) {
+				return
+			}
+
 			const shouldForcePin = scrollPhaseRef.current === "ANCHORED_FOLLOWING"
 			if (isAtBottomRef.current || shouldForcePin) {
 				if (isTaller) {
@@ -323,6 +341,10 @@ export function useScrollLifecycle({
 	// Auto-anchor and follow when streaming is active on the current tab
 	useEffect(() => {
 		if (isStreaming && !isHidden) {
+			// Don't override an in-progress programmatic navigation
+			if (performance.now() - navigationStartedAtRef.current < 2000) {
+				return
+			}
 			enterAnchoredFollowing()
 			scrollToBottomAuto()
 		}
@@ -333,8 +355,15 @@ export function useScrollLifecycle({
 	// -----------------------------------------------------------------------
 
 	const followOutputCallback = useCallback((): "auto" | false => {
-		return scrollPhase === "USER_BROWSING_HISTORY" && !isStreaming ? false : "auto"
-	}, [scrollPhase, isStreaming])
+		// If a programmatic navigation is in progress, NEVER follow output
+		if (performance.now() - navigationStartedAtRef.current < 2000) {
+			return false
+		}
+		const phase = scrollPhaseRef.current
+		const follow = phase !== "USER_BROWSING_HISTORY" && (isStreaming || phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM")
+		console.log("[scrollLifecycle] followOutputCallback phase:", phase, "isStreaming:", isStreaming, "-> returning:", follow ? "auto" : false)
+		return follow ? "auto" : false
+	}, [isStreaming])
 
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: atBottomStateChange
@@ -342,9 +371,16 @@ export function useScrollLifecycle({
 
 	const atBottomStateChangeCallback = useCallback(
 		(isAtBottom: boolean) => {
+			console.log("[scrollLifecycle] atBottomStateChange isAtBottom:", isAtBottom, "phase:", scrollPhaseRef.current)
 			isAtBottomRef.current = isAtBottom
 
 			const currentPhase = scrollPhaseRef.current
+
+			// If a programmatic navigation is in progress, don't change phase or auto-scroll
+			const navInProgress = performance.now() - navigationStartedAtRef.current < 2000
+			if (navInProgress) {
+				return
+			}
 
 			if (!isAtBottom && isHydratingRef.current && currentPhase !== "USER_BROWSING_HISTORY") {
 				setShowScrollToBottom(false)
@@ -352,8 +388,9 @@ export function useScrollLifecycle({
 			}
 
 			if (isAtBottom) {
-				if (currentPhase === "USER_BROWSING_HISTORY" && isHydratingRef.current) {
-					setShowScrollToBottom(true)
+				const timeSinceUserInput = performance.now() - lastUserScrollInputRef.current
+				if (currentPhase === "USER_BROWSING_HISTORY" || timeSinceUserInput < 1000) {
+					setShowScrollToBottom(false)
 					return
 				}
 
@@ -377,14 +414,17 @@ export function useScrollLifecycle({
 
 				// Content grew at the bottom during streaming (NO user scroll input).
 				// Auto-scroll to keep pinned at bottom.
-				scrollToBottomAuto()
-				setShowScrollToBottom(false)
+				if (isStreaming) {
+					console.log("[scrollLifecycle] Auto-scrolling to bottom during stream")
+					scrollToBottomAuto()
+					setShowScrollToBottom(false)
+				}
 				return
 			}
 
 			setShowScrollToBottom(currentPhase === "USER_BROWSING_HISTORY")
 		},
-		[enterAnchoredFollowing, enterUserBrowsingHistory, scrollToBottomAuto],
+		[enterAnchoredFollowing, enterUserBrowsingHistory, scrollToBottomAuto, isStreaming],
 	)
 
 	// -----------------------------------------------------------------------
@@ -417,6 +457,13 @@ export function useScrollLifecycle({
 			const scroller = scrollContainerRef.current
 
 			if (phase === "USER_BROWSING_HISTORY" && scroller) {
+				// Skip anchor compensation entirely during programmatic navigation
+				if (performance.now() - navigationStartedAtRef.current < 2000) {
+					prevVisualAnchorRef.current = null
+					driftAccumulatorRef.current = 0
+					rafId = requestAnimationFrame(pollAnchor)
+					return
+				}
 				// Throttle layout queries to at most once every ~32ms (~30fps) to eliminate layout thrashing
 				if (now - lastPollTime >= 32) {
 					lastPollTime = now
@@ -652,6 +699,49 @@ export function useScrollLifecycle({
 	// Return public API
 	// -----------------------------------------------------------------------
 
+	// -----------------------------------------------------------------------
+	// Navigate to a specific Virtuoso index (for clicking a user message)
+	// Sets the navigation lock so no auto-scroll can fight it.
+	// -----------------------------------------------------------------------
+
+	const navigateToIndex = useCallback(
+		(index: number) => {
+			console.log("[scrollLifecycle] navigateToIndex:", index)
+			// 1. Set the navigation lock BEFORE anything else
+			navigationStartedAtRef.current = performance.now()
+			lastUserScrollInputRef.current = performance.now()
+			// 2. Clear hydration and reanchor state
+			clearHydrationWindow()
+			cancelReanchorFrame()
+			// 3. Transition phase — this MUST call setScrollPhase to trigger
+			//    a React re-render so Virtuoso re-evaluates followOutput.
+			//    Do NOT pre-set scrollPhaseRef before this call, or
+			//    transitionScrollPhase will see the ref matches and skip
+			//    the setScrollPhase state update.
+			transitionScrollPhase("USER_BROWSING_HISTORY")
+			// 4. Clear any stale anchor data so compensation doesn't fight
+			prevVisualAnchorRef.current = null
+			driftAccumulatorRef.current = 0
+			// 5. Double-RAF: first frame lets React render the phase change
+			//    and Virtuoso re-evaluate followOutput (returns false).
+			//    Second frame lets Virtuoso fully settle its internal state.
+			//    THEN we issue the scroll command.
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					console.log("[scrollLifecycle] navigateToIndex double-RAF firing scrollToIndex:", index)
+					virtuosoRef.current?.scrollToIndex({
+						index,
+						align: "start",
+						behavior: "auto",
+					})
+					// Show scroll-to-bottom AFTER the scroll has been issued
+					setShowScrollToBottom(true)
+				})
+			})
+		},
+		[cancelReanchorFrame, clearHydrationWindow, transitionScrollPhase, virtuosoRef],
+	)
+
 	return {
 		scrollPhase,
 		showScrollToBottom,
@@ -661,6 +751,7 @@ export function useScrollLifecycle({
 		followOutputCallback,
 		atBottomStateChangeCallback,
 		scrollToBottomAuto,
+		navigateToIndex,
 		isAtBottomRef,
 		scrollPhaseRef,
 	}
