@@ -367,7 +367,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				sessionNotes={sessionNotes}
 			/>
 			{!disableTabBar && <TabBar tabs={tabs} activeTabId={activeTabId} />}
-			{task && <StickyUserMessage message={lastUserMessage} onScrollToMessage={handleScrollToMessage} />}
 
 			{task ? (
 				<>
@@ -394,6 +393,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							increaseViewportBy={{ top: 800, bottom: 400 }}
 							data={displayedMessages}
 							itemContent={itemContent}
+							rangeChanged={handleRangeChanged}
 							followOutput={followOutputCallback2}
 							atBottomStateChange={atBottomStateChangeCallback2}
 							atBottomThreshold={10}
