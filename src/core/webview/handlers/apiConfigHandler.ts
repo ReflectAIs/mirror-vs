@@ -165,6 +165,10 @@ export async function handleModelChange(provider: MirrorProvider, apiConfigurati
 		}
 		if (provider.contextProxy) {
 			await provider.contextProxy.setProviderSettings(apiConfiguration)
+			const currentProfileName = provider.contextProxy.getValue("currentApiConfigName")
+			if (currentProfileName) {
+				await provider.providerSettingsManager.saveConfig(currentProfileName, apiConfiguration)
+			}
 		}
 	}
 }

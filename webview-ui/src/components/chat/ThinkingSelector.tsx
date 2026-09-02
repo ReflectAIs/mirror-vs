@@ -11,7 +11,11 @@ interface ThinkingSelectorProps {
 
 export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ className }) => {
 	const { apiConfiguration, setApiConfiguration } = useExtensionState()
-	const currentEffort: ReasoningEffort = (apiConfiguration?.reasoningEffort as ReasoningEffort) || "medium"
+	const rawEffort = apiConfiguration?.reasoningEffort
+	const currentEffort: ReasoningEffort =
+		rawEffort === "low" || rawEffort === "high" || rawEffort === "medium"
+			? (rawEffort as ReasoningEffort)
+			: "medium"
 
 	const handleChange = useCallback(
 		(e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -19,6 +23,7 @@ export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ className })
 			const updatedConfig = {
 				...apiConfiguration,
 				reasoningEffort: value,
+				enableReasoningEffort: true,
 			}
 			setApiConfiguration(updatedConfig)
 			vscode.postMessage({
