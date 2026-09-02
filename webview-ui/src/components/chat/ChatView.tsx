@@ -27,9 +27,9 @@ import ChatWelcomeContent from "./ChatWelcomeContent"
 // Types
 // ---------------------------------------------------------------------------
 
-import TabBar from "./TabBar"
+import { CircleUser, ArrowUp, ArrowDown } from "lucide-react"
 
-import { StickyUserMessage } from "./StickyUserMessage"
+import TabBar from "./TabBar"
 
 export interface ChatViewProps {
 	isHidden: boolean
@@ -166,8 +166,20 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		handleScrollToLatestCheckpoint,
 		handleNavigateToMessage,
 		handleRangeChanged,
+		stickyTopUserIndex,
+		stickyBottomUserIndex,
 		virtuosoComponents,
 	} = msg
+
+	const topStickyMessage = useMemo(() => {
+		if (stickyTopUserIndex === null || stickyTopUserIndex === undefined) return null
+		return displayedMessages[stickyTopUserIndex] || null
+	}, [stickyTopUserIndex, displayedMessages])
+
+	const bottomStickyMessage = useMemo(() => {
+		if (stickyBottomUserIndex === null || stickyBottomUserIndex === undefined) return null
+		return displayedMessages[stickyBottomUserIndex] || null
+	}, [stickyBottomUserIndex, displayedMessages])
 
 	// ── Scroll lifecycle (needs refs from the hook) ──
 	const scrollLifecycle = useScrollLifecycle({
@@ -384,22 +396,66 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 			{task && (
 				<>
-					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
-						<Virtuoso
-							ref={virtuosoRef as any}
-							key={task.ts}
-							className="grow mb-1"
-							customScrollParent={scrollContainerRef.current || undefined}
-							increaseViewportBy={{ top: 800, bottom: 400 }}
-							data={displayedMessages}
-							itemContent={itemContent}
-							rangeChanged={handleRangeChanged}
-							followOutput={followOutputCallback2}
-							atBottomStateChange={atBottomStateChangeCallback2}
-							atBottomThreshold={10}
-							startReached={() => setMessageLimit((prev) => prev + 100)}
-							components={virtuosoComponents}
-						/>
+					<div className="relative grow flex flex-col min-h-0 overflow-hidden">
+						{/* Bidirectional Top Sticky Message Overlay */}
+						{topStickyMessage && (
+							<div className="absolute top-0 left-0 right-0 z-30 px-3 pt-1 pointer-events-auto">
+								<div
+									onClick={() => handleNavigateToMessage(topStickyMessage.ts)}
+									className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-white/10 bg-[rgba(18,18,26,0.92)] backdrop-blur-md shadow-md cursor-pointer hover:border-mirror-brand-via/40 hover:bg-[rgba(24,24,34,0.95)] transition-all text-xs select-none">
+									<div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+										<CircleUser className="w-3.5 h-3.5 text-mirror-brand-via shrink-0" />
+										<span className="font-bold text-vscode-foreground shrink-0 text-[11px]">You:</span>
+										<span className="text-vscode-descriptionForeground truncate text-[11px] font-normal">
+											{topStickyMessage.text}
+										</span>
+									</div>
+									<div className="flex items-center gap-1 text-[10.5px] text-vscode-descriptionForeground shrink-0 hover:text-vscode-foreground">
+										<span>Jump</span>
+										<ArrowUp className="w-3 h-3 text-mirror-brand-via" />
+									</div>
+								</div>
+							</div>
+						)}
+
+						<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
+							<Virtuoso
+								ref={virtuosoRef as any}
+								key={task.ts}
+								className="grow mb-1"
+								customScrollParent={scrollContainerRef.current || undefined}
+								increaseViewportBy={{ top: 800, bottom: 400 }}
+								data={displayedMessages}
+								itemContent={itemContent}
+								rangeChanged={handleRangeChanged}
+								followOutput={followOutputCallback2}
+								atBottomStateChange={atBottomStateChangeCallback2}
+								atBottomThreshold={10}
+								startReached={() => setMessageLimit((prev) => prev + 100)}
+								components={virtuosoComponents}
+							/>
+						</div>
+
+						{/* Bidirectional Bottom Sticky Message Overlay (when scrolled up into history) */}
+						{bottomStickyMessage && (
+							<div className="absolute bottom-2 left-0 right-0 z-30 px-3 pointer-events-auto">
+								<div
+									onClick={() => handleNavigateToMessage(bottomStickyMessage.ts)}
+									className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-white/10 bg-[rgba(18,18,26,0.92)] backdrop-blur-md shadow-md cursor-pointer hover:border-emerald-400/40 hover:bg-[rgba(24,24,34,0.95)] transition-all text-xs select-none">
+									<div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+										<CircleUser className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+										<span className="font-bold text-vscode-foreground shrink-0 text-[11px]">Next:</span>
+										<span className="text-vscode-descriptionForeground truncate text-[11px] font-normal">
+											{bottomStickyMessage.text}
+										</span>
+									</div>
+									<div className="flex items-center gap-1 text-[10.5px] text-vscode-descriptionForeground shrink-0 hover:text-vscode-foreground">
+										<span>Jump</span>
+										<ArrowDown className="w-3 h-3 text-emerald-400" />
+									</div>
+								</div>
+							</div>
+						)}
 					</div>
 					<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />
 					{areButtonsVisible && (
