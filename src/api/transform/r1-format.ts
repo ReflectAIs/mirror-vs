@@ -38,7 +38,7 @@ export type DeepSeekAssistantMessage = AssistantMessage & {
  */
 export function convertToR1Format(
 	messages: AnthropicMessage[],
-	options?: { mergeToolResultText?: boolean },
+	options?: { mergeToolResultText?: boolean; isThinkingModel?: boolean },
 ): Message[] {
 	const result: Message[] = []
 
@@ -194,8 +194,12 @@ export function convertToR1Format(
 					role: "assistant",
 					content: textParts.length > 0 ? textParts.join("\n") : null,
 					...(toolCalls.length > 0 && { tool_calls: toolCalls }),
-					// Preserve reasoning_content for DeepSeek interleaved thinking
-					...(finalReasoning && { reasoning_content: finalReasoning }),
+					// Preserve reasoning_content for DeepSeek interleaved thinking (must be present if thinking mode is enabled)
+					...(options?.isThinkingModel
+						? { reasoning_content: finalReasoning ?? "" }
+						: finalReasoning
+							? { reasoning_content: finalReasoning }
+							: {}),
 				}
 
 				// Check if we can merge with the last message (only if no tool calls)
@@ -209,8 +213,9 @@ export function convertToR1Format(
 						lastMessage.content = `${lastContent}\n${assistantMessage.content}`
 					}
 					// Preserve reasoning_content from the new message if present
-					if (finalReasoning) {
-						;(lastMessage as DeepSeekAssistantMessage).reasoning_content = finalReasoning
+					if (finalReasoning || options?.isThinkingModel) {
+						;(lastMessage as DeepSeekAssistantMessage).reasoning_content =
+							finalReasoning ?? (lastMessage as DeepSeekAssistantMessage).reasoning_content ?? ""
 					}
 				} else {
 					result.push(assistantMessage)
@@ -225,14 +230,19 @@ export function convertToR1Format(
 						lastMessage.content = message.content
 					}
 					// Preserve reasoning_content from the new message if present
-					if (reasoningContent) {
-						;(lastMessage as DeepSeekAssistantMessage).reasoning_content = reasoningContent
+					if (reasoningContent || options?.isThinkingModel) {
+						;(lastMessage as DeepSeekAssistantMessage).reasoning_content =
+							reasoningContent ?? (lastMessage as DeepSeekAssistantMessage).reasoning_content ?? ""
 					}
 				} else {
 					const assistantMessage: DeepSeekAssistantMessage = {
 						role: "assistant",
 						content: message.content,
-						...(reasoningContent && { reasoning_content: reasoningContent }),
+						...(options?.isThinkingModel
+							? { reasoning_content: reasoningContent ?? "" }
+							: reasoningContent
+								? { reasoning_content: reasoningContent }
+								: {}),
 					}
 					result.push(assistantMessage)
 				}

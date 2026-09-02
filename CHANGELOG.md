@@ -2,6 +2,14 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.7.11] - 2026-09-02
+
+### Added & Improved
+
+- **Interactive Thinking Mode Selector & Universal Reasoning Engine**: Added real-time thinking / reasoning effort selection (`Low`, `Medium`, `High`) directly in the chat control bar. Native reasoning models (Claude 3.7, o1/o3, DeepSeek R1, Gemini) use API token budgets, while custom/non-native models (Ollama, LM Studio, OpenAI Compatible, Fireworks AI, Mistral, Llama, Qwen) use dynamic prompt directives steering chain-of-thought depth across Low, Medium, and High.
+- **Thinking State Persistence**: Fixed level selection state persistence directly to active provider profiles.
+- **Startup Tab Optimization**: Prevented automatic extra empty tab creation on webview launch.
+
 ## [0.7.10] - 2026-09-01
 
 ### Added & Improved
