@@ -171,7 +171,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	const scrollLifecycle = useScrollLifecycle({
 		virtuosoRef,
 		scrollContainerRef,
-		taskTs: task?.ts,
+		taskId: activeTabId || currentTaskId || currentTaskItem?.id || (task?.ts ? String(task.ts) : undefined),
 		isStreaming,
 		isHidden,
 		hasTask: !!task,
@@ -379,7 +379,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
 						<Virtuoso
 							ref={virtuosoRef as any}
-							key={task.ts}
+							key={activeTabId || currentTaskId || currentTaskItem?.id || (task?.ts ? String(task.ts) : "chat-virtuoso")}
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 800, bottom: 400 }}

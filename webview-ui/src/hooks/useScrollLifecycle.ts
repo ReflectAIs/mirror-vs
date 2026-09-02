@@ -49,7 +49,7 @@ const isEditableKeyboardTarget = (target: EventTarget | null): boolean => {
 export interface UseScrollLifecycleOptions {
 	virtuosoRef: React.RefObject<VirtuosoHandle | null>
 	scrollContainerRef: React.RefObject<HTMLDivElement | null>
-	taskTs: number | undefined
+	taskId: string | undefined
 	isStreaming: boolean
 	isHidden: boolean
 	hasTask: boolean
@@ -75,7 +75,7 @@ export interface UseScrollLifecycleReturn {
 export function useScrollLifecycle({
 	virtuosoRef,
 	scrollContainerRef,
-	taskTs,
+	taskId,
 	isStreaming,
 	isHidden,
 	hasTask,
@@ -260,7 +260,7 @@ export function useScrollLifecycle({
 		clearHydrationWindow()
 		cancelReanchorFrame()
 
-		if (taskTs) {
+		if (taskId) {
 			transitionScrollPhase("HYDRATING_PINNED_TO_BOTTOM")
 			setShowScrollToBottom(false)
 			startHydrationWindow()
@@ -273,7 +273,7 @@ export function useScrollLifecycle({
 			clearHydrationWindow()
 			cancelReanchorFrame()
 		}
-	}, [cancelReanchorFrame, clearHydrationWindow, startHydrationWindow, taskTs, transitionScrollPhase])
+	}, [cancelReanchorFrame, clearHydrationWindow, startHydrationWindow, taskId, transitionScrollPhase])
 
 	// -----------------------------------------------------------------------
 	// Row height change handler
