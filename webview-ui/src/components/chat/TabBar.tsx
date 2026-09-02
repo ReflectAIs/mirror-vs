@@ -27,36 +27,35 @@ import BranchWorkspaceDialog from "./BranchWorkspaceDialog"
 function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 	if (hasPendingApproval || status === "interactive") {
 		return {
-			symbol: "(◕ᴗ◕✿)?",
-			className: "text-amber-400 font-mono text-[10.5px] font-bold tracking-tight shrink-0 animate-bounce",
+			dotClass: "w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0",
+			ringClass: "w-2 h-2 rounded-full bg-amber-400/30 shrink-0",
 			title: "Waiting for your input / approval",
 		}
 	}
 	switch (status) {
 		case "streaming":
 			return {
-				symbol: "(•̀ω•́)⚡",
-				className: "text-purple-400 font-mono text-[10.5px] font-bold tracking-tight shrink-0 animate-pulse",
-				title: "Model is working",
+				dotClass: "w-2 h-2 rounded-full bg-mirror-brand-via animate-pulse shrink-0",
+				ringClass: "w-2 h-2 rounded-full bg-purple-500/20 shrink-0",
+				title: "Thinking & Generating...",
 			}
 		case "completed":
 			return {
-				symbol: "(★‿★)✨",
-				className: "text-emerald-400 font-mono text-[10.5px] font-semibold tracking-tight shrink-0",
-				title: "Task complete!",
+				dotClass: "w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0",
+				ringClass: "w-1.5 h-1.5 rounded-full bg-emerald-400/20 shrink-0",
+				title: "Task complete",
 			}
 		case "error":
 			return {
-				symbol: "(｡•́︿•̀｡)",
-				className: "text-rose-400 font-mono text-[10.5px] font-semibold tracking-tight shrink-0",
+				dotClass: "w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0",
+				ringClass: "w-1.5 h-1.5 rounded-full bg-rose-400/20 shrink-0",
 				title: "Encountered an issue",
 			}
 		case "idle":
 		default:
 			return {
-				symbol: "(•‿•)",
-				className:
-					"text-vscode-descriptionForeground font-mono text-[10.5px] font-medium tracking-tight shrink-0 opacity-80",
+				dotClass: "w-1.5 h-1.5 rounded-full bg-white/20 shrink-0",
+				ringClass: "w-1.5 h-1.5 rounded-full bg-transparent shrink-0",
 				title: "Ready",
 			}
 	}
@@ -188,10 +187,10 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 							<div
 								key={tab.taskId}
 								className={cn(
-									"flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-vscode-panel-border transition-colors whitespace-nowrap shrink-0 min-w-0 max-w-[200px]",
+									"group flex items-center gap-2 px-2.5 py-1 text-xs rounded-md transition-all duration-150 whitespace-nowrap shrink-0 min-w-0 max-w-[180px]",
 									isActive
-										? "bg-vscode-sideBarSticky-background text-vscode-foreground border-b-2 border-b-vscode-focusBorder"
-										: "bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground",
+										? "bg-white/[0.08] text-vscode-foreground border border-white/10 shadow-sm"
+										: "bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-white/[0.04]",
 								)}
 								title={tab.title}>
 								{/* Clickable area: icon + title (or edit input) */}
@@ -203,7 +202,9 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 										setEditingTabTitle(tab.title)
 									}}
 									className="flex items-center gap-1.5 flex-1 min-w-0 text-left bg-transparent border-none cursor-pointer p-0 text-inherit">
-									<span className={mascot.className}>{mascot.symbol}</span>
+									<div className="relative flex items-center justify-center">
+										<span className={mascot.dotClass} />
+									</div>
 									{isEditingThisTab ? (
 										<input
 											type="text"
@@ -219,10 +220,7 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 											className="text-xs px-1 py-0 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none w-full"
 										/>
 									) : (
-										<span className="truncate flex-1">{tab.title}</span>
-									)}
-									{tab.hasPendingApproval && (
-										<span className="w-1.5 h-1.5 rounded-full bg-vscode-testing-iconFailed shrink-0" />
+										<span className="truncate flex-1 font-medium text-[11px]">{tab.title}</span>
 									)}
 								</div>
 								{/* Close button - separate from clickable area */}
@@ -236,7 +234,7 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 										e.stopPropagation()
 										e.preventDefault()
 									}}
-									className="shrink-0 p-0.5 rounded hover:bg-vscode-toolbar-activeBackground text-vscode-descriptionForeground hover:text-vscode-foreground ml-1 cursor-pointer"
+									className="shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-white/10 text-vscode-descriptionForeground hover:text-vscode-foreground transition-all cursor-pointer"
 									role="button"
 									aria-label={`Close ${tab.title}`}
 									tabIndex={0}

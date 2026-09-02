@@ -212,19 +212,17 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		prevExpandedRef.current = expandedRows
 	}, [expandedRows, enterUserBrowsingHistory2])
 
+	const chatMessagesOnly = useMemo(() => {
+		if (!task) return displayedMessages
+		if (displayedMessages.length > 0 && displayedMessages[0]?.ts === task.ts) {
+			return displayedMessages.slice(1)
+		}
+		return displayedMessages
+	}, [displayedMessages, task])
+
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: MirrorMessage) => {
-			if (index === 0 && task) {
-				return (
-					<TaskHeader
-						task={task}
-						parentTaskId={currentTaskItem?.parentTaskId}
-						buttonsDisabled={sendingDisabled}
-					/>
-				)
-			}
-
 			const hasCheckpoint = modifiedMessages.some((message) => message.say === "checkpoint_saved")
 
 			return (
@@ -234,7 +232,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					isExpanded={expandedRows[messageOrGroup.ts] || false}
 					onToggleExpand={msg.toggleRowExpansion}
 					lastModifiedMessage={modifiedMessages.at(-1)}
-					isLast={index === displayedMessages.length - 1}
+					isLast={index === chatMessagesOnly.length - 1}
 					onHeightChange={handleRowHeightChange2}
 					isStreaming={isStreaming}
 					onSuggestionClick={handleSuggestionClickInRow}
@@ -347,6 +345,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 			{task ? (
 				<>
+					<TaskHeader
+						task={task}
+						parentTaskId={currentTaskItem?.parentTaskId}
+						buttonsDisabled={sendingDisabled}
+					/>
 					{checkpointWarning && (
 						<div className="px-3 shrink-0 mb-2">
 							<CheckpointWarning warning={checkpointWarning} />
@@ -368,7 +371,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 800, bottom: 400 }}
-							data={displayedMessages}
+							data={chatMessagesOnly}
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}
 							atBottomStateChange={atBottomStateChangeCallback2}
