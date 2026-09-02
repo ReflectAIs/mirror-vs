@@ -2,31 +2,30 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.7.11] - 2026-09-02
+## [0.8.0] - 2026-09-02
 
 ### Added & Improved
 
 - **Interactive Thinking Mode Selector & Universal Reasoning Engine**: Added real-time thinking / reasoning effort selection (`Low`, `Medium`, `High`) directly in the chat control bar. Native reasoning models (Claude 3.7, o1/o3, DeepSeek R1, Gemini) use API token budgets, while custom/non-native models (Ollama, LM Studio, OpenAI Compatible, Fireworks AI, Mistral, Llama, Qwen) use dynamic prompt directives steering chain-of-thought depth across Low, Medium, and High.
 - **Thinking State Persistence**: Fixed level selection state persistence directly to active provider profiles.
 - **Startup Tab Optimization**: Prevented automatic extra empty tab creation on webview launch.
-
-## [0.7.10] - 2026-09-01
-
-### Added & Improved
-
-- **Interactive Thinking Mode Selector & Prompt-Steered Reasoning Engine**: Added real-time thinking / reasoning effort selection (`Low`, `Medium`, `High`) directly in the chat control bar. For native reasoning models (Claude 3.7, o1/o3, DeepSeek R1, Gemini), effort parameters and token budgets are passed directly to the API; for custom and non-native models (Ollama, LM Studio, OpenAI Compatible, Mistral, Llama, Qwen), dynamic prompt directives actively steer chain-of-thought depth across Low (fast/concise), Medium (balanced), and High (deep step-by-step analysis and trade-off evaluation).
 - **Non-Blocking Background Context Summarizer**: Implemented non-blocking background context condensation at 75% threshold to pre-summarize older history without stalling active user turns.
 - **Message Edit Conversation Preservation**: Fixed root task prompt editing (`say: "text"`) and intermediate user message rewinding to prevent deleting conversation history or dropping messages to `[]`.
 - **Ask Callback Watchdog Guards**: Added non-blocking watchdog timeouts and cancellation cleanup to `ask()` and `pWaitFor` so task loop execution never hangs.
 - **Terminal Focus & Auto-Popup Removal**: Eliminated intrusive terminal panel auto-popups during command execution and default-enabled inline background execution (`ExecaTerminal`).
-- **Fuzzy Diff Matcher with Trimmed-Line Fallback**: Upgraded `MultiSearchReplaceDiffStrategy` with normalized whitespace and trimmed-line fallback matching. Diff search blocks with minor indentation or whitespace variations match cleanly without failing or requiring costly re-read retry turns.
-- **Anti-Verification Optimization Directives**: Added prompt-level directives preventing models from executing redundant post-edit verification reads, eliminating 1–2 wasted turns after every file write.
-- **Aggressive Parallel Read Batching**: Optimized tool-use guidelines directing models to batch multiple read-only operations (`read_file`, `search_files`, `list_files`) together in a single turn.
-- **Real-Time Sandboxed Performance Test Suite**: Introduced an automated live benchmark harness in `src/__tests__/sandbox/` for real-time model evaluation, token profiling, latency tracking, and diff corner-case verification against live APIs.
+- **Fuzzy Diff Matcher with Trimmed-Line Fallback**: Upgraded `MultiSearchReplaceDiffStrategy` with normalized whitespace and trimmed-line fallback matching.
+- **Anti-Verification Optimization Directives**: Added prompt-level directives preventing models from executing redundant post-edit verification reads.
+- **Aggressive Parallel Read Batching**: Optimized tool-use guidelines directing models to batch multiple read-only operations together in a single turn.
+- **Real-Time Sandboxed Performance Test Suite**: Introduced an automated live benchmark harness for real-time model evaluation, token profiling, and latency tracking.
 
 ### Fixed
 
+- **Instant Tab Switching**: Removed a synchronous `extractKnowledgeFromTask` loop (disk I/O per task) that was blocking the extension event loop on every tab switch. Knowledge extraction now only runs on task completion and context condensation, where it belongs. Tab switches also no longer re-serialize the full `taskHistory` payload over the IPC bridge.
+- **Terminal Running Message Send (Single Click)**: Fixed a bug where sending a message while a terminal command was running required two clicks. The first click queued the message instead of answering the active `command_output` ask — now correctly sends an `askResponse` on the first press, unblocking `ExecuteCommandTool` immediately.
+- **Unified First User Message Row**: Removed the separate `TaskHeader` rendering branch for the first user message; all messages now render uniformly through `ChatRow`.
+- **Scroll Navigation State Skip**: Fixed `scrollPhaseRef` premature assignment in `useScrollLifecycle` that caused the first click on a message link to jump out of follow-mode without navigating, requiring a second click.
 - **Below-Threshold MatchIndex Propagation**: Resolved an issue where below-threshold fuzzy matches could retain invalid line indices, ensuring strict validation before applying multi-search replacements.
+
 
 ## [0.7.9] - 2026-08-26
 

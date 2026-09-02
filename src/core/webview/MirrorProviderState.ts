@@ -279,16 +279,6 @@ export class StateManager {
 			return activeSessionId ? task.sessionId === activeSessionId : true
 		})
 
-		// Extract knowledge from active tasks so the shared session context stays up to date
-		for (const t of allTasks) {
-			if (t.sessionId) {
-				try {
-					await this.provider.getSessionContextManager().extractKnowledgeFromTask(t)
-				} catch {
-					// non-fatal
-				}
-			}
-		}
 
 		const rawSharedContexts =
 			(await this.provider.contextProxy.getValue("sessionSharedContexts")) ?? sessionSharedContexts ?? {}

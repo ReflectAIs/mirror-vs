@@ -684,8 +684,8 @@ export class MirrorProvider
 			this.log(`[switchToTask] Failed to start restored switched task: ${error}`)
 		})
 
-		// Post updated state to webview
-		await this.postStateToWebview()
+		// Post updated state to webview (omit taskHistory — webview keeps it in-memory)
+		await this.postStateToWebviewWithoutTaskHistory()
 
 		this.log(`[switchToTask] Task ${target.taskId}.${target.instanceId} focused from mirror stack`)
 	}

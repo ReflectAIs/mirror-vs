@@ -829,11 +829,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		if (isFirstMessage) {
 			return false
 		}
-		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command" && mirrorAsk !== "command_output"
+		// command_output is an active ask — treat it like any other ask (responds directly, never queues)
+		const isRespondingToAsk = mirrorAsk !== undefined && mirrorAsk !== "command"
 		if (isRespondingToAsk) {
 			return false
 		}
-		return isStreaming || mirrorAsk === "command_output" || mirrorAsk === "command" || messageQueue.length > 0
+		return isStreaming || mirrorAsk === "command" || messageQueue.length > 0
 	}, [inputValue, selectedImages, mirrorAsk, isStreaming, messageQueue.length, messages.length])
 
 	const modelActivity = useMemo((): ModelActivity => {
@@ -920,17 +921,16 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					return
 				}
 
+				// command_output is an active ask — treat it like any other ask (responds directly, never queues)
 				const isRespondingToAsk =
 					!isStreaming &&
 					mirrorAskRef.current !== undefined &&
-					mirrorAskRef.current !== "command" &&
-					mirrorAskRef.current !== "command_output"
+					mirrorAskRef.current !== "command"
 				// If the chat is empty (first message in a new tab), never queue —
 				// send directly as a newTask.
 				const isFirstMessageInTab = messagesRef.current.length === 0
 				const isTaskBusy =
 					isStreaming ||
-					mirrorAskRef.current === "command_output" ||
 					mirrorAskRef.current === "command" ||
 					messageQueue.length > 0
 				const shouldQueue = !forceSend && !isRespondingToAsk && !isFirstMessageInTab && isTaskBusy
