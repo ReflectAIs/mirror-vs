@@ -25,6 +25,8 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Unified First User Message Row**: Removed the separate `TaskHeader` rendering branch for the first user message; all messages now render uniformly through `ChatRow`.
 - **Scroll Navigation State Skip**: Fixed `scrollPhaseRef` premature assignment in `useScrollLifecycle` that caused the first click on a message link to jump out of follow-mode without navigating, requiring a second click.
 - **Below-Threshold MatchIndex Propagation**: Resolved an issue where below-threshold fuzzy matches could retain invalid line indices, ensuring strict validation before applying multi-search replacements.
+- **Duplicate / Concurrent Context Compressions**: Fixed race conditions between background condensation and pre-request context management that caused multiple compressions to fire together. Added mutex lock / promise sharing to `TaskContextManagement`, ensured context checks strictly honor user-configured context thresholds, and made pre-request context management sequentially await in-flight condensations.
+- **Background Terminal Execution & Lingering Terminal Cleanup**: Enforced pure background execution (`ExecaTerminal`) for assistant tool commands, completely preventing VS Code from opening or revealing integrated terminal tabs. Added automatic cleanup of lingering "Mirror VS" terminals upon extension startup, task abort, and task release.
 
 
 ## [0.7.9] - 2026-08-26
