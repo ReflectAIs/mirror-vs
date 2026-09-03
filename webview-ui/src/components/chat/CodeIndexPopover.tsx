@@ -197,6 +197,9 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
 	const [saveError, setSaveError] = useState<string | null>(null)
 
+	// Auto-setup progress state
+	const [setupProgress, setSetupProgress] = useState<{ progress: number; label: string; step: string } | null>(null)
+
 	// Form validation state
 	const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
@@ -310,6 +313,18 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 						totalItems: event.data.values.totalItems,
 						currentItemUnit: event.data.values.currentItemUnit || "items",
 					})
+				}
+			} else if (event.data.type === "autoSetupProgress") {
+				const { step, progress, label } = event.data.values
+				if (step === "done") {
+					// Keep 100% visible briefly then clear
+					setSetupProgress({ step, progress: 100, label })
+					setTimeout(() => setSetupProgress(null), 2000)
+				} else if (step === "error") {
+					setSetupProgress({ step, progress: 0, label })
+					setTimeout(() => setSetupProgress(null), 4000)
+				} else {
+					setSetupProgress({ step, progress, label })
 				}
 			} else if (event.data.type === "codeIndexSettingsSaved") {
 				if (event.data.success) {
@@ -714,9 +729,56 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 								</p>
 							</div>
 						) : (
-							<div className="mt-4 mb-4 flex items-center gap-1.5 text-xs text-green-500 font-medium">
-								<span className="codicon codicon-pass text-green-500" />
-								<span>Setup is complete</span>
+							<div className="mt-4 mb-4 flex items-center justify-between gap-2">
+								<div className="flex items-center gap-1.5 text-xs text-green-500 font-medium">
+									<span className="codicon codicon-pass text-green-500" />
+									<span>Setup is complete</span>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="h-6 px-2 text-[11px] text-vscode-descriptionForeground hover:text-vscode-foreground gap-1"
+									onClick={() => vscode.postMessage({ type: "autoSetupCodeIndex" })}>
+									<span className="codicon codicon-refresh" />
+									Redo
+								</Button>
+							</div>
+						)}
+
+						{/* Auto-setup progress bar */}
+						{setupProgress && (
+							<div className="mt-2 mb-1">
+								<div className="flex items-center justify-between mb-1">
+									<span
+										className={`text-[11px] font-medium ${
+											setupProgress.step === "error"
+												? "text-red-500"
+												: setupProgress.step === "done"
+													? "text-green-500"
+													: "text-vscode-descriptionForeground"
+										}`}>
+										{setupProgress.label}
+									</span>
+									{setupProgress.step !== "error" && (
+										<span className="text-[11px] text-vscode-descriptionForeground">
+											{setupProgress.progress}%
+										</span>
+									)}
+								</div>
+								<div className="relative h-1.5 w-full overflow-hidden rounded-full bg-vscode-input-background">
+									<div
+										className={`h-full rounded-full transition-all duration-500 ease-out ${
+											setupProgress.step === "error"
+												? "bg-red-500"
+												: setupProgress.step === "done"
+													? "bg-green-500"
+													: "bg-primary"
+										}`}
+										style={{
+											width: `${setupProgress.step === "error" ? 100 : setupProgress.progress}%`,
+										}}
+									/>
+								</div>
 							</div>
 						)}
 

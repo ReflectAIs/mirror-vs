@@ -256,6 +256,14 @@ export class TaskMainLoop {
 		let nextUserContent = userContent
 		let includeFileDetails = true
 
+		// Reset abort and streaming flags to ensure clean loop execution
+		this.task.abort = false
+		this.task.abandoned = false
+		this.task.abortReason = undefined
+		this.task.didFinishAbortingStream = false
+		this.task.isStreaming = false
+		this.task.isWaitingForFirstChunk = false
+
 		this.task.emit(MirrorVSEventName.TaskStarted)
 		this.task.isLoopActive = true
 
@@ -304,6 +312,7 @@ export class TaskMainLoop {
 			}
 		} finally {
 			this.task.isLoopActive = false
+			this.task.contextManager.maybeTriggerBackgroundCondense()
 		}
 	}
 

@@ -1,0 +1,91 @@
+{
+	"scenarioName": "error_recovery",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://api.deepseek.com",
+		"model": "deepseek-v4-flash",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-Ot69Dv\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nlib/config.ts\nlib/server.ts\npackage.json",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1788232161730,
+			"responseTimestamp": 1788232162800,
+			"latencyMs": 1069.8464999999997,
+			"timeToFirstTokenMs": 1069.8464999999997,
+			"inputTokens": 1366,
+			"outputTokens": 54,
+			"totalTokens": 1420,
+			"assistantText": "",
+			"reasoningText": "Let me look at the config file.",
+			"toolCalls": [
+				{
+					"name": "read_file",
+					"args": {
+						"path": "lib/config.ts"
+					},
+					"result": "1 | export const config = {\n2 |   port: 3000,\n3 |   host: \"localhost\",\n4 |   debug: false,\n5 | }\n6 | ",
+					"durationMs": 0.29629999999451684,
+					"timestamp": 1788232162800
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1788232162801,
+			"responseTimestamp": 1788232164197,
+			"latencyMs": 1396.7498999999953,
+			"timeToFirstTokenMs": 1396.7498999999953,
+			"inputTokens": 1468,
+			"outputTokens": 89,
+			"totalTokens": 1557,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "lib/config.ts",
+						"diff": "<<<<<<< SEARCH\n  port: 3000,\n=======\n  port: 8080,\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to lib/config.ts.",
+					"durationMs": 1.1264000000010128,
+					"timestamp": 1788232164198
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 2,
+			"requestTimestamp": 1788232164198,
+			"responseTimestamp": 1788232165038,
+			"latencyMs": 839.7365000000063,
+			"timeToFirstTokenMs": 839.7365000000063,
+			"inputTokens": 1581,
+			"outputTokens": 62,
+			"totalTokens": 1643,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Changed the default port from 3000 to 8080 in `lib/config.ts`."
+					},
+					"result": "[TASK_COMPLETED] Changed the default port from 3000 to 8080 in `lib/config.ts`.",
+					"durationMs": 0.002300000000104774,
+					"timestamp": 1788232165038
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 3307.8407000000007,
+	"totalInputTokens": 4415,
+	"totalOutputTokens": 205,
+	"totalToolCalls": 3,
+	"completed": true
+}

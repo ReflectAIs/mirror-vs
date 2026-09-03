@@ -10,7 +10,6 @@ import Announcement from "./Announcement"
 import ChatRow from "./ChatRow"
 import WarningRow from "./WarningRow"
 import { ChatTextArea } from "./ChatTextArea"
-import TaskHeader from "./TaskHeader"
 import ProfileViolationWarning from "./ProfileViolationWarning"
 import { CheckpointWarning } from "./CheckpointWarning"
 import { QueuedMessages } from "./QueuedMessages"
@@ -78,6 +77,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		disableTabBar,
 	} = useExtensionState()
 
+	const scrollLifecycleRef = useRef<ReturnType<typeof useScrollLifecycle> | null>(null)
+	const handleSendMessageScroll = useCallback(() => {
+		scrollLifecycleRef.current?.resetToBottom()
+	}, [])
+
 	// ── Use the extracted hook for all message state, effects, and handlers ──
 	const msg = useChatMessages({
 		messages,
@@ -95,6 +99,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		isHidden,
 		routerModels,
 		t,
+		onSendMessage: handleSendMessageScroll,
 	})
 
 	const {
@@ -135,7 +140,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		apiMetrics,
 		modifiedMessages,
 		displayedMessages,
-		stickyUserIndex,
 		hasLatestCheckpoint,
 		currentFollowUpTs,
 		isStreaming,
@@ -167,15 +171,15 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		virtuosoComponents,
 	} = msg
 
-	// ── Scroll lifecycle (needs refs from the hook) ──
 	const scrollLifecycle = useScrollLifecycle({
 		virtuosoRef,
 		scrollContainerRef,
-		taskTs: task?.ts,
+		taskId: activeTabId || currentTaskId || currentTaskItem?.id || (task?.ts ? String(task.ts) : undefined),
 		isStreaming,
 		isHidden,
 		hasTask: !!task,
 	})
+	scrollLifecycleRef.current = scrollLifecycle
 
 	const {
 		showScrollToBottom: showScrollToBottom2,
@@ -185,6 +189,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		followOutputCallback: followOutputCallback2,
 		atBottomStateChangeCallback: atBottomStateChangeCallback2,
 		scrollToBottomAuto: scrollToBottomAuto2,
+		navigateToIndex: navigateToIndex2,
+		resetToBottom: resetToBottom2,
 		isAtBottomRef: isAtBottomRef2,
 		scrollPhaseRef: scrollPhaseRef2,
 	} = scrollLifecycle
@@ -212,19 +218,21 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		prevExpandedRef.current = expandedRows
 	}, [expandedRows, enterUserBrowsingHistory2])
 
+	const handleNavigateToMessageSafe = useCallback(
+		(ts: number) => {
+			console.log("[ChatView] handleNavigateToMessageSafe triggered for ts:", ts)
+			const messageIndex = displayedMessages.findIndex((msg) => msg.ts === ts)
+			console.log("[ChatView] Target index:", messageIndex, "total displayedMessages:", displayedMessages.length)
+			if (messageIndex >= 0) {
+				navigateToIndex2(messageIndex)
+			}
+		},
+		[displayedMessages, navigateToIndex2],
+	)
+
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
 	const itemContent = useCallback(
 		(index: number, messageOrGroup: MirrorMessage) => {
-			if (index === 0 && task) {
-				return (
-					<TaskHeader
-						task={task}
-						parentTaskId={currentTaskItem?.parentTaskId}
-						buttonsDisabled={sendingDisabled}
-					/>
-				)
-			}
-
 			const hasCheckpoint = modifiedMessages.some((message) => message.say === "checkpoint_saved")
 
 			return (
@@ -259,15 +267,12 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					}
 					hasCheckpoint={hasCheckpoint}
 					onJumpToPreviousCheckpoint={handleScrollToLatestCheckpoint}
-					isSticky={messageOrGroup.say === "user_feedback" && index === stickyUserIndex}
-					onNavigateToMessage={handleNavigateToMessage}
+					isSticky={false}
+					onNavigateToMessage={handleNavigateToMessageSafe}
 				/>
 			)
 		},
 		[
-			task,
-			currentTaskItem?.parentTaskId,
-			sendingDisabled,
 			expandedRows,
 			msg.toggleRowExpansion,
 			modifiedMessages,
@@ -282,8 +287,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			enableButtons,
 			primaryButtonText,
 			handleScrollToLatestCheckpoint,
-			handleNavigateToMessage,
-			stickyUserIndex,
+			handleNavigateToMessageSafe,
 		],
 	)
 
@@ -364,10 +368,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
 						<Virtuoso
 							ref={virtuosoRef as any}
-							key={task.ts}
+							key={activeTabId || currentTaskId || currentTaskItem?.id || (task?.ts ? String(task.ts) : "chat-virtuoso")}
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 800, bottom: 400 }}
+							initialTopMostItemIndex={displayedMessages.length > 0 ? displayedMessages.length - 1 : 0}
 							data={displayedMessages}
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}
@@ -429,6 +434,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				}}
 				onForceSend={(index) => {
 					if (effectiveQueue[index]) {
+						resetToBottom2()
 						const targetTaskId = activeTabId || currentTaskId
 						const queuedMsg = effectiveQueue[index]
 						vscode.postMessage({

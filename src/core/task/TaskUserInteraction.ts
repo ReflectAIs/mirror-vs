@@ -241,6 +241,9 @@ export class TaskUserInteraction {
 		// Wait for askResponse to be set
 		await pWaitFor(
 			() => {
+				if (this.task.abort) {
+					return true
+				}
 				if (this.task.askResponse !== undefined || this.task.lastMessageTs !== askTs) {
 					return true
 				}
@@ -249,6 +252,10 @@ export class TaskUserInteraction {
 			},
 			{ interval: 100 },
 		)
+
+		if (this.task.abort) {
+			throw new Error(`[MirrorVS#ask] task ${this.task.taskId}.${this.task.instanceId} aborted`)
+		}
 
 		if (this.task.askResponse === undefined && this.task.lastMessageTs !== askTs) {
 			// Could happen if we send multiple un-answered asks in a row i.e. with
@@ -457,10 +464,21 @@ export class TaskUserInteraction {
 
 				this.task.emit(MirrorVSEventName.TaskUserMessage, this.task.taskId)
 
-				// Handle the message directly instead of routing through the webview.
-				// This avoids a race condition where the webview's message state hasn't
-				// hydrated yet, causing it to interpret the message as a new task request.
-				this.handleWebviewAskResponse("messageResponse", text, images)
+				if (this.task.isLoopActive) {
+					// Handle the message directly instead of routing through the webview.
+					// This avoids a race condition where the webview's message state hasn't
+					// hydrated yet, causing it to interpret the message as a new task request.
+					this.handleWebviewAskResponse("messageResponse", text, images)
+				} else {
+					await this.task.say("user_feedback", text, images)
+					const { formatResponse } = await import("../prompts/responses")
+					const imageBlocks = formatResponse.imageBlocks(images)
+					const userContent = [
+						{ type: "text" as const, text: `<user_message>\n${text}\n</user_message>` },
+						...imageBlocks,
+					]
+					await this.task.initiateTaskLoop(userContent)
+				}
 			} else {
 				console.error("[Task#submitUserMessage] Provider reference lost")
 			}

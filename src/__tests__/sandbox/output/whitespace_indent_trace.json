@@ -1,0 +1,91 @@
+{
+	"scenarioName": "whitespace_indent",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://api.deepseek.com",
+		"model": "deepseek-v4-flash",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-p78iBK\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nsrc/matrix.ts\npackage.json",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1788232168348,
+			"responseTimestamp": 1788232169324,
+			"latencyMs": 976.6647000000012,
+			"timeToFirstTokenMs": 976.6647000000012,
+			"inputTokens": 1366,
+			"outputTokens": 54,
+			"totalTokens": 1420,
+			"assistantText": "",
+			"reasoningText": "Let me read the file first.",
+			"toolCalls": [
+				{
+					"name": "read_file",
+					"args": {
+						"path": "src/matrix.ts"
+					},
+					"result": "1 | export class Matrix {\n2 |     public static multiply(a: number[][], b: number[][]): number[][] {\n3 |         const rowsA = a.length;\n4 |         const colsA = a[0].length;\n5 |         const colsB = b[0].length;\n6 |         const result: number[][] = [];\n7 | \n8 |         for (let i = 0; i < rowsA; i++) {\n9 |             result[i] = [];\n10 |             for (let j = 0; j < colsB; j++) {\n11 |                 let sum = 0;\n12 |                 for (let k = 0; k < colsA; k++) {\n13 |                     sum += a[i][k] * b[k][j];\n14 |                 }\n15 |                 result[i][j] = sum;\n16 |             }\n17 |         }\n18 |         return result;\n19 |     }\n20 | }\n21 | ",
+					"durationMs": 0.3125,
+					"timestamp": 1788232169325
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1788232169325,
+			"responseTimestamp": 1788232171088,
+			"latencyMs": 1763.522299999997,
+			"timeToFirstTokenMs": 1763.522299999997,
+			"inputTokens": 1635,
+			"outputTokens": 192,
+			"totalTokens": 1827,
+			"assistantText": "",
+			"reasoningText": "I need to add validation: if `colsA !== b.length`, throw Error(\"Matrix dimensions do not match for multiplication\"). At the start of multiply.",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "src/matrix.ts",
+						"diff": "<<<<<<< SEARCH\n        const rowsA = a.length;\n        const colsA = a[0].length;\n        const colsB = b[0].length;\n=======\n        const rowsA = a.length;\n        const colsA = a[0].length;\n        if (colsA !== b.length) {\n            throw new Error(\"Matrix dimensions do not match for multiplication\");\n        }\n        const colsB = b[0].length;\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to src/matrix.ts.",
+					"durationMs": 0.8888999999981024,
+					"timestamp": 1788232171089
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 2,
+			"requestTimestamp": 1788232171089,
+			"responseTimestamp": 1788232172408,
+			"latencyMs": 1319.004399999998,
+			"timeToFirstTokenMs": 1319.004399999998,
+			"inputTokens": 1852,
+			"outputTokens": 84,
+			"totalTokens": 1936,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Added input dimension validation to `Matrix.multiply` in src/matrix.ts. The method now throws `Error(\"Matrix dimensions do not match for multiplication\")` when `colsA !== b.length`."
+					},
+					"result": "[TASK_COMPLETED] Added input dimension validation to `Matrix.multiply` in src/matrix.ts. The method now throws `Error(\"Matrix dimensions do not match for multiplication\")` when `colsA !== b.length`.",
+					"durationMs": 0.0021999999953550287,
+					"timestamp": 1788232172408
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 4060.4737000000023,
+	"totalInputTokens": 4853,
+	"totalOutputTokens": 330,
+	"totalToolCalls": 3,
+	"completed": true
+}

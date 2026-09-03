@@ -24,12 +24,36 @@ export class TerminalRegistry {
 	private static disposables: vscode.Disposable[] = []
 	private static isInitialized = false
 
+	/**
+	 * Disposes any lingering VS Code terminals created with name 'Mirror VS'.
+	 */
+	public static cleanupLingeringVsCodeTerminals(): void {
+		try {
+			if (typeof vscode !== "undefined" && vscode.window?.terminals) {
+				for (const term of vscode.window.terminals) {
+					if (term.name === "Mirror VS") {
+						try {
+							term.dispose()
+						} catch {
+							// Ignore if already disposed
+						}
+					}
+				}
+			}
+		} catch {
+			// Silently handle if vscode window API is unavailable in test environments
+		}
+	}
+
 	public static initialize() {
 		if (this.isInitialized) {
 			throw new Error("TerminalRegistry.initialize() should only be called once")
 		}
 
 		this.isInitialized = true
+
+		// Clean up any lingering "Mirror VS" VS Code terminals
+		this.cleanupLingeringVsCodeTerminals()
 
 		// TODO: This initialization code is VSCode specific, and therefore
 		// should probably live elsewhere.
@@ -200,7 +224,7 @@ export class TerminalRegistry {
 	public static async getOrCreateTerminal(
 		cwd: string,
 		taskId?: string,
-		provider: MirrorTerminalProvider = "vscode",
+		provider: MirrorTerminalProvider = "execa",
 	): Promise<MirrorTerminal> {
 		const terminals = this.getAllTerminals()
 		let terminal: MirrorTerminal | undefined
@@ -333,6 +357,13 @@ export class TerminalRegistry {
 		this.terminals.forEach((terminal) => {
 			if (terminal.taskId === taskId) {
 				terminal.taskId = undefined
+				if (terminal instanceof Terminal) {
+					try {
+						terminal.terminal.dispose()
+					} catch {
+						// Ignore if already disposed
+					}
+				}
 			}
 		})
 	}
@@ -357,6 +388,11 @@ export class TerminalRegistry {
 							}
 						})
 						.catch(() => {})
+					try {
+						terminal.terminal.dispose()
+					} catch {
+						// Ignore if already disposed
+					}
 				}
 				terminal.busy = false
 			}

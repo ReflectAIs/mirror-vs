@@ -10,7 +10,7 @@ export function getToolUseGuidelinesSection(): string {
 - Session shared context: use \`read_session_context\` to pull sibling-tab awareness, shared knowledge notes, and user-curated session notes on demand
 
 ## Batching Rules
-- Read-only tools (\`read_file\`, \`search_files\`, \`list_files\`, context retrieval tools) can be batched in parallel.
+- Read-only tools (\`read_file\`, \`search_files\`, \`list_files\`, context retrieval tools) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.
 - Any write tool + any other tool must NEVER be batched (writes must be sequential).
 - Flow-terminating tools (\`attempt_completion\`, \`switch_mode\`, \`new_task\`) must NEVER be batched.`
 }

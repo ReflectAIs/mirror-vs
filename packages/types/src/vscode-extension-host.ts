@@ -77,6 +77,7 @@ export interface ExtensionMessage {
 		| "codebaseIndexConfig"
 		| "codeIndexSettingsSaved"
 		| "codeIndexSecretStatus"
+		| "autoSetupProgress"
 		| "showDeleteMessageDialog"
 		| "showEditMessageDialog"
 		| "commands"

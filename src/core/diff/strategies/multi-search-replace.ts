@@ -401,13 +401,15 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 					bestMatchIndex,
 					bestMatchContent: midContent,
 				} = fuzzySearch(resultLines, searchChunk, searchStartIndex, searchEndIndex)
-				matchIndex = bestMatchIndex
 				bestMatchScore = bestScore
 				bestMatchContent = midContent
+				if (bestScore >= this.fuzzyThreshold) {
+					matchIndex = bestMatchIndex
+				}
 			}
 
 			// Try aggressive line number stripping as a fallback if regular matching fails
-			if (matchIndex === -1 || bestMatchScore < this.fuzzyThreshold) {
+			if (matchIndex === -1) {
 				// Strip both search and replace content once (simultaneously)
 				const aggressiveSearchContent = stripLineNumbers(searchContent, true)
 				const aggressiveReplaceContent = stripLineNumbers(replaceContent, true)
@@ -431,31 +433,61 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 					searchLines = aggressiveSearchLines
 					replaceLines = replaceContent ? replaceContent.split(/\r?\n/) : []
 				} else {
-					// No match found with either method
-					const originalContentSection =
-						startLine !== undefined && endLine !== undefined
-							? `\n\nOriginal Content:\n${addLineNumbers(
-									resultLines
-										.slice(
-											Math.max(0, startLine - 1 - this.bufferLines),
-											Math.min(resultLines.length, endLine + this.bufferLines),
-										)
-										.join("\n"),
-									Math.max(1, startLine - this.bufferLines),
-								)}`
-							: `\n\nOriginal Content:\n${addLineNumbers(resultLines.join("\n"))}`
+					// Fallback: Trimmed line matching (handles indentation & trailing whitespace differences)
+					// All non-empty lines must match exactly after trimming
+					const trimmedSearchLines = searchLines.map((l) => l.trim()).filter((l) => l.length > 0)
+					if (trimmedSearchLines.length > 0) {
+						let trimmedMatchIndex = -1
+						let matchCount = 0
+						for (let i = searchStartIndex; i <= searchEndIndex - searchLines.length; i++) {
+							const candidateLines = resultLines.slice(i, i + searchLines.length)
+							const candidateTrimmed = candidateLines.map((l) => l.trim()).filter((l) => l.length > 0)
+							if (
+								candidateTrimmed.length === trimmedSearchLines.length &&
+								candidateTrimmed.every((l, idx) => l === trimmedSearchLines[idx])
+							) {
+								matchCount++
+								trimmedMatchIndex = i
+							}
+						}
 
-					const bestMatchSection = bestMatchContent
-						? `\n\nBest Match Found:\n${addLineNumbers(bestMatchContent, matchIndex + 1)}`
-						: `\n\nBest Match Found:\n(no match)`
+						// Only apply if there is a unique unambiguous match in range
+						if (matchCount === 1) {
+							matchIndex = trimmedMatchIndex
+							bestMatchScore = 1.0
+							bestMatchContent = resultLines
+								.slice(trimmedMatchIndex, trimmedMatchIndex + searchLines.length)
+								.join("\n")
+						}
+					}
 
-					const lineRange = startLine ? ` at line: ${startLine}` : ""
+					if (matchIndex === -1) {
+						// No match found with either method
+						const originalContentSection =
+							startLine !== undefined && endLine !== undefined
+								? `\n\nOriginal Content:\n${addLineNumbers(
+										resultLines
+											.slice(
+												Math.max(0, startLine - 1 - this.bufferLines),
+												Math.min(resultLines.length, endLine + this.bufferLines),
+											)
+											.join("\n"),
+										Math.max(1, startLine - this.bufferLines),
+									)}`
+								: `\n\nOriginal Content:\n${addLineNumbers(resultLines.join("\n"))}`
 
-					diffResults.push({
-						success: false,
-						error: `No sufficiently similar match found${lineRange} (${Math.floor(bestMatchScore * 100)}% similar, needs ${Math.floor(this.fuzzyThreshold * 100)}%)\n\nDebug Info:\n- Similarity Score: ${Math.floor(bestMatchScore * 100)}%\n- Required Threshold: ${Math.floor(this.fuzzyThreshold * 100)}%\n- Search Range: ${startLine ? `starting at line ${startLine}` : "start to end"}\n- Tried both standard and aggressive line number stripping\n- Tip: Use the read_file tool to get the latest content of the file before attempting to use the apply_diff tool again, as the file content may have changed\n\nSearch Content:\n${searchChunk}${bestMatchSection}${originalContentSection}`,
-					})
-					continue
+						const bestMatchSection = bestMatchContent
+							? `\n\nBest Match Found:\n${addLineNumbers(bestMatchContent, matchIndex + 1)}`
+							: `\n\nBest Match Found:\n(no match)`
+
+						const lineRange = startLine ? ` at line: ${startLine}` : ""
+
+						diffResults.push({
+							success: false,
+							error: `No sufficiently similar match found${lineRange} (${Math.floor(bestMatchScore * 100)}% similar, needs ${Math.floor(this.fuzzyThreshold * 100)}%)\n\nDebug Info:\n- Similarity Score: ${Math.floor(bestMatchScore * 100)}%\n- Required Threshold: ${Math.floor(this.fuzzyThreshold * 100)}%\n- Search Range: ${startLine ? `starting at line ${startLine}` : "start to end"}\n- Tried both standard and aggressive line number stripping\n- Tip: Use the read_file tool to get the latest content of the file before attempting to use the apply_diff tool again, as the file content may have changed\n\nSearch Content:\n${searchChunk}${bestMatchSection}${originalContentSection}`,
+						})
+						continue
+					}
 				}
 			}
 

@@ -218,14 +218,14 @@ export async function handleEditMessageConfirm(
 			}
 		}
 
-		// For non-checkpoint edits, remove the ORIGINAL user message being edited and all subsequent messages
+		// For non-checkpoint edits, find the user message being edited
 		let deleteFromMessageIndex = messageIndex
 		let deleteFromApiIndex = apiConversationHistoryIndex
 
 		// Find the nearest preceding user message to ensure we replace the original, not just the assistant reply
 		for (let i = messageIndex; i >= 0; i--) {
 			const m = currentMirror.mirrorMessages[i]
-			if (m?.say === "user_feedback") {
+			if (m?.say === "user_feedback" || m?.say === "text" || i === 0) {
 				deleteFromMessageIndex = i
 				const userTs = m.ts
 				if (typeof userTs === "number") {
@@ -236,6 +236,58 @@ export async function handleEditMessageConfirm(
 				}
 				break
 			}
+		}
+
+		const targetMsg = currentMirror.mirrorMessages[deleteFromMessageIndex]
+		const isInitialPrompt = deleteFromMessageIndex === 0 && targetMsg?.say !== "user_feedback"
+
+		if (isInitialPrompt) {
+			// Editing the root task prompt: update first message in-place and restart task loop
+			if (currentMirror.mirrorMessages.length > 0) {
+				currentMirror.mirrorMessages[0].text = editedContent
+				if (images && images.length > 0) {
+					currentMirror.mirrorMessages[0].images = images
+				}
+			}
+
+			// Clear all subsequent messages if any
+			if (currentMirror.mirrorMessages.length > 1) {
+				const secondMsgTs = currentMirror.mirrorMessages[1]?.ts
+				if (secondMsgTs) {
+					await currentMirror.messageManager.rewindToTimestamp(secondMsgTs, { includeTargetMessage: true })
+				} else {
+					currentMirror.mirrorMessages = [currentMirror.mirrorMessages[0]]
+				}
+			}
+
+			// Reset API conversation history
+			await currentMirror.overwriteApiConversationHistory([])
+
+			// Update task metadata
+			currentMirror.metadata.task = editedContent
+			if (images) {
+				currentMirror.metadata.images = images
+			}
+
+			await saveTaskMessages({
+				messages: currentMirror.mirrorMessages,
+				taskId: currentMirror.taskId,
+				globalStoragePath: provider.contextProxy.globalStorageUri.fsPath,
+			})
+
+			await provider.postStateToWebview()
+
+			// Re-initiate task loop with new root prompt
+			const { formatResponse } = await import("../../prompts/responses")
+			const imageBlocks = formatResponse.imageBlocks(images)
+			await currentMirror.initiateTaskLoop([
+				{
+					type: "text",
+					text: `<user_message>\n${editedContent}\n</user_message>`,
+				},
+				...imageBlocks,
+			])
+			return
 		}
 
 		// Timestamp fallback for API history when exact user message isn't present

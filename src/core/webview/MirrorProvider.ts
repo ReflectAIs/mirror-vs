@@ -684,8 +684,8 @@ export class MirrorProvider
 			this.log(`[switchToTask] Failed to start restored switched task: ${error}`)
 		})
 
-		// Post updated state to webview
-		await this.postStateToWebview()
+		// Post updated state to webview (omit taskHistory — webview keeps it in-memory)
+		await this.postStateToWebviewWithoutTaskHistory()
 
 		this.log(`[switchToTask] Task ${target.taskId}.${target.instanceId} focused from mirror stack`)
 	}
@@ -1074,7 +1074,7 @@ export class MirrorProvider
 		this.getState().then(
 			({
 				terminalShellIntegrationTimeout = Terminal.defaultShellIntegrationTimeout,
-				terminalShellIntegrationDisabled = false,
+				terminalShellIntegrationDisabled = true,
 				terminalCommandDelay = 0,
 				terminalZshClearEolMark = true,
 				terminalZshOhMy = false,
@@ -1219,10 +1219,8 @@ export class MirrorProvider
 		})
 		this.webviewDisposables.push(configDisposable)
 
-		// If the extension is starting a new session, clear previous task state.
-		// But don't clear if there's already an active task (e.g., resumed via IPC/bridge).
 		const currentTask = this.getCurrentTask()
-		if (!currentTask || currentTask.abandoned || currentTask.abort) {
+		if (currentTask?.abandoned) {
 			await this.removeMirrorFromStack()
 		}
 

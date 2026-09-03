@@ -23,10 +23,12 @@ export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<
 	// so no AI loop runs — the user can interact with it by clicking.
 	await provider.restoreSessionTabs()
 
-	// If no tabs were restored (e.g. fresh session or all tabs were closed),
-	// ensure a clean idle task exists ready to receive user messages.
-	if (provider.mirrorStack.length === 0) {
-		await provider.createTask("", [], undefined, {}, {})
+	// If an empty task already exists in memory, switch to it.
+	const allTasks = provider.getAllTasksSorted()
+	const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0 && !t._started)
+
+	if (emptyTask) {
+		await provider.switchToTask(emptyTask.taskId)
 	}
 
 	provider.postStateToWebview()
@@ -279,8 +281,18 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 				`lastMsgType=${lastMsg?.type} lastMsgAsk=${lastMsg?.ask} started=${(currentTask as any)._started}`,
 		)
 
-		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk || !currentTask.startWithContent) {
+		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk) {
 			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+		} else if (!currentTask.isLoopActive && message.askResponse === "messageResponse") {
+			currentTask.abort = false
+			await currentTask.say("user_feedback", resolved.text, resolved.images)
+			const { formatResponse } = await import("../../prompts/responses")
+			const imageBlocks = formatResponse.imageBlocks(resolved.images)
+			const userContent = [
+				{ type: "text" as const, text: `<user_message>\n${resolved.text}\n</user_message>` },
+				...imageBlocks,
+			]
+			void currentTask.initiateTaskLoop(userContent)
 		} else if (!(currentTask as any)._started) {
 			await currentTask.startWithContent(resolved.text, resolved.images)
 		} else {

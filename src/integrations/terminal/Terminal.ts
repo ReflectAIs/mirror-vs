@@ -57,7 +57,14 @@ export class Terminal extends BaseTerminal {
 		// This ensures that we don't miss any events because they are
 		// configured before the process starts.
 		process.on("line", (line) => callbacks.onLine(line, process))
-		process.once("completed", (output) => callbacks.onCompleted(output, process))
+		process.once("completed", (output) => {
+			callbacks.onCompleted(output, process)
+			try {
+				this.terminal.dispose()
+			} catch {
+				// Ignore if already disposed
+			}
+		})
 		process.once("shell_execution_started", (pid) => callbacks.onShellExecutionStarted(pid, process))
 		process.once("shell_execution_complete", (details) => callbacks.onShellExecutionComplete(details, process))
 		process.once("no_shell_integration", (msg) => callbacks.onNoShellIntegration?.(msg, process))

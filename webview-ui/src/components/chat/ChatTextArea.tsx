@@ -26,6 +26,7 @@ import { StandardTooltip } from "@src/components/ui"
 
 import Thumbnails from "../common/Thumbnails"
 import { ModeSelector } from "./ModeSelector"
+import { ThinkingSelector } from "./ThinkingSelector"
 import { AutoApproveDropdown } from "./AutoApproveDropdown"
 import { SessionArtifacts } from "./SessionArtifacts"
 import { TerminalStatusBadge } from "./TerminalStatusBadge"
@@ -996,8 +997,10 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		return (
 			<div
 				className={cn(
-					"flex flex-col gap-1 bg-editor-background outline-none border border-none box-border",
-					isEditMode ? "p-2 w-full" : "relative px-1.5 pb-1 w-[calc(100%-16px)] ml-auto mr-auto",
+					"flex flex-col gap-1.5 outline-none box-border transition-all duration-200",
+					isEditMode
+						? "p-2 w-full bg-editor-background"
+						: "relative px-2.5 pt-2 pb-2 mb-2 w-[calc(100%-16px)] ml-auto mr-auto rounded-xl border border-white/10 bg-[rgba(18,18,26,0.85)] backdrop-blur-md shadow-lg focus-within:border-mirror-brand-via/50 focus-within:shadow-[0_0_20px_rgba(168,85,247,0.12)]",
 				)}>
 				<div className={cn(!isEditMode && "relative")}>
 					<div
@@ -1338,7 +1341,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 				)}
 
 				<div className="flex items-center gap-2">
-					<div className="flex items-center gap-2 min-w-0 overflow-clip flex-1">
+					<div className="flex items-center gap-2 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1">
 						<ModeSelector
 							value={mode}
 							title={t("chat:selectMode")}
@@ -1355,7 +1358,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									data-testid="model-selector"
 									value={modelId}
 									onChange={(e) => onModelChange(e.target.value)}
-									className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
+									className="min-w-0 max-w-[140px] h-6 px-1.5 text-[11px] bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-[rgba(255,255,255,0.12)] rounded focus:outline-none focus:border-mirror-brand-via cursor-pointer appearance-none"
 									style={{
 										backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
 										backgroundPosition: "right 4px center",
@@ -1364,7 +1367,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 										paddingRight: "20px",
 									}}>
 									{modelOptions.map((opt) => (
-										<option key={opt.value} value={opt.value}>
+										<option key={opt.value} value={opt.value} className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 											{opt.label}
 										</option>
 									))}
@@ -1394,6 +1397,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									className="min-w-0 w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-[rgba(255,255,255,0.08)] rounded focus:outline-none focus:border-mirror-brand-via"
 								/>
 							))}
+						<ThinkingSelector className="flex-shrink-0" />
 						<AutoApproveDropdown triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
 						<TerminalStatusBadge />
 						<SessionArtifacts triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />

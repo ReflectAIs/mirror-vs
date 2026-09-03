@@ -121,6 +121,8 @@ export class TaskApiRequest {
 						.getConfiguration(Package.name)
 						.get<boolean>("newTaskRequireTodos", false),
 					isStealthModel: modelInfo?.isStealthModel,
+					reasoningEffort: apiConfiguration?.reasoningEffort,
+					supportsNativeReasoning: !!(modelInfo?.supportsReasoningBudget || modelInfo?.supportsReasoningEffort),
 				},
 				undefined, // todoList
 				this.task.api.getModel().id,
@@ -146,6 +148,11 @@ export class TaskApiRequest {
 	// ──────────────────────────────────────────────────────────────
 
 	private async handleContextWindowExceededError(): Promise<void> {
+		if (this.task.contextManager.isCondensing) {
+			await this.task.contextManager.condenseContext()
+			return
+		}
+
 		const state = await this.task.providerRef.deref()?.getState()
 		const { profileThresholds = {}, mode, apiConfiguration } = state ?? {}
 
@@ -264,6 +271,11 @@ export class TaskApiRequest {
 					contextTruncation,
 				)
 			}
+
+			// Re-sync token usage snapshot immediately
+			const tokenUsage = this.task.getTokenUsage()
+			this.task.tokenUsageSnapshot = tokenUsage
+			this.task.debouncedEmitTokenUsage(tokenUsage, this.task.toolUsage)
 		} finally {
 			// Notify webview that context management is complete (removes in-progress spinner)
 			// IMPORTANT: Must always be sent to dismiss the spinner, even on error
@@ -344,6 +356,10 @@ export class TaskApiRequest {
 		// in the caller.
 		Task.lastGlobalApiRequestTime = performance.now()
 
+		if (this.task.contextManager.isCondensing) {
+			await this.task.contextManager.condenseContext()
+		}
+
 		const systemPrompt = await this.getSystemPrompt()
 		const { contextTokens } = this.task.getTokenUsage()
 
@@ -385,9 +401,6 @@ export class TaskApiRequest {
 			})
 
 			if (contextManagementWillRun) {
-				const isHardOverflow = maxTokens !== undefined ? contextTokens >= maxTokens : false
-				const runInBackground = autoCondenseContext && !isHardOverflow
-
 				const executeContextMgmt = async () => {
 					if (contextManagementWillRun && autoCondenseContext) {
 						await this.task.providerRef
@@ -505,6 +518,11 @@ export class TaskApiRequest {
 								contextTruncation,
 							)
 						}
+
+						// Re-sync token usage snapshot immediately
+						const tokenUsage = this.task.getTokenUsage()
+						this.task.tokenUsageSnapshot = tokenUsage
+						this.task.debouncedEmitTokenUsage(tokenUsage, this.task.toolUsage)
 					} finally {
 						if (contextManagementWillRun && autoCondenseContext) {
 							await this.task.providerRef
@@ -514,13 +532,7 @@ export class TaskApiRequest {
 					}
 				}
 
-				if (runInBackground) {
-					void executeContextMgmt().catch((err) =>
-						console.error("[TaskApiRequest] Background context condensation error:", err),
-					)
-				} else {
-					await executeContextMgmt()
-				}
+				await executeContextMgmt()
 			}
 		}
 

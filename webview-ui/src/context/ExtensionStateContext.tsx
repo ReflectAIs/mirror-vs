@@ -249,7 +249,7 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		disableTabBar: false, // Default: multi-tab is enabled
 		organizationAllowList: ORGANIZATION_ALLOW_ALL,
 		autoCondenseContext: true,
-		autoCondenseContextPercent: 100,
+		autoCondenseContextPercent: 75,
 		profileThresholds: {},
 		codebaseIndexConfig: {
 			codebaseIndexEnabled: true,

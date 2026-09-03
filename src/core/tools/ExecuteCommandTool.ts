@@ -237,9 +237,6 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 
 			const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()
 			const provider = await task.providerRef.deref()
-			const providerState = await provider?.getState()
-
-			const { terminalShellIntegrationDisabled = false } = providerState ?? {}
 
 			// Get command execution timeout from VSCode configuration (in seconds)
 			const commandExecutionTimeoutSeconds = vscode.workspace
@@ -262,11 +259,13 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			// Convert agent-specified timeout from seconds to milliseconds
 			const agentTimeout = resolveAgentTimeoutMs(timeoutSeconds)
 
+			// Enforce background terminal execution (ExecaTerminal) for assistant commands to prevent
+			// opening or revealing VS Code integrated terminal tabs.
 			const options: ExecuteCommandOptions = {
 				executionId,
 				command: canonicalCommand,
 				customCwd,
-				terminalShellIntegrationDisabled,
+				terminalShellIntegrationDisabled: true,
 				commandExecutionTimeout,
 				agentTimeout,
 			}
@@ -331,7 +330,7 @@ export async function executeCommandInTerminal(
 		executionId,
 		command,
 		customCwd,
-		terminalShellIntegrationDisabled = false,
+		terminalShellIntegrationDisabled = true,
 		commandExecutionTimeout = 0,
 		agentTimeout = 0,
 	}: ExecuteCommandOptions,
@@ -362,6 +361,9 @@ export async function executeCommandInTerminal(
 	let exitDetails: ExitCodeDetails | undefined
 	let shellIntegrationError: string | undefined
 	let hasAskedForCommandOutput = false
+
+	// Clean up any lingering VS Code terminals before acquiring terminal
+	TerminalRegistry.cleanupLingeringVsCodeTerminals?.()
 
 	const terminalProvider = terminalShellIntegrationDisabled ? "execa" : "vscode"
 	const provider = await task.providerRef.deref()
@@ -572,8 +574,6 @@ export async function executeCommandInTerminal(
 	const terminal = await TerminalRegistry.getOrCreateTerminal(workingDir, task.taskId, terminalProvider)
 
 	if (terminal instanceof Terminal) {
-		terminal.terminal.show(true)
-
 		// Update the working directory in case the terminal we asked for has
 		// a different working directory so that the model will know where the
 		// command actually executed.

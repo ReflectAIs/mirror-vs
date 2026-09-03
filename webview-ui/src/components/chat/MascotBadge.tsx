@@ -77,8 +77,8 @@ const MASCOT_EXPRESSIONS: Record<MascotStatus, MascotExpression> = {
 			"What say you, boss? 🫡",
 		],
 		label: "Waiting",
-		dotClass: "bg-yellow-400 animate-ping shadow-[0_0_10px_rgba(250,204,21,0.8)]",
-		badgeClass: "border-yellow-500/40 bg-yellow-500/15 text-yellow-200 shadow-yellow-900/20",
+		dotClass: "bg-amber-400/90 shadow-[0_0_6px_rgba(250,204,21,0.4)]",
+		badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-200 shadow-amber-900/10",
 	},
 	completed: {
 		expressions: [

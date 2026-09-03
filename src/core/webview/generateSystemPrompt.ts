@@ -60,6 +60,8 @@ export const generateSystemPrompt = async (provider: MirrorProvider, message: We
 				.getConfiguration(Package.name)
 				.get<boolean>("newTaskRequireTodos", false),
 			isStealthModel: modelInfo?.isStealthModel,
+			reasoningEffort: apiConfiguration?.reasoningEffort,
+			supportsNativeReasoning: !!((modelInfo as any)?.supportsReasoningBudget || (modelInfo as any)?.supportsReasoningEffort),
 		},
 		undefined, // todoList
 		undefined, // modelId
