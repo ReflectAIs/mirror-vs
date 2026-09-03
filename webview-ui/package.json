@@ -105,6 +105,6 @@
 		"lightningcss-wasm": "^1.33.0",
 		"lightningcss-win32-x64-msvc": "^1.33.0",
 		"vite": "6.3.6",
-		"vitest": "^3.2.3"
+		"vitest": "^4.1.11"
 	}
 }
