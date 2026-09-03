@@ -308,14 +308,14 @@ export function useScrollLifecycle({
 
 			const shouldForcePin = scrollPhaseRef.current === "ANCHORED_FOLLOWING"
 			if (isAtBottomRef.current || shouldForcePin) {
-				if (isTaller) {
-					scrollToBottomSmooth()
-				} else {
-					scrollToBottomAuto()
-				}
+				// Always use instant scroll ("auto") during content growth.
+				// "smooth" creates asynchronous animation frames that fight with rapid incoming
+				// content updates (e.g. streaming chunks or long message insertion), causing
+				// the viewport to stutter violently up and down.
+				scrollToBottomAuto()
 			}
 		},
-		[scrollToBottomSmooth, scrollToBottomAuto],
+		[scrollToBottomAuto],
 	)
 
 	// -----------------------------------------------------------------------
