@@ -19,6 +19,6 @@
 		"@mirror-vs/config-eslint": "workspace:^",
 		"@mirror-vs/config-typescript": "workspace:^",
 		"@types/node": "20.x",
-		"vitest": "^3.2.3"
+		"vitest": "^4.1.11"
 	}
 }
