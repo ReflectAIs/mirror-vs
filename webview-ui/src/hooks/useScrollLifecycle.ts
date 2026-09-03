@@ -301,21 +301,19 @@ export function useScrollLifecycle({
 				return
 			}
 
-			// Don't fight an in-progress programmatic navigation
-			if (performance.now() - navigationStartedAtRef.current < 2000) {
+			// When streaming is active, Virtuoso's native followOutput prop handles pinning
+			// directly inside its layout cycle. Redundant scrollToBottom calls here cause
+			// scroll fighting with Virtuoso's internal measurement loop.
+			if (isStreaming) {
 				return
 			}
 
 			const shouldForcePin = scrollPhaseRef.current === "ANCHORED_FOLLOWING"
 			if (isAtBottomRef.current || shouldForcePin) {
-				// Always use instant scroll ("auto") during content growth.
-				// "smooth" creates asynchronous animation frames that fight with rapid incoming
-				// content updates (e.g. streaming chunks or long message insertion), causing
-				// the viewport to stutter violently up and down.
 				scrollToBottomAuto()
 			}
 		},
-		[scrollToBottomAuto],
+		[isStreaming, scrollToBottomAuto],
 	)
 
 	// -----------------------------------------------------------------------
@@ -404,7 +402,7 @@ export function useScrollLifecycle({
 				}
 
 				const timeSinceUserInput = performance.now() - lastUserScrollInputRef.current
-				const userRecentlyScrolled = timeSinceUserInput < 250 || pointerScrollActiveRef.current
+				const userRecentlyScrolled = timeSinceUserInput < 500 || pointerScrollActiveRef.current
 
 				if (userRecentlyScrolled) {
 					// User explicitly initiated scroll input (wheel up, drag, key navigation)
@@ -412,19 +410,15 @@ export function useScrollLifecycle({
 					return
 				}
 
-				// Content grew at the bottom during streaming (NO user scroll input).
-				// Auto-scroll to keep pinned at bottom.
-				if (isStreaming) {
-					console.log("[scrollLifecycle] Auto-scrolling to bottom during stream")
-					scrollToBottomAuto()
-					setShowScrollToBottom(false)
-				}
+				// If not user scroll input and we are in ANCHORED_FOLLOWING, Virtuoso's native
+				// followOutput prop will automatically keep us pinned at bottom on next layout pass.
+				// We must NOT call scrollToBottomAuto() here as doing so triggers a feedback loop.
 				return
 			}
 
 			setShowScrollToBottom(currentPhase === "USER_BROWSING_HISTORY")
 		},
-		[enterAnchoredFollowing, enterUserBrowsingHistory, scrollToBottomAuto, isStreaming],
+		[enterAnchoredFollowing, enterUserBrowsingHistory],
 	)
 
 	// -----------------------------------------------------------------------
