@@ -77,6 +77,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		disableTabBar,
 	} = useExtensionState()
 
+	const scrollLifecycleRef = useRef<ReturnType<typeof useScrollLifecycle> | null>(null)
+	const handleSendMessageScroll = useCallback(() => {
+		scrollLifecycleRef.current?.resetToBottom()
+	}, [])
+
 	// ── Use the extracted hook for all message state, effects, and handlers ──
 	const msg = useChatMessages({
 		messages,
@@ -94,6 +99,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		isHidden,
 		routerModels,
 		t,
+		onSendMessage: handleSendMessageScroll,
 	})
 
 	const {
@@ -134,7 +140,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		apiMetrics,
 		modifiedMessages,
 		displayedMessages,
-		stickyUserIndex,
 		hasLatestCheckpoint,
 		currentFollowUpTs,
 		isStreaming,
@@ -166,7 +171,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		virtuosoComponents,
 	} = msg
 
-	// ── Scroll lifecycle (needs refs from the hook) ──
 	const scrollLifecycle = useScrollLifecycle({
 		virtuosoRef,
 		scrollContainerRef,
@@ -175,6 +179,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		isHidden,
 		hasTask: !!task,
 	})
+	scrollLifecycleRef.current = scrollLifecycle
 
 	const {
 		showScrollToBottom: showScrollToBottom2,
@@ -185,6 +190,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		atBottomStateChangeCallback: atBottomStateChangeCallback2,
 		scrollToBottomAuto: scrollToBottomAuto2,
 		navigateToIndex: navigateToIndex2,
+		resetToBottom: resetToBottom2,
 		isAtBottomRef: isAtBottomRef2,
 		scrollPhaseRef: scrollPhaseRef2,
 	} = scrollLifecycle
@@ -281,8 +287,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			enableButtons,
 			primaryButtonText,
 			handleScrollToLatestCheckpoint,
-			handleNavigateToMessage,
-			stickyUserIndex,
+			handleNavigateToMessageSafe,
 		],
 	)
 
@@ -429,6 +434,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				}}
 				onForceSend={(index) => {
 					if (effectiveQueue[index]) {
+						resetToBottom2()
 						const targetTaskId = activeTabId || currentTaskId
 						const queuedMsg = effectiveQueue[index]
 						vscode.postMessage({

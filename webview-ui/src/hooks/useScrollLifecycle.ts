@@ -65,6 +65,7 @@ export interface UseScrollLifecycleReturn {
 	atBottomStateChangeCallback: (isAtBottom: boolean) => void
 	scrollToBottomAuto: () => void
 	navigateToIndex: (index: number) => void
+	resetToBottom: () => void
 	isAtBottomRef: React.MutableRefObject<boolean>
 	scrollPhaseRef: React.MutableRefObject<ScrollPhase>
 }
@@ -736,6 +737,18 @@ export function useScrollLifecycle({
 		[cancelReanchorFrame, clearHydrationWindow, transitionScrollPhase, virtuosoRef],
 	)
 
+	const resetToBottom = useCallback(() => {
+		navigationStartedAtRef.current = 0
+		lastUserScrollInputRef.current = 0
+		clearHydrationWindow()
+		cancelReanchorFrame()
+		enterAnchoredFollowing()
+		scrollToBottomAuto()
+		requestAnimationFrame(() => {
+			scrollToBottomAuto()
+		})
+	}, [cancelReanchorFrame, clearHydrationWindow, enterAnchoredFollowing, scrollToBottomAuto])
+
 	return {
 		scrollPhase,
 		showScrollToBottom,
@@ -746,6 +759,7 @@ export function useScrollLifecycle({
 		atBottomStateChangeCallback,
 		scrollToBottomAuto,
 		navigateToIndex,
+		resetToBottom,
 		isAtBottomRef,
 		scrollPhaseRef,
 	}

@@ -68,6 +68,8 @@ export interface UseChatMessagesOptions {
 	t: (key: string) => string
 	/** From useScrollLifecycle — called when user starts browsing history via row expansion */
 	onUserExpandedRow?: (source: string) => void
+	/** From useScrollLifecycle — called when user sends a message or submits an action */
+	onSendMessage?: () => void
 }
 
 export interface UseChatMessagesReturn {
@@ -76,7 +78,6 @@ export interface UseChatMessagesReturn {
 	scrollContainerRef: React.RefObject<HTMLDivElement | null>
 	textAreaRef: React.RefObject<HTMLTextAreaElement | null>
 	inputValueRef: React.MutableRefObject<string>
-	stickyUserIndexRef: React.MutableRefObject<number | null>
 	displayedMessagesRef: React.MutableRefObject<MirrorMessage[]>
 	checkpointJumpCursorRef: React.MutableRefObject<number | null>
 	mirrorAskRef: React.MutableRefObject<MirrorAsk | undefined>
@@ -107,7 +108,6 @@ export interface UseChatMessagesReturn {
 	showRetiredProviderWarning: boolean
 	setShowRetiredProviderWarning: React.Dispatch<React.SetStateAction<boolean>>
 	aggregatedCostsMap: Map<string, { totalCost: number; ownCost: number; childrenCost: number }>
-	stickyUserIndex: number | null
 	showAnnouncementModal: boolean
 	setShowAnnouncementModal: React.Dispatch<React.SetStateAction<boolean>>
 	messageLimit: number
@@ -121,7 +121,6 @@ export interface UseChatMessagesReturn {
 	visibleMessages: MirrorMessage[]
 	groupedMessages: MirrorMessage[]
 	displayedMessages: MirrorMessage[]
-	userFeedbackIndices: number[]
 	checkpointIndices: number[]
 	hasLatestCheckpoint: boolean
 	isStreaming: boolean
@@ -301,6 +300,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		routerModels,
 		t,
 		onUserExpandedRow,
+		onSendMessage,
 	} = options
 
 	const { activeTerminals = [], currentTaskId, activeTabId, tabs = [] } = useExtensionState()
@@ -967,6 +967,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				}
 
 				userRespondedRef.current = true
+				onSendMessage?.()
 
 				if (messagesRef.current.length === 0) {
 					vscode.postMessage({
@@ -1072,6 +1073,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const handlePrimaryButtonClick = useCallback(
 		(text?: string, images?: string[]) => {
 			userRespondedRef.current = true
+			onSendMessage?.()
 
 			const trimmedInput = text?.trim()
 
@@ -1147,6 +1149,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const handleSecondaryButtonClick = useCallback(
 		(text?: string, images?: string[]) => {
 			userRespondedRef.current = true
+			onSendMessage?.()
 
 			const trimmedInput = text?.trim()
 
@@ -1771,35 +1774,8 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		return groupedMessages.slice(groupedMessages.length - messageLimit)
 	}, [groupedMessages, messageLimit])
 
-	const userFeedbackIndices = useMemo(() => {
-		const indices: number[] = []
-		for (let i = 0; i < displayedMessages.length; i++) {
-			if (displayedMessages[i]?.say === "user_feedback") {
-				indices.push(i)
-			}
-		}
-		return indices
-	}, [displayedMessages])
-
-	const [stickyUserIndex, setStickyUserIndex] = useState<number | null>(() => {
-		if (userFeedbackIndices.length > 0) {
-			return userFeedbackIndices[userFeedbackIndices.length - 1]
-		}
-		return null
-	})
-
-	const stickyUserIndexRef = useRef(stickyUserIndex)
-	stickyUserIndexRef.current = stickyUserIndex
 	const displayedMessagesRef = useRef(displayedMessages)
 	displayedMessagesRef.current = displayedMessages
-
-	useEffect(() => {
-		if (userFeedbackIndices.length > 0) {
-			setStickyUserIndex(userFeedbackIndices[userFeedbackIndices.length - 1])
-		} else {
-			setStickyUserIndex(null)
-		}
-	}, [userFeedbackIndices])
 
 	const handleRangeChanged = useCallback((_range: { startIndex: number; endIndex: number }) => {
 		// Intentionally no-op
@@ -1808,25 +1784,8 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const virtuosoComponents = useMemo(
 		() => ({
 			Item: ({ children, ...props }: any) => {
-				const index = props["data-index"]
-				const msgs = displayedMessagesRef.current
-				const msg = msgs[index]
-				const isStickyUser = msg?.say === "user_feedback" && index === stickyUserIndexRef.current
-
-				const customStyle = {
-					...props.style,
-					...(isStickyUser
-						? {
-								position: "sticky" as const,
-								top: 0,
-								zIndex: 1,
-								background: "var(--vscode-sideBar-background)",
-							}
-						: {}),
-				}
-
 				return (
-					<div {...props} style={customStyle}>
+					<div {...props}>
 						{children}
 					</div>
 				)
@@ -2036,7 +1995,6 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		scrollContainerRef,
 		textAreaRef,
 		inputValueRef,
-		stickyUserIndexRef,
 		displayedMessagesRef,
 		checkpointJumpCursorRef,
 		mirrorAskRef,
@@ -2066,7 +2024,6 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		showRetiredProviderWarning,
 		setShowRetiredProviderWarning,
 		aggregatedCostsMap,
-		stickyUserIndex,
 		showAnnouncementModal,
 		setShowAnnouncementModal,
 		messageLimit,
@@ -2079,7 +2036,6 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		visibleMessages,
 		groupedMessages,
 		displayedMessages,
-		userFeedbackIndices,
 		checkpointIndices,
 		hasLatestCheckpoint,
 		isStreaming,
