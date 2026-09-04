@@ -122,7 +122,9 @@ export class TaskApiRequest {
 						.get<boolean>("newTaskRequireTodos", false),
 					isStealthModel: modelInfo?.isStealthModel,
 					reasoningEffort: apiConfiguration?.reasoningEffort,
-					supportsNativeReasoning: !!(modelInfo?.supportsReasoningBudget || modelInfo?.supportsReasoningEffort),
+					supportsNativeReasoning: !!(
+						modelInfo?.supportsReasoningBudget || modelInfo?.supportsReasoningEffort
+					),
 				},
 				undefined, // todoList
 				this.task.api.getModel().id,
@@ -306,9 +308,8 @@ export class TaskApiRequest {
 
 		const now = performance.now()
 		const timeSinceLastRequest = now - Task.lastGlobalApiRequestTime
-		const rateLimitDelay = Math.ceil(
-			Math.min(rateLimitSeconds, Math.max(0, rateLimitSeconds * 1000 - timeSinceLastRequest) / 1000),
-		)
+		const remainingMs = rateLimitSeconds * 1000 - timeSinceLastRequest
+		const rateLimitDelay = Math.ceil(Math.min(rateLimitSeconds, Math.max(0, remainingMs) / 1000))
 
 		// Only show the countdown UX on the first attempt. Retry flows have their own delay messaging.
 		if (rateLimitDelay > 0 && retryAttempt === 0) {
@@ -652,7 +653,16 @@ export class TaskApiRequest {
 		// After the first chunk, the gate is released and streaming continues
 		// fully in parallel (Anthropic permits concurrent active streams; it
 		// only rejects the simultaneous start burst).
-		const releaseGlobalGate = await Task.acquireGlobalRequestGate()
+		const rateLimitSeconds = this.task.apiConfiguration?.rateLimitSeconds ?? 0
+		let didShowGateWait = false
+		const releaseGlobalGate = await Task.acquireGlobalRequestGate(rateLimitSeconds, async (secondsRemaining) => {
+			didShowGateWait = true
+			const delayMessage = JSON.stringify({ seconds: secondsRemaining })
+			await this.task.say("api_req_rate_limit_wait", delayMessage, undefined, true)
+		})
+		if (didShowGateWait) {
+			await this.task.say("api_req_rate_limit_wait", undefined, undefined, false)
+		}
 		let globalGateReleased = false
 		const releaseGlobalGateOnce = (): void => {
 			if (!globalGateReleased) {

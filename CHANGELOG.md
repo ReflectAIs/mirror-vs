@@ -2,6 +2,14 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.8.1] - 2026-09-04
+
+### Fixed
+
+- **Repetitive Token Loop on Markdown Tables**: Fixed false-positive trigger in `StreamDegenerationDetector` where Markdown table delimiters (`|`, `-`, `:`, spaces) were wrongly identified as degenerative token loops and abruptly halted generation.
+- **Cross-Tab Provider Rate Limiting**: Added global promise-chain request gate enforcement of `rateLimitSeconds` across all open tabs, with live countdown display (`api_req_rate_limit_wait`) while queued.
+- **Auto-Scroll to Task Complete Card**: Added staggered scroll layout passes in `ChatView` when task reaches `completion_result`, ensuring the completion card is fully visible without manual scrolling.
+
 ## [0.8.0] - 2026-09-02
 
 ### Added & Improved
@@ -27,7 +35,6 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Below-Threshold MatchIndex Propagation**: Resolved an issue where below-threshold fuzzy matches could retain invalid line indices, ensuring strict validation before applying multi-search replacements.
 - **Duplicate / Concurrent Context Compressions**: Fixed race conditions between background condensation and pre-request context management that caused multiple compressions to fire together. Added mutex lock / promise sharing to `TaskContextManagement`, ensured context checks strictly honor user-configured context thresholds, and made pre-request context management sequentially await in-flight condensations.
 - **Background Terminal Execution & Lingering Terminal Cleanup**: Enforced pure background execution (`ExecaTerminal`) for assistant tool commands, completely preventing VS Code from opening or revealing integrated terminal tabs. Added automatic cleanup of lingering "Mirror VS" terminals upon extension startup, task abort, and task release.
-
 
 ## [0.7.9] - 2026-08-26
 

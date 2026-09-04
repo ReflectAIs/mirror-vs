@@ -321,13 +321,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	/**
 	 * Serialization gate for concurrent provider requests across ALL tasks/tabs.
 	 *
-	 * When 2-3 tabs run simultaneously, every tab would otherwise transmit its
-	 * streaming request at the same instant, tripping the provider's overload
-	 * protection (Anthropic HTTP 529 "overloaded_error" → "The provider couldn't
-	 * process the request as made."). This promise-chain mutex lets only one tab
-	 * transmit at a time; the slot is released once the provider accepts the
-	 * request (first chunk arrives) or the request fails, so other tabs queue up
-	 * instead of firing together.
+	 * When multiple tabs run simultaneously, this promise-chain mutex ensures:
+	 * 1. Only one tab transmits at a time, avoiding burst overload (HTTP 529).
+	 * 2. User-configured `rateLimitSeconds` is strictly enforced across all tabs so
+	 *    requests from different tabs are serialized behind the configured delay.
 	 * @internal
 	 */
 	static globalRequestGate: Promise<void> = Promise.resolve()
@@ -336,23 +333,39 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 * Acquire the global request gate. Resolves with a `release` function once
 	 * it is this caller's turn to transmit. Callers MUST call `release` exactly
 	 * once (in both the success and failure paths) to avoid deadlocking the gate.
+	 *
+	 * @param rateLimitSeconds Optional user-configured provider rate limit delay in seconds.
+	 * @param onWait Optional callback invoked with the remaining seconds during rate limit wait.
 	 * @internal
 	 */
-	static acquireGlobalRequestGate(): Promise<() => void> {
+	static acquireGlobalRequestGate(
+		rateLimitSeconds: number = 0,
+		onWait?: (secondsRemaining: number) => Promise<void> | void,
+	): Promise<() => void> {
 		const previous = Task.globalRequestGate
 		let release!: () => void
 		Task.globalRequestGate = new Promise<void>((resolve) => {
 			release = resolve
 		})
 		return previous.then(async () => {
-			// Enforce a minimum 350ms stagger delay between consecutive request transmissions
-			// to avoid tripping provider rate limits on concurrent parallel tab bursts.
 			const STAGGER_MS = 350
+			const requiredDelayMs = Math.max(STAGGER_MS, Math.max(0, rateLimitSeconds) * 1000)
 			const now = performance.now()
 			if (Task.lastGlobalApiRequestTime) {
 				const elapsed = now - Task.lastGlobalApiRequestTime
-				if (elapsed < STAGGER_MS) {
-					await new Promise((r) => setTimeout(r, STAGGER_MS - elapsed))
+				if (elapsed < requiredDelayMs) {
+					const waitMs = requiredDelayMs - elapsed
+					if (onWait && waitMs >= 1000) {
+						let remainingSec = Math.ceil(waitMs / 1000)
+						while (remainingSec > 0) {
+							await onWait(remainingSec)
+							const step = Math.min(1000, remainingSec * 1000)
+							await new Promise((r) => setTimeout(r, step))
+							remainingSec--
+						}
+					} else {
+						await new Promise((r) => setTimeout(r, waitMs))
+					}
 				}
 			}
 			Task.lastGlobalApiRequestTime = performance.now()

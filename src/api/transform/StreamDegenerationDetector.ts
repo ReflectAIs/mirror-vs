@@ -27,10 +27,16 @@ export class StreamDegenerationDetector {
 		}
 
 		// 1. Check identical consecutive text chunks (e.g., repeating the same token 15+ times)
+		// Ignore pure whitespace or formatting delimiters like table borders/separators
 		if (this.recentChunks.length >= this.maxConsecutiveSameChunk) {
 			const tail = this.recentChunks.slice(-this.maxConsecutiveSameChunk)
 			if (tail.every((c) => c === tail[0])) {
-				return true
+				const chunk = tail[0]
+				// Don't trigger if the chunk is just formatting/separator characters (e.g., '-', '|', ' ', '=', '_', '*')
+				const isFormattingOnly = /^[\s\-|:=_+*#`~]+$/.test(chunk)
+				if (!isFormattingOnly) {
+					return true
+				}
 			}
 		}
 
@@ -40,6 +46,13 @@ export class StreamDegenerationDetector {
 			const sampleWindow = this.fullBuffer.slice(-150)
 			for (let patternLen = 2; patternLen <= 35; patternLen++) {
 				const pattern = sampleWindow.slice(-patternLen)
+
+				// Don't flag formatting characters or table syntax (e.g., '---', '|---|', ' - ', spaces)
+				// Pure formatting/delimiter repeating patterns are common in Markdown tables, rules, headers, etc.
+				if (/^[\s\-|:=_+*#`~]+$/.test(pattern)) {
+					continue
+				}
+
 				// Check if the pattern repeats consecutively at least maxConsecutiveSubstrings times
 				const repeatTarget = Math.max(3, Math.min(this.maxConsecutiveSubstrings, Math.floor(100 / patternLen)))
 				const expectedRepeat = pattern.repeat(repeatTarget)
