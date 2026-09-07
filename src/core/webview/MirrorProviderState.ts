@@ -236,6 +236,7 @@ export class StateManager {
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels,
+			settingsMode,
 		} = await this.getState()
 
 		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
@@ -327,7 +328,8 @@ export class StateManager {
 			activeTabId: currentTask?.taskId ?? (tabs.length > 0 ? tabs[0].taskId : ""),
 			currentTabWorktree:
 				currentTask?.worktreePath ||
-				(currentTask ? this.provider.getTabWorktree(currentTask.taskId) : undefined),
+				(currentTask ? this.provider.getTabWorktree(currentTask.taskId) : undefined) ||
+				this.provider.pendingWorktreePath,
 			filesReadByMirror,
 			apiConfiguration,
 			customInstructions,
@@ -441,6 +443,7 @@ export class StateManager {
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
 			comfyuiAutoSetup,
+			settingsMode: settingsMode ?? "normal",
 			imageAutoSetupRunning: (await import("../../services/image-runtime")).isAutoSetupRunning(),
 			imageAutoSetupStatus: (await import("../../services/image-runtime")).getLastAutoSetupStatus(),
 			openAiCodexIsAuthenticated: await (async () => {

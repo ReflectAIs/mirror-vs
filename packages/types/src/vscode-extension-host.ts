@@ -278,6 +278,7 @@ export interface ExtensionMessage {
 	copyProgressItemName?: string
 	// folderSelected
 	path?: string
+	worktreePath?: string
 }
 
 export interface OpenAiCodexRateLimitsMessage {
@@ -445,6 +446,7 @@ export type ExtensionState = Pick<
 	| "atlasCloudModels"
 	| "comfyCloudApiToken"
 	| "atlasCloudApiToken"
+	| "settingsMode"
 > & {
 	lockApiConfigAcrossModes?: boolean
 	version: string

@@ -136,6 +136,7 @@ export class MirrorProvider
 	private taskEventListeners: WeakMap<Task, Array<() => void>> = new WeakMap()
 	private currentWorkspacePath: string | undefined
 	public tabWorktrees: Map<string, string> = new Map()
+	public pendingWorktreePath?: string
 	private _disposed = false
 
 	public recentTasksCache?: string[]
@@ -726,7 +727,16 @@ export class MirrorProvider
 	 */
 	public getTabWorktree(taskId?: string): string | undefined {
 		if (!taskId) return undefined
-		return this.tabWorktrees.get(taskId)
+		const inMemory = this.tabWorktrees.get(taskId)
+		if (inMemory) return inMemory
+		try {
+			const persisted = this.contextProxy.getValues().sessionTabWorktrees
+			if (persisted && persisted[taskId]) {
+				this.tabWorktrees.set(taskId, persisted[taskId])
+				return persisted[taskId]
+			}
+		} catch {}
+		return undefined
 	}
 
 	/**
@@ -734,33 +744,34 @@ export class MirrorProvider
 	 * Persists the association so the tab retains it across tab switches.
 	 */
 	public async setTabWorktree(taskId: string | undefined, worktreePath: string): Promise<void> {
+		this.pendingWorktreePath = worktreePath
 		const targetTaskId = taskId || this.getCurrentTask()?.taskId
-		if (!targetTaskId) {
-			return
-		}
 
-		this.tabWorktrees.set(targetTaskId, worktreePath)
+		if (targetTaskId) {
+			this.tabWorktrees.set(targetTaskId, worktreePath)
 
-		// Persist in contextProxy under sessionTabWorktrees
-		try {
-			const persisted: Record<string, string> = (await this.contextProxy.getValue("sessionTabWorktrees")) || {}
-			persisted[targetTaskId] = worktreePath
-			await this.contextProxy.setValue("sessionTabWorktrees", persisted)
-		} catch (err) {
-			this.log(`[setTabWorktree] Failed to persist sessionTabWorktrees: ${err}`)
-		}
-
-		// Find the task on mirrorStack or backgroundTasks
-		const task = this.getAllTasksSorted().find((t) => t.taskId === targetTaskId)
-		if (task) {
-			task.worktreePath = worktreePath
-			if (task.historyItem) {
-				task.historyItem.worktreePath = worktreePath
-			}
+			// Persist in contextProxy under sessionTabWorktrees
 			try {
-				await task.saveMirrorMessages()
+				const persisted: Record<string, string> =
+					(await this.contextProxy.getValue("sessionTabWorktrees")) || {}
+				persisted[targetTaskId] = worktreePath
+				await this.contextProxy.setValue("sessionTabWorktrees", persisted)
 			} catch (err) {
-				this.log(`[setTabWorktree] Failed to save task history with new worktree: ${err}`)
+				this.log(`[setTabWorktree] Failed to persist sessionTabWorktrees: ${err}`)
+			}
+
+			// Find the task on mirrorStack or backgroundTasks
+			const task = this.getAllTasksSorted().find((t) => t.taskId === targetTaskId)
+			if (task) {
+				task.worktreePath = worktreePath
+				if (task.historyItem) {
+					task.historyItem.worktreePath = worktreePath
+				}
+				try {
+					await task.saveMirrorMessages()
+				} catch (err) {
+					this.log(`[setTabWorktree] Failed to save task history with new worktree: ${err}`)
+				}
 			}
 		}
 

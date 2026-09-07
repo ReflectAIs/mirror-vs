@@ -4,20 +4,31 @@ import i18next, { loadTranslations } from "./setup"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 
 // Create context for translations
-export const TranslationContext = createContext<{
+const TRANSLATION_CONTEXT_KEY = Symbol.for("__MIRROR_TRANSLATION_CONTEXT__")
+export const TranslationContext: React.Context<{
 	t: (key: string, options?: Record<string, any>) => string
 	i18n: typeof i18next
-}>({
-	t: (key: string) => key,
-	i18n: i18next,
-})
+}> =
+	(globalThis as any)[TRANSLATION_CONTEXT_KEY] ||
+	((globalThis as any)[TRANSLATION_CONTEXT_KEY] = createContext<{
+		t: (key: string, options?: Record<string, any>) => string
+		i18n: typeof i18next
+	}>({
+		t: (key: string) => key,
+		i18n: i18next,
+	}))
 
 // Translation provider component
 export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 	// Initialize with default configuration
 	const { i18n } = useTranslation()
-	// Get the extension state directly - it already contains all state properties
-	const extensionState = useExtensionState()
+	// Get the extension state directly - safe against context hydration timing
+	let extensionState: ReturnType<typeof useExtensionState> | null = null
+	try {
+		extensionState = useExtensionState()
+	} catch {
+		// Fallback if rendered outside ExtensionStateContextProvider
+	}
 
 	// Load translations once when the component mounts
 	useEffect(() => {
@@ -29,8 +40,10 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
 	}, [])
 
 	useEffect(() => {
-		i18n.changeLanguage(extensionState.language)
-	}, [i18n, extensionState.language])
+		if (extensionState?.language) {
+			i18n.changeLanguage(extensionState.language)
+		}
+	}, [i18n, extensionState?.language])
 
 	// Memoize the translation function to prevent unnecessary re-renders
 	const translate = useCallback(

@@ -289,6 +289,13 @@ export const globalSettingsSchema = z.object({
 	userBraveApiKey: z.string().optional(),
 
 	/**
+	 * Setup and settings view mode:
+	 * - "normal": Simple, streamlined setup and settings with predefined safe defaults.
+	 * - "advanced": Full configuration with all sections and granular parameters.
+	 */
+	settingsMode: z.enum(["normal", "advanced"]).optional(),
+
+	/**
 	 * Per-type active pipeline slug override for ComfyUI.
 	 * Keys are pipeline types (e.g. "txt2img", "img2img", "txt2audio", "txt2video").
 	 * Values are pipeline slugs (e.g. "txt2img-flash").

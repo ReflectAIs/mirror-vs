@@ -5,7 +5,16 @@ import type { WorktreeDefaultsResponse, BranchInfo, WorktreeIncludeStatus } from
 
 import { vscode } from "@/utils/vscode"
 import { useAppTranslation } from "@/i18n/TranslationContext"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Button, Input } from "@/components/ui"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	Button,
+	Input,
+} from "@/components/ui"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { CornerDownRight, Folder, FolderSearch, Info, ShieldCheck } from "lucide-react"
 
@@ -90,14 +99,15 @@ export const CreateWorktreeModal = ({
 					setIsCreating(false)
 					setCopyProgress(null)
 					if (message.success) {
+						const createdPath = (message as any).worktreePath || worktreePath
 						if (openAfterCreate) {
 							vscode.postMessage({
 								type: "switchWorktree",
-								worktreePath: worktreePath,
+								worktreePath: createdPath,
 								worktreeNewWindow: true,
 							})
 						}
-						onSuccess?.(worktreePath)
+						onSuccess?.(createdPath)
 						onClose()
 					} else {
 						setError(message.text || "Unknown error")
@@ -150,6 +160,7 @@ export const CreateWorktreeModal = ({
 			<DialogContent className="max-w-lg">
 				<DialogHeader>
 					<DialogTitle>{t("worktrees:createWorktree")}</DialogTitle>
+					<DialogDescription className="sr-only">{t("worktrees:createModalDescription")}</DialogDescription>
 				</DialogHeader>
 
 				<div className="flex flex-col gap-3">

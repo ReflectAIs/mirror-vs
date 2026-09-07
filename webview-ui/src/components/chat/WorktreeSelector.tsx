@@ -51,20 +51,40 @@ export const WorktreeSelector = ({
 	const [isGitRepo, setIsGitRepo] = useState(true)
 	const [showCreateModal, setShowCreateModal] = useState(false)
 	const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null)
+	const [selectedWorktreeOverride, setSelectedWorktreeOverride] = useState<string | null>(null)
 	const portalContainer = useMirrorPortal("mirror-portal")
 
 	const activeTab = useMemo(() => tabs?.find((t) => t.taskId === activeTabId), [tabs, activeTabId])
-	const selectedWorktreePath = activeTab?.worktreePath || currentTabWorktree
+
+	useEffect(() => {
+		if (activeTab?.worktreePath) {
+			setSelectedWorktreeOverride(activeTab.worktreePath)
+		} else if (currentTabWorktree) {
+			setSelectedWorktreeOverride(currentTabWorktree)
+		}
+	}, [activeTab?.worktreePath, currentTabWorktree])
+
+	const effectiveWorktreePath = selectedWorktreeOverride || activeTab?.worktreePath || currentTabWorktree
 
 	// Find current worktree
 	const currentWorktree = useMemo(() => {
-		if (selectedWorktreePath) {
-			const normSelected = normalizePath(selectedWorktreePath)
+		if (effectiveWorktreePath) {
+			const normSelected = normalizePath(effectiveWorktreePath)
 			const match = worktrees.find((w) => normalizePath(w.path) === normSelected)
 			if (match) return match
+			const folderName =
+				effectiveWorktreePath
+					.replace(/[/\\]+$/, "")
+					.split(/[/\\]/)
+					.pop() || ""
+			return {
+				path: effectiveWorktreePath,
+				branch: folderName ? `mirror-sandbox/${folderName}` : folderName,
+				isCurrent: true,
+			} as Worktree
 		}
 		return worktrees.find((w) => w.isCurrent) || worktrees[0]
-	}, [worktrees, selectedWorktreePath])
+	}, [worktrees, effectiveWorktreePath])
 
 	// Fetch worktrees when popover opens
 	const fetchWorktrees = useCallback(() => {
@@ -99,6 +119,7 @@ export const WorktreeSelector = ({
 
 	const handleSelect = useCallback(
 		(worktreePath: string) => {
+			setSelectedWorktreeOverride(worktreePath)
 			vscode.postMessage({
 				type: "setTabWorktree",
 				tabId: activeTabId,

@@ -123,7 +123,8 @@ export class TaskLifecycleManager {
 		const tabWorktree =
 			(options as any).worktreePath ||
 			(options.taskId ? this.provider.getTabWorktree(options.taskId) : undefined) ||
-			this.provider.getCurrentTask()?.worktreePath
+			this.provider.getCurrentTask()?.worktreePath ||
+			this.provider.pendingWorktreePath
 
 		const task = new Task({
 			provider: this.provider,

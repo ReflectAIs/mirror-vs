@@ -111,7 +111,9 @@ export async function handleListWorktrees(provider: MirrorProvider): Promise<Wor
 
 		const currentTask = provider.getCurrentTask()
 		const activeTabWorktree =
-			currentTask?.worktreePath || (currentTask ? provider.getTabWorktree(currentTask.taskId) : undefined)
+			currentTask?.worktreePath ||
+			(currentTask ? provider.getTabWorktree(currentTask.taskId) : undefined) ||
+			provider.pendingWorktreePath
 
 		if (activeTabWorktree) {
 			const normalize = (p: string) =>

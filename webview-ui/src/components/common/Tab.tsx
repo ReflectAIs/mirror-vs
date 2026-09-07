@@ -18,7 +18,12 @@ export const TabHeader = ({ className, children, ...props }: TabProps) => (
 )
 
 export const TabContent = forwardRef<HTMLDivElement, TabProps>(({ className, children, ...props }, ref) => {
-	const { renderContext } = useExtensionState()
+	let renderContext: string | undefined = undefined
+	try {
+		renderContext = useExtensionState()?.renderContext
+	} catch {
+		// Fallback for isolated renders or HMR
+	}
 
 	const onWheel = useCallback(
 		(e: React.WheelEvent<HTMLDivElement>) => {
