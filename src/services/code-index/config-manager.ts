@@ -86,7 +86,7 @@ export class CodeIndexConfigManager {
 
 		// Update instance variables with configuration
 		this.codebaseIndexEnabled = codebaseIndexEnabled ?? false
-		this.qdrantUrl = codebaseIndexQdrantUrl
+		this.qdrantUrl = codebaseIndexQdrantUrl || "http://localhost:6333"
 		this.qdrantApiKey = qdrantApiKey ?? ""
 		this.searchMinScore = codebaseIndexSearchMinScore
 		this.searchMaxResults = codebaseIndexSearchMaxResults
@@ -139,7 +139,7 @@ export class CodeIndexConfigManager {
 		this.modelId = codebaseIndexEmbedderModelId || undefined
 
 		this.ollamaOptions = {
-			ollamaBaseUrl: codebaseIndexEmbedderBaseUrl,
+			ollamaBaseUrl: codebaseIndexEmbedderBaseUrl || "http://localhost:11434",
 		}
 
 		this.openAiCompatibleOptions =
@@ -264,8 +264,8 @@ export class CodeIndexConfigManager {
 			return !!(openAiKey && qdrantUrl)
 		} else if (this.embedderProvider === "ollama") {
 			// Ollama model ID has a default, so only base URL is strictly required for config
-			const ollamaBaseUrl = this.ollamaOptions?.ollamaBaseUrl
-			const qdrantUrl = this.qdrantUrl
+			const ollamaBaseUrl = this.ollamaOptions?.ollamaBaseUrl || "http://localhost:11434"
+			const qdrantUrl = this.qdrantUrl || "http://localhost:6333"
 			return !!(ollamaBaseUrl && qdrantUrl)
 		} else if (this.embedderProvider === "openai-compatible") {
 			const baseUrl = this.openAiCompatibleOptions?.baseUrl

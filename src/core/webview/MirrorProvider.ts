@@ -2086,13 +2086,14 @@ export class MirrorProvider
 	 * @returns CodeIndexManager instance for the current workspace or the default one
 	 */
 	public getCurrentWorkspaceCodeIndexManager(): CodeIndexManager | undefined {
-		return CodeIndexManager.getInstance(this.context)
+		const currentWorkspace = this.pendingWorktreePath || this.cwd
+		return CodeIndexManager.getInstance(this.context, currentWorkspace)
 	}
 
 	/**
 	 * Updates the code index status subscription to listen to the current workspace manager
 	 */
-	private updateCodeIndexStatusSubscription(): void {
+	public updateCodeIndexStatusSubscription(): void {
 		// Get the current workspace manager
 		const currentManager = this.getCurrentWorkspaceCodeIndexManager()
 

@@ -30,6 +30,11 @@ export interface ICodeIndexManager {
 	readonly isFeatureConfigured: boolean
 
 	/**
+	 * The current embedder provider
+	 */
+	readonly currentEmbedderProvider?: EmbedderProvider
+
+	/**
 	 * Loads configuration from storage
 	 */
 	loadConfiguration(): Promise<void>

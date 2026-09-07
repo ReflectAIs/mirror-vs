@@ -35,7 +35,11 @@ export const IndexingStatusBadge: React.FC<IndexingStatusBadgeProps> = ({ classN
 		const handleMessage = (event: MessageEvent<IndexingStatusUpdateMessage>) => {
 			if (event.data.type === "indexingStatusUpdate") {
 				const status = event.data.values
-				if (!status.workspacePath || status.workspacePath === cwd) {
+				const matchesWorkspace =
+					!status?.workspacePath ||
+					!cwd ||
+					status.workspacePath.replace(/\\/g, "/").toLowerCase() === cwd.replace(/\\/g, "/").toLowerCase()
+				if (matchesWorkspace) {
 					setIndexingStatus(status)
 				}
 			}
