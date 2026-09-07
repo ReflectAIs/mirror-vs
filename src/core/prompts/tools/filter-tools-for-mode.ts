@@ -295,6 +295,11 @@ export function filterNativeToolsForMode(
 		allowedToolNames.delete("generate_image")
 	}
 
+	// Conditionally exclude code_graph if LSP_CODE_GRAPH experiment is disabled
+	if (!experiments?.lspCodeGraph) {
+		allowedToolNames.delete("code_graph")
+	}
+
 	// Conditionally exclude run_slash_command if experiment is not enabled
 	if (!experiments?.runSlashCommand) {
 		allowedToolNames.delete("run_slash_command")
@@ -413,6 +418,9 @@ export function isToolAllowedInMode(
 		}
 		if (toolName === "run_slash_command") {
 			return experiments?.runSlashCommand === true
+		}
+		if (toolName === "code_graph") {
+			return experiments?.lspCodeGraph === true
 		}
 		return true
 	}

@@ -236,6 +236,7 @@ export class StateManager {
 			comfyCloudApiToken,
 			atlasCloudApiToken,
 			atlasCloudModels,
+			settingsMode,
 		} = await this.getState()
 
 		const mergedAllowedCommands = this.mergeAllowedCommands(allowedCommands)
@@ -279,7 +280,6 @@ export class StateManager {
 			return activeSessionId ? task.sessionId === activeSessionId : true
 		})
 
-
 		const rawSharedContexts =
 			(await this.provider.contextProxy.getValue("sessionSharedContexts")) ?? sessionSharedContexts ?? {}
 		const tabs: TabInfo[] = allTasks.map((task) => {
@@ -318,6 +318,7 @@ export class StateManager {
 				hasPendingApproval,
 				lastActivity: task.lastActivity,
 				createdAt: task.createdAt,
+				worktreePath: task.worktreePath || this.provider.getTabWorktree(task.taskId),
 			}
 		})
 
@@ -325,6 +326,10 @@ export class StateManager {
 			version: this.provider.context.extension?.packageJSON?.version ?? "",
 			tabs,
 			activeTabId: currentTask?.taskId ?? (tabs.length > 0 ? tabs[0].taskId : ""),
+			currentTabWorktree:
+				currentTask?.worktreePath ||
+				(currentTask ? this.provider.getTabWorktree(currentTask.taskId) : undefined) ||
+				this.provider.pendingWorktreePath,
 			filesReadByMirror,
 			apiConfiguration,
 			customInstructions,
@@ -438,6 +443,7 @@ export class StateManager {
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
 			comfyuiAutoSetup,
+			settingsMode: settingsMode ?? "normal",
 			imageAutoSetupRunning: (await import("../../services/image-runtime")).isAutoSetupRunning(),
 			imageAutoSetupStatus: (await import("../../services/image-runtime")).getLastAutoSetupStatus(),
 			openAiCodexIsAuthenticated: await (async () => {

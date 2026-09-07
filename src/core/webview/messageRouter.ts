@@ -40,6 +40,7 @@ import {
 	handleFocusPanelRequest,
 	handleSwitchTab,
 	handleSwitchTaskTab,
+	handleSetTabWorktree,
 	handleCloseTaskTab,
 	handleInsertTextIntoTextarea,
 	handleRefreshCustomTools,
@@ -922,7 +923,11 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 
 		case "createWorktree": {
 			try {
-				const { success, message: text } = await handleCreateWorktree(
+				const {
+					success,
+					message: text,
+					worktree,
+				} = await handleCreateWorktree(
 					provider,
 					{
 						path: message.worktreePath!,
@@ -939,7 +944,29 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 					},
 				)
 
-				await provider.postMessageToWebview({ type: "worktreeResult", success, text })
+				const createdPath = worktree?.path || message.worktreePath
+				await provider.postMessageToWebview({
+					type: "worktreeResult",
+					success,
+					text,
+					worktreePath: createdPath,
+				})
+
+				if (success) {
+					try {
+						const { handleListWorktrees } = await import("./worktree/handlers")
+						const worktreeListResp = await handleListWorktrees(provider)
+						await provider.postMessageToWebview({
+							type: "worktreeList",
+							worktrees: worktreeListResp.worktrees,
+							isGitRepo: worktreeListResp.isGitRepo,
+							isMultiRoot: worktreeListResp.isMultiRoot,
+							isSubfolder: worktreeListResp.isSubfolder,
+							gitRootPath: worktreeListResp.gitRootPath,
+							error: worktreeListResp.error,
+						})
+					} catch {}
+				}
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : String(error)
 				await provider.postMessageToWebview({ type: "worktreeResult", success: false, text: errorMessage })
@@ -957,6 +984,22 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 				)
 
 				await provider.postMessageToWebview({ type: "worktreeResult", success, text })
+
+				if (success) {
+					try {
+						const { handleListWorktrees } = await import("./worktree/handlers")
+						const worktreeListResp = await handleListWorktrees(provider)
+						await provider.postMessageToWebview({
+							type: "worktreeList",
+							worktrees: worktreeListResp.worktrees,
+							isGitRepo: worktreeListResp.isGitRepo,
+							isMultiRoot: worktreeListResp.isMultiRoot,
+							isSubfolder: worktreeListResp.isSubfolder,
+							gitRootPath: worktreeListResp.gitRootPath,
+							error: worktreeListResp.error,
+						})
+					} catch {}
+				}
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : String(error)
 				await provider.postMessageToWebview({ type: "worktreeResult", success: false, text: errorMessage })
@@ -974,6 +1017,17 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 				)
 
 				await provider.postMessageToWebview({ type: "worktreeResult", success, text })
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				await provider.postMessageToWebview({ type: "worktreeResult", success: false, text: errorMessage })
+			}
+
+			break
+		}
+
+		case "setTabWorktree": {
+			try {
+				await handleSetTabWorktree(provider, message.tabId || message.taskId, message.worktreePath)
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : String(error)
 				await provider.postMessageToWebview({ type: "worktreeResult", success: false, text: errorMessage })

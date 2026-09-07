@@ -142,7 +142,10 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setUserBraveApiKey: (value: string) => void
 }
 
-export const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
+const EXTENSION_STATE_CONTEXT_KEY = Symbol.for("__MIRROR_EXTENSION_STATE_CONTEXT__")
+export const ExtensionStateContext: React.Context<ExtensionStateContextType | undefined> =
+	(globalThis as any)[EXTENSION_STATE_CONTEXT_KEY] ||
+	((globalThis as any)[EXTENSION_STATE_CONTEXT_KEY] = createContext<ExtensionStateContextType | undefined>(undefined))
 
 export const mergeExtensionState = (prevState: ExtensionState, newState: Partial<ExtensionState>) => {
 	const { customModePrompts: prevCustomModePrompts, experiments: prevExperiments, ...prevRest } = prevState
@@ -497,8 +500,15 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		alwaysAllowBrowser,
 		setAlwaysAllowBrowser,
 		followupAutoApproveTimeoutMs,
-		setExperimentEnabled: (id, enabled) =>
-			setState((prevState) => ({ ...prevState, experiments: { ...prevState.experiments, [id]: enabled } })),
+		setExperimentEnabled: (id, enabled) => {
+			setState((prevState) => ({ ...prevState, experiments: { ...prevState.experiments, [id]: enabled } }))
+			vscode.postMessage({
+				type: "updateSettings",
+				updatedSettings: {
+					experiments: { [id]: enabled },
+				},
+			})
+		},
 		setApiConfiguration,
 		setCustomInstructions: (value) => setState((prevState) => ({ ...prevState, customInstructions: value })),
 		setAlwaysAllowReadOnly: (value) => setState((prevState) => ({ ...prevState, alwaysAllowReadOnly: value })),

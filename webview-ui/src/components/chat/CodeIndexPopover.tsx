@@ -305,13 +305,18 @@ export const CodeIndexPopover: React.FC<CodeIndexPopoverProps> = ({
 	useEffect(() => {
 		const handleMessage = (event: MessageEvent<any>) => {
 			if (event.data.type === "indexingStatusUpdate") {
-				if (!event.data.values.workspacePath || event.data.values.workspacePath === cwd) {
+				const values = event.data.values
+				const matchesWorkspace =
+					!values?.workspacePath ||
+					!cwd ||
+					values.workspacePath.replace(/\\/g, "/").toLowerCase() === cwd.replace(/\\/g, "/").toLowerCase()
+				if (matchesWorkspace) {
 					setIndexingStatus({
-						systemStatus: event.data.values.systemStatus,
-						message: event.data.values.message || "",
-						processedItems: event.data.values.processedItems,
-						totalItems: event.data.values.totalItems,
-						currentItemUnit: event.data.values.currentItemUnit || "items",
+						systemStatus: values.systemStatus,
+						message: values.message || "",
+						processedItems: values.processedItems,
+						totalItems: values.totalItems,
+						currentItemUnit: values.currentItemUnit || "items",
 					})
 				}
 			} else if (event.data.type === "autoSetupProgress") {

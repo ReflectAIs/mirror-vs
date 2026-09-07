@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import { ContextProxy } from "../../core/config/ContextProxy"
 import { VectorStoreSearchResult } from "./interfaces"
-import { IndexingState } from "./interfaces/manager"
+import { IndexingState, EmbedderProvider } from "./interfaces/manager"
 import { CodeIndexConfigManager } from "./config-manager"
 import { CodeIndexStateManager } from "./state-manager"
 import { CodeIndexServiceFactory } from "./service-factory"
@@ -29,12 +29,20 @@ export class CodeIndexManager {
 	// Flag to prevent race conditions during error recovery
 	private _isRecoveringFromError = false
 
+	private static normalizeWorkspaceKey(p: string): string {
+		const norm = path.normalize(p)
+		return process.platform === "win32" ? norm.toLowerCase() : norm
+	}
+
 	public static getInstance(context: vscode.ExtensionContext, workspacePath?: string): CodeIndexManager | undefined {
 		// Resolve the workspace folder to get both fsPath and the real URI
 		let folder: vscode.WorkspaceFolder | undefined
 
 		if (workspacePath) {
-			folder = vscode.workspace.workspaceFolders?.find((f) => f.uri.fsPath === workspacePath)
+			const targetKey = CodeIndexManager.normalizeWorkspaceKey(workspacePath)
+			folder = vscode.workspace.workspaceFolders?.find(
+				(f) => CodeIndexManager.normalizeWorkspaceKey(f.uri.fsPath) === targetKey,
+			)
 		} else {
 			const activeEditor = vscode.window.activeTextEditor
 			if (activeEditor) {
@@ -50,7 +58,8 @@ export class CodeIndexManager {
 			workspacePath = folder.uri.fsPath
 		}
 
-		if (!CodeIndexManager.instances.has(workspacePath)) {
+		const instanceKey = CodeIndexManager.normalizeWorkspaceKey(workspacePath)
+		if (!CodeIndexManager.instances.has(instanceKey)) {
 			// folder may be undefined when workspacePath was provided but doesn't match
 			// any workspace folder (e.g. cwd passed from a tool). Fall back to file:// URI.
 			const folderUri =
@@ -62,9 +71,9 @@ export class CodeIndexManager {
 					path: workspacePath,
 					toString: () => `file://${workspacePath}`,
 				} as unknown as vscode.Uri)
-			CodeIndexManager.instances.set(workspacePath, new CodeIndexManager(workspacePath, folderUri, context))
+			CodeIndexManager.instances.set(instanceKey, new CodeIndexManager(workspacePath, folderUri, context))
 		}
-		return CodeIndexManager.instances.get(workspacePath)!
+		return CodeIndexManager.instances.get(instanceKey)!
 	}
 
 	public static getAllInstances(): CodeIndexManager[] {
@@ -142,6 +151,10 @@ export class CodeIndexManager {
 
 	public get isFeatureConfigured(): boolean {
 		return this._configManager?.isFeatureConfigured ?? false
+	}
+
+	public get currentEmbedderProvider(): EmbedderProvider | undefined {
+		return this._configManager?.currentEmbedderProvider
 	}
 
 	public get isInitialized(): boolean {

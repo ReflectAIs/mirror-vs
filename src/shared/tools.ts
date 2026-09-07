@@ -107,6 +107,9 @@ export const toolParamNames = [
 	"commit",
 	// sleep parameters
 	"seconds",
+	// code_graph parameters
+	"symbol",
+	"character",
 ] as const
 
 export type ToolParamName = (typeof toolParamNames)[number]
@@ -172,6 +175,15 @@ export type NativeToolArgs = {
 	activate_mcp_tool: { server_name: string; tool_name: string }
 	// Session shared context (intersession context sharing)
 	read_session_context: { scope?: "siblings" | "knowledge" | "notes" | "all" }
+	// LSP Code Graph navigation
+	code_graph: {
+		action: "workspace_symbols" | "find_definitions" | "find_references"
+		query?: string
+		path?: string
+		line?: number
+		character?: number
+		symbol?: string
+	}
 	// Add more tools as they are migrated to native protocol
 }
 
@@ -309,6 +321,11 @@ export interface SkillToolUse extends ToolUse<"skill"> {
 	params: Partial<Pick<Record<ToolParamName, string>, "skill" | "args">>
 }
 
+export interface CodeGraphToolUse extends ToolUse<"code_graph"> {
+	name: "code_graph"
+	params: Partial<Pick<Record<ToolParamName, string>, "action" | "query" | "path" | "line" | "character" | "symbol">>
+}
+
 export interface GenerateImageToolUse extends ToolUse<"generate_image"> {
 	name: "generate_image"
 	params: Partial<Pick<Record<ToolParamName, string>, "prompt" | "path" | "image">>
@@ -367,6 +384,7 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	search_mcp_tools: "search mcp tools",
 	activate_mcp_tool: "activate mcp tool",
 	read_session_context: "read session shared context",
+	code_graph: "LSP code graph search",
 } as const
 
 // Define available tool groups.
@@ -377,6 +395,7 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 			"search_files",
 			"list_files",
 			"codebase_search",
+			"code_graph",
 			"web_search",
 			"github_search",
 			"docs_search",
@@ -439,6 +458,7 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"search_mcp_tools",
 	"activate_mcp_tool",
 	"read_session_context",
+	"code_graph",
 ] as const
 
 /**

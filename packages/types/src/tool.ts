@@ -70,6 +70,8 @@ export const toolNames = [
 	"activate_mcp_tool",
 	// Session shared context (intersession context sharing)
 	"read_session_context",
+	// LSP Code Graph navigation (symbols, definitions, references)
+	"code_graph",
 ] as const
 
 export const toolNamesSchema = z.enum(toolNames)

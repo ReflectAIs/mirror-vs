@@ -120,6 +120,12 @@ export class TaskLifecycleManager {
 			throw new OrganizationAllowListViolationError(t("common:errors.violated_organization_allowlist"))
 		}
 
+		const tabWorktree =
+			(options as any).worktreePath ||
+			(options.taskId ? this.provider.getTabWorktree(options.taskId) : undefined) ||
+			this.provider.getCurrentTask()?.worktreePath ||
+			this.provider.pendingWorktreePath
+
 		const task = new Task({
 			provider: this.provider,
 			apiConfiguration,
@@ -137,11 +143,16 @@ export class TaskLifecycleManager {
 			// Session grouping: top-level tasks inherit the session ID.
 			// Child tasks (delegation) inherit via parentTask.sessionId flow.
 			sessionId: this.provider.currentSessionId,
+			worktreePath: tabWorktree,
 			// Ensure this task is present in mirrorStack before startTask() emits
 			// its initial state update, so state.currentTaskId is available ASAP.
 			startTask: false,
 			...options,
 		})
+
+		if (tabWorktree) {
+			this.provider.tabWorktrees.set(task.taskId, tabWorktree)
+		}
 
 		console.log(
 			`[SESSION-DBG] createTask: task=${task.taskId}.${task.instanceId} ` +
@@ -247,23 +258,22 @@ export class TaskLifecycleManager {
 
 		if (!historyItem) {
 			const taskText =
-				task.taskHistoryItem?.task ||
-				task.mirrorMessages.find((m) => m.say === "task")?.text ||
+				task.historyItem?.task ||
+				(task.mirrorMessages.find((m) => (m.say as string | undefined) === "task")?.text as string) ||
 				task.mirrorMessages[0]?.text ||
 				""
+			const tokenUsage = task.getTokenUsage()
 			historyItem = {
 				id: task.taskId,
-				ts: task.taskHistoryItem?.ts || task.mirrorMessages[0]?.ts || Date.now(),
+				ts: task.historyItem?.ts || task.mirrorMessages[0]?.ts || Date.now(),
+				number: task.historyItem?.number ?? 1,
 				task: taskText,
-				tokensIn: task.tokensIn,
-				tokensOut: task.tokensOut,
-				cacheWrites: task.cacheWrites,
-				cacheReads: task.cacheReads,
-				totalCost: task.totalCost,
+				tokensIn: tokenUsage.totalTokensIn,
+				tokensOut: tokenUsage.totalTokensOut,
+				cacheWrites: tokenUsage.totalCacheWrites,
+				cacheReads: tokenUsage.totalCacheReads,
+				totalCost: tokenUsage.totalCost,
 				size: 0,
-				shadowGitConfigWorkTree: task.taskHistoryItem?.shadowGitConfigWorkTree,
-				conversationHistoryDeletedRange: task.taskHistoryItem?.conversationHistoryDeletedRange,
-				isFavorited: task.taskHistoryItem?.isFavorited,
 			}
 		}
 
@@ -271,7 +281,12 @@ export class TaskLifecycleManager {
 		await task.mirrorMessagesManager.saveMirrorMessages()
 
 		// Rehydrate task in place with full history
-		await this.provider.createTaskWithHistoryItem({ ...historyItem, rootTask, parentTask })
+		await this.provider.createTaskWithHistoryItem({
+			...historyItem,
+			number: historyItem.number ?? 1,
+			rootTask,
+			parentTask,
+		})
 	}
 
 	// ── Clear ──────────────────────────────────────────────────────────────────

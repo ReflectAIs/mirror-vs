@@ -227,22 +227,77 @@ export async function handleStartIndexing(provider: MirrorProvider): Promise<voi
 
 		await manager.setWorkspaceEnabled(true)
 
-		if (manager.isFeatureEnabled && manager.isFeatureConfigured) {
-			await manager.initialize(provider.contextProxy)
+		// Ensure global feature is enabled
+		const currentConfig = getGlobalState(provider, "codebaseIndexConfig") || {}
+		if (!currentConfig.codebaseIndexEnabled) {
+			currentConfig.codebaseIndexEnabled = true
+			await updateGlobalState(provider, "codebaseIndexConfig", currentConfig)
+		}
 
-			const currentState = manager.state
-			if (currentState === "Standby" || currentState === "Error") {
-				manager.startIndexing()
-				if (!manager.isInitialized) {
-					await manager.initialize(provider.contextProxy)
-					if (manager.state === "Standby" || manager.state === "Error") {
-						manager.startIndexing()
-					}
-				}
+		// Initialize manager and load latest configuration
+		await manager.initialize(provider.contextProxy)
+
+		// Auto-fill sensible local defaults if needed for ollama
+		if (manager.currentEmbedderProvider === "ollama") {
+			let updated = false
+			if (!currentConfig.codebaseIndexEmbedderBaseUrl) {
+				currentConfig.codebaseIndexEmbedderBaseUrl = "http://localhost:11434"
+				updated = true
+			}
+			if (!currentConfig.codebaseIndexQdrantUrl) {
+				currentConfig.codebaseIndexQdrantUrl = "http://localhost:6333"
+				updated = true
+			}
+			if (updated) {
+				await updateGlobalState(provider, "codebaseIndexConfig", currentConfig)
+				await manager.initialize(provider.contextProxy)
 			}
 		}
+
+		if (!manager.isFeatureConfigured) {
+			const errorMsg = `Code indexing cannot start: Missing required configuration for ${manager.currentEmbedderProvider || "selected provider"}. Please check your embedder and vector database settings in the Code Index panel.`
+			provider.log(errorMsg)
+			provider.postMessageToWebview({
+				type: "indexingStatusUpdate",
+				values: {
+					systemStatus: "Error",
+					message: errorMsg,
+					processedItems: 0,
+					totalItems: 0,
+					currentItemUnit: "items",
+					workspacePath: manager.getCurrentStatus().workspacePath,
+					workspaceEnabled: true,
+				},
+			})
+			vscode.window.showErrorMessage(errorMsg)
+			return
+		}
+
+		// Ensure MirrorProvider has an active status subscription
+		provider.updateCodeIndexStatusSubscription()
+
+		// Start indexing
+		await manager.startIndexing()
+
+		// Immediately broadcast updated status to the webview
+		provider.postMessageToWebview({
+			type: "indexingStatusUpdate",
+			values: manager.getCurrentStatus(),
+		})
 	} catch (error) {
-		provider.log(`Error starting indexing: ${error instanceof Error ? error.message : String(error)}`)
+		const errorMessage = error instanceof Error ? error.message : String(error)
+		provider.log(`Error starting indexing: ${errorMessage}`)
+		provider.postMessageToWebview({
+			type: "indexingStatusUpdate",
+			values: {
+				systemStatus: "Error",
+				message: errorMessage,
+				processedItems: 0,
+				totalItems: 0,
+				currentItemUnit: "items",
+			},
+		})
+		vscode.window.showErrorMessage(`Failed to start indexing: ${errorMessage}`)
 	}
 }
 
@@ -278,10 +333,17 @@ export async function handleToggleWorkspaceIndexing(provider: MirrorProvider, me
 		}
 		const enabled = message.bool ?? false
 		await manager.setWorkspaceEnabled(enabled)
-		if (enabled && manager.isFeatureEnabled && manager.isFeatureConfigured) {
+		if (enabled) {
+			const currentConfig = getGlobalState(provider, "codebaseIndexConfig") || {}
+			if (!currentConfig.codebaseIndexEnabled) {
+				currentConfig.codebaseIndexEnabled = true
+				await updateGlobalState(provider, "codebaseIndexConfig", currentConfig)
+			}
 			await manager.initialize(provider.contextProxy)
-			manager.startIndexing()
-		} else if (!enabled) {
+			if (manager.isFeatureConfigured) {
+				await manager.startIndexing()
+			}
+		} else {
 			manager.stopIndexing()
 		}
 		provider.postMessageToWebview({
@@ -531,6 +593,7 @@ export async function handleAutoSetupCodeIndex(provider: MirrorProvider): Promis
 			codebaseIndexEnabled: true,
 			codebaseIndexQdrantUrl: "http://localhost:6333",
 			codebaseIndexEmbedderProvider: "ollama" as EmbedderProvider,
+			codebaseIndexEmbedderBaseUrl: "http://localhost:11434",
 			codebaseIndexEmbedderModelId: "nomic-embed-text",
 			codebaseIndexEmbedderModelDimension: 768,
 			codebaseIndexSearchMaxResults: 5,

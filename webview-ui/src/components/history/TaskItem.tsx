@@ -1,11 +1,11 @@
-import { memo, useState, useCallback, useRef, useEffect } from "react"
+import { memo, useState, useCallback, useRef, useEffect, useContext } from "react"
 import { ArrowRight, Folder, GitBranch, FolderSymlink } from "lucide-react"
 import type { DisplayHistoryItem } from "./types"
 
 import { vscode } from "@/utils/vscode"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useExtensionState } from "@/context/ExtensionStateContext"
+import { ExtensionStateContext } from "@/context/ExtensionStateContext"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -49,20 +49,25 @@ const TaskItem = ({
 	onRenameTab,
 	className,
 }: TaskItemProps) => {
-	const { cwd, currentWorkspacePath } = useExtensionState()
+	const extensionState = useContext(ExtensionStateContext)
+	const cwd = extensionState?.cwd
+	const currentWorkspacePath = extensionState?.currentWorkspacePath
 	const [isRenaming, setIsRenaming] = useState(false)
 	const [renameValue, setRenameValue] = useState(displayName || "")
 	const [showCrossWorkspaceDialog, setShowCrossWorkspaceDialog] = useState(false)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const blurTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
-	const activeCwd = currentWorkspacePath || cwd || ""
-	const isCrossWorkspace = Boolean(
-		item.workspace &&
-			activeCwd &&
-			item.workspace.replace(/\\/g, "/").toLowerCase().trim() !==
-				activeCwd.replace(/\\/g, "/").toLowerCase().trim(),
-	)
+	const normalizeWorkspace = (ws?: string): string => {
+		if (!ws) return ""
+		const normalized = ws.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase().trim()
+		const match = normalized.match(/^(.*?)\/\.mirror-vs\/worktrees\/[^/]+$/)
+		return match ? match[1] : normalized
+	}
+
+	const activeCwd = normalizeWorkspace(currentWorkspacePath || cwd)
+	const itemWorkspace = normalizeWorkspace(item.workspace)
+	const isCrossWorkspace = Boolean(itemWorkspace && activeCwd && itemWorkspace !== activeCwd)
 
 	// Keep rename value in sync when displayName changes externally
 	useEffect(() => {

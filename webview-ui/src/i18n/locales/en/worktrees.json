@@ -49,12 +49,21 @@
 	"deleting": "Deleting...",
 	"close": "Close",
 	"showInHomeScreen": "Show worktrees in home screen",
+	"createModalDescription": "Worktrees keep new changes in an isolated sandbox under .mirror-vs to keep your original code and main worktree safe.",
+	"taskIsolation": {
+		"title": "Isolate tasks in temporary Git Worktrees",
+		"enabledDesc": "When enabled, an isolated temporary worktree is created only if you explicitly ask for one in your prompt (e.g. 'run in sandbox'). Otherwise, tasks run directly in your active working tree.",
+		"disabledDesc": "Tasks execute directly in your active working tree without creating temporary worktrees.",
+		"enabledShort": "Only when explicitly requested in prompt",
+		"disabledShort": "Runs directly in selected worktree",
+		"tooltip": "Tasks run directly in your selected worktree by default. When enabled, a temporary sandbox worktree is created only if you explicitly request it in your prompt."
+	},
 	"selector": {
 		"worktree": "Worktree",
 		"title": "Worktrees",
 		"tooltip": "Switch between worktrees",
-		"description": "Git worktrees let you work on multiple branches simultaneously. Click to switch workspace.",
+		"description": "Git worktrees keep new changes in a sandbox to keep your original code and main worktree safe.",
 		"settings": "Manage Worktrees",
-		"info": "Git worktrees allow you to have multiple working directories attached to the same repository."
+		"info": "Git worktrees allow you to work on multiple branches in separate folders under .mirror-vs. We use this to keep new changes in a sandbox so your original code and main worktree remain completely safe."
 	}
 }

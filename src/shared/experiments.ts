@@ -14,6 +14,8 @@ export const EXPERIMENT_IDS = {
 	CUSTOM_TOOLS: "customTools",
 	BROWSER: "browser",
 	PARALLEL_TOOL_READS: "parallelToolReads",
+	LSP_CODE_GRAPH: "lspCodeGraph",
+	GIT_WORKTREE_SANDBOX: "gitWorktreeSandbox",
 } as const satisfies Record<string, ExperimentId>
 
 type _AssertExperimentIds = AssertEqual<Equals<ExperimentId, Values<typeof EXPERIMENT_IDS>>>
@@ -38,6 +40,8 @@ export const experimentConfigsMap: Record<ExperimentKey, ExperimentConfig> = {
 	CUSTOM_TOOLS: { enabled: false },
 	BROWSER: { enabled: false },
 	PARALLEL_TOOL_READS: { enabled: false },
+	LSP_CODE_GRAPH: { enabled: false },
+	GIT_WORKTREE_SANDBOX: { enabled: false },
 }
 
 export const experimentDefault = Object.fromEntries(

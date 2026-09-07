@@ -29,6 +29,7 @@ export type TaskMetadataOptions = {
 	messages: MirrorMessage[]
 	globalStoragePath: string
 	workspace: string
+	worktreePath?: string
 	mode?: string
 	/** Provider profile name for the task (sticky profile feature) */
 	apiConfigName?: string
@@ -46,6 +47,7 @@ export async function taskMetadata({
 	messages,
 	globalStoragePath,
 	workspace,
+	worktreePath,
 	mode,
 	apiConfigName,
 	initialStatus,
@@ -121,6 +123,7 @@ export async function taskMetadata({
 		totalCost: tokenUsage.totalCost,
 		size: taskDirSize,
 		workspace,
+		...(worktreePath ? { worktreePath } : {}),
 		mode,
 		...(typeof apiConfigName === "string" && apiConfigName.length > 0 ? { apiConfigName } : {}),
 		...(initialStatus && { status: initialStatus }),

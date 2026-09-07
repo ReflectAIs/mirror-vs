@@ -10,6 +10,12 @@ export async function handleQueueMessage(provider: MirrorProvider, message: Webv
 	const resolved = await resolveIncomingImages(provider, { text: message.text, images: message.images })
 	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
+		// If the task is currently waiting on an ask (e.g. command execution/question/approval), answer the ask with this message immediately
+		if (currentTask.taskAsk && !currentTask.taskAsk.isAnswered) {
+			currentTask.handleWebviewAskResponse("messageResponse", resolved.text, resolved.images)
+			return
+		}
+
 		currentTask.messageQueueService.addMessage(resolved.text, resolved.images)
 
 		// If the task is already started and the loop is not currently active (e.g. idle or background terminal running),

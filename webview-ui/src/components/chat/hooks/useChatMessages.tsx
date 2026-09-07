@@ -921,18 +921,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					return
 				}
 
-				// command_output is an active ask — treat it like any other ask (responds directly, never queues)
-				const isRespondingToAsk =
-					!isStreaming &&
-					mirrorAskRef.current !== undefined &&
-					mirrorAskRef.current !== "command"
+				// Active asks (command, command_output, followup, tool, etc.) respond directly and never queue
+				const isRespondingToAsk = !isStreaming && mirrorAskRef.current !== undefined
 				// If the chat is empty (first message in a new tab), never queue —
 				// send directly as a newTask.
 				const isFirstMessageInTab = messagesRef.current.length === 0
-				const isTaskBusy =
-					isStreaming ||
-					mirrorAskRef.current === "command" ||
-					messageQueue.length > 0
+				const isTaskBusy = isStreaming || messageQueue.length > 0
 				const shouldQueue = !forceSend && !isRespondingToAsk && !isFirstMessageInTab && isTaskBusy
 
 				if (shouldQueue) {
@@ -1784,11 +1778,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const virtuosoComponents = useMemo(
 		() => ({
 			Item: ({ children, ...props }: any) => {
-				return (
-					<div {...props}>
-						{children}
-					</div>
-				)
+				return <div {...props}>{children}</div>
 			},
 		}),
 		[],

@@ -86,12 +86,12 @@ describe("WorktreeSelector", () => {
 		expect(container.querySelector('[data-testid="worktree-selector-trigger"]')).not.toBeInTheDocument()
 	})
 
-	test("does not render when only one worktree exists", () => {
+	test("renders trigger when one worktree exists in git repo", () => {
 		const { container } = render(<WorktreeSelector />)
 
 		simulateWorktreeListMessage([mockWorktrees[0]])
 
-		expect(container.querySelector('[data-testid="worktree-selector-trigger"]')).not.toBeInTheDocument()
+		expect(container.querySelector('[data-testid="worktree-selector-trigger"]')).toBeInTheDocument()
 	})
 
 	test("renders trigger when multiple worktrees exist", () => {
@@ -148,7 +148,7 @@ describe("WorktreeSelector", () => {
 		expect(screen.getByText("worktrees:primary")).toBeInTheDocument()
 	})
 
-	test("sends switch message when selecting a different worktree", () => {
+	test("sends setTabWorktree message when selecting a different worktree", () => {
 		render(<WorktreeSelector />)
 
 		simulateWorktreeListMessage(mockWorktrees)
@@ -160,13 +160,13 @@ describe("WorktreeSelector", () => {
 		fireEvent.click(items[1]) // Second item is feature-branch
 
 		expect(mockPostMessage).toHaveBeenCalledWith({
-			type: "switchWorktree",
+			type: "setTabWorktree",
+			tabId: undefined,
 			worktreePath: "/path/to/feature-branch",
-			worktreeNewWindow: false,
 		})
 	})
 
-	test("does not send switch message when selecting current worktree", () => {
+	test("does not send setTabWorktree message when selecting current worktree", () => {
 		render(<WorktreeSelector />)
 
 		simulateWorktreeListMessage(mockWorktrees)
@@ -181,7 +181,7 @@ describe("WorktreeSelector", () => {
 
 		expect(mockPostMessage).not.toHaveBeenCalledWith(
 			expect.objectContaining({
-				type: "switchWorktree",
+				type: "setTabWorktree",
 			}),
 		)
 	})
@@ -295,5 +295,16 @@ describe("WorktreeSelector", () => {
 
 		// Should show "worktrees:noBranch" translation key for detached HEAD
 		expect(screen.getByText("worktrees:noBranch")).toBeInTheDocument()
+	})
+
+	test("shows delete button for non-current, non-bare worktrees", () => {
+		render(<WorktreeSelector />)
+
+		simulateWorktreeListMessage(mockWorktrees)
+
+		fireEvent.click(screen.getByTestId("worktree-selector-trigger"))
+
+		const deleteButtons = screen.getAllByTestId("delete-worktree-btn")
+		expect(deleteButtons.length).toBe(2) // feature-branch and another-branch (main is current & bare)
 	})
 })

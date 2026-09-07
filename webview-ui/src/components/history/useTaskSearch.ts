@@ -23,16 +23,22 @@ export const useTaskSearch = () => {
 		}
 	}, [searchQuery, sortOption, lastNonRelevantSort])
 
+	const normalizeWorkspace = (ws?: string): string => {
+		if (!ws) return ""
+		const normalized = ws.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
+		const match = normalized.match(/^(.*?)\/\.mirror-vs\/worktrees\/[^/]+$/)
+		return match ? match[1] : normalized
+	}
+
 	const presentableTasks = useMemo(() => {
 		let tasks = taskHistory.filter((item) => item.ts && item.task)
 		if (!showAllWorkspaces) {
-			tasks = tasks.filter(
-				(item) =>
-					!item.workspace ||
-					!cwd ||
-					item.workspace === cwd ||
-					item.workspace.replace(/\/+$/, "") === cwd.replace(/\/+$/, ""),
-			)
+			const activeCwd = normalizeWorkspace(cwd)
+			tasks = tasks.filter((item) => {
+				if (!item.workspace || !activeCwd) return true
+				const itemWs = normalizeWorkspace(item.workspace)
+				return itemWs === activeCwd
+			})
 		}
 		return tasks
 	}, [taskHistory, showAllWorkspaces, cwd])

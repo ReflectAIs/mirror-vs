@@ -9,6 +9,7 @@ import type { ToolUse } from "../../shared/tools"
 import { t } from "../../i18n"
 
 import { BaseTool, ToolCallbacks } from "./BaseTool"
+import { WorktreeSandboxManager } from "../../integrations/git/WorktreeSandboxManager"
 
 interface AttemptCompletionParams {
 	result: string
@@ -77,7 +78,9 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 
 			task.consecutiveMistakeCount = 0
 
-			await task.say("completion_result", result, undefined, false)
+			const finalResult = result
+
+			await task.say("completion_result", finalResult, undefined, false)
 
 			// Check for subtask using parentTaskId (metadata-driven delegation)
 			if (task.parentTaskId) {
@@ -131,6 +134,25 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 			const { response, text, images } = await task.ask("completion_result", "", false)
 
 			if (response === "yesButtonClicked") {
+				if (task.sandboxPath && task.workspacePath) {
+					const mergeRes = await WorktreeSandboxManager.applySandboxToWorkspace(
+						task.workspacePath,
+						task.taskId,
+					)
+					if (mergeRes.success) {
+						task.sandboxPath = undefined
+						await task.say(
+							"text",
+							`✅ **Sandbox Merged**: Successfully applied sandbox changes to the primary repository.\n\n${mergeRes.message}`,
+						)
+					} else {
+						await task.say(
+							"error",
+							`⚠️ **Sandbox Merge Warning**: ${mergeRes.message}\n\nYou can manually review and merge branch \`${WorktreeSandboxManager.getBranchName(task.taskId)}\` into \`${task.workspacePath}\`.`,
+						)
+					}
+				}
+
 				console.log(
 					`[AttemptCompletion] yesButtonClicked → emitTaskCompleted for task ${task.taskId}, queue size: ${task.messageQueueService?.messages?.length ?? 0}`,
 				)

@@ -84,10 +84,10 @@ export class TaskGetters {
 	// ──────────────────────────────────────────────────────────────
 
 	/**
-	 * Returns the current working directory (workspace path) for this task.
+	 * Returns the current working directory (workspace path or active git sandbox) for this task.
 	 */
 	public get cwd(): string {
-		return this.task.workspacePath
+		return this.task.sandboxPath ?? this.task.worktreePath ?? this.task.workspacePath
 	}
 
 	// ──────────────────────────────────────────────────────────────

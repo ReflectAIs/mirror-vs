@@ -273,6 +273,12 @@ export const globalSettingsSchema = z.object({
 	sessionClosedTabs: z.record(z.string(), z.array(z.string())).optional(),
 
 	/**
+	 * Maps taskId to its selected git worktree path.
+	 * Persisted so each tab retains its worktree across tab switches and restarts.
+	 */
+	sessionTabWorktrees: z.record(z.string(), z.string()).optional(),
+
+	/**
 	 * Shared selective context between tabs in the same session:
 	 * auto-extracted knowledge notes and user-curated notes.
 	 * Keyed by sessionId UUID. See `SharedSessionContext` in session.ts.
@@ -281,6 +287,13 @@ export const globalSettingsSchema = z.object({
 
 	activeSearchProvider: z.string().optional(),
 	userBraveApiKey: z.string().optional(),
+
+	/**
+	 * Setup and settings view mode:
+	 * - "normal": Simple, streamlined setup and settings with predefined safe defaults.
+	 * - "advanced": Full configuration with all sections and granular parameters.
+	 */
+	settingsMode: z.enum(["normal", "advanced"]).optional(),
 
 	/**
 	 * Per-type active pipeline slug override for ComfyUI.

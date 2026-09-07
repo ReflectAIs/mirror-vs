@@ -162,7 +162,7 @@ export class TaskHistoryStore {
 			const existing = this.cache.get(item.id)
 
 			// Merge: preserve existing metadata unless explicitly overwritten
-			const merged = existing ? { ...existing, ...item } : item
+			const merged = this.normalizeItemWorkspace(existing ? { ...existing, ...item } : item)
 
 			// Write per-task file (source of truth)
 			await this.writeTaskFile(merged)
@@ -266,7 +266,7 @@ export class TaskHistoryStore {
 					try {
 						const item = await this.readTaskFile(taskId)
 						if (item) {
-							this.cache.set(taskId, item)
+							this.cache.set(taskId, this.normalizeItemWorkspace(item))
 							changed = true
 						}
 					} catch {
@@ -374,7 +374,7 @@ export class TaskHistoryStore {
 			if (index.version === 1 && Array.isArray(index.entries)) {
 				for (const entry of index.entries) {
 					if (entry.id) {
-						this.cache.set(entry.id, entry)
+						this.cache.set(entry.id, this.normalizeItemWorkspace(entry))
 					}
 				}
 			}
@@ -433,6 +433,19 @@ export class TaskHistoryStore {
 	}
 
 	// ────────────────────────────── Private: Per-task file I/O ──────────────────────────────
+
+	/**
+	 * Normalizes workspace path if it points to an ephemeral .mirror-vs worktree sandbox,
+	 * ensuring the history item is always associated with the root repository.
+	 */
+	private normalizeItemWorkspace(item: HistoryItem): HistoryItem {
+		if (!item.workspace) return item
+		const match = item.workspace.replace(/\\/g, "/").match(/^(.*?)\/\.mirror-vs\/worktrees\/[^/]+$/)
+		if (match) {
+			return { ...item, workspace: match[1] }
+		}
+		return item
+	}
 
 	/**
 	 * Write a HistoryItem to its per-task `history_item.json` file.

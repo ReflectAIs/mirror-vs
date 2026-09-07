@@ -2,6 +2,27 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.8.1] - 2026-09-04
+
+### Added (Experimental)
+
+- **Native LSP Code Graph Navigation (`code_graph`)**: Added experimental support for deterministic, zero-token-waste code navigation powered by VS Code's Language Server Protocol:
+    - `workspace_symbols`: Global symbol resolution across TypeScript, Python, Rust, Go, Java, and C#.
+    - `find_definitions`: Direct jump to symbol definitions without regex guessing.
+    - `find_references`: Comprehensive workspace call-site and reference discovery.
+    - Gated behind the `LSP_CODE_GRAPH` (`"lspCodeGraph"`) experiment flag in Settings.
+- **Git Worktree Isolated Sandboxing (`gitWorktreeSandbox`)**: Added experimental support for sandboxed execution in an isolated git worktree:
+    - Runs tasks inside `.mirror-vs/worktrees/<task-id>` on dedicated ephemeral branch `mirror-sandbox/<task-id>`.
+    - Automatically isolates working tree changes so user's dirty working directory and active branch remain completely untouched.
+    - Transparent merge guidance and status summary upon task completion.
+    - Gated behind the `GIT_WORKTREE_SANDBOX` (`"gitWorktreeSandbox"`) experiment flag in Settings.
+
+### Fixed
+
+- **Repetitive Token Loop on Markdown Tables**: Fixed false-positive trigger in `StreamDegenerationDetector` where Markdown table delimiters (`|`, `-`, `:`, spaces) were wrongly identified as degenerative token loops and abruptly halted generation.
+- **Cross-Tab Provider Rate Limiting**: Added global promise-chain request gate enforcement of `rateLimitSeconds` across all open tabs, with live countdown display (`api_req_rate_limit_wait`) while queued.
+- **Auto-Scroll to Task Complete Card**: Added staggered scroll layout passes in `ChatView` when task reaches `completion_result`, ensuring the completion card is fully visible without manual scrolling.
+
 ## [0.8.0] - 2026-09-02
 
 ### Added & Improved
@@ -27,7 +48,6 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Below-Threshold MatchIndex Propagation**: Resolved an issue where below-threshold fuzzy matches could retain invalid line indices, ensuring strict validation before applying multi-search replacements.
 - **Duplicate / Concurrent Context Compressions**: Fixed race conditions between background condensation and pre-request context management that caused multiple compressions to fire together. Added mutex lock / promise sharing to `TaskContextManagement`, ensured context checks strictly honor user-configured context thresholds, and made pre-request context management sequentially await in-flight condensations.
 - **Background Terminal Execution & Lingering Terminal Cleanup**: Enforced pure background execution (`ExecaTerminal`) for assistant tool commands, completely preventing VS Code from opening or revealing integrated terminal tabs. Added automatic cleanup of lingering "Mirror VS" terminals upon extension startup, task abort, and task release.
-
 
 ## [0.7.9] - 2026-08-26
 

@@ -284,4 +284,30 @@ describe("useTaskSearch", () => {
 		// When not searching, it should fall back to newest
 		expect(result.current.sortOption).toBe("mostRelevant")
 	})
+
+	it("matches tasks created in .mirror-vs worktree sandboxes to the root repository cwd", () => {
+		mockUseExtensionState.mockReturnValue({
+			taskHistory: [
+				{
+					id: "sandboxed-task",
+					task: "Refactor in sandbox",
+					ts: Date.now(),
+					workspace: "/workspace/project1/.mirror-vs/worktrees/sandboxed-task",
+				},
+				{
+					id: "other-task",
+					task: "Other project task",
+					ts: Date.now(),
+					workspace: "/workspace/project2",
+				},
+			],
+			cwd: "/workspace/project1",
+		} as any)
+
+		const { result } = renderHook(() => useTaskSearch())
+
+		// Without showAllWorkspaces, sandboxed task should still be included because its parent repo matches cwd
+		expect(result.current.tasks).toHaveLength(1)
+		expect(result.current.tasks[0].id).toBe("sandboxed-task")
+	})
 })

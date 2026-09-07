@@ -201,6 +201,35 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		handleScrollToBottomClick2()
 	}, [_handleScrollToBottomAndResetCheckpointCursor, handleScrollToBottomClick2])
 
+	// ── Auto-scroll to bottom when task completes (completion_result arrives) ──
+	const lastDisplayedMessage = displayedMessages.at(-1)
+	const isTaskCompleted =
+		mirrorAsk === "completion_result" ||
+		lastDisplayedMessage?.ask === "completion_result" ||
+		lastDisplayedMessage?.say === "completion_result"
+
+	useEffect(() => {
+		if (isTaskCompleted) {
+			resetToBottom2()
+			// Staggered layout passes to account for Markdown rendering and card height changes
+			const timeouts: NodeJS.Timeout[] = []
+			const rafId1 = requestAnimationFrame(() => {
+				scrollToBottomAuto2()
+				const rafId2 = requestAnimationFrame(() => {
+					scrollToBottomAuto2()
+				})
+				timeouts.push(setTimeout(() => scrollToBottomAuto2(), 50))
+				timeouts.push(setTimeout(() => scrollToBottomAuto2(), 150))
+				timeouts.push(setTimeout(() => scrollToBottomAuto2(), 300))
+				return () => cancelAnimationFrame(rafId2)
+			})
+			return () => {
+				cancelAnimationFrame(rafId1)
+				timeouts.forEach(clearTimeout)
+			}
+		}
+	}, [isTaskCompleted, lastDisplayedMessage?.ts, resetToBottom2, scrollToBottomAuto2])
+
 	// ── Row expansion → notify scroll lifecycle ──
 	const prevExpandedRef = useRef<Record<number, boolean>>({})
 	useEffect(() => {
@@ -361,14 +390,17 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				<ChatWelcomeContent taskHistoryLength={taskHistory.length} />
 			)}
 
-			{!task && showWorktreesInHomeScreen && <WorktreeSelector />}
-
 			{task && (
 				<>
 					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
 						<Virtuoso
 							ref={virtuosoRef as any}
-							key={activeTabId || currentTaskId || currentTaskItem?.id || (task?.ts ? String(task.ts) : "chat-virtuoso")}
+							key={
+								activeTabId ||
+								currentTaskId ||
+								currentTaskItem?.id ||
+								(task?.ts ? String(task.ts) : "chat-virtuoso")
+							}
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 800, bottom: 400 }}
@@ -462,6 +494,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 						actionText={t("chat:retiredProvider.openSettings")}
 						onAction={() => vscode.postMessage({ type: "switchTab", tab: "settings" })}
 					/>
+				</div>
+			)}
+			{showWorktreesInHomeScreen && (
+				<div className="px-2 mb-0.5">
+					<WorktreeSelector />
 				</div>
 			)}
 			<ChatTextArea

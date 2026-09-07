@@ -59,6 +59,7 @@ import { docsSearchTool } from "../tools/DocsSearchTool"
 import { packageSearchTool } from "../tools/PackageSearchTool"
 import { readUrlTool } from "../tools/ReadUrlTool"
 import { sleepTool } from "../tools/SleepTool"
+import { codeGraphTool } from "../tools/CodeGraphTool"
 import { checkpointSave } from "../checkpoints"
 
 import { formatResponse } from "../prompts/responses"
@@ -78,6 +79,7 @@ const READ_TOOLS = new Set([
 	"docs_search",
 	"package_search",
 	"codebase_search",
+	"code_graph",
 	"read_url",
 	"sleep",
 	"get_workspace_file_tree",
@@ -118,6 +120,7 @@ const READ_TOOL_MAP: Record<string, { handle: (task: Task, block: any, callbacks
 	docs_search: docsSearchTool,
 	package_search: packageSearchTool,
 	codebase_search: codebaseSearchTool,
+	code_graph: codeGraphTool,
 	read_url: readUrlTool,
 	get_workspace_file_tree: getWorkspaceFileTreeTool,
 	get_workspace_pulse: getWorkspacePulseTool,
@@ -455,6 +458,8 @@ export async function presentAssistantMessage(mirror: Task) {
 						return `[${block.name} for '${block.params?.tool_name}' on '${block.params?.server_name}']`
 					case "codebase_search":
 						return `[${block.name} for '${block.params.query}']`
+					case "code_graph":
+						return `[${block.name} ${block.params?.action || "search"}${block.params?.query ? ` for '${block.params.query}'` : ""}${block.params?.path ? ` in '${block.params.path}'` : ""}]`
 					case "read_command_output":
 						return `[${block.name} for '${block.params.artifact_id}']`
 					case "update_todo_list":
@@ -902,6 +907,13 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "codebase_search":
 					await codebaseSearchTool.handle(mirror, block as ToolUse<"codebase_search">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "code_graph":
+					await codeGraphTool.handle(mirror, block as ToolUse<"code_graph">, {
 						askApproval,
 						handleError,
 						pushToolResult,

@@ -4,7 +4,16 @@ import type { Worktree } from "@mirror-vs/types"
 
 import { vscode } from "@/utils/vscode"
 import { useAppTranslation } from "@/i18n/TranslationContext"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Button, Checkbox } from "@/components/ui"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	Button,
+	Checkbox,
+} from "@/components/ui"
 import { Folder, GitBranch, TriangleAlert } from "lucide-react"
 
 interface DeleteWorktreeModalProps {
@@ -59,6 +68,7 @@ export const DeleteWorktreeModal = ({ open, onClose, worktree, onSuccess }: Dele
 			<DialogContent>
 				<DialogHeader>
 					<DialogTitle>{t("worktrees:deleteWorktree")}</DialogTitle>
+					<DialogDescription className="sr-only">{t("worktrees:deleteWarning")}</DialogDescription>
 				</DialogHeader>
 
 				<div className="flex flex-col gap-3 overflow-hidden">

@@ -20,6 +20,7 @@ import type {
 import { worktreeService, worktreeIncludeService, type CopyProgressCallback } from "@mirror-vs/core"
 
 import type { MirrorProvider } from "../MirrorProvider"
+import { WorktreeSandboxManager } from "../../../integrations/git/WorktreeSandboxManager"
 
 /**
  * Generate a random alphanumeric suffix for branch/folder names.
@@ -108,6 +109,24 @@ export async function handleListWorktrees(provider: MirrorProvider): Promise<Wor
 	try {
 		const worktrees = await worktreeService.listWorktrees(cwd)
 
+		const currentTask = provider.getCurrentTask()
+		const activeTabWorktree =
+			currentTask?.worktreePath ||
+			(currentTask ? provider.getTabWorktree(currentTask.taskId) : undefined) ||
+			provider.pendingWorktreePath
+
+		if (activeTabWorktree) {
+			const normalize = (p: string) =>
+				p
+					.replace(/[/\\]+/g, "/")
+					.toLowerCase()
+					.replace(/\/$/, "")
+			const normalizedActive = normalize(activeTabWorktree)
+			for (const wt of worktrees) {
+				wt.isCurrent = normalize(wt.path) === normalizedActive
+			}
+		}
+
 		return {
 			worktrees,
 			isGitRepo: true,
@@ -135,35 +154,43 @@ export async function handleCreateWorktree(
 	progressCallback?: CopyProgressCallback,
 ): Promise<WorktreeResult> {
 	const cwd = provider.cwd
+	const gitRoot = await worktreeService.getGitMirrortPath(cwd)
+	if (gitRoot) {
+		await WorktreeSandboxManager.ensureGitExclude(gitRoot)
+	}
 
 	const result = await worktreeService.createWorktree(cwd, options)
 
 	return result
 }
 
-export async function handleDeleteWorktree(provider: MirrorProvider, branch: string, force = false): Promise<WorktreeResult> {
+export async function handleDeleteWorktree(
+	provider: MirrorProvider,
+	worktreePath: string,
+	force = false,
+): Promise<WorktreeResult> {
 	const cwd = provider.cwd
-	const result = await worktreeService.deleteWorktree(cwd, branch, force)
+	const result = await worktreeService.deleteWorktree(cwd, worktreePath, force)
 
 	return result
 }
 
 export async function handleSwitchWorktree(
 	provider: MirrorProvider,
-	branch: string,
-	forceReload: boolean = false,
+	branchOrPath: string,
+	newWindow: boolean = false,
 ): Promise<WorktreeResult> {
 	const cwd = provider.cwd
 	const worktrees = await worktreeService.listWorktrees(cwd)
-	const target = worktrees.find((w) => w.branch === branch)
+	const target = worktrees.find((w) => w.path === branchOrPath || w.branch === branchOrPath)
 
-	if (!target) {
-		return { success: false, message: `Worktree for branch '${branch}' not found` }
-	}
+	const targetPath = target ? target.path : branchOrPath
 
-	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(target.path), { forceNewWindow: false })
+	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(targetPath), {
+		forceNewWindow: newWindow,
+	})
 
-	return { success: true, message: `Switched to worktree at ${target.path}` }
+	return { success: true, message: `Switched to worktree at ${targetPath}` }
 }
 
 export async function handleGetAvailableBranches(provider: MirrorProvider): Promise<BranchInfo> {
@@ -175,7 +202,8 @@ export async function handleGetAvailableBranches(provider: MirrorProvider): Prom
 
 export async function handleGetWorktreeDefaults(provider: MirrorProvider): Promise<WorktreeDefaultsResponse> {
 	const cwd = provider.cwd
-	const suggestedBranch = `feature/${generateRandomSuffix()}`
+	const randomSuffix = generateRandomSuffix()
+	const suggestedBranch = `mirror-sandbox/${randomSuffix}`
 	const gitRoot = await worktreeService.getGitMirrortPath(cwd)
 
 	if (!gitRoot) {
@@ -186,7 +214,7 @@ export async function handleGetWorktreeDefaults(provider: MirrorProvider): Promi
 		}
 	}
 
-	const suggestedPath = path.join(path.dirname(gitRoot), suggestedBranch)
+	const suggestedPath = path.join(gitRoot, ".mirror-vs", "worktrees", randomSuffix)
 
 	return { suggestedBranch, suggestedPath }
 }
@@ -198,20 +226,14 @@ export async function handleGetWorktreeIncludeStatus(provider: MirrorProvider): 
 	return status
 }
 
-export async function handleCheckBranchWorktreeInclude(
-	provider: MirrorProvider,
-	branchName: string,
-): Promise<boolean> {
+export async function handleCheckBranchWorktreeInclude(provider: MirrorProvider, branchName: string): Promise<boolean> {
 	const cwd = provider.cwd
 	const result = await worktreeIncludeService.branchHasWorktreeInclude(cwd, branchName)
 
 	return result
 }
 
-export async function handleCreateWorktreeInclude(
-	provider: MirrorProvider,
-	content: string,
-): Promise<WorktreeResult> {
+export async function handleCreateWorktreeInclude(provider: MirrorProvider, content: string): Promise<WorktreeResult> {
 	const cwd = provider.cwd
 
 	try {

@@ -37,6 +37,10 @@ vi.mock("../MirrorHero", () => ({
 	default: () => <div data-testid="mirror-hero">Mirror Hero</div>,
 }))
 
+vi.mock("../WelcomeMascot", () => ({
+	default: () => <div data-testid="welcome-mascot">Welcome Mascot</div>,
+}))
+
 vi.mock("../MirrorTips", () => ({
 	default: () => <div data-testid="mirror-tips">Mirror Tips</div>,
 }))
@@ -53,6 +57,14 @@ vi.mock("lucide-react", () => ({
 	ArrowLeft: () => <span data-testid="arrow-left-icon">left</span>,
 	Brain: () => <span data-testid="brain-icon">brain</span>,
 	Sparkles: () => <span data-testid="sparkles-icon">sparkles</span>,
+	Zap: () => <span data-testid="zap-icon">zap</span>,
+	SlidersHorizontal: () => <span data-testid="sliders-icon">sliders</span>,
+	Check: () => <span data-testid="check-icon">check</span>,
+	ExternalLink: () => <span data-testid="external-link-icon">external</span>,
+	Eye: () => <span data-testid="eye-icon">eye</span>,
+	EyeOff: () => <span data-testid="eye-off-icon">eye-off</span>,
+	ShieldCheck: () => <span data-testid="shield-check-icon">shield-check</span>,
+	History: () => <span data-testid="history-icon">history</span>,
 }))
 
 vi.mock("@src/utils/vscode", () => ({
@@ -115,7 +127,7 @@ describe("WelcomeViewProvider", () => {
 		expect(screen.getByTestId("welcome-step-indicator")).toBeInTheDocument()
 		expect(screen.getByTestId("welcome-step-indicator")).toHaveAttribute("data-current-step", "0")
 		expect(screen.getByTestId("mirror-tips")).toBeInTheDocument()
-		expect(screen.getByTestId("mirror-hero")).toBeInTheDocument()
+		expect(screen.getByTestId("welcome-mascot")).toBeInTheDocument()
 	})
 
 	it("opens provider setup when Get Started is clicked", () => {
@@ -224,5 +236,47 @@ describe("WelcomeViewProvider", () => {
 		fireEvent.click(screen.getByText(/welcome:importSettings/))
 
 		expect(vscode.postMessage).toHaveBeenCalledWith({ type: "importSettings" })
+	})
+
+	it("applies predefined safe settings when completing setup in Normal mode", () => {
+		renderWelcomeViewProvider({ apiConfiguration: { apiProvider: "openrouter" } })
+
+		// Start setup in normal mode
+		fireEvent.click(screen.getByTestId("button-primary"))
+		fireEvent.click(screen.getByText(/welcome:providerSignup.finish/))
+
+		// Should apply predefined safe defaults
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "updateSettings",
+			updatedSettings: {
+				settingsMode: "normal",
+				alwaysAllowReadOnly: true,
+				alwaysAllowWrite: false,
+				alwaysAllowExecute: false,
+				enableCheckpoints: true,
+				autoCondenseContext: true,
+				autoCondenseContextPercent: 75,
+			},
+		})
+	})
+
+	it("switches to advanced setup mode when Advanced button is clicked", () => {
+		renderWelcomeViewProvider({ apiConfiguration: { apiProvider: "openrouter" } })
+
+		// Go to provider setup
+		fireEvent.click(screen.getByTestId("button-primary"))
+
+		// Switch to Advanced setup
+		fireEvent.click(screen.getByText("Advanced"))
+
+		// Complete setup in Advanced mode
+		fireEvent.click(screen.getByText(/welcome:providerSignup.finish/))
+
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "updateSettings",
+			updatedSettings: {
+				settingsMode: "advanced",
+			},
+		})
 	})
 })
