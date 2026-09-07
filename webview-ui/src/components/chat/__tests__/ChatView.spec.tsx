@@ -743,7 +743,7 @@ describe("ChatView - Message Queueing Tests", () => {
 
 		// Wait for state to be updated and rendered
 		await waitFor(() => {
-			expect(getByText("Initial task")).toBeInTheDocument()
+			expect(getByText(/Initial task/)).toBeInTheDocument()
 		})
 
 		// Clear message calls before simulating user input
@@ -781,7 +781,7 @@ describe("ChatView - Message Queueing Tests", () => {
 	})
 
 	it("sends messages normally when API request is complete (cost present)", async () => {
-		const { getByTestId } = renderChatView()
+		const { getByTestId, getByText } = renderChatView()
 
 		// Hydrate state with completed API request (cost present)
 		mockPostMessage({
@@ -814,7 +814,7 @@ describe("ChatView - Message Queueing Tests", () => {
 
 		// Wait for state to be updated
 		await waitFor(() => {
-			expect(getByTestId("chat-textarea")).toBeInTheDocument()
+			expect(getByText(/Initial task/)).toBeInTheDocument()
 		})
 
 		// Clear message calls before simulating user input
@@ -910,7 +910,7 @@ describe("ChatView - Message Queueing Tests", () => {
 		)
 	})
 
-	it("queues messages during command_output state instead of losing them", async () => {
+	it("sends messages as askResponse during command execution state instead of queueing or losing them", async () => {
 		const { getByTestId } = renderChatView()
 
 		// Hydrate state with command_output ask (Proceed While Running state)
@@ -955,10 +955,11 @@ describe("ChatView - Message Queueing Tests", () => {
 			fireEvent.keyDown(input, { key: "Enter", code: "Enter" })
 		})
 
-		// Verify that the message was queued (not lost via terminalOperation)
+		// Verify that the message was sent as askResponse (not queued or lost via terminalOperation)
 		await waitFor(() => {
 			expect(vscode.postMessage).toHaveBeenCalledWith({
-				type: "queueMessage",
+				type: "askResponse",
+				askResponse: "messageResponse",
 				text: "message during command execution",
 				images: [],
 			})

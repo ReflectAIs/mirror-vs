@@ -4,6 +4,19 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.8.1] - 2026-09-04
 
+### Added (Experimental)
+
+- **Native LSP Code Graph Navigation (`code_graph`)**: Added experimental support for deterministic, zero-token-waste code navigation powered by VS Code's Language Server Protocol:
+    - `workspace_symbols`: Global symbol resolution across TypeScript, Python, Rust, Go, Java, and C#.
+    - `find_definitions`: Direct jump to symbol definitions without regex guessing.
+    - `find_references`: Comprehensive workspace call-site and reference discovery.
+    - Gated behind the `LSP_CODE_GRAPH` (`"lspCodeGraph"`) experiment flag in Settings.
+- **Git Worktree Isolated Sandboxing (`gitWorktreeSandbox`)**: Added experimental support for sandboxed execution in an isolated git worktree:
+    - Runs tasks inside `.mirror-vs/worktrees/<task-id>` on dedicated ephemeral branch `mirror-sandbox/<task-id>`.
+    - Automatically isolates working tree changes so user's dirty working directory and active branch remain completely untouched.
+    - Transparent merge guidance and status summary upon task completion.
+    - Gated behind the `GIT_WORKTREE_SANDBOX` (`"gitWorktreeSandbox"`) experiment flag in Settings.
+
 ### Fixed
 
 - **Repetitive Token Loop on Markdown Tables**: Fixed false-positive trigger in `StreamDegenerationDetector` where Markdown table delimiters (`|`, `-`, `:`, spaces) were wrongly identified as degenerative token loops and abruptly halted generation.

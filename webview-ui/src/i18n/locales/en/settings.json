@@ -850,6 +850,14 @@
 			"name": "Parallel tool reads (experimental)",
 			"description": "When enabled, the assistant can execute multiple independent read-only tools (read_file, search_files, list_files, etc.) in a single batch, improving performance. When disabled, each read tool runs sequentially. Disable this if you encounter issues with rate limits or model confusion."
 		},
+		"LSP_CODE_GRAPH": {
+			"name": "Native LSP Code Graph (experimental)",
+			"description": "Enables precise symbol search, go-to-definition, and find-references using VS Code's Language Server Protocol, reducing token costs and eliminating regex guessing."
+		},
+		"GIT_WORKTREE_SANDBOX": {
+			"name": "Git Worktree Isolated Sandboxing (experimental)",
+			"description": "Runs tasks in an isolated git worktree (.mirror-vs/worktrees/<task-id>). Your active working tree and unstaged changes remain untouched until you review and merge changes."
+		},
 		"MULTI_SEARCH_AND_REPLACE": {
 			"name": "Use experimental multi block diff tool",
 			"description": "When enabled, the assistant will use multi block diff tool. This will try to update multiple code blocks in the file in one request."

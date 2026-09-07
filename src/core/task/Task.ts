@@ -537,6 +537,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	/** @internal */
 	_messageManager?: MessageManager
 
+	experiments?: Record<string, boolean>
+	sandboxPath?: string
+
 	constructor({
 		provider,
 		apiConfiguration,
@@ -559,6 +562,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		sessionId,
 	}: TaskOptions) {
 		super()
+		this.experiments = experimentsConfig
 		this.conversationHistory = new TaskConversationHistory(this)
 		this.mirrorMessagesManager = new TaskMirrorMessages(this)
 		this.userInteractionManager = new TaskUserInteraction(this)

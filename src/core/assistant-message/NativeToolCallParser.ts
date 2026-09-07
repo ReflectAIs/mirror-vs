@@ -520,6 +520,24 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "code_graph":
+				if (
+					partialArgs.action !== undefined ||
+					partialArgs.query !== undefined ||
+					partialArgs.path !== undefined ||
+					partialArgs.symbol !== undefined
+				) {
+					nativeArgs = {
+						action: partialArgs.action,
+						query: partialArgs.query,
+						path: partialArgs.path,
+						line: partialArgs.line !== undefined ? Number(partialArgs.line) : undefined,
+						character: partialArgs.character !== undefined ? Number(partialArgs.character) : undefined,
+						symbol: partialArgs.symbol,
+					}
+				}
+				break
+
 			case "generate_image":
 				if (partialArgs.prompt !== undefined || partialArgs.path !== undefined) {
 					nativeArgs = {
@@ -1019,6 +1037,19 @@ export class NativeToolCallParser {
 						nativeArgs = {
 							query: args.query,
 							path: args.path,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "code_graph":
+					if (args.action !== undefined) {
+						nativeArgs = {
+							action: args.action,
+							query: args.query,
+							path: args.path,
+							line: args.line !== undefined ? Number(args.line) : undefined,
+							character: args.character !== undefined ? Number(args.character) : undefined,
+							symbol: args.symbol,
 						} as NativeArgsFor<TName>
 					}
 					break

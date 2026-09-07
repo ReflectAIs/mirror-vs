@@ -24,6 +24,8 @@ export const experimentIds = [
 	"customTools",
 	"browser",
 	"parallelToolReads",
+	"lspCodeGraph",
+	"gitWorktreeSandbox",
 ] as const
 
 export const experimentIdsSchema = z.enum(experimentIds)
@@ -54,6 +56,8 @@ export const experimentsSchema = z
 		customTools: z.boolean().optional(),
 		browser: z.boolean().optional(),
 		parallelToolReads: z.boolean().optional(),
+		lspCodeGraph: z.boolean().optional(),
+		gitWorktreeSandbox: z.boolean().optional(),
 	})
 	.transform((data) => {
 		// Strip the legacy field so it does not appear in the output type

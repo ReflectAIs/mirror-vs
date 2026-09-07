@@ -41,6 +41,7 @@ import getGitStatus from "./get_git_status"
 import readSessionContext from "./read_session_context"
 import searchMcpTools from "./searchMcpTools"
 import activateMcpTool from "./activateMcpTool"
+import codeGraph from "./code_graph"
 
 export { getMcpServerTools } from "./mcp_server"
 export { convertOpenAIToolToAnthropic, convertOpenAIToolsToAnthropic } from "./converters"
@@ -112,6 +113,7 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		searchMcpTools,
 		activateMcpTool,
 		readSessionContext,
+		codeGraph,
 	] satisfies OpenAI.Chat.ChatCompletionTool[]
 }
 

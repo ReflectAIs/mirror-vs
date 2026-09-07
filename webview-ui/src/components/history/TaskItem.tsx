@@ -1,11 +1,11 @@
-import { memo, useState, useCallback, useRef, useEffect } from "react"
+import { memo, useState, useCallback, useRef, useEffect, useContext } from "react"
 import { ArrowRight, Folder, GitBranch, FolderSymlink } from "lucide-react"
 import type { DisplayHistoryItem } from "./types"
 
 import { vscode } from "@/utils/vscode"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useExtensionState } from "@/context/ExtensionStateContext"
+import { ExtensionStateContext } from "@/context/ExtensionStateContext"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -49,7 +49,9 @@ const TaskItem = ({
 	onRenameTab,
 	className,
 }: TaskItemProps) => {
-	const { cwd, currentWorkspacePath } = useExtensionState()
+	const extensionState = useContext(ExtensionStateContext)
+	const cwd = extensionState?.cwd
+	const currentWorkspacePath = extensionState?.currentWorkspacePath
 	const [isRenaming, setIsRenaming] = useState(false)
 	const [renameValue, setRenameValue] = useState(displayName || "")
 	const [showCrossWorkspaceDialog, setShowCrossWorkspaceDialog] = useState(false)

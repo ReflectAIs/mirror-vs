@@ -9,6 +9,7 @@ import type { ToolUse } from "../../shared/tools"
 import { t } from "../../i18n"
 
 import { BaseTool, ToolCallbacks } from "./BaseTool"
+import { WorktreeSandboxManager } from "../../integrations/git/WorktreeSandboxManager"
 
 interface AttemptCompletionParams {
 	result: string
@@ -77,7 +78,16 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 
 			task.consecutiveMistakeCount = 0
 
-			await task.say("completion_result", result, undefined, false)
+			let finalResult = result
+			if (task.sandboxPath) {
+				const status = await WorktreeSandboxManager.getSandboxStatus(task.sandboxPath)
+				if (status.hasChanges) {
+					const branch = WorktreeSandboxManager.getBranchName(task.taskId)
+					finalResult += `\n\n🛡️ **Isolated Git Sandbox Notice**:\nAll changes were executed inside isolated worktree branch \`${branch}\`. Your primary working tree was kept untouched. To merge these changes into your active branch, run:\n\`\`\`bash\ngit merge ${branch}\n\`\`\``
+				}
+			}
+
+			await task.say("completion_result", finalResult, undefined, false)
 
 			// Check for subtask using parentTaskId (metadata-driven delegation)
 			if (task.parentTaskId) {

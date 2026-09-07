@@ -247,23 +247,22 @@ export class TaskLifecycleManager {
 
 		if (!historyItem) {
 			const taskText =
-				task.taskHistoryItem?.task ||
-				task.mirrorMessages.find((m) => m.say === "task")?.text ||
+				task.historyItem?.task ||
+				(task.mirrorMessages.find((m) => (m.say as string | undefined) === "task")?.text as string) ||
 				task.mirrorMessages[0]?.text ||
 				""
+			const tokenUsage = task.getTokenUsage()
 			historyItem = {
 				id: task.taskId,
-				ts: task.taskHistoryItem?.ts || task.mirrorMessages[0]?.ts || Date.now(),
+				ts: task.historyItem?.ts || task.mirrorMessages[0]?.ts || Date.now(),
+				number: task.historyItem?.number ?? 1,
 				task: taskText,
-				tokensIn: task.tokensIn,
-				tokensOut: task.tokensOut,
-				cacheWrites: task.cacheWrites,
-				cacheReads: task.cacheReads,
-				totalCost: task.totalCost,
+				tokensIn: tokenUsage.totalTokensIn,
+				tokensOut: tokenUsage.totalTokensOut,
+				cacheWrites: tokenUsage.totalCacheWrites,
+				cacheReads: tokenUsage.totalCacheReads,
+				totalCost: tokenUsage.totalCost,
 				size: 0,
-				shadowGitConfigWorkTree: task.taskHistoryItem?.shadowGitConfigWorkTree,
-				conversationHistoryDeletedRange: task.taskHistoryItem?.conversationHistoryDeletedRange,
-				isFavorited: task.taskHistoryItem?.isFavorited,
 			}
 		}
 

@@ -32,6 +32,7 @@ import type { AssistantMessageContent } from "../assistant-message"
 import type { GroundingSource } from "../../api/transform/stream"
 import { Task } from "./Task"
 import { isTransientProviderError } from "./transient-error"
+import { WorktreeSandboxManager } from "../../integrations/git/WorktreeSandboxManager"
 
 // ────────────────────────────────────────────────────────────
 //  Struggle Ledger — Auto-Recovery Engine
@@ -250,6 +251,18 @@ export class TaskMainLoop {
 	 * queued user messages and feeds them back as new user content.
 	 */
 	async initiateTaskLoop(userContent: Anthropic.Messages.ContentBlockParam[]): Promise<void> {
+		// Initialize isolated git sandbox if experiment is enabled and not yet initialized
+		if (this.task.experiments?.gitWorktreeSandbox && !this.task.sandboxPath) {
+			const sandbox = await WorktreeSandboxManager.createSandbox(this.task.workspacePath, this.task.taskId)
+			if (sandbox) {
+				this.task.sandboxPath = sandbox
+				await this.task.say(
+					"text",
+					`🛡️ Task running in isolated Git worktree: \`${sandbox}\` on branch \`${WorktreeSandboxManager.getBranchName(this.task.taskId)}\`. Your active working tree is untouched.`,
+				)
+			}
+		}
+
 		// Kicks off the checkpoints initialization process in the background.
 		getCheckpointService(this.task)
 

@@ -30,8 +30,12 @@ describe("experiments", () => {
 				customTools: false,
 				browser: false,
 				parallelToolReads: false,
+				lspCodeGraph: false,
+				gitWorktreeSandbox: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(false)
+			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.LSP_CODE_GRAPH)).toBe(false)
+			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.GIT_WORKTREE_SANDBOX)).toBe(false)
 		})
 
 		it("returns true when experiment is enabled", () => {
@@ -49,8 +53,12 @@ describe("experiments", () => {
 				customTools: false,
 				browser: false,
 				parallelToolReads: false,
+				lspCodeGraph: true,
+				gitWorktreeSandbox: true,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(true)
+			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.LSP_CODE_GRAPH)).toBe(true)
+			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.GIT_WORKTREE_SANDBOX)).toBe(true)
 		})
 
 		it("returns false when experiment is not present", () => {
@@ -68,6 +76,8 @@ describe("experiments", () => {
 				customTools: false,
 				browser: false,
 				parallelToolReads: false,
+				lspCodeGraph: false,
+				gitWorktreeSandbox: false,
 			}
 			expect(Experiments.isEnabled(experiments, EXPERIMENT_IDS.PREVENT_FOCUS_DISRUPTION)).toBe(false)
 		})
