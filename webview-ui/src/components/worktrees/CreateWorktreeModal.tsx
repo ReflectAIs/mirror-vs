@@ -7,7 +7,7 @@ import { vscode } from "@/utils/vscode"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Button, Input } from "@/components/ui"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
-import { CornerDownRight, Folder, FolderSearch, Info } from "lucide-react"
+import { CornerDownRight, Folder, FolderSearch, Info, ShieldCheck } from "lucide-react"
 
 interface CreateWorktreeModalProps {
 	open: boolean
@@ -153,6 +153,14 @@ export const CreateWorktreeModal = ({
 				</DialogHeader>
 
 				<div className="flex flex-col gap-3">
+					{/* Sandbox safety description */}
+					<div className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-vscode-input-background border border-vscode-panel-border text-xs">
+						<ShieldCheck className="size-4 text-mirror-brand-via shrink-0 mt-0.5" />
+						<span className="text-vscode-descriptionForeground">
+							{t("worktrees:createModalDescription")}
+						</span>
+					</div>
+
 					{/* No .worktreeinclude warning - shows when the current worktree doesn't have .worktreeinclude */}
 					{includeStatus?.exists === false && (
 						<div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-vscode-inputValidation-warningBackground border border-vscode-inputValidation-warningBorder text-sm">
@@ -194,7 +202,7 @@ export const CreateWorktreeModal = ({
 						<Input
 							value={branchName}
 							onChange={(e) => setBranchName(e.target.value)}
-							placeholder={defaults?.suggestedBranch || "worktree/feature-name"}
+							placeholder={defaults?.suggestedBranch || "mirror-sandbox/name"}
 							className="rounded-full"
 						/>
 					</div>
@@ -206,7 +214,7 @@ export const CreateWorktreeModal = ({
 						<Input
 							value={worktreePath}
 							onChange={(e) => setWorktreePath(e.target.value)}
-							placeholder={defaults?.suggestedPath || "/path/to/worktree"}
+							placeholder={defaults?.suggestedPath || ".mirror-vs/worktrees/name"}
 							className="rounded-full flex-1 pr-9"
 						/>
 						<FolderSearch

@@ -20,6 +20,7 @@ import type {
 import { worktreeService, worktreeIncludeService, type CopyProgressCallback } from "@mirror-vs/core"
 
 import type { MirrorProvider } from "../MirrorProvider"
+import { WorktreeSandboxManager } from "../../../integrations/git/WorktreeSandboxManager"
 
 /**
  * Generate a random alphanumeric suffix for branch/folder names.
@@ -135,6 +136,10 @@ export async function handleCreateWorktree(
 	progressCallback?: CopyProgressCallback,
 ): Promise<WorktreeResult> {
 	const cwd = provider.cwd
+	const gitRoot = await worktreeService.getGitMirrortPath(cwd)
+	if (gitRoot) {
+		await WorktreeSandboxManager.ensureGitExclude(gitRoot)
+	}
 
 	const result = await worktreeService.createWorktree(cwd, options)
 
@@ -179,7 +184,8 @@ export async function handleGetAvailableBranches(provider: MirrorProvider): Prom
 
 export async function handleGetWorktreeDefaults(provider: MirrorProvider): Promise<WorktreeDefaultsResponse> {
 	const cwd = provider.cwd
-	const suggestedBranch = `feature/${generateRandomSuffix()}`
+	const randomSuffix = generateRandomSuffix()
+	const suggestedBranch = `mirror-sandbox/${randomSuffix}`
 	const gitRoot = await worktreeService.getGitMirrortPath(cwd)
 
 	if (!gitRoot) {
@@ -190,7 +196,7 @@ export async function handleGetWorktreeDefaults(provider: MirrorProvider): Promi
 		}
 	}
 
-	const suggestedPath = path.join(path.dirname(gitRoot), suggestedBranch)
+	const suggestedPath = path.join(gitRoot, ".mirror-vs", "worktrees", randomSuffix)
 
 	return { suggestedBranch, suggestedPath }
 }

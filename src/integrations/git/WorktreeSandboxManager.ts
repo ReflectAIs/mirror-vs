@@ -47,10 +47,16 @@ export class WorktreeSandboxManager {
 				await fs.mkdir(path.dirname(excludePath), { recursive: true })
 			}
 
-			const pattern = ".mirror-vs/worktrees"
-			if (!content.includes(pattern)) {
-				const separator = content.endsWith("\n") || content.length === 0 ? "" : "\n"
-				await fs.writeFile(excludePath, `${content}${separator}${pattern}\n`, "utf8")
+			const patterns = [".mirror-vs", ".mirror-vs/worktrees"]
+			let updated = content
+			for (const pattern of patterns) {
+				if (!updated.includes(pattern)) {
+					const separator = updated.endsWith("\n") || updated.length === 0 ? "" : "\n"
+					updated = `${updated}${separator}${pattern}\n`
+				}
+			}
+			if (updated !== content) {
+				await fs.writeFile(excludePath, updated, "utf8")
 			}
 		} catch {
 			// Best-effort: ignore if .git directory is read-only or complex submodule
