@@ -148,7 +148,7 @@ describe("WorktreeSelector", () => {
 		expect(screen.getByText("worktrees:primary")).toBeInTheDocument()
 	})
 
-	test("sends switch message when selecting a different worktree", () => {
+	test("sends setTabWorktree message when selecting a different worktree", () => {
 		render(<WorktreeSelector />)
 
 		simulateWorktreeListMessage(mockWorktrees)
@@ -160,13 +160,13 @@ describe("WorktreeSelector", () => {
 		fireEvent.click(items[1]) // Second item is feature-branch
 
 		expect(mockPostMessage).toHaveBeenCalledWith({
-			type: "switchWorktree",
+			type: "setTabWorktree",
+			tabId: undefined,
 			worktreePath: "/path/to/feature-branch",
-			worktreeNewWindow: false,
 		})
 	})
 
-	test("does not send switch message when selecting current worktree", () => {
+	test("does not send setTabWorktree message when selecting current worktree", () => {
 		render(<WorktreeSelector />)
 
 		simulateWorktreeListMessage(mockWorktrees)
@@ -181,7 +181,7 @@ describe("WorktreeSelector", () => {
 
 		expect(mockPostMessage).not.toHaveBeenCalledWith(
 			expect.objectContaining({
-				type: "switchWorktree",
+				type: "setTabWorktree",
 			}),
 		)
 	})

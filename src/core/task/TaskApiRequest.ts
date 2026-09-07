@@ -131,7 +131,7 @@ export class TaskApiRequest {
 				this.task.api.getModel().id,
 				provider.getSkillsManager(),
 				await provider.buildSessionSharedContext(this.task.taskId),
-				this.task.workspacePath,
+				this.task.worktreePath || this.task.workspacePath,
 				this.task.sandboxPath,
 				this.task.sandboxPath ? WorktreeSandboxManager.getBranchName(this.task.taskId) : undefined,
 			)

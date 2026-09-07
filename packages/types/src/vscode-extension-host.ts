@@ -357,6 +357,8 @@ export interface TabInfo {
 	createdAt: number
 	/** Optional one-line summary of the tab's current activity or goal */
 	oneLiner?: string
+	/** Selected git worktree path for this tab */
+	worktreePath?: string
 }
 
 export type ExtensionState = Pick<
@@ -517,6 +519,8 @@ export type ExtensionState = Pick<
 	tabs: TabInfo[]
 	/** Currently active tab's taskId */
 	activeTabId: string
+	/** Worktree path for the currently active tab */
+	currentTabWorktree?: string
 	/** User-curated notes for the current session (derived from sessionSharedContexts). */
 	sessionNotes?: string
 	activeTerminalCount: number
@@ -702,6 +706,7 @@ export interface WebviewMessage {
 		| "createWorktree"
 		| "deleteWorktree"
 		| "switchWorktree"
+		| "setTabWorktree"
 		| "getAvailableBranches"
 		| "getWorktreeDefaults"
 		| "getWorktreeIncludeStatus"
@@ -858,6 +863,7 @@ export interface WebviewMessage {
 	/** Task configuration applied via `createTask()`. */
 	taskConfiguration?: MirrorVSSettings
 	// Worktree properties
+	tabId?: string
 	worktreePath?: string
 	worktreeBranch?: string
 	worktreeBaseBranch?: string

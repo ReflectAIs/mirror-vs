@@ -173,6 +173,7 @@ export class TaskMirrorMessages {
 				messages: this.mirrorMessages,
 				globalStoragePath: this.globalStoragePath,
 				workspace: this.task.workspacePath || this.cwd || "",
+				worktreePath: this.task.worktreePath,
 				mode: this.task._taskMode || defaultModeSlug,
 				apiConfigName: this.task._taskApiConfigName,
 				initialStatus: this.task.initialStatus,

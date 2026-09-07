@@ -20,6 +20,14 @@ interface WorktreeSelectorProps {
 	setExperimentEnabled?: (id: any, enabled: boolean) => void
 }
 
+const normalizePath = (p?: string) =>
+	p
+		? p
+				.replace(/[/\\]+/g, "/")
+				.toLowerCase()
+				.replace(/\/$/, "")
+		: ""
+
 export const WorktreeSelector = ({
 	disabled = false,
 	experiments: propExperiments,
@@ -35,6 +43,9 @@ export const WorktreeSelector = ({
 	const experiments = propExperiments ?? extensionState?.experiments
 	const setExperimentEnabled = propSetExperimentEnabled ?? extensionState?.setExperimentEnabled
 	const isSandboxEnabled = !!experiments?.["gitWorktreeSandbox"]
+	const activeTabId = extensionState?.activeTabId
+	const tabs = extensionState?.tabs
+	const currentTabWorktree = extensionState?.currentTabWorktree
 	const [open, setOpen] = useState(false)
 	const [worktrees, setWorktrees] = useState<Worktree[]>([])
 	const [isGitRepo, setIsGitRepo] = useState(true)
@@ -42,8 +53,18 @@ export const WorktreeSelector = ({
 	const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null)
 	const portalContainer = useMirrorPortal("mirror-portal")
 
+	const activeTab = useMemo(() => tabs?.find((t) => t.taskId === activeTabId), [tabs, activeTabId])
+	const selectedWorktreePath = activeTab?.worktreePath || currentTabWorktree
+
 	// Find current worktree
-	const currentWorktree = useMemo(() => worktrees.find((w) => w.isCurrent), [worktrees])
+	const currentWorktree = useMemo(() => {
+		if (selectedWorktreePath) {
+			const normSelected = normalizePath(selectedWorktreePath)
+			const match = worktrees.find((w) => normalizePath(w.path) === normSelected)
+			if (match) return match
+		}
+		return worktrees.find((w) => w.isCurrent) || worktrees[0]
+	}, [worktrees, selectedWorktreePath])
 
 	// Fetch worktrees when popover opens
 	const fetchWorktrees = useCallback(() => {
@@ -76,14 +97,17 @@ export const WorktreeSelector = ({
 		}
 	}, [open, fetchWorktrees])
 
-	const handleSelect = useCallback((worktreePath: string) => {
-		vscode.postMessage({
-			type: "switchWorktree",
-			worktreePath: worktreePath,
-			worktreeNewWindow: false,
-		})
-		setOpen(false)
-	}, [])
+	const handleSelect = useCallback(
+		(worktreePath: string) => {
+			vscode.postMessage({
+				type: "setTabWorktree",
+				tabId: activeTabId,
+				worktreePath: worktreePath,
+			})
+			setOpen(false)
+		},
+		[activeTabId],
+	)
 
 	const handleSettingsClick = useCallback(() => {
 		vscode.postMessage({
@@ -181,7 +205,9 @@ export const WorktreeSelector = ({
 					{/* Worktree list */}
 					<div className="max-h-[260px] overflow-y-auto py-1">
 						{worktrees.map((worktree) => {
-							const isSelected = worktree.isCurrent
+							const isSelected = currentWorktree
+								? normalizePath(worktree.path) === normalizePath(currentWorktree.path)
+								: worktree.isCurrent
 							const canDelete = !isSelected && !worktree.isBare
 							return (
 								<div
@@ -251,10 +277,13 @@ export const WorktreeSelector = ({
 				<CreateWorktreeModal
 					open={showCreateModal}
 					onClose={() => setShowCreateModal(false)}
-					openAfterCreate={true}
-					onSuccess={() => {
+					openAfterCreate={false}
+					onSuccess={(createdPath) => {
 						setShowCreateModal(false)
 						fetchWorktrees()
+						if (createdPath) {
+							handleSelect(createdPath)
+						}
 					}}
 				/>
 			)}

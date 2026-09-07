@@ -135,6 +135,7 @@ export class MirrorProvider
 	public taskCreationCallback: (task: Task) => void
 	private taskEventListeners: WeakMap<Task, Array<() => void>> = new WeakMap()
 	private currentWorkspacePath: string | undefined
+	public tabWorktrees: Map<string, string> = new Map()
 	private _disposed = false
 
 	public recentTasksCache?: string[]
@@ -576,6 +577,21 @@ export class MirrorProvider
 		// Post updated state to webview so it renders this task's messages
 		await this.postStateToWebview()
 
+		// Also refresh worktree list for the newly focused background task
+		try {
+			const { handleListWorktrees } = await import("./worktree/handlers")
+			const worktreeListResp = await handleListWorktrees(this)
+			await this.postMessageToWebview({
+				type: "worktreeList",
+				worktrees: worktreeListResp.worktrees,
+				isGitRepo: worktreeListResp.isGitRepo,
+				isMultiRoot: worktreeListResp.isMultiRoot,
+				isSubfolder: worktreeListResp.isSubfolder,
+				gitRootPath: worktreeListResp.gitRootPath,
+				error: worktreeListResp.error,
+			})
+		} catch {}
+
 		this.log(
 			`[focusBackgroundTask] Task ${backgroundTask.taskId}.${backgroundTask.instanceId} focused from background`,
 		)
@@ -687,7 +703,86 @@ export class MirrorProvider
 		// Post updated state to webview (omit taskHistory — webview keeps it in-memory)
 		await this.postStateToWebviewWithoutTaskHistory()
 
+		// Also refresh worktree list for the newly focused tab
+		try {
+			const { handleListWorktrees } = await import("./worktree/handlers")
+			const worktreeListResp = await handleListWorktrees(this)
+			await this.postMessageToWebview({
+				type: "worktreeList",
+				worktrees: worktreeListResp.worktrees,
+				isGitRepo: worktreeListResp.isGitRepo,
+				isMultiRoot: worktreeListResp.isMultiRoot,
+				isSubfolder: worktreeListResp.isSubfolder,
+				gitRootPath: worktreeListResp.gitRootPath,
+				error: worktreeListResp.error,
+			})
+		} catch {}
+
 		this.log(`[switchToTask] Task ${target.taskId}.${target.instanceId} focused from mirror stack`)
+	}
+
+	/**
+	 * Returns the remembered worktree path for a specific tab/task.
+	 */
+	public getTabWorktree(taskId?: string): string | undefined {
+		if (!taskId) return undefined
+		return this.tabWorktrees.get(taskId)
+	}
+
+	/**
+	 * Remembers and sets the worktree for a specific tab/task.
+	 * Persists the association so the tab retains it across tab switches.
+	 */
+	public async setTabWorktree(taskId: string | undefined, worktreePath: string): Promise<void> {
+		const targetTaskId = taskId || this.getCurrentTask()?.taskId
+		if (!targetTaskId) {
+			return
+		}
+
+		this.tabWorktrees.set(targetTaskId, worktreePath)
+
+		// Persist in contextProxy under sessionTabWorktrees
+		try {
+			const persisted: Record<string, string> = (await this.contextProxy.getValue("sessionTabWorktrees")) || {}
+			persisted[targetTaskId] = worktreePath
+			await this.contextProxy.setValue("sessionTabWorktrees", persisted)
+		} catch (err) {
+			this.log(`[setTabWorktree] Failed to persist sessionTabWorktrees: ${err}`)
+		}
+
+		// Find the task on mirrorStack or backgroundTasks
+		const task = this.getAllTasksSorted().find((t) => t.taskId === targetTaskId)
+		if (task) {
+			task.worktreePath = worktreePath
+			if (task.historyItem) {
+				task.historyItem.worktreePath = worktreePath
+			}
+			try {
+				await task.saveMirrorMessages()
+			} catch (err) {
+				this.log(`[setTabWorktree] Failed to save task history with new worktree: ${err}`)
+			}
+		}
+
+		// Push state update to webview so tabs array and currentTabWorktree update immediately
+		await this.postStateToWebviewWithoutTaskHistory()
+
+		// Also push updated worktree list so isCurrent reflects the newly selected worktree
+		try {
+			const { handleListWorktrees } = await import("./worktree/handlers")
+			const worktreeListResp = await handleListWorktrees(this)
+			await this.postMessageToWebview({
+				type: "worktreeList",
+				worktrees: worktreeListResp.worktrees,
+				isGitRepo: worktreeListResp.isGitRepo,
+				isMultiRoot: worktreeListResp.isMultiRoot,
+				isSubfolder: worktreeListResp.isSubfolder,
+				gitRootPath: worktreeListResp.gitRootPath,
+				error: worktreeListResp.error,
+			})
+		} catch (err) {
+			this.log(`[setTabWorktree] Failed to post worktree list update: ${err}`)
+		}
 	}
 
 	/**
@@ -1371,6 +1466,7 @@ export class MirrorProvider
 			parentTask: historyItem.parentTask,
 			taskNumber: historyItem.number,
 			workspacePath: historyItem.workspace,
+			worktreePath: historyItem.worktreePath ?? this.tabWorktrees.get(historyItem.id),
 			onCreated: this.taskCreationCallback,
 			startTask: options?.startTask ?? true,
 			// Preserve the status from the history item to avoid overwriting it when the task saves messages

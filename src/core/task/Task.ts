@@ -161,6 +161,7 @@ export interface TaskOptions extends CreateTaskOptions {
 	onCreated?: (task: Task) => void
 	initialTodos?: TodoItem[]
 	workspacePath?: string
+	worktreePath?: string
 	/** Initial status for the task's history item (e.g., "active" for child tasks) */
 	initialStatus?: "active" | "delegated" | "completed"
 }
@@ -539,6 +540,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	experiments?: Record<string, boolean>
 	sandboxPath?: string
+	worktreePath?: string
 
 	constructor({
 		provider,
@@ -558,6 +560,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		onCreated,
 		initialTodos,
 		workspacePath,
+		worktreePath: initialWorktreePath,
 		initialStatus,
 		sessionId,
 	}: TaskOptions) {
@@ -608,6 +611,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.workspacePath = parentTask
 			? parentTask.workspacePath
 			: (workspacePath ?? getWorkspacePath(path.join(os.homedir(), "Desktop")))
+
+		this.worktreePath =
+			initialWorktreePath ??
+			historyItem?.worktreePath ??
+			(parentTask ? (parentTask as Task).worktreePath : undefined)
 
 		this.instanceId = crypto.randomUUID().slice(0, 8)
 		this.taskNumber = -1

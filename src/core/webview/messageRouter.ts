@@ -40,6 +40,7 @@ import {
 	handleFocusPanelRequest,
 	handleSwitchTab,
 	handleSwitchTaskTab,
+	handleSetTabWorktree,
 	handleCloseTaskTab,
 	handleInsertTextIntoTextarea,
 	handleRefreshCustomTools,
@@ -974,6 +975,17 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 				)
 
 				await provider.postMessageToWebview({ type: "worktreeResult", success, text })
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				await provider.postMessageToWebview({ type: "worktreeResult", success: false, text: errorMessage })
+			}
+
+			break
+		}
+
+		case "setTabWorktree": {
+			try {
+				await handleSetTabWorktree(provider, message.tabId || message.taskId, message.worktreePath)
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : String(error)
 				await provider.postMessageToWebview({ type: "worktreeResult", success: false, text: errorMessage })

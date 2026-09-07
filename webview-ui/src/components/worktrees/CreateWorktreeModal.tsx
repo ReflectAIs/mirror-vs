@@ -13,7 +13,7 @@ interface CreateWorktreeModalProps {
 	open: boolean
 	onClose: () => void
 	openAfterCreate?: boolean
-	onSuccess?: () => void
+	onSuccess?: (worktreePath?: string) => void
 }
 
 export const CreateWorktreeModal = ({
@@ -97,7 +97,7 @@ export const CreateWorktreeModal = ({
 								worktreeNewWindow: true,
 							})
 						}
-						onSuccess?.()
+						onSuccess?.(worktreePath)
 						onClose()
 					} else {
 						setError(message.text || "Unknown error")

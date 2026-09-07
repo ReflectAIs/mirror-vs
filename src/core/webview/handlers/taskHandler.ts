@@ -662,6 +662,19 @@ export async function handleSwitchTaskTab(provider: MirrorProvider, taskId?: str
 }
 
 /**
+ * Handles the setTabWorktree message — sets and remembers the selected worktree for a tab.
+ */
+export async function handleSetTabWorktree(
+	provider: MirrorProvider,
+	tabId?: string,
+	worktreePath?: string,
+): Promise<void> {
+	if (worktreePath) {
+		await provider.setTabWorktree(tabId, worktreePath)
+	}
+}
+
+/**
  * Handles the closeTaskTab message — closes a task tab.
  * The frontend is expected to have already confirmed with the user before
  * sending this message. This method does NOT prompt for confirmation.

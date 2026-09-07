@@ -109,6 +109,22 @@ export async function handleListWorktrees(provider: MirrorProvider): Promise<Wor
 	try {
 		const worktrees = await worktreeService.listWorktrees(cwd)
 
+		const currentTask = provider.getCurrentTask()
+		const activeTabWorktree =
+			currentTask?.worktreePath || (currentTask ? provider.getTabWorktree(currentTask.taskId) : undefined)
+
+		if (activeTabWorktree) {
+			const normalize = (p: string) =>
+				p
+					.replace(/[/\\]+/g, "/")
+					.toLowerCase()
+					.replace(/\/$/, "")
+			const normalizedActive = normalize(activeTabWorktree)
+			for (const wt of worktrees) {
+				wt.isCurrent = normalize(wt.path) === normalizedActive
+			}
+		}
+
 		return {
 			worktrees,
 			isGitRepo: true,

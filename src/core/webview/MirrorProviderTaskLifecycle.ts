@@ -120,6 +120,11 @@ export class TaskLifecycleManager {
 			throw new OrganizationAllowListViolationError(t("common:errors.violated_organization_allowlist"))
 		}
 
+		const tabWorktree =
+			(options as any).worktreePath ||
+			(options.taskId ? this.provider.getTabWorktree(options.taskId) : undefined) ||
+			this.provider.getCurrentTask()?.worktreePath
+
 		const task = new Task({
 			provider: this.provider,
 			apiConfiguration,
@@ -137,11 +142,16 @@ export class TaskLifecycleManager {
 			// Session grouping: top-level tasks inherit the session ID.
 			// Child tasks (delegation) inherit via parentTask.sessionId flow.
 			sessionId: this.provider.currentSessionId,
+			worktreePath: tabWorktree,
 			// Ensure this task is present in mirrorStack before startTask() emits
 			// its initial state update, so state.currentTaskId is available ASAP.
 			startTask: false,
 			...options,
 		})
+
+		if (tabWorktree) {
+			this.provider.tabWorktrees.set(task.taskId, tabWorktree)
+		}
 
 		console.log(
 			`[SESSION-DBG] createTask: task=${task.taskId}.${task.instanceId} ` +
