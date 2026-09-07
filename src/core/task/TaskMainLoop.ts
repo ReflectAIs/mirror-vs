@@ -424,13 +424,7 @@ export class TaskMainLoop {
 			// Respect user-configured provider rate limiting BEFORE we emit api_req_started.
 			// This prevents the UI from showing an "API Request..." spinner while we are
 			// intentionally waiting due to the rate limit slider.
-			//
-			// NOTE: We also set Task.lastGlobalApiRequestTime here to reserve this slot
-			// before we build environment details (which can take time).
-			// This ensures subsequent requests (including subtasks) still honour the
-			// provider rate-limit window.
 			await this.task.maybeWaitForProviderRateLimit(currentItem.retryAttempt ?? 0)
-			Task.lastGlobalApiRequestTime = performance.now()
 
 			await this.task.say(
 				"api_req_started",
