@@ -56,6 +56,9 @@ async function generatePrompt(
 	modelId?: string,
 	skillsManager?: SkillsManager,
 	sessionSharedContext?: string,
+	workspacePath?: string,
+	sandboxPath?: string,
+	sandboxBranch?: string,
 ): Promise<string> {
 	if (!context) {
 		throw new Error("Extension context is required for generating system prompt")
@@ -99,7 +102,7 @@ ${getRulesSection(cwd, settings, mode)}
 
 ${getObjectiveSection()}
 
-${getSystemInfoSection(cwd)}
+${getSystemInfoSection(cwd, workspacePath, sandboxPath, sandboxBranch)}
 
 ${await addCustomInstructions(baseInstructions, globalCustomInstructions || "", cwd, mode, {
 	language: language ?? formatLanguage(vscode.env.language),
@@ -128,6 +131,9 @@ export const SYSTEM_PROMPT = async (
 	modelId?: string,
 	skillsManager?: SkillsManager,
 	sessionSharedContext?: string,
+	workspacePath?: string,
+	sandboxPath?: string,
+	sandboxBranch?: string,
 ): Promise<string> => {
 	if (!context) {
 		throw new Error("Extension context is required for generating system prompt")
@@ -157,5 +163,8 @@ export const SYSTEM_PROMPT = async (
 		modelId,
 		skillsManager,
 		sessionSharedContext,
+		workspacePath,
+		sandboxPath,
+		sandboxBranch,
 	)
 }

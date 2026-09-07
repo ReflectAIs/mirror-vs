@@ -58,13 +58,16 @@ const TaskItem = ({
 	const inputRef = useRef<HTMLInputElement>(null)
 	const blurTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
-	const activeCwd = currentWorkspacePath || cwd || ""
-	const isCrossWorkspace = Boolean(
-		item.workspace &&
-			activeCwd &&
-			item.workspace.replace(/\\/g, "/").toLowerCase().trim() !==
-				activeCwd.replace(/\\/g, "/").toLowerCase().trim(),
-	)
+	const normalizeWorkspace = (ws?: string): string => {
+		if (!ws) return ""
+		const normalized = ws.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase().trim()
+		const match = normalized.match(/^(.*?)\/\.mirror-vs\/worktrees\/[^/]+$/)
+		return match ? match[1] : normalized
+	}
+
+	const activeCwd = normalizeWorkspace(currentWorkspacePath || cwd)
+	const itemWorkspace = normalizeWorkspace(item.workspace)
+	const isCrossWorkspace = Boolean(itemWorkspace && activeCwd && itemWorkspace !== activeCwd)
 
 	// Keep rename value in sync when displayName changes externally
 	useEffect(() => {

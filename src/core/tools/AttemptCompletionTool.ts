@@ -80,11 +80,8 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 
 			let finalResult = result
 			if (task.sandboxPath) {
-				const status = await WorktreeSandboxManager.getSandboxStatus(task.sandboxPath)
-				if (status.hasChanges) {
-					const branch = WorktreeSandboxManager.getBranchName(task.taskId)
-					finalResult += `\n\n🛡️ **Isolated Git Sandbox Notice**:\nAll changes were executed inside isolated worktree branch \`${branch}\`. Your primary working tree was kept untouched. To merge these changes into your active branch, run:\n\`\`\`bash\ngit merge ${branch}\n\`\`\``
-				}
+				const branch = WorktreeSandboxManager.getBranchName(task.taskId)
+				finalResult += `\n\n🛡️ **Isolated Git Sandbox Notice**:\nAll changes were executed inside isolated worktree branch \`${branch}\` to protect your primary working tree (\`${task.workspacePath}\`).\nApproving completion will automatically merge these changes into your main repository. Or you can merge manually:\n\`\`\`bash\ncd "${task.workspacePath}" && git merge ${branch}\n\`\`\``
 			}
 
 			await task.say("completion_result", finalResult, undefined, false)
@@ -141,6 +138,25 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 			const { response, text, images } = await task.ask("completion_result", "", false)
 
 			if (response === "yesButtonClicked") {
+				if (task.sandboxPath && task.workspacePath) {
+					const mergeRes = await WorktreeSandboxManager.applySandboxToWorkspace(
+						task.workspacePath,
+						task.taskId,
+					)
+					if (mergeRes.success) {
+						task.sandboxPath = undefined
+						await task.say(
+							"text",
+							`✅ **Sandbox Merged**: Successfully applied sandbox changes to the primary repository.\n\n${mergeRes.message}`,
+						)
+					} else {
+						await task.say(
+							"error",
+							`⚠️ **Sandbox Merge Warning**: ${mergeRes.message}\n\nYou can manually review and merge branch \`${WorktreeSandboxManager.getBranchName(task.taskId)}\` into \`${task.workspacePath}\`.`,
+						)
+					}
+				}
+
 				console.log(
 					`[AttemptCompletion] yesButtonClicked → emitTaskCompleted for task ${task.taskId}, queue size: ${task.messageQueueService?.messages?.length ?? 0}`,
 				)

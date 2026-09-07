@@ -21,6 +21,7 @@ import { maybeRemoveImageBlocks } from "../../api/transform/image-cleaning"
 import { getModelMaxOutputTokens } from "../../shared/api"
 import { Package } from "../../shared/package"
 import { SYSTEM_PROMPT } from "../prompts/system"
+import { WorktreeSandboxManager } from "../../integrations/git/WorktreeSandboxManager"
 import { McpHub } from "../../services/mcp/McpHub"
 import { McpServerManager } from "../../services/mcp/McpServerManager"
 import { buildNativeToolsArrayWithRestrictions } from "./build-tools"
@@ -130,6 +131,9 @@ export class TaskApiRequest {
 				this.task.api.getModel().id,
 				provider.getSkillsManager(),
 				await provider.buildSessionSharedContext(this.task.taskId),
+				this.task.workspacePath,
+				this.task.sandboxPath,
+				this.task.sandboxPath ? WorktreeSandboxManager.getBranchName(this.task.taskId) : undefined,
 			)
 		})()
 	}

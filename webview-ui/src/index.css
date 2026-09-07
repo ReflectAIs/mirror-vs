@@ -1004,3 +1004,202 @@ select option:checked {
 	color: var(--vscode-list-activeSelectionForeground, #ffffff) !important;
 }
 
+/* ==========================================================================
+   Universal Smooth Transitions & Frontend Animations
+   ========================================================================== */
+
+/* 1. Global smooth scrolling & theme background transitions */
+html {
+	scroll-behavior: smooth;
+}
+
+body,
+#root {
+	transition:
+		background-color 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+		color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 2. Universal Interactive Element Transitions (buttons, links, clickables) */
+button,
+[role="button"],
+a,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.vscode-button,
+summary,
+.clickable,
+[role="tab"] {
+	transition:
+		background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		color 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+		filter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:hover,
+[role="button"]:hover,
+.vscode-button:hover,
+[role="tab"]:hover {
+	transform: translateY(-0.5px);
+}
+
+button:active,
+[role="button"]:active,
+.vscode-button:active,
+[role="tab"]:active {
+	transform: scale(0.97) translateY(0);
+	transition-duration: 0.08s;
+}
+
+/* 3. Universal Inputs, Textareas, and Dropdown Controls */
+input[type="text"],
+input[type="password"],
+input[type="search"],
+input[type="number"],
+input[type="url"],
+input[type="email"],
+textarea,
+select {
+	transition:
+		background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		color 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+		outline-color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007fd4);
+}
+
+/* 4. Checkboxes, Radios, and Toggles */
+input[type="checkbox"],
+input[type="radio"],
+[role="switch"],
+[role="checkbox"] {
+	transition:
+		background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input[type="checkbox"]:active,
+input[type="radio"]:active {
+	transform: scale(0.9);
+}
+
+/* 5. Universal Cards, Containers, History/Task Items, Badges */
+.card,
+[role="listitem"],
+[role="menuitem"],
+[role="option"],
+.history-item,
+.task-item,
+.badge,
+[class*="badge-"] {
+	transition:
+		background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 6. Universal Smooth View & Tab Page Entrance Transitions */
+main,
+[role="tabpanel"],
+.tab-content,
+.view-container {
+	animation: mirrorViewEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mirrorViewEnter {
+	from {
+		opacity: 0;
+		transform: translateY(5px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 7. Dialogs, Popovers, Dropdowns & Modals */
+[role="dialog"],
+[role="menu"],
+[data-radix-popper-content-wrapper],
+.modal-content,
+.popover-content,
+.dropdown-content {
+	animation: mirrorPopoverEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+	transition:
+		opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mirrorPopoverEnter {
+	from {
+		opacity: 0;
+		transform: scale(0.96) translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+/* 8. Tooltips */
+[role="tooltip"],
+[data-radix-tooltip-content] {
+	animation: mirrorTooltipEnter 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mirrorTooltipEnter {
+	from {
+		opacity: 0;
+		transform: translateY(2px) scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* 9. Accordions, Collapsibles, and Summaries */
+details,
+[data-state="open"],
+[data-state="closed"] {
+	transition:
+		max-height 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 0.2s ease;
+}
+
+summary {
+	cursor: pointer;
+	user-select: none;
+}
+
+/* 10. Scrollbar Smooth Hover */
+*::-webkit-scrollbar-thumb {
+	transition: background-color 0.2s ease;
+}
+
+/* 11. Reduced Motion Accessibility */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
+}
