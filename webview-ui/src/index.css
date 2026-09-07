@@ -1099,8 +1099,6 @@ input[type="radio"]:active {
 /* 5. Universal Cards, Containers, History/Task Items, Badges */
 .card,
 [role="listitem"],
-[role="menuitem"],
-[role="option"],
 .history-item,
 .task-item,
 .badge,
@@ -1111,6 +1109,14 @@ input[type="radio"]:active {
 		box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
 		transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
 		opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[role="menuitem"],
+[role="option"] {
+	transition:
+		background-color 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+		color 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* 6. Universal Smooth View & Tab Page Entrance Transitions */
@@ -1132,45 +1138,12 @@ main,
 	}
 }
 
-/* 7. Dialogs, Popovers, Dropdowns & Modals */
-[role="dialog"],
-[role="menu"],
-[data-radix-popper-content-wrapper],
-.modal-content,
-.popover-content,
-.dropdown-content {
-	animation: mirrorPopoverEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-	transition:
-		opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-		transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes mirrorPopoverEnter {
-	from {
-		opacity: 0;
-		transform: scale(0.96) translateY(-4px);
-	}
-	to {
-		opacity: 1;
-		transform: scale(1) translateY(0);
-	}
-}
-
-/* 8. Tooltips */
-[role="tooltip"],
-[data-radix-tooltip-content] {
-	animation: mirrorTooltipEnter 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes mirrorTooltipEnter {
-	from {
-		opacity: 0;
-		transform: translateY(2px) scale(0.96);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-	}
+/* 7. Radix / Floating UI Popper Wrappers (Header 3-dots, Dropdowns, Indexing Popups)
+   Must NEVER have transform animations or transitions on the outer wrapper,
+   as Floating UI calculates coordinate placement in JS on mount. */
+[data-radix-popper-content-wrapper] {
+	transition: none !important;
+	animation: none !important;
 }
 
 /* 9. Accordions, Collapsibles, and Summaries */

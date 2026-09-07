@@ -983,7 +983,14 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						{renderTab === "mcp" && <McpView />}
 
 						{/* Worktrees Section */}
-						{renderTab === "worktrees" && <WorktreesView />}
+						{renderTab === "worktrees" && (
+							<WorktreesView
+								gitWorktreeSandbox={experiments?.["gitWorktreeSandbox"] ?? false}
+								onToggleGitWorktreeSandbox={(enabled) =>
+									setExperimentEnabled("gitWorktreeSandbox", enabled)
+								}
+							/>
+						)}
 
 						{/* Prompts Section */}
 						{renderTab === "prompts" && (

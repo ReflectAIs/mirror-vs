@@ -49,6 +49,13 @@
 	"deleting": "Deleting...",
 	"close": "Close",
 	"showInHomeScreen": "Show worktrees in home screen",
+	"taskIsolation": {
+		"title": "Isolate tasks in temporary Git Worktrees",
+		"enabledDesc": "Tasks execute inside an isolated worktree branch (.mirror-vs/worktrees/<task-id>) to keep your working tree and unstaged changes untouched until merged.",
+		"disabledDesc": "Tasks execute directly in your active working tree without creating temporary worktrees.",
+		"enabledShort": "Creates temporary worktree branch",
+		"disabledShort": "Runs directly in selected worktree"
+	},
 	"selector": {
 		"worktree": "Worktree",
 		"title": "Worktrees",

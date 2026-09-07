@@ -86,12 +86,12 @@ describe("WorktreeSelector", () => {
 		expect(container.querySelector('[data-testid="worktree-selector-trigger"]')).not.toBeInTheDocument()
 	})
 
-	test("does not render when only one worktree exists", () => {
+	test("renders trigger when one worktree exists in git repo", () => {
 		const { container } = render(<WorktreeSelector />)
 
 		simulateWorktreeListMessage([mockWorktrees[0]])
 
-		expect(container.querySelector('[data-testid="worktree-selector-trigger"]')).not.toBeInTheDocument()
+		expect(container.querySelector('[data-testid="worktree-selector-trigger"]')).toBeInTheDocument()
 	})
 
 	test("renders trigger when multiple worktrees exist", () => {

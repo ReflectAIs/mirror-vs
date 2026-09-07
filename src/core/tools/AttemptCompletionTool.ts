@@ -78,11 +78,7 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 
 			task.consecutiveMistakeCount = 0
 
-			let finalResult = result
-			if (task.sandboxPath) {
-				const branch = WorktreeSandboxManager.getBranchName(task.taskId)
-				finalResult += `\n\n🛡️ **Isolated Git Sandbox Notice**:\nAll changes were executed inside isolated worktree branch \`${branch}\` to protect your primary working tree (\`${task.workspacePath}\`).\nApproving completion will automatically merge these changes into your main repository. Or you can merge manually:\n\`\`\`bash\ncd "${task.workspacePath}" && git merge ${branch}\n\`\`\``
-			}
+			const finalResult = result
 
 			await task.say("completion_result", finalResult, undefined, false)
 

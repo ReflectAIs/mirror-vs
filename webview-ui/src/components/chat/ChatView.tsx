@@ -390,8 +390,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				<ChatWelcomeContent taskHistoryLength={taskHistory.length} />
 			)}
 
-			{!task && showWorktreesInHomeScreen && <WorktreeSelector />}
-
 			{task && (
 				<>
 					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
@@ -496,6 +494,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 						actionText={t("chat:retiredProvider.openSettings")}
 						onAction={() => vscode.postMessage({ type: "switchTab", tab: "settings" })}
 					/>
+				</div>
+			)}
+			{showWorktreesInHomeScreen && (
+				<div className="px-2 mb-0.5">
+					<WorktreeSelector />
 				</div>
 			)}
 			<ChatTextArea

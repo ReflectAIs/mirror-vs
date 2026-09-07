@@ -36,12 +36,15 @@ Sandbox Ephemeral Git Branch: ${sandboxBranch || "ephemeral sandbox branch"}
 
 🛡️ ISOLATED GIT WORKTREE SANDBOX ACTIVE:
 - You are operating inside an isolated temporary Git worktree (${sandboxPath.toPosix()}) on branch '${sandboxBranch}'.
-- The user's MAIN REPOSITORY is at '${workspacePath.toPosix()}'. It is intentionally kept untouched until review and merge.
-- DO NOT confuse the temporary worktree with the main repository.
-- DO NOT run 'git push' from the temporary worktree branch to remote branches (such as origin/main or origin/master). Pushing from the sandbox does NOT update the user's main branch!
-- If the user asks you to push code while in a sandbox, inform them that changes are currently isolated in this temporary worktree and will be merged into their main repository upon approving completion (via attempt_completion). Do not push ephemeral sandbox branches directly.
+- The user's MAIN REPOSITORY is at '${workspacePath.toPosix()}'.
+- Do NOT output boilerplate notices about the isolated sandbox environment.
 - All file reading, editing, building, linting, and testing MUST take place in your current sandbox working directory (${sandboxPath.toPosix()}).
-- When completing the task, commit your work in the sandbox if needed, explain the changes made, and call attempt_completion. Upon user approval, your changes will be merged into the main repository at ${workspacePath.toPosix()}.`
+- Merging to Main Repository:
+  * If you are confident everything is tested, correct, and ready, you can merge your changes into the main repository using execute_command:
+    git -C "${workspacePath.toPosix()}" merge --no-ff "${sandboxBranch}" -m "Merge sandboxed changes"
+  * If you want user confirmation before merging, simply ask the user in your message whether they want you to merge the sandbox changes into their main repository.
+  * When attempt_completion is approved by the user, any unmerged sandbox changes will also be automatically merged into the main repository.
+- DO NOT run 'git push' from the temporary worktree branch to remote branches (such as origin/main or origin/master). Only push from the main repository once merged.`
 	} else {
 		details += `
 Current Workspace Directory: ${cwd.toPosix()}
