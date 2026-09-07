@@ -296,4 +296,15 @@ describe("WorktreeSelector", () => {
 		// Should show "worktrees:noBranch" translation key for detached HEAD
 		expect(screen.getByText("worktrees:noBranch")).toBeInTheDocument()
 	})
+
+	test("shows delete button for non-current, non-bare worktrees", () => {
+		render(<WorktreeSelector />)
+
+		simulateWorktreeListMessage(mockWorktrees)
+
+		fireEvent.click(screen.getByTestId("worktree-selector-trigger"))
+
+		const deleteButtons = screen.getAllByTestId("delete-worktree-btn")
+		expect(deleteButtons.length).toBe(2) // feature-branch and another-branch (main is current & bare)
+	})
 })

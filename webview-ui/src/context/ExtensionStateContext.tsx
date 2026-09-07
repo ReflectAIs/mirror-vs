@@ -497,8 +497,15 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		alwaysAllowBrowser,
 		setAlwaysAllowBrowser,
 		followupAutoApproveTimeoutMs,
-		setExperimentEnabled: (id, enabled) =>
-			setState((prevState) => ({ ...prevState, experiments: { ...prevState.experiments, [id]: enabled } })),
+		setExperimentEnabled: (id, enabled) => {
+			setState((prevState) => ({ ...prevState, experiments: { ...prevState.experiments, [id]: enabled } }))
+			vscode.postMessage({
+				type: "updateSettings",
+				updatedSettings: {
+					experiments: { [id]: enabled },
+				},
+			})
+		},
 		setApiConfiguration,
 		setCustomInstructions: (value) => setState((prevState) => ({ ...prevState, customInstructions: value })),
 		setAlwaysAllowReadOnly: (value) => setState((prevState) => ({ ...prevState, alwaysAllowReadOnly: value })),

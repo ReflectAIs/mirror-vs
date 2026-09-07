@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react"
-import { GitBranch, Check, ChevronDown, Plus } from "lucide-react"
+import { GitBranch, Check, ChevronDown, Plus, Trash2, Info } from "lucide-react"
 
 import type { Worktree, WorktreeListResponse } from "@mirror-vs/types"
 
@@ -11,6 +11,7 @@ import { useExtensionState } from "@/context/ExtensionStateContext"
 import { vscode } from "@/utils/vscode"
 
 import { CreateWorktreeModal } from "../worktrees/CreateWorktreeModal"
+import { DeleteWorktreeModal } from "../worktrees/DeleteWorktreeModal"
 import { IconButton } from "./IconButton"
 
 interface WorktreeSelectorProps {
@@ -38,6 +39,7 @@ export const WorktreeSelector = ({
 	const [worktrees, setWorktrees] = useState<Worktree[]>([])
 	const [isGitRepo, setIsGitRepo] = useState(true)
 	const [showCreateModal, setShowCreateModal] = useState(false)
+	const [worktreeToDelete, setWorktreeToDelete] = useState<Worktree | null>(null)
 	const portalContainer = useMirrorPortal("mirror-portal")
 
 	// Find current worktree
@@ -138,6 +140,9 @@ export const WorktreeSelector = ({
 								<h4 className="font-semibold text-xs text-vscode-foreground m-0">
 									{t("worktrees:selector.title")}
 								</h4>
+								<StandardTooltip content={t("worktrees:selector.info")}>
+									<Info className="size-3.5 text-vscode-descriptionForeground hover:text-vscode-foreground cursor-help" />
+								</StandardTooltip>
 							</div>
 							<IconButton
 								iconClass="codicon-settings-gear"
@@ -153,9 +158,14 @@ export const WorktreeSelector = ({
 					{/* Task Sandbox Isolation Option */}
 					<div className="px-3 py-2 border-b border-vscode-panel-border bg-vscode-editor-background/40 flex items-center justify-between gap-2">
 						<div className="flex flex-col pr-2">
-							<span className="text-xs font-semibold text-vscode-foreground">
-								{t("worktrees:taskIsolation.title")}
-							</span>
+							<div className="flex items-center gap-1">
+								<span className="text-xs font-semibold text-vscode-foreground">
+									{t("worktrees:taskIsolation.title")}
+								</span>
+								<StandardTooltip content={t("worktrees:taskIsolation.tooltip")}>
+									<Info className="size-3 text-vscode-descriptionForeground hover:text-vscode-foreground cursor-help" />
+								</StandardTooltip>
+							</div>
 							<span className="text-[11px] text-vscode-descriptionForeground">
 								{isSandboxEnabled
 									? t("worktrees:taskIsolation.enabledShort")
@@ -172,13 +182,14 @@ export const WorktreeSelector = ({
 					<div className="max-h-[260px] overflow-y-auto py-1">
 						{worktrees.map((worktree) => {
 							const isSelected = worktree.isCurrent
+							const canDelete = !isSelected && !worktree.isBare
 							return (
 								<div
 									key={worktree.path}
 									onClick={() => !isSelected && handleSelect(worktree.path)}
 									data-testid="worktree-selector-item"
 									className={cn(
-										"px-3 py-2 text-sm cursor-pointer flex items-center gap-2",
+										"group px-3 py-2 text-sm cursor-pointer flex items-center gap-2",
 										"hover:bg-vscode-list-hoverBackground transition-colors",
 										isSelected &&
 											"bg-vscode-list-activeSelectionBackground text-vscode-list-activeSelectionForeground",
@@ -197,7 +208,22 @@ export const WorktreeSelector = ({
 										</div>
 										<div className="text-xs opacity-75 ml-5 truncate">{worktree.path}</div>
 									</div>
-									{isSelected && <Check className="ml-auto size-4 p-0.5 shrink-0" />}
+									{isSelected ? (
+										<Check className="ml-auto size-4 p-0.5 shrink-0" />
+									) : canDelete ? (
+										<button
+											type="button"
+											title={t("worktrees:deleteWorktree")}
+											aria-label={t("worktrees:deleteWorktree")}
+											data-testid="delete-worktree-btn"
+											className="ml-auto opacity-0 group-hover:opacity-100 p-1 text-vscode-descriptionForeground hover:text-vscode-errorForeground rounded transition-opacity"
+											onClick={(e) => {
+												e.stopPropagation()
+												setWorktreeToDelete(worktree)
+											}}>
+											<Trash2 className="size-3.5" />
+										</button>
+									) : null}
 								</div>
 							)
 						})}
@@ -228,6 +254,19 @@ export const WorktreeSelector = ({
 					openAfterCreate={true}
 					onSuccess={() => {
 						setShowCreateModal(false)
+						fetchWorktrees()
+					}}
+				/>
+			)}
+
+			{/* Delete Worktree Modal */}
+			{worktreeToDelete && (
+				<DeleteWorktreeModal
+					open={!!worktreeToDelete}
+					onClose={() => setWorktreeToDelete(null)}
+					worktree={worktreeToDelete}
+					onSuccess={() => {
+						setWorktreeToDelete(null)
 						fetchWorktrees()
 					}}
 				/>

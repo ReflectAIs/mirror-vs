@@ -51,17 +51,18 @@
 	"showInHomeScreen": "Show worktrees in home screen",
 	"taskIsolation": {
 		"title": "Isolate tasks in temporary Git Worktrees",
-		"enabledDesc": "Tasks execute inside an isolated worktree branch (.mirror-vs/worktrees/<task-id>) to keep your working tree and unstaged changes untouched until merged.",
+		"enabledDesc": "When enabled, an isolated temporary worktree is created only if you explicitly ask for one in your prompt (e.g. 'run in sandbox'). Otherwise, tasks run directly in your active working tree.",
 		"disabledDesc": "Tasks execute directly in your active working tree without creating temporary worktrees.",
-		"enabledShort": "Creates temporary worktree branch",
-		"disabledShort": "Runs directly in selected worktree"
+		"enabledShort": "Only when explicitly requested in prompt",
+		"disabledShort": "Runs directly in selected worktree",
+		"tooltip": "Tasks run directly in your selected worktree by default. When enabled, a temporary sandbox worktree is created only if you explicitly request it in your prompt."
 	},
 	"selector": {
 		"worktree": "Worktree",
 		"title": "Worktrees",
 		"tooltip": "Switch between worktrees",
-		"description": "Git worktrees let you work on multiple branches simultaneously. Click to switch workspace.",
+		"description": "Git worktrees allow you to have multiple working directories attached to the same repository.",
 		"settings": "Manage Worktrees",
-		"info": "Git worktrees allow you to have multiple working directories attached to the same repository."
+		"info": "Git worktrees let you work on multiple branches simultaneously in separate directories without switching branches. Click any worktree to switch your workspace, or click the trash icon to delete an unused worktree."
 	}
 }

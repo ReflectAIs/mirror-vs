@@ -251,15 +251,29 @@ export class TaskMainLoop {
 	 * queued user messages and feeds them back as new user content.
 	 */
 	async initiateTaskLoop(userContent: Anthropic.Messages.ContentBlockParam[]): Promise<void> {
-		// Initialize isolated git sandbox if experiment is enabled and not yet initialized
+		// Initialize isolated git sandbox ONLY if experiment is enabled, sandbox is not yet created,
+		// and the user explicitly requested running in a sandbox/isolated worktree in their message.
+		// Otherwise, tasks run directly in the user-selected working tree / worktree.
 		if (this.task.experiments?.gitWorktreeSandbox && !this.task.sandboxPath) {
-			const sandbox = await WorktreeSandboxManager.createSandbox(this.task.workspacePath, this.task.taskId)
-			if (sandbox) {
-				this.task.sandboxPath = sandbox
-				await this.task.say(
-					"text",
-					`🛡️ Task running in isolated Git worktree: \`${sandbox}\` on branch \`${WorktreeSandboxManager.getBranchName(this.task.taskId)}\`. Your active working tree is untouched.`,
+			const promptText = userContent
+				.filter((block): block is Anthropic.Messages.TextBlockParam => block.type === "text")
+				.map((block) => block.text)
+				.join(" ")
+				.toLowerCase()
+			const explicitlyRequestedSandbox =
+				/\b(create\s+(a\s+)?(new\s+)?sandbox|run\s+in\s+(a\s+)?sandbox|isolated\s+worktree|sandbox\s+worktree|in\s+(a\s+)?sandbox)\b/i.test(
+					promptText,
 				)
+
+			if (explicitlyRequestedSandbox) {
+				const sandbox = await WorktreeSandboxManager.createSandbox(this.task.workspacePath, this.task.taskId)
+				if (sandbox) {
+					this.task.sandboxPath = sandbox
+					await this.task.say(
+						"text",
+						`🛡️ Task running in isolated Git worktree: \`${sandbox}\` on branch \`${WorktreeSandboxManager.getBranchName(this.task.taskId)}\`. Your active working tree is untouched.`,
+					)
+				}
 			}
 		}
 

@@ -141,29 +141,33 @@ export async function handleCreateWorktree(
 	return result
 }
 
-export async function handleDeleteWorktree(provider: MirrorProvider, branch: string, force = false): Promise<WorktreeResult> {
+export async function handleDeleteWorktree(
+	provider: MirrorProvider,
+	worktreePath: string,
+	force = false,
+): Promise<WorktreeResult> {
 	const cwd = provider.cwd
-	const result = await worktreeService.deleteWorktree(cwd, branch, force)
+	const result = await worktreeService.deleteWorktree(cwd, worktreePath, force)
 
 	return result
 }
 
 export async function handleSwitchWorktree(
 	provider: MirrorProvider,
-	branch: string,
-	forceReload: boolean = false,
+	branchOrPath: string,
+	newWindow: boolean = false,
 ): Promise<WorktreeResult> {
 	const cwd = provider.cwd
 	const worktrees = await worktreeService.listWorktrees(cwd)
-	const target = worktrees.find((w) => w.branch === branch)
+	const target = worktrees.find((w) => w.path === branchOrPath || w.branch === branchOrPath)
 
-	if (!target) {
-		return { success: false, message: `Worktree for branch '${branch}' not found` }
-	}
+	const targetPath = target ? target.path : branchOrPath
 
-	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(target.path), { forceNewWindow: false })
+	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(targetPath), {
+		forceNewWindow: newWindow,
+	})
 
-	return { success: true, message: `Switched to worktree at ${target.path}` }
+	return { success: true, message: `Switched to worktree at ${targetPath}` }
 }
 
 export async function handleGetAvailableBranches(provider: MirrorProvider): Promise<BranchInfo> {
@@ -198,20 +202,14 @@ export async function handleGetWorktreeIncludeStatus(provider: MirrorProvider): 
 	return status
 }
 
-export async function handleCheckBranchWorktreeInclude(
-	provider: MirrorProvider,
-	branchName: string,
-): Promise<boolean> {
+export async function handleCheckBranchWorktreeInclude(provider: MirrorProvider, branchName: string): Promise<boolean> {
 	const cwd = provider.cwd
 	const result = await worktreeIncludeService.branchHasWorktreeInclude(cwd, branchName)
 
 	return result
 }
 
-export async function handleCreateWorktreeInclude(
-	provider: MirrorProvider,
-	content: string,
-): Promise<WorktreeResult> {
+export async function handleCreateWorktreeInclude(provider: MirrorProvider, content: string): Promise<WorktreeResult> {
 	const cwd = provider.cwd
 
 	try {
