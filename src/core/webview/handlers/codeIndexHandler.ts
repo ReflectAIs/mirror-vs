@@ -237,14 +237,21 @@ export async function handleStartIndexing(provider: MirrorProvider): Promise<voi
 		// Initialize manager and load latest configuration
 		await manager.initialize(provider.contextProxy)
 
-		// Auto-fill sensible local defaults if needed
-		if (manager.currentEmbedderProvider === "ollama" && !currentConfig.codebaseIndexEmbedderBaseUrl) {
-			currentConfig.codebaseIndexEmbedderBaseUrl = "http://localhost:11434"
+		// Auto-fill sensible local defaults if needed for ollama
+		if (manager.currentEmbedderProvider === "ollama") {
+			let updated = false
+			if (!currentConfig.codebaseIndexEmbedderBaseUrl) {
+				currentConfig.codebaseIndexEmbedderBaseUrl = "http://localhost:11434"
+				updated = true
+			}
 			if (!currentConfig.codebaseIndexQdrantUrl) {
 				currentConfig.codebaseIndexQdrantUrl = "http://localhost:6333"
+				updated = true
 			}
-			await updateGlobalState(provider, "codebaseIndexConfig", currentConfig)
-			await manager.initialize(provider.contextProxy)
+			if (updated) {
+				await updateGlobalState(provider, "codebaseIndexConfig", currentConfig)
+				await manager.initialize(provider.contextProxy)
+			}
 		}
 
 		if (!manager.isFeatureConfigured) {

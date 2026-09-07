@@ -281,7 +281,12 @@ export class TaskLifecycleManager {
 		await task.mirrorMessagesManager.saveMirrorMessages()
 
 		// Rehydrate task in place with full history
-		await this.provider.createTaskWithHistoryItem({ ...historyItem, rootTask, parentTask })
+		await this.provider.createTaskWithHistoryItem({
+			...historyItem,
+			number: historyItem.number ?? 1,
+			rootTask,
+			parentTask,
+		})
 	}
 
 	// ── Clear ──────────────────────────────────────────────────────────────────

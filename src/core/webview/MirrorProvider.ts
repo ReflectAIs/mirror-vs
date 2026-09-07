@@ -703,7 +703,6 @@ export class MirrorProvider
 
 		// Post updated state to webview (omit taskHistory — webview keeps it in-memory)
 		await this.postStateToWebviewWithoutTaskHistory()
-
 		// Also refresh worktree list for the newly focused tab
 		try {
 			const { handleListWorktrees } = await import("./worktree/handlers")
