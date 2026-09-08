@@ -98,8 +98,8 @@ describe("ModelPicker", () => {
 			vi.advanceTimersByTime(100)
 		})
 
-		// Verify the API config was updated.
-		expect(mockSetApiConfigurationField).toHaveBeenCalledWith(defaultProps.modelIdKey, "model2")
+		// Verify the API config was updated (true = user-initiated selection).
+		expect(mockSetApiConfigurationField).toHaveBeenCalledWith(defaultProps.modelIdKey, "model2", true)
 	})
 
 	it("allows setting a custom model ID that's not in the predefined list", async () => {
@@ -141,8 +141,8 @@ describe("ModelPicker", () => {
 			vi.advanceTimersByTime(100)
 		})
 
-		// Verify the API config was updated with the custom model ID
-		expect(mockSetApiConfigurationField).toHaveBeenCalledWith(defaultProps.modelIdKey, customModelId)
+		// Verify the API config was updated with the custom model ID (true = user-initiated selection).
+		expect(mockSetApiConfigurationField).toHaveBeenCalledWith(defaultProps.modelIdKey, customModelId, true)
 	})
 
 	describe("Error Message Display", () => {

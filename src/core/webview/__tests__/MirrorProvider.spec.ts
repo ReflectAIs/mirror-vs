@@ -850,14 +850,14 @@ describe("MirrorProvider", () => {
 		expect(mockPostMessage).toHaveBeenCalled()
 	})
 
-	test("autoCondenseContextPercent defaults to 100", async () => {
+	test("autoCondenseContextPercent defaults to 75", async () => {
 		// Mock globalState.get to return undefined for autoCondenseContextPercent
 		;(mockContext.globalState.get as any).mockImplementation((key: string) =>
 			key === "autoCondenseContextPercent" ? undefined : null,
 		)
 
 		const state = await provider.getState()
-		expect(state.autoCondenseContextPercent).toBe(100)
+		expect(state.autoCondenseContextPercent).toBe(75)
 	})
 
 	test("handles autoCondenseContextPercent message", async () => {
@@ -1298,11 +1298,12 @@ describe("MirrorProvider", () => {
 				text: "Edited message content",
 			})
 
-			// Verify correct messages were kept - delete from the preceding user message to truly replace it
-			expect(mockMirror.overwriteMirrorMessages).toHaveBeenCalledWith([])
+			// Verify correct messages were kept - rewind to the preceding user message (ts 3000)
+			// preserves all messages before it
+			expect(mockMirror.overwriteMirrorMessages).toHaveBeenCalledWith([mockMessages[0], mockMessages[1]])
 
 			// Verify correct API messages were kept
-			expect(mockMirror.overwriteApiConversationHistory).toHaveBeenCalledWith([])
+			expect(mockMirror.overwriteApiConversationHistory).toHaveBeenCalledWith([{ ts: 1000 }, { ts: 2000 }])
 
 			// The new flow calls webviewMessageHandler recursively with askResponse
 			// We need to verify the recursive call happened by checking if the handler was called again
@@ -2640,9 +2641,9 @@ describe("MirrorProvider - Comprehensive Edit/Delete Edge Cases", () => {
 				text: "Edited message with preserved images",
 			})
 
-			// Verify messages were edited correctly - the ORIGINAL user message and all subsequent messages are removed
-			expect(mockMirror.overwriteMirrorMessages).toHaveBeenCalledWith([mockMessages[0]])
-			expect(mockMirror.overwriteApiConversationHistory).toHaveBeenCalledWith([{ ts: 1000 }])
+			// Verify messages were edited correctly - messages before the edited message (ts 3000) are preserved
+			expect(mockMirror.overwriteMirrorMessages).toHaveBeenCalledWith([mockMessages[0], mockMessages[1]])
+			expect(mockMirror.overwriteApiConversationHistory).toHaveBeenCalledWith([{ ts: 1000 }, { ts: 2000 }])
 			// Verify submitUserMessage was called with the edited content
 			expect(mockMirror.submitUserMessage).toHaveBeenCalledWith("Edited message with preserved images", [])
 		})

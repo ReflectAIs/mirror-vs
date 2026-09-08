@@ -24,7 +24,7 @@ describe("getToolUseGuidelinesSection", () => {
 		const guidelines = getToolUseGuidelinesSection()
 
 		expect(guidelines).toContain("## Batching Rules")
-		expect(guidelines).toContain("can be batched in parallel")
+		expect(guidelines).toContain("should be batched in parallel")
 		expect(guidelines).toContain("writes must be sequential")
 	})
 

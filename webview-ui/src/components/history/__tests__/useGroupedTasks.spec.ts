@@ -46,10 +46,23 @@ describe("buildSessionGroups", () => {
 			createMockTask({ id: "task-2", sessionId: "session-1", ts: 200 }),
 		]
 
-		const result = buildSessionGroups(tasks, {}, new Set<string>())
+		const result = buildSessionGroups(tasks, {}, new Set<string>(), "oldest")
 
 		expect(result).toHaveLength(1)
 		expect(result[0].tabs.map((t) => t.id)).toEqual(["task-1", "task-2", "task-3"])
+	})
+
+	it("sorts tabs by timestamp descending by default (newest)", () => {
+		const tasks = [
+			createMockTask({ id: "task-3", sessionId: "session-1", ts: 300 }),
+			createMockTask({ id: "task-1", sessionId: "session-1", ts: 100 }),
+			createMockTask({ id: "task-2", sessionId: "session-1", ts: 200 }),
+		]
+
+		const result = buildSessionGroups(tasks, {}, new Set<string>())
+
+		expect(result).toHaveLength(1)
+		expect(result[0].tabs.map((t) => t.id)).toEqual(["task-3", "task-2", "task-1"])
 	})
 
 	it("sorts sessions by newestTs descending", () => {

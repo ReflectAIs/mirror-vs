@@ -48,7 +48,7 @@ vi.mock("../../../utils/logging", () => ({
 
 // ---- Mock mirror-config ----
 vi.mock("../../../services/mirror-config", () => ({
-	getGlobalMirrorDirectory: () => path.join("/home/user", ".mirror"),
+	getGlobalMirrorDirectory: () => path.join("/home/user", ".mirror-vs"),
 }))
 
 // ---- Mock fs existsSync ----
@@ -68,8 +68,8 @@ import type { PipelineDefinition, PipelineType } from "../pipeline"
 // ---------------------------------------------------------------------------
 
 const DEFAULT_CWD = "/test/project"
-const GLOBAL_PIPELINES_DIR = path.join("/home/user", ".mirror", "pipelines")
-const PROJECT_PIPELINES_DIR = path.join(DEFAULT_CWD, ".mirror", "pipelines")
+const GLOBAL_PIPELINES_DIR = path.join("/home/user", ".mirror-vs", "pipelines")
+const PROJECT_PIPELINES_DIR = path.join(DEFAULT_CWD, ".mirror-vs", "pipelines")
 
 /** A minimal SDXL Turbo workflow in legacy array format. */
 const flashWorkflow = {

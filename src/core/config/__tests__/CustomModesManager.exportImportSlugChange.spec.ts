@@ -249,15 +249,19 @@ describe("CustomModesManager - Export/Import with Slug Changes", () => {
 			expect(result.success).toBe(true)
 
 			// Verify files were written to the correct new slug folder
-			const rule1Path = Object.keys(writtenFiles).find((p) => p.includes("rule1.md") && !p.includes(".mirrormodes"))
-			const rule2Path = Object.keys(writtenFiles).find((p) => p.includes("rule2.md") && !p.includes(".mirrormodes"))
+			const rule1Path = Object.keys(writtenFiles).find(
+				(p) => p.includes("rule1.md") && !p.includes(".mirrormodes"),
+			)
+			const rule2Path = Object.keys(writtenFiles).find(
+				(p) => p.includes("rule2.md") && !p.includes(".mirrormodes"),
+			)
 
 			expect(rule1Path).toBeDefined()
 			expect(rule2Path).toBeDefined()
 
 			// Check that files are in rules-new-slug-name folder
-			expect(rule1Path).toContain(path.join(".mirror", "rules-new-slug-name", "rule1.md"))
-			expect(rule2Path).toContain(path.join(".mirror", "rules-new-slug-name", "subfolder", "rule2.md"))
+			expect(rule1Path).toContain(path.join(".mirror-vs", "rules-new-slug-name", "rule1.md"))
+			expect(rule2Path).toContain(path.join(".mirror-vs", "rules-new-slug-name", "subfolder", "rule2.md"))
 
 			// Verify directories were created with new slug
 			expect(createdDirs.some((dir) => dir.includes("rules-new-slug-name"))).toBe(true)
@@ -304,15 +308,19 @@ describe("CustomModesManager - Export/Import with Slug Changes", () => {
 			expect(result.success).toBe(true)
 
 			// Verify files were written to the NEW slug folder, not the old one
-			const rule1Path = Object.keys(writtenFiles).find((p) => p.includes("rule1.md") && !p.includes(".mirrormodes"))
-			const rule2Path = Object.keys(writtenFiles).find((p) => p.includes("rule2.md") && !p.includes(".mirrormodes"))
+			const rule1Path = Object.keys(writtenFiles).find(
+				(p) => p.includes("rule1.md") && !p.includes(".mirrormodes"),
+			)
+			const rule2Path = Object.keys(writtenFiles).find(
+				(p) => p.includes("rule2.md") && !p.includes(".mirrormodes"),
+			)
 
 			expect(rule1Path).toBeDefined()
 			expect(rule2Path).toBeDefined()
 
 			// Check that files are in rules-new-slug-name folder (not rules-old-slug)
-			expect(rule1Path).toContain(path.join(".mirror", "rules-new-slug-name", "rule1.md"))
-			expect(rule2Path).toContain(path.join(".mirror", "rules-new-slug-name", "subfolder", "rule2.md"))
+			expect(rule1Path).toContain(path.join(".mirror-vs", "rules-new-slug-name", "rule1.md"))
+			expect(rule2Path).toContain(path.join(".mirror-vs", "rules-new-slug-name", "subfolder", "rule2.md"))
 
 			// Ensure old slug folder was NOT created
 			expect(rule1Path).not.toContain("rules-old-slug")
@@ -368,9 +376,9 @@ describe("CustomModesManager - Export/Import with Slug Changes", () => {
 			const newFormatPath = Object.keys(writtenFiles).find((p) => p.includes("new-format.md"))
 			const nestedPath = Object.keys(writtenFiles).find((p) => p.includes(path.join("nested", "file.md")))
 
-			expect(oldFormatPath).toContain(path.join(".mirror", "rules-mixed-mode", "old-format.md"))
-			expect(newFormatPath).toContain(path.join(".mirror", "rules-mixed-mode", "new-format.md"))
-			expect(nestedPath).toContain(path.join(".mirror", "rules-mixed-mode", "nested", "file.md"))
+			expect(oldFormatPath).toContain(path.join(".mirror-vs", "rules-mixed-mode", "old-format.md"))
+			expect(newFormatPath).toContain(path.join(".mirror-vs", "rules-mixed-mode", "new-format.md"))
+			expect(nestedPath).toContain(path.join(".mirror-vs", "rules-mixed-mode", "nested", "file.md"))
 		})
 	})
 
@@ -427,7 +435,7 @@ describe("CustomModesManager - Export/Import with Slug Changes", () => {
 				(p) => p.includes("rule.md") && !p.includes(".mirrormodes"),
 			)
 			expect(ruleFilePath).toBeDefined()
-			expect(ruleFilePath).toContain(path.join(".mirror", "rules-renamed-mode", "rule.md"))
+			expect(ruleFilePath).toContain(path.join(".mirror-vs", "rules-renamed-mode", "rule.md"))
 			expect(ruleFilePath).not.toContain("rules-original-mode")
 
 			// Verify content was preserved

@@ -1165,10 +1165,13 @@ describe("CustomModesManager", () => {
 				expect(result.success).toBe(true)
 
 				// Verify that fs.rm was called to remove the existing rules folder
-				expect(fs.rm).toHaveBeenCalledWith(expect.stringContaining(path.join(".mirror", "rules-test-mode")), {
-					recursive: true,
-					force: true,
-				})
+				expect(fs.rm).toHaveBeenCalledWith(
+					expect.stringContaining(path.join(".mirror-vs", "rules-test-mode")),
+					{
+						recursive: true,
+						force: true,
+					},
+				)
 
 				// Verify mode was imported
 				expect(fs.writeFile).toHaveBeenCalledWith(
@@ -1223,10 +1226,13 @@ describe("CustomModesManager", () => {
 				expect(result.success).toBe(true)
 
 				// Verify that fs.rm was called to remove the existing rules folder
-				expect(fs.rm).toHaveBeenCalledWith(expect.stringContaining(path.join(".mirror", "rules-test-mode")), {
-					recursive: true,
-					force: true,
-				})
+				expect(fs.rm).toHaveBeenCalledWith(
+					expect.stringContaining(path.join(".mirror-vs", "rules-test-mode")),
+					{
+						recursive: true,
+						force: true,
+					},
+				)
 
 				// Verify new rules files were created
 				expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining("rules-test-mode"), { recursive: true })

@@ -64,6 +64,7 @@ describe("presentAssistantMessage - Custom Tool Recording", () => {
 							customTools: true, // Enable by default
 						},
 					}),
+					postStateToWebview: vi.fn().mockResolvedValue(undefined),
 				}),
 			},
 			say: vi.fn().mockResolvedValue(undefined),
@@ -190,6 +191,7 @@ describe("presentAssistantMessage - Custom Tool Recording", () => {
 							customTools: true,
 						},
 					}),
+					postStateToWebview: vi.fn().mockResolvedValue(undefined),
 					getMcpHub: () => ({
 						findServerNameBySanitizedName: () => "test-server",
 						executeToolCall: vi.fn().mockResolvedValue({ content: [{ type: "text", text: "result" }] }),

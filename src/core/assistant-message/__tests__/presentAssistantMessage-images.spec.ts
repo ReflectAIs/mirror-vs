@@ -38,6 +38,7 @@ describe("presentAssistantMessage - Image Handling in Native Tool Calling", () =
 						mode: "code",
 						customModes: [],
 					}),
+					postStateToWebview: vi.fn().mockResolvedValue(undefined),
 				}),
 			},
 			say: vi.fn().mockResolvedValue(undefined),

@@ -481,7 +481,7 @@ describe("MirrorConfigService", () => {
 
 	describe("getAgentsDirectoriesForCwd", () => {
 		it("should return root directory and parent directories of subfolder .mirror dirs", async () => {
-			mockExecuteRipgrep.mockResolvedValueOnce([{ path: "package-a/.mirror/rules/rule.md", type: "file" }])
+			mockExecuteRipgrep.mockResolvedValueOnce([{ path: "package-a/.mirror-vs/rules/rule.md", type: "file" }])
 
 			const result = await getAgentsDirectoriesForCwd("/project/path")
 
@@ -501,9 +501,9 @@ describe("MirrorConfigService", () => {
 
 		it("should include multiple subfolder parent directories", async () => {
 			mockExecuteRipgrep.mockResolvedValueOnce([
-				{ path: "package-a/.mirror/rules/rule.md", type: "file" },
-				{ path: "package-b/.mirror/rules-code/rule.md", type: "file" },
-				{ path: "packages/core/.mirror/rules/rule.md", type: "file" },
+				{ path: "package-a/.mirror-vs/rules/rule.md", type: "file" },
+				{ path: "package-b/.mirror-vs/rules-code/rule.md", type: "file" },
+				{ path: "packages/core/.mirror-vs/rules/rule.md", type: "file" },
 			])
 
 			const result = await getAgentsDirectoriesForCwd("/project/path")

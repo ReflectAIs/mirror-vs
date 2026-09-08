@@ -568,14 +568,14 @@ export class CustomModesManager {
 			if (scope === "project") {
 				const workspacePath = getWorkspacePath()
 				if (workspacePath) {
-					rulesFolderPath = path.join(workspacePath, ".mirror", `rules-${slug}`)
+					rulesFolderPath = path.join(workspacePath, ".mirror-vs", `rules-${slug}`)
 				} else {
 					return // No workspace, can't delete project rules
 				}
 			} else {
 				// Global scope - use OS home directory
 				const homeDir = os.homedir()
-				rulesFolderPath = path.join(homeDir, ".mirror", `rules-${slug}`)
+				rulesFolderPath = path.join(homeDir, ".mirror-vs", `rules-${slug}`)
 			}
 
 			// Check if the rules folder exists and delete it
@@ -614,7 +614,7 @@ export class CustomModesManager {
 	}
 
 	/**
-	 * Checks if a mode has associated rules files in the .mirror/rules-{slug}/ directory
+	 * Checks if a mode has associated rules files in the .mirror-vs/rules-{slug}/ directory
 	 * @param slug - The mode identifier to check
 	 * @returns True if the mode has rules files with content, false otherwise
 	 */

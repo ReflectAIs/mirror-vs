@@ -53,6 +53,16 @@ vi.mock("path", async () => ({
 	}),
 }))
 
+// Mock mirror-config so only the project-local .mirror-vs directory is checked.
+// The real implementation also checks the global ~/.mirror-vs directory first,
+// which would make these tests non-deterministic.
+vi.mock("../../../services/mirror-config", () => ({
+	getMirrorDirectoriesForCwd: (cwd: string) => [`${cwd}/.mirror-vs`],
+	getAllMirrorDirectoriesForCwd: async (cwd: string) => [`${cwd}/.mirror-vs`],
+	getAgentsDirectoriesForCwd: async (cwd: string) => [cwd],
+	getGlobalMirrorDirectory: () => "/fake/global/.mirror-vs",
+}))
+
 import fs from "fs/promises"
 import type { PathLike } from "fs"
 
@@ -88,7 +98,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should read and trim file content", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		readFileMock.mockResolvedValue("  content with spaces  ")
 		const result = await loadRuleFiles("/fake/path")
@@ -97,7 +107,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should handle ENOENT error", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		readFileMock.mockRejectedValue({ code: "ENOENT" })
 		const result = await loadRuleFiles("/fake/path")
@@ -105,7 +115,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should handle EISDIR error", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		readFileMock.mockRejectedValue({ code: "EISDIR" })
 		const result = await loadRuleFiles("/fake/path")
@@ -113,7 +123,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should throw on unexpected errors", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		const error = new Error("Permission denied") as NodeJS.ErrnoException
 		error.code = "EPERM"
@@ -125,7 +135,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should not combine content from multiple rule files when they exist", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		readFileMock.mockImplementation((filePath: PathLike) => {
 			if (filePath.toString().endsWith(".mirrorrules")) {
@@ -142,7 +152,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should handle when no rule files exist", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		readFileMock.mockRejectedValue({ code: "ENOENT" })
 
@@ -151,7 +161,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should skip directories with same name as rule files", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 		readFileMock.mockImplementation((filePath: PathLike) => {
 			if (filePath.toString().endsWith(".mirrorrules")) {
@@ -167,24 +177,34 @@ describe("loadRuleFiles", () => {
 		expect(result).toBe("")
 	})
 
-	it("should use .mirror/rules/ directory when it exists and has files", async () => {
-		// Simulate .mirror/rules directory exists
+	it("should use .mirror-vs/rules/ directory when it exists and has files", async () => {
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
 
 		// Simulate listing files
 		readdirMock.mockResolvedValueOnce([
-			{ name: "file1.txt", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "file2.txt", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
+			{
+				name: "file1.txt",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
+			{
+				name: "file2.txt",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
 		] as any)
 
 		statMock.mockImplementation((path) => {
 			// Handle both Unix and Windows path separators
 			const normalizedPath = path.toString().replace(/\\/g, "/")
 			if (
-				normalizedPath.includes("/fake/path/.mirror/rules/file1.txt") ||
-				normalizedPath.includes("/fake/path/.mirror/rules/file2.txt")
+				normalizedPath.includes("/fake/path/.mirror-vs/rules/file1.txt") ||
+				normalizedPath.includes("/fake/path/.mirror-vs/rules/file2.txt")
 			) {
 				return Promise.resolve({
 					isFile: vi.fn().mockReturnValue(true),
@@ -199,10 +219,10 @@ describe("loadRuleFiles", () => {
 			const pathStr = filePath.toString()
 			// Handle both Unix and Windows path separators
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules/file1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/file1.txt") {
 				return Promise.resolve("content of file1")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/file2.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/file2.txt") {
 				return Promise.resolve("content of file2")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -210,8 +230,10 @@ describe("loadRuleFiles", () => {
 
 		const result = await loadRuleFiles("/fake/path")
 		// Paths in output should be relative to cwd
-		const expectedRelativePath1 = process.platform === "win32" ? ".mirror\\rules\\file1.txt" : ".mirror/rules/file1.txt"
-		const expectedRelativePath2 = process.platform === "win32" ? ".mirror\\rules\\file2.txt" : ".mirror/rules/file2.txt"
+		const expectedRelativePath1 =
+			process.platform === "win32" ? ".mirror-vs\\rules\\file1.txt" : ".mirror-vs/rules/file1.txt"
+		const expectedRelativePath2 =
+			process.platform === "win32" ? ".mirror-vs\\rules\\file2.txt" : ".mirror-vs/rules/file2.txt"
 		expect(result).toContain(`# Rules from ${expectedRelativePath1}:`)
 		expect(result).toContain("content of file1")
 		expect(result).toContain(`# Rules from ${expectedRelativePath2}:`)
@@ -219,11 +241,16 @@ describe("loadRuleFiles", () => {
 
 		// We expect both checks because our new implementation checks the files again for validation
 		// These are the absolute paths used internally
-		const expectedRulesDir = process.platform === "win32" ? "\\fake\\path\\.mirror\\rules" : "/fake/path/.mirror/rules"
+		const expectedRulesDir =
+			process.platform === "win32" ? "\\fake\\path\\.mirror-vs\\rules" : "/fake/path/.mirror-vs/rules"
 		const expectedFile1Path =
-			process.platform === "win32" ? "\\fake\\path\\.mirror\\rules\\file1.txt" : "/fake/path/.mirror/rules/file1.txt"
+			process.platform === "win32"
+				? "\\fake\\path\\.mirror-vs\\rules\\file1.txt"
+				: "/fake/path/.mirror-vs/rules/file1.txt"
 		const expectedFile2Path =
-			process.platform === "win32" ? "\\fake\\path\\.mirror\\rules\\file2.txt" : "/fake/path/.mirror/rules/file2.txt"
+			process.platform === "win32"
+				? "\\fake\\path\\.mirror-vs\\rules\\file2.txt"
+				: "/fake/path/.mirror-vs/rules/file2.txt"
 
 		expect(statMock).toHaveBeenCalledWith(expectedRulesDir)
 		expect(statMock).toHaveBeenCalledWith(expectedFile1Path)
@@ -232,31 +259,61 @@ describe("loadRuleFiles", () => {
 		expect(readFileMock).toHaveBeenCalledWith(expectedFile2Path, "utf-8")
 	})
 
-	it("should filter out cache files from .mirror/rules/ directory", async () => {
-		// Simulate .mirror/rules directory exists
+	it("should filter out cache files from .mirror-vs/rules/ directory", async () => {
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
 
 		// Simulate listing files including cache files
 		readdirMock.mockResolvedValueOnce([
-			{ name: "rule1.txt", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
-			{ name: ".DS_Store", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "Thumbs.db", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "rule2.md", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "cache.log", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
+			{
+				name: "rule1.txt",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
+			{
+				name: ".DS_Store",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
+			{
+				name: "Thumbs.db",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
+			{
+				name: "rule2.md",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
+			{
+				name: "cache.log",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
 			{
 				name: "backup.bak",
 				isFile: () => true,
 				isSymbolicLink: () => false,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
-			{ name: "temp.tmp", isFile: () => true, isSymbolicLink: () => false, parentPath: "/fake/path/.mirror/rules" },
+			{
+				name: "temp.tmp",
+				isFile: () => true,
+				isSymbolicLink: () => false,
+				parentPath: "/fake/path/.mirror-vs/rules",
+			},
 			{
 				name: "script.pyc",
 				isFile: () => true,
 				isSymbolicLink: () => false,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
 		] as any)
 
@@ -271,31 +328,31 @@ describe("loadRuleFiles", () => {
 			const normalizedPath = pathStr.replace(/\\/g, "/")
 
 			// Only rule files should be read - cache files should be skipped
-			if (normalizedPath === "/fake/path/.mirror/rules/rule1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/rule1.txt") {
 				return Promise.resolve("rule 1 content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/rule2.md") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/rule2.md") {
 				return Promise.resolve("rule 2 content")
 			}
 
 			// Cache files should not be read due to filtering
 			// If they somehow are read, return recognizable content
-			if (normalizedPath === "/fake/path/.mirror/rules/.DS_Store") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/.DS_Store") {
 				return Promise.resolve("DS_STORE_BINARY_CONTENT")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/Thumbs.db") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/Thumbs.db") {
 				return Promise.resolve("THUMBS_DB_CONTENT")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/backup.bak") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/backup.bak") {
 				return Promise.resolve("BACKUP_CONTENT")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/cache.log") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/cache.log") {
 				return Promise.resolve("LOG_CONTENT")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/temp.tmp") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/temp.tmp") {
 				return Promise.resolve("TEMP_CONTENT")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/script.pyc") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/script.pyc") {
 				return Promise.resolve("PYTHON_BYTECODE")
 			}
 
@@ -318,12 +375,12 @@ describe("loadRuleFiles", () => {
 
 		// Verify cache files are not read at all
 		const expectedCacheFiles = [
-			"/fake/path/.mirror/rules/.DS_Store",
-			"/fake/path/.mirror/rules/Thumbs.db",
-			"/fake/path/.mirror/rules/backup.bak",
-			"/fake/path/.mirror/rules/cache.log",
-			"/fake/path/.mirror/rules/temp.tmp",
-			"/fake/path/.mirror/rules/script.pyc",
+			"/fake/path/.mirror-vs/rules/.DS_Store",
+			"/fake/path/.mirror-vs/rules/Thumbs.db",
+			"/fake/path/.mirror-vs/rules/backup.bak",
+			"/fake/path/.mirror-vs/rules/cache.log",
+			"/fake/path/.mirror-vs/rules/temp.tmp",
+			"/fake/path/.mirror-vs/rules/script.pyc",
 		]
 
 		for (const cacheFile of expectedCacheFiles) {
@@ -332,8 +389,8 @@ describe("loadRuleFiles", () => {
 		}
 	})
 
-	it("should fall back to .mirrorrules when .mirror/rules/ is empty", async () => {
-		// Simulate .mirror/rules directory exists
+	it("should fall back to .mirrorrules when .mirror-vs/rules/ is empty", async () => {
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -354,7 +411,7 @@ describe("loadRuleFiles", () => {
 	})
 
 	it("should handle errors when reading directory", async () => {
-		// Simulate .mirror/rules directory exists
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -374,8 +431,8 @@ describe("loadRuleFiles", () => {
 		expect(result).toBe("\n# Rules from .mirrorrules:\nmirror rules content\n")
 	})
 
-	it("should read files from nested subdirectories in .mirror/rules/", async () => {
-		// Simulate .mirror/rules directory exists
+	it("should read files from nested subdirectories in .mirror-vs/rules/", async () => {
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -387,28 +444,28 @@ describe("loadRuleFiles", () => {
 				isFile: () => false,
 				isSymbolicLink: () => false,
 				isDirectory: () => true,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
 			{
 				name: "root.txt",
 				isFile: () => true,
 				isSymbolicLink: () => false,
 				isDirectory: () => false,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
 			{
 				name: "nested1.txt",
 				isFile: () => true,
 				isSymbolicLink: () => false,
 				isDirectory: () => false,
-				parentPath: "/fake/path/.mirror/rules/subdir",
+				parentPath: "/fake/path/.mirror-vs/rules/subdir",
 			},
 			{
 				name: "nested2.txt",
 				isFile: () => true,
 				isSymbolicLink: () => false,
 				isDirectory: () => false,
-				parentPath: "/fake/path/.mirror/rules/subdir/subdir2",
+				parentPath: "/fake/path/.mirror-vs/rules/subdir/subdir2",
 			},
 		] as any)
 
@@ -431,13 +488,13 @@ describe("loadRuleFiles", () => {
 			const pathStr = filePath.toString()
 			// Handle both Unix and Windows path separators
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules/root.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/root.txt") {
 				return Promise.resolve("root file content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/subdir/nested1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/subdir/nested1.txt") {
 				return Promise.resolve("nested file 1 content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/subdir/subdir2/nested2.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/subdir/subdir2/nested2.txt") {
 				return Promise.resolve("nested file 2 content")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -446,13 +503,16 @@ describe("loadRuleFiles", () => {
 		const result = await loadRuleFiles("/fake/path")
 
 		// Check root file content - paths in output should be relative
-		const expectedRelativeMirrortPath = process.platform === "win32" ? ".mirror\\rules\\root.txt" : ".mirror/rules/root.txt"
+		const expectedRelativeMirrortPath =
+			process.platform === "win32" ? ".mirror-vs\\rules\\root.txt" : ".mirror-vs/rules/root.txt"
 		const expectedRelativeNested1Path =
-			process.platform === "win32" ? ".mirror\\rules\\subdir\\nested1.txt" : ".mirror/rules/subdir/nested1.txt"
+			process.platform === "win32"
+				? ".mirror-vs\\rules\\subdir\\nested1.txt"
+				: ".mirror-vs/rules/subdir/nested1.txt"
 		const expectedRelativeNested2Path =
 			process.platform === "win32"
-				? ".mirror\\rules\\subdir\\subdir2\\nested2.txt"
-				: ".mirror/rules/subdir/subdir2/nested2.txt"
+				? ".mirror-vs\\rules\\subdir\\subdir2\\nested2.txt"
+				: ".mirror-vs/rules/subdir/subdir2/nested2.txt"
 
 		expect(result).toContain(`# Rules from ${expectedRelativeMirrortPath}:`)
 		expect(result).toContain("root file content")
@@ -465,15 +525,17 @@ describe("loadRuleFiles", () => {
 
 		// Verify correct absolute paths were checked internally
 		const expectedMirrortPath2 =
-			process.platform === "win32" ? "\\fake\\path\\.mirror\\rules\\root.txt" : "/fake/path/.mirror/rules/root.txt"
+			process.platform === "win32"
+				? "\\fake\\path\\.mirror-vs\\rules\\root.txt"
+				: "/fake/path/.mirror-vs/rules/root.txt"
 		const expectedNested1Path2 =
 			process.platform === "win32"
-				? "\\fake\\path\\.mirror\\rules\\subdir\\nested1.txt"
-				: "/fake/path/.mirror/rules/subdir/nested1.txt"
+				? "\\fake\\path\\.mirror-vs\\rules\\subdir\\nested1.txt"
+				: "/fake/path/.mirror-vs/rules/subdir/nested1.txt"
 		const expectedNested2Path2 =
 			process.platform === "win32"
-				? "\\fake\\path\\.mirror\\rules\\subdir\\subdir2\\nested2.txt"
-				: "/fake/path/.mirror/rules/subdir/subdir2/nested2.txt"
+				? "\\fake\\path\\.mirror-vs\\rules\\subdir\\subdir2\\nested2.txt"
+				: "/fake/path/.mirror-vs/rules/subdir/subdir2/nested2.txt"
 
 		expect(statMock).toHaveBeenCalledWith(expectedMirrortPath2)
 		expect(statMock).toHaveBeenCalledWith(expectedNested1Path2)
@@ -492,7 +554,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should combine all instruction types when provided", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockResolvedValue("mode specific rules")
@@ -514,7 +576,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should load AGENTS.md when settings.useAgentRules is true", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate AGENTS.md is NOT a symlink
@@ -556,7 +618,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should not load AGENTS.md when settings.useAgentRules is false", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockImplementation((filePath: PathLike) => {
@@ -586,7 +648,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should load AGENTS.md by default when settings.useAgentRules is undefined", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate AGENTS.md is NOT a symlink
@@ -622,7 +684,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should handle missing AGENTS.md gracefully", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockRejectedValue({ code: "ENOENT" })
@@ -647,7 +709,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should include AGENTS.md content along with other rules", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate AGENTS.md is NOT a symlink
@@ -694,7 +756,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should follow symlinks when loading AGENTS.md", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate AGENTS.md is a symlink
@@ -767,7 +829,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should handle AGENTS.md as a regular file when not a symlink", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate AGENTS.md is NOT a symlink
@@ -818,7 +880,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should load AGENT.md (singular) when AGENTS.md is not found", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate AGENTS.md doesn't exist but AGENT.md does
@@ -863,7 +925,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should prefer AGENTS.md over AGENT.md when both exist", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate both files exist
@@ -910,7 +972,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should return empty string when no instructions provided", async () => {
-		// Simulate no .mirror/rules directory
+		// Simulate no .mirror-vs/rules directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockRejectedValue({ code: "ENOENT" })
@@ -920,7 +982,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should handle missing mode-specific rules file", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockRejectedValue({ code: "ENOENT" })
@@ -938,7 +1000,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should handle unknown language codes properly", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockRejectedValue({ code: "ENOENT" })
@@ -957,7 +1019,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should throw on unexpected errors", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		const error = new Error("Permission denied") as NodeJS.ErrnoException
@@ -970,7 +1032,7 @@ describe("addCustomInstructions", () => {
 	})
 
 	it("should skip mode-specific rule files that are directories", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		readFileMock.mockImplementation((filePath: PathLike) => {
@@ -992,8 +1054,8 @@ describe("addCustomInstructions", () => {
 		expect(result).not.toContain("Rules from .mirrorrules-test-mode")
 	})
 
-	it("should use .mirror/rules-test-mode/ directory when it exists and has files", async () => {
-		// Simulate .mirror/rules-test-mode directory exists
+	it("should use .mirror-vs/rules-test-mode/ directory when it exists and has files", async () => {
+		// Simulate .mirror-vs/rules-test-mode directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -1004,13 +1066,13 @@ describe("addCustomInstructions", () => {
 				name: "rule1.txt",
 				isFile: () => true,
 				isSymbolicLink: () => false,
-				parentPath: "/fake/path/.mirror/rules-test-mode",
+				parentPath: "/fake/path/.mirror-vs/rules-test-mode",
 			},
 			{
 				name: "rule2.txt",
 				isFile: () => true,
 				isSymbolicLink: () => false,
-				parentPath: "/fake/path/.mirror/rules-test-mode",
+				parentPath: "/fake/path/.mirror-vs/rules-test-mode",
 			},
 		] as any)
 
@@ -1018,8 +1080,8 @@ describe("addCustomInstructions", () => {
 			// Handle both Unix and Windows path separators
 			const normalizedPath = path.toString().replace(/\\/g, "/")
 			if (
-				normalizedPath.includes("/fake/path/.mirror/rules-test-mode/rule1.txt") ||
-				normalizedPath.includes("/fake/path/.mirror/rules-test-mode/rule2.txt")
+				normalizedPath.includes("/fake/path/.mirror-vs/rules-test-mode/rule1.txt") ||
+				normalizedPath.includes("/fake/path/.mirror-vs/rules-test-mode/rule2.txt")
 			) {
 				return Promise.resolve({
 					isFile: vi.fn().mockReturnValue(true),
@@ -1034,10 +1096,10 @@ describe("addCustomInstructions", () => {
 			const pathStr = filePath.toString()
 			// Handle both Unix and Windows path separators
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules-test-mode/rule1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules-test-mode/rule1.txt") {
 				return Promise.resolve("mode specific rule 1")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules-test-mode/rule2.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules-test-mode/rule2.txt") {
 				return Promise.resolve("mode specific rule 2")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -1053,9 +1115,13 @@ describe("addCustomInstructions", () => {
 
 		// Paths in output should be relative
 		const expectedRelativeRule1Path =
-			process.platform === "win32" ? ".mirror\\rules-test-mode\\rule1.txt" : ".mirror/rules-test-mode/rule1.txt"
+			process.platform === "win32"
+				? ".mirror-vs\\rules-test-mode\\rule1.txt"
+				: ".mirror-vs/rules-test-mode/rule1.txt"
 		const expectedRelativeRule2Path =
-			process.platform === "win32" ? ".mirror\\rules-test-mode\\rule2.txt" : ".mirror/rules-test-mode/rule2.txt"
+			process.platform === "win32"
+				? ".mirror-vs\\rules-test-mode\\rule2.txt"
+				: ".mirror-vs/rules-test-mode/rule2.txt"
 
 		expect(result).toContain(`# Rules from ${expectedRelativeRule1Path}:`)
 		expect(result).toContain("mode specific rule 1")
@@ -1064,15 +1130,17 @@ describe("addCustomInstructions", () => {
 
 		// Verify absolute paths were used internally
 		const expectedAbsTestModeDir =
-			process.platform === "win32" ? "\\fake\\path\\.mirror\\rules-test-mode" : "/fake/path/.mirror/rules-test-mode"
+			process.platform === "win32"
+				? "\\fake\\path\\.mirror-vs\\rules-test-mode"
+				: "/fake/path/.mirror-vs/rules-test-mode"
 		const expectedAbsRule1Path =
 			process.platform === "win32"
-				? "\\fake\\path\\.mirror\\rules-test-mode\\rule1.txt"
-				: "/fake/path/.mirror/rules-test-mode/rule1.txt"
+				? "\\fake\\path\\.mirror-vs\\rules-test-mode\\rule1.txt"
+				: "/fake/path/.mirror-vs/rules-test-mode/rule1.txt"
 		const expectedAbsRule2Path =
 			process.platform === "win32"
-				? "\\fake\\path\\.mirror\\rules-test-mode\\rule2.txt"
-				: "/fake/path/.mirror/rules-test-mode/rule2.txt"
+				? "\\fake\\path\\.mirror-vs\\rules-test-mode\\rule2.txt"
+				: "/fake/path/.mirror-vs/rules-test-mode/rule2.txt"
 
 		expect(statMock).toHaveBeenCalledWith(expectedAbsTestModeDir)
 		expect(statMock).toHaveBeenCalledWith(expectedAbsRule1Path)
@@ -1081,8 +1149,8 @@ describe("addCustomInstructions", () => {
 		expect(readFileMock).toHaveBeenCalledWith(expectedAbsRule2Path, "utf-8")
 	})
 
-	it("should fall back to .mirrorrules-test-mode when .mirror/rules-test-mode/ does not exist", async () => {
-		// Simulate .mirror/rules-test-mode directory does not exist
+	it("should fall back to .mirrorrules-test-mode when .mirror-vs/rules-test-mode/ does not exist", async () => {
+		// Simulate .mirror-vs/rules-test-mode directory does not exist
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Simulate .mirrorrules-test-mode exists
@@ -1103,8 +1171,8 @@ describe("addCustomInstructions", () => {
 		expect(result).toContain("Rules from .mirrorrules-test-mode:\nmode specific rules from file")
 	})
 
-	it("should fall back to .mirrorrules when .mirror/rules-test-mode/ and .mirrorrules-test-mode do not exist", async () => {
-		// Simulate .mirror/rules-test-mode directory does not exist
+	it("should fall back to .mirrorrules when .mirror-vs/rules-test-mode/ and .mirrorrules-test-mode do not exist", async () => {
+		// Simulate .mirror-vs/rules-test-mode directory does not exist
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Simulate file reading
@@ -1128,12 +1196,12 @@ describe("addCustomInstructions", () => {
 		expect(result).toContain("# Rules from .mirrorrules:\nmode specific rules from mirror file")
 	})
 
-	it("should correctly format content from directories when using .mirror/rules-test-mode/", async () => {
+	it("should correctly format content from directories when using .mirror-vs/rules-test-mode/", async () => {
 		// Need to reset mockImplementation first to avoid interference from previous tests
 		statMock.mockReset()
 		readFileMock.mockReset()
 
-		// Simulate .mirror/rules-test-mode directory exists
+		// Simulate .mirror-vs/rules-test-mode directory exists
 		statMock.mockImplementationOnce(() =>
 			Promise.resolve({
 				isDirectory: vi.fn().mockReturnValue(true),
@@ -1142,7 +1210,7 @@ describe("addCustomInstructions", () => {
 
 		// Simulate directory has files
 		readdirMock.mockResolvedValueOnce([
-			{ name: "rule1.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules-test-mode" },
+			{ name: "rule1.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules-test-mode" },
 		] as any)
 		readFileMock.mockReset()
 
@@ -1152,7 +1220,7 @@ describe("addCustomInstructions", () => {
 			statCallCount++
 			// Handle both Unix and Windows path separators
 			const normalizedPath = filePath.toString().replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules-test-mode/rule1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules-test-mode/rule1.txt") {
 				return Promise.resolve({
 					isFile: vi.fn().mockReturnValue(true),
 					isDirectory: vi.fn().mockReturnValue(false),
@@ -1168,7 +1236,7 @@ describe("addCustomInstructions", () => {
 			const pathStr = filePath.toString()
 			// Handle both Unix and Windows path separators
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules-test-mode/rule1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules-test-mode/rule1.txt") {
 				return Promise.resolve("mode specific rule content")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -1183,7 +1251,9 @@ describe("addCustomInstructions", () => {
 
 		// Paths in output should be relative
 		const expectedRelativeRule1Path =
-			process.platform === "win32" ? ".mirror\\rules-test-mode\\rule1.txt" : ".mirror/rules-test-mode/rule1.txt"
+			process.platform === "win32"
+				? ".mirror-vs\\rules-test-mode\\rule1.txt"
+				: ".mirror-vs/rules-test-mode/rule1.txt"
 
 		expect(result).toContain(`# Rules from ${expectedRelativeRule1Path}:`)
 		expect(result).toContain("mode specific rule content")
@@ -1213,7 +1283,8 @@ describe("Directory existence checks", () => {
 		await loadRuleFiles("/fake/path")
 
 		// Verify stat was called to check directory existence
-		const expectedRulesDir = process.platform === "win32" ? "\\fake\\path\\.mirror\\rules" : "/fake/path/.mirror/rules"
+		const expectedRulesDir =
+			process.platform === "win32" ? "\\fake\\path\\.mirror-vs\\rules" : "/fake/path/.mirror-vs/rules"
 		expect(statMock).toHaveBeenCalledWith(expectedRulesDir)
 	})
 
@@ -1234,7 +1305,7 @@ describe("Directory existence checks", () => {
 // Indirectly test readTextFilesFromDirectory and formatDirectoryContent through loadRuleFiles
 describe("Rules directory reading", () => {
 	it.skipIf(process.platform === "win32")("should follow symbolic links in the rules directory", async () => {
-		// Simulate .mirror/rules directory exists
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -1246,29 +1317,33 @@ describe("Rules directory reading", () => {
 					name: "regular.txt",
 					isFile: () => true,
 					isSymbolicLink: () => false,
-					parentPath: "/fake/path/.mirror/rules",
+					parentPath: "/fake/path/.mirror-vs/rules",
 				},
 				{
 					name: "link.txt",
 					isFile: () => false,
 					isSymbolicLink: () => true,
-					parentPath: "/fake/path/.mirror/rules",
+					parentPath: "/fake/path/.mirror-vs/rules",
 				},
 				{
 					name: "link_dir",
 					isFile: () => false,
 					isSymbolicLink: () => true,
-					parentPath: "/fake/path/.mirror/rules",
+					parentPath: "/fake/path/.mirror-vs/rules",
 				},
 				{
 					name: "nested_link.txt",
 					isFile: () => false,
 					isSymbolicLink: () => true,
-					parentPath: "/fake/path/.mirror/rules",
+					parentPath: "/fake/path/.mirror-vs/rules",
 				},
 			] as any)
 			.mockResolvedValueOnce([
-				{ name: "subdir_link.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules/symlink-target-dir" },
+				{
+					name: "subdir_link.txt",
+					isFile: () => true,
+					parentPath: "/fake/path/.mirror-vs/rules/symlink-target-dir",
+				},
 			] as any)
 
 		// Simulate readlink response
@@ -1282,7 +1357,7 @@ describe("Rules directory reading", () => {
 		statMock.mockReset()
 		statMock.mockImplementation((path: string) => {
 			// For directory check
-			if (path === "/fake/path/.mirror/rules" || path.endsWith("dir")) {
+			if (path === "/fake/path/.mirror-vs/rules" || path.endsWith("dir")) {
 				return Promise.resolve({
 					isDirectory: vi.fn().mockReturnValue(true),
 					isFile: vi.fn().mockReturnValue(false),
@@ -1310,16 +1385,16 @@ describe("Rules directory reading", () => {
 			const pathStr = filePath.toString()
 			// Handle both Unix and Windows path separators
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules/regular.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/regular.txt") {
 				return Promise.resolve("regular file content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/symlink-target.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/symlink-target.txt") {
 				return Promise.resolve("symlink target content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/symlink-target-dir/subdir_link.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/symlink-target-dir/subdir_link.txt") {
 				return Promise.resolve("regular file content under symlink target dir")
 			}
-			if (normalizedPath === "/fake/path/.mirror/nested-symlink-target.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/nested-symlink-target.txt") {
 				return Promise.resolve("nested symlink target content")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -1329,15 +1404,17 @@ describe("Rules directory reading", () => {
 
 		// Verify both regular file and symlink target content are included (paths should be relative)
 		const expectedRelativeRegularPath =
-			process.platform === "win32" ? ".mirror\\rules\\regular.txt" : ".mirror/rules/regular.txt"
+			process.platform === "win32" ? ".mirror-vs\\rules\\regular.txt" : ".mirror-vs/rules/regular.txt"
 		const expectedRelativeSymlinkPath =
-			process.platform === "win32" ? ".mirror\\symlink-target.txt" : ".mirror/symlink-target.txt"
+			process.platform === "win32" ? ".mirror-vs\\symlink-target.txt" : ".mirror-vs/symlink-target.txt"
 		const expectedRelativeSubdirPath =
 			process.platform === "win32"
-				? ".mirror\\rules\\symlink-target-dir\\subdir_link.txt"
-				: ".mirror/rules/symlink-target-dir/subdir_link.txt"
+				? ".mirror-vs\\rules\\symlink-target-dir\\subdir_link.txt"
+				: ".mirror-vs/rules/symlink-target-dir/subdir_link.txt"
 		const expectedRelativeNestedPath =
-			process.platform === "win32" ? ".mirror\\nested-symlink-target.txt" : ".mirror/nested-symlink-target.txt"
+			process.platform === "win32"
+				? ".mirror-vs\\nested-symlink-target.txt"
+				: ".mirror-vs/nested-symlink-target.txt"
 
 		expect(result).toContain(`# Rules from ${expectedRelativeRegularPath}:`)
 		expect(result).toContain("regular file content")
@@ -1349,39 +1426,42 @@ describe("Rules directory reading", () => {
 		expect(result).toContain("nested symlink target content")
 
 		// Verify readlink was called with the symlink path
-		expect(readlinkMock).toHaveBeenCalledWith("/fake/path/.mirror/rules/link.txt")
-		expect(readlinkMock).toHaveBeenCalledWith("/fake/path/.mirror/rules/link_dir")
+		expect(readlinkMock).toHaveBeenCalledWith("/fake/path/.mirror-vs/rules/link.txt")
+		expect(readlinkMock).toHaveBeenCalledWith("/fake/path/.mirror-vs/rules/link_dir")
 
 		// Verify both files were read
-		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror/rules/regular.txt", "utf-8")
-		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror/symlink-target.txt", "utf-8")
-		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror/rules/symlink-target-dir/subdir_link.txt", "utf-8")
-		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror/nested-symlink-target.txt", "utf-8")
+		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror-vs/rules/regular.txt", "utf-8")
+		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror-vs/symlink-target.txt", "utf-8")
+		expect(readFileMock).toHaveBeenCalledWith(
+			"/fake/path/.mirror-vs/rules/symlink-target-dir/subdir_link.txt",
+			"utf-8",
+		)
+		expect(readFileMock).toHaveBeenCalledWith("/fake/path/.mirror-vs/nested-symlink-target.txt", "utf-8")
 	})
 	beforeEach(() => {
 		vi.clearAllMocks()
 	})
 
 	it.skipIf(process.platform === "win32")("should correctly format multiple files from directory", async () => {
-		// Simulate .mirror/rules directory exists
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
 
 		// Simulate listing files
 		readdirMock.mockResolvedValueOnce([
-			{ name: "file1.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "file2.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "file3.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules" },
+			{ name: "file1.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules" },
+			{ name: "file2.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules" },
+			{ name: "file3.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules" },
 		] as any)
 
 		statMock.mockImplementation((path) => {
 			// Handle both Unix and Windows path separators
 			const normalizedPath = path.toString().replace(/\\/g, "/")
 			expect([
-				"/fake/path/.mirror/rules/file1.txt",
-				"/fake/path/.mirror/rules/file2.txt",
-				"/fake/path/.mirror/rules/file3.txt",
+				"/fake/path/.mirror-vs/rules/file1.txt",
+				"/fake/path/.mirror-vs/rules/file2.txt",
+				"/fake/path/.mirror-vs/rules/file3.txt",
 			]).toContain(normalizedPath)
 
 			return Promise.resolve({
@@ -1393,13 +1473,13 @@ describe("Rules directory reading", () => {
 			const pathStr = filePath.toString()
 			// Handle both Unix and Windows path separators
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules/file1.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/file1.txt") {
 				return Promise.resolve("content of file1")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/file2.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/file2.txt") {
 				return Promise.resolve("content of file2")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/file3.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/file3.txt") {
 				return Promise.resolve("content of file3")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -1409,11 +1489,11 @@ describe("Rules directory reading", () => {
 
 		// Paths in output should be relative
 		const expectedRelativeFile1Path =
-			process.platform === "win32" ? ".mirror\\rules\\file1.txt" : ".mirror/rules/file1.txt"
+			process.platform === "win32" ? ".mirror-vs\\rules\\file1.txt" : ".mirror-vs/rules/file1.txt"
 		const expectedRelativeFile2Path =
-			process.platform === "win32" ? ".mirror\\rules\\file2.txt" : ".mirror/rules/file2.txt"
+			process.platform === "win32" ? ".mirror-vs\\rules\\file2.txt" : ".mirror-vs/rules/file2.txt"
 		const expectedRelativeFile3Path =
-			process.platform === "win32" ? ".mirror\\rules\\file3.txt" : ".mirror/rules/file3.txt"
+			process.platform === "win32" ? ".mirror-vs\\rules\\file3.txt" : ".mirror-vs/rules/file3.txt"
 
 		expect(result).toContain(`# Rules from ${expectedRelativeFile1Path}:`)
 		expect(result).toContain("content of file1")
@@ -1424,16 +1504,16 @@ describe("Rules directory reading", () => {
 	})
 
 	it("should return files in alphabetical order by filename", async () => {
-		// Simulate .mirror/rules directory exists
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
 
 		// Simulate listing files in non-alphabetical order to test sorting
 		readdirMock.mockResolvedValueOnce([
-			{ name: "zebra.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "alpha.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules" },
-			{ name: "Beta.txt", isFile: () => true, parentPath: "/fake/path/.mirror/rules" }, // Test case-insensitive sorting
+			{ name: "zebra.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules" },
+			{ name: "alpha.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules" },
+			{ name: "Beta.txt", isFile: () => true, parentPath: "/fake/path/.mirror-vs/rules" }, // Test case-insensitive sorting
 		] as any)
 
 		statMock.mockImplementation((path) => {
@@ -1445,13 +1525,13 @@ describe("Rules directory reading", () => {
 		readFileMock.mockImplementation((filePath: PathLike) => {
 			const pathStr = filePath.toString()
 			const normalizedPath = pathStr.replace(/\\/g, "/")
-			if (normalizedPath === "/fake/path/.mirror/rules/zebra.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/zebra.txt") {
 				return Promise.resolve("zebra content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/alpha.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/alpha.txt") {
 				return Promise.resolve("alpha content")
 			}
-			if (normalizedPath === "/fake/path/.mirror/rules/Beta.txt") {
+			if (normalizedPath === "/fake/path/.mirror-vs/rules/Beta.txt") {
 				return Promise.resolve("beta content")
 			}
 			return Promise.reject({ code: "ENOENT" })
@@ -1469,10 +1549,11 @@ describe("Rules directory reading", () => {
 
 		// Verify the expected file paths are in the result (should be relative)
 		const expectedRelativeAlphaPath =
-			process.platform === "win32" ? ".mirror\\rules\\alpha.txt" : ".mirror/rules/alpha.txt"
-		const expectedRelativeBetaPath = process.platform === "win32" ? ".mirror\\rules\\Beta.txt" : ".mirror/rules/Beta.txt"
+			process.platform === "win32" ? ".mirror-vs\\rules\\alpha.txt" : ".mirror-vs/rules/alpha.txt"
+		const expectedRelativeBetaPath =
+			process.platform === "win32" ? ".mirror-vs\\rules\\Beta.txt" : ".mirror-vs/rules/Beta.txt"
 		const expectedRelativeZebraPath =
-			process.platform === "win32" ? ".mirror\\rules\\zebra.txt" : ".mirror/rules/zebra.txt"
+			process.platform === "win32" ? ".mirror-vs\\rules\\zebra.txt" : ".mirror-vs/rules/zebra.txt"
 
 		expect(result).toContain(`# Rules from ${expectedRelativeAlphaPath}:`)
 		expect(result).toContain(`# Rules from ${expectedRelativeBetaPath}:`)
@@ -1486,7 +1567,7 @@ describe("Rules directory reading", () => {
 		readlinkMock.mockReset()
 		readFileMock.mockReset()
 
-		// First call: check if .mirror/rules directory exists
+		// First call: check if .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -1497,19 +1578,19 @@ describe("Rules directory reading", () => {
 				name: "01-first.link",
 				isFile: () => false,
 				isSymbolicLink: () => true,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
 			{
 				name: "02-second.link",
 				isFile: () => false,
 				isSymbolicLink: () => true,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
 			{
 				name: "03-third.link",
 				isFile: () => false,
 				isSymbolicLink: () => true,
-				parentPath: "/fake/path/.mirror/rules",
+				parentPath: "/fake/path/.mirror-vs/rules",
 			},
 		] as any)
 
@@ -1574,7 +1655,7 @@ describe("Rules directory reading", () => {
 	})
 
 	it("should handle empty file list gracefully", async () => {
-		// Simulate .mirror/rules directory exists
+		// Simulate .mirror-vs/rules directory exists
 		statMock.mockResolvedValueOnce({
 			isDirectory: vi.fn().mockReturnValue(true),
 		} as any)
@@ -1589,7 +1670,7 @@ describe("Rules directory reading", () => {
 	})
 
 	it("should load AGENTS.local.md alongside AGENTS.md for personal overrides", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate both AGENTS.md and AGENTS.local.md exist (not symlinks)
@@ -1636,7 +1717,7 @@ describe("Rules directory reading", () => {
 	})
 
 	it("should load AGENTS.local.md even when base AGENTS.md does not exist", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate only AGENTS.local.md exists (no base file)
@@ -1678,7 +1759,7 @@ describe("Rules directory reading", () => {
 	})
 
 	it("should load AGENTS.md without .local.md when local file does not exist", async () => {
-		// Simulate no .mirror/rules-test-mode directory
+		// Simulate no .mirror-vs/rules-test-mode directory
 		statMock.mockRejectedValueOnce({ code: "ENOENT" })
 
 		// Mock lstat to indicate only AGENTS.md exists (no local override)

@@ -166,8 +166,8 @@ describe("ModelPicker - Deprecated Models", () => {
 		const model2Option = screen.getByTestId("model-option-model-2")
 		await user.click(model2Option)
 
-		// Verify the selection was made
-		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("openRouterModelId", "model-2")
+		// Verify the selection was made (true = user-initiated selection).
+		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("openRouterModelId", "model-2", true)
 	})
 
 	it("should not display model info for deprecated models", () => {

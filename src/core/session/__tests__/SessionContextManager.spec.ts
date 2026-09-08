@@ -353,10 +353,10 @@ describe("SessionContextManager", () => {
 			const ctx = (await manager.getContext("session-1"))!
 			const texts = ctx.knowledge.map((n) => n.text)
 
-			expect(texts).toContain("Goal: Ship the landing page")
-			expect(texts).toContain("[completed] Add hero section")
-			expect(texts).toContain("[in_progress] Wire up analytics")
-			expect(texts).toContain("Completed: Deployed v1.2 to production")
+			expect(texts).toContain("🎯 Goal: Ship the landing page")
+			expect(texts).toContain("✓ [completed] Add hero section")
+			expect(texts).toContain("⏳ [in_progress] Wire up analytics")
+			expect(texts).toContain("✨ Completed: Deployed v1.2 to production")
 			expect(texts).not.toContain("Ignored")
 
 			// Notes carry source + timestamps.
@@ -394,8 +394,8 @@ describe("SessionContextManager", () => {
 
 			const ctx = (await manager.getContext("session-1"))!
 			const texts = ctx.knowledge.map((n) => n.text)
-			expect(texts).toContain("Goal: Task A goal")
-			expect(texts).toContain("Goal: Task B goal")
+			expect(texts).toContain("🎯 Goal: Task A goal")
+			expect(texts).toContain("🎯 Goal: Task B goal")
 		})
 
 		it("caps total knowledge notes at MAX_KNOWLEDGE_NOTES (50)", async () => {
@@ -436,7 +436,7 @@ describe("SessionContextManager", () => {
 			)
 
 			const ctx = (await manager.getContext("session-1"))!
-			const goal = ctx.knowledge.find((n) => n.text.startsWith("Goal:"))!
+			const goal = ctx.knowledge.find((n) => n.text.startsWith("🎯 Goal:"))!
 			expect(goal.text.length).toBeLessThanOrEqual(1024)
 		})
 	})

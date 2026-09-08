@@ -101,6 +101,8 @@ describe("Single-open-task invariant", () => {
 			addMirrorToStack,
 			updateGlobalState,
 			log: vi.fn(),
+			// Worktree lookup map used by createTaskWithHistoryItem
+			tabWorktrees: new Map<string, string>(),
 			customModesManager: { getCustomModes: vi.fn().mockResolvedValue([]) },
 			providerSettingsManager: {
 				getModeConfigId: vi.fn().mockResolvedValue(undefined),

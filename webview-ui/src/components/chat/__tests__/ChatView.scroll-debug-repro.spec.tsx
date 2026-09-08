@@ -349,9 +349,10 @@ describe("ChatView scroll behavior regression coverage", () => {
 		harness.emitAtBottom = () => {}
 	})
 
-	it("existing-task entry does not set a top-most initial anchor", async () => {
+	it("existing-task entry anchors the initial scroll to the last message", async () => {
 		await hydrate(2)
-		expect(harness.initialTopMostItemIndex).toBeUndefined()
+		// buildMessages() yields 3 messages (task + 2 rows), so the anchor is index 2.
+		expect(harness.initialTopMostItemIndex).toBe(2)
 	})
 
 	it("rehydration uses bounded bottom pinning", async () => {
