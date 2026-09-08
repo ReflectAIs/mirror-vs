@@ -542,6 +542,51 @@ export async function presentAssistantMessage(mirror: Task) {
 
 					break
 				}
+
+				// Guard against executing tool calls salvaged from a truncated stream.
+				// The model's JSON arguments were cut off mid-stream (e.g. an
+				// attempt_completion whose result text ends abruptly at `{`).
+				// Executing salvaged args would show the user incomplete output
+				// (e.g. a truncated completion message). Instead, surface an error
+				// tool_result so the model re-emits the full tool call.
+				if (isKnownTool && block.truncatedArgs && !customTool) {
+					// If the tool streamed a partial UI message (e.g. attempt_completion's partial completion_result
+					// or execute_command's partial ask), remove it so the user doesn't see a lingering truncated bubble.
+					const lastMessage = mirror.mirrorMessages.at(-1)
+					if (lastMessage?.partial) {
+						mirror.mirrorMessages.pop()
+					}
+					const prevMessage = mirror.mirrorMessages.at(-1)
+					if (block.name === "attempt_completion" && prevMessage?.say === "completion_result") {
+						mirror.mirrorMessages.pop()
+					}
+
+					const errorMessage =
+						`Tool call for '${block.name}' was truncated: the model's response stream ended before the tool arguments were complete. ` +
+						`The arguments were salvaged from a partial parse and may be missing data (e.g. an incomplete result text). ` +
+						`Please re-emit the complete tool call with the full arguments.`
+
+					mirror.consecutiveMistakeCount++
+					try {
+						mirror.recordToolError(block.name as ToolName, errorMessage)
+					} catch {
+						// Best-effort only
+					}
+
+					await mirror.say(
+						"error",
+						`[Stream truncated] The ${block.name} tool call was cut off before completion. Asking the model to re-emit it...`,
+					)
+
+					mirror.pushToolResultToUserContent({
+						type: "tool_result",
+						tool_use_id: sanitizeToolUseId(toolCallId),
+						content: formatResponse.toolError(errorMessage),
+						is_error: true,
+					})
+
+					break
+				}
 			}
 
 			// Store approval feedback to merge into tool result (GitHub #10465)

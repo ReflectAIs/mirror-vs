@@ -308,7 +308,43 @@ export class NativeToolCallParser {
 		// Clean up streaming state
 		this.streamingToolCalls.delete(id)
 
-		return finalToolUse
+		if (finalToolUse) {
+			return finalToolUse
+		}
+
+		// The complete JSON.parse failed (truncated/malformed arguments). Fall back to
+		// the last partial-json parse so the consumer receives a ToolUse flagged with
+		// `truncatedArgs: true` instead of null. This lets TaskMainLoop surface a
+		// "stream truncated" error rather than silently executing salvaged (possibly
+		// incomplete) arguments — e.g. an attempt_completion whose result text was
+		// cut off mid-sentence.
+		const mcpPrefix = MCP_TOOL_PREFIX + MCP_TOOL_SEPARATOR
+		if (toolCall.name.startsWith(mcpPrefix)) {
+			return null
+		}
+
+		try {
+			const partialArgs = parseJSON(toolCall.argumentsAccumulator)
+			if (partialArgs && typeof partialArgs === "object" && Object.keys(partialArgs).length > 0) {
+				const resolvedName = resolveToolAlias(toolCall.name) as ToolName
+				const originalName = toolCall.name !== resolvedName ? toolCall.name : undefined
+				const salvaged = this.createPartialToolUse(
+					toolCall.id,
+					resolvedName,
+					partialArgs,
+					false, // not partial anymore — the stream has ended
+					originalName,
+				)
+				if (salvaged) {
+					salvaged.truncatedArgs = true
+					return salvaged
+				}
+			}
+		} catch {
+			// Even partial-json could not recover anything usable
+		}
+
+		return null
 	}
 
 	private static coerceOptionalNumber(value: unknown): number | undefined {

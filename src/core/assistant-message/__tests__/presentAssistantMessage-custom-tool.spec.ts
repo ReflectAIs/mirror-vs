@@ -346,4 +346,99 @@ describe("presentAssistantMessage - Custom Tool Recording", () => {
 			expect(mockTask.recordToolUsage).not.toHaveBeenCalled()
 		})
 	})
+
+	describe("Truncated arguments handling", () => {
+		beforeEach(() => {
+			vi.mocked(customToolRegistry.has).mockReturnValue(false)
+			vi.mocked(customToolRegistry.get).mockReturnValue(undefined)
+		})
+
+		it("should remove in-flight partial completion_result and emit error tool_result", async () => {
+			const toolCallId = "tool_call_trunc_attempt_1"
+			mockTask.assistantMessageContent = [
+				{
+					type: "tool_use",
+					id: toolCallId,
+					name: "attempt_completion",
+					params: { result: "Truncated text..." },
+					nativeArgs: { result: "Truncated text..." },
+					partial: false,
+					truncatedArgs: true,
+				},
+			]
+
+			mockTask.mirrorMessages = [
+				{
+					ts: 1000,
+					type: "say",
+					say: "completion_result",
+					text: "Truncated text...",
+					partial: true,
+				},
+			]
+
+			await presentAssistantMessage(mockTask)
+
+			// 1. Partial completion_result message should be removed
+			expect(mockTask.mirrorMessages).toHaveLength(0)
+
+			// 2. Error message should be presented to the user
+			expect(mockTask.say).toHaveBeenCalledWith(
+				"error",
+				expect.stringContaining("[Stream truncated] The attempt_completion tool call was cut off"),
+			)
+
+			// 3. Mistake count incremented
+			expect(mockTask.consecutiveMistakeCount).toBe(1)
+
+			// 4. Tool result sent to model requesting re-emission
+			const toolResult = mockTask.userMessageContent.find(
+				(item: any) => item.type === "tool_result" && item.tool_use_id === toolCallId,
+			)
+			expect(toolResult).toBeDefined()
+			expect(toolResult.is_error).toBe(true)
+			expect(toolResult.content).toContain("was truncated: the model's response stream ended")
+		})
+
+		it("should remove in-flight partial command and completion_result when attempt_completion was cut off", async () => {
+			const toolCallId = "tool_call_trunc_attempt_2"
+			mockTask.assistantMessageContent = [
+				{
+					type: "tool_use",
+					id: toolCallId,
+					name: "attempt_completion",
+					params: { result: "Some result", command: "partial cmd" },
+					nativeArgs: { result: "Some result", command: "partial cmd" },
+					partial: false,
+					truncatedArgs: true,
+				},
+			]
+
+			mockTask.mirrorMessages = [
+				{
+					ts: 1000,
+					type: "say",
+					say: "completion_result",
+					text: "Some result",
+					partial: false,
+				},
+				{
+					ts: 1001,
+					type: "ask",
+					ask: "command",
+					text: "partial cmd",
+					partial: true,
+				},
+			]
+
+			await presentAssistantMessage(mockTask)
+
+			// Both partial command and the incomplete completion_result should be removed
+			expect(mockTask.mirrorMessages).toHaveLength(0)
+			expect(mockTask.say).toHaveBeenCalledWith(
+				"error",
+				expect.stringContaining("[Stream truncated] The attempt_completion tool call was cut off"),
+			)
+		})
+	})
 })

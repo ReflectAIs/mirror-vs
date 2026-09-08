@@ -1,4 +1,5 @@
 import * as vscode from "vscode"
+import crypto from "crypto"
 
 import type { WebviewMessage } from "@mirror-vs/types"
 
@@ -118,26 +119,54 @@ export async function handleNewTask(provider: MirrorProvider, message: WebviewMe
 			!resolved.text?.trim() && (!resolved.images || resolved.images.length === 0) && !message.sessionMode
 
 		if (isEmptyTabCreation) {
-			// Do not allow creating multiple empty tabs.
+			let targetSessionId = message.sessionId
+			let sessionWorkspace: string | undefined
+
+			if (targetSessionId) {
+				if (targetSessionId.startsWith("__legacy__")) {
+					const legacyTaskId = targetSessionId.replace("__legacy__", "")
+					targetSessionId = crypto.randomUUID()
+					const { historyItem } = await provider.getTaskWithId(legacyTaskId)
+					if (historyItem) {
+						historyItem.sessionId = targetSessionId
+						sessionWorkspace = historyItem.workspace
+						await provider.updateTaskHistory(historyItem)
+						const label = historyItem.task?.trim() || `Task ${historyItem.number ?? ""}`
+						const sessionName = label.length > 60 ? `${label.slice(0, 60)}…` : label
+						await provider.renameSession(targetSessionId, sessionName)
+					}
+				}
+
+				await provider.switchSession(targetSessionId, sessionWorkspace)
+			} else {
+				// Use existing session if one exists; otherwise create a new one.
+				// This ensures clicking "+" adds a tab to the current session
+				// instead of creating a separate session for each new tab.
+				await provider.getOrCreateSession()
+			}
+
+			const currentSession = provider.getCurrentSessionId()
+
+			// Do not allow creating multiple empty tabs in this session.
 			// Switch to the existing empty tab if one is already present on the stack.
 			const allTasks = provider.getAllTasksSorted()
-			const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0)
+			const emptyTask = allTasks.find(
+				(t) => (currentSession ? t.sessionId === currentSession : true) && t.mirrorMessages.length === 0,
+			)
 
 			if (emptyTask) {
 				provider.log(
-					`[handleNewTask] Found existing empty tab ${emptyTask.taskId} — switching instead of creating a new one`,
+					`[handleNewTask] Found existing empty tab ${emptyTask.taskId} in session ${currentSession} — switching instead of creating a new one`,
 				)
 				await provider.switchToTask(emptyTask.taskId)
 				await provider.postStateToWebview()
+				await provider.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
 				return
 			}
 
-			// Use existing session if one exists; otherwise create a new one.
-			// This ensures clicking "+" adds a tab to the current session
-			// instead of creating a separate session for each new tab.
-			await provider.getOrCreateSession()
 			await provider.createTask("", [], undefined, { taskId: message.taskId }, message.taskConfiguration)
 			await provider.postStateToWebview()
+			await provider.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
 			await provider.postMessageToWebview({ type: "invoke", invoke: "newChat" })
 			return
 		}

@@ -87,6 +87,16 @@ export class SessionManager {
 	}
 
 	/**
+	 * Switches the active session to the given sessionId and persists it.
+	 */
+	public async switchSession(sessionId: string, workspacePath?: string): Promise<void> {
+		this.provider.setCurrentSessionId(sessionId)
+		await this.provider.contextProxy.setValue("currentSessionId", sessionId)
+		await this.setWorkspaceSession(sessionId, workspacePath)
+		this.provider.log(`[switchSession] Switched to session ${sessionId}`)
+	}
+
+	/**
 	 * Clears the current session id from memory and persisted state.
 	 */
 	public async clearSession(): Promise<void> {

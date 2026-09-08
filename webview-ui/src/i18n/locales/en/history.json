@@ -54,5 +54,6 @@
 	"renameCancel": "Cancel",
 	"tasks_one": "{{count}} task",
 	"tasks_other": "{{count}} tasks",
-	"tokens": "tokens"
+	"tokens": "tokens",
+	"newTabInSession": "New tab in this session"
 }

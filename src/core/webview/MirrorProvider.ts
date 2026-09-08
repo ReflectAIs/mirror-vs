@@ -448,6 +448,10 @@ export class MirrorProvider
 		return this.sessionManager.getOrCreateSession()
 	}
 
+	public async switchSession(sessionId: string, workspacePath?: string): Promise<void> {
+		await this.sessionManager.switchSession(sessionId, workspacePath)
+	}
+
 	public async clearSession(): Promise<void> {
 		await this.sessionManager.clearSession()
 	}

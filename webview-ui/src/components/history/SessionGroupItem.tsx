@@ -1,7 +1,8 @@
 import { memo, useState, useCallback, useRef, useEffect } from "react"
-import { ChevronRight, Trash2, Folder } from "lucide-react"
+import { ChevronRight, Trash2, Folder, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatTimeAgo } from "@/utils/format"
+import { useAppTranslation } from "@/i18n/TranslationContext"
 import type { SessionGroup } from "./types"
 import TaskItem from "./TaskItem"
 
@@ -26,6 +27,8 @@ interface SessionGroupItemProps {
 	onRenameSession: (newName: string) => void
 	/** Callback to delete the entire session (all its tabs) */
 	onDeleteSession?: () => void
+	/** Callback to open a new tab in this session */
+	onNewTab?: () => void
 	/** Custom display names for tabs (from taskNames map) */
 	taskNames?: Record<string, string>
 	/** Callback to rename a tab */
@@ -52,10 +55,12 @@ const SessionGroupItem = ({
 	onToggleExpand,
 	onRenameSession,
 	onDeleteSession,
+	onNewTab,
 	taskNames,
 	onRenameTab,
 	className,
 }: SessionGroupItemProps) => {
+	const { t } = useAppTranslation()
 	const { sessionId, sessionName, tabs, taskCount, isExpanded } = session
 	const [isRenaming, setIsRenaming] = useState(false)
 	const [renameValue, setRenameValue] = useState(sessionName)
@@ -179,6 +184,26 @@ const SessionGroupItem = ({
 				<span className="shrink-0 text-[10px] text-vscode-descriptionForeground/40 whitespace-nowrap">
 					{timeLabel}
 				</span>
+
+				{/* New tab in session button */}
+				{!isSelectionMode && onNewTab && (
+					<button
+						onClick={(e) => {
+							e.stopPropagation()
+							onNewTab()
+						}}
+						className={cn(
+							"shrink-0 p-1 rounded-md border border-transparent",
+							"text-vscode-descriptionForeground/40 hover:text-vscode-foreground",
+							"hover:bg-vscode-input-background/50 hover:border-vscode-panel-border/30",
+							"opacity-0 group-hover:opacity-100 transition-all duration-150",
+						)}
+						aria-label={t("history:newTabInSession")}
+						title={t("history:newTabInSession")}
+						data-testid={`new-tab-session-${sessionId}`}>
+						<Plus className="size-3.5" />
+					</button>
+				)}
 
 				{/* Delete session button — only shown when there are tabs */}
 				{taskCount > 0 && !isSelectionMode && onDeleteSession && (

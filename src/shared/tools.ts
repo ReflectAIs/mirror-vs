@@ -212,6 +212,14 @@ export interface ToolUse<TName extends ToolName = ToolName> {
 	 * Used to monitor migration from old formats.
 	 */
 	usedLegacyFormat?: boolean
+	/**
+	 * Flag indicating whether the tool call was finalized from a truncated
+	 * stream (the model's JSON arguments were cut off before completion).
+	 * The arguments were salvaged via partial-json parsing and may be
+	 * incomplete. Callers should NOT execute such tool calls silently —
+	 * they must surface an error so the model can re-emit the full call.
+	 */
+	truncatedArgs?: boolean
 }
 
 /**

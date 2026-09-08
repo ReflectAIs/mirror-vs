@@ -57,6 +57,20 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		vscode.postMessage({ type: "renameTask", taskId, sessionName: newName })
 	}, [])
 
+	// Handle new tab in session
+	const handleNewTabInSession = useCallback(
+		(sessionId: string) => {
+			vscode.postMessage({
+				type: "newTask",
+				sessionId,
+				text: "",
+				images: [],
+			})
+			onDone()
+		},
+		[onDone],
+	)
+
 	const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
 	const [isSelectionMode, setIsSelectionMode] = useState(false)
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
@@ -326,6 +340,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 									const ids = session.tabs.map((t) => t.id)
 									setDeleteSessionTaskIds(ids)
 								}}
+								onNewTab={() => handleNewTabInSession(session.sessionId)}
 								onToggleExpand={() => toggleSessionExpand(session.sessionId)}
 								onRenameSession={(name) => setSessionName(session.sessionId, name)}
 								taskNames={taskNames}

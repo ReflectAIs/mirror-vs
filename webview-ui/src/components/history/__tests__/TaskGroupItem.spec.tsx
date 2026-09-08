@@ -370,4 +370,77 @@ describe("SessionGroupItem", () => {
 			expect(screen.getByText("Compact variant tab")).toBeInTheDocument()
 		})
 	})
+
+	describe("new tab in session button", () => {
+		it("renders new tab button when onNewTab is provided and not in selection mode", () => {
+			const session = createMockSession({ sessionId: "session-new-tab" })
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+					onNewTab={vi.fn()}
+				/>,
+			)
+
+			expect(screen.getByTestId("new-tab-session-session-new-tab")).toBeInTheDocument()
+		})
+
+		it("calls onNewTab and stops propagation when clicked", () => {
+			const onNewTab = vi.fn()
+			const onToggleExpand = vi.fn()
+			const session = createMockSession({ sessionId: "session-click-tab" })
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={onToggleExpand}
+					onRenameSession={vi.fn()}
+					onNewTab={onNewTab}
+				/>,
+			)
+
+			const btn = screen.getByTestId("new-tab-session-session-click-tab")
+			fireEvent.click(btn)
+
+			expect(onNewTab).toHaveBeenCalledTimes(1)
+			expect(onToggleExpand).not.toHaveBeenCalled()
+		})
+
+		it("hides new tab button when in selection mode", () => {
+			const session = createMockSession({ sessionId: "session-selection-mode" })
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					isSelectionMode={true}
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+					onNewTab={vi.fn()}
+				/>,
+			)
+
+			expect(screen.queryByTestId("new-tab-session-session-selection-mode")).not.toBeInTheDocument()
+		})
+
+		it("does not render new tab button when onNewTab is not provided", () => {
+			const session = createMockSession({ sessionId: "session-no-callback" })
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={vi.fn()}
+					onRenameSession={vi.fn()}
+				/>,
+			)
+
+			expect(screen.queryByTestId("new-tab-session-session-no-callback")).not.toBeInTheDocument()
+		})
+	})
 })
