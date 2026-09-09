@@ -188,29 +188,6 @@ export const WorktreeSelector = ({ disabled = false }: WorktreeSelectorProps) =>
 						</p>
 					</div>
 
-					{/* Task Sandbox Isolation Option */}
-					<div className="px-3 py-2 border-b border-vscode-panel-border bg-vscode-editor-background/40 flex items-center justify-between gap-2">
-						<div className="flex flex-col pr-2">
-							<div className="flex items-center gap-1">
-								<span className="text-xs font-semibold text-vscode-foreground">
-									{t("worktrees:taskIsolation.title")}
-								</span>
-								<StandardTooltip content={t("worktrees:taskIsolation.tooltip")}>
-									<Info className="size-3 text-vscode-descriptionForeground hover:text-vscode-foreground cursor-help" />
-								</StandardTooltip>
-							</div>
-							<span className="text-[11px] text-vscode-descriptionForeground">
-								{isSandboxEnabled
-									? t("worktrees:taskIsolation.enabledShort")
-									: t("worktrees:taskIsolation.disabledShort")}
-							</span>
-						</div>
-						<ToggleSwitch
-							checked={isSandboxEnabled}
-							onChange={() => setExperimentEnabled?.("gitWorktreeSandbox", !isSandboxEnabled)}
-						/>
-					</div>
-
 					{/* Worktree list */}
 					<div className="max-h-[260px] overflow-y-auto py-1">
 						{worktrees.map((worktree) => {
