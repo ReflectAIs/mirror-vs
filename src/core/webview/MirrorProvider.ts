@@ -2277,22 +2277,20 @@ export class MirrorProvider
 		}
 		await this.taskHistoryStore.upsert(newHistoryItem)
 
-		// 4. If branching to a different workspace, keep current active conversation uninterrupted
-		if (path.resolve(targetWorkspacePath) !== path.resolve(this.cwd)) {
-			vscode.window.showInformationMessage(
-				`🌿 Branched conversation to workspace "${targetWorkspaceName}". Your current chat continues uninterrupted here.`,
-			)
-			await this.postStateToWebview()
-			return null
-		}
-
-		// If branching within the same workspace, switch to the new session
+		// 4. Switch to the new session and load the branched task immediately
+		// (applies to both same-workspace and cross-workspace branching — the
+		// task carries its own workspacePath, so cross-workspace tasks load
+		// the same way as opening them from history).
 		this.currentSessionId = branchSessionId
 		await this.contextProxy.setValue("currentSessionId", branchSessionId)
 		const newTask = await this.createTaskWithHistoryItem(newHistoryItem, { startTask: false })
 		newTask.startRestoredTask().catch((error) => {
 			this.log(`[branchTaskToWorkspace] Failed to start restored task: ${error}`)
 		})
+
+		if (path.resolve(targetWorkspacePath) !== path.resolve(this.cwd)) {
+			vscode.window.showInformationMessage(`🌿 Branched conversation to workspace "${targetWorkspaceName}".`)
+		}
 
 		await this.postStateToWebview()
 		return newTask
