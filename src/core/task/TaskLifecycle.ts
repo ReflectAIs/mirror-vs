@@ -127,7 +127,9 @@ export class TaskLifecycle {
 
 			await this.task.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
 
-			await this.task.say("text", task, images)
+			// Record the initial task prompt as user feedback so the webview renders
+			// it as a user message ("You said") instead of a bot message.
+			await this.task.say("user_feedback", task, images)
 
 			// Check for too many MCP tools and warn the user
 			const { enabledToolCount, enabledServerCount } = await this.getEnabledMcpToolsCount()
