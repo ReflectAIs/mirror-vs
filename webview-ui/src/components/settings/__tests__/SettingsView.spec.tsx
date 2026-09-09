@@ -173,8 +173,13 @@ vi.mock("@/components/ui", () => ({
 			data-testid={dataTestId}
 		/>
 	),
-	Button: ({ children, onClick, variant, className, "data-testid": dataTestId }: any) => (
-		<button onClick={onClick} data-variant={variant} className={className} data-testid={dataTestId}>
+	Button: ({ children, onClick, variant, className, disabled, "data-testid": dataTestId }: any) => (
+		<button
+			onClick={onClick}
+			data-variant={variant}
+			className={className}
+			disabled={disabled}
+			data-testid={dataTestId}>
 			{children}
 		</button>
 	),
@@ -652,6 +657,17 @@ describe("SettingsView - Allowed Commands", () => {
 
 			// Check that unsaved changes dialog is shown
 			expect(screen.getByText("settings:unsavedChangesDialog.title")).toBeInTheDocument()
+		})
+
+		it("does not enable save button when opening experimental tab without changes", () => {
+			const { activateTab } = renderSettingsView()
+
+			// Activate the experimental tab
+			activateTab("experimental")
+
+			// Save button should be disabled since nothing was changed
+			const saveButton = screen.getByTestId("save-button")
+			expect(saveButton).toBeDisabled()
 		})
 	})
 })

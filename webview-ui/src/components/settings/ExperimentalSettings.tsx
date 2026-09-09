@@ -22,6 +22,12 @@ type ExperimentalSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	experiments: Experiments
 	setExperimentEnabled: SetExperimentEnabled
 
+	// Global provider & API key
+	imageGenerationProvider?: ImageGenerationProvider
+	setImageGenerationProvider?: (provider: ImageGenerationProvider) => void
+	openRouterImageApiKey?: string
+	setOpenRouterImageApiKey?: (apiKey: string) => void
+
 	// Per-type provider / model selection
 	generationProviders?: Record<string, ImageGenerationProvider>
 	updateGenerationProvider?: (type: string, provider: ImageGenerationProvider) => void
@@ -56,6 +62,10 @@ const PIPELINE_EXPERIMENT_KEYS = new Set([
 export const ExperimentalSettings = ({
 	experiments,
 	setExperimentEnabled,
+	imageGenerationProvider,
+	setImageGenerationProvider,
+	openRouterImageApiKey,
+	setOpenRouterImageApiKey,
 	generationProviders,
 	updateGenerationProvider,
 	openRouterModels,
@@ -143,9 +153,13 @@ export const ExperimentalSettings = ({
 		[autoSetupRunning],
 	)
 
-	// Filter entries — pipeline keys are rendered inside ImageGenerationSettings
+	// Filter entries — pipeline keys are rendered inside ImageGenerationSettings.
+	// LSP_CODE_GRAPH and GIT_WORKTREE_SANDBOX are enabled by default and no longer
+	// shown as experimental toggles.
 	const entries = Object.entries(experimentConfigsMap)
-	const nonPipelineEntries = entries.filter(([key]) => !PIPELINE_EXPERIMENT_KEYS.has(key))
+	const nonPipelineEntries = entries.filter(
+		([key]) => !PIPELINE_EXPERIMENT_KEYS.has(key) && key !== "LSP_CODE_GRAPH" && key !== "GIT_WORKTREE_SANDBOX",
+	)
 
 	// The first pipeline entry that has all required callbacks renders ImageGenerationSettings
 	// (which handles all 8 pipeline types internally)
@@ -175,6 +189,10 @@ export const ExperimentalSettings = ({
 								<ImageGenerationSettings
 									experiments={experiments}
 									setExperimentEnabled={setExperimentEnabled}
+									imageGenerationProvider={imageGenerationProvider}
+									setImageGenerationProvider={setImageGenerationProvider}
+									openRouterImageApiKey={openRouterImageApiKey}
+									setOpenRouterImageApiKey={setOpenRouterImageApiKey}
 									generationProviders={generationProviders}
 									updateGenerationProvider={updateGenerationProvider}
 									openRouterModels={openRouterModels}

@@ -5,7 +5,7 @@ import type { Worktree, WorktreeListResponse } from "@mirror-vs/types"
 
 import { cn } from "@/lib/utils"
 import { useMirrorPortal } from "@/components/ui/hooks/useMirrorPortal"
-import { Popover, PopoverContent, PopoverTrigger, StandardTooltip, Button, ToggleSwitch } from "@/components/ui"
+import { Popover, PopoverContent, PopoverTrigger, StandardTooltip, Button } from "@/components/ui"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { vscode } from "@/utils/vscode"
@@ -16,8 +16,6 @@ import { IconButton } from "./IconButton"
 
 interface WorktreeSelectorProps {
 	disabled?: boolean
-	experiments?: Record<string, boolean>
-	setExperimentEnabled?: (id: any, enabled: boolean) => void
 }
 
 const normalizePath = (p?: string) =>
@@ -28,11 +26,7 @@ const normalizePath = (p?: string) =>
 				.replace(/\/$/, "")
 		: ""
 
-export const WorktreeSelector = ({
-	disabled = false,
-	experiments: propExperiments,
-	setExperimentEnabled: propSetExperimentEnabled,
-}: WorktreeSelectorProps) => {
+export const WorktreeSelector = ({ disabled = false }: WorktreeSelectorProps) => {
 	const { t } = useAppTranslation()
 	let extensionState: ReturnType<typeof useExtensionState> | null = null
 	try {
@@ -40,9 +34,6 @@ export const WorktreeSelector = ({
 	} catch {
 		// Rendered outside ExtensionStateContextProvider (e.g. unit tests)
 	}
-	const experiments = propExperiments ?? extensionState?.experiments
-	const setExperimentEnabled = propSetExperimentEnabled ?? extensionState?.setExperimentEnabled
-	const isSandboxEnabled = !!experiments?.["gitWorktreeSandbox"]
 	const activeTabId = extensionState?.activeTabId
 	const tabs = extensionState?.tabs
 	const currentTabWorktree = extensionState?.currentTabWorktree
@@ -163,11 +154,6 @@ export const WorktreeSelector = ({
 					<span className="font-semibold">{t("worktrees:selector.worktree")}:</span>
 					<GitBranch className="w-3 h-3 text-mirror-brand-via" />
 					<span className="truncate max-w-[140px]">{currentWorktree?.branch || t("worktrees:noBranch")}</span>
-					{isSandboxEnabled && (
-						<span className="text-[10px] px-1 py-0.2 bg-mirror-brand-from/20 text-mirror-brand-to border border-mirror-brand-from/30 rounded">
-							sandbox
-						</span>
-					)}
 					<ChevronDown className="size-3 opacity-60" />
 				</PopoverTrigger>
 			</StandardTooltip>
@@ -198,29 +184,6 @@ export const WorktreeSelector = ({
 						<p className="m-0 mt-0.5 text-xs text-vscode-descriptionForeground">
 							{t("worktrees:selector.description")}
 						</p>
-					</div>
-
-					{/* Task Sandbox Isolation Option */}
-					<div className="px-3 py-2 border-b border-vscode-panel-border bg-vscode-editor-background/40 flex items-center justify-between gap-2">
-						<div className="flex flex-col pr-2">
-							<div className="flex items-center gap-1">
-								<span className="text-xs font-semibold text-vscode-foreground">
-									{t("worktrees:taskIsolation.title")}
-								</span>
-								<StandardTooltip content={t("worktrees:taskIsolation.tooltip")}>
-									<Info className="size-3 text-vscode-descriptionForeground hover:text-vscode-foreground cursor-help" />
-								</StandardTooltip>
-							</div>
-							<span className="text-[11px] text-vscode-descriptionForeground">
-								{isSandboxEnabled
-									? t("worktrees:taskIsolation.enabledShort")
-									: t("worktrees:taskIsolation.disabledShort")}
-							</span>
-						</div>
-						<ToggleSwitch
-							checked={isSandboxEnabled}
-							onChange={() => setExperimentEnabled?.("gitWorktreeSandbox", !isSandboxEnabled)}
-						/>
 					</div>
 
 					{/* Worktree list */}

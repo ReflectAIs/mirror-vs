@@ -30,8 +30,10 @@ vi.mock("../../../../api/image/pipeline-registry", () => ({
 		resolve: vi.fn(),
 		importPipeline: vi.fn(),
 		deletePipeline: vi.fn(),
+		exists: vi.fn(),
 		setUserDefault: vi.fn(),
 		getUserDefault: vi.fn(),
+		clearUserDefault: vi.fn(),
 		hidePipeline: vi.fn(),
 		unhidePipeline: vi.fn(),
 		isHidden: vi.fn(),
@@ -50,6 +52,7 @@ import {
 	handleImportPipeline,
 	handleDeletePipeline,
 	handleSetDefaultPipeline,
+	handleSetComfyuiDefaultPipeline,
 	handleHidePipeline,
 	handleUnhidePipeline,
 } from "../pipelineMessageHandler"
@@ -61,6 +64,7 @@ import {
 function createMockProvider(): MirrorProvider {
 	return {
 		postMessageToWebview: mockPostMessage,
+		postStateToWebview: vi.fn().mockResolvedValue(undefined),
 		log: mockLog,
 		getCurrentTask: mockGetCurrentTask.mockReturnValue({ cwd: "/test/cwd" }),
 		contextProxy: {
@@ -226,6 +230,7 @@ describe("pipelineMessageHandler", () => {
 
 		it("returns error on delete failure", async () => {
 			;(PipelineRegistry.deletePipeline as any).mockRejectedValue(new Error("not found"))
+			;(PipelineRegistry.exists as any).mockReturnValue(false)
 			;(PipelineRegistry.isInitialized as any).mockReturnValue(true)
 
 			await handleDeletePipeline(provider, { type: "deletePipeline", text: "nope" } as any)
@@ -233,6 +238,35 @@ describe("pipelineMessageHandler", () => {
 			expect(mockPostMessage).toHaveBeenCalledWith(
 				expect.objectContaining({ type: "deletePipelineResult", success: false, error: "not found" }),
 			)
+		})
+
+		it("soft-deletes built-in pipeline and persists to hiddenPipelines", async () => {
+			;(PipelineRegistry.deletePipeline as any).mockRejectedValue(new Error("Cannot delete built-in"))
+			;(PipelineRegistry.exists as any).mockReturnValue(true)
+			;(PipelineRegistry.resolve as any).mockReturnValue({ source: "builtin" })
+			;(PipelineRegistry.isHidden as any).mockReturnValue(true)
+			;(PipelineRegistry.listAll as any).mockReturnValue([])
+
+			await handleDeletePipeline(provider, { type: "deletePipeline", text: "builtin-pipe" } as any)
+
+			expect(PipelineRegistry.hidePipeline).toHaveBeenCalledWith("builtin-pipe")
+			expect(provider.contextProxy.setValue).toHaveBeenCalledWith("hiddenPipelines", ["builtin-pipe"])
+			expect(mockPostMessage).toHaveBeenCalledWith(
+				expect.objectContaining({ type: "deletePipelineResult", success: true, slug: "builtin-pipe" }),
+			)
+		})
+
+		it("cleans up comfyuiDefaultPipelines when deleting a default pipeline", async () => {
+			;(PipelineRegistry.deletePipeline as any).mockResolvedValue(undefined)
+			;(PipelineRegistry.listAll as any).mockReturnValue([])
+			;(provider.contextProxy.getValues as any).mockReturnValue({
+				comfyuiDefaultPipelines: { generate: "to-delete", edit: "other" },
+				hiddenPipelines: [],
+			})
+
+			await handleDeletePipeline(provider, { type: "deletePipeline", text: "to-delete" } as any)
+
+			expect(provider.contextProxy.setValue).toHaveBeenCalledWith("comfyuiDefaultPipelines", { edit: "other" })
 		})
 	})
 
@@ -286,6 +320,65 @@ describe("pipelineMessageHandler", () => {
 
 			expect(mockPostMessage).toHaveBeenCalledWith(
 				expect.objectContaining({ type: "setDefaultPipelineResult", success: false, error: "not found" }),
+			)
+		})
+	})
+
+	// ------------------------------------------------------------------
+	// handleSetComfyuiDefaultPipeline
+	// ------------------------------------------------------------------
+	describe("handleSetComfyuiDefaultPipeline", () => {
+		it("returns error when no pipelineType provided", async () => {
+			await handleSetComfyuiDefaultPipeline(provider, {
+				type: "setComfyuiDefaultPipeline",
+				values: {},
+			} as any)
+			expect(mockPostMessage).toHaveBeenCalledWith(
+				expect.objectContaining({ type: "setDefaultPipelineResult", success: false }),
+			)
+		})
+
+		it("clears the default pipeline when slug is empty", async () => {
+			;(provider.contextProxy.getValues as any).mockReturnValue({
+				comfyuiDefaultPipelines: { generate: "flash", txt2img: "flash" },
+			})
+
+			await handleSetComfyuiDefaultPipeline(provider, {
+				type: "setComfyuiDefaultPipeline",
+				values: { pipelineType: "generate", slug: "" },
+			} as any)
+
+			expect(PipelineRegistry.clearUserDefault).toHaveBeenCalledWith("generate")
+			expect(provider.contextProxy.setValue).toHaveBeenCalledWith("comfyuiDefaultPipelines", {})
+			expect(mockPostMessage).toHaveBeenCalledWith(
+				expect.objectContaining({ type: "setDefaultPipelineResult", success: true, slug: "" }),
+			)
+		})
+
+		it("sets the default pipeline and persists aliases", async () => {
+			;(PipelineRegistry.resolve as any).mockReturnValue({ type: "generate", slug: "turbo" })
+			;(PipelineRegistry.setUserDefault as any).mockReturnValue(undefined)
+			;(provider.contextProxy.getValues as any).mockReturnValue({
+				comfyuiDefaultPipelines: {},
+			})
+
+			await handleSetComfyuiDefaultPipeline(provider, {
+				type: "setComfyuiDefaultPipeline",
+				values: { pipelineType: "generate", slug: "turbo" },
+			} as any)
+
+			expect(PipelineRegistry.setUserDefault).toHaveBeenCalledWith("generate", "turbo")
+			expect(provider.contextProxy.setValue).toHaveBeenCalledWith("comfyuiDefaultPipelines", {
+				generate: "turbo",
+				txt2img: "turbo",
+			})
+			expect(mockPostMessage).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: "setDefaultPipelineResult",
+					success: true,
+					slug: "turbo",
+					pipelineType: "generate",
+				}),
 			)
 		})
 

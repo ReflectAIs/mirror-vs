@@ -116,12 +116,32 @@ export async function handleUpdateSettings(
 			// ImageProviderRouter can find it.  This is how a provider selected
 			// from the dropdown (without running auto-setup) becomes available.
 			ensureProviderRegistered(value as string)
+		} else if (key === "generationProviders" && value && typeof value === "object") {
+			for (const prov of Object.values(value as Record<string, string>)) {
+				ensureProviderRegistered(prov)
+			}
+		} else if (key === "openRouterImageApiKey" && typeof value === "string" && value.trim()) {
+			const { initializeImageProviders } = require("../../../services/image-runtime")
+			initializeImageProviders(value.trim(), provider.context, {
+				currentProvider: provider.contextProxy.getValue("imageGenerationProvider"),
+			})
+		} else if (key === "comfyuiDefaultPipelines") {
+			if (value && typeof value === "object") {
+				const { PipelineRegistry } = require("../../../api/image/pipeline-registry")
+				const hidden = provider.contextProxy.getValues().hiddenPipelines ?? []
+				PipelineRegistry.restorePersistedDefaults(value as Record<string, string>, hidden)
+			}
 		} else if (key === "activeSearchProvider") {
 			const { connectSearchProviderSelector } = require("../../../services/search")
 			connectSearchProviderSelector(() => ({ activeProvider: value }))
 		}
 
 		await provider.contextProxy.setValue(key as keyof MirrorVSSettings, newValue)
+	}
+
+	if (updatedSettings.comfyuiDefaultPipelines) {
+		const { handleRequestPipelines } = require("./pipelineMessageHandler")
+		await handleRequestPipelines(provider)
 	}
 
 	await provider.postStateToWebview()

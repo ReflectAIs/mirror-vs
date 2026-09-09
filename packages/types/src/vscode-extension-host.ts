@@ -434,6 +434,8 @@ export type ExtensionState = Pick<
 	| "showWorktreesInHomeScreen"
 	| "disabledTools"
 	| "comfyuiAutoSetup"
+	| "comfyuiPort"
+	| "comfyuiModel"
 	| "activeSearchProvider"
 	| "userBraveApiKey"
 	| "comfyuiDefaultPipelines"
@@ -1024,6 +1026,7 @@ export interface MirrorSayTool {
 	inputImage?: string // Path to input image for generateImage edits
 	pipeline?: string // Generic pipeline type for display (e.g. "txt2img", "img2img")
 	pipelineName?: string // Human-readable pipeline name (e.g. "SDXL Turbo Flash", "Standard Quality")
+	provider?: string // Provider name for display (e.g. "comfyui", "openrouter")
 	// Properties for runSlashCommand tool
 	command?: string
 	args?: string

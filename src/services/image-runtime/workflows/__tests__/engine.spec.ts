@@ -1044,5 +1044,39 @@ describe("WorkflowEngine", () => {
 			expect(workflow["5"].inputs.width).toBe(768)
 			expect(workflow["5"].inputs.height).toBe(768)
 		})
+
+		it("should skip cloud model IDs with slashes and preserve workflow checkpoint", () => {
+			const workflow = WorkflowEngine.normalizeWorkflow(JSON.parse(JSON.stringify(FLASH_LEGACY)))
+			expect(workflow["20"].inputs.ckpt_name).toBe("sd_xl_turbo.safetensors")
+			WorkflowEngine.injectModel(workflow, "google/gemini-2.5-flash-image")
+			expect(workflow["20"].inputs.ckpt_name).toBe("sd_xl_turbo.safetensors")
+		})
+
+		it("should strip non-executable MarkdownNote and Note nodes from legacy workflow", () => {
+			const legacyWithNotes = {
+				nodes: [
+					{ id: 1, type: "CheckpointLoaderSimple", inputs: [], widgets_values: ["model.safetensors"] },
+					{ id: 28, type: "MarkdownNote", inputs: [], outputs: [], widgets_values: ["# Documentation link"] },
+					{ id: 29, type: "Note", inputs: [], outputs: [], widgets_values: ["Some comment"] },
+				],
+				links: [],
+			}
+			const normalized = WorkflowEngine.normalizeWorkflow(legacyWithNotes)
+			expect(normalized["1"]).toBeDefined()
+			expect(normalized["28"]).toBeUndefined()
+			expect(normalized["29"]).toBeUndefined()
+		})
+
+		it("should strip non-executable MarkdownNote and Note nodes from object-format workflow", () => {
+			const objectWithNotes = {
+				"1": { class_type: "CheckpointLoaderSimple", inputs: {} },
+				"28": { class_type: "MarkdownNote", inputs: {} },
+				"29": { class_type: "Note", inputs: {} },
+			}
+			const normalized = WorkflowEngine.normalizeWorkflow(objectWithNotes)
+			expect(normalized["1"]).toBeDefined()
+			expect(normalized["28"]).toBeUndefined()
+			expect(normalized["29"]).toBeUndefined()
+		})
 	})
 })

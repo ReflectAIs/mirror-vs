@@ -99,7 +99,44 @@ export class ContextProxy {
 		// Migration: Clear old default condensing prompt so users get the improved v2 default
 		await this.migrateOldDefaultCondensingPrompt()
 
+		// Migration: Clear stale persisted values for experiments that graduated from
+		// experimental toggles to always-on defaults (lspCodeGraph, gitWorktreeSandbox)
+		await this.migrateGraduatedExperiments()
+
 		this._isInitialized = true
+	}
+
+	/**
+	 * Migrates experiments that are no longer user-configurable (removed from the
+	 * Experimental settings tab) to their new always-on defaults by clearing any
+	 * stale persisted `false` values.
+	 */
+	private async migrateGraduatedExperiments() {
+		try {
+			const experiments = this.stateCache["experiments"] as Record<string, boolean> | undefined
+
+			if (experiments && typeof experiments === "object") {
+				const graduatedDefaults = { lspCodeGraph: true, gitWorktreeSandbox: true }
+				const updates: Record<string, boolean> = {}
+
+				for (const [key, defaultValue] of Object.entries(graduatedDefaults)) {
+					if (experiments[key] !== undefined && experiments[key] !== defaultValue) {
+						updates[key] = defaultValue
+					}
+				}
+
+				if (Object.keys(updates).length > 0) {
+					const merged = { ...experiments, ...updates }
+					await this.originalContext.globalState.update("experiments", merged)
+					this.stateCache["experiments"] = merged
+					logger.info(`Migrated graduated experiments to defaults: ${Object.keys(updates).join(", ")}`)
+				}
+			}
+		} catch (error) {
+			logger.error(
+				`Error during graduated experiments migration: ${error instanceof Error ? error.message : String(error)}`,
+			)
+		}
 	}
 
 	/**

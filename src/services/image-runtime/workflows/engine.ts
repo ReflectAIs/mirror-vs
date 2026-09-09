@@ -110,10 +110,40 @@ export class WorkflowEngine {
 			WorkflowEngine.populateWidgetInputs(converted)
 			return converted
 		}
+		// Strip non-executable UI note nodes if already in object format
+		WorkflowEngine.stripNonExecutableNodes(workflow)
 		// Populate inputs from widgets_values for nodes where the /prompt API
 		// expects values in inputs rather than relying on widgets_values.
 		WorkflowEngine.populateWidgetInputs(workflow)
 		return workflow
+	}
+
+	/**
+	 * Check if a node type is a non-executable UI note/annotation node
+	 * (e.g. MarkdownNote, Note) that ComfyUI's backend does not recognize as
+	 * an executable node in /prompt payloads.
+	 */
+	static isNonExecutableNode(nodeType?: string): boolean {
+		if (!nodeType) return false
+		const lower = nodeType.toLowerCase()
+		return (
+			nodeType === "MarkdownNote" ||
+			nodeType === "Note" ||
+			lower === "markdownnote" ||
+			lower === "note" ||
+			lower.endsWith("note")
+		)
+	}
+
+	/**
+	 * Strip non-executable UI note nodes from an object-format workflow.
+	 */
+	static stripNonExecutableNodes(workflow: Record<string, any>): void {
+		for (const [key, node] of Object.entries(workflow)) {
+			if (node && typeof node === "object" && WorkflowEngine.isNonExecutableNode(node.class_type)) {
+				delete workflow[key]
+			}
+		}
 	}
 
 	/**
@@ -155,6 +185,11 @@ export class WorkflowEngine {
 		const linkMap = WorkflowEngine.buildLinkMap(legacy.links ?? [])
 
 		for (const node of legacy.nodes) {
+			// Skip UI note nodes (MarkdownNote, Note) that fail backend execution
+			if (WorkflowEngine.isNonExecutableNode(node.type)) {
+				continue
+			}
+
 			const key = String(node.id)
 			const obj: any = {
 				class_type: node.type,
@@ -522,7 +557,15 @@ export class WorkflowEngine {
 	/**
 	 * Set the checkpoint / model via the "Load Checkpoint" node.
 	 */
-	static injectModel(workflow: any, model: string): void {
+	static injectModel(workflow: any, model?: string): void {
+		if (!model) return
+		// If model is a cloud provider model ID (e.g. "google/gemini-2.5-flash-image", "openai/gpt-5"),
+		// do not inject it into local CheckpointLoaderSimple. Preserve the workflow's existing checkpoint.
+		if (model.includes("/")) {
+			console.warn(`[WorkflowEngine] Skipping injectModel for cloud model ID: ${model}`)
+			return
+		}
+
 		const node = WorkflowEngine.findNode(workflow, "Load Checkpoint", "CheckpointLoaderSimple")
 		if (node?.inputs) {
 			// ComfyUI CheckpointLoaderSimple expects the exact filename including extension.

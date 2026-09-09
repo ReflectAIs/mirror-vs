@@ -525,5 +525,203 @@ describe("generateImageTool", () => {
 			expect(mockMirror.say).toHaveBeenCalledWith("error", expect.stringContaining("Unsupported image format"))
 			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Unsupported image format"))
 		})
+
+		it("should normalize string 'null' image parameter and generate without error", async () => {
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "A beautiful landscape",
+					path: "landscape.png",
+					image: "null", // String "null" sent by LLM with strict schema
+				},
+				nativeArgs: {
+					prompt: "A beautiful landscape",
+					path: "landscape.png",
+					image: "null",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			// Should NOT complain about file "null" not found
+			expect(mockMirror.say).not.toHaveBeenCalledWith("error", expect.stringContaining("Input image not found"))
+			expect(mockMirror._mockGenerateImage).toHaveBeenCalled()
+		})
+
+		it("should succeed with comfyui active provider even when openRouterApiKey is not set", async () => {
+			const mockComfyGenerate = vi.fn().mockResolvedValue({
+				success: true,
+				imageData: "data:image/png;base64,comfyb64",
+			})
+			const comfyProvider: ImageProvider = {
+				name: "comfyui",
+				health: vi.fn().mockResolvedValue({ alive: true }),
+				listModels: vi.fn().mockResolvedValue([]),
+				generate: mockComfyGenerate,
+				edit: vi.fn(),
+				inpaint: vi.fn(),
+				outpaint: vi.fn(),
+				upscale: vi.fn(),
+				removeBackground: vi.fn(),
+				interrupt: vi.fn(),
+				getProgress: vi.fn().mockReturnValue({ status: "idle" }),
+				getCapabilities: vi.fn().mockReturnValue({}),
+			}
+			ImageProviderRegistry.register("comfyui", comfyProvider)
+			setActiveProviderSelector(() => "comfyui")
+
+			// Provider state without any openRouterImageApiKey
+			mockMirror.providerRef = {
+				deref: () => ({
+					getState: vi.fn().mockResolvedValue({
+						experiments: {
+							[EXPERIMENT_IDS.TXT2IMG]: true,
+						},
+						openRouterImageApiKey: undefined,
+						imageGenerationProvider: "comfyui",
+					}),
+				}),
+			}
+
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Local comfy generation",
+					path: "comfy.png",
+					image: "null",
+				},
+				nativeArgs: {
+					prompt: "Local comfy generation",
+					path: "comfy.png",
+					image: "null",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			// Should NOT ask for OpenRouter API key
+			expect(mockMirror.say).not.toHaveBeenCalledWith(
+				"error",
+				expect.stringContaining("OpenRouter API key is required"),
+			)
+			expect(mockComfyGenerate).toHaveBeenCalled()
+		})
+
+		it("should require OpenRouter API key only when openrouter is the active provider and has no key", async () => {
+			setActiveProviderSelector(() => "openrouter")
+			mockMirror.providerRef = {
+				deref: () => ({
+					getState: vi.fn().mockResolvedValue({
+						experiments: {
+							[EXPERIMENT_IDS.TXT2IMG]: true,
+						},
+						openRouterImageApiKey: undefined,
+						apiConfiguration: {},
+						imageGenerationProvider: "openrouter",
+					}),
+				}),
+			}
+
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Cloud generation",
+					path: "cloud.png",
+				},
+				nativeArgs: {
+					prompt: "Cloud generation",
+					path: "cloud.png",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			expect(mockMirror.say).toHaveBeenCalledWith(
+				"error",
+				expect.stringMatching(/openRouterApiKeyRequired|OpenRouter API key is required/),
+			)
+			expect(mockMirror._mockGenerateImage).not.toHaveBeenCalled()
+		})
+
+		it("should select local model (sd_xl_turbo) instead of OpenRouter Google Flash model when ComfyUI is active", async () => {
+			const mockComfyGenerate = vi.fn().mockResolvedValue({
+				success: true,
+				imageData: "data:image/png;base64,comfydata",
+			})
+			const mockComfyProvider: ImageProvider = {
+				name: "comfyui",
+				health: vi.fn().mockResolvedValue({ alive: true }),
+				listModels: vi.fn().mockResolvedValue([]),
+				generate: mockComfyGenerate,
+				edit: vi.fn(),
+				inpaint: vi.fn(),
+				outpaint: vi.fn(),
+				upscale: vi.fn(),
+				removeBackground: vi.fn(),
+				interrupt: vi.fn(),
+				getProgress: vi.fn().mockReturnValue({ status: "idle" }),
+				getCapabilities: vi.fn().mockReturnValue({}),
+			}
+			ImageProviderRegistry.register("comfyui", mockComfyProvider)
+			setActiveProviderSelector(() => "comfyui")
+
+			mockMirror.providerRef = {
+				deref: () => ({
+					getState: vi.fn().mockResolvedValue({
+						experiments: {
+							[EXPERIMENT_IDS.TXT2IMG]: true,
+						},
+						imageGenerationProvider: "comfyui",
+						openRouterImageGenerationSelectedModel: "google/gemini-2.5-flash-image",
+					}),
+					convertToWebviewUri: (p: string) => p,
+				}),
+			}
+
+			const block: ToolUse = {
+				type: "tool_use",
+				name: "generate_image",
+				params: {
+					prompt: "Local generation",
+					path: "local.png",
+				},
+				nativeArgs: {
+					prompt: "Local generation",
+					path: "local.png",
+				},
+				partial: false,
+			}
+
+			await generateImageTool.handle(mockMirror as Task, block as ToolUse<"generate_image">, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			expect(mockComfyGenerate).toHaveBeenCalledWith(
+				"Local generation",
+				expect.objectContaining({
+					model: "sd_xl_turbo",
+				}),
+			)
+		})
 	})
 })

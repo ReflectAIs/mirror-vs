@@ -133,7 +133,6 @@ describe("NormalSettingsView", () => {
 
 		expect(screen.getByText("Automatic Git Checkpoints")).toBeInTheDocument()
 		expect(screen.getByText("Auto Context Condensing")).toBeInTheDocument()
-		expect(screen.getByText("Isolated Git Worktree Sandbox")).toBeInTheDocument()
 		expect(screen.getByText("Sound Notifications")).toBeInTheDocument()
 	})
 

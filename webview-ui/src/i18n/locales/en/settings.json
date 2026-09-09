@@ -160,6 +160,14 @@
 		"disableTabBar": {
 			"label": "Disable multi-tab interface",
 			"description": "When enabled, hides the tab bar and returns to single-task mode. Multi-tab is on by default."
+		},
+		"mascotTheme": {
+			"label": "Mascot Theme",
+			"description": "Choose a visual theme style for the AI helper mascot.",
+			"cyberpunk": "Cyberpunk Neon",
+			"retro": "Retro Monochrome",
+			"synthwave": "Synthwave Sunset",
+			"solar": "Solar Flare"
 		}
 	},
 	"prompts": {

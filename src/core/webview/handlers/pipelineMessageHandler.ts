@@ -33,6 +33,10 @@ export async function handleRequestPipelines(provider: MirrorProvider): Promise<
 	try {
 		if (!PipelineRegistry.isInitialized()) {
 			const cwd = getCurrentCwd(provider)
+			console.log(
+				"[PipelineDebug] handleRequestPipelines: registry not initialized, initializing with cwd =",
+				cwd,
+			)
 			await PipelineRegistry.initialize(cwd)
 		}
 
@@ -40,6 +44,12 @@ export async function handleRequestPipelines(provider: MirrorProvider): Promise<
 		// on every request, so that changes made in settings are reflected
 		// even if the registry was already initialized.
 		const values = provider.contextProxy.getValues()
+		console.log(
+			"[PipelineDebug] handleRequestPipelines: persisted comfyuiDefaultPipelines =",
+			JSON.stringify(values.comfyuiDefaultPipelines ?? {}),
+			"hiddenPipelines =",
+			JSON.stringify(values.hiddenPipelines ?? []),
+		)
 		PipelineRegistry.restorePersistedDefaults(values.comfyuiDefaultPipelines ?? {}, values.hiddenPipelines ?? [])
 
 		const pipelines = PipelineRegistry.listAll()
@@ -52,7 +62,9 @@ export async function handleRequestPipelines(provider: MirrorProvider): Promise<
 				type: p.type,
 				tags: p.tags,
 				source: p.source,
-				isDefault: p.isDefault,
+				isDefault:
+					PipelineRegistry.getUserDefault(p.type) === p.slug ||
+					(!PipelineRegistry.getUserDefault(p.type) && p.isDefault),
 				hidden: PipelineRegistry.isHidden(p.slug),
 			})),
 		})
@@ -212,7 +224,41 @@ export async function handleDeletePipeline(provider: MirrorProvider, message: We
 		}
 
 		const cwd = getCurrentCwd(provider)
-		await PipelineRegistry.deletePipeline(slug, cwd)
+		try {
+			await PipelineRegistry.deletePipeline(slug, cwd)
+		} catch (deleteError) {
+			// If it's a built-in pipeline that cannot be physically unlinked, soft-delete (hide) it
+			const def = PipelineRegistry.exists(slug) ? PipelineRegistry.resolve(slug) : null
+			if (def?.source === "builtin") {
+				PipelineRegistry.hidePipeline(slug)
+			} else {
+				throw deleteError
+			}
+		}
+
+		// Clean up comfyuiDefaultPipelines if this slug was saved as a default
+		const currentDefaults = provider.contextProxy.getValues().comfyuiDefaultPipelines ?? {}
+		const updatedDefaults = { ...currentDefaults }
+		let defaultsChanged = false
+		for (const [type, defaultSlug] of Object.entries(updatedDefaults)) {
+			if (defaultSlug === slug) {
+				delete updatedDefaults[type]
+				defaultsChanged = true
+			}
+		}
+		if (defaultsChanged) {
+			await provider.contextProxy.setValue("comfyuiDefaultPipelines", updatedDefaults)
+			await provider.postStateToWebview()
+		}
+
+		// Also persist hiddenPipelines tombstone if it was soft-deleted or hidden
+		if (PipelineRegistry.isHidden(slug)) {
+			const currentHidden = provider.contextProxy.getValues().hiddenPipelines ?? []
+			if (!currentHidden.includes(slug)) {
+				await provider.contextProxy.setValue("hiddenPipelines", [...currentHidden, slug])
+			}
+		}
+
 		await provider.postMessageToWebview({
 			type: "deletePipelineResult",
 			success: true,
@@ -228,6 +274,27 @@ export async function handleDeletePipeline(provider: MirrorProvider, message: We
 			success: false,
 			error: errorMessage,
 		})
+	}
+}
+
+function syncPipelineAliases(defaults: Record<string, string>, type: string, slug?: string): void {
+	const aliasMap: Record<string, string> = {
+		generate: "txt2img",
+		txt2img: "generate",
+		edit: "img2img",
+		img2img: "edit",
+		audio: "txt2audio",
+		txt2audio: "audio",
+		video: "txt2video",
+		txt2video: "video",
+	}
+	const alias = aliasMap[type]
+	if (slug) {
+		defaults[type] = slug
+		if (alias) defaults[alias] = slug
+	} else {
+		delete defaults[type]
+		if (alias) delete defaults[alias]
 	}
 }
 
@@ -249,13 +316,27 @@ export async function handleSetDefaultPipeline(provider: MirrorProvider, message
 			return
 		}
 
-		// Resolve the pipeline to get its type
-		const def = PipelineRegistry.resolve(slug)
-		const pipelineType = def.type
+		const cwd = getCurrentCwd(provider)
+		if (!PipelineRegistry.isInitialized()) {
+			await PipelineRegistry.initialize(cwd)
+		}
 
-		// Store the user preference in-memory (session-scoped).
-		// The PipelineRegistry's autoSelect will honor it immediately.
-		PipelineRegistry.setUserDefault(pipelineType, slug)
+		// Resolve the pipeline to get its type if possible
+		let pipelineType: PipelineType = "generate"
+		if (PipelineRegistry.exists(slug)) {
+			const def = PipelineRegistry.resolve(slug)
+			pipelineType = def.type
+			PipelineRegistry.setUserDefault(pipelineType, slug)
+		}
+
+		// Persist to global state so it survives restarts
+		const currentDefaults = provider.contextProxy.getValues().comfyuiDefaultPipelines ?? {}
+		const updatedDefaults: Record<string, string> = {
+			...currentDefaults,
+		}
+		syncPipelineAliases(updatedDefaults, pipelineType, slug)
+		await provider.contextProxy.setValue("comfyuiDefaultPipelines", updatedDefaults)
+		await provider.postStateToWebview()
 
 		await provider.postMessageToWebview({
 			type: "setDefaultPipelineResult",
@@ -286,35 +367,71 @@ export async function handleSetComfyuiDefaultPipeline(
 ): Promise<void> {
 	try {
 		const { pipelineType, slug } = message.values ?? {}
-		if (!pipelineType || !slug) {
+		console.log(
+			`[PipelineDebug] handleSetComfyuiDefaultPipeline: received pipelineType="${pipelineType}", slug="${slug}"`,
+		)
+		if (!pipelineType) {
+			console.log("[PipelineDebug] handleSetComfyuiDefaultPipeline: ERROR — missing pipelineType")
 			await provider.postMessageToWebview({
 				type: "setDefaultPipelineResult",
 				success: false,
-				error: "Missing pipelineType or slug in message values",
+				error: "Missing pipelineType in message values",
 			})
 			return
 		}
 
-		// Resolve the pipeline to validate it exists
-		const def = PipelineRegistry.resolve(slug)
-		if (!def) {
+		const cwd = getCurrentCwd(provider)
+		if (!PipelineRegistry.isInitialized()) {
+			console.log("[PipelineDebug] handleSetComfyuiDefaultPipeline: initializing registry with cwd =", cwd)
+			await PipelineRegistry.initialize(cwd)
+		}
+
+		const currentDefaults = provider.contextProxy.getValues().comfyuiDefaultPipelines ?? {}
+		console.log(
+			"[PipelineDebug] handleSetComfyuiDefaultPipeline: currentDefaults =",
+			JSON.stringify(currentDefaults),
+			"registry has slug:",
+			slug ? PipelineRegistry.exists(slug) : "(clearing)",
+		)
+		const updatedDefaults = { ...currentDefaults }
+
+		if (!slug) {
+			// Clear user default
+			PipelineRegistry.clearUserDefault(pipelineType)
+			syncPipelineAliases(updatedDefaults, pipelineType, undefined)
+
+			await provider.contextProxy.setValue("comfyuiDefaultPipelines", updatedDefaults)
+			await provider.postStateToWebview()
+
 			await provider.postMessageToWebview({
 				type: "setDefaultPipelineResult",
-				success: false,
-				error: `No pipeline found with slug "${slug}"`,
+				success: true,
+				slug: "",
+				pipelineType,
 			})
+			// Refresh the pipeline list
+			await handleRequestPipelines(provider)
 			return
 		}
 
-		// Store preference in PipelineRegistry session memory
-		PipelineRegistry.setUserDefault(pipelineType, slug)
+		// Store preference in PipelineRegistry session memory if pipeline exists
+		if (PipelineRegistry.exists(slug)) {
+			PipelineRegistry.setUserDefault(pipelineType, slug)
+		} else {
+			console.warn(
+				`[PipelineDebug] handleSetComfyuiDefaultPipeline: slug "${slug}" NOT in registry cache — session default NOT set (persisted value will still be saved)`,
+			)
+		}
 
 		// Persist to global state so it survives restarts
-		const currentDefaults = provider.contextProxy.getValues().comfyuiDefaultPipelines ?? {}
-		await provider.contextProxy.setValue("comfyuiDefaultPipelines", {
-			...currentDefaults,
-			[pipelineType]: slug,
-		})
+		syncPipelineAliases(updatedDefaults, pipelineType, slug)
+		console.log(
+			"[PipelineDebug] handleSetComfyuiDefaultPipeline: persisting comfyuiDefaultPipelines =",
+			JSON.stringify(updatedDefaults),
+		)
+
+		await provider.contextProxy.setValue("comfyuiDefaultPipelines", updatedDefaults)
+		await provider.postStateToWebview()
 
 		await provider.postMessageToWebview({
 			type: "setDefaultPipelineResult",
@@ -621,20 +738,36 @@ export async function handleDeleteComfyuiWorkflow(provider: MirrorProvider, mess
 			throw new Error("Missing filename parameter")
 		}
 
-		const comfyuiPipelinesDir = WorkflowScanner.getComfyuiPipelinesDir()
 		const slug = filename.replace(/\.json$/, "")
-		const filePath = path.join(comfyuiPipelinesDir, filename.endsWith(".json") ? filename : `${filename}.json`)
+		const jsonFileName = filename.endsWith(".json") ? filename : `${filename}.json`
 
+		// 1. Delete from persistent comfyui pipelines directory (~/.mirror-vs/pipelines/comfyui/)
+		const comfyuiPipelinesDir = WorkflowScanner.getComfyuiPipelinesDir()
+		const pipelineFilePath = path.join(comfyuiPipelinesDir, jsonFileName)
 		try {
-			await fsp.access(filePath)
+			await fsp.unlink(pipelineFilePath)
 		} catch {
-			throw new Error(`Workflow file "${filename}" not found in pipelines directory`)
+			// File might not exist in pipelines directory
 		}
 
-		await fsp.unlink(filePath)
+		// 2. Delete from ComfyUI install user workflows directory ({comfyUISrcPath}/user/default/workflows/)
+		try {
+			const comfyUIPath = getDefaultComfyUIPath()
+			const comfyUISrcPath = WorkflowScanner.getComfyUISrcPath(comfyUIPath)
+			const userWorkflowsDir = WorkflowScanner.getUserWorkflowDir(comfyUISrcPath)
+			const userWorkflowPath = path.join(userWorkflowsDir, jsonFileName)
+			await fsp.unlink(userWorkflowPath)
+		} catch {
+			// File might not exist in ComfyUI user workflows
+		}
 
-		// Also delete from pipeline registry if it was registered
+		// 3. Delete from PipelineRegistry if it was registered
 		const cwd = getCurrentCwd(provider)
+		try {
+			await PipelineRegistry.deletePipeline(slug, cwd)
+		} catch {
+			// Might not have been in the registry
+		}
 		await PipelineRegistry.initialize(cwd)
 
 		await provider.postMessageToWebview({

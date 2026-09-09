@@ -682,6 +682,10 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 
 		case "setComfyuiDefaultPipeline":
+			console.log(
+				`[PipelineDebug] messageRouter: setComfyuiDefaultPipeline received, values =`,
+				JSON.stringify(message.values ?? {}),
+			)
 			await handleSetComfyuiDefaultPipeline(provider, message)
 			break
 

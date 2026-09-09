@@ -1034,6 +1034,19 @@ export const ChatRowContent = ({
 											{tool.content}
 										</div>
 										<div className="flex items-center gap-2 text-xs text-vscode-descriptionForeground mt-1">
+											{tool.provider && (
+												<code className="text-[10px] px-1 py-0.5 bg-vscode-badge-background text-vscode-badge-foreground rounded">
+													{tool.provider === "comfyui"
+														? "🖥 ComfyUI"
+														: tool.provider === "openrouter"
+															? "☁️ OpenRouter"
+															: tool.provider === "comfy_cloud"
+																? "☁️ Comfy Cloud"
+																: tool.provider === "atlas_cloud"
+																	? "🌐 Atlas Cloud"
+																	: tool.provider}
+												</code>
+											)}
 											<code className="text-[10px] px-1 py-0.5 bg-vscode-badge-background text-vscode-badge-foreground rounded">
 												{tool.pipelineName
 													? `${tool.pipeline || "auto"} · ${tool.pipelineName}`
@@ -1053,9 +1066,22 @@ export const ChatRowContent = ({
 								</ToolUseBlock>
 							</div>
 						)}
-						{message.type !== "ask" && tool.pipeline && (
+						{message.type !== "ask" && (tool.pipeline || tool.provider) && (
 							<div className="pl-6">
 								<div className="flex items-center gap-2 text-xs text-vscode-descriptionForeground mt-1">
+									{tool.provider && (
+										<code className="text-[10px] px-1 py-0.5 bg-vscode-badge-background text-vscode-badge-foreground rounded">
+											{tool.provider === "comfyui"
+												? "🖥 ComfyUI"
+												: tool.provider === "openrouter"
+													? "☁️ OpenRouter"
+													: tool.provider === "comfy_cloud"
+														? "☁️ Comfy Cloud"
+														: tool.provider === "atlas_cloud"
+															? "🌐 Atlas Cloud"
+															: tool.provider}
+										</code>
+									)}
 									<code className="text-[10px] px-1 py-0.5 bg-vscode-badge-background text-vscode-badge-foreground rounded">
 										{tool.pipelineName ? `${tool.pipeline} · ${tool.pipelineName}` : tool.pipeline}
 									</code>

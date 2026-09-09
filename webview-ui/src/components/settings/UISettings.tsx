@@ -1,6 +1,6 @@
 import { HTMLAttributes, useMemo } from "react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
-import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
+import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption } from "@vscode/webview-ui-toolkit/react"
 
 import { SetCachedStateField } from "./types"
 import { SectionHeader } from "./SectionHeader"
@@ -12,6 +12,7 @@ interface UISettingsProps extends HTMLAttributes<HTMLDivElement> {
 	reasoningBlockCollapsed: boolean
 	enterBehavior: "send" | "newline"
 	disableTabBar: boolean
+	mascotTheme?: "cyberpunk" | "retro" | "synthwave" | "solar"
 	setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType>
 }
 
@@ -19,6 +20,7 @@ export const UISettings = ({
 	reasoningBlockCollapsed,
 	enterBehavior,
 	disableTabBar,
+	mascotTheme,
 	setCachedStateField,
 	...props
 }: UISettingsProps) => {
@@ -101,6 +103,29 @@ export const UISettings = ({
 							</VSCodeCheckbox>
 							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
 								{t("settings:ui.disableTabBar.description")}
+							</div>
+						</div>
+					</SearchableSetting>
+
+					{/* Mascot Theme Setting */}
+					<SearchableSetting
+						settingId="ui-mascot-theme"
+						section="ui"
+						label={t("settings:ui.mascotTheme.label")}>
+						<div className="flex flex-col gap-1">
+							<label className="block font-medium mb-1">{t("settings:ui.mascotTheme.label")}</label>
+							<VSCodeDropdown
+								value={mascotTheme || "cyberpunk"}
+								onChange={(e: any) => setCachedStateField("mascotTheme", e.target.value)}
+								className="w-full"
+								data-testid="mascot-theme-dropdown">
+								<VSCodeOption value="cyberpunk">{t("settings:ui.mascotTheme.cyberpunk")}</VSCodeOption>
+								<VSCodeOption value="retro">{t("settings:ui.mascotTheme.retro")}</VSCodeOption>
+								<VSCodeOption value="synthwave">{t("settings:ui.mascotTheme.synthwave")}</VSCodeOption>
+								<VSCodeOption value="solar">{t("settings:ui.mascotTheme.solar")}</VSCodeOption>
+							</VSCodeDropdown>
+							<div className="text-vscode-descriptionForeground text-sm mt-1">
+								{t("settings:ui.mascotTheme.description")}
 							</div>
 						</div>
 					</SearchableSetting>

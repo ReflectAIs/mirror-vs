@@ -276,7 +276,7 @@ describe("ImageGenerationSettings", () => {
 	describe("Provider Switching", () => {
 		it("renders ComfyUI as the default provider option for each channel", () => {
 			const experiments = onlyExperiment(EXPERIMENT_IDS.TXT2IMG)
-			const { getByText } = render(
+			const { getAllByText } = render(
 				<ImageGenerationSettings
 					{...defaultProps}
 					experiments={experiments}
@@ -285,14 +285,14 @@ describe("ImageGenerationSettings", () => {
 			)
 
 			// ComfyUI option text should be visible
-			expect(getByText("🖥 Local (ComfyUI)")).toBeInTheDocument()
+			expect(getAllByText("🖥 Local (ComfyUI)").length).toBeGreaterThanOrEqual(1)
 			// OpenRouter option text should also be visible
-			expect(getByText("☁️ Cloud (OpenRouter)")).toBeInTheDocument()
+			expect(getAllByText("☁️ Cloud (OpenRouter)").length).toBeGreaterThanOrEqual(1)
 		})
 
 		it("renders Comfy Cloud provider option for each channel", () => {
 			const experiments = onlyExperiment(EXPERIMENT_IDS.TXT2IMG)
-			const { getByText } = render(
+			const { getAllByText } = render(
 				<ImageGenerationSettings
 					{...defaultProps}
 					experiments={experiments}
@@ -300,12 +300,12 @@ describe("ImageGenerationSettings", () => {
 				/>,
 			)
 
-			expect(getByText("☁️ Comfy Cloud")).toBeInTheDocument()
+			expect(getAllByText("☁️ Comfy Cloud").length).toBeGreaterThanOrEqual(1)
 		})
 
 		it("renders Atlas Cloud provider option for each channel", () => {
 			const experiments = onlyExperiment(EXPERIMENT_IDS.TXT2IMG)
-			const { getByText } = render(
+			const { getAllByText } = render(
 				<ImageGenerationSettings
 					{...defaultProps}
 					experiments={experiments}
@@ -313,7 +313,7 @@ describe("ImageGenerationSettings", () => {
 				/>,
 			)
 
-			expect(getByText("🌐 Atlas Cloud")).toBeInTheDocument()
+			expect(getAllByText("🌐 Atlas Cloud").length).toBeGreaterThanOrEqual(1)
 		})
 	})
 

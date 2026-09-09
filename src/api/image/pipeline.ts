@@ -160,10 +160,21 @@ export function stripPipelineHeader(raw: any): any {
 }
 
 /**
- * Guess the pipeline type from a workflow's node composition.
+ * Guess the pipeline type from a workflow's filename/slug and node composition.
  * Useful when no `_pipeline` header is present.
  */
-export function guessPipelineType(workflow: any): PipelineType {
+export function guessPipelineType(workflow: any, filenameOrSlug?: string): PipelineType {
+	if (filenameOrSlug) {
+		const lower = filenameOrSlug.toLowerCase()
+		if (lower.includes("inpaint")) return "inpaint" as PipelineType
+		if (lower.includes("outpaint")) return "outpaint" as PipelineType
+		if (lower.includes("upscale")) return "upscale" as PipelineType
+		if (lower.includes("remove-bg") || lower.includes("rembg") || lower.includes("remove_bg"))
+			return "remove-bg" as PipelineType
+		if (lower.includes("img2img") || lower.includes("edit")) return "edit" as PipelineType
+		if (lower.includes("txt2img") || lower.includes("generate")) return "generate" as PipelineType
+	}
+
 	if (!workflow || typeof workflow !== "object") return "generate"
 
 	const classTypes = new Set<string>()
@@ -183,10 +194,13 @@ export function guessPipelineType(workflow: any): PipelineType {
 		}
 	}
 
-	if (classTypes.has("LoadImage") && classTypes.has("VAEEncode")) return "edit" as PipelineType
-	if (classTypes.has("LoadImage") && classTypes.has("InpaintModelConditioning")) return "inpaint" as PipelineType
-	if (classTypes.has("LoadImage") && classTypes.has("ImageUpscaleWithModel")) return "upscale" as PipelineType
-	if (classTypes.has("LoadImage") && classTypes.has("OutpaintModelConditioning")) return "outpaint" as PipelineType
-	if (classTypes.has("LoadImage") && classTypes.has("RMBG")) return "remove-bg" as PipelineType
+	if (classTypes.has("InpaintModelConditioning")) return "inpaint" as PipelineType
+	if (classTypes.has("OutpaintModelConditioning")) return "outpaint" as PipelineType
+	if (classTypes.has("ImageUpscaleWithModel") || classTypes.has("UpscaleModelLoader"))
+		return "upscale" as PipelineType
+	if (classTypes.has("RMBG") || classTypes.has("ImageRemoveBackground")) return "remove-bg" as PipelineType
+	if (classTypes.has("LoadImage") && (classTypes.has("VAEEncode") || classTypes.has("VAEEncodeForInpaint")))
+		return "edit" as PipelineType
+	if (classTypes.has("LoadImage")) return "edit" as PipelineType
 	return "generate" as PipelineType
 }

@@ -406,6 +406,28 @@ describe("PipelineRegistry", () => {
 			expect(PipelineRegistry.exists("user-pipe")).toBe(false)
 		})
 
+		it("deletes a comfyui-sourced pipeline from comfyui pipelines directory", async () => {
+			;(PipelineRegistry as any).cache.set("comfy-pipe", {
+				slug: "comfy-pipe",
+				name: "Comfy Workflow",
+				type: "generate",
+				tags: [],
+				source: "comfyui",
+				isDefault: false,
+				workflow: {},
+			})
+			;(PipelineRegistry as any).byType.set("generate", ["comfy-pipe"])
+			PipelineRegistry.setUserDefault("generate", "comfy-pipe")
+
+			await PipelineRegistry.deletePipeline("comfy-pipe")
+
+			expect(PipelineRegistry.exists("comfy-pipe")).toBe(false)
+			expect(PipelineRegistry.getUserDefault("generate")).toBeUndefined()
+			expect(mockUnlink).toHaveBeenCalledWith(
+				path.join("/home/user", ".mirror-vs", "pipelines", "comfyui", "comfy-pipe.json"),
+			)
+		})
+
 		it("throws when trying to delete a built-in pipeline", async () => {
 			;(PipelineRegistry as any).cache.set("builtin-pipe", {
 				slug: "builtin-pipe",
@@ -548,6 +570,51 @@ describe("PipelineRegistry", () => {
 			const def = PipelineRegistry.resolve("mypipe")
 			expect(def.source).toBe("project")
 			expect(def.name).toBe("Project")
+		})
+	})
+
+	describe("userDefaults management", () => {
+		beforeEach(() => {
+			;(PipelineRegistry as any).initialized = true
+			;(PipelineRegistry as any).cache.set("my-turbo", {
+				slug: "my-turbo",
+				name: "Turbo",
+				type: "generate",
+				tags: [],
+				source: "builtin",
+				isDefault: false,
+				workflow: {},
+			})
+			;(PipelineRegistry as any).cache.set("my-edit", {
+				slug: "my-edit",
+				name: "Edit",
+				type: "edit",
+				tags: [],
+				source: "builtin",
+				isDefault: false,
+				workflow: {},
+			})
+		})
+
+		it("maps aliases like txt2img to generate and img2img to edit", () => {
+			PipelineRegistry.restorePersistedDefaults(
+				{
+					txt2img: "my-turbo",
+					img2img: "my-edit",
+				},
+				[],
+			)
+
+			expect(PipelineRegistry.getUserDefault("generate")).toBe("my-turbo")
+			expect(PipelineRegistry.getUserDefault("edit")).toBe("my-edit")
+		})
+
+		it("allows clearing user defaults", () => {
+			PipelineRegistry.setUserDefault("generate", "my-turbo")
+			expect(PipelineRegistry.getUserDefault("generate")).toBe("my-turbo")
+
+			PipelineRegistry.clearUserDefault("generate")
+			expect(PipelineRegistry.getUserDefault("generate")).toBeUndefined()
 		})
 	})
 })

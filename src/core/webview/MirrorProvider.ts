@@ -1213,7 +1213,8 @@ export class MirrorProvider
 					initializeImageProviders,
 					connectProviderSelectorToSettings,
 				} = require("../../services/image-runtime")
-				initializeImageProviders(state.openRouterImageApiKey, this.context, {
+				const openRouterKey = state.openRouterImageApiKey || state.apiConfiguration?.openRouterApiKey
+				initializeImageProviders(openRouterKey, this.context, {
 					comfyui: state.comfyuiAutoSetup,
 					currentProvider: state.imageGenerationProvider,
 				})

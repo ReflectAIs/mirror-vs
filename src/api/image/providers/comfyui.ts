@@ -295,7 +295,8 @@ export class ComfyUIProvider implements ImageProvider {
 			console.log(
 				`[ComfyUIProvider] resolveWorkflow: auto-selecting pipeline for type="${type}", model="${options?.model}"`,
 			)
-			def = PipelineRegistry.autoSelect(prompt, type, options?.model, options?.allowlists)
+			const localModel = options?.model && !options.model.includes("/") ? options.model : undefined
+			def = PipelineRegistry.autoSelect(prompt, type, localModel, options?.allowlists)
 		}
 		console.log(
 			`[ComfyUIProvider] resolveWorkflow: selected pipeline slug="${def.slug}", name="${def.name}", type="${def.type}"`,
@@ -319,7 +320,9 @@ export class ComfyUIProvider implements ImageProvider {
 				model: options.model,
 			})
 			WorkflowEngine.injectPrompt(workflow, prompt)
-			WorkflowEngine.injectModel(workflow, options.model)
+			if (options.model && !options.model.includes("/")) {
+				WorkflowEngine.injectModel(workflow, options.model)
+			}
 
 			// Seed: use the provided one or generate a random one
 			const seed = options.seed ?? Math.floor(Math.random() * 2 ** 32)

@@ -2,6 +2,27 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.8.2] - 2026-09-09
+
+### Added
+
+- **Mascot Theme Setting**: Added a new "Mascot Theme" setting with four visual styles for the AI helper mascot — Cyberpunk Neon, Retro Monochrome, Synthwave Sunset, and Solar Flare.
+- **Sound Theme Setting**: Added a `soundTheme` preference (defaults to `classic`) persisted with the other notification settings.
+- **Image Generation Provider Badges in Chat**: `generate_image` tool results now display a provider badge (🖥 ComfyUI, ☁️ OpenRouter, ☁️ Comfy Cloud, 🌐 Atlas Cloud) alongside the pipeline name, and render even when only the provider is known.
+- **Multi-Root Workspace Awareness**: System prompt now lists all workspace folders when a multi-root workspace is open, instructing the agent to locate and operate on files in the correct folder instead of assuming everything belongs to the primary one.
+
+### Changed
+
+- **Graduated Experiments to Always-On Defaults**: "Native LSP Code Graph" and "Git Worktree Isolated Sandboxing" are no longer experimental toggles — both are now enabled by default and removed from the Experimental settings tab, the Worktrees settings view, the worktree selector popover, and the normal settings view. A startup migration resets any previously persisted `false` values so existing users get the features enabled.
+- **Local-First Image Generation Default**: New users now default to the local ComfyUI image provider (existing users with a configured model keep OpenRouter), matching the settings UI default.
+
+### Fixed
+
+- **Save Button Always Enabled in Settings**: Fixed a regression where opening the settings view immediately flagged unsaved changes. Mount-time initialization effects (e.g. ThinkingBudget defaulting `enableReasoningEffort`) no longer mark the form dirty — only explicit user actions do.
+- **Pipeline Type Normalization**: Legacy pipeline type labels (`txt2img` → `generate`, `img2img` → `edit`) are now normalized during discovery so pipelines group under the channels the UI filters by, and persisted default pipeline aliases are restored correctly on startup.
+- **Pipeline Cleanup Across Directories**: Pipeline deletion now checks all candidate directories (ComfyUI, project, and global pipelines dirs) so files are removed regardless of where they were imported.
+- **Settings Sync for Generation Providers & Pipelines**: Saving settings now registers newly selected generation providers, re-initializes image providers when the OpenRouter image API key changes, restores persisted ComfyUI default pipelines, and refreshes the pipeline list after default changes.
+
 ## [0.8.1] - 2026-09-04
 
 ### Added (Experimental)

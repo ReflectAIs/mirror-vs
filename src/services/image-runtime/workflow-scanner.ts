@@ -108,7 +108,7 @@ export class WorkflowScanner {
 			try {
 				const raw = JSON.parse(await fsp.readFile(filePath, "utf-8"))
 				const hasMetadata = !!(raw && typeof raw === "object" && raw._pipeline)
-				const guessedType = guessPipelineType(raw)
+				const guessedType = guessPipelineType(raw, file)
 
 				results.push({
 					filename: file,
@@ -124,7 +124,7 @@ export class WorkflowScanner {
 					filename: file,
 					slug,
 					path: filePath,
-					guessedType: "generate" as PipelineType,
+					guessedType: guessPipelineType(null, file),
 					hasMetadata: false,
 				})
 			}
@@ -135,16 +135,6 @@ export class WorkflowScanner {
 		return results
 	}
 
-	/**
-	 * Import a single workflow from the ComfyUI user workflows directory
-	 * into the persistent comfyui pipelines directory.
-	 *
-	 * Copies the .json file to `~/.mirror/pipelines/comfyui/{slug}.json`.
-	 *
-	 * @param comfyUISrcPath - ComfyUI source path
-	 * @param filename - The workflow filename (e.g. "my_sdxl_workflow.json")
-	 * @returns The slug of the imported pipeline
-	 */
 	/**
 	 * Import a single workflow from the ComfyUI user workflows directory
 	 * into the persistent comfyui pipelines directory.
@@ -170,32 +160,27 @@ export class WorkflowScanner {
 
 		const destPath = path.join(destDir, `${slug}.json`)
 
-		if (pipelineType) {
-			// Inject a _pipeline header with the specified type
-			const raw = JSON.parse(await fsp.readFile(srcPath, "utf-8"))
-			const existingHeader = raw._pipeline
-			const toSave: any = {
-				_pipeline: {
-					name: existingHeader?.name ?? slug,
-					description: existingHeader?.description ?? "",
-					type: pipelineType,
-					tags: existingHeader?.tags ?? [],
-					isDefault: existingHeader?.isDefault ?? false,
-				},
-			}
-			// Spread remaining keys (skip _pipeline if present)
-			for (const key of Object.keys(raw)) {
-				if (key !== "_pipeline") {
-					toSave[key] = raw[key]
-				}
-			}
-			await fsp.writeFile(destPath, JSON.stringify(toSave, null, 2), "utf-8")
-			logger.info(`[WorkflowScanner] Imported workflow "${filename}" → ${destPath} with type "${pipelineType}"`)
-		} else {
-			// Copy the file as-is
-			await fsp.copyFile(srcPath, destPath)
-			logger.info(`[WorkflowScanner] Imported workflow "${filename}" → ${destPath}`)
+		const raw = JSON.parse(await fsp.readFile(srcPath, "utf-8"))
+		const existingHeader = raw._pipeline
+		const determinedType: PipelineType = pipelineType ?? existingHeader?.type ?? guessPipelineType(raw, filename)
+
+		const toSave: any = {
+			_pipeline: {
+				name: existingHeader?.name ?? slug,
+				description: existingHeader?.description ?? "",
+				type: determinedType,
+				tags: existingHeader?.tags ?? [],
+				isDefault: existingHeader?.isDefault ?? false,
+			},
 		}
+		// Spread remaining keys (skip _pipeline if present)
+		for (const key of Object.keys(raw)) {
+			if (key !== "_pipeline") {
+				toSave[key] = raw[key]
+			}
+		}
+		await fsp.writeFile(destPath, JSON.stringify(toSave, null, 2), "utf-8")
+		logger.info(`[WorkflowScanner] Imported workflow "${filename}" → ${destPath} with type "${determinedType}"`)
 
 		return slug
 	}
@@ -250,10 +235,8 @@ export class WorkflowScanner {
 	static async seedDefaultWorkflows(comfyUISrcPath: string): Promise<void> {
 		const workflowsSrcDir = resolveWorkflowsDir()
 		const userWorkflowsDir = this.getUserWorkflowDir(comfyUISrcPath)
-		const persistentDir = this.getComfyuiPipelinesDir()
 
 		await fsp.mkdir(userWorkflowsDir, { recursive: true })
-		await fsp.mkdir(persistentDir, { recursive: true })
 
 		try {
 			const files = await fsp.readdir(workflowsSrcDir)
@@ -262,23 +245,17 @@ export class WorkflowScanner {
 			for (const file of jsonFiles) {
 				const srcPath = path.join(workflowsSrcDir, file)
 				const userDestPath = path.join(userWorkflowsDir, file)
-				const persistentDestPath = path.join(persistentDir, file)
 
-				// Copy to user default workflows dir
+				// Copy only to ComfyUI's user default workflows directory so ComfyUI sees them.
+				// Do NOT automatically seed into mirror pipelines directory — pipelines should
+				// only appear when explicitly imported by the user from workflow scanning or import.
 				try {
 					await fsp.copyFile(srcPath, userDestPath)
 				} catch (err) {
 					logger.warn(`[WorkflowScanner] Failed to copy workflow to user workflows: ${err}`)
 				}
-
-				// Copy to persistent mirror pipelines dir
-				try {
-					await fsp.copyFile(srcPath, persistentDestPath)
-				} catch (err) {
-					logger.warn(`[WorkflowScanner] Failed to copy workflow to persistent pipelines: ${err}`)
-				}
 			}
-			logger.info(`[WorkflowScanner] Successfully seeded default workflows.`)
+			logger.info(`[WorkflowScanner] Successfully seeded default workflows to ComfyUI user workflows.`)
 		} catch (err) {
 			logger.error(`[WorkflowScanner] Error seeding default workflows: ${err}`)
 		}

@@ -314,8 +314,6 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 		[setCachedStateField],
 	)
 
-	const isSandboxEnabled = cachedState.experiments?.["gitWorktreeSandbox"] ?? false
-
 	return (
 		<div className="space-y-6 max-w-2xl mx-auto pb-8">
 			{/* Normal Mode Banner */}
@@ -648,25 +646,6 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 						<VSCodeCheckbox
 							checked={cachedState.autoCondenseContext ?? true}
 							onChange={(e: any) => setCachedStateField("autoCondenseContext", e.target.checked)}
-						/>
-					</div>
-
-					{/* Git Worktree Sandbox */}
-					<div className="flex items-start justify-between gap-3 border-t border-vscode-editorGroup-border/30 pt-3">
-						<div className="space-y-0.5">
-							<div className="text-xs font-semibold text-vscode-foreground flex items-center gap-1.5">
-								<GitBranch className="w-3.5 h-3.5 text-vscode-descriptionForeground" />
-								Isolated Git Worktree Sandbox
-							</div>
-							<p className="text-[11px] text-vscode-descriptionForeground leading-snug m-0">
-								Keeps new changes in a sandboxed Git worktree (
-								<code className="text-[10px]">.mirror-vs/mirror-sandbox/</code>) to keep your main
-								branch safe until ready to merge.
-							</p>
-						</div>
-						<VSCodeCheckbox
-							checked={isSandboxEnabled}
-							onChange={(e: any) => setExperimentEnabled("gitWorktreeSandbox", e.target.checked)}
 						/>
 					</div>
 

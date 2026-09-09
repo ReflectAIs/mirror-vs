@@ -40,8 +40,9 @@ export const experimentConfigsMap: Record<ExperimentKey, ExperimentConfig> = {
 	CUSTOM_TOOLS: { enabled: false },
 	BROWSER: { enabled: false },
 	PARALLEL_TOOL_READS: { enabled: false },
-	LSP_CODE_GRAPH: { enabled: false },
-	GIT_WORKTREE_SANDBOX: { enabled: false },
+	// Enabled by default (no longer experimental toggles in the UI)
+	LSP_CODE_GRAPH: { enabled: true },
+	GIT_WORKTREE_SANDBOX: { enabled: true },
 }
 
 export const experimentDefault = Object.fromEntries(

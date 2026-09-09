@@ -1,5 +1,6 @@
 import os from "os"
 import osName from "os-name"
+import * as vscode from "vscode"
 
 import { getShell } from "../../../utils/shell"
 
@@ -46,7 +47,25 @@ Sandbox Ephemeral Git Branch: ${sandboxBranch || "ephemeral sandbox branch"}
   * When attempt_completion is approved by the user, any unmerged sandbox changes will also be automatically merged into the main repository.
 - DO NOT run 'git push' from the temporary worktree branch to remote branches (such as origin/main or origin/master). Only push from the main repository once merged.`
 	} else {
-		details += `
+		// Multi-root workspace awareness: list all workspace folders when more than one is open.
+		const workspaceFolders = vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath) ?? []
+		const isMultiRoot = workspaceFolders.length > 1
+
+		if (isMultiRoot) {
+			const folderList = workspaceFolders.map((p, i) => `${i + 1}. ${p.toPosix()}`).join("\n")
+			details += `
+Current Workspace Directory: ${cwd.toPosix()}
+
+MULTI-ROOT WORKSPACE ACTIVE:
+This VS Code window has ${workspaceFolders.length} workspace folders open:
+${folderList}
+
+- '${cwd.toPosix()}' is the PRIMARY workspace folder and the default directory for all tool operations.
+- The other folders above are also part of the user's workspace and are fully accessible for reading, editing, and searching.
+- When the user references a project, file, or feature, determine which workspace folder it belongs to and operate on files in that folder (e.g. use 'cd <folder> && <command>' for terminal commands, or absolute paths for file tools).
+- Do NOT assume everything belongs to the primary folder — check the other workspace folders when the primary one does not contain what you need.`
+		} else {
+			details += `
 Current Workspace Directory: ${cwd.toPosix()}
 
 The Current Workspace Directory is the active VS Code project directory, and is therefore the default directory for all tool operations. New terminals will be created in the current workspace directory, however if you change directories in a terminal it will then have a different working directory; changing directories in a terminal does not modify the workspace directory, because you do not have access to change the workspace directory. When the user initially gives you a task, a recursive list of all filepaths in the current workspace directory ('/test/path') will be included in environment_details. This provides an overview of the project's file structure, offering key insights into the project from directory/file names (how developers conceptualize and organize their code) and file extensions (the language used). This can also guide decision-making on which files to explore further. If you need to further explore directories such as outside the current workspace directory, you can use the list_files tool. If you pass 'true' for the recursive parameter, it will list files recursively. Otherwise, it will list files at the top level, which is better suited for generic directories where you don't necessarily need the nested structure, like the Desktop.
@@ -54,6 +73,7 @@ The Current Workspace Directory is the active VS Code project directory, and is 
 GIT WORKTREE & SANDBOX RULES:
 - The user creates, selects, and manages Git worktrees directly in the VS Code UI.
 - Do NOT autonomously create Git worktrees or sandboxes using terminal commands. Operate directly in the current workspace directory unless the user explicitly requests you to create a worktree.`
+		}
 	}
 
 	return details

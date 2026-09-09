@@ -148,6 +148,12 @@ interface ImageGenerationSettingsProps {
 	experiments: Experiments
 	setExperimentEnabled: SetExperimentEnabled
 
+	// Global provider & API key
+	imageGenerationProvider?: ImageGenerationProvider
+	setImageGenerationProvider?: (provider: ImageGenerationProvider) => void
+	openRouterImageApiKey?: string
+	setOpenRouterImageApiKey?: (apiKey: string) => void
+
 	// Per-type provider / model selection
 	generationProviders?: Record<string, ImageGenerationProvider>
 	updateGenerationProvider?: (type: string, provider: ImageGenerationProvider) => void
@@ -180,6 +186,10 @@ interface ImageGenerationSettingsProps {
 export const ImageGenerationSettings = ({
 	experiments,
 	setExperimentEnabled,
+	imageGenerationProvider,
+	setImageGenerationProvider,
+	openRouterImageApiKey,
+	setOpenRouterImageApiKey,
 	generationProviders,
 	updateGenerationProvider,
 	openRouterModels,
@@ -401,9 +411,15 @@ export const ImageGenerationSettings = ({
 
 	const renderChannelSection = (channel: ChannelDef) => {
 		const isEnabled = !!experiments[channel.type]
-		const activeProvider = generationProviders?.[channel.type] ?? "comfyui"
+		const activeProvider = generationProviders?.[channel.type] ?? imageGenerationProvider ?? "comfyui"
 		const channelPipelines = getPipelinesForType(channel.pipelineType)
-		const currentPipelineSlug = comfyuiDefaultPipelines?.[channel.type] ?? ""
+		const currentPipelineSlug =
+			comfyuiDefaultPipelines?.[channel.pipelineType] ?? comfyuiDefaultPipelines?.[channel.type] ?? ""
+		console.log(
+			`[PipelineDebug][webview] renderChannelSection(${channel.type}): pipelineType="${channel.pipelineType}", currentPipelineSlug="${currentPipelineSlug}", comfyuiDefaultPipelines=`,
+			JSON.stringify(comfyuiDefaultPipelines ?? {}),
+			`channelPipelines=[${channelPipelines.map((p) => p.slug).join(", ")}]`,
+		)
 		const currentModel = openRouterModels?.[channel.type] ?? ""
 		const currentAtlasModel = atlasCloudModels?.[channel.type] ?? ""
 
@@ -480,6 +496,11 @@ export const ImageGenerationSettings = ({
 												key={p.slug}
 												className="flex items-center gap-2 px-3 py-2 hover:bg-vscode-list-hoverBackground border-b border-vscode-editorGroup-border/30 last:border-b-0">
 												<span className="text-sm flex-1 min-w-0 truncate">{p.name}</span>
+												{p.isDefault && (
+													<span className="text-[10px] bg-mirror-brand-via/20 text-mirror-brand-via px-1.5 py-0.5 rounded font-medium shrink-0">
+														Default
+													</span>
+												)}
 												<span className="text-[10px] text-vscode-descriptionForeground shrink-0 mr-1">
 													{p.slug}
 												</span>
@@ -516,19 +537,40 @@ export const ImageGenerationSettings = ({
 									<label className="block text-xs font-medium mb-1 text-vscode-descriptionForeground">
 										Default Pipeline
 									</label>
-									<VSCodeDropdown
+									<select
 										value={currentPipelineSlug}
-										onChange={(e: any) => setComfyuiDefaultPipeline?.(channel.type, e.target.value)}
-										className="w-full">
-										<VSCodeOption value="" className="py-2 px-3">
-											(use auto-select)
-										</VSCodeOption>
+										onChange={(e) => {
+											const newSlug = e.target.value ?? ""
+											console.log(
+												`[PipelineDebug][webview] Default Pipeline onChange(${channel.type}): newSlug="${newSlug}", posting setComfyuiDefaultPipeline`,
+											)
+											setComfyuiDefaultPipeline?.(channel.pipelineType, newSlug)
+											vscode.postMessage({
+												type: "setComfyuiDefaultPipeline",
+												values: {
+													pipelineType: channel.pipelineType,
+													slug: newSlug,
+												},
+											} as any)
+										}}
+										className="w-full bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-vscode-dropdown-border rounded p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-vscode-focusBorder cursor-pointer">
+										<option value="">(use auto-select)</option>
 										{channelPipelines.map((p) => (
-											<VSCodeOption key={p.slug} value={p.slug} className="py-2 px-3">
+											<option key={p.slug} value={p.slug}>
 												{p.name}
-											</VSCodeOption>
+											</option>
 										))}
-									</VSCodeDropdown>
+										{/* Fallback: if the persisted default slug isn't in the loaded
+										    pipeline list (e.g. list not yet loaded, or type mismatch),
+										    render it anyway so the <select> can display the saved
+										    value instead of silently reverting to "(use auto-select)". */}
+										{currentPipelineSlug !== "" &&
+											!channelPipelines.some((p) => p.slug === currentPipelineSlug) && (
+												<option key={currentPipelineSlug} value={currentPipelineSlug}>
+													{currentPipelineSlug}
+												</option>
+											)}
+									</select>
 								</div>
 							</div>
 						)}
@@ -559,7 +601,10 @@ export const ImageGenerationSettings = ({
 								</label>
 								<VSCodeTextField
 									value={currentPipelineSlug}
-									onInput={(e: any) => setComfyuiDefaultPipeline?.(channel.type, e.target.value)}
+									onInput={(e: any) => {
+										const newSlug = e.target.value ?? ""
+										setComfyuiDefaultPipeline?.(channel.pipelineType, newSlug)
+									}}
 									placeholder="e.g., txt2img"
 									className="w-full"
 								/>
@@ -607,6 +652,54 @@ export const ImageGenerationSettings = ({
 						</p>
 					</div>
 				</div>
+			</div>
+
+			{/* ─── Global Default Provider selector ───────────────── */}
+			<div className="border border-vscode-editorGroup-border/50 rounded-md p-4 space-y-3">
+				<div>
+					<label className="block text-sm font-medium mb-1">Default Image Provider</label>
+					<p className="text-xs text-vscode-descriptionForeground mb-2">
+						Choose your primary provider for image generation. Individual pipeline types below will use this
+						provider unless customized.
+					</p>
+					<VSCodeDropdown
+						value={imageGenerationProvider || "comfyui"}
+						onChange={(e: any) => setImageGenerationProvider?.(e.target.value)}
+						className="w-full">
+						<VSCodeOption value="comfyui" className="py-2 px-3">
+							🖥 Local (ComfyUI)
+						</VSCodeOption>
+						<VSCodeOption value="openrouter" className="py-2 px-3">
+							☁️ Cloud (OpenRouter)
+						</VSCodeOption>
+						<VSCodeOption value="comfy_cloud" className="py-2 px-3">
+							☁️ Comfy Cloud
+						</VSCodeOption>
+						<VSCodeOption value="atlas_cloud" className="py-2 px-3">
+							🌐 Atlas Cloud
+						</VSCodeOption>
+					</VSCodeDropdown>
+				</div>
+
+				{/* OpenRouter API key configuration if OpenRouter is selected or used */}
+				{(imageGenerationProvider === "openrouter" ||
+					Object.values(generationProviders ?? {}).includes("openrouter")) && (
+					<div>
+						<label className="block text-xs font-medium mb-1 text-vscode-descriptionForeground">
+							OpenRouter API Key
+						</label>
+						<VSCodeTextField
+							type="password"
+							value={openRouterImageApiKey || ""}
+							onInput={(e: any) => setOpenRouterImageApiKey?.(e.target.value)}
+							placeholder="sk-or-v1-..."
+							className="w-full"
+						/>
+						<p className="text-vscode-descriptionForeground text-xs mt-1">
+							Leave blank to use your main OpenRouter API key from API Configuration if configured.
+						</p>
+					</div>
+				)}
 			</div>
 
 			{/* ─── Each channel as its own section ──────────────── */}

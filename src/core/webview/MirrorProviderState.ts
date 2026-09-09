@@ -176,6 +176,8 @@ export class StateManager {
 			checkpointTimeout,
 			taskHistory,
 			soundVolume,
+			mascotTheme,
+			soundTheme,
 			writeDelayMs,
 			terminalShellIntegrationTimeout,
 			terminalShellIntegrationDisabled,
@@ -227,6 +229,7 @@ export class StateManager {
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
 			comfyuiAutoSetup,
+			comfyuiDefaultPipelines,
 			lockApiConfigAcrossModes,
 			currentSessionId,
 			sessionNames,
@@ -372,6 +375,8 @@ export class StateManager {
 				}
 			})(),
 			soundVolume: soundVolume ?? 0.5,
+			mascotTheme: mascotTheme ?? "cyberpunk",
+			soundTheme: soundTheme ?? "classic",
 			writeDelayMs: writeDelayMs ?? DEFAULT_WRITE_DELAY_MS,
 			terminalShellIntegrationTimeout: terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
 			terminalShellIntegrationDisabled: terminalShellIntegrationDisabled ?? true,
@@ -443,6 +448,7 @@ export class StateManager {
 			openRouterImageApiKey,
 			openRouterImageGenerationSelectedModel,
 			comfyuiAutoSetup,
+			comfyuiDefaultPipelines: comfyuiDefaultPipelines ?? {},
 			settingsMode: settingsMode ?? "normal",
 			imageAutoSetupRunning: (await import("../../services/image-runtime")).isAutoSetupRunning(),
 			imageAutoSetupStatus: (await import("../../services/image-runtime")).getLastAutoSetupStatus(),
@@ -552,6 +558,8 @@ export class StateManager {
 			allowedCommands: stateValues.allowedCommands,
 			deniedCommands: stateValues.deniedCommands,
 			soundEnabled: stateValues.soundEnabled ?? false,
+			mascotTheme: stateValues.mascotTheme ?? "cyberpunk",
+			soundTheme: stateValues.soundTheme ?? "classic",
 			ttsEnabled: stateValues.ttsEnabled ?? false,
 			ttsSpeed: stateValues.ttsSpeed ?? 1.0,
 			enableCheckpoints: stateValues.enableCheckpoints ?? true,
@@ -639,7 +647,13 @@ export class StateManager {
 			sessionSharedContexts: stateValues.sessionSharedContexts ?? {},
 			activeSearchProvider: stateValues.activeSearchProvider ?? "duckduckgo",
 			userBraveApiKey: stateValues.userBraveApiKey,
-			comfyuiDefaultPipelines: stateValues.comfyuiDefaultPipelines ?? {},
+			comfyuiDefaultPipelines: (() => {
+				console.log(
+					"[PipelineDebug] getState: posting comfyuiDefaultPipelines to webview =",
+					JSON.stringify(stateValues.comfyuiDefaultPipelines ?? {}),
+				)
+				return stateValues.comfyuiDefaultPipelines ?? {}
+			})(),
 			comfyuiHardwareProfile: stateValues.comfyuiHardwareProfile,
 			huggingFaceApiToken: stateValues.huggingFaceApiToken ? "********" : undefined,
 			comfyCloudApiToken: stateValues.comfyCloudApiToken ? "********" : undefined,

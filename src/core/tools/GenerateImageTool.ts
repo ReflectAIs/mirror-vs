@@ -75,24 +75,36 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 			return
 		}
 
+		// Normalize inputImagePath: models often send null or "null" for new text-to-image generations
+		const normalizedInputImagePath =
+			inputImagePath &&
+			inputImagePath !== "null" &&
+			inputImagePath !== "undefined" &&
+			typeof inputImagePath === "string" &&
+			inputImagePath.trim() !== ""
+				? inputImagePath.trim()
+				: undefined
+
 		let inputImageData: string | undefined
-		if (inputImagePath) {
-			const inputImageFullPath = path.resolve(task.cwd, inputImagePath)
+		if (normalizedInputImagePath) {
+			const inputImageFullPath = path.resolve(task.cwd, normalizedInputImagePath)
 
 			const inputImageExists = await fileExistsAtPath(inputImageFullPath)
 			if (!inputImageExists) {
-				await task.say("error", `Input image not found: ${getReadablePath(task.cwd, inputImagePath)}`)
+				await task.say("error", `Input image not found: ${getReadablePath(task.cwd, normalizedInputImagePath)}`)
 				task.didToolFailInCurrentTurn = true
 				pushToolResult(
-					formatResponse.toolError(`Input image not found: ${getReadablePath(task.cwd, inputImagePath)}`),
+					formatResponse.toolError(
+						`Input image not found: ${getReadablePath(task.cwd, normalizedInputImagePath)}`,
+					),
 				)
 				return
 			}
 
-			const inputImageAccessAllowed = task.mirrorIgnoreController?.validateAccess(inputImagePath)
+			const inputImageAccessAllowed = task.mirrorIgnoreController?.validateAccess(normalizedInputImagePath)
 			if (!inputImageAccessAllowed) {
-				await task.say("mirrorignore_error", inputImagePath)
-				pushToolResult(formatResponse.mirrorIgnoreError(inputImagePath))
+				await task.say("mirrorignore_error", normalizedInputImagePath)
+				pushToolResult(formatResponse.mirrorIgnoreError(normalizedInputImagePath))
 				return
 			}
 
@@ -134,60 +146,60 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 
 		const isWriteProtected = task.mirrorProtectedController?.isWriteProtected(relPath) || false
 
-		// Use shared utility for backwards compatibility logic
-		const imageProvider = getImageGenerationProvider(
-			state?.imageGenerationProvider,
-			!!state?.openRouterImageGenerationSelectedModel,
-		)
-
-		// Get the selected model
-		let selectedModel = state?.openRouterImageGenerationSelectedModel
-		let modelInfo = undefined
-
-		// Find the model info matching both value AND provider
-		// (since the same model value can exist for multiple providers)
-		if (selectedModel) {
-			modelInfo = IMAGE_GENERATION_MODELS.find((m) => m.value === selectedModel && m.provider === imageProvider)
-			if (!modelInfo) {
-				// Model doesn't exist for this provider, use first model for selected provider
-				const providerModels = IMAGE_GENERATION_MODELS.filter((m) => m.provider === imageProvider)
-				modelInfo = providerModels[0]
-				selectedModel = modelInfo?.value || IMAGE_GENERATION_MODEL_IDS[0]
-			}
-		} else {
-			// No model selected, use first model for selected provider
-			const providerModels = IMAGE_GENERATION_MODELS.filter((m) => m.provider === imageProvider)
-			modelInfo = providerModels[0]
-			selectedModel = modelInfo?.value || IMAGE_GENERATION_MODEL_IDS[0]
-		}
-
-		// Use the provider selection
-		const modelProvider = imageProvider
-		const apiMethod = modelInfo?.apiMethod
-
-		const openRouterApiKey = state?.openRouterImageApiKey
-
-		// Validate API key only when OpenRouter is the active provider
-		if (imageProvider === "openrouter" && !openRouterApiKey) {
-			const errorMessage = t("tools:generateImage.openRouterApiKeyRequired")
-			await task.say("error", errorMessage)
-			pushToolResult(formatResponse.toolError(errorMessage))
-			return
-		}
-
 		const fullPath = path.resolve(task.cwd, relPath)
 		const isOutsideWorkspace = isPathOutsideWorkspace(fullPath)
 
-		// Determine pipeline type for display in the approval UI
+		// Determine pipeline type for display in the approval UI and provider routing
 		const pipelineType = inputImageData ? "img2img" : pipeline || "txt2img"
 		console.log(
 			`[GenerateImageTool] pipelineType resolved to = "${pipelineType}" (inputImageData=${!!inputImageData}, raw pipeline="${pipeline}")`,
 		)
 
+		// Route through the active provider with per-type resolution.
+		const activeProvider = ImageProviderRouter.getActiveProvider(pipelineType)
+		console.log(`[GenerateImageTool] activeProvider = ${activeProvider?.name ?? "undefined"}`)
+		if (!activeProvider) {
+			const errorMessage =
+				"No image generation provider is configured or available. Please check that ComfyUI is running at http://127.0.0.1:8188 or configure an OpenRouter API key in Settings."
+			console.log(`[GenerateImageTool] ERROR: no active provider — aborting`)
+			await task.say("error", errorMessage)
+			pushToolResult(formatResponse.toolError(errorMessage))
+			return
+		}
+
+		// Validate OpenRouter API key only when OpenRouter is the active provider
+		if (activeProvider.name === "openrouter") {
+			const openRouterApiKey = state?.openRouterImageApiKey || state?.apiConfiguration?.openRouterApiKey
+			if (!openRouterApiKey) {
+				const errorMessage = t("tools:generateImage.openRouterApiKeyRequired")
+				await task.say("error", errorMessage)
+				pushToolResult(formatResponse.toolError(errorMessage))
+				return
+			}
+		}
+
+		// Model resolution for the active provider
+		let selectedModel: string
+		if (activeProvider.name === "comfyui") {
+			selectedModel = state?.comfyuiModel || "sd_xl_turbo"
+		} else if (activeProvider.name === "openrouter") {
+			selectedModel =
+				state?.openRouterModels?.[pipelineType] ||
+				state?.openRouterImageGenerationSelectedModel ||
+				"google/gemini-2.5-flash-image"
+		} else if (activeProvider.name === "atlas_cloud") {
+			selectedModel = state?.atlasCloudModels?.[pipelineType] || "atlas-cloud/default"
+		} else if (activeProvider.name === "comfy_cloud") {
+			selectedModel = "comfy-cloud/default"
+		} else {
+			selectedModel = state?.openRouterImageGenerationSelectedModel || IMAGE_GENERATION_MODEL_IDS[0]
+		}
+
 		// Resolve the actual pipeline early so the human-readable name can be shown
 		// in the frontend message alongside the generic type.
-		// The LLM always passes a pipeline slug — resolve it to get the human-readable name
-		// BEFORE approval so the user sees the exact pipeline that will be used.
+		const effectivePipeline =
+			pipeline || (activeProvider.name === "comfyui" ? state?.comfyuiDefaultPipelines?.[pipelineType] : undefined)
+
 		let resolvedPipelineName: string | undefined
 		try {
 			if (!PipelineRegistry.isInitialized()) {
@@ -195,18 +207,18 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 				await PipelineRegistry.initialize(cwd)
 			}
 			const internalType = inputImageData ? "edit" : "generate"
-			console.log(`[GenerateImageTool] Resolving pipeline slug="${pipeline}" type="${internalType}"`)
-			if (pipeline) {
-				const def = PipelineRegistry.resolve(pipeline, internalType as any)
+			console.log(`[GenerateImageTool] Resolving pipeline slug="${effectivePipeline}" type="${internalType}"`)
+			if (effectivePipeline) {
+				const def = PipelineRegistry.resolve(effectivePipeline, internalType as any)
 				resolvedPipelineName = def.name
-				console.log(`[GenerateImageTool] Resolved pipeline "${pipeline}" → name="${def.name}"`)
+				console.log(`[GenerateImageTool] Resolved pipeline "${effectivePipeline}" → name="${def.name}"`)
 			} else {
 				console.warn(`[GenerateImageTool] pipeline slug is empty/falsy — cannot resolve`)
 			}
 		} catch (e) {
 			// PipelineRegistry not available or resolution failed — fall back to the slug itself
 			console.warn(`[GenerateImageTool] Could not resolve pipeline name: ${e instanceof Error ? e.message : e}`)
-			resolvedPipelineName = pipeline || undefined
+			resolvedPipelineName = effectivePipeline || undefined
 		}
 
 		const sharedMessageProps = {
@@ -225,7 +237,8 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 				content: prompt,
 				pipeline: pipelineType,
 				pipelineName: resolvedPipelineName,
-				...(inputImagePath && { inputImage: getReadablePath(task.cwd, inputImagePath) }),
+				provider: activeProvider.name,
+				...(normalizedInputImagePath && { inputImage: getReadablePath(task.cwd, normalizedInputImagePath) }),
 			}
 			console.log(
 				`[GenerateImageTool] === APPROVAL MESSAGE PAYLOAD ===`,
@@ -240,21 +253,6 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 			const didApprove = await askApproval("tool", approvalMessage, undefined, isWriteProtected)
 
 			if (!didApprove) {
-				return
-			}
-
-			// Route through the active provider with per-type resolution.
-			console.log(
-				`[GenerateImageTool] imageProvider from state = "${imageProvider}", selectedModel = "${selectedModel}", pipelineType="${pipelineType}"`,
-			)
-			const activeProvider = ImageProviderRouter.getActiveProvider(pipelineType)
-			console.log(`[GenerateImageTool] activeProvider = ${activeProvider?.name ?? "undefined"}`)
-			if (!activeProvider) {
-				const errorMessage =
-					"No image generation provider is configured. Please select a provider in Experimental Settings."
-				console.log(`[GenerateImageTool] ERROR: no active provider — aborting`)
-				await task.say("error", errorMessage)
-				pushToolResult(formatResponse.toolError(errorMessage))
 				return
 			}
 
@@ -301,7 +299,7 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 				onProgress,
 				...(allowlists && { allowlists }),
 			}
-			baseOptions.pipeline = pipeline
+			baseOptions.pipeline = effectivePipeline
 
 			let result
 			if (inputImageData) {

@@ -58,11 +58,17 @@ export type ImageGenerationProvider = "openrouter" | "comfyui" | "comfy_cloud" |
  * Get the image generation provider with backwards compatibility
  * - If provider is explicitly set, use it
  * - If a model is already configured (existing users), default to "openrouter"
- * - Otherwise default to "openrouter" (new users)
+ * - Otherwise default to "comfyui" (local-first default matching settings UI)
  */
 export function getImageGenerationProvider(
 	explicitProvider: ImageGenerationProvider | undefined,
-	_hasExistingModel: boolean,
+	hasExistingModel: boolean,
 ): ImageGenerationProvider {
-	return explicitProvider !== undefined ? explicitProvider : "openrouter"
+	if (explicitProvider !== undefined) {
+		return explicitProvider
+	}
+	if (hasExistingModel) {
+		return "openrouter"
+	}
+	return "comfyui"
 }

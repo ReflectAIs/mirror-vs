@@ -13,11 +13,8 @@ type NotificationSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	ttsSpeed?: number
 	soundEnabled?: boolean
 	soundVolume?: number
-	mascotTheme?: "cyberpunk" | "retro" | "synthwave" | "solar"
 	soundTheme?: "classic" | "scifi"
-	setCachedStateField: SetCachedStateField<
-		"ttsEnabled" | "ttsSpeed" | "soundEnabled" | "soundVolume" | "mascotTheme" | "soundTheme"
-	>
+	setCachedStateField: SetCachedStateField<"ttsEnabled" | "ttsSpeed" | "soundEnabled" | "soundVolume" | "soundTheme">
 }
 
 export const NotificationSettings = ({
@@ -25,7 +22,6 @@ export const NotificationSettings = ({
 	ttsSpeed,
 	soundEnabled,
 	soundVolume,
-	mascotTheme,
 	soundTheme,
 	setCachedStateField,
 	...props
@@ -36,23 +32,6 @@ export const NotificationSettings = ({
 			<SectionHeader>{t("settings:sections.notifications")}</SectionHeader>
 
 			<Section>
-				<SearchableSetting settingId="notifications-mascot-theme" section="notifications" label="Mascot Theme">
-					<label className="block font-medium mb-1">Mascot Theme</label>
-					<VSCodeDropdown
-						value={mascotTheme || "cyberpunk"}
-						onChange={(e: any) => setCachedStateField("mascotTheme", e.target.value)}
-						className="w-full"
-						data-testid="mascot-theme-dropdown">
-						<VSCodeOption value="cyberpunk">Cyberpunk Neon</VSCodeOption>
-						<VSCodeOption value="retro">Retro Monochrome</VSCodeOption>
-						<VSCodeOption value="synthwave">Synthwave Sunset</VSCodeOption>
-						<VSCodeOption value="solar">Solar Flare</VSCodeOption>
-					</VSCodeDropdown>
-					<div className="text-vscode-descriptionForeground text-sm mt-1">
-						Choose a visual theme style for the AI helper mascot.
-					</div>
-				</SearchableSetting>
-
 				<SearchableSetting
 					settingId="notifications-sound-theme"
 					section="notifications"

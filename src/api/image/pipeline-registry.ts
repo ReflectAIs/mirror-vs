@@ -156,11 +156,23 @@ export class PipelineRegistry {
 	static restorePersistedDefaults(defaults: Record<string, string>, hidden: string[]): void {
 		// Restore user-defined default overrides
 		this.userDefaults.clear()
-		for (const [type, slug] of Object.entries(defaults)) {
+		const aliasMap: Record<string, PipelineType> = {
+			txt2img: "generate",
+			img2img: "edit",
+		}
+		for (const [key, slug] of Object.entries(defaults)) {
+			const type = (aliasMap[key] || key) as PipelineType
 			if (this.cache.has(slug)) {
-				this.userDefaults.set(type as PipelineType, slug)
+				this.userDefaults.set(type, slug)
+			} else {
+				console.warn(
+					`[PipelineDebug] restorePersistedDefaults: persisted default "${key}" -> "${slug}" DROPPED — slug not found in registry cache (discovered: ${Array.from(this.cache.keys()).join(", ") || "none"})`,
+				)
 			}
 		}
+		console.log(
+			`[PipelineDebug] restorePersistedDefaults: restored userDefaults = ${JSON.stringify(Object.fromEntries(this.userDefaults))}`,
+		)
 
 		// Restore hidden pipelines
 		this.hiddenPipelines = new Set(hidden)
@@ -271,6 +283,19 @@ export class PipelineRegistry {
 					type: guessPipelineType(workflow),
 					tags: [],
 					isDefault: false,
+				}
+
+				// Normalize legacy/alias type labels (e.g. "txt2img" → "generate") so
+				// pipelines group under the channel the UI filters by.
+				const typeAliases: Record<string, PipelineType> = {
+					txt2img: "generate",
+					img2img: "edit",
+				}
+				if (typeAliases[meta.type]) {
+					console.log(
+						`[PipelineDebug] discoverFromDirectory: normalizing pipeline "${slug}" type "${meta.type}" → "${typeAliases[meta.type]}"`,
+					)
+					meta.type = typeAliases[meta.type]
 				}
 
 				const def: PipelineDefinition = {
@@ -559,17 +584,40 @@ export class PipelineRegistry {
 			)
 		}
 
-		const dir = def.source === "project" && cwd ? this.getProjectPipelinesDir(cwd) : this.getGlobalPipelinesDir()
+		// Resolve target directories based on source and check all candidates
+		const candidateDirs: string[] = []
+		if (def.source === "comfyui") {
+			candidateDirs.push(this.getComfyuiPipelinesDir())
+		} else if (def.source === "project" && cwd) {
+			candidateDirs.push(this.getProjectPipelinesDir(cwd))
+		} else if (def.source === "global") {
+			candidateDirs.push(this.getGlobalPipelinesDir())
+		}
+		// Also defensively include standard pipeline directories to ensure cleanup
+		candidateDirs.push(this.getComfyuiPipelinesDir(), this.getGlobalPipelinesDir())
+		if (cwd) {
+			candidateDirs.push(this.getProjectPipelinesDir(cwd))
+		}
 
-		const filePath = path.join(dir, `${slug}.json`)
-		try {
-			await fsp.unlink(filePath)
-		} catch {
-			// File may already be gone
+		for (const dir of new Set(candidateDirs)) {
+			const filePath = path.join(dir, `${slug}.json`)
+			try {
+				await fsp.unlink(filePath)
+			} catch {
+				// File may not exist in this candidate directory
+			}
 		}
 
 		this.cache.delete(slug)
 		this.hiddenPipelines.delete(slug)
+
+		// Remove from user defaults if this pipeline was set as default
+		for (const [type, defaultSlug] of this.userDefaults) {
+			if (defaultSlug === slug) {
+				this.userDefaults.delete(type)
+			}
+		}
+
 		// Rebuild type index
 		this.byType.clear()
 		for (const [, d] of this.cache) {
@@ -696,7 +744,10 @@ export class PipelineRegistry {
 	 */
 	static setUserDefault(type: PipelineType, slug: string): void {
 		if (this.cache.has(slug)) {
+			console.log(`[PipelineDebug] setUserDefault: ${type} -> ${slug}`)
 			this.userDefaults.set(type, slug)
+		} else {
+			console.warn(`[PipelineDebug] setUserDefault: IGNORED ${type} -> ${slug} — slug not in registry cache`)
 		}
 	}
 
@@ -706,6 +757,13 @@ export class PipelineRegistry {
 	 */
 	static getUserDefault(type: PipelineType): string | undefined {
 		return this.userDefaults.get(type)
+	}
+
+	/**
+	 * Clear the user-defined default pipeline for a given type.
+	 */
+	static clearUserDefault(type: PipelineType): void {
+		this.userDefaults.delete(type)
 	}
 
 	static reset(): void {

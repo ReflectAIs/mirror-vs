@@ -262,32 +262,11 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					return prevState
 				}
 
-				const previousValue = prevState.apiConfiguration?.[field]
-
-				// Helper to check if two values are semantically equal
-				const areValuesEqual = (a: any, b: any): boolean => {
-					if (a === b) return true
-					if (a == null && b == null) return true
-					if (typeof a !== typeof b) return false
-					if (typeof a === "object" && typeof b === "object") {
-						return JSON.stringify(a) === JSON.stringify(b)
-					}
-					return false
-				}
-
-				// Only skip change detection for automatic initialization (not user actions)
-				// This prevents the dirty state when the component initializes and auto-syncs values
-				const isInitialSync =
-					!isUserAction &&
-					(previousValue === undefined || previousValue === "" || previousValue === null) &&
-					value !== undefined &&
-					value !== "" &&
-					value !== null
-
-				// Also skip if it's an automatic sync with semantically equal values
-				const isAutomaticNoOpSync = !isUserAction && areValuesEqual(previousValue, value)
-
-				if (!isInitialSync && !isAutomaticNoOpSync) {
+				// Only mark the form dirty for explicit user actions. Automatic syncs
+				// (isUserAction=false, e.g. mount-time initialization effects like
+				// ThinkingBudget defaulting enableReasoningEffort) write the value
+				// without flagging unsaved changes.
+				if (isUserAction) {
 					setChangeDetected(true)
 				}
 				return { ...prevState, apiConfiguration: { ...prevState.apiConfiguration, [field]: value } }
@@ -373,13 +352,37 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	}, [])
 
 	const setComfyuiDefaultPipeline = useCallback((type: string, slug: string) => {
+		console.log(`[PipelineDebug][webview] setComfyuiDefaultPipeline(${type}, "${slug}") called`)
 		setCachedState((prevState) => {
-			const current = prevState.comfyuiDefaultPipelines ?? {}
-			if (current[type] === slug) return prevState
+			const current = { ...(prevState.comfyuiDefaultPipelines ?? {}) }
+			if (current[type] === slug) {
+				console.log(
+					`[PipelineDebug][webview] setComfyuiDefaultPipeline(${type}): no change (already "${slug}") — skipping`,
+				)
+				return prevState
+			}
 			setChangeDetected(true)
+			const aliasMap: Record<string, string> = {
+				generate: "txt2img",
+				txt2img: "generate",
+				edit: "img2img",
+				img2img: "edit",
+				audio: "txt2audio",
+				txt2audio: "audio",
+				video: "txt2video",
+				txt2video: "video",
+			}
+			const alias = aliasMap[type]
+			if (!slug) {
+				delete current[type]
+				if (alias) delete current[alias]
+			} else {
+				current[type] = slug
+				if (alias) current[alias] = slug
+			}
 			return {
 				...prevState,
-				comfyuiDefaultPipelines: { ...current, [type]: slug },
+				comfyuiDefaultPipelines: current,
 			}
 		})
 	}, [])
@@ -995,7 +998,6 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 									ttsSpeed={ttsSpeed}
 									soundEnabled={soundEnabled}
 									soundVolume={soundVolume}
-									mascotTheme={mascotTheme}
 									soundTheme={soundTheme}
 									setCachedStateField={setCachedStateField}
 								/>
@@ -1050,14 +1052,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 							{renderTab === "mcp" && <McpView />}
 
 							{/* Worktrees Section */}
-							{renderTab === "worktrees" && (
-								<WorktreesView
-									gitWorktreeSandbox={experiments?.["gitWorktreeSandbox"] ?? false}
-									onToggleGitWorktreeSandbox={(enabled) =>
-										setExperimentEnabled("gitWorktreeSandbox", enabled)
-									}
-								/>
-							)}
+							{renderTab === "worktrees" && <WorktreesView />}
 
 							{/* Prompts Section */}
 							{renderTab === "prompts" && (
@@ -1077,6 +1072,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 									reasoningBlockCollapsed={reasoningBlockCollapsed ?? true}
 									enterBehavior={enterBehavior ?? "send"}
 									disableTabBar={disableTabBar ?? false}
+									mascotTheme={mascotTheme}
 									setCachedStateField={setCachedStateField}
 								/>
 							)}
@@ -1086,6 +1082,10 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								<ExperimentalSettings
 									setExperimentEnabled={setExperimentEnabled}
 									experiments={experiments}
+									imageGenerationProvider={imageGenerationProvider}
+									setImageGenerationProvider={setImageGenerationProvider}
+									openRouterImageApiKey={openRouterImageApiKey}
+									setOpenRouterImageApiKey={setOpenRouterImageApiKey}
 									generationProviders={generationProviders}
 									updateGenerationProvider={updateGenerationProvider}
 									openRouterModels={openRouterModels}

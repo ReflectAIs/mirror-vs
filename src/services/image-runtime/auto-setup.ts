@@ -90,8 +90,11 @@ export function initializeImageProviders(
 		ImageProviderRegistry.register("atlas_cloud", acProvider)
 	}
 
-	// If the user has selected ComfyUI in settings (even without
-	// completing auto-setup), register it so the router can find it.
+	// Always register ComfyUI provider so local ComfyUI (http://127.0.0.1:8188)
+	// is immediately available for health checks, model listing, and image generation.
+	registerComfyUIProvider()
+
+	// If the user has selected a specific provider in settings, ensure it is registered.
 	ensureProviderRegistered(previouslyConfigured?.currentProvider)
 }
 
@@ -122,8 +125,12 @@ export function connectProviderSelectorToSettings(
 		if (pipelineType && state?.generationProviders?.[pipelineType]) {
 			return state.generationProviders[pipelineType]
 		}
-		// Fallback to global provider setting
-		return state?.imageGenerationProvider || "openrouter"
+		// Explicit global provider setting
+		if (state?.imageGenerationProvider) {
+			return state.imageGenerationProvider
+		}
+		// Fallback to local ComfyUI (matches UI default and avoids requiring OpenRouter API key)
+		return "comfyui"
 	})
 }
 

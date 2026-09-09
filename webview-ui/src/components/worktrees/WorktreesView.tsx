@@ -13,20 +13,11 @@ import { CreateWorktreeModal } from "./CreateWorktreeModal"
 import { DeleteWorktreeModal } from "./DeleteWorktreeModal"
 import { Folder, GitBranch, Lock, Plus, SquareArrowOutUpRight, Trash } from "lucide-react"
 
-interface WorktreesViewProps {
-	gitWorktreeSandbox?: boolean
-	onToggleGitWorktreeSandbox?: (value: boolean) => void
-}
+interface WorktreesViewProps {}
 
-export const WorktreesView = ({ gitWorktreeSandbox, onToggleGitWorktreeSandbox }: WorktreesViewProps = {}) => {
+export const WorktreesView = ({}: WorktreesViewProps = {}) => {
 	const { t } = useAppTranslation()
-	const { showWorktreesInHomeScreen, setShowWorktreesInHomeScreen, experiments, setExperimentEnabled } =
-		useExtensionState()
-
-	const isSandboxEnabled =
-		gitWorktreeSandbox !== undefined ? gitWorktreeSandbox : (experiments?.["gitWorktreeSandbox"] ?? false)
-	const handleToggleSandbox =
-		onToggleGitWorktreeSandbox || ((enabled: boolean) => setExperimentEnabled("gitWorktreeSandbox", enabled))
+	const { showWorktreesInHomeScreen, setShowWorktreesInHomeScreen } = useExtensionState()
 
 	// State
 	const [worktrees, setWorktrees] = useState<Worktree[]>([])
@@ -198,17 +189,6 @@ export const WorktreesView = ({ gitWorktreeSandbox, onToggleGitWorktreeSandbox }
 						onClick={handleToggleShowInHomeScreen}>
 						<ToggleSwitch checked={showWorktreesInHomeScreen} onChange={handleToggleShowInHomeScreen} />
 						<span>{t("worktrees:showInHomeScreen")}</span>
-					</label>
-
-					{/* Task Sandbox Isolation toggle */}
-					<label
-						className="flex cursor-pointer items-center gap-2 text-sm text-vscode-descriptionForeground"
-						onClick={() => handleToggleSandbox(!isSandboxEnabled)}>
-						<ToggleSwitch
-							checked={isSandboxEnabled}
-							onChange={() => handleToggleSandbox(!isSandboxEnabled)}
-						/>
-						<span>{t("worktrees:taskIsolation.title")}</span>
 					</label>
 
 					{/* New Worktree button */}
