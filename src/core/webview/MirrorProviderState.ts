@@ -292,12 +292,15 @@ export class StateManager {
 
 			// Derive TabStatus from live streaming/ask flags & TaskState
 			let status: TabStatus
-			if (task.isStreaming || task.isWaitingForFirstChunk || (task as any).isExecutingTool) {
+			if (isCompletionAsk || task.state === TaskState.Completed) {
+				// A completed task always shows as completed, even if stale
+				// streaming/executing flags are still set (e.g. isExecutingTool
+				// is left true after attempt_completion is approved).
+				status = "completed"
+			} else if (task.isStreaming || task.isWaitingForFirstChunk || (task as any).isExecutingTool) {
 				status = "streaming"
 			} else if (hasPendingApproval) {
 				status = "interactive"
-			} else if (isCompletionAsk || task.state === TaskState.Completed) {
-				status = "completed"
 			} else if (task.state === TaskState.Error || task.state === TaskState.Aborted) {
 				status = "error"
 			} else if (task.isLoopActive && !isCompletionAsk) {

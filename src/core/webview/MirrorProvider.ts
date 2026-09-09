@@ -1,6 +1,7 @@
 import os from "os"
 import * as path from "path"
 import EventEmitter from "events"
+import pWaitFor from "p-wait-for"
 
 import { Anthropic } from "@anthropic-ai/sdk"
 import * as vscode from "vscode"
@@ -1544,6 +1545,30 @@ export class MirrorProvider
 			// Process the pending edit after a short delay to ensure the task is fully initialized
 			setTimeout(async () => {
 				try {
+					// Wait until the resumed task has posted its resume ask (resume_task /
+					// resume_completed_task). This guarantees that:
+					// 1. resumeTaskFromHistory has finished re-reading mirror messages from
+					//    disk, so the slice below cannot be clobbered by a stale re-read.
+					// 2. ask() has already reset askResponse and is now blocking, so the
+					//    handleWebviewAskResponse call below resolves the resume ask instead
+					//    of being wiped by it. (Waiting on isInitialized alone is not safe:
+					//    it is set before ask() resets askResponse.)
+					await pWaitFor(
+						() =>
+							task.mirrorMessages.some(
+								(m) =>
+									m.type === "ask" && (m.ask === "resume_task" || m.ask === "resume_completed_task"),
+							),
+						{ interval: 50, timeout: 5_000 },
+					).catch(() => {
+						// Timeout: proceed anyway — the previous behavior was a blind 100ms
+						// delay, so attempting the edit is still strictly better than
+						// dropping it.
+						this.log(
+							`[createTaskWithHistoryItem] Timed out waiting for resume ask before processing pending edit for task ${task.taskId}`,
+						)
+					})
+
 					// Find the message index in the restored state
 					const { messageIndex, apiConversationHistoryIndex } = (() => {
 						const messageIndex = task.mirrorMessages.findIndex((msg) => msg.ts === pendingEdit.messageTs)
