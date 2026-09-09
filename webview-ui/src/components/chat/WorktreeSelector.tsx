@@ -5,7 +5,7 @@ import type { Worktree, WorktreeListResponse } from "@mirror-vs/types"
 
 import { cn } from "@/lib/utils"
 import { useMirrorPortal } from "@/components/ui/hooks/useMirrorPortal"
-import { Popover, PopoverContent, PopoverTrigger, StandardTooltip, Button, ToggleSwitch } from "@/components/ui"
+import { Popover, PopoverContent, PopoverTrigger, StandardTooltip, Button } from "@/components/ui"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { vscode } from "@/utils/vscode"
@@ -16,8 +16,6 @@ import { IconButton } from "./IconButton"
 
 interface WorktreeSelectorProps {
 	disabled?: boolean
-	experiments?: Record<string, boolean>
-	setExperimentEnabled?: (id: any, enabled: boolean) => void
 }
 
 const normalizePath = (p?: string) =>
