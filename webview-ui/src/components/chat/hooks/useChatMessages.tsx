@@ -1505,6 +1505,14 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				if (message.say === "text" && (message.text ?? "") === "" && (message.images?.length ?? 0) === 0) {
 					return false
 				}
+				// A stale partial rate-limit row (e.g. its finalize say was missed
+				// after an abort/retry) must not keep spinning once newer messages
+				// exist — same "only when last" rule as the non-ever-visible path.
+				if (message.say === "api_req_rate_limit_wait" && message.partial === true) {
+					if (message !== modifiedMessages.at(-1)) {
+						return false
+					}
+				}
 				return true
 			}
 

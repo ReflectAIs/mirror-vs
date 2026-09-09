@@ -352,25 +352,31 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			const STAGGER_MS = 350
 			const requiredDelayMs = Math.max(STAGGER_MS, Math.max(0, rateLimitSeconds) * 1000)
 			const now = performance.now()
-			if (Task.lastGlobalApiRequestTime) {
-				const elapsed = now - Task.lastGlobalApiRequestTime
-				if (elapsed < requiredDelayMs) {
-					const waitMs = requiredDelayMs - elapsed
-					if (onWait && waitMs >= 1000) {
-						let remainingSec = Math.ceil(waitMs / 1000)
-						while (remainingSec > 0) {
-							await onWait(remainingSec)
-							const step = Math.min(1000, remainingSec * 1000)
-							await new Promise((r) => setTimeout(r, step))
-							remainingSec--
+			try {
+				if (Task.lastGlobalApiRequestTime) {
+					const elapsed = now - Task.lastGlobalApiRequestTime
+					if (elapsed < requiredDelayMs) {
+						const waitMs = requiredDelayMs - elapsed
+						if (onWait && waitMs >= 1000) {
+							let remainingSec = Math.ceil(waitMs / 1000)
+							while (remainingSec > 0) {
+								await onWait(remainingSec)
+								const step = Math.min(1000, remainingSec * 1000)
+								await new Promise((r) => setTimeout(r, step))
+								remainingSec--
+							}
+						} else {
+							await new Promise((r) => setTimeout(r, waitMs))
 						}
-					} else {
-						await new Promise((r) => setTimeout(r, waitMs))
 					}
 				}
+			} finally {
+				// The release handle MUST be returned even if onWait throws (e.g.
+				// the task was aborted mid-countdown and say() rejected) — otherwise
+				// the static gate promise chain deadlocks every tab.
+				Task.lastGlobalApiRequestTime = performance.now()
+				return release
 			}
-			Task.lastGlobalApiRequestTime = performance.now()
-			return release
 		})
 	}
 

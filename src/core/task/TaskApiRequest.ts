@@ -665,7 +665,20 @@ export class TaskApiRequest {
 			await this.task.say("api_req_rate_limit_wait", delayMessage, undefined, true)
 		})
 		if (didShowGateWait) {
-			await this.task.say("api_req_rate_limit_wait", undefined, undefined, false)
+			// Finalize the partial rate-limit row so the spinner stops. The say
+			// can throw when the task is aborted mid-wait; the partial row must
+			// still be finalized (best-effort) or it would spin forever.
+			try {
+				await this.task.say("api_req_rate_limit_wait", undefined, undefined, false)
+			} catch {
+				const staleRow = [...this.task.mirrorMessages]
+					.reverse()
+					.find((m) => m.type === "say" && m.say === "api_req_rate_limit_wait" && m.partial === true)
+				if (staleRow) {
+					staleRow.partial = false
+					void this.task.mirrorMessagesManager.updateMirrorMessage(staleRow)
+				}
+			}
 		}
 		let globalGateReleased = false
 		const releaseGlobalGateOnce = (): void => {
