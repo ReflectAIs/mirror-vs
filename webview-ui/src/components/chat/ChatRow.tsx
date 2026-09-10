@@ -349,13 +349,17 @@ export const ChatRowContent = ({
 							getIconSpan("error", errorColor)
 						)
 					) : cost !== null && cost !== undefined ? (
-						getIconSpan("pulse", normalColor)
+						// Request completed — no icon. A static icon here reads as a
+						// stuck spinner; the cost badge already marks the finished row.
+						// The live spinner (below) only shows while the request is
+						// actually in progress.
+						null
 					) : apiRequestFailedMessage ? (
 						getIconSpan("error", errorColor)
 					) : isLast ? (
 						<ProgressIndicator />
 					) : (
-						getIconSpan("pulse", normalColor)
+						null
 					),
 					apiReqCancelReason !== null && apiReqCancelReason !== undefined ? (
 						apiReqCancelReason === "user_cancelled" ? (
