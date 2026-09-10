@@ -115,10 +115,10 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 		<div className="my-1 group">
 			<div
 				className={cn(
-					"inline-flex items-center gap-1.5 h-6 px-2 rounded-full border text-[11px] cursor-pointer select-none transition-colors duration-150",
+					"inline-flex items-center gap-1.5 py-0.5 text-[11px] cursor-pointer select-none transition-colors duration-150",
 					isActivelyThinking
-						? "border-amber-500/40 bg-amber-500/10 text-vscode-foreground"
-						: "border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 text-vscode-descriptionForeground hover:text-vscode-foreground",
+						? "text-vscode-foreground font-medium"
+						: "text-vscode-descriptionForeground hover:text-vscode-foreground",
 				)}
 				onClick={handleToggle}>
 				<Lightbulb
@@ -129,7 +129,7 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 							: "text-vscode-descriptionForeground/70 group-hover:text-vscode-descriptionForeground",
 					)}
 				/>
-				<span className="font-medium tracking-tight">
+				<span className="tracking-tight">
 					{isActivelyThinking
 						? t("chat:reasoning.thinking")
 						: t("chat:reasoning.thought", { defaultValue: "Thought" })}
@@ -150,7 +150,7 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 			{(content?.trim()?.length ?? 0) > 0 && !isCollapsed && (
 				<div
 					ref={contentRef}
-					className="mt-1.5 rounded-lg border border-vscode-editorGroup-border/20 bg-vscode-editor-background/20 p-2.5 text-[11px] leading-relaxed text-vscode-descriptionForeground font-mono break-words max-h-64 overflow-y-auto">
+					className="mt-1.5 pl-3 border-l border-vscode-editorGroup-border/40 py-1 text-[11px] leading-relaxed text-vscode-descriptionForeground/85 font-mono break-words max-h-64 overflow-y-auto">
 					<MarkdownBlock markdown={content} />
 				</div>
 			)}

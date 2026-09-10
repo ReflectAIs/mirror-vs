@@ -368,8 +368,7 @@ export const ChatRowContent = ({
 						) : (
 							getIconSpan("error", errorColor)
 						)
-					) : cost !== null && cost !== undefined ? // actually in progress. // The live spinner (below) only shows while the request is // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
-					null : apiRequestFailedMessage ? (
+					) : cost !== null && cost !== undefined ? null : apiRequestFailedMessage ? ( // actually in progress. // The live spinner (below) only shows while the request is // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
 						getIconSpan("error", errorColor)
 					) : isLast ? (
 						<ProgressIndicator />
@@ -1594,8 +1593,8 @@ export const ChatRowContent = ({
 								)}>
 								<div className="flex items-center gap-2 flex-grow min-w-0">
 									{isApiRequestInProgress ? (
-										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-vscode-badge-background/10 text-[11px] text-vscode-descriptionForeground animate-pulse border border-vscode-badge-background/15">
-											<span className="size-1.5 rounded-full bg-mirror-brand-from"></span>
+										<div className="inline-flex items-center gap-1.5 py-0.5 text-[11px] text-vscode-descriptionForeground select-none">
+											<span className="size-1.5 rounded-full bg-mirror-brand-from animate-pulse"></span>
 											<span>{t("chat:apiRequest.streaming")}</span>
 										</div>
 									) : (
