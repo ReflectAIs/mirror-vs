@@ -909,45 +909,7 @@ export class TaskApiRequest {
 
 		const cleanConversationHistory: (Anthropic.Messages.MessageParam | ReasoningItemForRequest)[] = []
 
-		// Index tool uses and file modifications to compact superseded read_file payloads
-		const toolUseMap = new Map<string, { name: string; input: Record<string, any>; msgIndex: number }>()
-		const modifiedPaths = new Set<string>()
-
-		messages.forEach((m, idx) => {
-			if (m.role === "assistant" && Array.isArray(m.content)) {
-				for (const block of m.content) {
-					if (block.type === "tool_use" && block.id) {
-						const input =
-							typeof block.input === "object" && block.input !== null
-								? (block.input as Record<string, any>)
-								: {}
-						toolUseMap.set(block.id, { name: block.name, input, msgIndex: idx })
-
-						const rawPath = input.path || input.file_path || input.filePath
-						if (typeof rawPath === "string" && rawPath.trim()) {
-							const normalized = rawPath.trim().toLowerCase()
-							if (
-								[
-									"apply_diff",
-									"edit_file",
-									"write_to_file",
-									"newFileCreated",
-									"editedExistingFile",
-									"appliedDiff",
-									"insertContent",
-									"searchAndReplace",
-								].includes(block.name)
-							) {
-								modifiedPaths.add(normalized)
-							}
-						}
-					}
-				}
-			}
-		})
-
-		for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
-			const msg = messages[msgIndex]
+		for (const msg of messages) {
 			// Standalone reasoning: send encrypted, skip plain text
 			if (msg.type === "reasoning") {
 				if (msg.encrypted_content) {
@@ -1068,42 +1030,9 @@ export class TaskApiRequest {
 
 			// Default path for regular messages (no embedded reasoning)
 			if (msg.role) {
-				let finalContent = msg.content
-
-				// Compact superseded tool results for distant historical messages (outside recent 4 messages)
-				const isDistantMessage = msgIndex < messages.length - 4
-				if (msg.role === "user" && isDistantMessage && Array.isArray(msg.content)) {
-					finalContent = msg.content.map((block) => {
-						if (block.type === "tool_result" && block.tool_use_id && !block.is_error) {
-							const toolUse = toolUseMap.get(block.tool_use_id)
-							if (toolUse?.name === "read_file") {
-								const rawPath = toolUse.input.path || toolUse.input.file_path || toolUse.input.filePath
-								const normalized = typeof rawPath === "string" ? rawPath.trim().toLowerCase() : ""
-								if (normalized && modifiedPaths.has(normalized)) {
-									let rawText = ""
-									if (typeof block.content === "string") {
-										rawText = block.content
-									} else if (Array.isArray(block.content)) {
-										rawText = block.content.map((c: any) => c.text || "").join("\n")
-									}
-
-									if (rawText.length > 1000) {
-										const lineCount = rawText.split("\n").length
-										return {
-											...block,
-											content: `[File content for '${rawPath}' (${lineCount} lines) was read in an earlier turn and subsequently edited. Raw original read omitted to preserve context tokens. Full current file is available on disk or via read_file.]`,
-										}
-									}
-								}
-							}
-						}
-						return block
-					})
-				}
-
 				cleanConversationHistory.push({
 					role: msg.role,
-					content: finalContent as Anthropic.Messages.ContentBlockParam[] | string,
+					content: msg.content as Anthropic.Messages.ContentBlockParam[] | string,
 					...(msg.role === "assistant" &&
 						msg.reasoning_content && { reasoning_content: msg.reasoning_content }),
 				} as any)
