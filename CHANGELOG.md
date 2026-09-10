@@ -2,6 +2,14 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.8.3] - 2026-09-10
+
+### Fixed
+
+- **Duplicate User Message After Edit + Checkpoint Restore**: Fixed editing a user message with "restore to checkpoint" showing two user messages (the old one and the edited one). The pending-edit processor now waits for the resumed task's `resume_task` ask to appear before slicing off the old message and resolving the resume with the edited text, giving a deterministic sync point between the rewind and the re-init.
+- **Rate-Limit Spinner Persisting After Limit Cleared**: Fixed the rate-limit countdown spinner continuing to rotate after the wait was over and queued turns had executed. Stale partial `api_req_rate_limit_wait` rows are now hidden once newer messages exist, the partial row is finalized (best-effort) even when the task is aborted mid-wait, and the cross-tab request gate always returns its release handle even if the countdown is interrupted.
+- **Static "Worked" Icon on Completed API Requests**: Removed the static pulse icon left on finished `api_req_started` rows — it read as a stuck spinner. The live spinner still shows while a request is actually in progress; completed rows are marked by their cost badge.
+
 ## [0.8.2] - 2026-09-09
 
 ### Added
