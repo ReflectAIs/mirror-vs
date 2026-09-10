@@ -259,6 +259,7 @@ export const mirrorMessageSchema = z.object({
 	images: z.array(z.string()).optional(),
 	partial: z.boolean().optional(),
 	reasoning: z.string().optional(),
+	duration: z.number().optional(),
 	conversationHistoryIndex: z.number().optional(),
 	checkpoint: z.record(z.string(), z.unknown()).optional(),
 	progressStatus: toolProgressStatusSchema.optional(),

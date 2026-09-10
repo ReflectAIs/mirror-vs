@@ -22,19 +22,29 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 
 	const [isCollapsed, setIsCollapsed] = useState(reasoningBlockCollapsed)
 
-	// Explicit check: only actively thinking if streaming is active, this is the last message,
-	// and the message is explicitly marked partial.
-	const isStreamActive = isStreaming && isLast && isPartial === true
+	// A block is only actively thinking if it is explicitly partial, streaming is active,
+	// this message is the latest in the chat, and no backend duration has been fixed yet.
+	const isStreamActive = isStreaming && isLast && isPartial === true && duration === undefined
 
 	const startTimeRef = useRef<number>(ts || Date.now())
 	const lastChunkAtRef = useRef<number>(Date.now())
 	const prevContentLengthRef = useRef<number>(content?.length ?? 0)
+	const frozenDurationRef = useRef<number | null>(duration !== undefined ? duration : null)
 
-	// Track whether thinking has concluded
-	const [thinkingConcluded, setThinkingConcluded] = useState<boolean>(!isStreamActive || duration !== undefined)
-	const [elapsed, setElapsed] = useState<number>(() => {
+	// Keep track of content updates to detect when thinking tokens stop arriving
+	const currentLength = content?.length ?? 0
+	if (currentLength !== prevContentLengthRef.current) {
+		prevContentLengthRef.current = currentLength
+		lastChunkAtRef.current = Date.now()
+	}
+
+	const [isDoneThinking, setIsDoneThinking] = useState<boolean>(() => !isStreamActive)
+	const [elapsedMs, setElapsedMs] = useState<number>(() => {
 		if (duration !== undefined) return duration
-		if (!isStreamActive) return 0
+		if (!isStreamActive) {
+			// If already concluded on initial render, estimate from content length rather than Date.now() - ts
+			return Math.max(1000, Math.round(((content?.length ?? 0) / 120) * 1000))
+		}
 		return Math.max(0, Date.now() - (ts || Date.now()))
 	})
 
@@ -44,54 +54,57 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 		setIsCollapsed(reasoningBlockCollapsed)
 	}, [reasoningBlockCollapsed])
 
-	// Detect content updates
-	const currentLength = content?.length ?? 0
-	if (currentLength !== prevContentLengthRef.current) {
-		prevContentLengthRef.current = currentLength
-		lastChunkAtRef.current = Date.now()
-	}
-
-	// Once stream is not active or duration provided, finalize immediately
+	// If backend duration arrives or stream is no longer active, freeze immediately
 	useEffect(() => {
 		if (duration !== undefined) {
-			setElapsed(duration)
-			setThinkingConcluded(true)
+			frozenDurationRef.current = duration
+			setElapsedMs(duration)
+			setIsDoneThinking(true)
 			return
 		}
 
 		if (!isStreamActive) {
-			setThinkingConcluded(true)
-			setElapsed((prev) => {
-				if (prev > 0) return prev
-				const total = Math.max(1000, lastChunkAtRef.current - startTimeRef.current)
-				return total
-			})
+			setIsDoneThinking(true)
+			if (frozenDurationRef.current === null) {
+				const finalMs = Math.max(1000, lastChunkAtRef.current - startTimeRef.current)
+				frozenDurationRef.current = finalMs
+				setElapsedMs(finalMs)
+			}
 			return
 		}
 
-		// Actively streaming: tick timer every second, but auto-conclude if no new thinking tokens for > 2.5s
-		setThinkingConcluded(false)
+		// Actively thinking: tick timer every 500ms
+		setIsDoneThinking(false)
+		let timerId: NodeJS.Timeout | undefined
+
 		const tick = () => {
 			const now = Date.now()
 			const idleMs = now - lastChunkAtRef.current
 
-			// If no new reasoning tokens arrived in 2.5 seconds, model finished thinking and moved to next phase
-			if (idleMs > 2500 && currentLength > 0) {
-				setThinkingConcluded(true)
-				setElapsed(Math.max(1000, lastChunkAtRef.current - startTimeRef.current))
+			// If no new reasoning tokens arrived for > 2 seconds, thinking is concluded
+			if (idleMs > 2000 && currentLength > 0) {
+				const finalMs = Math.max(1000, lastChunkAtRef.current - startTimeRef.current)
+				frozenDurationRef.current = finalMs
+				setElapsedMs(finalMs)
+				setIsDoneThinking(true)
+				if (timerId) clearInterval(timerId)
 				return
 			}
 
-			setElapsed(Math.max(0, now - startTimeRef.current))
+			setElapsedMs(Math.max(0, now - startTimeRef.current))
 		}
 
-		tick()
-		const id = setInterval(tick, 500)
-		return () => clearInterval(id)
+		timerId = setInterval(tick, 500)
+		return () => {
+			if (timerId) clearInterval(timerId)
+		}
 	}, [isStreamActive, duration, currentLength])
 
-	const isActivelyThinking = isStreamActive && !thinkingConcluded
-	const seconds = Math.max(1, Math.round(elapsed / 1000))
+	const isActivelyThinking = isStreamActive && !isDoneThinking
+	const seconds = Math.max(
+		1,
+		Math.round((frozenDurationRef.current !== null ? frozenDurationRef.current : elapsedMs) / 1000),
+	)
 	const secondsLabel = t("chat:reasoning.seconds", { count: seconds })
 
 	const handleToggle = () => {
@@ -121,7 +134,7 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 						? t("chat:reasoning.thinking")
 						: t("chat:reasoning.thought", { defaultValue: "Thought" })}
 				</span>
-				{elapsed > 0 && (
+				{seconds > 0 && (
 					<span className="text-[10px] font-mono opacity-60">
 						· {secondsLabel}
 						{isActivelyThinking && " …"}

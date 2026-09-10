@@ -637,6 +637,31 @@ export class TaskMainLoop {
 				})
 				let assistantMessage = ""
 				let reasoningMessage = ""
+				let reasoningStartTime: number | undefined
+				let reasoningEndTime: number | undefined
+				let reasoningFinalized = false
+
+				const finalizeReasoning = async () => {
+					if (reasoningFinalized || !reasoningMessage) {
+						return
+					}
+					reasoningFinalized = true
+					const duration = Math.max(
+						1000,
+						(reasoningEndTime ?? Date.now()) - (reasoningStartTime ?? Date.now()),
+					)
+					const lastReasoningIndex = findLastIndex(
+						this.task.mirrorMessages,
+						(m) => m.type === "say" && m.say === "reasoning",
+					)
+					if (lastReasoningIndex !== -1) {
+						const msg = this.task.mirrorMessages[lastReasoningIndex]
+						msg.partial = false
+						msg.duration = duration
+						await this.task.mirrorMessagesManager.updateMirrorMessage(msg)
+					}
+				}
+
 				let pendingGroundingSources: GroundingSource[] = []
 				this.task.isStreaming = true
 
@@ -678,6 +703,10 @@ export class TaskMainLoop {
 
 						switch (chunk.type) {
 							case "reasoning": {
+								if (reasoningStartTime === undefined) {
+									reasoningStartTime = Date.now()
+								}
+								reasoningEndTime = Date.now()
 								reasoningMessage += chunk.text
 								// Only apply formatting if the message contains sentence-ending punctuation followed by **
 								let formattedReasoning = reasoningMessage
@@ -708,6 +737,7 @@ export class TaskMainLoop {
 								}
 								break
 							case "tool_call_partial": {
+								await finalizeReasoning()
 								// Process raw tool call chunk through NativeToolCallParser
 								// which handles tracking, buffering, and emits events
 								const events = NativeToolCallParser.processRawChunk({
@@ -834,6 +864,7 @@ export class TaskMainLoop {
 							}
 
 							case "tool_call": {
+								await finalizeReasoning()
 								// Legacy: Handle complete tool calls (for backward compatibility)
 								// Convert native tool call to ToolUse format
 								const toolUse = NativeToolCallParser.parseToolCall({
@@ -863,6 +894,7 @@ export class TaskMainLoop {
 								break
 							}
 							case "text": {
+								await finalizeReasoning()
 								assistantMessage += chunk.text
 
 								// Native tool calling: text chunks are plain text.
@@ -1086,19 +1118,7 @@ export class TaskMainLoop {
 				// Complete the reasoning message if it exists
 				// We can't use say() here because the reasoning message may not be the last message
 				// (other messages like text blocks or tool uses may have been added after it during streaming)
-				if (reasoningMessage) {
-					const lastReasoningIndex = findLastIndex(
-						this.task.mirrorMessages,
-						(m) => m.type === "say" && m.say === "reasoning",
-					)
-
-					if (lastReasoningIndex !== -1 && this.task.mirrorMessages[lastReasoningIndex].partial) {
-						this.task.mirrorMessages[lastReasoningIndex].partial = false
-						await this.task.mirrorMessagesManager.updateMirrorMessage(
-							this.task.mirrorMessages[lastReasoningIndex],
-						)
-					}
-				}
+				await finalizeReasoning()
 
 				await this.task.mirrorMessagesManager.saveMirrorMessages()
 				await this.task.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
