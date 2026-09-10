@@ -1671,6 +1671,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			"newFileCreated",
 			"insertContent",
 			"searchAndReplace",
+			"search_and_replace",
+			"search_replace",
+			"edit",
+			"edit_file",
+			"apply_patch",
+			"apply_diff",
 		])
 
 		const isEditFileAsk = (msg: MirrorMessage): boolean => {
@@ -1678,6 +1684,18 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			try {
 				const tool = JSON.parse(msg.text || "{}")
 				return editFileTools.has(tool.tool) && !tool.batchDiffs
+			} catch {
+				return false
+			}
+		}
+
+		const searchTools = new Set(["codebaseSearch", "searchFiles", "codebase_search", "search_files"])
+
+		const isSearchAsk = (msg: MirrorMessage): boolean => {
+			if (msg.type !== "ask" || msg.ask !== "tool") return false
+			try {
+				const tool = JSON.parse(msg.text || "{}")
+				return searchTools.has(tool.tool) && !tool.batchSearches
 			} catch {
 				return false
 			}
@@ -1745,18 +1763,18 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		}
 
 		const synthesizeEditFileBatch = (batch: MirrorMessage[]): MirrorMessage => {
-			const batchDiffs = batch.map((batchMsg) => {
+			const batchDiffs = batch.map((batchMsg, idx) => {
 				try {
 					const tool = JSON.parse(batchMsg.text || "{}")
 					return {
 						path: tool.path || "",
 						changeCount: 1,
-						key: tool.path || "",
+						key: `${tool.path || ""}-${idx}`,
 						content: tool.content || tool.diff || "",
 						diffStats: tool.diffStats,
 					}
 				} catch {
-					return { path: "", changeCount: 0, key: "", content: "" }
+					return { path: "", changeCount: 0, key: `${idx}`, content: "" }
 				}
 			})
 
@@ -1766,15 +1784,62 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			} catch {
 				return batch[0]
 			}
+			const allAnswered = batch.every((m) => m.isAnswered)
 			return {
-				...batch[0],
-				text: JSON.stringify({ ...firstTool, batchDiffs }),
+				...batch[batch.length - 1],
+				ts: batch[0].ts,
+				isAnswered: allAnswered,
+				text: JSON.stringify({ ...firstTool, tool: "editedExistingFile", batchDiffs }),
+			}
+		}
+
+		const synthesizeSearchBatch = (batch: MirrorMessage[]): MirrorMessage => {
+			const batchSearches = batch.map((batchMsg, idx) => {
+				try {
+					const tool = JSON.parse(batchMsg.text || "{}")
+					return {
+						tool: tool.tool || "codebaseSearch",
+						query: tool.query || tool.regex || "",
+						regex: tool.regex || tool.query || "",
+						path: tool.path || "",
+						filePattern: tool.filePattern || "",
+						isOutsideWorkspace: tool.isOutsideWorkspace || false,
+						content: tool.content || "",
+						key: `${tool.tool}-${tool.query || tool.regex || ""}-${tool.path || ""}-${idx}`,
+					}
+				} catch {
+					return {
+						tool: "codebaseSearch",
+						query: "",
+						regex: "",
+						path: "",
+						filePattern: "",
+						isOutsideWorkspace: false,
+						content: "",
+						key: `search-${idx}`,
+					}
+				}
+			})
+
+			let firstTool
+			try {
+				firstTool = JSON.parse(batch[0].text || "{}")
+			} catch {
+				return batch[0]
+			}
+			const allAnswered = batch.every((m) => m.isAnswered)
+			return {
+				...batch[batch.length - 1],
+				ts: batch[0].ts,
+				isAnswered: allAnswered,
+				text: JSON.stringify({ ...firstTool, batchSearches }),
 			}
 		}
 
 		const readFileBatched = batchConsecutive(filtered, isReadFileAsk, synthesizeReadFileBatch)
 		const listFilesBatched = batchConsecutive(readFileBatched, isListFilesAsk, synthesizeListFilesBatch)
-		const result = batchConsecutive(listFilesBatched, isEditFileAsk, synthesizeEditFileBatch)
+		const editFilesBatched = batchConsecutive(listFilesBatched, isEditFileAsk, synthesizeEditFileBatch)
+		const result = batchConsecutive(editFilesBatched, isSearchAsk, synthesizeSearchBatch)
 
 		if (isCondensing) {
 			result.push({

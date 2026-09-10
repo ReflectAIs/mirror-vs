@@ -235,6 +235,7 @@
 		"wantsToEditOutsideWorkspace": "Mirror VS wants to edit this file outside of the workspace",
 		"wantsToEditProtected": "Mirror VS wants to edit a protected configuration file",
 		"wantsToApplyBatchChanges": "Mirror VS wants to apply changes to multiple files",
+		"didApplyBatchChanges": "Mirror VS applied changes to multiple files",
 		"wantsToGenerateImage": "Mirror VS wants to generate an image",
 		"wantsToGenerateImageOutsideWorkspace": "Mirror VS wants to generate an image outside of the workspace",
 		"wantsToGenerateImageProtected": "Mirror VS wants to generate an image in a protected location",
@@ -256,6 +257,8 @@
 		"wantsToViewMultipleDirectories": "Mirror VS wants to view multiple directories",
 		"wantsToSearch": "Mirror VS wants to search this directory for <code>{{regex}}</code>",
 		"didSearch": "Mirror VS searched this directory for <code>{{regex}}</code>",
+		"wantsToSearchMultiple": "Mirror VS wants to perform multiple searches",
+		"didSearchMultiple": "Mirror VS performed multiple searches",
 		"wantsToSearchOutsideWorkspace": "Mirror VS wants to search this directory (outside workspace) for <code>{{regex}}</code>",
 		"didSearchOutsideWorkspace": "Mirror VS searched this directory (outside workspace) for <code>{{regex}}</code>"
 	},

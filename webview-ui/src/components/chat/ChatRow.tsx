@@ -42,6 +42,7 @@ import { FollowUpSuggest } from "./FollowUpSuggest"
 import { BatchFilePermission } from "./BatchFilePermission"
 import { BatchDiffApproval } from "./BatchDiffApproval"
 import { BatchListFilesPermission } from "./BatchListFilesPermission"
+import { BatchSearchDisplay } from "./BatchSearchDisplay"
 import { ProgressIndicator } from "./ProgressIndicator"
 import { ImageProgressRow } from "./ImageProgressRow"
 import { Markdown } from "./Markdown"
@@ -76,6 +77,7 @@ import {
 	ArrowRight,
 	Check,
 	ChevronUp,
+	Search,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PathTooltip } from "../ui/PathTooltip"
@@ -365,8 +367,7 @@ export const ChatRowContent = ({
 							getIconSpan("error", errorColor)
 						)
 					) : cost !== null &&
-					  cost !== undefined ? // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
-					// The live spinner (below) only shows while the request is
+					  cost !== undefined ? // The live spinner (below) only shows while the request is // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
 					// actually in progress.
 					null : apiRequestFailedMessage ? (
 						getIconSpan("error", errorColor)
@@ -453,6 +454,55 @@ export const ChatRowContent = ({
 				style={{ color: "var(--vscode-foreground)", marginBottom: "-1.5px" }}></span>
 		)
 
+		const renderBatchSearch = (batchSearches: any[]) => {
+			const searchCount = batchSearches.length
+			const isPendingApproval = message.type === "ask" && !message.isAnswered
+
+			return (
+				<div className="group">
+					<div
+						className="flex items-center justify-between cursor-pointer select-none"
+						style={{
+							...headerStyle,
+							marginBottom: isBatchExpanded ? 6 : 0,
+						}}
+						onClick={handleToggleBatchExpand}>
+						<div className="flex items-center gap-2">
+							<Search className="w-4 shrink-0" aria-label="Search icon" />
+							<span style={{ fontWeight: "bold" }}>
+								{isPendingApproval
+									? t("chat:directoryOperations.wantsToSearchMultiple", {
+											defaultValue: "Mirror VS wants to perform multiple searches",
+										})
+									: t("chat:directoryOperations.didSearchMultiple", {
+											defaultValue: "Mirror VS performed multiple searches",
+										})}
+							</span>
+							<span className="text-xs text-vscode-descriptionForeground mt-0.5">
+								({searchCount} {searchCount === 1 ? "search" : "searches"})
+							</span>
+						</div>
+						<div className="flex items-center gap-2">
+							{message.isAnswered && (
+								<span className="text-emerald-400 text-xs font-normal mr-1">✓ Searched</span>
+							)}
+							<ChevronUp
+								className={cn(
+									"w-4 transition-all opacity-0 group-hover:opacity-100",
+									!isBatchExpanded && "-rotate-180",
+								)}
+							/>
+						</div>
+					</div>
+					{isBatchExpanded && (
+						<div className="pl-6">
+							<BatchSearchDisplay searches={batchSearches} ts={message?.ts} />
+						</div>
+					)}
+				</div>
+			)
+		}
+
 		switch (tool.tool as string) {
 			case "editedExistingFile":
 			case "appliedDiff":
@@ -468,6 +518,7 @@ export const ChatRowContent = ({
 				const batchDiffs = tool.batchDiffs
 				if (batchDiffs && Array.isArray(batchDiffs) && batchDiffs.length > 0) {
 					const diffCount = batchDiffs.length
+					const isPendingApproval = message.type === "ask" && !message.isAnswered
 					return (
 						<div className="group">
 							<div
@@ -480,7 +531,11 @@ export const ChatRowContent = ({
 								<div className="flex items-center gap-2">
 									<FileDiff className="w-4 shrink-0" aria-label="Batch diff icon" />
 									<span style={{ fontWeight: "bold" }}>
-										{t("chat:fileOperations.wantsToApplyBatchChanges")}
+										{isPendingApproval
+											? t("chat:fileOperations.wantsToApplyBatchChanges")
+											: t("chat:fileOperations.didApplyBatchChanges", {
+													defaultValue: "Mirror VS applied changes to multiple files",
+												})}
 									</span>
 									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
 										({diffCount} {diffCount === 1 ? "file" : "files"})
@@ -488,7 +543,7 @@ export const ChatRowContent = ({
 								</div>
 								<div className="flex items-center gap-2">
 									{message.isAnswered && (
-										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Approved</span>
+										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Applied</span>
 									)}
 									<ChevronUp
 										className={cn(
@@ -588,7 +643,12 @@ export const ChatRowContent = ({
 						</div>
 					</>
 				)
-			case "codebaseSearch": {
+			case "codebaseSearch":
+			case "codebase_search": {
+				const batchSearches = tool.batchSearches
+				if (batchSearches && Array.isArray(batchSearches) && batchSearches.length > 0) {
+					return renderBatchSearch(batchSearches)
+				}
 				return (
 					<div style={headerStyle}>
 						{toolIcon("search")}
@@ -938,6 +998,11 @@ export const ChatRowContent = ({
 				)
 			}
 			case "searchFiles":
+			case "search_files": {
+				const batchSearches = tool.batchSearches
+				if (batchSearches && Array.isArray(batchSearches) && batchSearches.length > 0) {
+					return renderBatchSearch(batchSearches)
+				}
 				return (
 					<>
 						<div style={headerStyle}>
@@ -977,6 +1042,7 @@ export const ChatRowContent = ({
 						</div>
 					</>
 				)
+			}
 			case "switchMode":
 				return (
 					<>

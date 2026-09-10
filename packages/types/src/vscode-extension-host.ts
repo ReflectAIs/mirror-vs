@@ -1021,6 +1021,16 @@ export interface MirrorSayTool {
 		isOutsideWorkspace?: boolean
 		key: string
 	}>
+	batchSearches?: Array<{
+		tool: string
+		query?: string
+		regex?: string
+		path?: string
+		filePattern?: string
+		isOutsideWorkspace?: boolean
+		content?: string
+		key: string
+	}>
 	question?: string
 	imageData?: string // Base64 encoded image data for generated images
 	inputImage?: string // Path to input image for generateImage edits

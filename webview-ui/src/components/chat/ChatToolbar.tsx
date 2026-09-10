@@ -13,8 +13,9 @@ import {
 	DropdownMenuSeparator,
 } from "@src/components/ui/dropdown-menu"
 import { getModelMaxOutputTokens } from "@shared/api"
-import { formatLargeNumber } from "@src/utils/format"
 import { vscode } from "@src/utils/vscode"
+import { cn } from "@/lib/utils"
+import { formatLargeNumber } from "@src/utils/format"
 import { ContextWindowProgress } from "./ContextWindowProgress"
 import { TodoListDisplay } from "./TodoListDisplay"
 import { MascotBadge, type MascotStatus } from "./MascotBadge"
@@ -167,22 +168,40 @@ const ChatToolbar = ({
 
 				{/* Right Action Buttons */}
 				<div className="flex items-center gap-1 shrink-0 ml-auto">
-					{task && (
-						<button
-							onClick={() => setActiveHeaderPanel((prev) => (prev === "stats" ? "none" : "stats"))}
-							className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-vscode-button-background/10 text-vscode-button-background hover:bg-vscode-button-background/20 transition-colors border border-vscode-button-background/20 cursor-pointer shrink-0"
-							title="View Session Statistics">
-							<span>⚡</span>
-							<span className="truncate max-w-[55px]">
-								$
-								{(
-									(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
-										? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
-										: undefined) ?? apiMetrics.totalCost
-								).toFixed(3)}
-							</span>
-						</button>
-					)}
+					{task &&
+						(() => {
+							const currentTotalCost =
+								(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
+									? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
+									: undefined) ?? apiMetrics.totalCost
+							const hasCost = typeof currentTotalCost === "number" && currentTotalCost > 0
+
+							if (hasCost) {
+								return (
+									<button
+										onClick={() =>
+											setActiveHeaderPanel((prev) => (prev === "stats" ? "none" : "stats"))
+										}
+										className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-vscode-button-background/10 text-vscode-button-background hover:bg-vscode-button-background/20 transition-colors border border-vscode-button-background/20 cursor-pointer shrink-0"
+										title="View Session Statistics">
+										<span>⚡</span>
+										<span className="truncate max-w-[55px]">${currentTotalCost.toFixed(3)}</span>
+									</button>
+								)
+							}
+
+							return (
+								<Button
+									variant="ghost"
+									className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground text-vscode-foreground"
+									onClick={() =>
+										setActiveHeaderPanel((prev) => (prev === "stats" ? "none" : "stats"))
+									}
+									title="Session Statistics">
+									<span className="text-xs">⚡</span>
+								</Button>
+							)
+						})()}
 					{currentTaskItem?.parentTaskId && (
 						<Button
 							variant="ghost"

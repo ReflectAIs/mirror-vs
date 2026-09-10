@@ -1,5 +1,6 @@
 import React, { memo, useState } from "react"
 import CodeAccordion from "../common/CodeAccordion"
+import { vscode } from "@src/utils/vscode"
 
 interface FileDiff {
 	path: string
@@ -25,10 +26,10 @@ export const BatchDiffApproval = memo(({ files = [], ts }: BatchDiffApprovalProp
 		return null
 	}
 
-	const handleToggleExpand = (filePath: string) => {
+	const handleToggleExpand = (itemKey: string) => {
 		setExpandedFiles((prev) => ({
 			...prev,
-			[filePath]: !prev[filePath],
+			[itemKey]: !prev[itemKey],
 		}))
 	}
 
@@ -38,16 +39,26 @@ export const BatchDiffApproval = memo(({ files = [], ts }: BatchDiffApprovalProp
 				{files.map((file, index) => {
 					// Use backend-provided unified diff only. Stats also provided by backend.
 					const unified = file.content || ""
+					const itemKey = file.key || `${file.path}-${index}`
 
 					return (
-						<div key={`${file.path}-${index}-${ts}`}>
+						<div key={`${itemKey}-${ts}`}>
 							<CodeAccordion
 								path={file.path}
 								code={unified}
 								language="diff"
-								isExpanded={expandedFiles[file.path] || false}
-								onToggleExpand={() => handleToggleExpand(file.path)}
+								isExpanded={expandedFiles[itemKey] || false}
+								onToggleExpand={() => handleToggleExpand(itemKey)}
 								diffStats={file.diffStats ?? undefined}
+								onJumpToFile={
+									file.path
+										? () =>
+												vscode.postMessage({
+													type: "openFile",
+													text: file.path.startsWith(".") ? file.path : `./${file.path}`,
+												})
+										: undefined
+								}
 							/>
 						</div>
 					)

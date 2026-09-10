@@ -4,8 +4,9 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.8.4] - 2026-09-10
 
-### Optimized & Fixed
-
+- **Grouped Search & Edit Tool Rows**: Consolidated consecutive codebase search and file edit operations into compact, collapsible grouped cards matching batch file reads and directory listings.
+- **Dynamic Header API Cost Display**: Replaced the persistent `$0.000` text in the header with a clean, compact session stats trigger for free/unmetered models, displaying the cost pill only when metered cost is greater than $0.
+- **Informational Terminal Progress for Long Commands**: Added system prompt directives and `execute_command` tool guidelines instructing the model to keep visible progress indicators (progress bars, step banners) active during long-running commands purely for user info without impacting automated callbacks.
 - **Stable Prefix Caching**: Decoupled dynamic multi-tab sibling context from the system prompt into static session directives, preventing sibling tab updates from invalidating 100% of prefix caches on OpenAI, DeepSeek, Fireworks, and vLLM. Live sibling status is now streamed at the tail of user turns via environment details.
 - **OpenAI & Custom Proxy Cache Tracking**: Fixed `OpenAiHandler` streaming responses dropping `cacheReadTokens` and ignoring `prompt_tokens_details.cached_tokens`. Cached tokens are now accurately reported in the UI and discounted in cost calculations.
 - **Redundant File Tree Elimination**: Stopped re-dumping the recursive 200-file workspace tree on user follow-up messages, saving 1,000–3,000 input tokens per follow-up interaction.

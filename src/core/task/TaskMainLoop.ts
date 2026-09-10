@@ -517,6 +517,10 @@ export class TaskMainLoop {
 			await this.task.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
 
 			try {
+				this.task.cachedStreamingModel = this.task.api.getModel()
+				const streamModelInfo = this.task.cachedStreamingModel.info
+				const cachedModelId = this.task.cachedStreamingModel.id
+
 				let cacheWriteTokens = 0
 				let cacheReadTokens = 0
 				let inputTokens = 0
@@ -622,11 +626,8 @@ export class TaskMainLoop {
 
 				await this.task.diffViewProvider.reset()
 
-				// Cache model info once per API request to avoid repeated calls during streaming
-				// This is especially important for tools and background usage collection
+				// Re-sync cached model info if changed
 				this.task.cachedStreamingModel = this.task.api.getModel()
-				const streamModelInfo = this.task.cachedStreamingModel.info
-				const cachedModelId = this.task.cachedStreamingModel.id
 
 				// Yields only if the first chunk is successful, otherwise will
 				// allow the user to retry the request (most likely due to rate
