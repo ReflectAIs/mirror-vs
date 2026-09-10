@@ -157,7 +157,7 @@ describe("getEnvironmentDetails", () => {
 		// Visible Files and Open Tabs headers only appear when there's content
 		expect(result).toContain("# Current Time")
 		expect(result).not.toContain("# Git Status") // Git status is disabled by default (maxGitStatusFiles = 0)
-		expect(result).toContain("# Current Cost")
+		expect(result).not.toContain("# Current Cost") // Current Cost disabled by default to preserve prefix caching
 		expect(result).toContain("# Current Mode")
 		expect(result).toContain("<model>test-model</model>")
 
@@ -168,8 +168,6 @@ describe("getEnvironmentDetails", () => {
 			globalCustomInstructions: "test instructions",
 			language: "en",
 		})
-
-		expect(getApiMetrics).toHaveBeenCalledWith(mockMirror.mirrorMessages)
 	})
 
 	it("should include file details when includeFileDetails is true", async () => {

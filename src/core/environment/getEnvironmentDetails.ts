@@ -188,6 +188,11 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 
 				if (output) {
 					output = Terminal.compressTerminalOutput(output)
+					if (output.length > 2000) {
+						const head = output.slice(0, 1000)
+						const tail = output.slice(-800)
+						output = `${head}\n\n[... Truncated ${output.length - 1800} characters. Use read_command_output with artifact_id to inspect full output if needed ...]\n\n${tail}`
+					}
 					terminalOutputs.push(`Command: \`${process.command}\`\n${output}`)
 				}
 			}
@@ -215,27 +220,26 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 		}
 	}
 
-	// 9. Current Cost (volatile — changes on every turn)
-	const { includeCurrentCost = true } = state ?? {}
+	// 9. Current Cost (disabled by default to prevent prefix cache invalidation across turns)
+	const { includeCurrentCost = false } = state ?? {}
 
 	if (includeCurrentCost) {
 		const { totalCost } = getApiMetrics(mirror.mirrorMessages)
 		volatileDetails += `\n\n# Current Cost\n${totalCost !== null ? `$${totalCost.toFixed(2)}` : "(Not available)"}`
 	}
 
-	// 10. Current Time (volatile — changes on every second)
+	// 10. Current Time (Date & Timezone - stabilized across turns for prompt caching)
 	const { includeCurrentTime = true } = state ?? {}
 
 	if (includeCurrentTime) {
 		const now = new Date()
-		// Round to nearest minute for prompt caching optimization
-		const roundedIso = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString()
+		const dateStr = now.toISOString().split("T")[0] // YYYY-MM-DD
 		const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 		const timeZoneOffset = -now.getTimezoneOffset() / 60
 		const timeZoneOffsetHours = Math.floor(Math.abs(timeZoneOffset))
 		const timeZoneOffsetMinutes = Math.abs(Math.round((Math.abs(timeZoneOffset) - timeZoneOffsetHours) * 60))
 		const timeZoneOffsetStr = `${timeZoneOffset >= 0 ? "+" : "-"}${timeZoneOffsetHours}:${timeZoneOffsetMinutes.toString().padStart(2, "0")}`
-		volatileDetails += `\n\n# Current Time\nCurrent time in ISO 8601 UTC format: ${roundedIso}\nUser time zone: ${timeZone}, UTC${timeZoneOffsetStr}`
+		volatileDetails += `\n\n# Current Time\nCurrent date: ${dateStr}\nUser time zone: ${timeZone}, UTC${timeZoneOffsetStr}`
 	}
 
 	// 11. Sibling Tabs in Session (volatile — live tab status updates)

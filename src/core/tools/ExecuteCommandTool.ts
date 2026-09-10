@@ -487,7 +487,8 @@ export async function executeCommandInTerminal(
 			hasEmittedBackgroundCompletion = true
 			const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
 			const exitStatus = formatExitStatus(exitDetails)
-			const previewSnippet = result.length > 0 ? (result.length > 2000 ? result.slice(-2000) : result) : ""
+			const previewSnippet =
+				result && result.length > 0 ? (result.length > 2000 ? result.slice(-2000) : result) : ""
 			const notification = [
 				`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus}]`,
 				previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
@@ -545,7 +546,7 @@ export async function executeCommandInTerminal(
 				}
 
 				// Continue using compressed output for UI display
-				result = Terminal.compressTerminalOutput(output ?? "")
+				result = Terminal.compressTerminalOutput(output ?? "") ?? output ?? ""
 				latestCompressedOutput = result
 
 				// Preserve order: wait for queued partial updates, then emit the final
@@ -677,7 +678,7 @@ export async function executeCommandInTerminal(
 			formatResponse.toolResult(
 				[
 					`Command is still running in background in terminal from '${terminal.getCurrentWorkingDirectory().toPosix()}'.`,
-					result.length > 0 ? `Output so far:\n${result}\n` : "\n",
+					result && result.length > 0 ? `Output so far:\n${result}\n` : "\n",
 					`<user_message>\n${text}\n</user_message>`,
 					`IMPORTANT: The user sent an urgent message while this command was executing. Address the user's message immediately. Do not poll with sleep or echo.`,
 				].join("\n"),
@@ -717,16 +718,27 @@ export async function executeCommandInTerminal(
 			exitStatus = `Exit code: <undefined, notify user>`
 		}
 
+		const outputStr = result ?? ""
+		let outputText = outputStr
+		if (!persistedResult?.truncated && outputStr.length > 12_000) {
+			const head = outputStr.slice(0, 4_000)
+			const tail = outputStr.slice(-8_000)
+			const artifactHint = persistedResult?.artifactPath
+				? `Artifact ID: ${path.basename(persistedResult.artifactPath)}. Use read_command_output tool with artifact_id to search or read the full output in parts using offset and limit if needed.`
+				: `Use read_command_output or execute_command with specific flags/grep to inspect specific sections if needed.`
+			outputText = `${head}\n\n[... Truncated ${outputStr.length - 12_000} characters to preserve context window and cache. ${artifactHint} ...]\n\n${tail}`
+		}
+
 		return [
 			false,
-			`Command executed in terminal within working directory '${currentWorkingDir}'. ${exitStatus}\nOutput:\n${result}`,
+			`Command executed in terminal within working directory '${currentWorkingDir}'. ${exitStatus}\nOutput:\n${outputText}`,
 		]
 	} else {
 		return [
 			false,
 			[
 				`Command is running in background in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
-				result.length > 0 ? `Output so far:\n${result}\n` : "\n",
+				result && result.length > 0 ? `Output so far:\n${result}\n` : "\n",
 				"IMPORTANT: The command has moved to the background. The terminal callback will automatically notify and wake you up when the command finishes. If you have no other independent tasks to perform right now, END YOUR TURN IMMEDIATELY WITHOUT CALLING ANY TOOLS. Do NOT call read_command_output, sleep, or check on the terminal in a loop — wait patiently for the callback.",
 			].join("\n"),
 		]

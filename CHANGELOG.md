@@ -7,10 +7,16 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 ### Added
 
 - **Chat Window Aesthetic Revamp**:
-    - Redesigned thinking/reasoning blocks into an elegant pill card (`💡 Thinking · 7s ...` / `💡 Thought · 7s ⌄`) with contained, collapsible markdown.
+    - Redesigned thinking/reasoning blocks into an ultra-compact micro-pill (`h-6`, subtle border, gentle amber pulse) with contained, collapsible markdown.
+    - Fixed thinking seconds timer continuously increasing after model stopped thinking by introducing idle-stream detection and strict active-phase guards.
     - Sleek frosted bubble styling for user messages with rounded corners, subtle "YOU" author badge, and quiet micro-actions on hover.
     - Modernized codebase search results into an integrated card layout, eliminating awkward negative margins and raw bordered boxes.
     - Redesigned in-progress API streaming indicators to a quiet pulsing pill (`• Working...`) and eliminated empty ghost rows when completed requests have no cost or errors.
+- **Cost Reduction & Prefix Cache Optimization**:
+    - Stabilized `# Current Time` to date + timezone and omitted volatile `# Current Cost` from environment details, eliminating prefix cache invalidation between user turns.
+    - Superseded read file compaction: compacted historic raw file reads for files subsequently modified into deterministic references, saving thousands of context tokens without affecting prefix cache hits.
+    - Capped large inline terminal output to head & tail windows with artifact retrieval hints to prevent context bloat.
+    - Enforced zero-preamble directives in system prompt to eliminate conversational token overhead.
 - **Grouped Search & Edit Tool Rows**: Consolidated consecutive codebase search and file edit operations into compact, collapsible grouped cards matching batch file reads and directory listings.
 - **Informational Terminal Progress for Long Commands**: Added system prompt directives and `execute_command` tool guidelines instructing the model to keep visible progress indicators (progress bars, step banners) active during long-running commands purely for user info without impacting automated callbacks.
 
