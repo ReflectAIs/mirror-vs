@@ -11,7 +11,7 @@ export async function handleQueueMessage(provider: MirrorProvider, message: Webv
 	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
 		// If the task is currently waiting on an ask (e.g. command execution/question/approval), answer the ask with this message immediately
-		if (currentTask.taskAsk && !currentTask.taskAsk.isAnswered) {
+		if (currentTask.isWaitingOnAsk || (currentTask.taskAsk && !currentTask.taskAsk.isAnswered)) {
 			currentTask.handleWebviewAskResponse("messageResponse", resolved.text, resolved.images)
 			return
 		}
@@ -76,7 +76,7 @@ export async function handleForceSendQueuedMessage(provider: MirrorProvider, mes
 	const resolved = await resolveIncomingImages(provider, { text, images })
 
 	// If the task is currently waiting on an ask (e.g. question/approval), answer the ask with this message
-	if (currentTask.taskAsk && !currentTask.taskAsk.isAnswered) {
+	if (currentTask.isWaitingOnAsk || (currentTask.taskAsk && !currentTask.taskAsk.isAnswered)) {
 		currentTask.handleWebviewAskResponse("messageResponse", resolved.text, resolved.images)
 		return
 	}

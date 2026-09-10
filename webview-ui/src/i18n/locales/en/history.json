@@ -55,5 +55,7 @@
 	"tasks_one": "{{count}} task",
 	"tasks_other": "{{count}} tasks",
 	"tokens": "tokens",
-	"newTabInSession": "New tab in this session"
+	"newTabInSession": "New tab in this session",
+	"newSession": "New Session (Fresh Workspace / Reset Tasks)",
+	"add": "Add"
 }

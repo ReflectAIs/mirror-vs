@@ -60,5 +60,7 @@
 	"renameSave": "Enregistrer",
 	"renameCancel": "Annuler",
 	"tasks_one": "{{count}} tâche",
-	"tasks_other": "{{count}} tâches"
+	"tasks_other": "{{count}} tâches",
+	"newSession": "Nouvelle session (nouvel espace de travail / réinitialiser les tâches)",
+	"add": "Ajouter"
 }

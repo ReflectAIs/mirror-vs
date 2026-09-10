@@ -75,14 +75,14 @@ describe("BatchFilePermission", () => {
 		expect(container.firstChild).toBeNull()
 	})
 
-	it("renders nothing when onPermissionResponse is not provided", () => {
-		const { container } = render(
+	it("renders file list even when onPermissionResponse is not provided", () => {
+		render(
 			<TranslationProvider>
 				<BatchFilePermission files={mockFiles} onPermissionResponse={undefined} ts={Date.now()} />
 			</TranslationProvider>,
 		)
 
-		expect(container.firstChild).toBeNull()
+		expect(screen.getByText(/Button\.tsx/)).toBeInTheDocument()
 	})
 
 	it("opens file when clicking on file item", () => {

@@ -444,6 +444,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	public lastMessageTs?: number
 	/** @internal */
 	autoApprovalTimeoutRef?: NodeJS.Timeout
+	/** Whether the task is currently blocked waiting for an ask() response. */
+	public isWaitingOnAsk: boolean = false
 
 	// Tool Use
 	consecutiveMistakeCount: number = 0
@@ -1114,9 +1116,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		sayType: "user_feedback" | "terminal_callback" = "user_feedback",
 	): Promise<void> {
 		this.inBetweenMessages.push({ text, images })
-		// If the task is currently waiting on an ask (askResponse is undefined),
+		// If the task is currently waiting on an ask,
 		// answer it immediately so the waiting ask promise unblocks.
-		const wasWaitingOnAsk = this.askResponse === undefined
+		const wasWaitingOnAsk = Boolean(this.isWaitingOnAsk || this.taskAsk !== undefined)
 		if (wasWaitingOnAsk) {
 			this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
 		}

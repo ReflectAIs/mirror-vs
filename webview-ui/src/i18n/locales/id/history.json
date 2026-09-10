@@ -62,5 +62,7 @@
 	"renameSave": "Simpan",
 	"renameCancel": "Batal",
 	"tasks_one": "{{count}} tugas",
-	"tasks_other": "{{count}} tugas"
+	"tasks_other": "{{count}} tugas",
+	"newSession": "Sesi baru (ruang kerja baru / atur ulang tugas)",
+	"add": "Tambah"
 }

@@ -18,8 +18,8 @@ interface BatchFilePermissionProps {
 }
 
 export const BatchFilePermission = memo(({ files = [], onPermissionResponse, ts }: BatchFilePermissionProps) => {
-	// Don't render if there are no files or no response handler
-	if (!files?.length || !onPermissionResponse) {
+	// Don't render if there are no files
+	if (!files?.length) {
 		return null
 	}
 

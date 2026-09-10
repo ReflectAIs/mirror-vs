@@ -230,6 +230,7 @@
 		"wantsToReadAndXMore": "Mirror VS wants to read this file and {{count}} more",
 		"wantsToReadOutsideWorkspace": "Mirror VS wants to read this file outside of the workspace",
 		"didRead": "Mirror VS read this file",
+		"didReadMultiple": "Mirror VS read multiple files",
 		"wantsToEdit": "Mirror VS wants to edit this file",
 		"wantsToEditOutsideWorkspace": "Mirror VS wants to edit this file outside of the workspace",
 		"wantsToEditProtected": "Mirror VS wants to edit a protected configuration file",

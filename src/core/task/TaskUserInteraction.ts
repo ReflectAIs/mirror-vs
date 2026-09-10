@@ -239,19 +239,24 @@ export class TaskUserInteraction {
 		this.tryDrainQueuedMessage()
 
 		// Wait for askResponse to be set
-		await pWaitFor(
-			() => {
-				if (this.task.abort) {
-					return true
-				}
-				if (this.task.askResponse !== undefined || this.task.lastMessageTs !== askTs) {
-					return true
-				}
+		this.task.isWaitingOnAsk = true
+		try {
+			await pWaitFor(
+				() => {
+					if (this.task.abort) {
+						return true
+					}
+					if (this.task.askResponse !== undefined || this.task.lastMessageTs !== askTs) {
+						return true
+					}
 
-				return false
-			},
-			{ interval: 100 },
-		)
+					return false
+				},
+				{ interval: 100 },
+			)
+		} finally {
+			this.task.isWaitingOnAsk = false
+		}
 
 		if (this.task.abort) {
 			throw new Error(`[MirrorVS#ask] task ${this.task.taskId}.${this.task.instanceId} aborted`)

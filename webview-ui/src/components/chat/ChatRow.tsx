@@ -41,6 +41,7 @@ import { CheckpointSaved } from "./checkpoints/CheckpointSaved"
 import { FollowUpSuggest } from "./FollowUpSuggest"
 import { BatchFilePermission } from "./BatchFilePermission"
 import { BatchDiffApproval } from "./BatchDiffApproval"
+import { BatchListFilesPermission } from "./BatchListFilesPermission"
 import { ProgressIndicator } from "./ProgressIndicator"
 import { ImageProgressRow } from "./ImageProgressRow"
 import { Markdown } from "./Markdown"
@@ -74,6 +75,7 @@ import {
 	Split,
 	ArrowRight,
 	Check,
+	ChevronUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PathTooltip } from "../ui/PathTooltip"
@@ -215,6 +217,20 @@ export const ChatRowContent = ({
 		onToggleExpand(message.ts)
 	}, [onToggleExpand, message.ts])
 
+	const [isBatchExpanded, setIsBatchExpanded] = useState<boolean>(() => !message.isAnswered)
+	const prevAnsweredRef = useRef(message.isAnswered)
+	useEffect(() => {
+		if (!prevAnsweredRef.current && message.isAnswered) {
+			setIsBatchExpanded(false)
+		}
+		prevAnsweredRef.current = message.isAnswered
+	}, [message.isAnswered])
+
+	const handleToggleBatchExpand = useCallback(() => {
+		setIsBatchExpanded((prev) => !prev)
+		handleToggleExpand()
+	}, [handleToggleExpand])
+
 	// Handle edit button click
 	const handleEditClick = useCallback(() => {
 		setIsEditing(true)
@@ -348,19 +364,16 @@ export const ChatRowContent = ({
 						) : (
 							getIconSpan("error", errorColor)
 						)
-					) : cost !== null && cost !== undefined ? (
-						// Request completed — no icon. A static icon here reads as a
-						// stuck spinner; the cost badge already marks the finished row.
-						// The live spinner (below) only shows while the request is
-						// actually in progress.
-						null
-					) : apiRequestFailedMessage ? (
+					) : cost !== null &&
+					  cost !== undefined ? // Request completed — no icon. A static icon here reads as a
+					// stuck spinner; the cost badge already marks the finished row.
+					// The live spinner (below) only shows while the request is
+					// actually in progress.
+					null : apiRequestFailedMessage ? (
 						getIconSpan("error", errorColor)
 					) : isLast ? (
 						<ProgressIndicator />
-					) : (
-						null
-					),
+					) : null,
 					apiReqCancelReason !== null && apiReqCancelReason !== undefined ? (
 						apiReqCancelReason === "user_cancelled" ? (
 							<span style={{ color: normalColor, fontWeight: "bold" }}>
@@ -453,17 +466,41 @@ export const ChatRowContent = ({
 			case "apply_patch":
 			case "apply_diff":
 				// Check if this is a batch diff request
-				if (message.type === "ask" && tool.batchDiffs && Array.isArray(tool.batchDiffs)) {
+				const batchDiffs = tool.batchDiffs
+				if (batchDiffs && Array.isArray(batchDiffs) && batchDiffs.length > 0) {
+					const diffCount = batchDiffs.length
 					return (
-						<>
-							<div style={headerStyle}>
-								<FileDiff className="w-4 shrink-0" aria-label="Batch diff icon" />
-								<span style={{ fontWeight: "bold" }}>
-									{t("chat:fileOperations.wantsToApplyBatchChanges")}
-								</span>
+						<div className="group">
+							<div
+								className="flex items-center justify-between cursor-pointer select-none"
+								style={{
+									...headerStyle,
+									marginBottom: isBatchExpanded ? 6 : 0,
+								}}
+								onClick={handleToggleBatchExpand}>
+								<div className="flex items-center gap-2">
+									<FileDiff className="w-4 shrink-0" aria-label="Batch diff icon" />
+									<span style={{ fontWeight: "bold" }}>
+										{t("chat:fileOperations.wantsToApplyBatchChanges")}
+									</span>
+									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
+										({diffCount} {diffCount === 1 ? "file" : "files"})
+									</span>
+								</div>
+								<div className="flex items-center gap-2">
+									{message.isAnswered && (
+										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Approved</span>
+									)}
+									<ChevronUp
+										className={cn(
+											"w-4 transition-all opacity-0 group-hover:opacity-100",
+											!isBatchExpanded && "-rotate-180",
+										)}
+									/>
+								</div>
 							</div>
-							<BatchDiffApproval files={tool.batchDiffs} ts={message.ts} />
-						</>
+							{isBatchExpanded && <BatchDiffApproval files={batchDiffs} ts={message.ts} />}
+						</div>
 					)
 				}
 
@@ -581,27 +618,61 @@ export const ChatRowContent = ({
 
 				return <TodoChangeDisplay previousTodos={previousTodos} newTodos={todos} />
 			}
-			case "readFile":
+			case "readFile": {
 				// Check if this is a batch file permission request
-				const isBatchRequest = message.type === "ask" && tool.batchFiles && Array.isArray(tool.batchFiles)
+				const batchFiles = tool.batchFiles
+				const isBatchRequest = Boolean(batchFiles && Array.isArray(batchFiles) && batchFiles.length > 0)
 
-				if (isBatchRequest) {
+				if (isBatchRequest && batchFiles) {
+					const fileCount = batchFiles.length
+					const isPendingApproval = message.type === "ask" && !message.isAnswered
+
 					return (
-						<>
-							<div style={headerStyle}>
-								<BookOpen className="w-4 shrink-0" aria-label="View files icon" />
-								<span style={{ fontWeight: "bold" }}>
-									{t("chat:fileOperations.wantsToReadMultiple")}
-								</span>
-							</div>
-							<BatchFilePermission
-								files={tool.batchFiles || []}
-								onPermissionResponse={(response) => {
-									onBatchFileResponse?.(response)
+						<div className="group">
+							<div
+								className="flex items-center justify-between cursor-pointer select-none"
+								style={{
+									...headerStyle,
+									marginBottom: isBatchExpanded ? 6 : 0,
 								}}
-								ts={message?.ts}
-							/>
-						</>
+								onClick={handleToggleBatchExpand}>
+								<div className="flex items-center gap-2">
+									<BookOpen className="w-4 shrink-0" aria-label="View files icon" />
+									<span style={{ fontWeight: "bold" }}>
+										{isPendingApproval
+											? t("chat:fileOperations.wantsToReadMultiple")
+											: t("chat:fileOperations.didReadMultiple", {
+													defaultValue: "Mirror VS read multiple files",
+												})}
+									</span>
+									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
+										({fileCount} {fileCount === 1 ? "file" : "files"})
+									</span>
+								</div>
+								<div className="flex items-center gap-2">
+									{message.isAnswered && (
+										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Approved</span>
+									)}
+									<ChevronUp
+										className={cn(
+											"w-4 transition-all opacity-0 group-hover:opacity-100",
+											!isBatchExpanded && "-rotate-180",
+										)}
+									/>
+								</div>
+							</div>
+							{isBatchExpanded && (
+								<div className="pl-6">
+									<BatchFilePermission
+										files={batchFiles}
+										onPermissionResponse={(response) => {
+											onBatchFileResponse?.(response)
+										}}
+										ts={message?.ts}
+									/>
+								</div>
+							)}
+						</div>
 					)
 				}
 
@@ -649,6 +720,7 @@ export const ChatRowContent = ({
 						</div>
 					</>
 				)
+			}
 			case "skill": {
 				const skillInfo = tool
 				return (
@@ -718,7 +790,54 @@ export const ChatRowContent = ({
 					</>
 				)
 			}
-			case "listFilesTopLevel":
+			case "listFilesTopLevel": {
+				const batchDirs = tool.batchDirs
+				const isBatchDirs = Boolean(batchDirs && Array.isArray(batchDirs) && batchDirs.length > 0)
+				if (isBatchDirs && batchDirs) {
+					const dirCount = batchDirs.length
+					const isPendingApproval = message.type === "ask" && !message.isAnswered
+
+					return (
+						<div className="group">
+							<div
+								className="flex items-center justify-between cursor-pointer select-none"
+								style={{
+									...headerStyle,
+									marginBottom: isBatchExpanded ? 6 : 0,
+								}}
+								onClick={handleToggleBatchExpand}>
+								<div className="flex items-center gap-2">
+									<ListTree className="w-4 shrink-0" aria-label="List files icon" />
+									<span style={{ fontWeight: "bold" }}>
+										{isPendingApproval
+											? t("chat:directoryOperations.wantsToViewTopLevel")
+											: t("chat:directoryOperations.didViewTopLevel")}
+									</span>
+									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
+										({dirCount} {dirCount === 1 ? "directory" : "directories"})
+									</span>
+								</div>
+								<div className="flex items-center gap-2">
+									{message.isAnswered && (
+										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Approved</span>
+									)}
+									<ChevronUp
+										className={cn(
+											"w-4 transition-all opacity-0 group-hover:opacity-100",
+											!isBatchExpanded && "-rotate-180",
+										)}
+									/>
+								</div>
+							</div>
+							{isBatchExpanded && (
+								<div className="pl-6">
+									<BatchListFilesPermission dirs={batchDirs} ts={message?.ts} />
+								</div>
+							)}
+						</div>
+					)
+				}
+
 				return (
 					<>
 						<div style={headerStyle}>
@@ -744,7 +863,55 @@ export const ChatRowContent = ({
 						</div>
 					</>
 				)
-			case "listFilesRecursive":
+			}
+			case "listFilesRecursive": {
+				const batchDirs = tool.batchDirs
+				const isBatchDirs = Boolean(batchDirs && Array.isArray(batchDirs) && batchDirs.length > 0)
+				if (isBatchDirs && batchDirs) {
+					const dirCount = batchDirs.length
+					const isPendingApproval = message.type === "ask" && !message.isAnswered
+
+					return (
+						<div className="group">
+							<div
+								className="flex items-center justify-between cursor-pointer select-none"
+								style={{
+									...headerStyle,
+									marginBottom: isBatchExpanded ? 6 : 0,
+								}}
+								onClick={handleToggleBatchExpand}>
+								<div className="flex items-center gap-2">
+									<FolderTree className="w-4 shrink-0" aria-label="Folder tree icon" />
+									<span style={{ fontWeight: "bold" }}>
+										{isPendingApproval
+											? t("chat:directoryOperations.wantsToViewRecursiveOutsideWorkspace")
+											: t("chat:directoryOperations.didViewRecursive")}
+									</span>
+									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
+										({dirCount} {dirCount === 1 ? "directory" : "directories"})
+									</span>
+								</div>
+								<div className="flex items-center gap-2">
+									{message.isAnswered && (
+										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Approved</span>
+									)}
+									<ChevronUp
+										className={cn(
+											"w-4 transition-all opacity-0 group-hover:opacity-100",
+											!isBatchExpanded && "-rotate-180",
+										)}
+									/>
+								</div>
+							</div>
+							{isBatchExpanded && (
+								<div className="pl-6">
+									<BatchListFilesPermission dirs={batchDirs} ts={message?.ts} />
+								</div>
+							)}
+						</div>
+					)
+				}
+
 				return (
 					<>
 						<div style={headerStyle}>
@@ -770,6 +937,7 @@ export const ChatRowContent = ({
 						</div>
 					</>
 				)
+			}
 			case "searchFiles":
 				return (
 					<>

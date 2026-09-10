@@ -54,5 +54,7 @@
 	"renameCancel": "취소",
 	"tasks_one": "작업 {{count}}개",
 	"tasks_other": "작업 {{count}}개",
-	"tokens": "토큰"
+	"tokens": "토큰",
+	"newSession": "새 세션 (새 작업 공간 / 작업 초기화)",
+	"add": "추가"
 }

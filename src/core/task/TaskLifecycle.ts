@@ -485,6 +485,10 @@ export class TaskLifecycle {
 		}
 
 		this.task.abort = true
+		this.task.isWaitingOnAsk = false
+		this.task.askResponse = undefined
+		this.task.askResponseText = undefined
+		this.task.askResponseImages = undefined
 
 		// Reset consecutive error counters on abort (manual intervention)
 		this.task.consecutiveNoToolUseCount = 0

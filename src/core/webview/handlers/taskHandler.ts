@@ -297,7 +297,7 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	if (currentTask) {
 		const lastMsg = currentTask.mirrorMessages?.at(-1)
-		const isWaitingOnAsk = currentTask.askResponse === undefined
+		const isWaitingOnAsk = Boolean(currentTask.isWaitingOnAsk || currentTask.taskAsk !== undefined)
 		const isButtonResponse = message.askResponse === "yesButtonClicked" || message.askResponse === "noButtonClicked"
 		const hasPendingAsk =
 			currentTask.idleAsk !== undefined ||
@@ -307,12 +307,19 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 		console.log(
 			`[handleAskResponse] taskId=${currentTask.taskId} askResponse=${message.askResponse} ` +
 				`isWaitingOnAsk=${isWaitingOnAsk} isButtonResponse=${isButtonResponse} hasPendingAsk=${hasPendingAsk} ` +
-				`lastMsgType=${lastMsg?.type} lastMsgAsk=${lastMsg?.ask} started=${(currentTask as any)._started}`,
+				`lastMsgType=${lastMsg?.type} lastMsgAsk=${lastMsg?.ask} started=${(currentTask as any)._started} isLoopActive=${currentTask.isLoopActive}`,
 		)
 
 		if (isWaitingOnAsk || isButtonResponse || hasPendingAsk) {
 			currentTask.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
-		} else if (!currentTask.isLoopActive && message.askResponse === "messageResponse") {
+		} else if (!(currentTask as any)._started && currentTask.startWithContent) {
+			await currentTask.startWithContent(resolved.text, resolved.images)
+		} else if (
+			!currentTask.isLoopActive &&
+			message.askResponse === "messageResponse" &&
+			currentTask.say &&
+			currentTask.initiateTaskLoop
+		) {
 			currentTask.abort = false
 			await currentTask.say("user_feedback", resolved.text, resolved.images)
 			const { formatResponse } = await import("../../prompts/responses")
@@ -322,14 +329,14 @@ export async function handleAskResponse(provider: MirrorProvider, message: Webvi
 				...imageBlocks,
 			]
 			void currentTask.initiateTaskLoop(userContent)
-		} else if (!(currentTask as any)._started) {
-			await currentTask.startWithContent(resolved.text, resolved.images)
-		} else {
+		} else if (currentTask.injectInBetweenMessage) {
 			// If task is started and has no active ask (e.g. background terminal running),
 			// inject as an in-between steering message so the model receives and considers it immediately.
 			if (resolved.text || (resolved.images && resolved.images.length > 0)) {
 				await currentTask.injectInBetweenMessage(resolved.text ?? "", resolved.images, "user_feedback")
 			}
+		} else {
+			currentTask.handleWebviewAskResponse?.(message.askResponse!, resolved.text, resolved.images)
 		}
 	}
 }

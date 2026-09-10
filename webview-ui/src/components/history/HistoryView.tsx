@@ -71,6 +71,12 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		[onDone],
 	)
 
+	// Handle starting a new session (same path as the chat toolbar's New Session button)
+	const handleNewSession = useCallback(() => {
+		vscode.postMessage({ type: "clearTask" })
+		onDone()
+	}, [onDone])
+
 	const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
 	const [isSelectionMode, setIsSelectionMode] = useState(false)
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
@@ -142,26 +148,40 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 							{t("history:history")}
 						</h3>
 					</div>
-					<StandardTooltip
-						content={
-							isSelectionMode ? `${t("history:exitSelectionMode")}` : `${t("history:enterSelectionMode")}`
-						}>
-						<Button
-							variant="ghost"
-							className={cn(
-								"h-6 px-2 text-[10px] flex items-center gap-1 rounded-full border transition-all duration-150 font-medium",
+					<div className="flex items-center gap-1.5">
+						<StandardTooltip content={t("history:newSession")}>
+							<Button
+								className="h-6 px-2.5 text-[10px] flex items-center gap-1 rounded-full font-medium"
+								onClick={handleNewSession}
+								aria-label={t("history:newSession")}
+								data-testid="history-new-session-button">
+								<span className="codicon codicon-add text-xs flex items-center justify-center" />
+								<span>{t("history:add")}</span>
+							</Button>
+						</StandardTooltip>
+						<StandardTooltip
+							content={
 								isSelectionMode
-									? "bg-mirror-brand-via/15 text-vscode-foreground border-mirror-brand-via/40"
-									: "bg-vscode-sideBar-background/30 text-vscode-descriptionForeground border-vscode-panel-border/30 hover:border-mirror-brand-via/40 hover:text-vscode-foreground",
-							)}
-							onClick={toggleSelectionMode}
-							data-testid="toggle-selection-mode-button">
-							<span
-								className={`codicon ${isSelectionMode ? "codicon-check-all" : "codicon-checklist"} text-[10px]`}
-							/>
-							<span>{isSelectionMode ? t("history:exitSelection") : t("history:selectionMode")}</span>
-						</Button>
-					</StandardTooltip>
+									? `${t("history:exitSelectionMode")}`
+									: `${t("history:enterSelectionMode")}`
+							}>
+							<Button
+								variant="ghost"
+								className={cn(
+									"h-6 px-2 text-[10px] flex items-center gap-1 rounded-full border transition-all duration-150 font-medium",
+									isSelectionMode
+										? "bg-mirror-brand-via/15 text-vscode-foreground border-mirror-brand-via/40"
+										: "bg-vscode-sideBar-background/30 text-vscode-descriptionForeground border-vscode-panel-border/30 hover:border-mirror-brand-via/40 hover:text-vscode-foreground",
+								)}
+								onClick={toggleSelectionMode}
+								data-testid="toggle-selection-mode-button">
+								<span
+									className={`codicon ${isSelectionMode ? "codicon-check-all" : "codicon-checklist"} text-[10px]`}
+								/>
+								<span>{isSelectionMode ? t("history:exitSelection") : t("history:selectionMode")}</span>
+							</Button>
+						</StandardTooltip>
+					</div>
 				</div>
 				<div className="flex flex-col gap-2">
 					<div className="relative flex items-center">

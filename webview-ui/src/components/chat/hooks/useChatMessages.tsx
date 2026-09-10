@@ -1693,8 +1693,11 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			} catch {
 				return batch[0]
 			}
+			const allAnswered = batch.every((m) => m.isAnswered)
 			return {
-				...batch[0],
+				...batch[batch.length - 1],
+				ts: batch[0].ts,
+				isAnswered: allAnswered,
 				text: JSON.stringify({ ...firstTool, batchFiles }),
 			}
 		}
@@ -1720,8 +1723,11 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			} catch {
 				return batch[0]
 			}
+			const allAnswered = batch.every((m) => m.isAnswered)
 			return {
-				...batch[0],
+				...batch[batch.length - 1],
+				ts: batch[0].ts,
+				isAnswered: allAnswered,
 				text: JSON.stringify({ ...firstTool, batchDirs }),
 			}
 		}
