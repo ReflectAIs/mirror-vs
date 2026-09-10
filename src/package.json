@@ -585,7 +585,7 @@
 		"@types/tmp": "^0.2.6",
 		"@types/turndown": "^5.0.5",
 		"@types/vscode": "^1.84.0",
-		"@vscode/test-electron": "^2.5.2",
+		"@vscode/test-electron": "^3.1.0",
 		"@vscode/vsce": "3.3.2",
 		"ai": "^6.0.75",
 		"esbuild-wasm": "^0.25.0",
