@@ -27,25 +27,15 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 	const isStreamActive = isStreaming && isLast && isPartial === true && duration === undefined
 
 	const startTimeRef = useRef<number>(ts || Date.now())
-	const lastChunkAtRef = useRef<number>(Date.now())
-	const prevContentLengthRef = useRef<number>(content?.length ?? 0)
 	const frozenDurationRef = useRef<number | null>(duration !== undefined ? duration : null)
 
-	// Keep track of content updates to detect when thinking tokens stop arriving
-	const currentLength = content?.length ?? 0
-	if (currentLength !== prevContentLengthRef.current) {
-		prevContentLengthRef.current = currentLength
-		lastChunkAtRef.current = Date.now()
-	}
-
-	const [isDoneThinking, setIsDoneThinking] = useState<boolean>(() => !isStreamActive)
 	const [elapsedMs, setElapsedMs] = useState<number>(() => {
 		if (duration !== undefined) return duration
-		if (!isStreamActive) {
-			// If already concluded on initial render, estimate from content length rather than Date.now() - ts
-			return Math.max(1000, Math.round(((content?.length ?? 0) / 120) * 1000))
+		if (isStreamActive) {
+			return Math.max(0, Date.now() - (ts || Date.now()))
 		}
-		return Math.max(0, Date.now() - (ts || Date.now()))
+		// If already concluded on mount without duration, estimate from content length
+		return Math.max(1000, Math.round(((content?.length ?? 0) / 120) * 1000))
 	})
 
 	const contentRef = useRef<HTMLDivElement>(null)
@@ -54,57 +44,44 @@ export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, du
 		setIsCollapsed(reasoningBlockCollapsed)
 	}, [reasoningBlockCollapsed])
 
-	// If backend duration arrives or stream is no longer active, freeze immediately
 	useEffect(() => {
+		// 1. If backend duration is present, use it and freeze
 		if (duration !== undefined) {
 			frozenDurationRef.current = duration
 			setElapsedMs(duration)
-			setIsDoneThinking(true)
 			return
 		}
 
+		// 2. If stream is no longer active for this block, freeze at current elapsed time
 		if (!isStreamActive) {
-			setIsDoneThinking(true)
-			if (frozenDurationRef.current === null) {
-				const finalMs = Math.max(1000, lastChunkAtRef.current - startTimeRef.current)
-				frozenDurationRef.current = finalMs
-				setElapsedMs(finalMs)
-			}
+			setElapsedMs((prev) => {
+				if (prev > 0) {
+					frozenDurationRef.current = prev
+					return prev
+				}
+				const fallback = Math.max(1000, Math.round(((content?.length ?? 0) / 120) * 1000))
+				frozenDurationRef.current = fallback
+				return fallback
+			})
 			return
 		}
 
-		// Actively thinking: tick timer every 500ms
-		setIsDoneThinking(false)
-		let timerId: NodeJS.Timeout | undefined
+		// 3. Actively thinking: smoothly tick every 500ms without interruption
+		const start = ts || startTimeRef.current || Date.now()
+		startTimeRef.current = start
 
 		const tick = () => {
-			const now = Date.now()
-			const idleMs = now - lastChunkAtRef.current
-
-			// If no new reasoning tokens arrived for > 2 seconds, thinking is concluded
-			if (idleMs > 2000 && currentLength > 0) {
-				const finalMs = Math.max(1000, lastChunkAtRef.current - startTimeRef.current)
-				frozenDurationRef.current = finalMs
-				setElapsedMs(finalMs)
-				setIsDoneThinking(true)
-				if (timerId) clearInterval(timerId)
-				return
-			}
-
-			setElapsedMs(Math.max(0, now - startTimeRef.current))
+			setElapsedMs(Math.max(0, Date.now() - start))
 		}
 
-		timerId = setInterval(tick, 500)
-		return () => {
-			if (timerId) clearInterval(timerId)
-		}
-	}, [isStreamActive, duration, currentLength])
+		tick()
+		const timerId = setInterval(tick, 500)
+		return () => clearInterval(timerId)
+	}, [isStreamActive, duration, ts])
 
-	const isActivelyThinking = isStreamActive && !isDoneThinking
-	const seconds = Math.max(
-		1,
-		Math.round((frozenDurationRef.current !== null ? frozenDurationRef.current : elapsedMs) / 1000),
-	)
+	const isActivelyThinking = isStreamActive
+	const finalMs = frozenDurationRef.current !== null ? frozenDurationRef.current : elapsedMs
+	const seconds = Math.max(1, Math.round(finalMs / 1000))
 	const secondsLabel = t("chat:reasoning.seconds", { count: seconds })
 
 	const handleToggle = () => {
