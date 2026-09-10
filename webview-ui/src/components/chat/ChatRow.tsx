@@ -77,7 +77,9 @@ import {
 	ArrowRight,
 	Check,
 	ChevronUp,
+	ChevronDown,
 	Search,
+	FileEdit,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PathTooltip } from "../ui/PathTooltip"
@@ -366,9 +368,7 @@ export const ChatRowContent = ({
 						) : (
 							getIconSpan("error", errorColor)
 						)
-					) : cost !== null &&
-					  cost !== undefined ? // The live spinner (below) only shows while the request is // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
-					// actually in progress.
+					) : cost !== null && cost !== undefined ? // actually in progress. // The live spinner (below) only shows while the request is // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
 					null : apiRequestFailedMessage ? (
 						getIconSpan("error", errorColor)
 					) : isLast ? (
@@ -456,46 +456,34 @@ export const ChatRowContent = ({
 
 		const renderBatchSearch = (batchSearches: any[]) => {
 			const searchCount = batchSearches.length
-			const isPendingApproval = message.type === "ask" && !message.isAnswered
 
 			return (
-				<div className="group">
+				<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all overflow-hidden text-xs shadow-xs group">
 					<div
-						className="flex items-center justify-between cursor-pointer select-none"
-						style={{
-							...headerStyle,
-							marginBottom: isBatchExpanded ? 6 : 0,
-						}}
+						className="flex items-center justify-between px-3 py-2 cursor-pointer select-none gap-2"
 						onClick={handleToggleBatchExpand}>
-						<div className="flex items-center gap-2">
-							<Search className="w-4 shrink-0" aria-label="Search icon" />
-							<span style={{ fontWeight: "bold" }}>
-								{isPendingApproval
-									? t("chat:directoryOperations.wantsToSearchMultiple", {
-											defaultValue: "Mirror VS wants to perform multiple searches",
-										})
-									: t("chat:directoryOperations.didSearchMultiple", {
-											defaultValue: "Mirror VS performed multiple searches",
-										})}
-							</span>
-							<span className="text-xs text-vscode-descriptionForeground mt-0.5">
-								({searchCount} {searchCount === 1 ? "search" : "searches"})
+						<div className="flex items-center gap-2 min-w-0">
+							<div className="size-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+								<Search className="size-3.5" aria-label="Search icon" />
+							</div>
+							<span className="font-medium text-vscode-foreground truncate">
+								Searched {searchCount} {searchCount === 1 ? "location" : "locations"}
 							</span>
 						</div>
-						<div className="flex items-center gap-2">
+						<div className="flex items-center gap-1.5 shrink-0">
 							{message.isAnswered && (
-								<span className="text-emerald-400 text-xs font-normal mr-1">✓ Searched</span>
+								<span className="text-[10px] text-emerald-400 font-medium mr-0.5">✓ Done</span>
 							)}
-							<ChevronUp
+							<ChevronDown
 								className={cn(
-									"w-4 transition-all opacity-0 group-hover:opacity-100",
-									!isBatchExpanded && "-rotate-180",
+									"size-3.5 text-vscode-descriptionForeground/70 transition-transform duration-200",
+									isBatchExpanded && "rotate-180",
 								)}
 							/>
 						</div>
 					</div>
 					{isBatchExpanded && (
-						<div className="pl-6">
+						<div className="border-t border-vscode-editorGroup-border/20 p-2.5 bg-vscode-editor-background/20">
 							<BatchSearchDisplay searches={batchSearches} ts={message?.ts} />
 						</div>
 					)}
@@ -519,6 +507,7 @@ export const ChatRowContent = ({
 				if (batchDiffs && Array.isArray(batchDiffs) && batchDiffs.length > 0) {
 					const diffCount = batchDiffs.length
 					const isPendingApproval = message.type === "ask" && !message.isAnswered
+
 					return (
 						<div className="group">
 							<div
@@ -529,12 +518,14 @@ export const ChatRowContent = ({
 								}}
 								onClick={handleToggleBatchExpand}>
 								<div className="flex items-center gap-2">
-									<FileDiff className="w-4 shrink-0" aria-label="Batch diff icon" />
+									<FileEdit className="w-4 shrink-0" aria-label="Edit files icon" />
 									<span style={{ fontWeight: "bold" }}>
 										{isPendingApproval
-											? t("chat:fileOperations.wantsToApplyBatchChanges")
-											: t("chat:fileOperations.didApplyBatchChanges", {
-													defaultValue: "Mirror VS applied changes to multiple files",
+											? t("chat:fileOperations.wantsToEditMultiple", {
+													defaultValue: "Mirror VS wants to edit multiple files",
+												})
+											: t("chat:fileOperations.didEditMultiple", {
+													defaultValue: "Mirror VS edited multiple files",
 												})}
 									</span>
 									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
@@ -593,13 +584,12 @@ export const ChatRowContent = ({
 						<div className="pl-6">
 							<CodeAccordion
 								path={tool.path}
-								code={unifiedDiff ?? tool.content ?? tool.diff ?? ""}
+								code={unifiedDiff ?? tool.diff}
 								language="diff"
 								progressStatus={message.progressStatus}
 								isLoading={message.partial}
 								isExpanded={isExpanded}
 								onToggleExpand={handleToggleExpand}
-								onJumpToFile={onJumpToCreatedFile}
 								diffStats={tool.diffStats}
 							/>
 						</div>
@@ -650,23 +640,26 @@ export const ChatRowContent = ({
 					return renderBatchSearch(batchSearches)
 				}
 				return (
-					<div style={headerStyle}>
-						{toolIcon("search")}
-						<span style={{ fontWeight: "bold" }}>
-							{tool.path ? (
-								<Trans
-									i18nKey="chat:codebaseSearch.wantsToSearchWithPath"
-									components={{ code: <code></code> }}
-									values={{ query: tool.query, path: tool.path }}
-								/>
-							) : (
-								<Trans
-									i18nKey="chat:codebaseSearch.wantsToSearch"
-									components={{ code: <code></code> }}
-									values={{ query: tool.query }}
-								/>
-							)}
-						</span>
+					<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all px-3 py-2 text-xs shadow-xs flex items-center justify-between select-none">
+						<div className="flex items-center gap-2 min-w-0">
+							<div className="size-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+								<Search className="size-3.5" />
+							</div>
+							<div className="flex items-center gap-1.5 min-w-0 truncate">
+								<span className="font-medium text-vscode-foreground">Searched codebase for</span>
+								<span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-vscode-badge-background/20 text-vscode-foreground truncate">
+									&quot;{tool.query}&quot;
+								</span>
+								{tool.path && (
+									<span className="text-vscode-descriptionForeground text-[11px] font-mono shrink-0">
+										in {tool.path}
+									</span>
+								)}
+							</div>
+						</div>
+						{message.isAnswered && (
+							<span className="text-[10px] text-emerald-400 font-medium shrink-0 ml-2">✓ Done</span>
+						)}
 					</div>
 				)
 			}
@@ -687,41 +680,37 @@ export const ChatRowContent = ({
 					const isPendingApproval = message.type === "ask" && !message.isAnswered
 
 					return (
-						<div className="group">
+						<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all overflow-hidden text-xs shadow-xs group">
 							<div
-								className="flex items-center justify-between cursor-pointer select-none"
-								style={{
-									...headerStyle,
-									marginBottom: isBatchExpanded ? 6 : 0,
-								}}
+								className="flex items-center justify-between px-3 py-2 cursor-pointer select-none gap-2"
 								onClick={handleToggleBatchExpand}>
-								<div className="flex items-center gap-2">
-									<BookOpen className="w-4 shrink-0" aria-label="View files icon" />
-									<span style={{ fontWeight: "bold" }}>
-										{isPendingApproval
-											? t("chat:fileOperations.wantsToReadMultiple")
-											: t("chat:fileOperations.didReadMultiple", {
-													defaultValue: "Mirror VS read multiple files",
-												})}
+								<div className="flex items-center gap-2 min-w-0">
+									<div className="size-5 rounded-md bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
+										<BookOpen className="size-3.5" aria-label="View files icon" />
+									</div>
+									<span className="font-medium text-vscode-foreground truncate">
+										{isPendingApproval ? "Read files request" : `Read ${fileCount} files`}
 									</span>
-									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
-										({fileCount} {fileCount === 1 ? "file" : "files"})
+									<span className="text-[10px] text-vscode-descriptionForeground font-mono bg-vscode-badge-background/15 px-1.5 py-0.5 rounded-full">
+										{fileCount} {fileCount === 1 ? "file" : "files"}
 									</span>
 								</div>
-								<div className="flex items-center gap-2">
+								<div className="flex items-center gap-1.5 shrink-0">
 									{message.isAnswered && (
-										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Approved</span>
+										<span className="text-[10px] text-emerald-400 font-medium mr-0.5">
+											✓ Approved
+										</span>
 									)}
-									<ChevronUp
+									<ChevronDown
 										className={cn(
-											"w-4 transition-all opacity-0 group-hover:opacity-100",
-											!isBatchExpanded && "-rotate-180",
+											"size-3.5 text-vscode-descriptionForeground/70 transition-transform duration-200",
+											isBatchExpanded && "rotate-180",
 										)}
 									/>
 								</div>
 							</div>
 							{isBatchExpanded && (
-								<div className="pl-6">
+								<div className="border-t border-vscode-editorGroup-border/20 p-2.5 bg-vscode-editor-background/20">
 									<BatchFilePermission
 										files={batchFiles}
 										onPermissionResponse={(response) => {
@@ -1003,44 +992,54 @@ export const ChatRowContent = ({
 				if (batchSearches && Array.isArray(batchSearches) && batchSearches.length > 0) {
 					return renderBatchSearch(batchSearches)
 				}
+				const searchPath = tool.path! + (tool.filePattern ? `/(${tool.filePattern})` : "")
 				return (
-					<>
-						<div style={headerStyle}>
-							{toolIcon("search")}
-							<span style={{ fontWeight: "bold" }}>
-								{message.type === "ask" ? (
-									<Trans
-										i18nKey={
-											tool.isOutsideWorkspace
-												? "chat:directoryOperations.wantsToSearchOutsideWorkspace"
-												: "chat:directoryOperations.wantsToSearch"
-										}
-										components={{ code: <code className="font-medium">{tool.regex}</code> }}
-										values={{ regex: tool.regex }}
-									/>
-								) : (
-									<Trans
-										i18nKey={
-											tool.isOutsideWorkspace
-												? "chat:directoryOperations.didSearchOutsideWorkspace"
-												: "chat:directoryOperations.didSearch"
-										}
-										components={{ code: <code className="font-medium">{tool.regex}</code> }}
-										values={{ regex: tool.regex }}
+					<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all overflow-hidden text-xs shadow-xs group">
+						<div
+							className="flex items-center justify-between px-3 py-2 cursor-pointer select-none gap-2"
+							onClick={handleToggleExpand}>
+							<div className="flex items-center gap-2 min-w-0">
+								<div className="size-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+									<Search className="size-3.5" aria-label="Search icon" />
+								</div>
+								<div className="flex items-center gap-1.5 min-w-0 truncate">
+									<span className="font-medium text-vscode-foreground truncate">Searched</span>
+									<span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-vscode-badge-background/20 text-vscode-foreground truncate">
+										&quot;{tool.regex}&quot;
+									</span>
+									{tool.path && (
+										<span className="text-vscode-descriptionForeground text-[11px] font-mono shrink-0">
+											in {tool.path}
+										</span>
+									)}
+								</div>
+							</div>
+							<div className="flex items-center gap-1.5 shrink-0">
+								{message.isAnswered && (
+									<span className="text-[10px] text-emerald-400 font-medium mr-0.5">✓ Done</span>
+								)}
+								{tool.content && (
+									<ChevronDown
+										className={cn(
+											"size-3.5 text-vscode-descriptionForeground/70 transition-transform duration-200",
+											isExpanded && "rotate-180",
+										)}
 									/>
 								)}
-							</span>
+							</div>
 						</div>
-						<div className="pl-6">
-							<CodeAccordion
-								path={tool.path! + (tool.filePattern ? `/(${tool.filePattern})` : "")}
-								code={tool.content}
-								language="shellsession"
-								isExpanded={isExpanded}
-								onToggleExpand={handleToggleExpand}
-							/>
-						</div>
-					</>
+						{isExpanded && tool.content && (
+							<div className="border-t border-vscode-editorGroup-border/20 p-2.5 bg-vscode-editor-background/20">
+								<CodeAccordion
+									path={searchPath}
+									code={tool.content}
+									language="shellsession"
+									isExpanded={true}
+									onToggleExpand={() => {}}
+								/>
+							</div>
+						)}
+					</div>
 				)
 			}
 			case "switchMode":
@@ -1573,35 +1572,44 @@ export const ChatRowContent = ({
 							duration={(message as any).duration}
 						/>
 					)
-				case "api_req_started":
-					// Determine if the API request is in progress
+				case "api_req_started": {
+					const hasError =
+						((cost === null || cost === undefined) && apiRequestFailedMessage) ||
+						apiReqStreamingFailedMessage
+					const hasCancel = apiReqCancelReason !== undefined && apiReqCancelReason !== null
+					const hasPositiveCost = typeof cost === "number" && cost > 0
 					const isApiRequestInProgress =
 						apiReqCancelReason === undefined && apiRequestFailedMessage === undefined && cost === undefined
+
+					if (!isApiRequestInProgress && !hasError && !hasCancel && !hasPositiveCost) {
+						return null
+					}
 
 					return (
 						<>
 							<div
-								className={`group text-sm transition-opacity ${
-									isApiRequestInProgress ? "opacity-100" : "opacity-40 hover:opacity-100"
-								}`}
-								style={{
-									...headerStyle,
-									marginBottom:
-										((cost === null || cost === undefined) && apiRequestFailedMessage) ||
-										apiReqStreamingFailedMessage
-											? 10
-											: 0,
-									justifyContent: "space-between",
-								}}>
-								<div style={{ display: "flex", alignItems: "center", gap: "10px", flexGrow: 1 }}>
-									{icon}
-									{title}
+								className={cn(
+									"group text-xs transition-opacity my-1 flex items-center justify-between",
+									isApiRequestInProgress ? "opacity-100" : "opacity-45 hover:opacity-100",
+								)}>
+								<div className="flex items-center gap-2 flex-grow min-w-0">
+									{isApiRequestInProgress ? (
+										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-vscode-badge-background/10 text-[11px] text-vscode-descriptionForeground animate-pulse border border-vscode-badge-background/15">
+											<span className="size-1.5 rounded-full bg-mirror-brand-from"></span>
+											<span>{t("chat:apiRequest.streaming")}</span>
+										</div>
+									) : (
+										<>
+											{icon}
+											{title}
+										</>
+									)}
 								</div>
-								<div
-									className="text-xs text-vscode-dropdown-foreground border-vscode-dropdown-border/50 border px-1.5 py-0.5 rounded-lg"
-									style={{ opacity: cost !== null && cost !== undefined && cost > 0 ? 1 : 0 }}>
-									${Number(cost || 0)?.toFixed(4)}
-								</div>
+								{hasPositiveCost && (
+									<div className="text-[10px] text-vscode-descriptionForeground font-mono bg-vscode-badge-background/10 border border-vscode-editorGroup-border/30 px-1.5 py-0.5 rounded-full">
+										${cost.toFixed(4)}
+									</div>
+								)}
 							</div>
 							{(((cost === null || cost === undefined) && apiRequestFailedMessage) ||
 								apiReqStreamingFailedMessage) && (
@@ -1618,6 +1626,7 @@ export const ChatRowContent = ({
 							)}
 						</>
 					)
+				}
 				case "api_req_retry_delayed":
 					let body = t(`chat:apiRequest.failed`)
 					let retryInfo, rawError, code, docsURL
@@ -1750,16 +1759,16 @@ export const ChatRowContent = ({
 					return (
 						<div
 							className={cn(
-								"group my-1.5 p-3 rounded-xl transition-all relative overflow-hidden",
+								"group my-2 p-3.5 rounded-2xl transition-all relative overflow-hidden",
 								isSticky
-									? "border border-vscode-button-background/25 bg-vscode-sideBar-background/90 backdrop-blur-md shadow-md"
-									: "border border-vscode-editorGroup-border/60 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 hover:border-mirror-brand-via/35 shadow-xs",
+									? "border border-mirror-brand-via/35 bg-vscode-sideBar-background/95 backdrop-blur-md shadow-md"
+									: "border border-vscode-editorGroup-border/30 bg-vscode-input-background/35 hover:bg-vscode-input-background/55 shadow-xs",
 							)}
 							style={
 								isSticky
 									? {
 											background:
-												"color-mix(in srgb, var(--vscode-sideBar-background) 92%, transparent)",
+												"color-mix(in srgb, var(--vscode-sideBar-background) 94%, transparent)",
 											backdropFilter: "blur(14px)",
 											WebkitBackdropFilter: "blur(14px)",
 											border: "1px solid color-mix(in srgb, var(--vscode-button-background) 25%, transparent)",
@@ -1771,17 +1780,17 @@ export const ChatRowContent = ({
 									: undefined
 							}>
 							<div
-								className="flex justify-between items-center w-full mb-1 cursor-pointer select-none"
+								className="flex justify-between items-center w-full mb-1.5 cursor-pointer select-none"
 								onClick={(e) => {
 									e.stopPropagation()
 									onNavigateToMessage?.(message.ts)
 								}}
 								title="Click to scroll to this message">
-								<div className="flex items-center gap-2">
-									<div className="size-5 rounded-full bg-vscode-button-background/15 flex items-center justify-center text-vscode-button-background shrink-0">
-										<CircleUser className="size-3.5" aria-label="User icon" />
+								<div className="flex items-center gap-1.5">
+									<div className="size-4 rounded-full bg-vscode-button-background/20 flex items-center justify-center text-vscode-button-background shrink-0">
+										<CircleUser className="size-2.5" aria-label="User icon" />
 									</div>
-									<span className="text-xs font-bold text-vscode-foreground tracking-wide">
+									<span className="text-[11px] font-semibold text-vscode-descriptionForeground tracking-wider uppercase">
 										{t("chat:feedback.youSaid")}
 									</span>
 								</div>

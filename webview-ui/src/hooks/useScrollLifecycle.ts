@@ -126,8 +126,6 @@ export function useScrollLifecycle({
 	// shift at the sub-pixel level, every frame. To prevent oscillation, we
 	// re-query the DOM immediately after applying compensation so the next
 	// frame sees the post-compensation positions.
-	const prevVisualAnchorRef = useRef<Map<string, number> | null>(null)
-	const driftAccumulatorRef = useRef<number>(0)
 	const lastUserScrollInputRef = useRef<number>(0)
 
 	// --- Navigation lock ---
@@ -377,20 +375,21 @@ export function useScrollLifecycle({
 	// Virtuoso callback: followOutput
 	// -----------------------------------------------------------------------
 
-	const followOutputCallback = useCallback(
-		(_isAtBottom?: boolean): "auto" | false => {
-			// If a programmatic navigation is in progress, NEVER follow output
-			if (performance.now() - navigationStartedAtRef.current < 2000) {
-				return false
-			}
-			const phase = scrollPhaseRef.current
-			const follow =
-				phase !== "USER_BROWSING_HISTORY" &&
-				(isStreaming || phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM")
-			return follow ? "auto" : false
-		},
-		[isStreaming],
-	)
+	const followOutputCallback = useCallback((isAtBottom?: boolean): "auto" | false => {
+		// If a programmatic navigation is in progress, NEVER follow output
+		if (performance.now() - navigationStartedAtRef.current < 2000) {
+			return false
+		}
+		// If at bottom, ALWAYS follow output so streaming stays pinned
+		if (isAtBottom || isAtBottomRef.current) {
+			return "auto"
+		}
+		const phase = scrollPhaseRef.current
+		if (phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM") {
+			return "auto"
+		}
+		return false
+	}, [])
 
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: atBottomStateChange
@@ -400,175 +399,34 @@ export function useScrollLifecycle({
 		(isAtBottom: boolean) => {
 			isAtBottomRef.current = isAtBottom
 
-			const currentPhase = scrollPhaseRef.current
-
 			// If a programmatic navigation is in progress, don't change phase or auto-scroll
 			const navInProgress = performance.now() - navigationStartedAtRef.current < 2000
 			if (navInProgress) {
 				return
 			}
 
-			if (!isAtBottom && isHydratingRef.current && currentPhase !== "USER_BROWSING_HISTORY") {
+			if (isAtBottom) {
+				enterAnchoredFollowing()
 				setShowScrollToBottom(false)
 				return
 			}
 
-			if (isAtBottom) {
-				const timeSinceUserInput = performance.now() - lastUserScrollInputRef.current
-				if (currentPhase === "USER_BROWSING_HISTORY" || timeSinceUserInput < 1000) {
-					setShowScrollToBottom(false)
-					return
-				}
-
-				enterAnchoredFollowing()
-				return
-			}
-
-			if (currentPhase === "ANCHORED_FOLLOWING" && !isAtBottom) {
+			if (scrollPhaseRef.current === "ANCHORED_FOLLOWING") {
 				if (isClickingScrollToBottomRef.current) {
 					return
 				}
-
-				const timeSinceUserInput = performance.now() - lastUserScrollInputRef.current
-				const userRecentlyScrolled = timeSinceUserInput < 500 || pointerScrollActiveRef.current
-
-				if (userRecentlyScrolled) {
-					// User explicitly initiated scroll input (wheel up, drag, key navigation)
-					enterUserBrowsingHistory("pointer-scroll-up")
-					return
-				}
-
-				// If not user scroll input and we are in ANCHORED_FOLLOWING, Virtuoso's native
-				// followOutput prop will automatically keep us pinned at bottom on next layout pass.
-				// We must NOT call scrollToBottomAuto() here as doing so triggers a feedback loop.
+				enterUserBrowsingHistory("pointer-scroll-up")
 				return
 			}
 
-			setShowScrollToBottom(currentPhase === "USER_BROWSING_HISTORY")
+			setShowScrollToBottom(true)
 		},
 		[enterAnchoredFollowing, enterUserBrowsingHistory],
 	)
 
-	// -----------------------------------------------------------------------
-	// Scroll anchoring (Multi-Anchor Visual Tracking)
-	//
-	// During streaming, content below the viewport grows, pushing existing
-	// items upward. We compensate by tracking ALL rendered [data-index]
-	// elements' visual positions (getBoundingClientRect().top) each frame.
-	//
-	// Why multi-anchor: Virtuoso recycles DOM nodes aggressively — the
-	// FIRST visible [data-index] changes on almost every frame. By tracking
-	// ALL items in a Map<string, number>, we can find ANY element that
-	// persists across two frames and use its delta for compensation.
-	//
-	// Compensation: if the same logical item shifted (delta != 0), apply
-	// inverse compensation: scrollTop += delta. This undoes the visual shift
-	// at the sub-pixel level, every frame.
-	//
-	// Anti-oscillation: after applying compensation, we immediately re-query
-	// the DOM and store post-compensation positions as the new prev map.
-	// This prevents the next frame from seeing a stale pre-compensation delta.
-	// -----------------------------------------------------------------------
-
-	useEffect(() => {
-		let rafId: number | null = null
-		let lastPollTime = 0
-
-		const pollAnchor = (now: number) => {
-			const phase = scrollPhaseRef.current
-			const scroller = scrollContainerRef.current
-
-			if (phase === "USER_BROWSING_HISTORY" && scroller) {
-				// Skip anchor compensation entirely during programmatic navigation
-				if (performance.now() - navigationStartedAtRef.current < 2000) {
-					prevVisualAnchorRef.current = null
-					driftAccumulatorRef.current = 0
-					rafId = requestAnimationFrame(pollAnchor)
-					return
-				}
-				// Throttle layout queries to at most once every ~32ms (~30fps) to eliminate layout thrashing
-				if (now - lastPollTime >= 32) {
-					lastPollTime = now
-					const msSinceUserInput = performance.now() - lastUserScrollInputRef.current
-					const activelyScrolling = msSinceUserInput < 150
-
-					// 1. Snapshot raw float positions of all [data-index] elements
-					const scrollerTop = scroller.getBoundingClientRect().top
-					const currentAnchors = new Map<string, number>()
-					const items = scroller.querySelectorAll<HTMLElement>("[data-index]")
-					for (let i = 0; i < items.length; i++) {
-						const el = items[i]
-						const inner = el.querySelector("[data-ts]")
-						const key = inner ? inner.getAttribute("data-ts") : el.getAttribute("data-index")
-						if (key !== null) {
-							currentAnchors.set(key, el.getBoundingClientRect().top - scrollerTop)
-						}
-					}
-
-					const prevAnchors = prevVisualAnchorRef.current
-					let compensated = false
-
-					// 2. Compare against previous frame's positions
-					if (!activelyScrolling && prevAnchors && prevAnchors.size > 0 && currentAnchors.size > 0) {
-						let matchCount = 0
-						let sumDelta = 0
-
-						for (const [idx, prevTop] of prevAnchors) {
-							const currentTop = currentAnchors.get(idx)
-							if (currentTop !== undefined) {
-								matchCount++
-								const delta = currentTop - prevTop
-								sumDelta += delta
-							}
-						}
-
-						if (matchCount > 0) {
-							// 3. Compute average drift across ALL matching elements.
-							const avgDelta = sumDelta / matchCount
-
-							// 4. Accumulate the fractional drift.
-							const accumulator = driftAccumulatorRef.current + avgDelta
-							driftAccumulatorRef.current = accumulator
-
-							const intDelta = Math.round(accumulator)
-							if (intDelta !== 0) {
-								// 5. Apply inverse compensation (integer pixel amount)
-								scroller.scrollTop += intDelta
-
-								// 6. Remove compensated amount from accumulator
-								driftAccumulatorRef.current -= intDelta
-								prevVisualAnchorRef.current = null
-								compensated = true
-							}
-						}
-					} else if (activelyScrolling) {
-						// Reset accumulator when user actively scrolls
-						driftAccumulatorRef.current = 0
-					}
-
-					if (!compensated) {
-						prevVisualAnchorRef.current = currentAnchors
-					}
-				}
-			} else {
-				if (prevVisualAnchorRef.current !== null) {
-					prevVisualAnchorRef.current = null
-				}
-				driftAccumulatorRef.current = 0
-			}
-
-			rafId = requestAnimationFrame(pollAnchor)
-		}
-
-		rafId = requestAnimationFrame(pollAnchor)
-
-		return () => {
-			if (rafId !== null) {
-				cancelAnimationFrame(rafId)
-				rafId = null
-			}
-		}
-	}, [scrollContainerRef])
+	// Scroll anchoring: Virtuoso handles virtualized items and scroll positioning
+	// natively. Intrusive RAF scrollTop mutation during USER_BROWSING_HISTORY is disabled
+	// to ensure smooth, hardware-accelerated momentum scrolling without stutter or drift.
 
 	// -----------------------------------------------------------------------
 	// User intent: wheel
@@ -741,10 +599,7 @@ export function useScrollLifecycle({
 			//    transitionScrollPhase will see the ref matches and skip
 			//    the setScrollPhase state update.
 			transitionScrollPhase("USER_BROWSING_HISTORY")
-			// 4. Clear any stale anchor data so compensation doesn't fight
-			prevVisualAnchorRef.current = null
-			driftAccumulatorRef.current = 0
-			// 5. Double-RAF: first frame lets React render the phase change
+			// 4. Double-RAF: first frame lets React render the phase change
 			//    and Virtuoso re-evaluate followOutput (returns false).
 			//    Second frame lets Virtuoso fully settle its internal state.
 			//    THEN we issue the scroll command.

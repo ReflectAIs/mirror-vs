@@ -387,33 +387,46 @@ const ChatToolbar = ({
 										</tr>
 									)}
 
-									<tr className="border-b border-vscode-editorGroup-border/20">
-										<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
-											API Cost
-										</th>
-										<td className="py-2 text-right font-mono font-semibold">
-											$
-											{(
-												(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
-													? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
-													: undefined) ?? apiMetrics.totalCost
-											).toFixed(4)}
-										</td>
-									</tr>
+									{(() => {
+										const panelTotalCost =
+											(currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id)
+												? aggregatedCostsMap.get(currentTaskItem.id)!.totalCost
+												: undefined) ?? apiMetrics.totalCost
 
-									{currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id) && (
-										<tr>
-											<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
-												Cost Breakdown
-											</th>
-											<td className="py-2 text-right font-mono text-[10px] text-vscode-descriptionForeground whitespace-pre-wrap">
-												{getCostBreakdownIfNeeded(aggregatedCostsMap.get(currentTaskItem.id)!, {
-													own: t("common:costs.own"),
-													subtasks: t("common:costs.subtasks"),
-												})}
-											</td>
-										</tr>
-									)}
+										if (typeof panelTotalCost !== "number" || panelTotalCost <= 0) {
+											return null
+										}
+
+										return (
+											<>
+												<tr className="border-b border-vscode-editorGroup-border/20">
+													<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
+														API Cost
+													</th>
+													<td className="py-2 text-right font-mono font-semibold">
+														${panelTotalCost.toFixed(4)}
+													</td>
+												</tr>
+
+												{currentTaskItem?.id && aggregatedCostsMap.has(currentTaskItem.id) && (
+													<tr>
+														<th className="py-2 text-left font-medium text-vscode-descriptionForeground">
+															Cost Breakdown
+														</th>
+														<td className="py-2 text-right font-mono text-[10px] text-vscode-descriptionForeground whitespace-pre-wrap">
+															{getCostBreakdownIfNeeded(
+																aggregatedCostsMap.get(currentTaskItem.id)!,
+																{
+																	own: t("common:costs.own"),
+																	subtasks: t("common:costs.subtasks"),
+																},
+															)}
+														</td>
+													</tr>
+												)}
+											</>
+										)
+									})()}
 								</tbody>
 							</table>
 						</div>

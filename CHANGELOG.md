@@ -4,16 +4,29 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.8.4] - 2026-09-10
 
+### Added
+
+- **Chat Window Aesthetic Revamp**:
+    - Redesigned thinking/reasoning blocks into an elegant pill card (`💡 Thinking · 7s ...` / `💡 Thought · 7s ⌄`) with contained, collapsible markdown.
+    - Sleek frosted bubble styling for user messages with rounded corners, subtle "YOU" author badge, and quiet micro-actions on hover.
+    - Modernized codebase search results into an integrated card layout, eliminating awkward negative margins and raw bordered boxes.
+    - Redesigned in-progress API streaming indicators to a quiet pulsing pill (`• Working...`) and eliminated empty ghost rows when completed requests have no cost or errors.
 - **Grouped Search & Edit Tool Rows**: Consolidated consecutive codebase search and file edit operations into compact, collapsible grouped cards matching batch file reads and directory listings.
-- **Dynamic Header API Cost Display**: Replaced the persistent `$0.000` text in the header with a clean, compact session stats trigger for free/unmetered models, displaying the cost pill only when metered cost is greater than $0.
 - **Informational Terminal Progress for Long Commands**: Added system prompt directives and `execute_command` tool guidelines instructing the model to keep visible progress indicators (progress bars, step banners) active during long-running commands purely for user info without impacting automated callbacks.
+
+### Fixed
+
+- **Scroll Drift & Stutter Elimination**:
+    - Removed intrusive requestAnimationFrame DOM anchor polling in `useScrollLifecycle.ts`, enabling smooth 60fps native momentum scrolling when browsing chat history without drift, jitter, or scroll fight.
+    - Fixed autoscroll re-pinning so reaching the bottom immediately re-engages pinned streaming mode and hides the scroll-to-bottom button.
+- **Header API Cost & Session Statistics Cleanup**:
+    - Completely removed the API Cost and Cost Breakdown table rows from the Session Statistics popover drawer when cost is $0.000 or unmetered.
+    - Replaced persistent `$0.000` text in the header with a clean session stats button for free/unmetered models.
 - **Stable Prefix Caching**: Decoupled dynamic multi-tab sibling context from the system prompt into static session directives, preventing sibling tab updates from invalidating 100% of prefix caches on OpenAI, DeepSeek, Fireworks, and vLLM. Live sibling status is now streamed at the tail of user turns via environment details.
 - **OpenAI & Custom Proxy Cache Tracking**: Fixed `OpenAiHandler` streaming responses dropping `cacheReadTokens` and ignoring `prompt_tokens_details.cached_tokens`. Cached tokens are now accurately reported in the UI and discounted in cost calculations.
 - **Redundant File Tree Elimination**: Stopped re-dumping the recursive 200-file workspace tree on user follow-up messages, saving 1,000–3,000 input tokens per follow-up interaction.
 - **Anthropic Tool Cache Breakpoint**: Attached ephemeral prompt cache breakpoints to the native tool catalog, ensuring 4,000–6,000 tokens of tool schemas are cached across requests.
 - **Chat Window Alignment**: Fixed asymmetrical horizontal padding across message rows, tool cards, and queued messages to align symmetrically with the toolbar, status badges, and text input box.
-- **Spacing Between File Edits and Bot Messages**: Eliminated ghost completed API request rows, zeroed top margin on initial markdown elements, and tightened message wrappers to remove excessive whitespace gaps.
-- **Smooth Auto-Scroll**: Increased bottom detection threshold to 48px to eliminate stutter and rapid re-render oscillations during streaming token delivery, and batched scroll commands with `requestAnimationFrame`.
 
 ## [0.8.3] - 2026-09-10
 

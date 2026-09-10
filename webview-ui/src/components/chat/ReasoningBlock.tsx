@@ -16,14 +16,7 @@ interface ReasoningBlockProps {
 	metadata?: any
 }
 
-export const ReasoningBlock = ({
-	content,
-	ts,
-	isStreaming,
-	isLast,
-	isPartial,
-	duration,
-}: ReasoningBlockProps) => {
+export const ReasoningBlock = ({ content, ts, isStreaming, isLast, isPartial, duration }: ReasoningBlockProps) => {
 	const { t } = useTranslation()
 	const { reasoningBlockCollapsed } = useExtensionState()
 
@@ -33,7 +26,9 @@ export const ReasoningBlock = ({
 	const isActivelyThinking = isStreaming && isLast && (isPartial === true || isPartial === undefined)
 
 	const startTimeRef = useRef<number>(ts || Date.now())
-	const [elapsed, setElapsed] = useState<number>(() => duration ?? (isActivelyThinking ? Math.max(0, Date.now() - (ts || Date.now())) : 0))
+	const [elapsed, setElapsed] = useState<number>(
+		() => duration ?? (isActivelyThinking ? Math.max(0, Date.now() - (ts || Date.now())) : 0),
+	)
 	const contentRef = useRef<HTMLDivElement>(null)
 
 	useEffect(() => {
@@ -66,33 +61,47 @@ export const ReasoningBlock = ({
 	}
 
 	return (
-		<div className="group">
+		<div className="my-1.5 group">
 			<div
-				className="flex items-center justify-between mb-2.5 pr-2 cursor-pointer select-none"
+				className={cn(
+					"inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs cursor-pointer select-none transition-all duration-150 shadow-xs",
+					isActivelyThinking
+						? "border-mirror-brand-via/35 bg-mirror-brand-via/10 text-vscode-foreground"
+						: "border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/50 hover:bg-vscode-sideBar-background/80 text-vscode-descriptionForeground hover:text-vscode-foreground",
+				)}
 				onClick={handleToggle}>
-				<div className="flex items-center gap-2">
-					<Lightbulb className={cn("w-4 text-vscode-foreground", isActivelyThinking && "text-mirror-brand-via animate-pulse")} />
-					<span className="font-bold text-vscode-foreground">{t("chat:reasoning.thinking")}</span>
+				<div className="flex items-center gap-1.5">
+					<Lightbulb
+						className={cn(
+							"size-3.5",
+							isActivelyThinking
+								? "text-mirror-brand-via animate-pulse"
+								: "text-vscode-descriptionForeground",
+						)}
+					/>
+					<span className="font-medium">
+						{isActivelyThinking
+							? t("chat:reasoning.thinking")
+							: t("chat:reasoning.thought", { defaultValue: "Thought" })}
+					</span>
 					{elapsed > 0 && (
-						<span className="text-xs text-vscode-descriptionForeground mt-0.5">
-							{secondsLabel}
+						<span className="text-[11px] opacity-75 font-mono">
+							· {secondsLabel}
 							{isActivelyThinking && " ..."}
 						</span>
 					)}
 				</div>
-				<div className="flex items-center gap-2">
-					<ChevronUp
-						className={cn(
-							"w-4 transition-all opacity-0 group-hover:opacity-100",
-							isCollapsed && "-rotate-180",
-						)}
-					/>
-				</div>
+				<ChevronUp
+					className={cn(
+						"size-3 transition-transform duration-200 text-vscode-descriptionForeground/70 group-hover:text-vscode-foreground",
+						isCollapsed && "-rotate-180",
+					)}
+				/>
 			</div>
 			{(content?.trim()?.length ?? 0) > 0 && !isCollapsed && (
 				<div
 					ref={contentRef}
-					className="border-l border-vscode-descriptionForeground/20 ml-2 pl-4 pb-1 text-vscode-descriptionForeground break-words">
+					className="mt-2 rounded-xl border border-vscode-editorGroup-border/25 bg-vscode-editor-background/30 p-3 text-xs leading-relaxed text-vscode-descriptionForeground font-mono break-words max-h-72 overflow-y-auto">
 					<MarkdownBlock markdown={content} />
 				</div>
 			)}
