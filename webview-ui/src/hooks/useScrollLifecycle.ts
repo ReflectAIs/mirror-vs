@@ -200,11 +200,19 @@ export function useScrollLifecycle({
 		[virtuosoRef],
 	)
 
+	const scrollRafIdRef = useRef<number | null>(null)
+
 	const scrollToBottomAuto = useCallback(() => {
-		virtuosoRef.current?.scrollToIndex({
-			index: "LAST",
-			align: "end",
-			behavior: "auto",
+		if (scrollRafIdRef.current !== null) {
+			return
+		}
+		scrollRafIdRef.current = requestAnimationFrame(() => {
+			scrollRafIdRef.current = null
+			virtuosoRef.current?.scrollToIndex({
+				index: "LAST",
+				align: "end",
+				behavior: "auto",
+			})
 		})
 	}, [virtuosoRef])
 
@@ -260,6 +268,10 @@ export function useScrollLifecycle({
 			clearHydrationWindow()
 			cancelReanchorFrame()
 			scrollToBottomSmooth.clear()
+			if (scrollRafIdRef.current !== null) {
+				cancelAnimationFrame(scrollRafIdRef.current)
+				scrollRafIdRef.current = null
+			}
 		}
 	}, [cancelReanchorFrame, clearHydrationWindow, scrollToBottomSmooth])
 
@@ -324,18 +336,30 @@ export function useScrollLifecycle({
 	const handleScrollToBottomClick = useCallback(() => {
 		isClickingScrollToBottomRef.current = true
 		enterAnchoredFollowing()
-		scrollToBottomAuto()
+		if (scrollRafIdRef.current !== null) {
+			cancelAnimationFrame(scrollRafIdRef.current)
+			scrollRafIdRef.current = null
+		}
+		virtuosoRef.current?.scrollToIndex({
+			index: "LAST",
+			align: "end",
+			behavior: "auto",
+		})
 		cancelReanchorFrame()
 		reanchorAnimationFrameRef.current = requestAnimationFrame(() => {
 			reanchorAnimationFrameRef.current = null
 			if (scrollPhaseRef.current === "ANCHORED_FOLLOWING") {
-				scrollToBottomAuto()
+				virtuosoRef.current?.scrollToIndex({
+					index: "LAST",
+					align: "end",
+					behavior: "auto",
+				})
 			}
 			setTimeout(() => {
 				isClickingScrollToBottomRef.current = false
 			}, 50)
 		})
-	}, [cancelReanchorFrame, enterAnchoredFollowing, scrollToBottomAuto])
+	}, [cancelReanchorFrame, enterAnchoredFollowing, virtuosoRef])
 
 	// Auto-anchor and follow when streaming is active on the current tab
 	useEffect(() => {
@@ -353,16 +377,20 @@ export function useScrollLifecycle({
 	// Virtuoso callback: followOutput
 	// -----------------------------------------------------------------------
 
-	const followOutputCallback = useCallback((): "auto" | false => {
-		// If a programmatic navigation is in progress, NEVER follow output
-		if (performance.now() - navigationStartedAtRef.current < 2000) {
-			return false
-		}
-		const phase = scrollPhaseRef.current
-		const follow = phase !== "USER_BROWSING_HISTORY" && (isStreaming || phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM")
-		console.log("[scrollLifecycle] followOutputCallback phase:", phase, "isStreaming:", isStreaming, "-> returning:", follow ? "auto" : false)
-		return follow ? "auto" : false
-	}, [isStreaming])
+	const followOutputCallback = useCallback(
+		(_isAtBottom?: boolean): "auto" | false => {
+			// If a programmatic navigation is in progress, NEVER follow output
+			if (performance.now() - navigationStartedAtRef.current < 2000) {
+				return false
+			}
+			const phase = scrollPhaseRef.current
+			const follow =
+				phase !== "USER_BROWSING_HISTORY" &&
+				(isStreaming || phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM")
+			return follow ? "auto" : false
+		},
+		[isStreaming],
+	)
 
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: atBottomStateChange
@@ -370,7 +398,6 @@ export function useScrollLifecycle({
 
 	const atBottomStateChangeCallback = useCallback(
 		(isAtBottom: boolean) => {
-			console.log("[scrollLifecycle] atBottomStateChange isAtBottom:", isAtBottom, "phase:", scrollPhaseRef.current)
 			isAtBottomRef.current = isAtBottom
 
 			const currentPhase = scrollPhaseRef.current

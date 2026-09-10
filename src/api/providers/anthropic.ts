@@ -110,6 +110,15 @@ export class AnthropicHandler extends BaseProvider implements SingleCompletionHa
 				const lastUserMsgIndex = userMsgIndices[userMsgIndices.length - 1] ?? -1
 				const secondLastMsgUserIndex = userMsgIndices[userMsgIndices.length - 2] ?? -1
 
+				const toolsWithCache =
+					nativeToolParams.tools && nativeToolParams.tools.length > 0
+						? nativeToolParams.tools.map((tool, index) =>
+								index === nativeToolParams.tools.length - 1
+									? { ...tool, cache_control: cacheControl }
+									: tool,
+							)
+						: nativeToolParams.tools
+
 				stream = await this.client.messages.create(
 					{
 						model: modelId,
@@ -136,6 +145,7 @@ export class AnthropicHandler extends BaseProvider implements SingleCompletionHa
 						}),
 						stream: true,
 						...nativeToolParams,
+						tools: toolsWithCache as any,
 					},
 					(() => {
 						// prompt caching: https://x.com/alexalbert__/status/1823751995901272068

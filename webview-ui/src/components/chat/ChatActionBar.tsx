@@ -40,7 +40,7 @@ const ChatActionBar = ({
 }: ChatActionBarProps) => {
 	return (
 		<div
-			className={`flex h-8 items-center mb-1.5 px-4 justify-end gap-2 ${
+			className={`flex h-8 items-center mb-1.5 px-3 justify-end gap-2 ${
 				showScrollToBottom ? "opacity-100" : enableButtons ? "opacity-100" : "opacity-50"
 			}`}>
 			{showScrollToBottom ? (

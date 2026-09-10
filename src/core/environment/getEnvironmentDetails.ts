@@ -238,6 +238,14 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 		volatileDetails += `\n\n# Current Time\nCurrent time in ISO 8601 UTC format: ${roundedIso}\nUser time zone: ${timeZone}, UTC${timeZoneOffsetStr}`
 	}
 
+	// 11. Sibling Tabs in Session (volatile — live tab status updates)
+	if (mirror.sessionId && mirrorProvider) {
+		const sessionContext = await mirrorProvider.buildSessionSharedContext(mirror.taskId)
+		if (sessionContext) {
+			volatileDetails += `\n\n${sessionContext}`
+		}
+	}
+
 	if (volatileDetails) {
 		details += volatileDetails
 	}

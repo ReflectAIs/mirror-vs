@@ -130,7 +130,7 @@ export class TaskApiRequest {
 				undefined, // todoList
 				this.task.api.getModel().id,
 				provider.getSkillsManager(),
-				await provider.buildSessionSharedContext(this.task.taskId),
+				provider.buildStaticSessionContext(this.task.taskId),
 				this.task.worktreePath || this.task.workspacePath,
 				this.task.sandboxPath,
 				this.task.sandboxPath ? WorktreeSandboxManager.getBranchName(this.task.taskId) : undefined,

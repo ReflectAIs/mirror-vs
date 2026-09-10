@@ -145,7 +145,7 @@ const ChatRow = memo(
 		const prevHeightRef = useRef(0)
 
 		const [chatrow, { height }] = useSize(
-			<div className="px-[15px] py-[10px] pr-[6px]" data-ts={message.ts}>
+			<div className="px-3 py-1.5" data-ts={message.ts}>
 				<ChatRowContent {...props} />
 			</div>,
 		)
@@ -365,8 +365,7 @@ export const ChatRowContent = ({
 							getIconSpan("error", errorColor)
 						)
 					) : cost !== null &&
-					  cost !== undefined ? // Request completed — no icon. A static icon here reads as a
-					// stuck spinner; the cost badge already marks the finished row.
+					  cost !== undefined ? // stuck spinner; the cost badge already marks the finished row. // Request completed — no icon. A static icon here reads as a
 					// The live spinner (below) only shows while the request is
 					// actually in progress.
 					null : apiRequestFailedMessage ? (
@@ -417,7 +416,7 @@ export const ChatRowContent = ({
 		alignItems: "center",
 		gap: "10px",
 		cursor: "default",
-		marginBottom: "10px",
+		marginBottom: "6px",
 		wordBreak: "break-word",
 	}
 
@@ -1646,8 +1645,8 @@ export const ChatRowContent = ({
 					)
 				case "text":
 					return (
-						<div className="group my-2 p-1 transition-all">
-							<div className="flex items-center gap-2 mb-1.5">
+						<div className="group my-0.5 px-0.5 py-0.5 transition-all">
+							<div className="flex items-center gap-2 mb-1">
 								<div className="size-6.5 rounded-full flex items-center justify-center overflow-hidden shrink-0">
 									<img src={MIRROR_LOGO_DATA_URI} alt="Mirror VS" className="size-6 object-contain" />
 								</div>
@@ -1685,7 +1684,7 @@ export const ChatRowContent = ({
 					return (
 						<div
 							className={cn(
-								"group my-2.5 p-3 rounded-xl transition-all relative overflow-hidden",
+								"group my-1.5 p-3 rounded-xl transition-all relative overflow-hidden",
 								isSticky
 									? "border border-vscode-button-background/25 bg-vscode-sideBar-background/90 backdrop-blur-md shadow-md"
 									: "border border-vscode-editorGroup-border/60 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 hover:border-mirror-brand-via/35 shadow-xs",

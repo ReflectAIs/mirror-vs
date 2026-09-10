@@ -61,12 +61,14 @@ export const generateSystemPrompt = async (provider: MirrorProvider, message: We
 				.get<boolean>("newTaskRequireTodos", false),
 			isStealthModel: modelInfo?.isStealthModel,
 			reasoningEffort: apiConfiguration?.reasoningEffort,
-			supportsNativeReasoning: !!((modelInfo as any)?.supportsReasoningBudget || (modelInfo as any)?.supportsReasoningEffort),
+			supportsNativeReasoning: !!(
+				(modelInfo as any)?.supportsReasoningBudget || (modelInfo as any)?.supportsReasoningEffort
+			),
 		},
 		undefined, // todoList
 		undefined, // modelId
 		provider.getSkillsManager(),
-		await provider.buildSessionSharedContext(provider.getCurrentTask()?.taskId),
+		provider.buildStaticSessionContext(provider.getCurrentTask()?.taskId),
 	)
 
 	return systemPrompt

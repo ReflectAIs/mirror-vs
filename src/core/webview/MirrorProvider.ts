@@ -2189,6 +2189,21 @@ export class MirrorProvider
 	}
 
 	/**
+	 * Builds an invariant static `# Session Shared Context` directive for the system prompt.
+	 * Kept deterministic across turns and tasks to guarantee prompt cache stability.
+	 */
+	public buildStaticSessionContext(taskId?: string): string {
+		const task = taskId
+			? (this.mirrorStack.find((t) => t.taskId === taskId) ??
+				[...this.backgroundTasks.values()].find((t) => t.taskId === taskId))
+			: this.getCurrentTask()
+		if (!task?.sessionId) {
+			return ""
+		}
+		return this.getSessionContextManager().buildStaticSessionDirective(task.sessionId)
+	}
+
+	/**
 	 * Builds the compact `# Session Shared Context` section for the given task's
 	 * session. Falls back to the current task when no taskId is supplied.
 	 * Returns "" when the task has no session, so callers inject nothing.

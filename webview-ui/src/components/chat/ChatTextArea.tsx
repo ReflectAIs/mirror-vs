@@ -1000,7 +1000,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					"flex flex-col gap-1.5 outline-none box-border transition-all duration-200",
 					isEditMode
 						? "p-2 w-full bg-editor-background"
-						: "relative px-2.5 pt-2 pb-2 mb-2 w-[calc(100%-16px)] ml-auto mr-auto rounded-xl border border-white/10 bg-[rgba(18,18,26,0.85)] backdrop-blur-md shadow-lg focus-within:border-mirror-brand-via/50 focus-within:shadow-[0_0_20px_rgba(168,85,247,0.12)]",
+						: "relative px-2.5 pt-2 pb-2 mb-2 w-[calc(100%-24px)] ml-auto mr-auto rounded-xl border border-white/10 bg-[rgba(18,18,26,0.85)] backdrop-blur-md shadow-lg focus-within:border-mirror-brand-via/50 focus-within:shadow-[0_0_20px_rgba(168,85,247,0.12)]",
 				)}>
 				<div className={cn(!isEditMode && "relative")}>
 					<div
@@ -1367,7 +1367,10 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 										paddingRight: "20px",
 									}}>
 									{modelOptions.map((opt) => (
-										<option key={opt.value} value={opt.value} className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+										<option
+											key={opt.value}
+											value={opt.value}
+											className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 											{opt.label}
 										</option>
 									))}

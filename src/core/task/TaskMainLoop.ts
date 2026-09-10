@@ -326,7 +326,7 @@ export class TaskMainLoop {
 							{ type: "text" as const, text: `<user_message>\n${queued.text}\n</user_message>` },
 							...imageBlocks,
 						]
-						includeFileDetails = true
+						includeFileDetails = false // Subsequent user follow-ups in an ongoing task do not need the full file tree re-dumped
 						continue
 					}
 

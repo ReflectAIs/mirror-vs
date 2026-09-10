@@ -409,7 +409,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							itemContent={itemContent}
 							followOutput={followOutputCallback2}
 							atBottomStateChange={atBottomStateChangeCallback2}
-							atBottomThreshold={10}
+							atBottomThreshold={48}
 							startReached={() => setMessageLimit((prev) => prev + 100)}
 							components={virtuosoComponents}
 						/>
@@ -497,7 +497,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				</div>
 			)}
 			{showWorktreesInHomeScreen && (
-				<div className="px-2 mb-0.5">
+				<div className="px-3 mb-1">
 					<WorktreeSelector />
 				</div>
 			)}

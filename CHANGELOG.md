@@ -2,6 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.8.4] - 2026-09-10
+
+### Optimized & Fixed
+
+- **Stable Prefix Caching**: Decoupled dynamic multi-tab sibling context from the system prompt into static session directives, preventing sibling tab updates from invalidating 100% of prefix caches on OpenAI, DeepSeek, Fireworks, and vLLM. Live sibling status is now streamed at the tail of user turns via environment details.
+- **OpenAI & Custom Proxy Cache Tracking**: Fixed `OpenAiHandler` streaming responses dropping `cacheReadTokens` and ignoring `prompt_tokens_details.cached_tokens`. Cached tokens are now accurately reported in the UI and discounted in cost calculations.
+- **Redundant File Tree Elimination**: Stopped re-dumping the recursive 200-file workspace tree on user follow-up messages, saving 1,000–3,000 input tokens per follow-up interaction.
+- **Anthropic Tool Cache Breakpoint**: Attached ephemeral prompt cache breakpoints to the native tool catalog, ensuring 4,000–6,000 tokens of tool schemas are cached across requests.
+- **Chat Window Alignment**: Fixed asymmetrical horizontal padding across message rows, tool cards, and queued messages to align symmetrically with the toolbar, status badges, and text input box.
+- **Spacing Between File Edits and Bot Messages**: Eliminated ghost completed API request rows, zeroed top margin on initial markdown elements, and tightened message wrappers to remove excessive whitespace gaps.
+- **Smooth Auto-Scroll**: Increased bottom detection threshold to 48px to eliminate stutter and rapid re-render oscillations during streaming token delivery, and batched scroll commands with `requestAnimationFrame`.
+
 ## [0.8.3] - 2026-09-10
 
 ### Added

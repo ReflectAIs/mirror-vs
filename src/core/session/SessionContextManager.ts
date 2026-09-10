@@ -118,11 +118,27 @@ export class SessionContextManager {
 		return undefined
 	}
 
-	// ── Compact summary (injected into system prompt) ──────────────────────
+	// ── Static session directive (for system prompt cache stability) ──────
 
 	/**
-	 * Builds a compact `# Session Shared Context` section for the system prompt.
-	 * Always includes the sibling roster plus counts for knowledge/notes, so the
+	 * Builds an invariant static `# Session Shared Context` directive for the system prompt.
+	 * Kept deterministic and stable across turns and tasks to preserve prefix caching.
+	 */
+	public buildStaticSessionDirective(sessionId?: string): string {
+		if (!sessionId) {
+			return ""
+		}
+		return [
+			"# Session Shared Context",
+			"You are working inside a workspace session that may contain multiple tabs (independent tasks). Each tab is a separate task, but you may share selective context with them. Use the `read_session_context` tool to inspect sibling tabs, shared knowledge, or notes on demand.",
+		].join("\n")
+	}
+
+	// ── Compact summary (injected into environment details / live updates) ─
+
+	/**
+	 * Builds a compact `# Session Shared Context` section.
+	 * Includes the sibling roster plus counts for knowledge/notes, so the
 	 * model knows deeper context exists and can call `read_session_context`.
 	 */
 	public async buildCompactSummary(sessionId: string, currentTaskId?: string): Promise<string> {

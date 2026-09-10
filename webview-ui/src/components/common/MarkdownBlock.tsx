@@ -118,9 +118,19 @@ const StyledMarkdown = styled.div`
 		list-style-type: lower-roman;
 	}
 
+	> :first-child,
+	p:first-child,
+	h1:first-child,
+	h2:first-child,
+	h3:first-child,
+	ul:first-child,
+	ol:first-child {
+		margin-top: 0;
+	}
+
 	p {
 		white-space: pre-wrap;
-		margin: 1em 0 0.25em;
+		margin: 0.75em 0 0.25em;
 	}
 
 	/* Prevent layout shifts during streaming */

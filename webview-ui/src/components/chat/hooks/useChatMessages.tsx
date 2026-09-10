@@ -32,6 +32,7 @@ import { getApiMetrics } from "@shared/getApiMetrics"
 import { getAllModes } from "@shared/modes"
 import { ProfileValidator } from "@shared/ProfileValidator"
 import { getLatestTodo } from "@shared/todo"
+import { safeJsonParse } from "@shared/core"
 
 import { vscode } from "@src/utils/vscode"
 import { useDebounceEffect } from "@src/utils/useDebounceEffect"
@@ -1484,6 +1485,17 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					return false
 				}
 				if (message.text && userMessageCheckpointHashes.has(message.text)) {
+					return false
+				}
+			}
+
+			// Successfully finished api_req_started (has cost, no error/cancel) shouldn't render
+			// as an empty ghost row in the chat since live session cost is already shown in the top toolbar.
+			if (message.say === "api_req_started" && message.text) {
+				const info = safeJsonParse<{ cost?: number; cancelReason?: string; streamingFailedMessage?: string }>(
+					message.text,
+				)
+				if (info?.cost !== undefined && !info.cancelReason && !info.streamingFailedMessage) {
 					return false
 				}
 			}
