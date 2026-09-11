@@ -133,7 +133,7 @@ const ChatToolbar = ({
 						<MirrorHero activity={activity as any} size="small" />
 					</div>
 					<div className="flex flex-col min-w-0 overflow-hidden">
-						<span className="font-bold text-xs sm:text-sm tracking-wide bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent shrink-0">
+						<span className="font-semibold text-xs sm:text-sm tracking-tight text-vscode-foreground shrink-0">
 							Mirror VS
 						</span>
 						{isEditingSession ? (
