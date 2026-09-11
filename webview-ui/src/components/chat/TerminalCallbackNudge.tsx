@@ -3,6 +3,7 @@ import { ChevronDown, CheckCircle2, XCircle, Terminal, ArrowUpRight, Copy, Check
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui"
 import { vscode } from "@/utils/vscode"
+import { detectInteractivePrompt } from "./CommandExecution"
 
 interface TerminalCallbackNudgeProps {
 	text?: string
@@ -15,6 +16,7 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 	const [copied, setCopied] = useState(false)
 	const [terminalInput, setTerminalInput] = useState("")
 	const [inputSentFeedback, setInputSentFeedback] = useState(false)
+	const [showInputManually, setShowInputManually] = useState(false)
 
 	const parsed = useMemo(() => {
 		if (!text) return { command: "", cwd: "", exitStatus: "", output: "", isNotice: false }
@@ -70,6 +72,14 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 		parsed.exitStatus !== "Running"
 
 	const isRunning = parsed.exitStatus === "Running"
+
+	const hasInteractivePrompt = useMemo(() => {
+		if (!isRunning && !parsed.isNotice) return false
+		return detectInteractivePrompt(parsed.output)
+	}, [isRunning, parsed.isNotice, parsed.output])
+
+	const shouldShowInteractiveInput =
+		(isRunning || parsed.isNotice) && (hasInteractivePrompt || showInputManually || parsed.isNotice)
 
 	const handleJumpToCommand = useCallback(() => {
 		// Try to find the closest previous command DOM element or scroll up
@@ -148,6 +158,22 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 				</div>
 
 				<div className="flex items-center gap-1 shrink-0">
+					{(isRunning || parsed.isNotice) && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setShowInputManually((prev) => !prev)}
+							className={cn(
+								"h-5 text-[10px] px-1.5 flex items-center gap-0.5 cursor-pointer transition-colors",
+								hasInteractivePrompt || showInputManually
+									? "text-amber-400 bg-amber-500/10"
+									: "text-vscode-descriptionForeground hover:text-vscode-foreground",
+							)}
+							title={showInputManually ? "Hide input" : "Send input"}>
+							<Terminal className="size-2.5" />
+							<span>Input</span>
+						</Button>
+					)}
 					{parsed.output && (
 						<Button
 							variant="ghost"
@@ -189,10 +215,15 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 				</div>
 			)}
 
-			{(isRunning || parsed.isNotice) && (
-				<div className="px-2.5 py-1.5 border-t border-vscode-panel-border/20 flex flex-col gap-1.5 bg-vscode-input-background/20">
+			{shouldShowInteractiveInput && (
+				<div className="px-2.5 py-1.5 border-t border-vscode-panel-border/20 flex flex-col gap-1.5 bg-vscode-input-background/20 animate-in fade-in duration-200">
 					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground">
-						<span>Interactive Terminal Input:</span>
+						<span className="flex items-center gap-1 font-medium">
+							{hasInteractivePrompt && (
+								<span className="size-1 rounded-full bg-amber-400 animate-pulse" />
+							)}
+							Interactive Terminal Input:
+						</span>
 						{inputSentFeedback && (
 							<span className="text-emerald-400 flex items-center gap-0.5">
 								<Check className="size-2.5" /> Sent to terminal

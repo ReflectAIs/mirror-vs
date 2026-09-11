@@ -1,7 +1,7 @@
 import { useCallback, useState, memo, useMemo } from "react"
 import { useEvent } from "react-use"
 import { t } from "i18next"
-import { ChevronDown, OctagonX, Check } from "lucide-react"
+import { ChevronDown, OctagonX, Check, Terminal as TerminalIcon } from "lucide-react"
 
 import { type ExtensionMessage, type CommandExecutionStatus, commandExecutionStatusSchema } from "@mirror-vs/types"
 
@@ -19,6 +19,18 @@ import CodeBlock from "@src/components/common/CodeBlock"
 
 import { CommandPatternSelector } from "./CommandPatternSelector"
 import { TerminalOutput } from "./TerminalOutput"
+
+// Heuristic pattern to detect interactive prompts waiting for user input
+export const INTERACTIVE_PROMPT_REGEX =
+	/(?:\[[yYnN]\/[yYnN]\]|\([yYnN]\/[yYnN]\)|\b(?:password|passphrase|username):\s*$|\b(?:confirm|continue\?|proceed\?|are you sure\?)\s*$|\[\s*(?:yes|no)\s*\]|\?\s*\[[^\]]+\]|\(yes\/no\)\s*\??\s*$|Press\s+\[?Enter\]?\s+to\s+continue|Do you want to continue\?|\(Y\/n\)|\(y\/N\))/i
+
+export function detectInteractivePrompt(output: string): boolean {
+	if (!output) return false
+	// Check the tail of the output (last 600 characters or last 5 lines)
+	const tail = output.slice(-600).trim()
+	if (!tail) return false
+	return INTERACTIVE_PROMPT_REGEX.test(tail)
+}
 
 interface CommandPattern {
 	pattern: string
@@ -49,6 +61,7 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 	const [status, setStatus] = useState<CommandExecutionStatus | null>(null)
 	const [interactiveInput, setInteractiveInput] = useState("")
 	const [inputSentFeedback, setInputSentFeedback] = useState(false)
+	const [showInputManually, setShowInputManually] = useState(false)
 
 	const handleSendInput = useCallback(
 		(customVal?: string) => {
@@ -68,6 +81,14 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 	// task message (this is the case for completed commands) or from the
 	// streaming output (this is the case for running commands).
 	const output = streamingOutput || parsedOutput
+
+	// Check whether the terminal is currently waiting on an interactive prompt (e.g. y/n, password, confirm)
+	const hasInteractivePrompt = useMemo(() => {
+		if (status?.status !== "started") return false
+		return detectInteractivePrompt(output)
+	}, [status?.status, output])
+
+	const shouldShowInteractiveInput = status?.status === "started" && (hasInteractivePrompt || showInputManually)
 
 	// Extract command patterns from the actual command that was executed
 	const commandPatterns = useMemo<CommandPattern[]>(() => {
@@ -191,6 +212,23 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 										(PID: {status.pid})
 									</div>
 								)}
+								<StandardTooltip
+									content={showInputManually ? "Hide terminal input" : "Send terminal input"}>
+									<Button
+										variant="ghost"
+										size="icon"
+										className={cn(
+											"size-6",
+											(hasInteractivePrompt || showInputManually) &&
+												"text-amber-400 bg-amber-500/10",
+										)}
+										onClick={(e) => {
+											e.stopPropagation()
+											setShowInputManually((prev) => !prev)
+										}}>
+										<TerminalIcon className="size-3.5" />
+									</Button>
+								</StandardTooltip>
 								<StandardTooltip content={t("chat:commandExecution.abort")}>
 									<Button
 										variant="ghost"
@@ -232,10 +270,15 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 					<CodeBlock source={command} language="shell" />
 					<OutputContainer isExpanded={isExpanded} output={output} />
 				</div>
-				{status?.status === "started" && (
-					<div className="px-2.5 py-2 border-t border-vscode-panel-border/30 flex flex-col gap-1.5 bg-vscode-input-background/15">
+				{shouldShowInteractiveInput && (
+					<div className="px-2.5 py-2 border-t border-vscode-panel-border/30 flex flex-col gap-1.5 bg-vscode-input-background/15 animate-in fade-in duration-200">
 						<div className="flex items-center justify-between text-[11px] text-vscode-descriptionForeground">
-							<span>Interactive Input (Background Process PID {status.pid || ""}):</span>
+							<span className="flex items-center gap-1.5 font-medium">
+								{hasInteractivePrompt && (
+									<span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+								)}
+								Interactive Input (Background Process PID {status?.pid || ""}):
+							</span>
 							{inputSentFeedback && (
 								<span className="text-emerald-400 flex items-center gap-1 text-[11px]">
 									<Check className="size-3" /> Sent to process
