@@ -220,7 +220,7 @@ const ChatToolbar = ({
 							setShowRetiredProviderWarning(false)
 							vscode.postMessage({ type: "clearTask" })
 						}}
-						title="New Session (Fresh Workspace / Reset Tasks)">
+						title="New Session">
 						<span className="codicon codicon-add text-xs flex items-center justify-center" />
 					</Button>
 					<Button

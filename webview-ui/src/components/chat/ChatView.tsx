@@ -212,22 +212,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	useEffect(() => {
 		if (isTaskCompleted) {
 			resetToBottom2()
-			// Staggered layout passes to account for Markdown rendering and card height changes
-			const timeouts: NodeJS.Timeout[] = []
-			const rafId1 = requestAnimationFrame(() => {
+			const rafId = requestAnimationFrame(() => {
 				scrollToBottomAuto2()
-				const rafId2 = requestAnimationFrame(() => {
-					scrollToBottomAuto2()
-				})
-				timeouts.push(setTimeout(() => scrollToBottomAuto2(), 50))
-				timeouts.push(setTimeout(() => scrollToBottomAuto2(), 150))
-				timeouts.push(setTimeout(() => scrollToBottomAuto2(), 300))
-				return () => cancelAnimationFrame(rafId2)
 			})
-			return () => {
-				cancelAnimationFrame(rafId1)
-				timeouts.forEach(clearTimeout)
-			}
+			return () => cancelAnimationFrame(rafId)
 		}
 	}, [isTaskCompleted, lastDisplayedMessage?.ts, resetToBottom2, scrollToBottomAuto2])
 

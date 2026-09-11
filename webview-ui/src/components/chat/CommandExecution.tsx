@@ -181,169 +181,106 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 
 	useEvent("message", onMessage)
 
+	const isRunning = status?.status === "started"
+	const isSuccess = status?.status === "exited" && status.exitCode === 0
+	const isFailed = status?.status === "exited" && status.exitCode !== 0
+
 	return (
-		<>
+		<div className="my-1 select-none">
 			<div
-				className="flex flex-row items-center justify-between gap-2 mb-1 cursor-pointer select-none"
+				className="flex items-center justify-between gap-2 py-1 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 cursor-pointer select-none group transition-colors text-xs"
 				onClick={() => setIsExpanded(!isExpanded)}>
-				<div className="flex flex-row items-center gap-2">
-					{icon}
-					{title}
-					{status?.status === "exited" && (
-						<div className="flex flex-row items-center gap-2 font-mono text-xs">
-							<StandardTooltip
-								content={t("chat.commandExecution.exitStatus", { exitStatus: status.exitCode })}>
-								<div
-									className={cn(
-										"rounded-full size-2",
-										status.exitCode === 0 ? "bg-green-600" : "bg-red-600",
-									)}
-								/>
-							</StandardTooltip>
-						</div>
-					)}
+				<div className="flex items-center gap-2 min-w-0 flex-1">
+					<TerminalIcon className="size-3.5 text-vscode-descriptionForeground shrink-0" />
+					<span className="text-vscode-descriptionForeground/70 text-[11px] shrink-0 font-normal">
+						{isRunning ? "Running" : isSuccess ? "Ran command" : isFailed ? "Command failed" : "Terminal"}
+					</span>
+					<code
+						className="font-mono text-[11.5px] text-vscode-foreground font-semibold truncate"
+						title={command}>
+						{command}
+					</code>
 				</div>
-				<div className=" flex flex-row items-center justify-between gap-2 px-1">
-					<div className="flex flex-row items-center gap-1">
-						{status?.status === "started" && (
-							<div className="flex flex-row items-center gap-2 font-mono text-xs">
-								{status.pid && (
-									<div className="whitespace-nowrap text-vscode-descriptionForeground">
-										(PID: {status.pid})
-									</div>
-								)}
-								<StandardTooltip
-									content={showInputManually ? "Hide terminal input" : "Send terminal input"}>
-									<Button
-										variant="ghost"
-										size="icon"
-										className={cn(
-											"size-6",
-											(hasInteractivePrompt || showInputManually) &&
-												"text-amber-400 bg-amber-500/10",
-										)}
-										onClick={(e) => {
-											e.stopPropagation()
-											setShowInputManually((prev) => !prev)
-										}}>
-										<TerminalIcon className="size-3.5" />
-									</Button>
-								</StandardTooltip>
-								<StandardTooltip content={t("chat:commandExecution.abort")}>
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={(e) => {
-											e.stopPropagation()
-											vscode.postMessage({
-												type: "terminalOperation",
-												terminalOperation: "abort",
-											})
-										}}>
-										<OctagonX className="size-4" />
-									</Button>
-								</StandardTooltip>
-							</div>
+				<div className="flex items-center gap-1.5 shrink-0">
+					{isRunning && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />}
+					{isSuccess && <span className="text-emerald-400 text-[10px] font-medium shrink-0">✓</span>}
+					{isFailed && (
+						<span className="text-red-400 text-[10px] font-medium shrink-0">✗ ({status.exitCode})</span>
+					)}
+					{isRunning && (
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation()
+								vscode.postMessage({ type: "terminalOperation", terminalOperation: "abort" })
+							}}
+							className="text-red-400 hover:text-red-300 p-0.5 rounded hover:bg-vscode-toolbar-hoverBackground cursor-pointer"
+							title="Abort command">
+							<OctagonX className="size-3" />
+						</button>
+					)}
+					<ChevronDown
+						className={cn(
+							"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
+							isExpanded ? "rotate-0" : "-rotate-90",
 						)}
-						{output.length > 0 && (
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={(e) => {
-									e.stopPropagation()
-									setIsExpanded(!isExpanded)
-								}}>
-								<ChevronDown
-									className={cn(
-										"size-4 transition-transform duration-300",
-										isExpanded && "rotate-180",
-									)}
-								/>
-							</Button>
-						)}
-					</div>
+					/>
 				</div>
 			</div>
 
-			<div className="bg-vscode-editor-background border border-vscode-border rounded-xs ml-6 mt-2 overflow-hidden">
-				<div className="p-2">
-					<CodeBlock source={command} language="shell" />
-					<OutputContainer isExpanded={isExpanded} output={output} />
+			{isExpanded && (
+				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 flex flex-col gap-1.5 my-1">
+					{output.length > 0 && (
+						<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[220px] overflow-auto">
+							<TerminalOutput content={output} />
+						</div>
+					)}
+					{command && command.trim() && (
+						<CommandPatternSelector
+							patterns={commandPatterns}
+							allowedCommands={allowedCommands}
+							deniedCommands={deniedCommands}
+							onAllowPatternChange={handleAllowPatternChange}
+							onDenyPatternChange={handleDenyPatternChange}
+						/>
+					)}
 				</div>
-				{shouldShowInteractiveInput && (
-					<div className="px-2.5 py-2 border-t border-vscode-panel-border/30 flex flex-col gap-1.5 bg-vscode-input-background/15 animate-in fade-in duration-200">
-						<div className="flex items-center justify-between text-[11px] text-vscode-descriptionForeground">
-							<span className="flex items-center gap-1.5 font-medium">
-								{hasInteractivePrompt && (
-									<span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
-								)}
-								Interactive Input (Background Process PID {status?.pid || ""}):
-							</span>
-							{inputSentFeedback && (
-								<span className="text-emerald-400 flex items-center gap-1 text-[11px]">
-									<Check className="size-3" /> Sent to process
-								</span>
-							)}
-						</div>
-						<div className="flex items-center gap-1.5">
-							<div className="flex items-center gap-1 shrink-0">
-								<button
-									type="button"
-									onClick={() => handleSendInput("y")}
-									className="h-6 px-2 rounded text-[11px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
-									title="Send 'y' (Yes)">
-									y
-								</button>
-								<button
-									type="button"
-									onClick={() => handleSendInput("n")}
-									className="h-6 px-2 rounded text-[11px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
-									title="Send 'n' (No)">
-									n
-								</button>
-								<button
-									type="button"
-									onClick={() => handleSendInput("")}
-									className="h-6 px-2 rounded text-[11px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
-									title="Send Enter (Return)">
-									↵ Enter
-								</button>
-							</div>
-							<div className="flex items-center gap-1 flex-1 min-w-0">
-								<input
-									type="text"
-									value={interactiveInput}
-									onChange={(e) => setInteractiveInput(e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											handleSendInput()
-										}
-									}}
-									placeholder="Type response to terminal..."
-									className="h-6 px-2 text-[11px] rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border focus:border-vscode-focusBorder outline-none flex-1 min-w-0"
-								/>
-								<Button
-									variant="primary"
-									size="sm"
-									onClick={() => handleSendInput()}
-									className="h-6 px-2.5 text-[11px] flex items-center gap-1 shrink-0 cursor-pointer">
-									<span>Send</span>
-								</Button>
-							</div>
-						</div>
-					</div>
-				)}
-				{command && command.trim() && (
-					<CommandPatternSelector
-						patterns={commandPatterns}
-						allowedCommands={allowedCommands}
-						deniedCommands={deniedCommands}
-						onAllowPatternChange={handleAllowPatternChange}
-						onDenyPatternChange={handleDenyPatternChange}
+			)}
+
+			{shouldShowInteractiveInput && (
+				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 py-1 flex items-center gap-1.5">
+					<span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+					<button
+						type="button"
+						onClick={() => handleSendInput("y")}
+						className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground cursor-pointer">
+						y
+					</button>
+					<button
+						type="button"
+						onClick={() => handleSendInput("n")}
+						className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground cursor-pointer">
+						n
+					</button>
+					<input
+						type="text"
+						value={interactiveInput}
+						onChange={(e) => setInteractiveInput(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") handleSendInput()
+						}}
+						placeholder="Terminal response..."
+						className="h-5 px-1.5 text-[10px] rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border outline-none flex-1 min-w-0"
 					/>
-				)}
-			</div>
-		</>
+					<button
+						type="button"
+						onClick={() => handleSendInput()}
+						className="h-5 px-2 text-[10px] rounded bg-vscode-button-background text-vscode-button-foreground cursor-pointer">
+						Send
+					</button>
+				</div>
+			)}
+		</div>
 	)
 }
 

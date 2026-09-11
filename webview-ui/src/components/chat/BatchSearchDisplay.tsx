@@ -1,6 +1,7 @@
 import { memo, useState } from "react"
 import CodeAccordion from "../common/CodeAccordion"
 import { vscode } from "@src/utils/vscode"
+import { FileOperationItem } from "./FileOperationItem"
 
 export interface BatchSearchItem {
 	tool: string
@@ -33,7 +34,7 @@ export const BatchSearchDisplay = memo(({ searches = [], ts }: BatchSearchDispla
 	}
 
 	return (
-		<div className="pt-[5px] flex flex-col gap-1.5">
+		<div className="flex flex-col gap-0.5">
 			{searches.map((search, index) => {
 				const itemKey = search.key || `${search.tool}-${index}-${ts}`
 				const queryText = search.query || search.regex || ""
@@ -46,21 +47,34 @@ export const BatchSearchDisplay = memo(({ searches = [], ts }: BatchSearchDispla
 				if (search.content) {
 					const accordionTitle = pathText ? `"${queryText}" in ${pathText}` : `"${queryText}"`
 					return (
-						<div key={itemKey}>
-							<CodeAccordion
-								path={accordionTitle}
-								code={search.content}
-								language="shellsession"
-								isExpanded={expandedItems[itemKey] || false}
-								onToggleExpand={() => handleToggleExpand(itemKey)}
+						<div key={itemKey} className="flex flex-col gap-0.5">
+							<FileOperationItem
+								verb="Searched"
+								filePath={pathText || accordionTitle}
+								lineRange={queryText ? `"${queryText}"` : undefined}
+								onClick={() => handleToggleExpand(itemKey)}
 							/>
+							{expandedItems[itemKey] && (
+								<div className="pl-4 pt-1">
+									<CodeAccordion
+										path={accordionTitle}
+										code={search.content}
+										language="shellsession"
+										isExpanded={true}
+										onToggleExpand={() => handleToggleExpand(itemKey)}
+									/>
+								</div>
+							)}
 						</div>
 					)
 				}
 
 				return (
-					<div
+					<FileOperationItem
 						key={itemKey}
+						verb="Searched"
+						filePath={pathText || search.path || "codebase"}
+						lineRange={queryText ? `"${queryText}"` : undefined}
 						onClick={() => {
 							if (search.path) {
 								vscode.postMessage({
@@ -69,22 +83,7 @@ export const BatchSearchDisplay = memo(({ searches = [], ts }: BatchSearchDispla
 								})
 							}
 						}}
-						className={`relative flex items-center justify-between pl-3 pr-2.5 py-2 rounded-md border border-vscode-input-border/30 bg-vscode-input-background/15 ${search.path ? "hover:bg-vscode-input-background/30 hover:border-vscode-input-border/60 cursor-pointer" : ""} transition-all duration-150 ease-out group before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2.5px] before:bg-vscode-button-background before:opacity-60 before:group-hover:opacity-100 before:transition-opacity before:rounded-r`}>
-						<div className="flex items-center gap-2 overflow-hidden flex-grow mr-2">
-							<span className="codicon codicon-search text-[14px] shrink-0 text-vscode-button-background/70 group-hover:text-vscode-button-background" />
-							<span className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis text-vscode-foreground">
-								&quot;{queryText}&quot;
-							</span>
-							{pathText && (
-								<span className="text-[10px] text-vscode-descriptionForeground font-mono bg-vscode-button-background/10 px-1.5 py-0.5 rounded shrink-0">
-									{pathText}
-								</span>
-							)}
-						</div>
-						{search.path && (
-							<span className="codicon codicon-link-external text-[13px] text-vscode-descriptionForeground group-hover:text-vscode-foreground transition-colors shrink-0" />
-						)}
-					</div>
+					/>
 				)
 			})}
 		</div>

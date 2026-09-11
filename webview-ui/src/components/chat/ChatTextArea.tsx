@@ -998,7 +998,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					"flex flex-col gap-1.5 outline-none box-border",
 					isEditMode
 						? "p-2 w-full bg-editor-background"
-						: "relative px-2.5 pt-2 pb-1.5 mb-1.5 w-[calc(100%-20px)] ml-auto mr-auto rounded-lg border border-vscode-input-border bg-vscode-input-background focus-within:border-vscode-focusBorder",
+						: "relative px-2.5 pt-2 pb-1.5 mb-1.5 w-[calc(100%-20px)] ml-auto mr-auto rounded-lg border border-vscode-input-border/50 bg-vscode-input-background transition-shadow duration-200 focus-within:shadow-[0_0_0_1px_var(--vscode-focusBorder)] focus-within:border-transparent",
 				)}>
 				<div className={cn(!isEditMode && "relative")}>
 					<div
@@ -1066,7 +1066,6 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 								"flex-col-reverse",
 								"min-h-0",
 								"overflow-hidden",
-								"rounded-md",
 							)}>
 							<div
 								ref={highlightLayerRef}
@@ -1090,7 +1089,6 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									isEditMode ? "pr-16" : "pr-14",
 									"z-10",
 									"forced-color-adjust-none",
-									"rounded-md",
 								)}
 								style={{
 									color: "transparent",
@@ -1137,6 +1135,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 								maxRows={12}
 								autoFocus={true}
 								className={cn(
+									"chat-input",
 									"w-full",
 									"text-vscode-input-foreground",
 									"font-vscode-font-family",
@@ -1144,17 +1143,16 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									"leading-vscode-editor-line-height",
 									"cursor-text",
 									"py-1.5 px-1.5",
-									"border-0 outline-none focus:outline-none focus:ring-0",
+									"border-0 !outline-none !shadow-none focus:!outline-none focus:!ring-0 focus:!shadow-none",
 									isDraggingOver
 										? "bg-[color-mix(in_srgb,var(--vscode-input-background)_95%,var(--vscode-focusBorder))]"
 										: "bg-transparent",
 									"min-h-[38px]",
 									"box-border",
-									"rounded-md",
 									"resize-none",
 									"overflow-x-hidden",
 									"overflow-y-auto",
-									isEditMode ? "pr-16" : "pr-14",
+									isEditMode ? "pr-16" : hasInputContent ? "pr-20" : "pr-8",
 									"flex-none flex-grow",
 									"z-[2]",
 									"scrollbar-none",
@@ -1163,7 +1161,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 								onScroll={() => updateHighlights()}
 							/>
 
-							<div className="absolute top-1/2 -translate-y-1/2 right-1 z-30 flex items-center gap-0.5">
+							<div className="absolute bottom-1.5 right-1.5 z-30 flex items-center gap-0.5">
 								<StandardTooltip content={t("chat:addImages")}>
 									<button
 										aria-label={t("chat:addImages")}
@@ -1178,7 +1176,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 											"cursor-pointer",
 											!shouldDisableImages
 												? "opacity-60 hover:opacity-100 pointer-events-auto"
-												: "opacity-0 pointer-events-none",
+												: "hidden pointer-events-none",
 											"focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
 											!shouldDisableImages && "hover:bg-vscode-toolbar-hoverBackground",
 										)}>
@@ -1218,10 +1216,9 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 												"transition-colors duration-150",
 												"cursor-pointer",
 												hasInputContent
-													? "opacity-60 hover:opacity-100 pointer-events-auto"
-													: "opacity-0 pointer-events-none",
+													? "opacity-60 hover:opacity-100 pointer-events-auto hover:bg-vscode-toolbar-hoverBackground"
+													: "hidden pointer-events-none",
 												"focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
-												hasInputContent && "hover:bg-vscode-toolbar-hoverBackground",
 											)}>
 											<WandSparkles
 												className={cn("w-3.5 h-3.5", isEnhancingPrompt && "animate-spin")}
@@ -1281,7 +1278,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 												"transition-colors duration-150",
 												hasInputContent
 													? "opacity-90 hover:opacity-100 pointer-events-auto cursor-pointer text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground"
-													: "opacity-0 pointer-events-none",
+													: "hidden pointer-events-none",
 												"focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
 											)}>
 											<SendHorizontal className="size-3.5" />

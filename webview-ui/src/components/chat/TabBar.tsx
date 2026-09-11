@@ -167,14 +167,14 @@ const TabBar = ({ tabs, activeTabId }: TabBarProps) => {
 			<div className="flex items-center justify-between border-b border-vscode-panel-border bg-vscode-sideBar-background shrink-0 select-none">
 				{/* Tabs scroll area */}
 				<div className="flex items-center gap-0 overflow-x-auto min-w-0 flex-1">
-					{/* "+" button to create a new task/tab */}
+					{/* "+" button to add a new tab in this session */}
 					<button
 						onClick={handleNewTab}
 						className={cn(
 							"flex items-center justify-center px-2.5 py-2 text-xs cursor-pointer border-r border-vscode-panel-border transition-colors shrink-0",
 							"bg-transparent text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground",
 						)}
-						title="New tab in this session (Cmd/Ctrl+N)"
+						title="New Tab"
 						aria-label="New tab">
 						<Plus className="w-4 h-4" />
 					</button>

@@ -2,6 +2,25 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.0] - 2026-09-11
+
+### Added & Improved
+
+- **Minimalist File Operations Tree**:
+    - Replaced bulky tool cards and nested borders with a compact tree layout featuring `ToolDisclosure` and `FileOperationItem`.
+    - Integrated language-specific file icons, line ranges, and clean action verbs (`Analyzed`, `Read`, `Edited`, `Searched`).
+    - Streamlined multi-file displays for file explorations, batch search results, and batch diff approvals into clean inline listings.
+- **Unified Dynamic Edit Headers**:
+    - Consolidated separate action verbs and duplicate filenames into a single dynamic title (`Editing <filename>` while in progress, `Edited <filename>` on completion).
+    - Status indicators (`✓ Applied`, `Running...`) and diff stats (`+added -removed`) sit neatly in the disclosure status area.
+- **Default-Collapsed Diff Review Windows**:
+    - Single-file edits and diff review accordions are collapsed by default in the chat window, preventing visual clutter while remaining one-click expandable for inspection.
+- **Scroll Stuttering & ResizeObserver Optimization**:
+    - Debounced height change notifications and eliminated layout thrashing from continuous observers on historical messages, preventing webview gray-screen crashes.
+- **Input & Navigation Refinements**:
+    - Pinned image attachment button to the bottom-right corner of the chat input box without floating drift during multi-line input.
+    - Simplified new tab vs new session actions with clear, minimal tooltips.
+
 ## [0.8.5] - 2026-09-11
 
 ### Added

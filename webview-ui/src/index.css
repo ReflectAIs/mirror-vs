@@ -590,7 +590,7 @@
 
 /* Form Element Focus States */
 
-textarea:focus {
+textarea:focus:not(.chat-input) {
 	outline: 1.5px solid var(--vscode-focusBorder, #007fd4);
 }
 
@@ -1074,7 +1074,7 @@ select {
 }
 
 input:focus,
-textarea:focus,
+textarea:focus:not(.chat-input),
 select:focus {
 	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007fd4);
 }

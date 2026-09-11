@@ -53,6 +53,8 @@ import { MIRROR_LOGO_DATA_URI } from "@/assets/logoData"
 import { AutoApprovedRequestLimitWarning } from "./AutoApprovedRequestLimitWarning"
 import { InProgressRow, CondensationResultRow, CondensationErrorRow, TruncationResultRow } from "./context-management"
 import CodebaseSearchResultsDisplay from "./CodebaseSearchResultsDisplay"
+import { FileOperationItem } from "./FileOperationItem"
+import { ToolDisclosure } from "./ToolDisclosure"
 import { appendImages } from "@src/utils/imageUtils"
 import { McpExecution } from "./McpExecution"
 import { ChatTextArea } from "./ChatTextArea"
@@ -145,8 +147,8 @@ const ChatRow = memo(
 	(props: ChatRowProps) => {
 		const { isLast, onHeightChange, message } = props
 		// Store the previous height to compare with the current height
-		// This allows us to detect changes without causing re-renders
 		const prevHeightRef = useRef(0)
+		const debounceTimeoutRef = useRef<number | null>(null)
 
 		const [chatrow, { height }] = useSize(
 			<div className="px-3 py-1.5" data-ts={message.ts}>
@@ -155,18 +157,37 @@ const ChatRow = memo(
 		)
 
 		useEffect(() => {
+			if (!isLast) {
+				if (debounceTimeoutRef.current !== null) {
+					window.clearTimeout(debounceTimeoutRef.current)
+					debounceTimeoutRef.current = null
+				}
+				return
+			}
 			const isHeightValid = height !== 0 && height !== Infinity
-			// used for partials, command output, etc.
-			// NOTE: it's important we don't distinguish between partial or complete here since our scroll effects in chatview need to handle height change during partial -> complete
-			const isInitialRender = prevHeightRef.current === 0 // prevents scrolling when new element is added since we already scroll for that
-			// height starts off at Infinity
-			if (isLast && isHeightValid && height !== prevHeightRef.current) {
+			const isInitialRender = prevHeightRef.current === 0
+
+			// Require minimum 6px delta to prevent sub-pixel layout thrash and debounced execution
+			if (isHeightValid && Math.abs(height - prevHeightRef.current) >= 6) {
 				if (!isInitialRender) {
-					onHeightChange(height > prevHeightRef.current)
+					if (debounceTimeoutRef.current !== null) {
+						window.clearTimeout(debounceTimeoutRef.current)
+					}
+					debounceTimeoutRef.current = window.setTimeout(() => {
+						onHeightChange(height > prevHeightRef.current)
+						debounceTimeoutRef.current = null
+					}, 50)
 				}
 				prevHeightRef.current = height
 			}
-		}, [height, isLast, onHeightChange, message])
+
+			return () => {
+				if (debounceTimeoutRef.current !== null) {
+					window.clearTimeout(debounceTimeoutRef.current)
+					debounceTimeoutRef.current = null
+				}
+			}
+		}, [height, isLast, onHeightChange])
 
 		// we cannot return null as virtuoso does not support it, so we use a separate visibleMessages array to filter out messages that should not be rendered
 		return chatrow
@@ -457,36 +478,13 @@ export const ChatRowContent = ({
 			const searchCount = batchSearches.length
 
 			return (
-				<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all overflow-hidden text-xs shadow-xs group">
-					<div
-						className="flex items-center justify-between px-3 py-2 cursor-pointer select-none gap-2"
-						onClick={handleToggleBatchExpand}>
-						<div className="flex items-center gap-2 min-w-0">
-							<div className="size-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
-								<Search className="size-3.5" aria-label="Search icon" />
-							</div>
-							<span className="font-medium text-vscode-foreground truncate">
-								Searched {searchCount} {searchCount === 1 ? "location" : "locations"}
-							</span>
-						</div>
-						<div className="flex items-center gap-1.5 shrink-0">
-							{message.isAnswered && (
-								<span className="text-[10px] text-emerald-400 font-medium mr-0.5">✓ Done</span>
-							)}
-							<ChevronDown
-								className={cn(
-									"size-3.5 text-vscode-descriptionForeground/70 transition-transform duration-200",
-									isBatchExpanded && "rotate-180",
-								)}
-							/>
-						</div>
-					</div>
-					{isBatchExpanded && (
-						<div className="border-t border-vscode-editorGroup-border/20 p-2.5 bg-vscode-editor-background/20">
-							<BatchSearchDisplay searches={batchSearches} ts={message?.ts} />
-						</div>
-					)}
-				</div>
+				<ToolDisclosure
+					title={`Searched ${searchCount} ${searchCount === 1 ? "location" : "locations"}`}
+					isExpanded={isBatchExpanded}
+					onToggle={handleToggleBatchExpand}
+					status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
+					<BatchSearchDisplay searches={batchSearches} ts={message?.ts} />
+				</ToolDisclosure>
 			)
 		}
 
@@ -505,133 +503,81 @@ export const ChatRowContent = ({
 				const batchDiffs = tool.batchDiffs
 				if (batchDiffs && Array.isArray(batchDiffs) && batchDiffs.length > 0) {
 					const diffCount = batchDiffs.length
-					const isPendingApproval = message.type === "ask" && !message.isAnswered
 
 					return (
-						<div className="group">
-							<div
-								className="flex items-center justify-between cursor-pointer select-none"
-								style={{
-									...headerStyle,
-									marginBottom: isBatchExpanded ? 6 : 0,
-								}}
-								onClick={handleToggleBatchExpand}>
-								<div className="flex items-center gap-2">
-									<FileEdit className="w-4 shrink-0" aria-label="Edit files icon" />
-									<span style={{ fontWeight: "bold" }}>
-										{isPendingApproval
-											? t("chat:fileOperations.wantsToEditMultiple", {
-													defaultValue: "Mirror VS wants to edit multiple files",
-												})
-											: t("chat:fileOperations.didEditMultiple", {
-													defaultValue: "Mirror VS edited multiple files",
-												})}
-									</span>
-									<span className="text-xs text-vscode-descriptionForeground mt-0.5">
-										({diffCount} {diffCount === 1 ? "file" : "files"})
-									</span>
-								</div>
-								<div className="flex items-center gap-2">
-									{message.isAnswered && (
-										<span className="text-emerald-400 text-xs font-normal mr-1">✓ Applied</span>
-									)}
-									<ChevronUp
-										className={cn(
-											"w-4 transition-all opacity-0 group-hover:opacity-100",
-											!isBatchExpanded && "-rotate-180",
-										)}
-									/>
-								</div>
-							</div>
-							{isBatchExpanded && <BatchDiffApproval files={batchDiffs} ts={message.ts} />}
-						</div>
+						<ToolDisclosure
+							title={`Edited ${diffCount} ${diffCount === 1 ? "file" : "files"}`}
+							isExpanded={isBatchExpanded}
+							onToggle={handleToggleBatchExpand}
+							status={
+								message.isAnswered ? <span className="text-emerald-400">✓ Applied</span> : undefined
+							}>
+							<BatchDiffApproval files={batchDiffs} ts={message.ts} />
+						</ToolDisclosure>
 					)
 				}
 
 				// Regular single file diff
+				const editFileName = tool.path ? tool.path.split(/[\/\\]/).pop() : "file"
+				const isEditInProgress = (isLast && isStreaming) || message.partial
 				return (
-					<>
-						<div style={headerStyle}>
-							{tool.isProtected ? (
-								<span
-									className="codicon codicon-lock"
-									style={{ color: "var(--vscode-editorWarning-foreground)", marginBottom: "-1.5px" }}
-								/>
-							) : (
-								toolIcon("diff")
-							)}
-							<span style={{ fontWeight: "bold" }}>
-								{tool.isProtected
-									? t("chat:fileOperations.wantsToEditProtected")
-									: tool.isOutsideWorkspace
-										? t("chat:fileOperations.wantsToEditOutsideWorkspace")
-										: t("chat:fileOperations.wantsToEdit")}
+					<ToolDisclosure
+						title={isEditInProgress ? `Editing ${editFileName}` : `Edited ${editFileName}`}
+						defaultExpanded={false}
+						status={
+							<span className="flex items-center gap-2">
+								{tool.diffStats && (tool.diffStats.added > 0 || tool.diffStats.removed > 0) && (
+									<span className="text-[10px] font-mono flex items-center gap-1.5 font-medium">
+										{tool.diffStats.added > 0 && (
+											<span className="text-vscode-charts-green">+{tool.diffStats.added}</span>
+										)}
+										{tool.diffStats.removed > 0 && (
+											<span className="text-vscode-charts-red">-{tool.diffStats.removed}</span>
+										)}
+									</span>
+								)}
+								{message.isAnswered ? (
+									<span className="text-emerald-400">✓ Applied</span>
+								) : isLast && isStreaming ? (
+									<span className="text-mirror-brand-via animate-pulse">Running...</span>
+								) : null}
 							</span>
-							{message.isAnswered && (
-								<span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-normal">
-									{isLast && isStreaming ? (
-										<>
-											<ProgressIndicator />
-											<span className="text-mirror-brand-via animate-pulse">Running...</span>
-										</>
-									) : (
-										<span className="text-emerald-400">✓ Approved</span>
-									)}
-								</span>
-							)}
-						</div>
-						<div className="pl-6">
-							<CodeAccordion
-								path={tool.path}
-								code={unifiedDiff ?? tool.diff}
-								language="diff"
-								progressStatus={message.progressStatus}
-								isLoading={message.partial}
-								isExpanded={isExpanded}
-								onToggleExpand={handleToggleExpand}
-								diffStats={tool.diffStats}
-							/>
-						</div>
-					</>
+						}>
+						<CodeAccordion
+							path={tool.path}
+							code={unifiedDiff ?? tool.diff}
+							language="diff"
+							progressStatus={message.progressStatus}
+							isLoading={message.partial}
+							isExpanded={isExpanded}
+							onToggleExpand={handleToggleExpand}
+							diffStats={tool.diffStats}
+							hideHeader={true}
+						/>
+					</ToolDisclosure>
 				)
-			case "insertContent":
+			case "insertContent": {
+				const insertFileName = tool.path ? tool.path.split(/[\/\\]/).pop() : "file"
+				const isInsertInProgress = (isLast && isStreaming) || message.partial
 				return (
-					<>
-						<div style={headerStyle}>
-							{tool.isProtected ? (
-								<span
-									className="codicon codicon-lock"
-									style={{ color: "var(--vscode-editorWarning-foreground)", marginBottom: "-1.5px" }}
-								/>
-							) : (
-								toolIcon("insert")
-							)}
-							<span style={{ fontWeight: "bold" }}>
-								{tool.isProtected
-									? t("chat:fileOperations.wantsToEditProtected")
-									: tool.isOutsideWorkspace
-										? t("chat:fileOperations.wantsToEditOutsideWorkspace")
-										: tool.lineNumber === 0
-											? t("chat:fileOperations.wantsToInsertAtEnd")
-											: t("chat:fileOperations.wantsToInsertWithLineNumber", {
-													lineNumber: tool.lineNumber,
-												})}
-							</span>
-						</div>
-						<div className="pl-6">
-							<CodeAccordion
-								path={tool.path}
-								code={unifiedDiff ?? tool.diff}
-								language="diff"
-								progressStatus={message.progressStatus}
-								isLoading={message.partial}
-								isExpanded={isExpanded}
-								onToggleExpand={handleToggleExpand}
-								diffStats={tool.diffStats}
-							/>
-						</div>
-					</>
+					<ToolDisclosure
+						title={isInsertInProgress ? `Editing ${insertFileName}` : `Edited ${insertFileName}`}
+						defaultExpanded={false}
+						status={message.isAnswered ? <span className="text-emerald-400">✓ Applied</span> : undefined}>
+						<CodeAccordion
+							path={tool.path}
+							code={unifiedDiff ?? tool.diff}
+							language="diff"
+							progressStatus={message.progressStatus}
+							isLoading={message.partial}
+							isExpanded={isExpanded}
+							onToggleExpand={handleToggleExpand}
+							diffStats={tool.diffStats}
+							hideHeader={true}
+						/>
+					</ToolDisclosure>
 				)
+			}
 			case "codebaseSearch":
 			case "codebase_search": {
 				const batchSearches = tool.batchSearches
@@ -639,27 +585,16 @@ export const ChatRowContent = ({
 					return renderBatchSearch(batchSearches)
 				}
 				return (
-					<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all px-3 py-2 text-xs shadow-xs flex items-center justify-between select-none">
-						<div className="flex items-center gap-2 min-w-0">
-							<div className="size-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
-								<Search className="size-3.5" />
-							</div>
-							<div className="flex items-center gap-1.5 min-w-0 truncate">
-								<span className="font-medium text-vscode-foreground">Searched codebase for</span>
-								<span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-vscode-badge-background/20 text-vscode-foreground truncate">
-									&quot;{tool.query}&quot;
-								</span>
-								{tool.path && (
-									<span className="text-vscode-descriptionForeground text-[11px] font-mono shrink-0">
-										in {tool.path}
-									</span>
-								)}
-							</div>
-						</div>
-						{message.isAnswered && (
-							<span className="text-[10px] text-emerald-400 font-medium shrink-0 ml-2">✓ Done</span>
-						)}
-					</div>
+					<ToolDisclosure
+						title={`Searched codebase for "${tool.query}"`}
+						defaultExpanded={true}
+						status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
+						<FileOperationItem
+							verb="Searched"
+							filePath={tool.path || "codebase"}
+							lineRange={tool.query ? `"${tool.query}"` : undefined}
+						/>
+					</ToolDisclosure>
 				)
 			}
 			case "updateTodoList" as any: {
@@ -676,96 +611,50 @@ export const ChatRowContent = ({
 
 				if (isBatchRequest && batchFiles) {
 					const fileCount = batchFiles.length
-					const isPendingApproval = message.type === "ask" && !message.isAnswered
 
 					return (
-						<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all overflow-hidden text-xs shadow-xs group">
-							<div
-								className="flex items-center justify-between px-3 py-2 cursor-pointer select-none gap-2"
-								onClick={handleToggleBatchExpand}>
-								<div className="flex items-center gap-2 min-w-0">
-									<div className="size-5 rounded-md bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0">
-										<BookOpen className="size-3.5" aria-label="View files icon" />
-									</div>
-									<span className="font-medium text-vscode-foreground truncate">
-										{isPendingApproval ? "Read files request" : `Read ${fileCount} files`}
-									</span>
-									<span className="text-[10px] text-vscode-descriptionForeground font-mono bg-vscode-badge-background/15 px-1.5 py-0.5 rounded-full">
-										{fileCount} {fileCount === 1 ? "file" : "files"}
-									</span>
-								</div>
-								<div className="flex items-center gap-1.5 shrink-0">
-									{message.isAnswered && (
-										<span className="text-[10px] text-emerald-400 font-medium mr-0.5">
-											✓ Approved
-										</span>
-									)}
-									<ChevronDown
-										className={cn(
-											"size-3.5 text-vscode-descriptionForeground/70 transition-transform duration-200",
-											isBatchExpanded && "rotate-180",
-										)}
-									/>
-								</div>
-							</div>
-							{isBatchExpanded && (
-								<div className="border-t border-vscode-editorGroup-border/20 p-2.5 bg-vscode-editor-background/20">
-									<BatchFilePermission
-										files={batchFiles}
-										onPermissionResponse={(response) => {
-											onBatchFileResponse?.(response)
-										}}
-										ts={message?.ts}
-									/>
-								</div>
-							)}
-						</div>
+						<ToolDisclosure
+							title={`Exploring ${fileCount} ${fileCount === 1 ? "file" : "files"}`}
+							isExpanded={isBatchExpanded}
+							onToggle={handleToggleBatchExpand}
+							status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
+							<BatchFilePermission
+								files={batchFiles}
+								onPermissionResponse={(response) => {
+									onBatchFileResponse?.(response)
+								}}
+								ts={message?.ts}
+							/>
+						</ToolDisclosure>
 					)
 				}
 
 				// Regular single file read request
 				return (
-					<>
-						<div style={headerStyle}>
-							<BookOpen className="w-4 shrink-0" aria-label="Read file icon" />
-							<span style={{ fontWeight: "bold" }}>
-								{message.type === "ask"
-									? tool.isOutsideWorkspace
-										? t("chat:fileOperations.wantsToReadOutsideWorkspace")
-										: tool.additionalFileCount && tool.additionalFileCount > 0
-											? t("chat:fileOperations.wantsToReadAndXMore", {
-													count: tool.additionalFileCount,
-												})
-											: t("chat:fileOperations.wantsToRead")
-									: t("chat:fileOperations.didRead")}
-							</span>
-						</div>
-						<div className="pl-6">
-							<ToolUseBlock>
-								<ToolUseBlockHeader
-									className="group"
-									onClick={() =>
-										vscode.postMessage({
-											type: "openFile",
-											text: tool.content,
-											values: tool.startLine ? { line: tool.startLine } : undefined,
-										})
-									}>
-									{tool.path?.startsWith(".") && <span>.</span>}
-									<PathTooltip content={formatPathTooltip(tool.path, tool.reason)}>
-										<span className="whitespace-nowrap overflow-hidden text-ellipsis text-left mr-2 rtl">
-											{formatPathTooltip(tool.path, tool.reason)}
-										</span>
-									</PathTooltip>
-									<div style={{ flexGrow: 1 }}></div>
-									<SquareArrowOutUpRight
-										className="w-4 shrink-0 codicon codicon-link-external opacity-0 group-hover:opacity-100 transition-opacity"
-										style={{ fontSize: 13.5, margin: "1px 0" }}
-									/>
-								</ToolUseBlockHeader>
-							</ToolUseBlock>
-						</div>
-					</>
+					<ToolDisclosure
+						title="Exploring 1 file"
+						defaultExpanded={true}
+						status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
+						<FileOperationItem
+							verb="Analyzed"
+							filePath={tool.path || ""}
+							lineRange={
+								tool.startLine
+									? (tool as any).endLine
+										? `L${tool.startLine}-${(tool as any).endLine}`
+										: `L${tool.startLine}`
+									: tool.reason
+							}
+							startLine={tool.startLine}
+							onClick={() =>
+								vscode.postMessage({
+									type: "openFile",
+									text: tool.content || tool.path,
+									values: tool.startLine ? { line: tool.startLine } : undefined,
+								})
+							}
+						/>
+					</ToolDisclosure>
 				)
 			}
 			case "skill": {
@@ -993,42 +882,18 @@ export const ChatRowContent = ({
 				}
 				const searchPath = tool.path! + (tool.filePattern ? `/(${tool.filePattern})` : "")
 				return (
-					<div className="my-1.5 rounded-xl border border-vscode-editorGroup-border/30 bg-vscode-sideBar-background/40 hover:bg-vscode-sideBar-background/70 transition-all overflow-hidden text-xs shadow-xs group">
-						<div
-							className="flex items-center justify-between px-3 py-2 cursor-pointer select-none gap-2"
-							onClick={handleToggleExpand}>
-							<div className="flex items-center gap-2 min-w-0">
-								<div className="size-5 rounded-md bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
-									<Search className="size-3.5" aria-label="Search icon" />
-								</div>
-								<div className="flex items-center gap-1.5 min-w-0 truncate">
-									<span className="font-medium text-vscode-foreground truncate">Searched</span>
-									<span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-vscode-badge-background/20 text-vscode-foreground truncate">
-										&quot;{tool.regex}&quot;
-									</span>
-									{tool.path && (
-										<span className="text-vscode-descriptionForeground text-[11px] font-mono shrink-0">
-											in {tool.path}
-										</span>
-									)}
-								</div>
-							</div>
-							<div className="flex items-center gap-1.5 shrink-0">
-								{message.isAnswered && (
-									<span className="text-[10px] text-emerald-400 font-medium mr-0.5">✓ Done</span>
-								)}
-								{tool.content && (
-									<ChevronDown
-										className={cn(
-											"size-3.5 text-vscode-descriptionForeground/70 transition-transform duration-200",
-											isExpanded && "rotate-180",
-										)}
-									/>
-								)}
-							</div>
-						</div>
+					<ToolDisclosure
+						title={`Searched "${tool.regex}"${tool.path ? ` in ${tool.path}` : ""}`}
+						defaultExpanded={true}
+						status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
+						<FileOperationItem
+							verb="Searched"
+							filePath={searchPath}
+							lineRange={tool.regex ? `"${tool.regex}"` : undefined}
+							onClick={tool.content ? handleToggleExpand : undefined}
+						/>
 						{isExpanded && tool.content && (
-							<div className="border-t border-vscode-editorGroup-border/20 p-2.5 bg-vscode-editor-background/20">
+							<div className="pl-4 pt-1">
 								<CodeAccordion
 									path={searchPath}
 									code={tool.content}
@@ -1038,7 +903,7 @@ export const ChatRowContent = ({
 								/>
 							</div>
 						)}
-					</div>
+					</ToolDisclosure>
 				)
 			}
 			case "switchMode":

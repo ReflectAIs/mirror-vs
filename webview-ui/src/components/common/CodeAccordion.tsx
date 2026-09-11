@@ -1,13 +1,12 @@
 import { memo, useMemo } from "react"
-import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react"
+import { ChevronDown } from "lucide-react"
 import { type ToolProgressStatus } from "@mirror-vs/types"
 import { getLanguageFromPath } from "@src/utils/getLanguageFromPath"
-import { formatPathTooltip } from "@src/utils/formatPathTooltip"
+import { cn } from "@src/lib/utils"
 
-import { ToolUseBlock, ToolUseBlockHeader } from "./ToolUseBlock"
 import CodeBlock from "./CodeBlock"
-import { PathTooltip } from "../ui/PathTooltip"
 import DiffView from "./DiffView"
+import { getFileIcon, parsePathAndLines } from "../chat/FileOperationItem"
 
 interface CodeAccordionProps {
 	path?: string
@@ -20,8 +19,8 @@ interface CodeAccordionProps {
 	onToggleExpand: () => void
 	header?: string
 	onJumpToFile?: () => void
-	// New props for diff stats
 	diffStats?: { added: number; removed: number }
+	hideHeader?: boolean
 }
 
 const CodeAccordion = ({
@@ -36,12 +35,14 @@ const CodeAccordion = ({
 	header,
 	onJumpToFile,
 	diffStats,
+	hideHeader = false,
 }: CodeAccordionProps) => {
 	const inferredLanguage = useMemo(() => language ?? (path ? getLanguageFromPath(path) : "txt"), [path, language])
 	const source = useMemo(() => code.trim(), [code])
-	const hasHeader = Boolean(path || isFeedback || header)
+	const hasHeader = !hideHeader && Boolean(path || isFeedback || header)
 
-	// Use provided diff stats only (render-only)
+	const { fileName, displayPath } = useMemo(() => parsePathAndLines(path || header || ""), [path, header])
+
 	const derivedStats = useMemo(() => {
 		if (diffStats && (diffStats.added > 0 || diffStats.removed > 0)) return diffStats
 		return null
@@ -50,73 +51,54 @@ const CodeAccordion = ({
 	const hasValidStats = Boolean(derivedStats && (derivedStats.added > 0 || derivedStats.removed > 0))
 
 	return (
-		<ToolUseBlock>
+		<div className="my-0.5">
 			{hasHeader && (
-				<ToolUseBlockHeader onClick={onToggleExpand} className="group">
-					{isLoading && <VSCodeProgressRing className="size-3 mr-2" />}
-					{header ? (
-						<div className="flex items-center">
-							<span className="codicon codicon-server mr-1.5"></span>
-							<PathTooltip content={header}>
-								<span className="whitespace-nowrap overflow-hidden text-ellipsis mr-2">{header}</span>
-							</PathTooltip>
-						</div>
-					) : isFeedback ? (
-						<div className="flex items-center">
-							<span className={`codicon codicon-${isFeedback ? "feedback" : "codicon-output"} mr-1.5`} />
-							<span className="whitespace-nowrap overflow-hidden text-ellipsis mr-2 rtl">
-								{isFeedback ? "User Edits" : "Console Logs"}
-							</span>
-						</div>
+				<div
+					onClick={onToggleExpand}
+					className="flex items-center gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/40 cursor-pointer text-xs group transition-colors select-none"
+					title={displayPath}>
+					<span className="text-vscode-descriptionForeground/70 text-[11px] font-normal w-14 shrink-0 truncate">
+						{isFeedback ? "Feedback" : inferredLanguage === "diff" ? "Edited" : "Viewed"}
+					</span>
+					{path ? (
+						getFileIcon(displayPath)
 					) : (
-						<>
-							{path?.startsWith(".") && <span>.</span>}
-							<PathTooltip content={formatPathTooltip(path)}>
-								<span className="whitespace-nowrap overflow-hidden text-ellipsis text-left mr-2 rtl">
-									{formatPathTooltip(path)}
-								</span>
-							</PathTooltip>
-						</>
+						<span className="codicon codicon-output text-xs shrink-0 text-vscode-descriptionForeground" />
 					)}
-					<div className="flex-grow-1" />
-					{/* Prefer diff stats over generic progress indicator if available */}
+					<span className="font-semibold text-vscode-foreground text-[11.5px] truncate">
+						{header || fileName}
+					</span>
+					<div className="flex-grow" />
 					{hasValidStats ? (
-						<div className="flex items-center gap-2 mr-1">
-							<span className="text-xs font-medium text-vscode-charts-green">+{derivedStats!.added}</span>
-							<span className="text-xs font-medium text-vscode-charts-red">-{derivedStats!.removed}</span>
-						</div>
+						<span className="text-[10px] font-mono shrink-0 flex items-center gap-1.5 font-medium mr-1">
+							{derivedStats!.added > 0 && (
+								<span className="text-vscode-charts-green">+{derivedStats!.added}</span>
+							)}
+							{derivedStats!.removed > 0 && (
+								<span className="text-vscode-charts-red">-{derivedStats!.removed}</span>
+							)}
+						</span>
 					) : (
-						progressStatus &&
-						progressStatus.text && (
-							<>
-								{progressStatus.icon && (
-									<span className={`codicon codicon-${progressStatus.icon} mr-1`} />
-								)}
-								<span className="mr-1 ml-auto text-vscode-descriptionForeground">
-									{progressStatus.text}
-								</span>
-							</>
+						progressStatus?.text && (
+							<span className="text-[10px] text-vscode-descriptionForeground mr-1">
+								{progressStatus.text}
+							</span>
 						)
 					)}
-					{onJumpToFile && path && (
-						<span
-							className="codicon codicon-link-external mr-1"
-							style={{ fontSize: 13.5 }}
-							onClick={(e) => {
-								e.stopPropagation()
-								onJumpToFile()
-							}}
-							aria-label={`Open file: ${path}`}
-						/>
-					)}
-					{!onJumpToFile && (
-						<span
-							className={`opacity-0 group-hover:opacity-100 codicon codicon-chevron-${isExpanded ? "up" : "down"}`}></span>
-					)}
-				</ToolUseBlockHeader>
+					<ChevronDown
+						className={cn(
+							"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
+							isExpanded ? "rotate-0" : "-rotate-90",
+						)}
+					/>
+				</div>
 			)}
 			{(!hasHeader || isExpanded) && (
-				<div className="overflow-x-auto overflow-y-auto max-h-[300px] max-w-full">
+				<div
+					className={cn(
+						"overflow-x-auto overflow-y-auto max-h-[320px] max-w-full rounded border border-vscode-panel-border/30 bg-vscode-editor-background",
+						hasHeader && "mt-1 ml-3",
+					)}>
 					{inferredLanguage === "diff" ? (
 						<DiffView source={source} filePath={path} />
 					) : (
@@ -124,7 +106,7 @@ const CodeAccordion = ({
 					)}
 				</div>
 			)}
-		</ToolUseBlock>
+		</div>
 	)
 }
 

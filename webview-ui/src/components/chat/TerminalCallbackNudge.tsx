@@ -117,90 +117,63 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 	)
 
 	return (
-		<div className="my-1.5 w-full max-w-full overflow-hidden box-border rounded-md bg-vscode-sideBar-background/60 border border-vscode-panel-border/40 hover:border-mirror-brand-via/30 transition-all text-xs shadow-2xs backdrop-blur-xs group">
-			<div className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 min-h-[30px] w-full min-w-0 max-w-full overflow-hidden box-border">
-				<div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-					<Terminal
-						className={cn(
-							"size-3.5 shrink-0",
-							isRunning
-								? "text-amber-400 animate-pulse"
-								: isSuccess
-									? "text-emerald-400"
-									: "text-red-400",
-						)}
-					/>
-					<span className="text-[10px] font-semibold text-vscode-descriptionForeground tracking-wider uppercase shrink-0">
-						{parsed.isNotice ? "Terminal Active" : "Terminal Done"}
+		<div className="my-1 select-none text-xs">
+			<div
+				onClick={() => {
+					if (parsed.output) setIsExpanded(!isExpanded)
+				}}
+				className={cn(
+					"flex items-center justify-between gap-2 py-1 px-1.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground select-none group transition-colors",
+					parsed.output ? "cursor-pointer hover:bg-vscode-list-hoverBackground/30" : "",
+				)}>
+				<div className="flex items-center gap-2 min-w-0 flex-1">
+					<Terminal className="size-3.5 text-vscode-descriptionForeground shrink-0" />
+					<span className="text-vscode-descriptionForeground/70 text-[11px] shrink-0 font-normal">
+						{isRunning ? "Terminal active" : "Terminal"}
 					</span>
 					{parsed.command && (
-						<span
-							className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-vscode-badge-background/20 text-vscode-foreground min-w-0 max-w-[140px] xs:max-w-[200px] sm:max-w-[280px] truncate border border-vscode-panel-border/30 shrink"
+						<code
+							className="font-mono text-[11.5px] text-vscode-foreground font-semibold truncate"
 							title={parsed.command}>
 							{parsed.command}
-						</span>
-					)}
-					{parsed.exitStatus && (
-						<span
-							className={cn(
-								"text-[10px] font-mono font-medium px-1.5 py-0.2 rounded border inline-flex items-center gap-1 shrink-0 whitespace-nowrap",
-								isRunning
-									? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-									: isSuccess
-										? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-										: "bg-red-500/10 text-red-400 border-red-500/20",
-							)}>
-							{!isRunning &&
-								(isSuccess ? <CheckCircle2 className="size-2.5" /> : <XCircle className="size-2.5" />)}
-							{parsed.exitStatus}
-						</span>
+						</code>
 					)}
 				</div>
 
-				<div className="flex items-center gap-1 shrink-0">
-					{(isRunning || parsed.isNotice) && (
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setShowInputManually((prev) => !prev)}
-							className={cn(
-								"h-5 text-[10px] px-1.5 flex items-center gap-0.5 cursor-pointer transition-colors",
-								hasInteractivePrompt || showInputManually
-									? "text-amber-400 bg-amber-500/10"
-									: "text-vscode-descriptionForeground hover:text-vscode-foreground",
-							)}
-							title={showInputManually ? "Hide input" : "Send input"}>
-							<Terminal className="size-2.5" />
-							<span>Input</span>
-						</Button>
+				<div className="flex items-center gap-1.5 shrink-0">
+					{isRunning ? (
+						<span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+					) : isSuccess ? (
+						<span className="text-emerald-400 text-[10px] font-medium shrink-0">✓</span>
+					) : (
+						<span className="text-red-400 text-[10px] font-medium shrink-0">✗</span>
 					)}
+
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation()
+							handleJumpToCommand()
+						}}
+						className="text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 rounded hover:bg-vscode-toolbar-hoverBackground cursor-pointer opacity-70 group-hover:opacity-100 transition-opacity"
+						title="Jump to command in chat">
+						<ArrowUpRight className="size-3" />
+					</button>
+
 					{parsed.output && (
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setIsExpanded(!isExpanded)}
-							className="h-5 text-[10px] px-1.5 text-vscode-descriptionForeground hover:text-vscode-foreground flex items-center gap-1 cursor-pointer">
-							<span>{isExpanded ? "Hide" : "View Output"}</span>
-							<ChevronDown
-								className={cn("size-2.5 transition-transform duration-200", isExpanded && "rotate-180")}
-							/>
-						</Button>
+						<ChevronDown
+							className={cn(
+								"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
+								isExpanded ? "rotate-0" : "-rotate-90",
+							)}
+						/>
 					)}
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={handleJumpToCommand}
-						className="h-5 text-[10px] px-1.5 text-vscode-descriptionForeground hover:text-vscode-foreground flex items-center gap-0.5 cursor-pointer opacity-70 group-hover:opacity-100 transition-opacity"
-						title="Scroll to terminal command in chat">
-						<span>Jump</span>
-						<ArrowUpRight className="size-2.5" />
-					</Button>
 				</div>
 			</div>
 
 			{isExpanded && parsed.output && (
-				<div className="px-2.5 pb-2 pt-1 border-t border-vscode-panel-border/20 w-full max-w-full overflow-hidden box-border">
-					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono mb-1 min-w-0">
+				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 flex flex-col gap-1 my-1">
+					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono">
 						<span className="truncate mr-2">{parsed.cwd ? `cwd: ${parsed.cwd}` : "Output"}</span>
 						<button
 							onClick={handleCopy}
@@ -209,70 +182,43 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 							<span>{copied ? "Copied" : "Copy"}</span>
 						</button>
 					</div>
-					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full max-w-full box-border">
+					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full box-border">
 						{parsed.output}
 					</pre>
 				</div>
 			)}
 
 			{shouldShowInteractiveInput && (
-				<div className="px-2.5 py-1.5 border-t border-vscode-panel-border/20 flex flex-col gap-1.5 bg-vscode-input-background/20 animate-in fade-in duration-200">
-					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground">
-						<span className="flex items-center gap-1 font-medium">
-							{hasInteractivePrompt && (
-								<span className="size-1 rounded-full bg-amber-400 animate-pulse" />
-							)}
-							Interactive Terminal Input:
-						</span>
-						{inputSentFeedback && (
-							<span className="text-emerald-400 flex items-center gap-0.5">
-								<Check className="size-2.5" /> Sent to terminal
-							</span>
-						)}
-					</div>
-					<div className="flex items-center gap-1.5">
-						<div className="flex items-center gap-1">
-							<button
-								onClick={() => handleSendInput("y")}
-								className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
-								title="Send 'y' (Yes)">
-								y
-							</button>
-							<button
-								onClick={() => handleSendInput("n")}
-								className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
-								title="Send 'n' (No)">
-								n
-							</button>
-							<button
-								onClick={() => handleSendInput("")}
-								className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
-								title="Send Enter (Return)">
-								↵ Enter
-							</button>
-						</div>
-						<div className="flex items-center gap-1 flex-1 min-w-0">
-							<input
-								type="text"
-								value={terminalInput}
-								onChange={(e) => setTerminalInput(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										handleSendInput()
-									}
-								}}
-								placeholder="Type response to terminal..."
-								className="h-5 px-1.5 text-[11px] rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border focus:border-vscode-focusBorder outline-none flex-1 min-w-0"
-							/>
-							<Button
-								variant="primary"
-								size="sm"
-								onClick={() => handleSendInput()}
-								className="h-5 px-2 text-[10px] flex items-center gap-1 shrink-0">
-								<span>Send</span>
-							</Button>
-						</div>
-					</div>
+				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 py-1 flex items-center gap-1.5">
+					<span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+					<button
+						type="button"
+						onClick={() => handleSendInput("y")}
+						className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground cursor-pointer">
+						y
+					</button>
+					<button
+						type="button"
+						onClick={() => handleSendInput("n")}
+						className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground cursor-pointer">
+						n
+					</button>
+					<input
+						type="text"
+						value={terminalInput}
+						onChange={(e) => setTerminalInput(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") handleSendInput()
+						}}
+						placeholder="Terminal response..."
+						className="h-5 px-1.5 text-[10px] rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border outline-none flex-1 min-w-0"
+					/>
+					<button
+						type="button"
+						onClick={() => handleSendInput()}
+						className="h-5 px-2 text-[10px] rounded bg-vscode-button-background text-vscode-button-foreground cursor-pointer">
+						Send
+					</button>
 				</div>
 			)}
 		</div>
