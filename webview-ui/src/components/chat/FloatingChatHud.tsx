@@ -48,28 +48,19 @@ export const FloatingChatHud = memo(
 					<button
 						onClick={onScrollToBottom}
 						className={cn(
-							"h-7 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-all duration-150",
-							"bg-vscode-sideBar-background/90 hover:bg-vscode-sideBar-background text-vscode-foreground",
-							"border border-vscode-panel-border/60 hover:border-mirror-brand-via/50 backdrop-blur-md",
-							"hover:scale-[1.02] active:scale-[0.98]",
+							"h-6.5 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors duration-150",
+							"bg-vscode-editor-background hover:bg-vscode-sideBar-background text-vscode-foreground",
+							"border border-vscode-panel-border/80 shadow-sm",
 						)}
 						title="Jump to latest message">
 						{isReasoning ? (
 							<>
-								<span className="relative flex h-2 w-2 mr-0.5">
-									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mirror-brand-via opacity-75" />
-									<span className="relative inline-flex rounded-full h-2 w-2 bg-mirror-brand-via" />
-								</span>
-								<span className="bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent font-semibold">
-									Thinking · {seconds}s
-								</span>
+								<span className="size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0" />
+								<span className="text-vscode-foreground font-medium">Thinking · {seconds}s</span>
 							</>
 						) : isStreaming ? (
 							<>
-								<span className="relative flex h-2 w-2 mr-0.5">
-									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mirror-brand-via opacity-75" />
-									<span className="relative inline-flex rounded-full h-2 w-2 bg-mirror-brand-via" />
-								</span>
+								<span className="size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0" />
 								<span className="text-vscode-foreground font-medium">Working...</span>
 							</>
 						) : (
@@ -77,7 +68,7 @@ export const FloatingChatHud = memo(
 								Jump to bottom
 							</span>
 						)}
-						<ChevronDown className="size-3.5 text-vscode-descriptionForeground shrink-0" />
+						<ChevronDown className="size-3 text-vscode-descriptionForeground shrink-0" />
 					</button>
 
 					{/* Checkpoint button if available */}
@@ -85,10 +76,9 @@ export const FloatingChatHud = memo(
 						<button
 							onClick={onScrollToCheckpoint}
 							className={cn(
-								"h-7 px-2.5 rounded-full flex items-center gap-1 text-xs font-medium cursor-pointer transition-all duration-150",
-								"bg-vscode-sideBar-background/90 hover:bg-vscode-sideBar-background text-vscode-descriptionForeground hover:text-vscode-foreground",
-								"border border-vscode-panel-border/60 hover:border-mirror-brand-via/50 backdrop-blur-md",
-								"hover:scale-[1.02] active:scale-[0.98]",
+								"h-6.5 px-2 rounded-md flex items-center gap-1 text-xs font-medium cursor-pointer transition-colors duration-150",
+								"bg-vscode-editor-background hover:bg-vscode-sideBar-background text-vscode-descriptionForeground hover:text-vscode-foreground",
+								"border border-vscode-panel-border/80 shadow-sm",
 							)}
 							title="Scroll to latest checkpoint">
 							<History className="size-3 shrink-0" />

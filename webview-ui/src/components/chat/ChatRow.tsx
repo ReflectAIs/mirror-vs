@@ -1721,10 +1721,14 @@ export const ChatRowContent = ({
 					return (
 						<div className="group my-0.5 px-0.5 py-0.5 transition-all">
 							<div className="flex items-center gap-2 mb-1">
-								<div className="size-6.5 rounded-full flex items-center justify-center overflow-hidden shrink-0">
-									<img src={MIRROR_LOGO_DATA_URI} alt="Mirror VS" className="size-6 object-contain" />
+								<div className="size-6 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+									<img
+										src={MIRROR_LOGO_DATA_URI}
+										alt="Mirror VS"
+										className="size-5.5 object-contain"
+									/>
 								</div>
-								<span className="text-xs font-bold bg-gradient-to-r from-mirror-brand-from via-mirror-brand-via to-mirror-brand-to bg-clip-text text-transparent">
+								<span className="text-xs font-semibold text-vscode-foreground">
 									{t("chat:text.mirrorSaid")}
 								</span>
 								<div className="flex-grow" />
@@ -1758,28 +1762,13 @@ export const ChatRowContent = ({
 					return (
 						<div
 							className={cn(
-								"group my-2 p-3.5 rounded-2xl transition-all relative overflow-hidden",
+								"group my-1.5 p-3 rounded-lg transition-all relative overflow-hidden",
 								isSticky
-									? "border border-mirror-brand-via/35 bg-vscode-sideBar-background/95 backdrop-blur-md shadow-md"
-									: "border border-vscode-editorGroup-border/30 bg-vscode-input-background/35 hover:bg-vscode-input-background/55 shadow-xs",
-							)}
-							style={
-								isSticky
-									? {
-											background:
-												"color-mix(in srgb, var(--vscode-sideBar-background) 94%, transparent)",
-											backdropFilter: "blur(14px)",
-											WebkitBackdropFilter: "blur(14px)",
-											border: "1px solid color-mix(in srgb, var(--vscode-button-background) 25%, transparent)",
-											borderBottom:
-												"2px solid color-mix(in srgb, var(--vscode-button-background) 45%, transparent)",
-											boxShadow:
-												"0 8px 24px rgba(0,0,0,0.2), 0 2px 8px color-mix(in srgb, var(--vscode-button-background) 5%, transparent)",
-										}
-									: undefined
-							}>
+									? "border border-vscode-focusBorder bg-vscode-sideBar-background shadow-sm"
+									: "border border-vscode-panel-border/30 bg-vscode-input-background/40 hover:bg-vscode-input-background/60",
+							)}>
 							<div
-								className="flex justify-between items-center w-full mb-1.5 cursor-pointer select-none"
+								className="flex justify-between items-center w-full mb-1 cursor-pointer select-none"
 								onClick={(e) => {
 									e.stopPropagation()
 									onNavigateToMessage?.(message.ts)
