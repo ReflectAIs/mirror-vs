@@ -1,7 +1,7 @@
 {
-	"name": "@mirror-vs/config-typescript",
-	"private": true,
-	"publishConfig": {
-		"access": "public"
-	}
+  "name": "@mirror-vs/config-typescript",
+  "private": true,
+  "publishConfig": {
+    "access": "public"
+  }
 }

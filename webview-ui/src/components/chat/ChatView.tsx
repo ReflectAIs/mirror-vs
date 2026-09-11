@@ -406,7 +406,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							}
 							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
-							increaseViewportBy={{ top: 800, bottom: 400 }}
+							increaseViewportBy={{ top: 200, bottom: 100 }}
 							initialTopMostItemIndex={displayedMessages.length > 0 ? displayedMessages.length - 1 : 0}
 							data={displayedMessages}
 							itemContent={itemContent}
