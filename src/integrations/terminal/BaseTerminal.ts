@@ -39,6 +39,10 @@ export abstract class BaseTerminal implements MirrorTerminal {
 
 	abstract runCommand(command: string, callbacks: MirrorTerminalCallbacks): MirrorTerminalProcessResultPromise
 
+	public write(_input: string): boolean {
+		return false
+	}
+
 	/**
 	 * Sets the active stream for this terminal and notifies the process
 	 * @param stream The stream to set, or undefined to clean up

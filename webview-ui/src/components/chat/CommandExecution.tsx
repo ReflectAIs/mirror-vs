@@ -1,7 +1,7 @@
 import { useCallback, useState, memo, useMemo } from "react"
 import { useEvent } from "react-use"
 import { t } from "i18next"
-import { ChevronDown, OctagonX } from "lucide-react"
+import { ChevronDown, OctagonX, Check } from "lucide-react"
 
 import { type ExtensionMessage, type CommandExecutionStatus, commandExecutionStatusSchema } from "@mirror-vs/types"
 
@@ -47,6 +47,22 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 	const [isExpanded, setIsExpanded] = useState(false)
 	const [streamingOutput, setStreamingOutput] = useState("")
 	const [status, setStatus] = useState<CommandExecutionStatus | null>(null)
+	const [interactiveInput, setInteractiveInput] = useState("")
+	const [inputSentFeedback, setInputSentFeedback] = useState(false)
+
+	const handleSendInput = useCallback(
+		(customVal?: string) => {
+			const textToSend = customVal !== undefined ? customVal : interactiveInput
+			vscode.postMessage({
+				type: "sendTerminalInput",
+				terminalInput: textToSend,
+			})
+			setInteractiveInput("")
+			setInputSentFeedback(true)
+			setTimeout(() => setInputSentFeedback(false), 2500)
+		},
+		[interactiveInput],
+	)
 
 	// The command's output can either come from the text associated with the
 	// task message (this is the case for completed commands) or from the
@@ -170,7 +186,11 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 					<div className="flex flex-row items-center gap-1">
 						{status?.status === "started" && (
 							<div className="flex flex-row items-center gap-2 font-mono text-xs">
-								{status.pid && <div className="whitespace-nowrap">(PID: {status.pid})</div>}
+								{status.pid && (
+									<div className="whitespace-nowrap text-vscode-descriptionForeground">
+										(PID: {status.pid})
+									</div>
+								)}
 								<StandardTooltip content={t("chat:commandExecution.abort")}>
 									<Button
 										variant="ghost"
@@ -207,11 +227,69 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 				</div>
 			</div>
 
-			<div className="bg-vscode-editor-background border border-vscode-border rounded-xs ml-6 mt-2">
+			<div className="bg-vscode-editor-background border border-vscode-border rounded-xs ml-6 mt-2 overflow-hidden">
 				<div className="p-2">
 					<CodeBlock source={command} language="shell" />
 					<OutputContainer isExpanded={isExpanded} output={output} />
 				</div>
+				{status?.status === "started" && (
+					<div className="px-2.5 py-2 border-t border-vscode-panel-border/30 flex flex-col gap-1.5 bg-vscode-input-background/15">
+						<div className="flex items-center justify-between text-[11px] text-vscode-descriptionForeground">
+							<span>Interactive Input (Background Process PID {status.pid || ""}):</span>
+							{inputSentFeedback && (
+								<span className="text-emerald-400 flex items-center gap-1 text-[11px]">
+									<Check className="size-3" /> Sent to process
+								</span>
+							)}
+						</div>
+						<div className="flex items-center gap-1.5">
+							<div className="flex items-center gap-1 shrink-0">
+								<button
+									type="button"
+									onClick={() => handleSendInput("y")}
+									className="h-6 px-2 rounded text-[11px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
+									title="Send 'y' (Yes)">
+									y
+								</button>
+								<button
+									type="button"
+									onClick={() => handleSendInput("n")}
+									className="h-6 px-2 rounded text-[11px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
+									title="Send 'n' (No)">
+									n
+								</button>
+								<button
+									type="button"
+									onClick={() => handleSendInput("")}
+									className="h-6 px-2 rounded text-[11px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
+									title="Send Enter (Return)">
+									↵ Enter
+								</button>
+							</div>
+							<div className="flex items-center gap-1 flex-1 min-w-0">
+								<input
+									type="text"
+									value={interactiveInput}
+									onChange={(e) => setInteractiveInput(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											handleSendInput()
+										}
+									}}
+									placeholder="Type response to terminal..."
+									className="h-6 px-2 text-[11px] rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border focus:border-vscode-focusBorder outline-none flex-1 min-w-0"
+								/>
+								<Button
+									variant="primary"
+									size="sm"
+									onClick={() => handleSendInput()}
+									className="h-6 px-2.5 text-[11px] flex items-center gap-1 shrink-0 cursor-pointer">
+									<span>Send</span>
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
 				{command && command.trim() && (
 					<CommandPatternSelector
 						patterns={commandPatterns}

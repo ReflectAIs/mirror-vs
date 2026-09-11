@@ -1,7 +1,8 @@
 import { memo, useState, useMemo, useCallback } from "react"
-import { ChevronDown, CheckCircle2, XCircle, Terminal, ArrowUpRight, Copy, Check } from "lucide-react"
+import { ChevronDown, CheckCircle2, XCircle, Terminal, ArrowUpRight, Copy, Check, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui"
+import { vscode } from "@/utils/vscode"
 
 interface TerminalCallbackNudgeProps {
 	text?: string
@@ -12,6 +13,8 @@ interface TerminalCallbackNudgeProps {
 export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageTs }: TerminalCallbackNudgeProps) => {
 	const [isExpanded, setIsExpanded] = useState(false)
 	const [copied, setCopied] = useState(false)
+	const [terminalInput, setTerminalInput] = useState("")
+	const [inputSentFeedback, setInputSentFeedback] = useState(false)
 
 	const parsed = useMemo(() => {
 		if (!text) return { command: "", cwd: "", exitStatus: "", output: "", isNotice: false }
@@ -88,6 +91,20 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 			setTimeout(() => setCopied(false), 2000)
 		}
 	}, [parsed.output])
+
+	const handleSendInput = useCallback(
+		(customVal?: string) => {
+			const valToSend = customVal !== undefined ? customVal : terminalInput
+			vscode.postMessage({
+				type: "sendTerminalInput",
+				terminalInput: valToSend,
+			})
+			setTerminalInput("")
+			setInputSentFeedback(true)
+			setTimeout(() => setInputSentFeedback(false), 2000)
+		},
+		[terminalInput],
+	)
 
 	return (
 		<div className="my-1.5 w-full max-w-full overflow-hidden box-border rounded-md bg-vscode-sideBar-background/60 border border-vscode-panel-border/40 hover:border-mirror-brand-via/30 transition-all text-xs shadow-2xs backdrop-blur-xs group">
@@ -169,6 +186,62 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full max-w-full box-border">
 						{parsed.output}
 					</pre>
+				</div>
+			)}
+
+			{(isRunning || parsed.isNotice) && (
+				<div className="px-2.5 py-1.5 border-t border-vscode-panel-border/20 flex flex-col gap-1.5 bg-vscode-input-background/20">
+					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground">
+						<span>Interactive Terminal Input:</span>
+						{inputSentFeedback && (
+							<span className="text-emerald-400 flex items-center gap-0.5">
+								<Check className="size-2.5" /> Sent to terminal
+							</span>
+						)}
+					</div>
+					<div className="flex items-center gap-1.5">
+						<div className="flex items-center gap-1">
+							<button
+								onClick={() => handleSendInput("y")}
+								className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
+								title="Send 'y' (Yes)">
+								y
+							</button>
+							<button
+								onClick={() => handleSendInput("n")}
+								className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
+								title="Send 'n' (No)">
+								n
+							</button>
+							<button
+								onClick={() => handleSendInput("")}
+								className="h-5 px-1.5 rounded text-[10px] font-mono bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-panel-border/40 cursor-pointer"
+								title="Send Enter (Return)">
+								↵ Enter
+							</button>
+						</div>
+						<div className="flex items-center gap-1 flex-1 min-w-0">
+							<input
+								type="text"
+								value={terminalInput}
+								onChange={(e) => setTerminalInput(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										handleSendInput()
+									}
+								}}
+								placeholder="Type response to terminal..."
+								className="h-5 px-1.5 text-[11px] rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-input-border focus:border-vscode-focusBorder outline-none flex-1 min-w-0"
+							/>
+							<Button
+								variant="primary"
+								size="sm"
+								onClick={() => handleSendInput()}
+								className="h-5 px-2 text-[10px] flex items-center gap-1 shrink-0">
+								<span>Send</span>
+							</Button>
+						</div>
+					</div>
 				</div>
 			)}
 		</div>

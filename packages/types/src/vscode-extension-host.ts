@@ -579,6 +579,8 @@ export interface WebviewMessage {
 		| "askResponse"
 		| "terminalOperation"
 		| "killTerminal"
+		| "openTerminal"
+		| "sendTerminalInput"
 		| "clearTask"
 		| "didShowAnnouncement"
 		| "selectImages"
@@ -812,6 +814,7 @@ export interface WebviewMessage {
 	terminalOperation?: "continue" | "abort"
 	terminalId?: number
 	terminalType?: "terminal" | "ssh"
+	terminalInput?: string
 	messageTs?: number
 	inclusive?: boolean
 	restoreCheckpoint?: boolean

@@ -14,6 +14,14 @@ import { getGitStatus } from "../../utils/git"
 const execAsync = promisify(exec)
 const MAX_PULSE_LENGTH = 5000
 
+interface GitPulseCacheEntry {
+	timestamp: number
+	branch: string
+	status: string
+}
+const gitPulseCache = new Map<string, GitPulseCacheEntry>()
+const GIT_PULSE_CACHE_TTL_MS = 5_000
+
 /**
  * Builds a mode-appropriate "Workspace Pulse" — a compact, proactive context bundle
  * injected into environment details so the model can skip 2-4 probing tool calls.
@@ -60,12 +68,24 @@ export async function buildWorkspacePulse(mirror: Task, currentMode: string): Pr
 		pulse += "\n"
 	}
 
-	// ── 2. Git pulse (all modes) — async, never blocking the UI thread ──
+	// ── 2. Git pulse (all modes) — async with 5s in-memory cache ──
 	try {
-		const [{ stdout: branch }, { stdout: status }] = await Promise.all([
-			execAsync("git rev-parse --abbrev-ref HEAD", { cwd: mirror.cwd }),
-			execAsync("git status --short | head -5", { cwd: mirror.cwd }),
-		])
+		const cached = gitPulseCache.get(mirror.cwd)
+		let branch = ""
+		let status = ""
+
+		if (cached && Date.now() - cached.timestamp < GIT_PULSE_CACHE_TTL_MS) {
+			branch = cached.branch
+			status = cached.status
+		} else {
+			const [{ stdout: b }, { stdout: s }] = await Promise.all([
+				execAsync("git rev-parse --abbrev-ref HEAD", { cwd: mirror.cwd }),
+				execAsync("git status --short | head -5", { cwd: mirror.cwd }),
+			])
+			branch = b
+			status = s
+			gitPulseCache.set(mirror.cwd, { timestamp: Date.now(), branch, status })
+		}
 
 		pulse += `- **Git:** branch \`${branch.trim()}\``
 		const statusLines = status.trim().split("\n").filter(Boolean)

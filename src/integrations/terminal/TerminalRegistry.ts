@@ -469,4 +469,37 @@ export class TerminalRegistry {
 		ShellIntegrationManager.zshCleanupTmpDir(id)
 		this.terminals = this.terminals.filter((t) => t.id !== id)
 	}
+
+	/**
+	 * Focuses / reveals the VS Code integrated terminal for a given terminal ID or the latest busy terminal.
+	 */
+	public static showTerminal(id?: number): boolean {
+		const target =
+			id !== undefined
+				? this.getTerminalById(id)
+				: this.terminals.find((t) => t.busy) || this.terminals[this.terminals.length - 1]
+
+		if (target instanceof Terminal && target.terminal) {
+			target.terminal.show()
+			return true
+		}
+
+		return false
+	}
+
+	/**
+	 * Sends input text directly to a running terminal (VS Code terminal or Execa background process).
+	 */
+	public static sendInputToTerminal(id: number | undefined, input: string): boolean {
+		const target =
+			id !== undefined
+				? this.getTerminalById(id)
+				: this.terminals.find((t) => t.busy) || this.terminals[this.terminals.length - 1]
+
+		if (!target) {
+			return false
+		}
+
+		return target.write(input)
+	}
 }

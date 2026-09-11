@@ -2,6 +2,24 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.8.5] - 2026-09-11
+
+### Added
+
+- **Interactive Terminal Prompt Bridge (3.3)**:
+    - Added one-click **Terminal** focus action in command execution cards and callback nudges to instantly reveal and focus the native VS Code integrated terminal tab.
+    - Added inline interactive quick-response bar with instant `y`, `n`, `↵ Enter` buttons and text input in terminal callback nudges, allowing users to answer interactive CLI prompts (`[y/N]`, confirmations, inputs) directly from the chat UI without switching windows.
+    - Integrated extension backend bridge via `TerminalRegistry.showTerminal` and `TerminalRegistry.sendInputToTerminal` for both native VS Code terminals and background child processes.
+- **Floating Sticky Chat HUD (3.1)**:
+    - Integrated modern glassmorphic floating HUD overlaying the lower chat viewport.
+    - Displays live reasoning duration (`💡 Thinking 12s...`) or live tool progress (`⚙ Working...`) in sync with model activity.
+    - Includes integrated smooth **Jump to bottom** action with chevron icon that only appears when scrolled up.
+- **Performance & Smooth Scrolling Optimizations (2.1 & 2.3)**:
+    - **Terminal Streaming Throttling**: Added tail-window streaming compression in `ExecuteCommandTool` and display windowing in `TerminalOutput` for large outputs (>40,000 characters), preventing regex bottlenecks and DOM bloat while preserving 60fps UI responsiveness.
+    - **Lazy Diff Syntax Highlighting**: Integrated `IntersectionObserver` into `DiffView` to defer CPU-heavy Shiki AST highlighting until diff cards enter the viewport (with 300px preload margin), eliminating scroll lag when rendering multi-file diff batches.
+- **Workspace Pulse & Directory In-Memory Cache (2.2)**:
+    - Added short-lived TTL in-memory caching to `listFiles` (10s TTL) and `workspacePulse` (5s TTL) with path invalidation, eliminating redundant `git rev-parse`, `git status`, and filesystem scan subprocesses across consecutive turns.
+
 ## [0.8.4] - 2026-09-10
 
 ### Added

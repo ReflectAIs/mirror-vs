@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useState } from "react"
+import { memo, useMemo, useEffect, useState, useRef } from "react"
 import { parseUnifiedDiff, type DiffLine } from "@src/utils/parseUnifiedDiff"
 import { normalizeLanguage } from "@src/utils/highlighter"
 import { getLanguageFromPath } from "@src/utils/getLanguageFromPath"
@@ -23,6 +23,9 @@ interface Hunk {
  * matching VSCode's diff editor style
  */
 const DiffView = memo(({ source, filePath }: DiffViewProps) => {
+	const containerRef = useRef<HTMLDivElement>(null)
+	const [isVisible, setIsVisible] = useState(() => typeof IntersectionObserver === "undefined")
+
 	// Determine language from file path
 	const normalizedLang = useMemo(() => normalizeLanguage(getLanguageFromPath(filePath || "") || "txt"), [filePath])
 
@@ -37,6 +40,25 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 		const lineCount = source.split("\n").length
 		return lineCount <= 1000 // Only highlight diffs with <= 1000 lines
 	}, [source])
+
+	// Observe visibility before triggering expensive highlighting
+	useEffect(() => {
+		if (isVisible || typeof IntersectionObserver === "undefined") return
+		const el = containerRef.current
+		if (!el) return
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries.some((e) => e.isIntersecting)) {
+					setIsVisible(true)
+					observer.disconnect()
+				}
+			},
+			{ rootMargin: "300px" },
+		)
+		observer.observe(el)
+		return () => observer.disconnect()
+	}, [isVisible])
 
 	// Parse diff and group into hunks
 	const diffLines = useMemo(() => parseUnifiedDiff(source, filePath), [source, filePath])
@@ -102,17 +124,20 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 	// State for the processed hunks with highlighting
 	const [processedHunks, setProcessedHunks] = useState<Hunk[]>(hunks)
 
-	// Effect to handle async highlighting
+	// Effect to handle async highlighting only when visible in viewport
 	useEffect(() => {
-		if (!shouldHighlight) {
+		if (!shouldHighlight || !isVisible) {
 			setProcessedHunks(hunks)
 			return
 		}
+
+		let isCancelled = false
 
 		const processHunks = async () => {
 			const processed: Hunk[] = []
 
 			for (let i = 0; i < hunks.length; i++) {
+				if (isCancelled) return
 				const hunk = hunks[i]
 				try {
 					const highlighted = await highlightHunks(
@@ -134,11 +159,17 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 				}
 			}
 
-			setProcessedHunks(processed)
+			if (!isCancelled) {
+				setProcessedHunks(processed)
+			}
 		}
 
 		processHunks()
-	}, [hunks, shouldHighlight, normalizedLang, isLightTheme, filePath])
+
+		return () => {
+			isCancelled = true
+		}
+	}, [hunks, shouldHighlight, isVisible, normalizedLang, isLightTheme, filePath])
 
 	// Render helper that uses precomputed highlighting
 	const renderContent = (line: DiffLine, hunk: Hunk, lineIndexInHunk: number): React.ReactNode => {
@@ -168,7 +199,9 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 	}
 
 	return (
-		<div className="diff-view bg-[var(--vscode-editor-background)] rounded-md overflow-hidden text-[0.95em]">
+		<div
+			ref={containerRef}
+			className="diff-view bg-[var(--vscode-editor-background)] rounded-md overflow-hidden text-[0.95em]">
 			<div className="overflow-x-hidden">
 				<table className="w-full border-collapse table-auto">
 					<tbody>

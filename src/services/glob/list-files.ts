@@ -22,6 +22,25 @@ interface ScanContext {
 	ignoreInstance: ReturnType<typeof ignore>
 }
 
+interface ListFilesCacheEntry {
+	timestamp: number
+	result: [string[], boolean]
+}
+const listFilesCache = new Map<string, ListFilesCacheEntry>()
+const LIST_FILES_CACHE_TTL_MS = 10_000
+
+export function invalidateListFilesCache(dirPath?: string): void {
+	if (dirPath) {
+		for (const key of listFilesCache.keys()) {
+			if (key.startsWith(dirPath)) {
+				listFilesCache.delete(key)
+			}
+		}
+	} else {
+		listFilesCache.clear()
+	}
+}
+
 /**
  * List files in a directory, with optional recursive traversal
  *
@@ -36,10 +55,20 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 		return [[], false]
 	}
 
+	const isTestEnv = process.env.NODE_ENV === "test" || process.env.VITEST === "true"
+	const cacheKey = `${dirPath}:${recursive}:${limit}`
+	if (!isTestEnv) {
+		const cached = listFilesCache.get(cacheKey)
+		if (cached && Date.now() - cached.timestamp < LIST_FILES_CACHE_TTL_MS) {
+			return cached.result
+		}
+	}
+
 	// Handle special directories
 	const specialResult = await handleSpecialDirectories(dirPath)
 
 	if (specialResult) {
+		listFilesCache.set(cacheKey, { timestamp: Date.now(), result: specialResult })
 		return specialResult
 	}
 
@@ -53,7 +82,9 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 		// Calculate remaining limit for directories
 		const remainingLimit = Math.max(0, limit - files.length)
 		const directories = await listFilteredDirectories(dirPath, false, ignoreInstance, remainingLimit)
-		return formatAndCombineResults(files, directories, limit)
+		const finalResult = formatAndCombineResults(files, directories, limit)
+		listFilesCache.set(cacheKey, { timestamp: Date.now(), result: finalResult })
+		return finalResult
 	}
 
 	// For recursive mode, use the original approach but ensure first-level directories are included
@@ -69,10 +100,14 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 	// If we hit the limit, ensure all first-level directories are included
 	if (limitReached) {
 		const firstLevelDirs = await getFirstLevelDirectories(dirPath, ignoreInstance)
-		return ensureFirstLevelDirectoriesIncluded(results, firstLevelDirs, limit)
+		const finalResult = ensureFirstLevelDirectoriesIncluded(results, firstLevelDirs, limit)
+		listFilesCache.set(cacheKey, { timestamp: Date.now(), result: finalResult })
+		return finalResult
 	}
 
-	return [results, limitReached]
+	const finalResult: [string[], boolean] = [results, limitReached]
+	listFilesCache.set(cacheKey, { timestamp: Date.now(), result: finalResult })
+	return finalResult
 }
 
 /**

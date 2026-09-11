@@ -1852,12 +1852,12 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		return result
 	}, [isCondensing, visibleMessages])
 
+	// Retain 100% of groupedMessages in the frontend so chat history is never truncated.
+	// React Virtuoso natively virtualizes rendering (only mounting DOM nodes for items in the viewport),
+	// providing true infinite scrolling across the entire conversation history without DOM bloat.
 	const displayedMessages = useMemo(() => {
-		if (groupedMessages.length <= messageLimit) {
-			return groupedMessages
-		}
-		return groupedMessages.slice(groupedMessages.length - messageLimit)
-	}, [groupedMessages, messageLimit])
+		return groupedMessages
+	}, [groupedMessages])
 
 	const displayedMessagesRef = useRef(displayedMessages)
 	displayedMessagesRef.current = displayedMessages

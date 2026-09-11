@@ -18,6 +18,7 @@ export interface MirrorTerminal {
 	getUnretrievedOutput(): string
 	getLastCommand(): string
 	cleanCompletedProcessQueue(): void
+	write(input: string): boolean
 }
 
 export interface MirrorTerminalCallbacks {

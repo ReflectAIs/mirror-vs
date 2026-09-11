@@ -69,8 +69,18 @@ function cleanTerminalOutput(content: string): string {
  * to match terminal rendering behavior.
  */
 export const TerminalOutput: React.FC<TerminalOutputProps> = ({ content, className }) => {
+	const displayContent = useMemo(() => {
+		const MAX_DISPLAY_CHARS = 50_000
+		if (content && content.length > MAX_DISPLAY_CHARS) {
+			const head = content.slice(0, 5_000)
+			const tail = content.slice(-40_000)
+			return `${head}\n\n[... Truncated ${content.length - 45_000} characters for smooth display ...]\n\n${tail}`
+		}
+		return content
+	}, [content])
+
 	const html = useMemo(() => {
-		const cleanedContent = cleanTerminalOutput(content)
+		const cleanedContent = cleanTerminalOutput(displayContent)
 		try {
 			return converter.toHtml(cleanedContent)
 		} catch {
@@ -78,7 +88,7 @@ export const TerminalOutput: React.FC<TerminalOutputProps> = ({ content, classNa
 			// eslint-disable-next-line no-control-regex
 			return cleanedContent.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")
 		}
-	}, [content])
+	}, [displayContent])
 
 	return (
 		<pre

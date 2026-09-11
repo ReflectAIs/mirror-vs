@@ -21,6 +21,7 @@ import { useChatMessages } from "./hooks/useChatMessages"
 import ChatToolbar from "./ChatToolbar"
 import ChatActionBar from "./ChatActionBar"
 import ChatWelcomeContent from "./ChatWelcomeContent"
+import FloatingChatHud from "./FloatingChatHud"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -392,7 +393,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 			{task && (
 				<>
-					<div className="scrollable grow flex flex-col overflow-y-auto" ref={scrollContainerRef as any}>
+					<div
+						className="scrollable grow flex flex-col overflow-y-auto relative"
+						ref={scrollContainerRef as any}>
 						<Virtuoso
 							ref={virtuosoRef as any}
 							key={
@@ -410,8 +413,15 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							followOutput={followOutputCallback2}
 							atBottomStateChange={atBottomStateChangeCallback2}
 							atBottomThreshold={48}
-							startReached={() => setMessageLimit((prev) => prev + 100)}
 							components={virtuosoComponents}
+						/>
+						<FloatingChatHud
+							show={showScrollToBottom2}
+							isStreaming={isStreaming}
+							lastMessage={displayedMessages[displayedMessages.length - 1]}
+							hasLatestCheckpoint={hasLatestCheckpoint}
+							onScrollToBottom={handleScrollToBottomAndResetCheckpointCursor}
+							onScrollToCheckpoint={handleScrollToLatestCheckpoint}
 						/>
 					</div>
 					<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />

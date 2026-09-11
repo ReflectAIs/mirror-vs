@@ -427,9 +427,18 @@ export async function executeCommandInTerminal(
 		const emitUpdate = () => {
 			pendingCommandOutputEmitTimer = undefined
 			lastCommandOutputEmitAt = Date.now()
-			const compressedOutput = Terminal.compressTerminalOutput(accumulatedOutput)
-			latestCompressedOutput = compressedOutput
-			const status: CommandExecutionStatus = { executionId, status: "output", output: compressedOutput }
+
+			// For live streaming, if output is very large, compress the tail window to keep regex fast and UI responsive
+			const MAX_STREAMING_COMPRESS_CHARS = 40_000
+			let streamSlice = accumulatedOutput
+			let prefix = ""
+			if (accumulatedOutput.length > MAX_STREAMING_COMPRESS_CHARS) {
+				streamSlice = accumulatedOutput.slice(-MAX_STREAMING_COMPRESS_CHARS)
+				prefix = `[... earlier streaming output omitted for performance ...]\n`
+			}
+			const compressedOutput = Terminal.compressTerminalOutput(streamSlice) ?? streamSlice
+			latestCompressedOutput = `${prefix}${compressedOutput}`
+			const status: CommandExecutionStatus = { executionId, status: "output", output: latestCompressedOutput }
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			void queueCommandOutputMessage(latestCompressedOutput, true)
 		}

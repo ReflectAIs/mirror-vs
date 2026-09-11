@@ -40,6 +40,14 @@ export class Terminal extends BaseTerminal {
 		return this.terminal.exitStatus !== undefined
 	}
 
+	public override write(input: string): boolean {
+		if (this.terminal) {
+			this.terminal.sendText(input, true)
+			return true
+		}
+		return false
+	}
+
 	public override runCommand(
 		command: string,
 		callbacks: MirrorTerminalCallbacks,

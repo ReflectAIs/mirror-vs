@@ -15,7 +15,10 @@ export class ExecaTerminal extends BaseTerminal {
 		return false
 	}
 
-	public override runCommand(command: string, callbacks: MirrorTerminalCallbacks): MirrorTerminalProcessResultPromise {
+	public override runCommand(
+		command: string,
+		callbacks: MirrorTerminalCallbacks,
+	): MirrorTerminalProcessResultPromise {
 		this.busy = true
 
 		const process = new ExecaTerminalProcess(this)
@@ -34,5 +37,12 @@ export class ExecaTerminal extends BaseTerminal {
 		})
 
 		return mergePromise(process, promise)
+	}
+
+	public override write(input: string): boolean {
+		if (this.process instanceof ExecaTerminalProcess) {
+			return this.process.write(input)
+		}
+		return false
 	}
 }

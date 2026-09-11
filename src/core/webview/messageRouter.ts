@@ -147,6 +147,7 @@ import { handleOpenFile, handleReadFileContent, handleSaveImage, handleOpenExter
 
 // ── Utilities for inline handlers ─────────────────────────────
 import { openImage } from "../../integrations/misc/image-handler"
+import { TerminalRegistry } from "../../integrations/terminal/TerminalRegistry"
 import { openMention } from "../mentions"
 import { stopTts } from "../../utils/tts"
 import { Mode } from "../../shared/modes"
@@ -259,6 +260,12 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "killTerminal":
 			await handleKillTerminal(provider, message.terminalId, message.terminalType)
+			break
+		case "openTerminal":
+			TerminalRegistry.showTerminal(message.terminalId)
+			break
+		case "sendTerminalInput":
+			TerminalRegistry.sendInputToTerminal(message.terminalId, message.terminalInput ?? message.text ?? "")
 			break
 		case "clearTask":
 			await handleClearTask(provider)

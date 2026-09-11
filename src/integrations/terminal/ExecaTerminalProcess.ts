@@ -43,8 +43,8 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 				shell: BaseTerminal.getExecaShellPath() || true,
 				cwd: this.terminal.getCurrentWorkingDirectory(),
 				all: true,
-				// Ignore stdin to ensure non-interactive mode and prevent hanging
-				stdin: "ignore",
+				// Pipe stdin to enable interactive responses (y/n, enter, prompts) from webview UI
+				stdin: "pipe",
 				env: {
 					...process.env,
 					// Ensure UTF-8 encoding for Ruby, CocoaPods, etc.
@@ -256,5 +256,19 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 		if (output !== "") {
 			this.emit("line", output)
 		}
+	}
+
+	public write(input: string): boolean {
+		if (this.subprocess?.stdin && !this.subprocess.stdin.destroyed && this.subprocess.stdin.writable) {
+			try {
+				const text = input.endsWith("\n") ? input : input + "\n"
+				this.subprocess.stdin.write(text)
+				return true
+			} catch (err) {
+				console.error("[ExecaTerminalProcess] Failed writing to stdin:", err)
+				return false
+			}
+		}
+		return false
 	}
 }
