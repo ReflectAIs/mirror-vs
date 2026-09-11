@@ -131,17 +131,17 @@ export interface UseChatMessagesReturn {
 	lastMessage: MirrorMessage | undefined
 	modelPickerConfig: {
 		modelIdKey:
-			| "apiModelId"
-			| "openRouterModelId"
-			| "requestyModelId"
-			| "unboundModelId"
-			| "litellmModelId"
-			| "vercelAiGatewayModelId"
-			| "openAiModelId"
-			| "ollamaModelId"
-			| "lmStudioModelId"
-			| "vsCodeLmModelSelector"
-			| "customModelId"
+		| "apiModelId"
+		| "openRouterModelId"
+		| "requestyModelId"
+		| "unboundModelId"
+		| "litellmModelId"
+		| "vercelAiGatewayModelId"
+		| "openAiModelId"
+		| "ollamaModelId"
+		| "lmStudioModelId"
+		| "vsCodeLmModelSelector"
+		| "customModelId"
 		models: Record<string, ModelInfo> | null
 		defaultModelId: string
 		serviceName: string
@@ -816,7 +816,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					if (cost === undefined) {
 						return true
 					}
-				} catch {}
+				} catch { }
 			}
 		}
 
@@ -1205,17 +1205,17 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 
 	const modelPickerConfig = useMemo<{
 		modelIdKey:
-			| "apiModelId"
-			| "openRouterModelId"
-			| "requestyModelId"
-			| "unboundModelId"
-			| "litellmModelId"
-			| "vercelAiGatewayModelId"
-			| "openAiModelId"
-			| "ollamaModelId"
-			| "lmStudioModelId"
-			| "vsCodeLmModelSelector"
-			| "customModelId"
+		| "apiModelId"
+		| "openRouterModelId"
+		| "requestyModelId"
+		| "unboundModelId"
+		| "litellmModelId"
+		| "vercelAiGatewayModelId"
+		| "openAiModelId"
+		| "ollamaModelId"
+		| "lmStudioModelId"
+		| "vsCodeLmModelSelector"
+		| "customModelId"
 		models: Record<string, ModelInfo> | null
 		defaultModelId: string
 		serviceName: string
@@ -1227,11 +1227,11 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			string,
 			{
 				modelIdKey:
-					| "openRouterModelId"
-					| "requestyModelId"
-					| "unboundModelId"
-					| "litellmModelId"
-					| "vercelAiGatewayModelId"
+				| "openRouterModelId"
+				| "requestyModelId"
+				| "unboundModelId"
+				| "litellmModelId"
+				| "vercelAiGatewayModelId"
 				routerKey: string
 			}
 		> = {
@@ -1321,7 +1321,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			if (saved) {
 				custom = JSON.parse(saved)
 			}
-		} catch {}
+		} catch { }
 		let deleted: string[] = []
 		try {
 			const saved = localStorage.getItem(
@@ -1330,7 +1330,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			if (saved) {
 				deleted = JSON.parse(saved)
 			}
-		} catch {}
+		} catch { }
 		const currentId = (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
 		const allKeys = [...new Set([...(currentId ? [currentId] : []), ...builtIn, ...custom])].filter(
 			(key) => !deleted.includes(key) || key === currentId,
@@ -1904,7 +1904,6 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					</div>
 				)
 			},
-			Footer: () => <div className="h-10 w-full shrink-0 pointer-events-none" />,
 		}),
 		[],
 	)
