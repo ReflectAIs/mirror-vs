@@ -8,6 +8,7 @@ interface ToolDisclosureProps {
 	defaultExpanded?: boolean
 	isExpanded?: boolean
 	onToggle?: () => void
+	onRowClick?: () => void
 	status?: React.ReactNode
 	className?: string
 	contentClassName?: string
@@ -20,6 +21,7 @@ export const ToolDisclosure = memo(
 		defaultExpanded = false,
 		isExpanded: controlledExpanded,
 		onToggle,
+		onRowClick,
 		status,
 		className,
 		contentClassName,
@@ -27,7 +29,8 @@ export const ToolDisclosure = memo(
 		const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
 		const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded
 
-		const handleToggle = () => {
+		const handleToggle = (e?: React.MouseEvent) => {
+			e?.stopPropagation()
 			if (onToggle) {
 				onToggle()
 			} else {
@@ -35,22 +38,46 @@ export const ToolDisclosure = memo(
 			}
 		}
 
+		const handleRowClick = (e: React.MouseEvent) => {
+			if (onRowClick) {
+				onRowClick()
+			} else {
+				handleToggle(e)
+			}
+		}
+
 		return (
-			<div className={cn("my-1 select-none", className)}>
+			<div className={cn("my-1 select-none min-w-0 max-w-full", className)}>
 				<div
-					onClick={handleToggle}
-					className="flex items-center gap-1.5 py-1 px-1 rounded hover:bg-vscode-list-hoverBackground/30 text-xs text-vscode-descriptionForeground hover:text-vscode-foreground cursor-pointer transition-colors group">
-					<span className="font-normal flex items-center gap-1.5">{title}</span>
-					<ChevronDown
-						className={cn(
-							"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
-							isExpanded ? "rotate-0" : "-rotate-90",
-						)}
-					/>
-					{status && <div className="ml-auto text-[11px] shrink-0 font-normal">{status}</div>}
+					onClick={handleRowClick}
+					className="flex items-center gap-1.5 py-1 px-1 rounded hover:bg-vscode-list-hoverBackground/30 text-xs text-vscode-descriptionForeground hover:text-vscode-foreground cursor-pointer transition-colors group min-w-0 max-w-full overflow-hidden">
+					<span
+						className="font-normal flex items-center gap-1.5 min-w-0 flex-1 truncate"
+						title={typeof title === "string" ? title : undefined}>
+						{title}
+					</span>
+					<button
+						type="button"
+						onClick={handleToggle}
+						className="p-0.5 rounded hover:bg-vscode-toolbar-hoverBackground/60 text-vscode-descriptionForeground hover:text-vscode-foreground transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+						title={isExpanded ? "Collapse" : "Expand preview"}>
+						<ChevronDown
+							className={cn(
+								"size-3.5 text-vscode-descriptionForeground/70 group-hover:text-vscode-foreground transition-transform duration-150 shrink-0",
+								isExpanded ? "rotate-0" : "-rotate-90",
+							)}
+						/>
+					</button>
+					{status && <div className="ml-auto text-[11px] shrink-0 font-normal pl-1">{status}</div>}
 				</div>
 				{isExpanded && (
-					<div className={cn("pl-2 pt-0.5 pb-1 flex flex-col gap-0.5", contentClassName)}>{children}</div>
+					<div
+						className={cn(
+							"pl-2 pt-0.5 pb-1 flex flex-col gap-0.5 min-w-0 max-w-full overflow-hidden",
+							contentClassName,
+						)}>
+						{children}
+					</div>
 				)}
 			</div>
 		)

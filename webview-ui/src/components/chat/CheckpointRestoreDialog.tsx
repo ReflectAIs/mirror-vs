@@ -10,6 +10,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@src/components/ui"
+import { cn } from "@src/lib/utils"
 
 interface CheckpointRestoreDialogProps {
 	open: boolean
@@ -51,22 +52,27 @@ export const CheckpointRestoreDialog: React.FC<CheckpointRestoreDialogProps> = (
 					<AlertDialogTitle className="text-lg">{title}</AlertDialogTitle>
 					<AlertDialogDescription className="text-base">{description}</AlertDialogDescription>
 				</AlertDialogHeader>
-				<AlertDialogFooter className="flex-col gap-2">
-					<AlertDialogCancel className="bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border-vscode-button-border">
-						{t("common:answers.cancel")}
-					</AlertDialogCancel>
-					<AlertDialogAction
-						onClick={handleConfirmWithoutRestore}
-						className="bg-vscode-button-background hover:bg-vscode-button-hoverBackground text-vscode-button-foreground border-vscode-button-border">
-						{isEdit ? t("common:confirmation.editOnly") : t("common:confirmation.deleteOnly")}
-					</AlertDialogAction>
+				<AlertDialogFooter className="flex flex-col sm:flex-col gap-2 pt-2">
 					{hasCheckpoint && (
 						<AlertDialogAction
 							onClick={handleConfirmWithRestore}
-							className="bg-vscode-button-background hover:bg-vscode-button-hoverBackground text-vscode-button-foreground border-vscode-button-border">
+							className="w-full bg-vscode-button-background hover:bg-vscode-button-hoverBackground text-vscode-button-foreground font-medium py-1.5 px-3 rounded text-xs cursor-pointer transition-colors shadow-sm">
 							{t("common:confirmation.restoreToCheckpoint")}
 						</AlertDialogAction>
 					)}
+					<AlertDialogAction
+						onClick={handleConfirmWithoutRestore}
+						className={cn(
+							"w-full py-1.5 px-3 rounded text-xs font-medium cursor-pointer transition-colors",
+							hasCheckpoint
+								? "bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-button-border/40"
+								: "bg-vscode-button-background hover:bg-vscode-button-hoverBackground text-vscode-button-foreground",
+						)}>
+						{isEdit ? t("common:confirmation.editOnly") : t("common:confirmation.deleteOnly")}
+					</AlertDialogAction>
+					<AlertDialogCancel className="w-full bg-transparent hover:bg-vscode-toolbar-hoverBackground text-vscode-descriptionForeground hover:text-vscode-foreground border-none text-xs font-normal cursor-pointer py-1 mt-0.5">
+						{t("common:answers.cancel")}
+					</AlertDialogCancel>
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>

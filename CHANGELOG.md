@@ -15,11 +15,19 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Status indicators (`✓ Applied`, `Running...`) and diff stats (`+added -removed`) sit neatly in the disclosure status area.
 - **Default-Collapsed Diff Review Windows**:
     - Single-file edits and diff review accordions are collapsed by default in the chat window, preventing visual clutter while remaining one-click expandable for inspection.
+- **Batch Command Execution UI**:
+    - Added `BatchCommandExecution` component rendering grouped command batches as a single collapsible disclosure with per-command streaming output, status, and interactive input support.
+    - Extended the message schema to persist `batchCommands` so batch executions survive history reloads.
+- **Session Knowledge Management**:
+    - Added delete controls in the Shared Context dialog: remove individual knowledge notes or clear all, backed by a new `deleteSessionKnowledge` message routed through `SessionContextManager.deleteKnowledgeNote`.
 - **Scroll Stuttering & ResizeObserver Optimization**:
     - Debounced height change notifications and eliminated layout thrashing from continuous observers on historical messages, preventing webview gray-screen crashes.
 - **Input & Navigation Refinements**:
     - Pinned image attachment button to the bottom-right corner of the chat input box without floating drift during multi-line input.
     - Simplified new tab vs new session actions with clear, minimal tooltips.
+    - Click-to-open file navigation on edit disclosure headers; immediate webview state sync after message edits to remove stale rows.
+    - Horizontal overflow fixes in chat view, markdown, and file operation rows (`min-w-0`/`overflow-x-hidden`); smooth height transition for collapsible command output.
+    - Restyled checkpoint restore dialog with full-width stacked action buttons and a subtle cancel option.
 
 ## [0.8.5] - 2026-09-11
 

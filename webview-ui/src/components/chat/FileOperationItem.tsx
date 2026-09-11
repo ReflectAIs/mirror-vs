@@ -108,7 +108,7 @@ export const FileOperationItem = memo(
 			<div
 				onClick={handleClick}
 				className={cn(
-					"flex items-center gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/40 cursor-pointer text-xs group transition-colors select-none",
+					"flex items-center gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/40 cursor-pointer text-xs group transition-colors select-none min-w-0 max-w-full overflow-hidden",
 					className,
 				)}
 				title={`${displayPath}${effectiveLineRange ? ` #${effectiveLineRange}` : ""}`}>
@@ -116,7 +116,9 @@ export const FileOperationItem = memo(
 					{verb}
 				</span>
 				{getFileIcon(displayPath)}
-				<span className="font-semibold text-vscode-foreground text-[11.5px] truncate">{fileName}</span>
+				<span className="font-semibold text-vscode-foreground text-[11.5px] truncate min-w-0 flex-1">
+					{fileName}
+				</span>
 				{effectiveLineRange && (
 					<span className="text-vscode-descriptionForeground/60 text-[11px] font-mono shrink-0">
 						#{effectiveLineRange.startsWith("L") ? effectiveLineRange : `L${effectiveLineRange}`}

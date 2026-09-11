@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
-import { Share2, X, FileText, Sparkles, Layers, Eye, Clock, CheckCircle2, Bot, Radio, Save } from "lucide-react"
+import { Share2, X, FileText, Sparkles, Layers, Eye, Clock, CheckCircle2, Bot, Radio, Save, Trash2 } from "lucide-react"
 
 import type { TabInfo, SharedSessionContext } from "@mirror-vs/types"
 import { Button } from "@src/components/ui"
@@ -51,6 +51,29 @@ export const SharedContextDialog: React.FC<SharedContextDialogProps> = ({
 			})
 		}
 	}, [currentSessionId, notesBuffer])
+
+	const handleDeleteNote = useCallback(
+		(noteId?: string, index?: number) => {
+			if (currentSessionId) {
+				vscode.postMessage({
+					type: "deleteSessionKnowledge",
+					sessionId: currentSessionId,
+					noteId: noteId || (index !== undefined ? String(index) : undefined),
+				})
+			}
+		},
+		[currentSessionId],
+	)
+
+	const handleClearAllKnowledge = useCallback(() => {
+		if (currentSessionId) {
+			vscode.postMessage({
+				type: "deleteSessionKnowledge",
+				sessionId: currentSessionId,
+				clearAll: true,
+			})
+		}
+	}, [currentSessionId])
 
 	// Format what the model actually receives in system prompt
 	const rawSystemPromptPreview = useMemo(() => {
@@ -227,10 +250,21 @@ export const SharedContextDialog: React.FC<SharedContextDialogProps> = ({
 
 					{activeSection === "knowledge" && (
 						<div className="flex flex-col gap-2.5">
-							<p className="text-xs text-vscode-descriptionForeground">
-								Key decisions and milestones automatically extracted from tasks when they complete or
-								condense.
-							</p>
+							<div className="flex items-center justify-between gap-2">
+								<p className="text-xs text-vscode-descriptionForeground">
+									Key decisions and milestones automatically extracted from tasks when they complete
+									or condense.
+								</p>
+								{knowledgeNotes.length > 0 && (
+									<button
+										onClick={handleClearAllKnowledge}
+										className="text-[11px] px-2 py-0.5 rounded text-vscode-errorForeground hover:bg-vscode-errorForeground/10 cursor-pointer transition-colors shrink-0 flex items-center gap-1 font-medium"
+										title="Clear all extracted session knowledge">
+										<Trash2 className="w-3 h-3" />
+										Clear All
+									</button>
+								)}
+							</div>
 							{knowledgeNotes.length === 0 ? (
 								<div className="p-8 text-center text-xs text-vscode-descriptionForeground border border-dashed border-vscode-editorGroup-border rounded-lg">
 									No knowledge notes extracted yet. As tasks complete in this session, key insights
@@ -241,19 +275,27 @@ export const SharedContextDialog: React.FC<SharedContextDialogProps> = ({
 									{knowledgeNotes.map((note, index) => (
 										<div
 											key={note.id || index}
-											className="p-3 rounded-lg bg-vscode-editor-background border border-vscode-editorGroup-border/50 flex flex-col gap-1 text-xs">
+											className="p-3 rounded-lg bg-vscode-editor-background border border-vscode-editorGroup-border/50 flex flex-col gap-1.5 text-xs group relative">
 											<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground">
 												<span className="font-mono">
 													From Tab: {note.sourceTaskId?.slice(0, 8)}...
 												</span>
-												{note.createdAt && (
-													<span className="flex items-center gap-1">
-														<Clock className="w-3 h-3" />
-														{new Date(note.createdAt).toLocaleTimeString()}
-													</span>
-												)}
+												<div className="flex items-center gap-2">
+													{note.createdAt && (
+														<span className="flex items-center gap-1">
+															<Clock className="w-3 h-3" />
+															{new Date(note.createdAt).toLocaleTimeString()}
+														</span>
+													)}
+													<button
+														onClick={() => handleDeleteNote(note.id, index)}
+														className="p-1 rounded text-vscode-descriptionForeground hover:text-vscode-errorForeground hover:bg-vscode-toolbar-hoverBackground cursor-pointer transition-colors opacity-70 group-hover:opacity-100"
+														title="Delete this knowledge note">
+														<Trash2 className="w-3 h-3" />
+													</button>
+												</div>
 											</div>
-											<p className="text-vscode-foreground leading-relaxed font-mono text-[11px] whitespace-pre-wrap">
+											<p className="text-vscode-foreground leading-relaxed font-mono text-[11px] whitespace-pre-wrap break-words">
 												{note.text}
 											</p>
 										</div>

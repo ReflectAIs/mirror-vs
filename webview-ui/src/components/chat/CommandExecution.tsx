@@ -187,6 +187,12 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 
 	return (
 		<div className="my-1 select-none">
+			{(title || icon) && (
+				<div className="flex items-center gap-1.5 text-xs text-vscode-descriptionForeground mb-1">
+					{icon}
+					{title}
+				</div>
+			)}
 			<div
 				className="flex items-center justify-between gap-2 py-1 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 cursor-pointer select-none group transition-colors text-xs"
 				onClick={() => setIsExpanded(!isExpanded)}>
@@ -196,7 +202,8 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 						{isRunning ? "Running" : isSuccess ? "Ran command" : isFailed ? "Command failed" : "Terminal"}
 					</span>
 					<code
-						className="font-mono text-[11.5px] text-vscode-foreground font-semibold truncate"
+						data-testid="code-block"
+						className="font-mono text-[11.5px] text-vscode-foreground font-medium truncate no-code-bg bg-transparent px-0 py-0"
 						title={command}>
 						{command}
 					</code>
@@ -228,24 +235,29 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 				</div>
 			</div>
 
-			{isExpanded && (
-				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 flex flex-col gap-1.5 my-1">
-					{output.length > 0 && (
-						<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[220px] overflow-auto">
-							<TerminalOutput content={output} />
-						</div>
-					)}
-					{command && command.trim() && (
-						<CommandPatternSelector
-							patterns={commandPatterns}
-							allowedCommands={allowedCommands}
-							deniedCommands={deniedCommands}
-							onAllowPatternChange={handleAllowPatternChange}
-							onDenyPatternChange={handleDenyPatternChange}
-						/>
-					)}
-				</div>
-			)}
+			<div
+				className={cn(
+					"ml-3 pl-2.5 border-l border-vscode-panel-border/20 flex flex-col gap-1.5 overflow-hidden transition-all duration-150",
+					{
+						"max-h-0 opacity-0 pointer-events-none": !isExpanded,
+						"max-h-[600px] opacity-100 my-1": isExpanded,
+					},
+				)}>
+				{output.length > 0 && (
+					<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[220px] overflow-auto">
+						<TerminalOutput content={output} />
+					</div>
+				)}
+				{command && command.trim() && (
+					<CommandPatternSelector
+						patterns={commandPatterns}
+						allowedCommands={allowedCommands}
+						deniedCommands={deniedCommands}
+						onAllowPatternChange={handleAllowPatternChange}
+						onDenyPatternChange={handleDenyPatternChange}
+					/>
+				)}
+			</div>
 
 			{shouldShowInteractiveInput && (
 				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 py-1 flex items-center gap-1.5">
@@ -298,7 +310,7 @@ const OutputContainerInternal = ({ isExpanded, output }: { isExpanded: boolean; 
 
 const OutputContainer = memo(OutputContainerInternal)
 
-const parseCommandAndOutput = (text: string | undefined) => {
+export const parseCommandAndOutput = (text: string | undefined) => {
 	if (!text) {
 		return { command: "", output: "" }
 	}

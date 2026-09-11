@@ -258,6 +258,23 @@ export class SessionContextManager {
 		await this.persistAll(await this.getAllContexts())
 	}
 
+	/**
+	 * Deletes a knowledge note by id or index, or clears all knowledge notes for a session.
+	 */
+	public async deleteKnowledgeNote(sessionId: string, noteId?: string, clearAll?: boolean): Promise<void> {
+		if (!sessionId) {
+			return
+		}
+		const ctx = await this.getOrCreateContext(sessionId)
+		if (clearAll) {
+			ctx.knowledge = []
+		} else if (noteId) {
+			ctx.knowledge = ctx.knowledge.filter((note, idx) => note.id !== noteId && String(idx) !== noteId)
+		}
+		ctx.updatedAt = Date.now()
+		await this.persistAll(await this.getAllContexts())
+	}
+
 	// ── Auto knowledge extraction (Phase 3) ────────────────────────────────
 
 	/**

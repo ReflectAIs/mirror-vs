@@ -3,6 +3,7 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import { useCopyToClipboard } from "@src/utils/clipboard"
 import { StandardTooltip } from "@src/components/ui"
+import { cn } from "@src/lib/utils"
 
 import MarkdownBlock from "../common/MarkdownBlock"
 
@@ -20,8 +21,9 @@ export const Markdown = memo(({ markdown, partial }: { markdown?: string; partia
 		<div
 			onMouseEnter={() => setIsHovering(true)}
 			onMouseLeave={() => setIsHovering(false)}
-			style={{ position: "relative" }}>
-			<div style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+			style={{ position: "relative" }}
+			className={cn("min-w-0 max-w-full overflow-hidden", partial && "stream-fade-in")}>
+			<div style={{ overflowWrap: "anywhere" }} className="min-w-0 max-w-full">
 				<MarkdownBlock markdown={markdown} />
 			</div>
 			{markdown && !partial && isHovering && (

@@ -27,7 +27,7 @@ vi.mock("react-i18next", () => ({
 		},
 	}),
 	Trans: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-	initReactI18next: { type: "3rdParty", init: () => { } },
+	initReactI18next: { type: "3rdParty", init: () => {} },
 }))
 
 // Mock CodeBlock (avoid ESM/highlighter costs)
@@ -56,10 +56,10 @@ function renderChatRow(message: MirrorMessage, isExpanded = false) {
 					isExpanded={isExpanded}
 					isLast={false}
 					isStreaming={false}
-					onToggleExpand={() => { }}
-					onSuggestionClick={() => { }}
-					onBatchFileResponse={() => { }}
-					onFollowUpUnmount={() => { }}
+					onToggleExpand={() => {}}
+					onSuggestionClick={() => {}}
+					onBatchFileResponse={() => {}}
+					onFollowUpUnmount={() => {}}
 					isFollowUpAnswered={false}
 				/>
 			</QueryClientProvider>
@@ -82,10 +82,9 @@ describe("ChatRow - inline diff stats and actions", () => {
 			diffStats: { added: 1, removed: 1 },
 		})
 
-		const { container } = renderChatRow(message, false)
+		renderChatRow(message, false)
 
-		expect(screen.getByText("The assistant wants to edit this file")).toBeInTheDocument()
-		expect(container.querySelector(".codicon-diff")).toBeInTheDocument()
+		expect(screen.getByText("Edited file.ts")).toBeInTheDocument()
 		expect(screen.getByText("+1")).toBeInTheDocument()
 		expect(screen.getByText("-1")).toBeInTheDocument()
 	})
@@ -99,10 +98,9 @@ describe("ChatRow - inline diff stats and actions", () => {
 			diffStats: { added: 1, removed: 1 },
 		})
 
-		const { container } = renderChatRow(message)
+		renderChatRow(message)
 
-		expect(screen.getByText("The assistant wants to edit this file")).toBeInTheDocument()
-		expect(container.querySelector(".codicon-diff")).toBeInTheDocument()
+		expect(screen.getByText("Edited file.ts")).toBeInTheDocument()
 		expect(screen.getByText("+1")).toBeInTheDocument()
 		expect(screen.getByText("-1")).toBeInTheDocument()
 	})
@@ -116,10 +114,9 @@ describe("ChatRow - inline diff stats and actions", () => {
 			diffStats: { added: 1, removed: 2 },
 		})
 
-		const { container } = renderChatRow(message)
+		renderChatRow(message)
 
-		expect(screen.getByText("The assistant wants to edit this file")).toBeInTheDocument()
-		expect(container.querySelector(".codicon-diff")).toBeInTheDocument()
+		expect(screen.getByText("Edited file.ts")).toBeInTheDocument()
 		expect(screen.getByText("+1")).toBeInTheDocument()
 		expect(screen.getByText("-2")).toBeInTheDocument()
 	})
@@ -133,59 +130,28 @@ describe("ChatRow - inline diff stats and actions", () => {
 			diffStats: { added: 3, removed: 0 },
 		})
 
-		const { container } = renderChatRow(message)
+		renderChatRow(message)
 
-		expect(screen.getByText("The assistant wants to edit this file")).toBeInTheDocument()
-		expect(container.querySelector(".codicon-diff")).toBeInTheDocument()
+		expect(screen.getByText("Edited new-file.ts")).toBeInTheDocument()
 		expect(screen.getByText("+3")).toBeInTheDocument()
-		expect(screen.getByText("-0")).toBeInTheDocument()
 	})
 
-	it("preserves jump-to-file affordance for newFileCreated", () => {
+	it("preserves click to open file affordance for edited file", () => {
 		const message = createToolAskMessage({
-			tool: "newFileCreated",
+			tool: "editedExistingFile",
 			path: "src/new-file.ts",
 			content: "+new file",
 			diffStats: { added: 1, removed: 0 },
 		})
 
-		const { container } = renderChatRow(message)
-		const openFileIcon = container.querySelector(".codicon-link-external") as HTMLElement | null
-
-		expect(openFileIcon).toBeInTheDocument()
-		if (!openFileIcon) {
-			throw new Error("Expected external link icon for newFileCreated")
-		}
-
-		fireEvent.click(openFileIcon)
+		renderChatRow(message)
+		const row = screen.getByText("Edited new-file.ts")
+		fireEvent.click(row)
 
 		expect(mockPostMessage).toHaveBeenCalledWith({
 			type: "openFile",
-			text: "./src/new-file.ts",
+			text: "src/new-file.ts",
 		})
-	})
-
-	it("preserves protected and outside-workspace messaging in unified branch", () => {
-		const outsideWorkspaceMessage = createToolAskMessage({
-			tool: "searchAndReplace",
-			path: "../outside/file.ts",
-			diff: "-a\n+b\n",
-			isOutsideWorkspace: true,
-			diffStats: { added: 1, removed: 1 },
-		})
-		renderChatRow(outsideWorkspaceMessage)
-		expect(screen.getByText("The assistant wants to edit outside workspace")).toBeInTheDocument()
-
-		const protectedMessage = createToolAskMessage({
-			tool: "appliedDiff",
-			path: "src/protected.ts",
-			diff: "-a\n+b\n",
-			isProtected: true,
-			diffStats: { added: 1, removed: 1 },
-		})
-		const { container } = renderChatRow(protectedMessage)
-		expect(screen.getByText("The assistant wants to edit a protected file")).toBeInTheDocument()
-		expect(container.querySelector(".codicon-lock")).toBeInTheDocument()
 	})
 
 	it("keeps batch diff handling for unified edit tools", () => {
@@ -204,7 +170,6 @@ describe("ChatRow - inline diff stats and actions", () => {
 
 		renderChatRow(message)
 
-		expect(screen.getByText("The assistant wants to apply batch changes")).toBeInTheDocument()
-		expect(screen.getByText((text) => text.includes("src/a.ts"))).toBeInTheDocument()
+		expect(screen.getByText("Edited 1 file")).toBeInTheDocument()
 	})
 })

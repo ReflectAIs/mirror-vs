@@ -1588,6 +1588,9 @@ export class MirrorProvider
 							)
 						}
 
+						// Immediately sync the truncated state to the webview to remove the old message before the new one is added
+						await this.postStateToWebview()
+
 						// Process the edited message
 						await task.handleWebviewAskResponse(
 							"messageResponse",

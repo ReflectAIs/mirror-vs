@@ -283,6 +283,21 @@ export async function handleUpdateSessionNotes(
 }
 
 /**
+ * Handles the deleteSessionKnowledge message — deletes one or all knowledge notes for a session.
+ */
+export async function handleDeleteSessionKnowledge(
+	provider: MirrorProvider,
+	sessionId?: string,
+	noteId?: string,
+	clearAll?: boolean,
+): Promise<void> {
+	if (sessionId) {
+		await provider.getSessionContextManager().deleteKnowledgeNote(sessionId, noteId, clearAll)
+		await provider.postStateToWebview()
+	}
+}
+
+/**
  * Handles the customInstructions message.
  */
 export async function handleCustomInstructions(provider: MirrorProvider, text?: string): Promise<void> {

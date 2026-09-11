@@ -276,6 +276,7 @@ export const mirrorMessageSchema = z.object({
 	isProtected: z.boolean().optional(),
 	apiProtocol: z.union([z.literal("openai"), z.literal("anthropic")]).optional(),
 	isAnswered: z.boolean().optional(),
+	batchCommands: z.array(z.any()).optional(),
 })
 
 export type MirrorMessage = z.infer<typeof mirrorMessageSchema>

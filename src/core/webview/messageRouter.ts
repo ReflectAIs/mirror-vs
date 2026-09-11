@@ -21,6 +21,7 @@ import {
 	handleRenameSession,
 	handleRenameTask,
 	handleUpdateSessionNotes,
+	handleDeleteSessionKnowledge,
 	handleAskResponse,
 	handleTerminalOperation,
 	handleKillTerminal,
@@ -248,6 +249,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "updateSessionNotes":
 			await handleUpdateSessionNotes(provider, message.sessionId, message.sessionNotes)
+			break
+		case "deleteSessionKnowledge":
+			await handleDeleteSessionKnowledge(provider, message.sessionId, message.noteId, message.clearAll)
 			break
 		case "customInstructions":
 			await provider.updateCustomInstructions(message.text)

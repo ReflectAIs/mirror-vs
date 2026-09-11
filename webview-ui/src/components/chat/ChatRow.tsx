@@ -47,6 +47,7 @@ import { ProgressIndicator } from "./ProgressIndicator"
 import { ImageProgressRow } from "./ImageProgressRow"
 import { Markdown } from "./Markdown"
 import { CommandExecution } from "./CommandExecution"
+import { BatchCommandExecution } from "./BatchCommandExecution"
 import { CommandExecutionError } from "./CommandExecutionError"
 import { TerminalCallbackNudge } from "./TerminalCallbackNudge"
 import { MIRROR_LOGO_DATA_URI } from "@/assets/logoData"
@@ -524,6 +525,11 @@ export const ChatRowContent = ({
 					<ToolDisclosure
 						title={isEditInProgress ? `Editing ${editFileName}` : `Edited ${editFileName}`}
 						defaultExpanded={false}
+						onRowClick={() => {
+							if (tool.path) {
+								vscode.postMessage({ type: "openFile", text: tool.path })
+							}
+						}}
 						status={
 							<span className="flex items-center gap-2">
 								{tool.diffStats && (tool.diffStats.added > 0 || tool.diffStats.removed > 0) && (
@@ -563,6 +569,11 @@ export const ChatRowContent = ({
 					<ToolDisclosure
 						title={isInsertInProgress ? `Editing ${insertFileName}` : `Edited ${insertFileName}`}
 						defaultExpanded={false}
+						onRowClick={() => {
+							if (tool.path) {
+								vscode.postMessage({ type: "openFile", text: tool.path })
+							}
+						}}
 						status={message.isAnswered ? <span className="text-emerald-400">✓ Applied</span> : undefined}>
 						<CodeAccordion
 							path={tool.path}
@@ -2034,6 +2045,9 @@ export const ChatRowContent = ({
 				case "mistake_limit_reached":
 					return <ErrorRow type="mistake_limit" message={message.text || ""} errorDetails={message.text} />
 				case "command":
+					if ((message as any).batchCommands && Array.isArray((message as any).batchCommands)) {
+						return <BatchCommandExecution batchCommands={(message as any).batchCommands} isLast={isLast} />
+					}
 					return (
 						<CommandExecution
 							executionId={message.ts.toString()}

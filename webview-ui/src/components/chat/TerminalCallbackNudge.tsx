@@ -133,7 +133,7 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 					</span>
 					{parsed.command && (
 						<code
-							className="font-mono text-[11.5px] text-vscode-foreground font-semibold truncate"
+							className="font-mono text-[11.5px] text-vscode-foreground font-medium truncate no-code-bg bg-transparent px-0 py-0"
 							title={parsed.command}>
 							{parsed.command}
 						</code>

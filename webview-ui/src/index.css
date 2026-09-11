@@ -250,7 +250,7 @@
 
 	/* Code Block Styles */
 	pre,
-	code {
+	code:not(.no-code-bg) {
 		background-color: var(--vscode-textCodeBlock-background);
 	}
 
@@ -1175,4 +1175,20 @@ summary {
 		transition-duration: 0.001ms !important;
 		scroll-behavior: auto !important;
 	}
+}
+
+/* 12. Streaming Content Fade-in Animation */
+@keyframes stream-fade-in {
+	from {
+		opacity: 0.85;
+		transform: translateY(1px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.stream-fade-in {
+	animation: stream-fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

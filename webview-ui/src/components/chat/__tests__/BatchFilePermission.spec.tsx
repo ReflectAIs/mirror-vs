@@ -131,9 +131,8 @@ describe("BatchFilePermission", () => {
 			</TranslationProvider>,
 		)
 
-		// Should render dot before the path
-		expect(screen.getByText(".")).toBeInTheDocument()
-		expect(screen.getByText(/\/src\/index\.ts/)).toBeInTheDocument()
+		// Should render the file name
+		expect(screen.getByText("index.ts")).toBeInTheDocument()
 	})
 
 	it("re-renders when timestamp changes", () => {
@@ -157,7 +156,7 @@ describe("BatchFilePermission", () => {
 		expect(screen.getByText(/Button\.tsx/)).toBeInTheDocument()
 	})
 
-	it("displays external link icon for all files", () => {
+	it("displays FileOperationItem for all files", () => {
 		render(
 			<TranslationProvider>
 				<BatchFilePermission
@@ -168,10 +167,8 @@ describe("BatchFilePermission", () => {
 			</TranslationProvider>,
 		)
 
-		// All files should have external link icons
-		const externalLinkIcons = screen.getAllByText((_content, element) => {
-			return element?.classList?.contains("codicon-link-external") ?? false
-		})
-		expect(externalLinkIcons).toHaveLength(mockFiles.length)
+		// All files should render an Analyzed item
+		const analyzedLabels = screen.getAllByText("Analyzed")
+		expect(analyzedLabels).toHaveLength(mockFiles.length)
 	})
 })

@@ -752,6 +752,7 @@ export interface WebviewMessage {
 		// Session messages
 		| "renameSession"
 		| "updateSessionNotes"
+		| "deleteSessionKnowledge"
 		// Task/tab rename
 		| "renameTask"
 		// Model change messages
@@ -762,6 +763,10 @@ export interface WebviewMessage {
 	sessionName?: string
 	/** User-curated markdown notes for the session (for updateSessionNotes message) */
 	sessionNotes?: string
+	/** Note ID for session knowledge operations */
+	noteId?: string
+	/** Whether to clear all items in session knowledge operation */
+	clearAll?: boolean
 	/** Session mode: "continueOrCreate" means create a new task within the current session */
 	sessionMode?: "continueOrCreate"
 	text?: string

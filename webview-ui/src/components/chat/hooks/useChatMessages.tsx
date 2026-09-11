@@ -46,6 +46,7 @@ import type { ModelActivity } from "@src/components/welcome/MirrorHero"
 import { getModelMaxOutputTokens } from "@shared/api"
 import { formatLargeNumber } from "@src/utils/format"
 import { MAX_IMAGES_PER_MESSAGE } from "../ChatView"
+import { parseCommandAndOutput } from "../CommandExecution"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1836,10 +1837,38 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 			}
 		}
 
+		const isCommandAsk = (msg: MirrorMessage): boolean => {
+			return msg.type === "ask" && msg.ask === "command" && !msg.batchCommands
+		}
+
+		const synthesizeCommandBatch = (batch: MirrorMessage[]): MirrorMessage => {
+			const batchCommands = batch.map((batchMsg, idx) => {
+				const { command, output } = parseCommandAndOutput(batchMsg.text)
+				return {
+					executionId: batchMsg.ts.toString(),
+					command,
+					output,
+					text: batchMsg.text,
+					isAnswered: batchMsg.isAnswered,
+					ts: batchMsg.ts,
+					key: `cmd-${batchMsg.ts}-${idx}`,
+				}
+			})
+
+			const allAnswered = batch.every((m) => m.isAnswered)
+			return {
+				...batch[batch.length - 1],
+				ts: batch[0].ts,
+				isAnswered: allAnswered,
+				batchCommands,
+			}
+		}
+
 		const readFileBatched = batchConsecutive(filtered, isReadFileAsk, synthesizeReadFileBatch)
 		const listFilesBatched = batchConsecutive(readFileBatched, isListFilesAsk, synthesizeListFilesBatch)
 		const editFilesBatched = batchConsecutive(listFilesBatched, isEditFileAsk, synthesizeEditFileBatch)
-		const result = batchConsecutive(editFilesBatched, isSearchAsk, synthesizeSearchBatch)
+		const searchBatched = batchConsecutive(editFilesBatched, isSearchAsk, synthesizeSearchBatch)
+		const result = batchConsecutive(searchBatched, isCommandAsk, synthesizeCommandBatch)
 
 		if (isCondensing) {
 			result.push({
@@ -1869,8 +1898,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const virtuosoComponents = useMemo(
 		() => ({
 			Item: ({ children, ...props }: any) => {
-				return <div {...props}>{children}</div>
+				return (
+					<div {...props} className="min-w-0 max-w-full overflow-hidden">
+						{children}
+					</div>
+				)
 			},
+			Footer: () => <div className="h-10 w-full shrink-0 pointer-events-none" />,
 		}),
 		[],
 	)
