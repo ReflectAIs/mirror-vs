@@ -20,9 +20,15 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Extended the message schema to persist `batchCommands` so batch executions survive history reloads.
 - **Session Knowledge Management**:
     - Added delete controls in the Shared Context dialog: remove individual knowledge notes or clear all, backed by a new `deleteSessionKnowledge` message routed through `SessionContextManager.deleteKnowledgeNote`.
+- **Checkpoint Row & Menu Polish**:
+    - Restyled checkpoint rows with a subtle vertical commit icon, muted label, and a thin gradient divider that brightens on hover or when the menu is open.
+    - Compact 6×6 icon-only checkpoint menu buttons (view diff, restore, jump to previous, more) with toolbar hover backgrounds for a tighter row layout.
 - **Scroll Stuttering & ResizeObserver Optimization**:
     - Debounced height change notifications and eliminated layout thrashing from continuous observers on historical messages, preventing webview gray-screen crashes.
 - **Input & Navigation Refinements**:
+    - Relaxed Virtuoso item wrapper to `min-w-0 max-w-full` (dropped `overflow-hidden`) so hover actions and popovers render unclipped inside chat rows.
+- **Agent Sandbox Harness**:
+    - Added a self-hosted sandbox runner (`src/__tests__/sandbox`) with tagged scenarios (basic, advanced, mirror-vs, bugfix, security) and per-scenario markdown/JSON trace reports under `output/`, runnable via new `sandbox*` scripts.
     - Pinned image attachment button to the bottom-right corner of the chat input box without floating drift during multi-line input.
     - Simplified new tab vs new session actions with clear, minimal tooltips.
     - Click-to-open file navigation on edit disclosure headers; immediate webview state sync after message edits to remove stale rows.

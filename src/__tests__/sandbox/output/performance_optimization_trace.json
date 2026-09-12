@@ -1,0 +1,67 @@
+{
+  "scenarioName": "performance_optimization",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-0mUfYu\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/analytics.ts\n```\nexport interface Event {\n  userId: string\n  type: string\n  timestamp: number\n  value: number\n}\n\n// SLOW: O(n^2) — nested loop\nexport function getEventsForUser(events: Event[], userId: string): Event[] {\n  const result: Event[] = []\n  for (const event of events) {\n    for (let i = 0; i < events.length; i++) {\n      if (events[i].userId === userId && events[i] === event) {\n        result.push(event)\n      }\n    }\n  }\n  return result\n}\n\n// SLOW: filters per type = multiple passes\nexport function getSummaryByType(events: Event[]): Record<string, { count: number; total: number; avg: number }> {\n  const types = [...new Set(events.map(e => e.type))]\n  const summary: Record<string, { count: number; total: number; avg: number }> = {}\n  for (const type of types) {\n    const typeEvents = events.filter(e => e.type === type)\n    const total = typeEvents.reduce((sum, e) => sum + e.value, 0)\n    summary[type] = { count: typeEvents.length, total, avg: total / typeEvents.length }\n  }\n  return summary\n}\n\n```\n\n### package.json\n```\n{\n  \"name\": \"analytics-lib\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180314681,
+      "responseTimestamp": 1789180318694,
+      "latencyMs": 4012.8398330000055,
+      "timeToFirstTokenMs": 4012.8398330000055,
+      "inputTokens": 1479,
+      "outputTokens": 418,
+      "totalTokens": 1897,
+      "assistantText": "",
+      "reasoningText": "The task is straightforward. I need to edit src/analytics.ts:\n\n1. Fix getEventsForUser to O(n) using a simple filter.\n2. Make getSummaryByType single pass.\n3. Add comments above each function noting complexity before and after.\n\nThe file content is already provided in workspace files, so I don't need to read it. I'll use apply_diff or write_to_file. Let me write the new content.\n\nFor getSummaryByType single pass: iterate events once, accumulate count and total per type, then compute avg. Note: avg for types with zero events — only types present in events will exist, so no division by zero.\n\nLet me write the file.",
+      "toolCalls": [
+        {
+          "name": "write_to_file",
+          "args": {
+            "content": "export interface Event {\n  userId: string\n  type: string\n  timestamp: number\n  value: number\n}\n\n// Complexity: before O(n^2) (nested loop scanning all events for each event) -> after O(n) (single filter pass)\nexport function getEventsForUser(events: Event[], userId: string): Event[] {\n  return events.filter(event => event.userId === userId)\n}\n\n// Complexity: before O(n * t) where t = number of distinct types (one full filter pass per type) -> after O(n) (single pass accumulating counts and totals)\nexport function getSummaryByType(events: Event[]): Record<string, { count: number; total: number; avg: number }> {\n  const summary: Record<string, { count: number; total: number; avg: number }> = {}\n  for (const event of events) {\n    const entry = summary[event.type] ?? (summary[event.type] = { count: 0, total: 0, avg: 0 })\n    entry.count++\n    entry.total += event.value\n  }\n  for (const type of Object.keys(summary)) {\n    summary[type].avg = summary[type].total / summary[type].count\n  }\n  return summary\n}\n",
+            "path": "src/analytics.ts"
+          },
+          "result": "File written successfully to src/analytics.ts (26 lines).",
+          "durationMs": 0.6700000000128057,
+          "timestamp": 1789180318694
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180318694,
+      "responseTimestamp": 1789180320923,
+      "latencyMs": 2228.861124999996,
+      "timeToFirstTokenMs": 2228.861124999996,
+      "inputTokens": 1913,
+      "outputTokens": 121,
+      "totalTokens": 2034,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Optimized src/analytics.ts:\n\n1. **getEventsForUser** — replaced the O(n^2) nested loop with a single `events.filter(event => event.userId === userId)`, now O(n).\n2. **getSummaryByType** — replaced per-type `filter` passes (O(n·t)) with a single pass that accumulates `count` and `total` per type, then one O(t) pass to compute averages. Overall O(n).\n3. Added a comment above each function documenting complexity before → after."
+          },
+          "result": "[TASK_COMPLETED] Optimized src/analytics.ts:\n\n1. **getEventsForUser** — replaced the O(n^2) nested loop with a single `events.filter(event => event.userId === userId)`, now O(n).\n2. **getSummaryByType** — replaced per-type `filter` passes (O(n·t)) with a single pass that accumulates `count` and `total` per type, then one O(t) pass to compute averages. Overall O(n).\n3. Added a comment above each function documenting complexity before → after.",
+          "durationMs": 0.0019170000159647316,
+          "timestamp": 1789180320923
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 6242.435417000001,
+  "totalInputTokens": 3392,
+  "totalOutputTokens": 539,
+  "totalToolCalls": 2,
+  "completed": true
+}

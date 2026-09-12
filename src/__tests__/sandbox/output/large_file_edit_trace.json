@@ -1,0 +1,67 @@
+{
+  "scenarioName": "large_file_edit",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-BVcs1J\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/constants.ts\n```\nexport const APP_VERSION = \"2.1.0\"\nexport const APP_NAME = \"Mirror VS\"\n\nexport const API_TIMEOUTS = {\n  default: 30_000,\n  upload: 120_000,\n  download: 60_000,\n  heartbeat: 5_000,\n}\n\nexport const API_RETRY_LIMITS = {\n  read: 3,\n  write: 2,\n  auth: 5,\n}\n\nexport const API_BASE_URLS = {\n  production: \"https://api.mirror-vs.com\",\n  staging: \"https://staging-api.mirror-vs.com\",\n  development: \"http://localhost:3001\",\n}\n\nexport const FEATURE_FLAGS = {\n  enableStreaming: true,\n  enableCheckpoints: true,\n  enableMultiTab: false,\n  enableCodexIntegration: false,\n  enableVoiceInput: false,\n  enableCollaboration: false,\n  enableAnalytics: true,\n  enableExperimentalDiff: false,\n}\n\nexport const MAX_CHAT_HISTORY = 1_000\nexport const MAX_FILE_SIZE_MB = 50\nexport const DEBOUNCE_MS = 300\nexport const ANIMATION_DURATION_MS = 200\n\n```\n\n### package.json\n```\n{\n  \"name\": \"mirror-constants\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180221181,
+      "responseTimestamp": 1789180222811,
+      "latencyMs": 1629.887750000009,
+      "timeToFirstTokenMs": 1629.887750000009,
+      "inputTokens": 1409,
+      "outputTokens": 76,
+      "totalTokens": 1485,
+      "assistantText": "",
+      "reasoningText": "The user wants a simple change: set `enableMultiTab: false` to `enableMultiTab: true` in src/constants.ts. Only that one value. Use apply_diff.",
+      "toolCalls": [
+        {
+          "name": "apply_diff",
+          "args": {
+            "diff": "<<<<<<< SEARCH\n  enableMultiTab: false,\n=======\n  enableMultiTab: true,\n>>>>>>> REPLACE",
+            "path": "src/constants.ts"
+          },
+          "result": "Applied 1 diff hunk(s) to src/constants.ts.",
+          "durationMs": 0.41199999999662396,
+          "timestamp": 1789180222811
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180222811,
+      "responseTimestamp": 1789180223733,
+      "latencyMs": 922.1287920000032,
+      "timeToFirstTokenMs": 922.1287920000032,
+      "inputTokens": 1502,
+      "outputTokens": 43,
+      "totalTokens": 1545,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Updated `src/constants.ts`: changed `enableMultiTab` from `false` to `true` in the FEATURE_FLAGS object. No other values were modified."
+          },
+          "result": "[TASK_COMPLETED] Updated `src/constants.ts`: changed `enableMultiTab` from `false` to `true` in the FEATURE_FLAGS object. No other values were modified.",
+          "durationMs": 0.002458999995724298,
+          "timestamp": 1789180223734
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 2552.472167,
+  "totalInputTokens": 2911,
+  "totalOutputTokens": 119,
+  "totalToolCalls": 2,
+  "completed": true
+}

@@ -1,91 +1,67 @@
 {
-	"scenarioName": "error_recovery",
-	"config": {
-		"apiKey": "***",
-		"baseUrl": "https://api.deepseek.com",
-		"model": "deepseek-v4-flash",
-		"maxTurns": 15,
-		"temperature": 0
-	},
-	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-Ot69Dv\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nlib/config.ts\nlib/server.ts\npackage.json",
-	"turns": [
-		{
-			"turnIndex": 0,
-			"requestTimestamp": 1788232161730,
-			"responseTimestamp": 1788232162800,
-			"latencyMs": 1069.8464999999997,
-			"timeToFirstTokenMs": 1069.8464999999997,
-			"inputTokens": 1366,
-			"outputTokens": 54,
-			"totalTokens": 1420,
-			"assistantText": "",
-			"reasoningText": "Let me look at the config file.",
-			"toolCalls": [
-				{
-					"name": "read_file",
-					"args": {
-						"path": "lib/config.ts"
-					},
-					"result": "1 | export const config = {\n2 |   port: 3000,\n3 |   host: \"localhost\",\n4 |   debug: false,\n5 | }\n6 | ",
-					"durationMs": 0.29629999999451684,
-					"timestamp": 1788232162800
-				}
-			],
-			"isCompletion": false
-		},
-		{
-			"turnIndex": 1,
-			"requestTimestamp": 1788232162801,
-			"responseTimestamp": 1788232164197,
-			"latencyMs": 1396.7498999999953,
-			"timeToFirstTokenMs": 1396.7498999999953,
-			"inputTokens": 1468,
-			"outputTokens": 89,
-			"totalTokens": 1557,
-			"assistantText": "",
-			"reasoningText": "",
-			"toolCalls": [
-				{
-					"name": "apply_diff",
-					"args": {
-						"path": "lib/config.ts",
-						"diff": "<<<<<<< SEARCH\n  port: 3000,\n=======\n  port: 8080,\n>>>>>>> REPLACE"
-					},
-					"result": "Applied 1 diff hunk(s) to lib/config.ts.",
-					"durationMs": 1.1264000000010128,
-					"timestamp": 1788232164198
-				}
-			],
-			"isCompletion": false
-		},
-		{
-			"turnIndex": 2,
-			"requestTimestamp": 1788232164198,
-			"responseTimestamp": 1788232165038,
-			"latencyMs": 839.7365000000063,
-			"timeToFirstTokenMs": 839.7365000000063,
-			"inputTokens": 1581,
-			"outputTokens": 62,
-			"totalTokens": 1643,
-			"assistantText": "",
-			"reasoningText": "",
-			"toolCalls": [
-				{
-					"name": "attempt_completion",
-					"args": {
-						"result": "Changed the default port from 3000 to 8080 in `lib/config.ts`."
-					},
-					"result": "[TASK_COMPLETED] Changed the default port from 3000 to 8080 in `lib/config.ts`.",
-					"durationMs": 0.002300000000104774,
-					"timestamp": 1788232165038
-				}
-			],
-			"isCompletion": true
-		}
-	],
-	"totalLatencyMs": 3307.8407000000007,
-	"totalInputTokens": 4415,
-	"totalOutputTokens": 205,
-	"totalToolCalls": 3,
-	"completed": true
+  "scenarioName": "error_recovery",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-EiMYVq\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### lib/config.ts\n```\nexport const config = {\n  port: 3000,\n  host: \"localhost\",\n  debug: false,\n}\n\n```\n\n### lib/server.ts\n```\nimport { config } from \"./config\"\nexport function startServer() {\n  console.log(`Server running at ${config.host}:${config.port}`)\n}\n\n```\n\n### package.json\n```\n{\n  \"name\": \"server-app\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180139613,
+      "responseTimestamp": 1789180140679,
+      "latencyMs": 1066.944542000001,
+      "timeToFirstTokenMs": 1066.944542000001,
+      "inputTokens": 1238,
+      "outputTokens": 82,
+      "totalTokens": 1320,
+      "assistantText": "",
+      "reasoningText": "The task is simple: change the default port from 3000 to 8080 in lib/config.ts. The file content is already provided in the workspace files. I can just apply the diff directly.",
+      "toolCalls": [
+        {
+          "name": "apply_diff",
+          "args": {
+            "diff": "<<<<<<< SEARCH\n  port: 3000,\n=======\n  port: 8080,\n>>>>>>> REPLACE",
+            "path": "lib/config.ts"
+          },
+          "result": "Applied 1 diff hunk(s) to lib/config.ts.",
+          "durationMs": 0.3803330000009737,
+          "timestamp": 1789180140680
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180140680,
+      "responseTimestamp": 1789180143133,
+      "latencyMs": 2453.0368329999983,
+      "timeToFirstTokenMs": 2453.0368329999983,
+      "inputTokens": 1337,
+      "outputTokens": 58,
+      "totalTokens": 1395,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Changed the default port from 3000 to 8080 in lib/config.ts. The server (lib/server.ts) reads this value dynamically, so it will now start on port 8080 with no further changes needed."
+          },
+          "result": "[TASK_COMPLETED] Changed the default port from 3000 to 8080 in lib/config.ts. The server (lib/server.ts) reads this value dynamically, so it will now start on port 8080 with no further changes needed.",
+          "durationMs": 0.0015000000021245796,
+          "timestamp": 1789180143133
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 3520.5757909999993,
+  "totalInputTokens": 2575,
+  "totalOutputTokens": 140,
+  "totalToolCalls": 2,
+  "completed": true
 }

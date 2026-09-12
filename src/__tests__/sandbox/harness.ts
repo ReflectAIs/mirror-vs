@@ -181,39 +181,41 @@ const SANDBOX_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
 //  System Prompt (condensed version of the real extension prompt)
 // ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(projectRoot: string, fileList: string[]): string {
-	return `You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.
+function buildSystemPrompt(projectRoot: string, fileList: string[], fileContents: Record<string, string>): string {
+	const fileSection = fileList
+		.map((f) => "### " + f + "\n```\n" + (fileContents[f] ?? "(content unavailable)") + "\n```")
+		.join("\n\n")
 
-## Tool Use
-You have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.
+	return `You are Mirror, an expert software engineer assistant operating in an agentic coding loop.
 
-## Tool Selection Guidelines
-- Read code: \`read_file\` | Search code: \`search_files\`
-- Edit code: \`apply_diff\` | Create file: \`write_to_file\` | Shell command: \`execute_command\`
-- When done: \`attempt_completion\`
+## Tool Selection
+- Read unknown/new files: \`read_file\` | Search: \`search_files\` | List dir: \`list_files\`
+- Edit existing file: \`apply_diff\` or \`edit_file\` | Create new file: \`write_to_file\` | Shell: \`execute_command\`
+- Done: \`attempt_completion\`
 
-## Batching Rules
-- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.
-- Write tools must be sequential and never batched.
+## Batching
+- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.
+- Write tools must be sequential (one per turn).
 - attempt_completion must never be batched.
 
-## Rules
-- Project root: ${projectRoot}
-- All paths are relative to the project root.
-- Be concise in your thinking.
-- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.
-- Do NOT ask unnecessary questions. Use tools to find answers.
-- Your goal is to accomplish the task, NOT engage in conversation.
-- If a tool fails twice, change strategy immediately.
-- NEVER start messages with "Great", "Certainly", "Okay", "Sure".
+## Efficiency Rules — CRITICAL
+- ALL workspace file contents are provided in the "Workspace Files" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.
+- Only call read_file for files NOT listed below, or files you created/modified mid-task.
+- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.
+- If a tool fails twice with the same approach, change strategy immediately.
+- Be concise. Do not engage in conversation. Never start with "Great", "Sure", "Okay", "Certainly".
 
 ## Objective
-1. Analyze the task and set clear goals.
-2. Work through each goal using tools.
-3. Call attempt_completion when done.
+1. Read the task requirements carefully.
+2. Make all required changes using tools.
+3. Call attempt_completion when FULLY done.
 
-## Current Workspace Files
-${fileList.join("\n")}`
+## Project Root
+${projectRoot}
+(All file paths are relative to the project root.)
+
+## Workspace Files
+${fileSection}`
 }
 
 // ────────────────────────────────────────────────────────────
@@ -234,7 +236,7 @@ export class SandboxHarness {
 
 	async runScenario(scenarioName: string, userPrompt: string, project: SandboxProject): Promise<ConversationTrace> {
 		const fileList = Object.keys(project.files)
-		const systemPrompt = buildSystemPrompt(project.rootDir, fileList)
+		const systemPrompt = buildSystemPrompt(project.rootDir, fileList, project.files)
 
 		const trace: ConversationTrace = {
 			scenarioName,

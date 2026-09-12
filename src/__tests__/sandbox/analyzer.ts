@@ -279,3 +279,143 @@ export function formatSummaryTable(reports: PerformanceReport[]): string {
 
 	return lines.join("\n")
 }
+
+// ────────────────────────────────────────────────────────────
+//  HTML Report Generator
+// ────────────────────────────────────────────────────────────
+
+export function generateHtmlReport(reports: PerformanceReport[], model: string): string {
+	const totalScenarios = reports.length
+	const passed = reports.filter((r) => r.completed).length
+	const totalCost = reports.reduce((s, r) => s + r.estimatedCost, 0)
+	const totalTokens = reports.reduce((s, r) => s + r.totalInputTokens + r.totalOutputTokens, 0)
+	const totalLatencyS = (reports.reduce((s, r) => s + r.totalLatencyMs, 0) / 1000).toFixed(1)
+	const modelShort = model.split("/").pop() || model
+
+	const scenarioCards = reports
+		.map((r) => {
+			const statusColor = r.completed ? "#10b981" : "#ef4444"
+			const signalHtml = r.signals.map((s) => `<div class="signal">${s}</div>`).join("")
+			const toolBreakdownHtml = Object.entries(r.toolCallBreakdown)
+				.sort(([, a], [, b]) => b - a)
+				.map(([name, count]) => `<span class="tool-badge">${name}: ${count}</span>`)
+				.join("")
+			return `
+<div class="card ${r.completed ? "card-pass" : "card-fail"}">
+  <div class="card-header">
+    <div>
+      <div class="card-title">${r.scenarioName}</div>
+      <div class="card-model">${r.model.split("/").pop()}</div>
+    </div>
+    <div class="status-badge" style="background:${statusColor}20;color:${statusColor};border:1px solid ${statusColor}40">${r.completed ? "✅ Passed" : "❌ Failed"}</div>
+  </div>
+  ${r.error ? `<div class="error-box">⚠️ ${r.error}</div>` : ""}
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">${r.totalTurns}</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">${r.totalToolCalls}</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">${r.redundantReads}</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">${r.wrongToolAttempts}</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">${(r.totalLatencyMs / 1000).toFixed(1)}s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$${r.estimatedCost.toFixed(5)}</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 ${r.totalInputTokens.toLocaleString()} in / ${r.totalOutputTokens.toLocaleString()} out</span>
+    <span>Efficiency: ${r.tokenEfficiency}</span>
+  </div>
+  ${toolBreakdownHtml ? `<div class="tools-row">${toolBreakdownHtml}</div>` : ""}
+  ${signalHtml ? `<div class="signals">${signalHtml}</div>` : ""}
+</div>`
+		})
+		.join("\n")
+
+	const tableRows = reports
+		.map(
+			(r) => `
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">${r.scenarioName}</td>
+  <td>${r.completed ? '<span style="color:#10b981">✅</span>' : '<span style="color:#ef4444">❌</span>'}</td>
+  <td>${r.totalTurns}</td>
+  <td>${r.totalToolCalls}</td>
+  <td>${r.wrongToolAttempts}</td>
+  <td>${r.totalInputTokens.toLocaleString()}</td>
+  <td>${r.totalOutputTokens.toLocaleString()}</td>
+  <td>${(r.totalLatencyMs / 1000).toFixed(1)}s</td>
+  <td>$${r.estimatedCost.toFixed(5)}</td>
+</tr>`,
+		)
+		.join("")
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mirror VS — Sandbox Test Report</title>
+<style>
+:root{--bg:#0f0f13;--surface:#1a1a24;--surface2:#22222e;--border:#2a2a3a;--text:#e2e2f0;--muted:#888899;--accent:#7c6ff7;--pass:#10b981;--fail:#ef4444}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);padding:40px 32px;border-bottom:1px solid var(--border)}
+.header h1{font-size:28px;font-weight:700;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .subtitle{color:var(--muted);margin-top:6px;font-size:14px}
+.header .model-chip{display:inline-block;background:#7c6ff720;border:1px solid #7c6ff740;color:#a78bfa;padding:4px 12px;border-radius:20px;font-size:12px;margin-top:12px}
+.summary-bar{display:flex;gap:20px;padding:20px 32px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.summary-stat .val{font-size:24px;font-weight:700}
+.summary-stat .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+.pass-val{color:var(--pass)}.fail-val{color:var(--fail)}
+.progress-bar{height:6px;background:var(--border);overflow:hidden;margin:0 32px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--pass),#34d399)}
+.section-title{padding:20px 32px 8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;padding:16px 32px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-pass{border-left:3px solid var(--pass)}.card-fail{border-left:3px solid var(--fail)}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:600;font-family:monospace;color:#c4b5fd}
+.card-model{font-size:11px;color:var(--muted);margin-top:3px}
+.status-badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--surface2);border-radius:8px;padding:10px;text-align:center}
+.stat-value{font-size:18px;font-weight:700}
+.stat-label{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px}
+.tokens-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:10px}
+.tools-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tool-badge{background:#3b82f620;border:1px solid #3b82f640;color:#93c5fd;font-size:11px;padding:2px 8px;border-radius:12px;font-family:monospace}
+.signals{display:flex;flex-direction:column;gap:4px}
+.signal{font-size:12px;color:var(--muted);padding:4px 8px;background:var(--surface2);border-radius:6px}
+.error-box{background:#ef444415;border:1px solid #ef444440;color:#fca5a5;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:12px}
+table{width:calc(100% - 64px);margin:0 32px 32px;border-collapse:collapse;font-size:13px}
+th{background:var(--surface);color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 14px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--surface2)}
+.ts{color:var(--muted);font-size:11px;text-align:right;padding:16px 32px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🔬 Mirror VS Sandbox Test Report</h1>
+  <div class="subtitle">AI model performance across coding tasks — basic to advanced</div>
+  <div class="model-chip">🤖 ${modelShort}</div>
+</div>
+<div class="summary-bar">
+  <div class="summary-stat"><div class="val">${totalScenarios}</div><div class="lbl">Total Scenarios</div></div>
+  <div class="summary-stat"><div class="val pass-val">${passed}</div><div class="lbl">Passed ✅</div></div>
+  <div class="summary-stat"><div class="val fail-val">${totalScenarios - passed}</div><div class="lbl">Failed ❌</div></div>
+  <div class="summary-stat"><div class="val">${Math.round((passed / totalScenarios) * 100)}%</div><div class="lbl">Pass Rate</div></div>
+  <div class="summary-stat"><div class="val">${totalLatencyS}s</div><div class="lbl">Total Time</div></div>
+  <div class="summary-stat"><div class="val">${(totalTokens / 1000).toFixed(0)}k</div><div class="lbl">Total Tokens</div></div>
+  <div class="summary-stat"><div class="val">$${totalCost.toFixed(4)}</div><div class="lbl">Est. Cost</div></div>
+</div>
+<div class="progress-bar"><div class="progress-fill" style="width:${Math.round((passed / totalScenarios) * 100)}%"></div></div>
+<div class="section-title">Scenario Results</div>
+<div class="grid">${scenarioCards}</div>
+<div class="section-title">Summary Table</div>
+<table>
+  <thead>
+    <tr><th>Scenario</th><th>Status</th><th>Turns</th><th>Tools</th><th>Errors</th><th>Input Tok</th><th>Output Tok</th><th>Time</th><th>Cost</th></tr>
+  </thead>
+  <tbody>${tableRows}</tbody>
+</table>
+<div class="ts">Generated ${new Date().toISOString()} · Mirror VS Sandbox</div>
+</body>
+</html>`
+}

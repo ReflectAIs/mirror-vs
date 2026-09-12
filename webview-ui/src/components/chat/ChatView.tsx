@@ -392,7 +392,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 								currentTaskItem?.id ||
 								(task?.ts ? String(task.ts) : "chat-virtuoso")
 							}
-							className="grow mb-1 min-w-0 max-w-full overflow-x-hidden"
+							className="grow mb-1"
 							customScrollParent={scrollContainerRef.current || undefined}
 							increaseViewportBy={{ top: 200, bottom: 100 }}
 							initialTopMostItemIndex={displayedMessages.length > 0 ? displayedMessages.length - 1 : 0}

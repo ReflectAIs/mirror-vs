@@ -84,23 +84,24 @@ export const CheckpointSaved = ({
 
 	return (
 		<div
-			className="flex items-center justify-between gap-2 pt-2 pb-3"
+			className="group flex items-center justify-between gap-2 py-0.5 my-1"
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}>
-			<div className="flex items-center gap-2 text-blue-400 whitespace-nowrap">
-				<GitCommitVertical className="w-4" />
-				<span className="font-semibold">{t("chat:checkpoint.regular")}</span>
-				{isCurrent && <span className="text-muted">({t("chat:checkpoint.current")})</span>}
+			<div className="flex items-center gap-1.5 text-vscode-descriptionForeground/60 group-hover:text-vscode-foreground whitespace-nowrap select-none transition-colors">
+				<GitCommitVertical className="w-3.5 h-3.5 text-vscode-descriptionForeground/40 group-hover:text-blue-400 transition-colors" />
+				<span className="text-[11px] font-medium tracking-tight">{t("chat:checkpoint.regular")}</span>
+				{isCurrent && <span className="text-[10px] text-vscode-descriptionForeground/40">({t("chat:checkpoint.current")})</span>}
 			</div>
 			<span
-				className="block w-full h-[2px] mt-[2px] text-xs"
+				className="block w-full h-[1px] transition-all duration-200"
 				style={{
-					backgroundImage:
-						"linear-gradient(90deg, rgba(0, 188, 255, .65), rgba(0, 188, 255, .65) 80%, rgba(0, 188, 255, 0) 99%)",
+					backgroundImage: menuVisible
+						? "linear-gradient(90deg, rgba(59, 130, 246, 0.4), rgba(59, 130, 246, 0.1) 70%, transparent 100%)"
+						: "linear-gradient(90deg, rgba(128, 128, 128, 0.18), transparent 90%)",
 				}}></span>
 
 			{/* Keep menu visible while hovering, popover is open, or briefly after close to prevent jump */}
-			<div data-testid="checkpoint-menu-container" className={cn("h-4 -mt-2", menuVisible ? "block" : "hidden")}>
+			<div data-testid="checkpoint-menu-container" className={cn("h-6 -my-1 shrink-0 flex items-center", menuVisible ? "block" : "hidden")}>
 				<CheckpointMenu
 					ts={props.ts}
 					commitHash={props.commitHash}

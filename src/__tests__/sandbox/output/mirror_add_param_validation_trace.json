@@ -1,0 +1,67 @@
+{
+  "scenarioName": "mirror_add_param_validation",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-KGKf2j\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/core/tools/GetGitStatusTool.ts\n```\nimport { Task } from \"../task/Task\"\nimport type { ToolUse } from \"../../shared/tools\"\nimport { BaseTool, ToolCallbacks } from \"./BaseTool\"\nimport { getGitStatus } from \"../../utils/git\"\n\ninterface GetGitStatusParams {\n\tmaxFiles?: number\n}\n\nexport class GetGitStatusTool extends BaseTool<\"get_git_status\"> {\n\treadonly name = \"get_git_status\" as const\n\n\tasync execute(params: GetGitStatusParams, task: Task, callbacks: ToolCallbacks): Promise<void> {\n\t\tconst { pushToolResult } = callbacks\n\n\t\ttry {\n\t\t\tconst maxFiles = params.maxFiles ?? 50\n\t\t\tconst gitStatus = await getGitStatus(task.cwd, Math.min(maxFiles, 200))\n\n\t\t\tif (!gitStatus) {\n\t\t\t\tpushToolResult(\"No git status available (not a git repository or no changes detected).\")\n\t\t\t\treturn\n\t\t\t}\n\n\t\t\tpushToolResult(gitStatus)\n\t\t} catch (e) {\n\t\t\tconst message = e instanceof Error ? e.message : String(e)\n\t\t\tpushToolResult(`Failed to retrieve git status: ${message}`)\n\t\t}\n\t}\n\n\toverride async handlePartial(task: Task, block: ToolUse<\"get_git_status\">): Promise<void> {\n\t\t// No partial handling needed — just let it stream in\n\t}\n}\n\nexport const getGitStatusTool = new GetGitStatusTool()\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180411655,
+      "responseTimestamp": 1789180414723,
+      "latencyMs": 3068.1983750000363,
+      "timeToFirstTokenMs": 3068.1983750000363,
+      "inputTokens": 1468,
+      "outputTokens": 314,
+      "totalTokens": 1782,
+      "assistantText": "",
+      "reasoningText": "The task is simple: add validation to the execute method in GetGitStatusTool.ts. The file content is already provided in the workspace files section, so I don't need to read it.\n\nI need to add validation: if `params.maxFiles` is provided but is less than 1, call `pushToolResult` with 'maxFiles must be at least 1' and return early.\n\nLet me apply the diff:\n\n```typescript\nasync execute(params: GetGitStatusParams, task: Task, callbacks: ToolCallbacks): Promise<void> {\n    const { pushToolResult } = callbacks\n\n    if (params.maxFiles !== undefined && params.maxFiles < 1) {\n        pushToolResult(\"maxFiles must be at least 1\")\n        return\n    }\n\n    try {\n        ...\n```\n\nThat's the change. Let me use apply_diff.",
+      "toolCalls": [
+        {
+          "name": "apply_diff",
+          "args": {
+            "diff": "<<<<<<< SEARCH\n\tasync execute(params: GetGitStatusParams, task: Task, callbacks: ToolCallbacks): Promise<void> {\n\t\tconst { pushToolResult } = callbacks\n\n\t\ttry {\n=======\n\tasync execute(params: GetGitStatusParams, task: Task, callbacks: ToolCallbacks): Promise<void> {\n\t\tconst { pushToolResult } = callbacks\n\n\t\tif (params.maxFiles !== undefined && params.maxFiles < 1) {\n\t\t\tpushToolResult(\"maxFiles must be at least 1\")\n\t\t\treturn\n\t\t}\n\n\t\ttry {\n>>>>>>> REPLACE",
+            "path": "src/core/tools/GetGitStatusTool.ts"
+          },
+          "result": "Applied 1 diff hunk(s) to src/core/tools/GetGitStatusTool.ts.",
+          "durationMs": 0.7829580000252463,
+          "timestamp": 1789180414724
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180414724,
+      "responseTimestamp": 1789180416157,
+      "latencyMs": 1432.4175000000396,
+      "timeToFirstTokenMs": 1432.4175000000396,
+      "inputTokens": 1805,
+      "outputTokens": 95,
+      "totalTokens": 1900,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Added validation to `execute` in src/core/tools/GetGitStatusTool.ts: when `params.maxFiles` is provided and is less than 1, the method now calls `pushToolResult(\"maxFiles must be at least 1\")` and returns early, before the existing git status logic. All existing behavior (defaulting to 50, capping at 200, error handling) remains unchanged."
+          },
+          "result": "[TASK_COMPLETED] Added validation to `execute` in src/core/tools/GetGitStatusTool.ts: when `params.maxFiles` is provided and is less than 1, the method now calls `pushToolResult(\"maxFiles must be at least 1\")` and returns early, before the existing git status logic. All existing behavior (defaulting to 50, capping at 200, error handling) remains unchanged.",
+          "durationMs": 0.00266700005158782,
+          "timestamp": 1789180416157
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 4501.450707999989,
+  "totalInputTokens": 3273,
+  "totalOutputTokens": 409,
+  "totalToolCalls": 2,
+  "completed": true
+}

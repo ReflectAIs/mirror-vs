@@ -1,91 +1,67 @@
 {
-	"scenarioName": "simple_edit",
-	"config": {
-		"apiKey": "***",
-		"baseUrl": "https://api.deepseek.com",
-		"model": "deepseek-v4-flash",
-		"maxTurns": 15,
-		"temperature": 0
-	},
-	"systemPrompt": "You are Mirror, an expert software engineer assistant. You operate in an agentic coding loop.\n\n## Tool Use\nYou have access to tools for reading files, writing files, searching, applying diffs, executing commands, and completing tasks. Use one tool at a time and wait for the result.\n\n## Tool Selection Guidelines\n- Read code: `read_file` | Search code: `search_files`\n- Edit code: `apply_diff` | Create file: `write_to_file` | Shell command: `execute_command`\n- When done: `attempt_completion`\n\n## Batching Rules\n- Read-only tools (read_file, search_files, list_files) should be batched in parallel in a single turn whenever inspecting multiple files or searching across locations.\n- Write tools must be sequential and never batched.\n- attempt_completion must never be batched.\n\n## Rules\n- Project root: C:\\Users\\HP\\AppData\\Local\\Temp\\mirror-sandbox-6cHPci\n- All paths are relative to the project root.\n- Be concise in your thinking.\n- Do NOT re-read files immediately after a successful edit or write operation to verify changes. Trust successful tool return confirmations and proceed directly to completion or the next required step.\n- Do NOT ask unnecessary questions. Use tools to find answers.\n- Your goal is to accomplish the task, NOT engage in conversation.\n- If a tool fails twice, change strategy immediately.\n- NEVER start messages with \"Great\", \"Certainly\", \"Okay\", \"Sure\".\n\n## Objective\n1. Analyze the task and set clear goals.\n2. Work through each goal using tools.\n3. Call attempt_completion when done.\n\n## Current Workspace Files\nsrc/index.ts\nsrc/utils.ts\npackage.json",
-	"turns": [
-		{
-			"turnIndex": 0,
-			"requestTimestamp": 1788232125757,
-			"responseTimestamp": 1788232127101,
-			"latencyMs": 1344.1440999999998,
-			"timeToFirstTokenMs": 1344.1440999999998,
-			"inputTokens": 1353,
-			"outputTokens": 53,
-			"totalTokens": 1406,
-			"assistantText": "",
-			"reasoningText": "Let me read the file first.",
-			"toolCalls": [
-				{
-					"name": "read_file",
-					"args": {
-						"path": "src/index.ts"
-					},
-					"result": "1 | import { greet } from \"./utils\"\n2 | \n3 | function main() {\n4 |   const name = \"World\"\n5 |   const message = greet(name)\n6 |   return message\n7 | }\n8 | \n9 | export default main\n10 | ",
-					"durationMs": 0.6467999999999847,
-					"timestamp": 1788232127102
-				}
-			],
-			"isCompletion": false
-		},
-		{
-			"turnIndex": 1,
-			"requestTimestamp": 1788232127102,
-			"responseTimestamp": 1788232128380,
-			"latencyMs": 1277.5901,
-			"timeToFirstTokenMs": 1277.5901,
-			"inputTokens": 1475,
-			"outputTokens": 105,
-			"totalTokens": 1580,
-			"assistantText": "",
-			"reasoningText": "",
-			"toolCalls": [
-				{
-					"name": "apply_diff",
-					"args": {
-						"path": "src/index.ts",
-						"diff": "<<<<<<< SEARCH\nfunction main() {\n  const name = \"World\"\n=======\nfunction main() {\n  console.log(\"Starting main...\")\n  const name = \"World\"\n>>>>>>> REPLACE"
-					},
-					"result": "Applied 1 diff hunk(s) to src/index.ts.",
-					"durationMs": 1.4321999999997388,
-					"timestamp": 1788232128381
-				}
-			],
-			"isCompletion": false
-		},
-		{
-			"turnIndex": 2,
-			"requestTimestamp": 1788232128381,
-			"responseTimestamp": 1788232129400,
-			"latencyMs": 1018.4372000000003,
-			"timeToFirstTokenMs": 1018.4372000000003,
-			"inputTokens": 1604,
-			"outputTokens": 69,
-			"totalTokens": 1673,
-			"assistantText": "",
-			"reasoningText": "",
-			"toolCalls": [
-				{
-					"name": "attempt_completion",
-					"args": {
-						"result": "Added `console.log(\"Starting main...\")` at the beginning of the `main()` function in `src/index.ts`."
-					},
-					"result": "[TASK_COMPLETED] Added `console.log(\"Starting main...\")` at the beginning of the `main()` function in `src/index.ts`.",
-					"durationMs": 0.002599999999802094,
-					"timestamp": 1788232129400
-				}
-			],
-			"isCompletion": true
-		}
-	],
-	"totalLatencyMs": 3643.0172999999995,
-	"totalInputTokens": 4432,
-	"totalOutputTokens": 227,
-	"totalToolCalls": 3,
-	"completed": true
+  "scenarioName": "simple_edit",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-xAecUS\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/index.ts\n```\nimport { greet } from \"./utils\"\n\nfunction main() {\n  const name = \"World\"\n  const message = greet(name)\n  return message\n}\n\nexport default main\n\n```\n\n### src/utils.ts\n```\nexport function greet(name: string): string {\n  return `Hello, ${name}!`\n}\n\n```\n\n### package.json\n```\n{\n  \"name\": \"test-project\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180120858,
+      "responseTimestamp": 1789180122566,
+      "latencyMs": 1708.224042,
+      "timeToFirstTokenMs": 1708.224042,
+      "inputTokens": 1226,
+      "outputTokens": 111,
+      "totalTokens": 1337,
+      "assistantText": "",
+      "reasoningText": "The user wants me to add a console.log(\"Starting main...\") at the beginning of the main() function in src/index.ts. The file content is already provided in the workspace files, so I don't need to read it. I'll use apply_diff to make the edit.",
+      "toolCalls": [
+        {
+          "name": "apply_diff",
+          "args": {
+            "diff": "<<<<<<< SEARCH\nfunction main() {\n  const name = \"World\"\n=======\nfunction main() {\n  console.log(\"Starting main...\")\n  const name = \"World\"\n>>>>>>> REPLACE",
+            "path": "src/index.ts"
+          },
+          "result": "Applied 1 diff hunk(s) to src/index.ts.",
+          "durationMs": 0.6074579999999514,
+          "timestamp": 1789180122567
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180122567,
+      "responseTimestamp": 1789180123994,
+      "latencyMs": 1427.3826250000002,
+      "timeToFirstTokenMs": 1427.3826250000002,
+      "inputTokens": 1354,
+      "outputTokens": 44,
+      "totalTokens": 1398,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Added `console.log(\"Starting main...\")` as the first statement inside the `main()` function in src/index.ts, before the `name` variable declaration."
+          },
+          "result": "[TASK_COMPLETED] Added `console.log(\"Starting main...\")` as the first statement inside the `main()` function in src/index.ts, before the `name` variable declaration.",
+          "durationMs": 0.0020410000001902517,
+          "timestamp": 1789180123994
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 3136.452583,
+  "totalInputTokens": 2580,
+  "totalOutputTokens": 155,
+  "totalToolCalls": 2,
+  "completed": true
 }

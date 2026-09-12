@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mirror VS — Sandbox Test Report</title>
+<style>
+:root{--bg:#0f0f13;--surface:#1a1a24;--surface2:#22222e;--border:#2a2a3a;--text:#e2e2f0;--muted:#888899;--accent:#7c6ff7;--pass:#10b981;--fail:#ef4444}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);padding:40px 32px;border-bottom:1px solid var(--border)}
+.header h1{font-size:28px;font-weight:700;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .subtitle{color:var(--muted);margin-top:6px;font-size:14px}
+.header .model-chip{display:inline-block;background:#7c6ff720;border:1px solid #7c6ff740;color:#a78bfa;padding:4px 12px;border-radius:20px;font-size:12px;margin-top:12px}
+.summary-bar{display:flex;gap:20px;padding:20px 32px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.summary-stat .val{font-size:24px;font-weight:700}
+.summary-stat .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+.pass-val{color:var(--pass)}.fail-val{color:var(--fail)}
+.progress-bar{height:6px;background:var(--border);overflow:hidden;margin:0 32px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--pass),#34d399)}
+.section-title{padding:20px 32px 8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;padding:16px 32px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-pass{border-left:3px solid var(--pass)}.card-fail{border-left:3px solid var(--fail)}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:600;font-family:monospace;color:#c4b5fd}
+.card-model{font-size:11px;color:var(--muted);margin-top:3px}
+.status-badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--surface2);border-radius:8px;padding:10px;text-align:center}
+.stat-value{font-size:18px;font-weight:700}
+.stat-label{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px}
+.tokens-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:10px}
+.tools-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tool-badge{background:#3b82f620;border:1px solid #3b82f640;color:#93c5fd;font-size:11px;padding:2px 8px;border-radius:12px;font-family:monospace}
+.signals{display:flex;flex-direction:column;gap:4px}
+.signal{font-size:12px;color:var(--muted);padding:4px 8px;background:var(--surface2);border-radius:6px}
+.error-box{background:#ef444415;border:1px solid #ef444440;color:#fca5a5;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:12px}
+table{width:calc(100% - 64px);margin:0 32px 32px;border-collapse:collapse;font-size:13px}
+th{background:var(--surface);color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:10px 14px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--surface2)}
+.ts{color:var(--muted);font-size:11px;text-align:right;padding:16px 32px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🔬 Mirror VS Sandbox Test Report</h1>
+  <div class="subtitle">AI model performance across coding tasks — basic to advanced</div>
+  <div class="model-chip">🤖 glm-5p3-flash</div>
+</div>
+<div class="summary-bar">
+  <div class="summary-stat"><div class="val">28</div><div class="lbl">Total Scenarios</div></div>
+  <div class="summary-stat"><div class="val pass-val">28</div><div class="lbl">Passed ✅</div></div>
+  <div class="summary-stat"><div class="val fail-val">0</div><div class="lbl">Failed ❌</div></div>
+  <div class="summary-stat"><div class="val">100%</div><div class="lbl">Pass Rate</div></div>
+  <div class="summary-stat"><div class="val">474.4s</div><div class="lbl">Total Time</div></div>
+  <div class="summary-stat"><div class="val">337k</div><div class="lbl">Total Tokens</div></div>
+  <div class="summary-stat"><div class="val">$0.0436</div><div class="lbl">Est. Cost</div></div>
+</div>
+<div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+<div class="section-title">Scenario Results</div>
+<div class="grid">
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">simple_edit</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">3.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00030</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 2,580 in / 155 out</span>
+    <span>Efficiency: 0.06</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">bug_fix</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">10.0s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00089</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 5,438 in / 1,151 out</span>
+    <span>Efficiency: 0.212</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">execute_command: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 3 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">feature_add</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">5.6s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00073</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 5,100 in / 736 out</span>
+    <span>Efficiency: 0.144</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 2</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 3 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">error_recovery</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">3.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00030</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 2,575 in / 140 out</span>
+    <span>Efficiency: 0.054</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">duplicate_code_blocks</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">3.2s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00037</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 2,811 in / 312 out</span>
+    <span>Efficiency: 0.111</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">whitespace_indent</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">3.8s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00037</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 2,880 in / 262 out</span>
+    <span>Efficiency: 0.091</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">exploration</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">1</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">1</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">10.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00043</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 1,370 in / 967 out</span>
+    <span>Efficiency: 0.706</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 1 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">multi_file_refactor</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">7</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">7</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">10.3s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00150</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 12,898 in / 684 out</span>
+    <span>Efficiency: 0.053</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 4</span><span class="tool-badge">search_files: 2</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">typescript_generics</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">28.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00161</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 8,518 in / 2,522 out</span>
+    <span>Efficiency: 0.296</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">execute_command: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 3 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">async_await_refactor</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">22.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00146</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 7,771 in / 2,274 out</span>
+    <span>Efficiency: 0.293</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">execute_command: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 3 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">large_file_edit</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">2.6s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00033</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 2,911 in / 119 out</span>
+    <span>Efficiency: 0.041</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">parallelism_test</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">9.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00106</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 6,631 in / 1,323 out</span>
+    <span>Efficiency: 0.2</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 2</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 3 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">write_unit_tests</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">60.0s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00492</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 26,432 in / 7,590 out</span>
+    <span>Efficiency: 0.287</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">execute_command</arg_key><arg_value>command</arg_key><arg_value>ls node_modules/.bin 2>/dev/null | head -5; echo "---"; ls</arg_value>: 1</span><span class="tool-badge">execute_command: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">security_vulnerability</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">21.8s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00166</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 10,358 in / 2,075 out</span>
+    <span>Efficiency: 0.2</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 3</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">performance_optimization</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">6.2s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00050</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,392 in / 539 out</span>
+    <span>Efficiency: 0.159</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">complex_debugging</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">13.6s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00151</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 10,883 in / 1,394 out</span>
+    <span>Efficiency: 0.128</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 2</span><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">execute_command: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">api_integration</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">7.6s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00088</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 6,627 in / 711 out</span>
+    <span>Efficiency: 0.107</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 3 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">dependency_injection</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">36.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00323</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 20,744 in / 3,836 out</span>
+    <span>Efficiency: 0.185</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 2</span><span class="tool-badge">list_files: 1</span><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">db_schema_migration</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">33.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00319</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 21,337 in / 3,508 out</span>
+    <span>Efficiency: 0.164</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 2</span><span class="tool-badge">list_files: 1</span><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_add_param_validation</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">4.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00045</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,273 in / 409 out</span>
+    <span>Efficiency: 0.125</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_fix_repetition_detector</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">27.4s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00255</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 16,164 in / 3,124 out</span>
+    <span>Efficiency: 0.193</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 2</span><span class="tool-badge">search_files: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_extract_shared_util</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">19.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00244</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 17,925 in / 2,143 out</span>
+    <span>Efficiency: 0.12</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 2</span><span class="tool-badge">search_files: 1</span><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_add_new_tool</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">16.8s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00124</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 6,091 in / 2,115 out</span>
+    <span>Efficiency: 0.347</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_add_keyboard_shortcut</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">9.0s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00078</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 4,874 in / 959 out</span>
+    <span>Efficiency: 0.197</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_add_jsdoc</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">50.7s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00350</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 20,894 in / 4,697 out</span>
+    <span>Efficiency: 0.225</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 3</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_fix_controlled_component</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">18.2s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00230</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 17,828 in / 1,736 out</span>
+    <span>Efficiency: 0.097</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 2</span><span class="tool-badge">read_file: 1</span><span class="tool-badge">search_files: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">📖 Read before edit pattern on: webview-ui/src/components/chat/ToolDisclosure.tsx</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_rename_across_files</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">9</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">9</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">16.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00312</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 27,333 in / 1,280 out</span>
+    <span>Efficiency: 0.047</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">apply_diff: 5</span><span class="tool-badge">search_files: 3</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_add_retry_logic</div>
+      <div class="card-model">glm-5p3-flash</div>
+    </div>
+    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">4</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
+    <div class="stat"><div class="stat-value">21.2s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00196</div><div class="stat-label">Cost</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 12,612 in / 2,313 out</span>
+    <span>Efficiency: 0.183</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">execute_command: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  
+</div></div>
+<div class="section-title">Summary Table</div>
+<table>
+  <thead>
+    <tr><th>Scenario</th><th>Status</th><th>Turns</th><th>Tools</th><th>Errors</th><th>Input Tok</th><th>Output Tok</th><th>Time</th><th>Cost</th></tr>
+  </thead>
+  <tbody>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">simple_edit</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>2,580</td>
+  <td>155</td>
+  <td>3.1s</td>
+  <td>$0.00030</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">bug_fix</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>3</td>
+  <td>3</td>
+  <td>0</td>
+  <td>5,438</td>
+  <td>1,151</td>
+  <td>10.0s</td>
+  <td>$0.00089</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">feature_add</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>3</td>
+  <td>3</td>
+  <td>0</td>
+  <td>5,100</td>
+  <td>736</td>
+  <td>5.6s</td>
+  <td>$0.00073</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">error_recovery</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>2,575</td>
+  <td>140</td>
+  <td>3.5s</td>
+  <td>$0.00030</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">duplicate_code_blocks</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>2,811</td>
+  <td>312</td>
+  <td>3.2s</td>
+  <td>$0.00037</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">whitespace_indent</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>2,880</td>
+  <td>262</td>
+  <td>3.8s</td>
+  <td>$0.00037</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">exploration</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>1</td>
+  <td>1</td>
+  <td>0</td>
+  <td>1,370</td>
+  <td>967</td>
+  <td>10.1s</td>
+  <td>$0.00043</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">multi_file_refactor</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>7</td>
+  <td>7</td>
+  <td>0</td>
+  <td>12,898</td>
+  <td>684</td>
+  <td>10.3s</td>
+  <td>$0.00150</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">typescript_generics</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>3</td>
+  <td>3</td>
+  <td>0</td>
+  <td>8,518</td>
+  <td>2,522</td>
+  <td>28.1s</td>
+  <td>$0.00161</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">async_await_refactor</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>3</td>
+  <td>3</td>
+  <td>0</td>
+  <td>7,771</td>
+  <td>2,274</td>
+  <td>22.5s</td>
+  <td>$0.00146</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">large_file_edit</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>2,911</td>
+  <td>119</td>
+  <td>2.6s</td>
+  <td>$0.00033</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">parallelism_test</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>3</td>
+  <td>3</td>
+  <td>0</td>
+  <td>6,631</td>
+  <td>1,323</td>
+  <td>9.1s</td>
+  <td>$0.00106</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">write_unit_tests</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>4</td>
+  <td>4</td>
+  <td>0</td>
+  <td>26,432</td>
+  <td>7,590</td>
+  <td>60.0s</td>
+  <td>$0.00492</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">security_vulnerability</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>4</td>
+  <td>4</td>
+  <td>0</td>
+  <td>10,358</td>
+  <td>2,075</td>
+  <td>21.8s</td>
+  <td>$0.00166</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">performance_optimization</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,392</td>
+  <td>539</td>
+  <td>6.2s</td>
+  <td>$0.00050</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">complex_debugging</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>5</td>
+  <td>5</td>
+  <td>0</td>
+  <td>10,883</td>
+  <td>1,394</td>
+  <td>13.6s</td>
+  <td>$0.00151</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">api_integration</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>3</td>
+  <td>3</td>
+  <td>0</td>
+  <td>6,627</td>
+  <td>711</td>
+  <td>7.6s</td>
+  <td>$0.00088</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">dependency_injection</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>5</td>
+  <td>5</td>
+  <td>0</td>
+  <td>20,744</td>
+  <td>3,836</td>
+  <td>36.5s</td>
+  <td>$0.00323</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">db_schema_migration</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>5</td>
+  <td>5</td>
+  <td>0</td>
+  <td>21,337</td>
+  <td>3,508</td>
+  <td>33.1s</td>
+  <td>$0.00319</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_add_param_validation</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,273</td>
+  <td>409</td>
+  <td>4.5s</td>
+  <td>$0.00045</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_fix_repetition_detector</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>4</td>
+  <td>4</td>
+  <td>0</td>
+  <td>16,164</td>
+  <td>3,124</td>
+  <td>27.4s</td>
+  <td>$0.00255</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_extract_shared_util</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>5</td>
+  <td>5</td>
+  <td>0</td>
+  <td>17,925</td>
+  <td>2,143</td>
+  <td>19.5s</td>
+  <td>$0.00244</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_add_new_tool</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>6,091</td>
+  <td>2,115</td>
+  <td>16.8s</td>
+  <td>$0.00124</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_add_keyboard_shortcut</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>4,874</td>
+  <td>959</td>
+  <td>9.0s</td>
+  <td>$0.00078</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_add_jsdoc</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>4</td>
+  <td>4</td>
+  <td>0</td>
+  <td>20,894</td>
+  <td>4,697</td>
+  <td>50.7s</td>
+  <td>$0.00350</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_fix_controlled_component</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>5</td>
+  <td>5</td>
+  <td>0</td>
+  <td>17,828</td>
+  <td>1,736</td>
+  <td>18.2s</td>
+  <td>$0.00230</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_rename_across_files</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>9</td>
+  <td>9</td>
+  <td>0</td>
+  <td>27,333</td>
+  <td>1,280</td>
+  <td>16.5s</td>
+  <td>$0.00312</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_add_retry_logic</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>4</td>
+  <td>4</td>
+  <td>0</td>
+  <td>12,612</td>
+  <td>2,313</td>
+  <td>21.2s</td>
+  <td>$0.00196</td>
+</tr></tbody>
+</table>
+<div class="ts">Generated 2026-09-12T02:36:35.429Z · Mirror VS Sandbox</div>
+</body>
+</html>

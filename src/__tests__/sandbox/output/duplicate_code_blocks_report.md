@@ -1,61 +1,51 @@
 # 📊 Sandbox Test Report: duplicate_code_blocks
-
-**Model**: deepseek-v4-flash
+**Model**: accounts/fireworks/models/glm-5p3-flash
 **Status**: ✅ Completed
 
 ## Turn Efficiency
-
-| Metric              | Value |
-| ------------------- | ----- |
-| Total Turns         | 3     |
-| Wasted Turns        | 0     |
-| Turns to Completion | 3     |
+| Metric | Value |
+|--------|-------|
+| Total Turns | 2 |
+| Wasted Turns | 0 |
+| Turns to Completion | 2 |
 
 ## Token Usage
-
-| Metric                    | Value    |
-| ------------------------- | -------- |
-| Total Input Tokens        | 4,631    |
-| Total Output Tokens       | 269      |
-| Avg Input/Turn            | 1,544    |
-| Avg Output/Turn           | 90       |
-| Token Efficiency (out/in) | 0.058    |
-| Estimated Cost            | $0.00054 |
+| Metric | Value |
+|--------|-------|
+| Total Input Tokens | 2,811 |
+| Total Output Tokens | 312 |
+| Avg Input/Turn | 1,406 |
+| Avg Output/Turn | 156 |
+| Token Efficiency (out/in) | 0.111 |
+| Estimated Cost | $0.00037 |
 
 ## Tool Usage
-
-| Metric            | Value                                     |
-| ----------------- | ----------------------------------------- |
-| Total Tool Calls  | 3                                         |
-| Unique Tools Used | read_file, apply_diff, attempt_completion |
-| Redundant Reads   | 0                                         |
-| Failed Tool Calls | 0                                         |
+| Metric | Value |
+|--------|-------|
+| Total Tool Calls | 2 |
+| Unique Tools Used | apply_diff, attempt_completion |
+| Redundant Reads | 0 |
+| Failed Tool Calls | 0 |
 
 ### Tool Call Breakdown
-
-| Tool               | Count |
-| ------------------ | ----- |
-| read_file          | 1     |
-| apply_diff         | 1     |
-| attempt_completion | 1     |
+| Tool | Count |
+|------|-------|
+| apply_diff | 1 |
+| attempt_completion | 1 |
 
 ## Latency
-
-| Metric        | Value |
-| ------------- | ----- |
-| Total Latency | 3.3s  |
-| Avg per Turn  | 1.1s  |
-| Fastest Turn  | 1.0s  |
-| Slowest Turn  | 1.2s  |
+| Metric | Value |
+|--------|-------|
+| Total Latency | 3.2s |
+| Avg per Turn | 1.6s |
+| Fastest Turn | 0.9s |
+| Slowest Turn | 2.3s |
 
 ## Reasoning
-
-| Metric                   | Value |
-| ------------------------ | ----- |
-| Turns with Reasoning     | 2 / 3 |
-| Avg Reasoning Chars/Turn | 17    |
+| Metric | Value |
+|--------|-------|
+| Turns with Reasoning | 1 / 2 |
+| Avg Reasoning Chars/Turn | 364 |
 
 ## Behavioral Signals
-
-- ✅ Excellent turn efficiency — completed in 3 turn(s)
-- 📖 Read before edit pattern on: src/handlers.ts
+- ✅ Excellent turn efficiency — completed in 2 turn(s)

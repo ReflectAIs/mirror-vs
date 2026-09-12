@@ -1,0 +1,92 @@
+{
+  "scenarioName": "api_integration",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-0ruazX\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/routes/users.ts\n```\nimport express from \"express\"\nconst router = express.Router()\ninterface User { id: string; name: string; email: string; createdAt: Date }\nconst users: User[] = [\n  { id: \"1\", name: \"Alice\", email: \"alice@example.com\", createdAt: new Date(\"2024-01-01\") },\n  { id: \"2\", name: \"Bob\", email: \"bob@example.com\", createdAt: new Date(\"2024-01-02\") },\n]\nrouter.get(\"/\", (req, res) => res.json({ users, total: users.length }))\nrouter.get(\"/:id\", (req, res) => {\n  const user = users.find(u => u.id === req.params.id)\n  if (!user) return res.status(404).json({ error: \"User not found\" })\n  res.json(user)\n})\nrouter.post(\"/\", (req, res) => {\n  const { name, email } = req.body\n  if (!name || !email) return res.status(400).json({ error: \"name and email required\" })\n  const newUser: User = { id: String(Date.now()), name, email, createdAt: new Date() }\n  users.push(newUser)\n  res.status(201).json(newUser)\n})\nexport default router\n\n```\n\n### src/routes/posts.ts\n```\nimport express from \"express\"\nconst router = express.Router()\ninterface Post { id: string; userId: string; title: string; body: string; createdAt: Date }\nconst posts: Post[] = [\n  { id: \"1\", userId: \"1\", title: \"Hello World\", body: \"My first post\", createdAt: new Date() },\n]\nrouter.get(\"/\", (req, res) => {\n  const { userId } = req.query\n  const result = userId ? posts.filter(p => p.userId === userId) : posts\n  res.json({ posts: result, total: result.length })\n})\nrouter.get(\"/:id\", (req, res) => {\n  const post = posts.find(p => p.id === req.params.id)\n  if (!post) return res.status(404).json({ error: \"Post not found\" })\n  res.json(post)\n})\nrouter.post(\"/\", (req, res) => {\n  const { userId, title, body } = req.body\n  if (!userId || !title || !body) return res.status(400).json({ error: \"userId, title, and body required\" })\n  const newPost: Post = { id: String(Date.now()), userId, title, body, createdAt: new Date() }\n  posts.push(newPost)\n  res.status(201).json(newPost)\n})\nexport default router\n\n```\n\n### src/app.ts\n```\nimport express from \"express\"\nimport usersRouter from \"./routes/users\"\nimport postsRouter from \"./routes/posts\"\nconst app = express()\napp.use(express.json())\napp.use(\"/users\", usersRouter)\napp.use(\"/posts\", postsRouter)\nexport default app\n\n```\n\n### package.json\n```\n{\n  \"name\": \"rest-api\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": { \"express\": \"^4.18.0\" }\n}\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180334548,
+      "responseTimestamp": 1789180338335,
+      "latencyMs": 3786.858332999982,
+      "timeToFirstTokenMs": 3786.858332999982,
+      "inputTokens": 1844,
+      "outputTokens": 483,
+      "totalTokens": 2327,
+      "assistantText": "",
+      "reasoningText": "The task is straightforward: create `src/routes/comments.ts` following the same pattern as posts.ts, and register it in src/app.ts.\n\nLet me create the comments route file following the exact same patterns as posts.ts, then update app.ts.\n\nThe comments route:\n- Comment interface: id, postId, userId, text, createdAt\n- GET /comments with optional postId filter\n- GET /comments/:id\n- POST /comments validating postId, userId, text\n\nThen register in app.ts.\n\nThese are two writes — write tools must be sequential (one per turn). Actually, the instructions say \"Write tools must be sequential (one per turn).\" So I'll do write_to_file for comments.ts first, then apply_diff for app.ts. Actually, can I batch two write calls? The instruction says write tools must be sequential (one per turn). So I'll do them one at a time.",
+      "toolCalls": [
+        {
+          "name": "write_to_file",
+          "args": {
+            "content": "import express from \"express\"\nconst router = express.Router()\ninterface Comment { id: string; postId: string; userId: string; text: string; createdAt: Date }\nconst comments: Comment[] = [\n  { id: \"1\", postId: \"1\", userId: \"2\", text: \"Nice post!\", createdAt: new Date() },\n]\nrouter.get(\"/\", (req, res) => {\n  const { postId } = req.query\n  const result = postId ? comments.filter(c => c.postId === postId) : comments\n  res.json({ comments: result, total: result.length })\n})\nrouter.get(\"/:id\", (req, res) => {\n  const comment = comments.find(c => c.id === req.params.id)\n  if (!comment) return res.status(404).json({ error: \"Comment not found\" })\n  res.json(comment)\n})\nrouter.post(\"/\", (req, res) => {\n  const { postId, userId, text } = req.body\n  if (!postId || !userId || !text) return res.status(400).json({ error: \"postId, userId, and text required\" })\n  const newComment: Comment = { id: String(Date.now()), postId, userId, text, createdAt: new Date() }\n  comments.push(newComment)\n  res.status(201).json(newComment)\n})\nexport default router\n",
+            "path": "src/routes/comments.ts"
+          },
+          "result": "File written successfully to src/routes/comments.ts (25 lines).",
+          "durationMs": 1.156875000015134,
+          "timestamp": 1789180338336
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180338336,
+      "responseTimestamp": 1789180339636,
+      "latencyMs": 1300.3678340000042,
+      "timeToFirstTokenMs": 1300.3678340000042,
+      "inputTokens": 2343,
+      "outputTokens": 80,
+      "totalTokens": 2423,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "apply_diff",
+          "args": {
+            "diff": "<<<<<<< SEARCH\nimport postsRouter from \"./routes/posts\"\n=======\nimport postsRouter from \"./routes/posts\"\nimport commentsRouter from \"./routes/comments\"\n>>>>>>> REPLACE\n<<<<<<< SEARCH\napp.use(\"/posts\", postsRouter)\n=======\napp.use(\"/posts\", postsRouter)\napp.use(\"/comments\", commentsRouter)\n>>>>>>> REPLACE",
+            "path": "src/app.ts"
+          },
+          "result": "Applied 2 diff hunk(s) to src/app.ts.",
+          "durationMs": 0.7713330000115093,
+          "timestamp": 1789180339637
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 2,
+      "requestTimestamp": 1789180339637,
+      "responseTimestamp": 1789180342119,
+      "latencyMs": 2482.361124999996,
+      "timeToFirstTokenMs": 2482.361124999996,
+      "inputTokens": 2440,
+      "outputTokens": 148,
+      "totalTokens": 2588,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Added the `comments` resource following the existing patterns:\n\n- **Created `src/routes/comments.ts`**: `Comment` interface (`id`, `postId`, `userId`, `text`, `createdAt`), in-memory array with a seed comment, `GET /comments` with optional `postId` query filter (returns `{ comments, total }`), `GET /comments/:id` with 404 handling, and `POST /comments` validating `postId`, `userId`, and `text` (400 on missing fields, 201 on creation).\n- **Updated `src/app.ts`**: imported `commentsRouter` and mounted it at `/comments` alongside the existing routers."
+          },
+          "result": "[TASK_COMPLETED] Added the `comments` resource following the existing patterns:\n\n- **Created `src/routes/comments.ts`**: `Comment` interface (`id`, `postId`, `userId`, `text`, `createdAt`), in-memory array with a seed comment, `GET /comments` with optional `postId` query filter (returns `{ comments, total }`), `GET /comments/:id` with 404 handling, and `POST /comments` validating `postId`, `userId`, and `text` (400 on missing fields, 201 on creation).\n- **Updated `src/app.ts`**: imported `commentsRouter` and mounted it at `/comments` alongside the existing routers.",
+          "durationMs": 0.002833000005921349,
+          "timestamp": 1789180342119
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 7571.6338749999995,
+  "totalInputTokens": 6627,
+  "totalOutputTokens": 711,
+  "totalToolCalls": 3,
+  "completed": true
+}

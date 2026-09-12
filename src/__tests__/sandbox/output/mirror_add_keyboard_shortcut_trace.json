@@ -1,0 +1,67 @@
+{
+  "scenarioName": "mirror_add_keyboard_shortcut",
+  "config": {
+    "apiKey": "***",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "model": "accounts/fireworks/models/glm-5p3-flash",
+    "maxTurns": 15,
+    "temperature": 0
+  },
+  "systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-XvzTQO\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### webview-ui/src/components/chat/FloatingChatHud.tsx\n```\nimport React, { memo, useEffect, useState } from \"react\"\nimport { ChevronDown, History } from \"lucide-react\"\nimport { cn } from \"@/lib/utils\"\nimport type { MirrorMessage } from \"@mirror-vs/types\"\n\ninterface FloatingChatHudProps {\n\tshow: boolean\n\tisStreaming?: boolean\n\tlastMessage?: MirrorMessage\n\thasLatestCheckpoint?: boolean\n\tonScrollToBottom: () => void\n\tonScrollToCheckpoint?: () => void\n}\n\nexport const FloatingChatHud = memo(\n\t({\n\t\tshow,\n\t\tisStreaming = false,\n\t\tlastMessage,\n\t\thasLatestCheckpoint = false,\n\t\tonScrollToBottom,\n\t\tonScrollToCheckpoint,\n\t}: FloatingChatHudProps) => {\n\t\tconst [seconds, setSeconds] = useState(1)\n\n\t\tconst isReasoning = isStreaming && lastMessage?.say === \"reasoning\" && !lastMessage?.duration\n\n\t\tuseEffect(() => {\n\t\t\tif (!isReasoning) {\n\t\t\t\tsetSeconds(1)\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst timer = setInterval(() => {\n\t\t\t\tsetSeconds((s) => s + 1)\n\t\t\t}, 1000)\n\t\t\treturn () => clearInterval(timer)\n\t\t}, [isReasoning])\n\n\t\tif (!show) {\n\t\t\treturn null\n\t\t}\n\n\t\treturn (\n\t\t\t<div className=\"absolute bottom-2 left-0 right-0 flex items-center justify-center pointer-events-none z-20 px-4 animate-in fade-in slide-in-from-bottom-2 duration-200\">\n\t\t\t\t<div className=\"flex items-center gap-1.5 pointer-events-auto shadow-lg shadow-black/20\">\n\t\t\t\t\t<button\n\t\t\t\t\t\tonClick={onScrollToBottom}\n\t\t\t\t\t\tclassName={cn(\n\t\t\t\t\t\t\t\"h-6.5 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors duration-150\",\n\t\t\t\t\t\t\t\"bg-vscode-editor-background hover:bg-vscode-sideBar-background text-vscode-foreground\",\n\t\t\t\t\t\t\t\"border border-vscode-panel-border/80 shadow-sm\",\n\t\t\t\t\t\t)}\n\t\t\t\t\t\ttitle=\"Jump to latest message\">\n\t\t\t\t\t\t{isReasoning ? (\n\t\t\t\t\t\t\t<>\n\t\t\t\t\t\t\t\t<span className=\"size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0\" />\n\t\t\t\t\t\t\t\t<span className=\"text-vscode-foreground font-medium\">Thinking · {seconds}s</span>\n\t\t\t\t\t\t\t</>\n\t\t\t\t\t\t) : isStreaming ? (\n\t\t\t\t\t\t\t<>\n\t\t\t\t\t\t\t\t<span className=\"size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0\" />\n\t\t\t\t\t\t\t\t<span className=\"text-vscode-foreground font-medium\">Working...</span>\n\t\t\t\t\t\t\t</>\n\t\t\t\t\t\t) : (\n\t\t\t\t\t\t\t<span className=\"text-vscode-descriptionForeground hover:text-vscode-foreground\">\n\t\t\t\t\t\t\t\tJump to bottom\n\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t)}\n\t\t\t\t\t\t<ChevronDown className=\"size-3 text-vscode-descriptionForeground shrink-0\" />\n\t\t\t\t\t</button>\n\n\t\t\t\t\t{hasLatestCheckpoint && onScrollToCheckpoint && (\n\t\t\t\t\t\t<button\n\t\t\t\t\t\t\tonClick={onScrollToCheckpoint}\n\t\t\t\t\t\t\tclassName={cn(\n\t\t\t\t\t\t\t\t\"h-6.5 px-2 rounded-md flex items-center gap-1 text-xs font-medium cursor-pointer transition-colors duration-150\",\n\t\t\t\t\t\t\t\t\"bg-vscode-editor-background hover:bg-vscode-sideBar-background text-vscode-descriptionForeground hover:text-vscode-foreground\",\n\t\t\t\t\t\t\t\t\"border border-vscode-panel-border/80 shadow-sm\",\n\t\t\t\t\t\t\t)}\n\t\t\t\t\t\t\ttitle=\"Scroll to latest checkpoint\">\n\t\t\t\t\t\t\t<History className=\"size-3 shrink-0\" />\n\t\t\t\t\t\t\t<span>Checkpoint</span>\n\t\t\t\t\t\t</button>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t)\n\t},\n)\n\nFloatingChatHud.displayName = \"FloatingChatHud\"\nexport default FloatingChatHud\n\n```",
+  "turns": [
+    {
+      "turnIndex": 0,
+      "requestTimestamp": 1789180479853,
+      "responseTimestamp": 1789180486963,
+      "latencyMs": 7109.753749999974,
+      "timeToFirstTokenMs": 7109.753749999974,
+      "inputTokens": 2019,
+      "outputTokens": 809,
+      "totalTokens": 2828,
+      "assistantText": "",
+      "reasoningText": "The task is to add a keyboard shortcut to FloatingChatHud.tsx. I have the file content already in the workspace files section. I need to add a useEffect that attaches a keydown listener to window when `show` is true, cleaning up when show becomes false or unmount. The handler fires only if key is \"Escape\" or \"End\", calling onScrollToBottom.\n\nI should not modify JSX or other existing logic. Just add the useEffect.\n\nLet me write the diff. I'll add the useEffect after the existing reasoning timer useEffect, before the `if (!show)` early return.\n\nThe handler:\n\n```tsx\nuseEffect(() => {\n\tif (!show) {\n\t\treturn\n\t}\n\tconst handleKeyDown = (event: KeyboardEvent) => {\n\t\tif (event.key === \"Escape\" || event.key === \"End\") {\n\t\t\tonScrollToBottom()\n\t\t}\n\t}\n\twindow.addEventListener(\"keydown\", handleKeyDown)\n\treturn () => {\n\t\twindow.removeEventListener(\"keydown\", handleKeyDown)\n\t}\n}, [show, onScrollToBottom])\n```\n\nUse apply_diff with a SEARCH/REPLACE block. The search block should include the existing useEffect ending and the `if (!show)` line to anchor placement.\n\nLet me construct:\n\n```\n<<<<<<< SEARCH\n\t\tuseEffect(() => {\n\t\t\tif (!isReasoning) {\n\t\t\t\tsetSeconds(1)\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst timer = setInterval(() => {\n\t\t\t\tsetSeconds((s) => s + 1)\n\t\t\t}, 1000)\n\t\t\treturn () => clearInterval(timer)\n\t\t}, [isReasoning])\n\n\t\tif (!show) {\n=======\n\t\tuseEffect(() => {\n\t\t\tif (!isReasoning) {\n\t\t\t\tsetSeconds(1)\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst timer = setInterval(() => {\n\t\t\t\tsetSeconds((s) => s + 1)\n\t\t\t}, 1000)\n\t\t\treturn () => clearInterval(timer)\n\t\t}, [isReasoning])\n\n\t\tuseEffect(() => {\n\t\t\tif (!show) {\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst handleKeyDown = (event: KeyboardEvent) => {\n\t\t\t\tif (event.key === \"Escape\" || event.key === \"End\") {\n\t\t\t\t\tonScrollToBottom()\n\t\t\t\t}\n\t\t\t}\n\t\t\twindow.addEventListener(\"keydown\", handleKeyDown)\n\t\t\treturn () => {\n\t\t\t\twindow.removeEventListener(\"keydown\", handleKeyDown)\n\t\t\t}\n\t\t}, [show, onScrollToBottom])\n\n\t\tif (!show) {\n>>>>>>> REPLACE\n```\n\nThat should work. The file uses tabs for indentation. Let me make sure I use tabs consistently.",
+      "toolCalls": [
+        {
+          "name": "apply_diff",
+          "args": {
+            "diff": "<<<<<<< SEARCH\n\t\tuseEffect(() => {\n\t\t\tif (!isReasoning) {\n\t\t\t\tsetSeconds(1)\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst timer = setInterval(() => {\n\t\t\t\tsetSeconds((s) => s + 1)\n\t\t\t}, 1000)\n\t\t\treturn () => clearInterval(timer)\n\t\t}, [isReasoning])\n\n\t\tif (!show) {\n=======\n\t\tuseEffect(() => {\n\t\t\tif (!isReasoning) {\n\t\t\t\tsetSeconds(1)\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst timer = setInterval(() => {\n\t\t\t\tsetSeconds((s) => s + 1)\n\t\t\t}, 1000)\n\t\t\treturn () => clearInterval(timer)\n\t\t}, [isReasoning])\n\n\t\tuseEffect(() => {\n\t\t\tif (!show) {\n\t\t\t\treturn\n\t\t\t}\n\t\t\tconst handleKeyDown = (event: KeyboardEvent) => {\n\t\t\t\tif (event.key === \"Escape\" || event.key === \"End\") {\n\t\t\t\t\tonScrollToBottom()\n\t\t\t\t}\n\t\t\t}\n\t\t\twindow.addEventListener(\"keydown\", handleKeyDown)\n\t\t\treturn () => {\n\t\t\t\twindow.removeEventListener(\"keydown\", handleKeyDown)\n\t\t\t}\n\t\t}, [show, onScrollToBottom])\n\n\t\tif (!show) {\n>>>>>>> REPLACE",
+            "path": "webview-ui/src/components/chat/FloatingChatHud.tsx"
+          },
+          "result": "Applied 1 diff hunk(s) to webview-ui/src/components/chat/FloatingChatHud.tsx.",
+          "durationMs": 0.7447499999543652,
+          "timestamp": 1789180486964
+        }
+      ],
+      "isCompletion": false
+    },
+    {
+      "turnIndex": 1,
+      "requestTimestamp": 1789180486964,
+      "responseTimestamp": 1789180488864,
+      "latencyMs": 1899.7179999999935,
+      "timeToFirstTokenMs": 1899.7179999999935,
+      "inputTokens": 2855,
+      "outputTokens": 150,
+      "totalTokens": 3005,
+      "assistantText": "",
+      "reasoningText": "",
+      "toolCalls": [
+        {
+          "name": "attempt_completion",
+          "args": {
+            "result": "Added a keyboard shortcut effect to `FloatingChatHud.tsx` without touching the JSX or existing logic:\n\n- New `useEffect` placed after the existing reasoning-timer effect, before the `if (!show)` early return.\n- When `show` is true, it attaches a `keydown` listener on `window`; the handler calls `onScrollToBottom()` only when `event.key` is `\"Escape\"` or `\"End\"`.\n- The effect returns a cleanup that removes the listener, so it detaches when `show` becomes false or on unmount.\n- Dependencies are `[show, onScrollToBottom]` so the listener stays in sync with the latest callback."
+          },
+          "result": "[TASK_COMPLETED] Added a keyboard shortcut effect to `FloatingChatHud.tsx` without touching the JSX or existing logic:\n\n- New `useEffect` placed after the existing reasoning-timer effect, before the `if (!show)` early return.\n- When `show` is true, it attaches a `keydown` listener on `window`; the handler calls `onScrollToBottom()` only when `event.key` is `\"Escape\"` or `\"End\"`.\n- The effect returns a cleanup that removes the listener, so it detaches when `show` becomes false or on unmount.\n- Dependencies are `[show, onScrollToBottom]` so the listener stays in sync with the latest callback.",
+          "durationMs": 0.007625000027474016,
+          "timestamp": 1789180488864
+        }
+      ],
+      "isCompletion": true
+    }
+  ],
+  "totalLatencyMs": 9010.306332999957,
+  "totalInputTokens": 4874,
+  "totalOutputTokens": 959,
+  "totalToolCalls": 2,
+  "completed": true
+}

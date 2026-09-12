@@ -101,10 +101,14 @@ export const CheckpointMenu = ({
 	)
 
 	return (
-		<div className="flex flex-row gap-1">
+		<div className="flex flex-row items-center gap-0.5">
 			<StandardTooltip content={t("chat:checkpoint.menu.viewDiff")}>
-				<Button variant="ghost" size="icon" onClick={onCheckpointDiff}>
-					<span className="codicon codicon-diff-single" />
+				<Button
+					variant="ghost"
+					size="icon"
+					className="h-6 w-6 p-0 hover:bg-vscode-toolbar-hoverBackground"
+					onClick={onCheckpointDiff}>
+					<span className="codicon codicon-diff-single text-xs" />
 				</Button>
 			</StandardTooltip>
 			<Popover
@@ -116,8 +120,12 @@ export const CheckpointMenu = ({
 				data-testid="restore-popover">
 				<StandardTooltip content={t("chat:checkpoint.menu.restore")}>
 					<PopoverTrigger asChild>
-						<Button variant="ghost" size="icon" aria-label={t("chat:checkpoint.menu.restore")}>
-							<span className="codicon codicon-history" />
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-6 w-6 p-0 hover:bg-vscode-toolbar-hoverBackground"
+							aria-label={t("chat:checkpoint.menu.restore")}>
+							<span className="codicon codicon-history text-xs" />
 						</Button>
 					</PopoverTrigger>
 				</StandardTooltip>
@@ -176,17 +184,22 @@ export const CheckpointMenu = ({
 				<Button
 					variant="ghost"
 					size="icon"
+					className="h-6 w-6 p-0 hover:bg-vscode-toolbar-hoverBackground"
 					onClick={onJumpToPreviousCheckpoint}
 					data-testid="jump-previous-checkpoint-btn"
 					aria-label={t("chat:scrollToLatestCheckpoint")}>
-					<span className="codicon codicon-chevron-up" />
+					<span className="codicon codicon-chevron-up text-xs" />
 				</Button>
 			</StandardTooltip>
 			<Popover open={moreOpen} onOpenChange={(open) => setMoreOpen(open)} data-testid="more-popover">
 				<StandardTooltip content={t("chat:task.seeMore")}>
 					<PopoverTrigger asChild>
-						<Button variant="ghost" size="icon" aria-label={t("chat:checkpoint.menu.more")}>
-							<span className="codicon codicon-kebab-vertical" />
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-6 w-6 p-0 hover:bg-vscode-toolbar-hoverBackground"
+							aria-label={t("chat:checkpoint.menu.more")}>
+							<span className="codicon codicon-kebab-vertical text-xs" />
 						</Button>
 					</PopoverTrigger>
 				</StandardTooltip>
