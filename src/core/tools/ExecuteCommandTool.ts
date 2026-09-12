@@ -564,7 +564,8 @@ export async function executeCommandInTerminal(
 				await queueCommandOutputMessage(result, false, true)
 				completed = true
 			} finally {
-				// Signal that onCompleted has finished, so the main code can safely use persistedResult
+				// Immediately dismiss any pending command_output ask and signal completion
+				task.supersedePendingAsk?.()
 				resolveOnCompleted?.()
 				checkAndNotifyBackgroundCompletion()
 			}
@@ -652,7 +653,17 @@ export async function executeCommandInTerminal(
 		clearTimeout(agentTimeoutId)
 		clearTimeout(userTimeoutId)
 		clearTimeout(pendingCommandOutputEmitTimer)
+		task.supersedePendingAsk?.()
 		task.terminalProcess = undefined
+		if (terminal) {
+			terminal.busy = false
+			if (terminal.process) {
+				try {
+					;(terminal.process as any).stopHotTimer?.()
+					;(terminal.process as any).isHot = false
+				} catch {}
+			}
+		}
 	}
 
 	if (shellIntegrationError) {

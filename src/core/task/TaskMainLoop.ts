@@ -375,10 +375,13 @@ export class TaskMainLoop {
 			while (this.task.inBetweenMessages.length > 0) {
 				const inBetween = this.task.inBetweenMessages.shift()
 				if (inBetween) {
+					const isTerminalCallback = inBetween.sayType === "terminal_callback"
 					currentUserContent.push(
 						{
 							type: "text" as const,
-							text: `<user_message>\n${inBetween.text}\n</user_message>`,
+							text: isTerminalCallback
+								? inBetween.text
+								: `<user_message>\n${inBetween.text}\n</user_message>`,
 						},
 						...formatResponse.imageBlocks(inBetween.images),
 					)

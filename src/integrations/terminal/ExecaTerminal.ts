@@ -26,7 +26,13 @@ export class ExecaTerminal extends BaseTerminal {
 		this.process = process
 
 		process.on("line", (line) => callbacks.onLine(line, process))
-		process.once("completed", (output) => callbacks.onCompleted(output, process))
+		process.once("completed", (output) => {
+			this.busy = false
+			if (this.process) {
+				this.process.isHot = false
+			}
+			callbacks.onCompleted(output, process)
+		})
 		process.once("shell_execution_started", (pid) => callbacks.onShellExecutionStarted(pid, process))
 		process.once("shell_execution_complete", (details) => callbacks.onShellExecutionComplete(details, process))
 

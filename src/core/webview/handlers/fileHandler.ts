@@ -17,11 +17,38 @@ import { getCurrentCwd } from "./_helpers"
  * Handles opening a file in the editor. Supports absolute and relative paths.
  */
 export async function handleOpenFile(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
-	let filePath: string = message.text!
+	let filePath: string = message.text || ""
+
+	// Strip any trailing line/col specifiers if present in raw path, e.g. "path/to/file.ts:10:5" or "file.ts#L10-20"
+	const lineMatch = filePath.match(/^(.*?)(?:[:#](?:L)?(\d+)(?:[:-](\d+))?)?$/i)
+	let parsedLine: number | undefined
+	let parsedEndLine: number | undefined
+	if (lineMatch && (lineMatch[2] || lineMatch[3])) {
+		filePath = lineMatch[1]
+		parsedLine = lineMatch[2] ? parseInt(lineMatch[2], 10) : undefined
+		parsedEndLine = lineMatch[3] ? parseInt(lineMatch[3], 10) : undefined
+	}
+
 	if (!path.isAbsolute(filePath)) {
 		filePath = path.join(getCurrentCwd(provider), filePath)
 	}
-	openFile(filePath, message.values as { create?: boolean; content?: string; line?: number; preview?: boolean })
+
+	const values = (message.values ?? {}) as {
+		create?: boolean
+		content?: string
+		line?: number
+		endLine?: number
+		preview?: boolean
+	}
+
+	const line = values.line ?? parsedLine
+	const endLine = values.endLine ?? parsedEndLine
+
+	openFile(filePath, {
+		...values,
+		line,
+		endLine,
+	})
 }
 
 /**

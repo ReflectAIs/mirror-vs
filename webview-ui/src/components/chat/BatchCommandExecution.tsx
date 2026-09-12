@@ -98,11 +98,8 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 	return (
 		<div className="flex flex-col min-w-0 max-w-full">
 			<div
-				onClick={() => hasOutput && setIsExpanded(!isExpanded)}
-				className={cn(
-					"flex items-center justify-between gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 select-none group transition-colors text-xs min-w-0 max-w-full",
-					hasOutput ? "cursor-pointer" : "cursor-default",
-				)}>
+				onClick={() => setIsExpanded(!isExpanded)}
+				className="flex items-center justify-between gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 select-none group transition-colors text-xs min-w-0 max-w-full cursor-pointer">
 				<div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
 					<TerminalIcon className="size-3.5 text-vscode-descriptionForeground shrink-0" />
 					<code
@@ -129,21 +126,31 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 							<OctagonX className="size-3" />
 						</button>
 					)}
-					{hasOutput && (
-						<ChevronDown
-							className={cn(
-								"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
-								isExpanded ? "rotate-0" : "-rotate-90",
-							)}
-						/>
-					)}
+					<ChevronDown
+						className={cn(
+							"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
+							isExpanded ? "rotate-0" : "-rotate-90",
+						)}
+					/>
 				</div>
 			</div>
 
-			{isExpanded && hasOutput && (
+			{isExpanded && (
 				<div className="ml-5 my-1 pl-2 border-l border-vscode-panel-border/30 min-w-0 max-w-full">
 					<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[200px] overflow-auto min-w-0 max-w-full">
-						<TerminalOutput content={output} />
+						{hasOutput ? (
+							<TerminalOutput content={output} />
+						) : (
+							<div className="text-vscode-descriptionForeground italic">
+								{isRunning
+									? "Running command..."
+									: isSuccess
+										? "Command completed with no output (exit code 0)"
+										: isFailed
+											? `Command exited with code ${status?.exitCode}`
+											: "(No output produced)"}
+							</div>
+						)}
 					</div>
 				</div>
 			)}

@@ -7,6 +7,8 @@ interface FilePermissionItem {
 	isOutsideWorkspace?: boolean
 	key: string
 	content?: string // full path
+	startLine?: number
+	endLine?: number
 }
 
 interface BatchFilePermissionProps {
@@ -28,6 +30,8 @@ export const BatchFilePermission = memo(({ files = [], ts }: BatchFilePermission
 					verb="Analyzed"
 					filePath={file.path}
 					lineRange={file.lineSnippet}
+					startLine={file.startLine}
+					endLine={file.endLine}
 				/>
 			))}
 		</div>

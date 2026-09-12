@@ -73,6 +73,7 @@ export class Terminal extends BaseTerminal {
 		// configured before the process starts.
 		process.on("line", (line) => callbacks.onLine(line, process))
 		process.once("completed", (output) => {
+			this.busy = false
 			callbacks.onCompleted(output, process)
 			try {
 				this.terminal.dispose()

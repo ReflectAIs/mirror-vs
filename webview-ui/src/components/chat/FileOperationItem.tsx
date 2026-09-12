@@ -8,6 +8,7 @@ interface FileOperationItemProps {
 	filePath: string
 	lineRange?: string
 	startLine?: number
+	endLine?: number
 	diffStats?: { added: number; removed: number }
 	onClick?: () => void
 	className?: string
@@ -38,24 +39,37 @@ export function parsePathAndLines(
 	fileName: string
 	lineRange?: string
 	startLine?: number
+	endLine?: number
 } {
 	let path = rawPath || ""
 	let lineRange: string | undefined = undefined
 	let startLine: number | undefined = undefined
+	let endLine: number | undefined = undefined
 
-	// Check if path contains line range, e.g. "foo.tsx:10-20" or "foo.tsx#L10-20"
-	const hashMatch = path.match(/[#:]L?(\d+)(?:-(\d+))?$/)
+	// Check if path contains line range or line:col, e.g. "foo.tsx:10-20" or "foo.tsx:10:5" or "foo.tsx#L10-20"
+	const hashMatch = path.match(/[#:](?:L)?(\d+)(?:[:-](\d+))?$/i)
 	if (hashMatch) {
 		startLine = parseInt(hashMatch[1], 10)
-		const endLine = hashMatch[2] ? parseInt(hashMatch[2], 10) : undefined
+		endLine = hashMatch[2] ? parseInt(hashMatch[2], 10) : undefined
 		lineRange = endLine ? `L${startLine}-${endLine}` : `L${startLine}`
 		path = path.slice(0, hashMatch.index)
 	} else if (rawSnippet) {
-		const snippetMatch = rawSnippet.match(/#?L?(\d+)(?:-(\d+))?/)
-		if (snippetMatch) {
-			startLine = parseInt(snippetMatch[1], 10)
-			const endLine = snippetMatch[2] ? parseInt(snippetMatch[2], 10) : undefined
+		const linesMatch = rawSnippet.match(/(?:lines?\s+|L)(\d+)(?:\s*-\s*(\d+))?/i)
+		const upToMatch = rawSnippet.match(/up\s+to\s+(\d+)\s+lines?/i)
+		const rangeMatch = rawSnippet.match(/\b(\d+)\s*-\s*(\d+)\b/)
+
+		if (linesMatch) {
+			startLine = parseInt(linesMatch[1], 10)
+			endLine = linesMatch[2] ? parseInt(linesMatch[2], 10) : undefined
 			lineRange = endLine ? `L${startLine}-${endLine}` : `L${startLine}`
+		} else if (upToMatch) {
+			startLine = 1
+			endLine = parseInt(upToMatch[1], 10)
+			lineRange = `L1-${endLine}`
+		} else if (rangeMatch) {
+			startLine = parseInt(rangeMatch[1], 10)
+			endLine = parseInt(rangeMatch[2], 10)
+			lineRange = `L${startLine}-${endLine}`
 		}
 	}
 
@@ -68,6 +82,7 @@ export function parsePathAndLines(
 		fileName,
 		lineRange,
 		startLine,
+		endLine,
 	}
 }
 
@@ -77,6 +92,7 @@ export const FileOperationItem = memo(
 		filePath,
 		lineRange: explicitLineRange,
 		startLine: explicitStartLine,
+		endLine: explicitEndLine,
 		diffStats,
 		onClick,
 		className,
@@ -86,9 +102,11 @@ export const FileOperationItem = memo(
 			fileName,
 			lineRange: parsedLineRange,
 			startLine: parsedStartLine,
-		} = parsePathAndLines(filePath)
+			endLine: parsedEndLine,
+		} = parsePathAndLines(filePath, explicitLineRange)
 		const effectiveLineRange = explicitLineRange || parsedLineRange
 		const effectiveStartLine = explicitStartLine ?? parsedStartLine
+		const effectiveEndLine = explicitEndLine ?? parsedEndLine
 
 		const handleClick = () => {
 			if (onClick) {
@@ -99,7 +117,7 @@ export const FileOperationItem = memo(
 				vscode.postMessage({
 					type: "openFile",
 					text: displayPath,
-					values: effectiveStartLine ? { line: effectiveStartLine } : undefined,
+					values: effectiveStartLine ? { line: effectiveStartLine, endLine: effectiveEndLine } : undefined,
 				})
 			}
 		}

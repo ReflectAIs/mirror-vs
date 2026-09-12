@@ -54,7 +54,7 @@ import { MIRROR_LOGO_DATA_URI } from "@/assets/logoData"
 import { AutoApprovedRequestLimitWarning } from "./AutoApprovedRequestLimitWarning"
 import { InProgressRow, CondensationResultRow, CondensationErrorRow, TruncationResultRow } from "./context-management"
 import CodebaseSearchResultsDisplay from "./CodebaseSearchResultsDisplay"
-import { FileOperationItem } from "./FileOperationItem"
+import { FileOperationItem, parsePathAndLines } from "./FileOperationItem"
 import { ToolDisclosure } from "./ToolDisclosure"
 import { appendImages } from "@src/utils/imageUtils"
 import { McpExecution } from "./McpExecution"
@@ -641,6 +641,16 @@ export const ChatRowContent = ({
 				}
 
 				// Regular single file read request
+				const singlePath = tool.path || tool.content || ""
+				const parsedSingle = parsePathAndLines(singlePath, tool.reason)
+				const resolvedStartLine = tool.startLine ?? parsedSingle.startLine
+				const resolvedEndLine = (tool as any).endLine ?? parsedSingle.endLine
+				const resolvedLineRange = resolvedStartLine
+					? resolvedEndLine
+						? `L${resolvedStartLine}-${resolvedEndLine}`
+						: `L${resolvedStartLine}`
+					: tool.reason
+
 				return (
 					<ToolDisclosure
 						title="Exploring 1 file"
@@ -648,20 +658,18 @@ export const ChatRowContent = ({
 						status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
 						<FileOperationItem
 							verb="Analyzed"
-							filePath={tool.path || ""}
-							lineRange={
-								tool.startLine
-									? (tool as any).endLine
-										? `L${tool.startLine}-${(tool as any).endLine}`
-										: `L${tool.startLine}`
-									: tool.reason
-							}
-							startLine={tool.startLine}
+							filePath={parsedSingle.displayPath || singlePath}
+							lineRange={resolvedLineRange}
+							startLine={resolvedStartLine}
+							endLine={resolvedEndLine}
 							onClick={() =>
 								vscode.postMessage({
 									type: "openFile",
-									text: tool.content || tool.path,
-									values: tool.startLine ? { line: tool.startLine } : undefined,
+									text: parsedSingle.displayPath || singlePath,
+									values:
+										resolvedStartLine !== undefined
+											? { line: resolvedStartLine, endLine: resolvedEndLine }
+											: undefined,
 								})
 							}
 						/>

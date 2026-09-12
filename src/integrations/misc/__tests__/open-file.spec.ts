@@ -17,6 +17,7 @@ vi.mock("vscode", () => ({
 	window: {
 		showTextDocument: vi.fn(),
 		showErrorMessage: vi.fn(),
+		createTextEditorDecorationType: vi.fn(() => ({})),
 		tabGroups: {
 			all: [],
 		},
@@ -29,10 +30,23 @@ vi.mock("vscode", () => ({
 		Directory: 2,
 		File: 1,
 	},
+	ThemeColor: vi.fn(function (name: string) {
+		return { id: name }
+	}),
 	Selection: vi.fn((startLine: number, startChar: number, endLine: number, endChar: number) => ({
 		start: { line: startLine, character: startChar },
 		end: { line: endLine, character: endChar },
 	})),
+	Range: vi.fn((startLine: number, startChar: number, endLine: number, endChar: number) => ({
+		start: { line: startLine, character: startChar },
+		end: { line: endLine, character: endChar },
+	})),
+	TextEditorRevealType: {
+		Default: 0,
+		InCenter: 1,
+		InCenterIfOutsideViewport: 2,
+		AtTop: 3,
+	},
 	TabInputText: vi.fn(),
 }))
 
@@ -233,6 +247,47 @@ describe("openFile", () => {
 				Buffer.from(content, "utf8"),
 			)
 			expect(vscode.workspace.openTextDocument).toHaveBeenCalled()
+		})
+	})
+
+	describe("line highlighting and navigation", () => {
+		it("should select line range, reveal in center, and apply highlight decoration", async () => {
+			const filePath = "./existing/file.ts"
+			vi.mocked(vscode.workspace.fs.stat).mockResolvedValue({
+				type: vscode.FileType.File,
+				ctime: 0,
+				mtime: 0,
+				size: 100,
+			})
+
+			const mockLine = { text: "const x = 42;" }
+			const mockDoc = {
+				lineCount: 100,
+				lineAt: vi.fn().mockReturnValue(mockLine),
+			}
+			const mockEditor = {
+				revealRange: vi.fn(),
+				setDecorations: vi.fn(),
+			}
+
+			vi.mocked(vscode.workspace.openTextDocument).mockResolvedValue(mockDoc as any)
+			vi.mocked(vscode.window.showTextDocument).mockResolvedValue(mockEditor as any)
+
+			await openFile(filePath, { line: 10, endLine: 15 })
+
+			expect(vscode.workspace.openTextDocument).toHaveBeenCalled()
+			expect(vscode.window.showTextDocument).toHaveBeenCalledWith(
+				mockDoc,
+				expect.objectContaining({
+					preview: false,
+					selection: expect.objectContaining({
+						start: { line: 9, character: 0 },
+						end: { line: 14, character: mockLine.text.length },
+					}),
+				}),
+			)
+			expect(mockEditor.revealRange).toHaveBeenCalledWith(expect.anything(), 1) // InCenter
+			expect(mockEditor.setDecorations).toHaveBeenCalled()
 		})
 	})
 })

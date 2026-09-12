@@ -22,6 +22,7 @@ const CodebaseSearchResult: React.FC<CodebaseSearchResultProps> = ({ filePath, s
 			text: "./" + filePath,
 			values: {
 				line: startLine,
+				endLine,
 			},
 		})
 	}

@@ -182,7 +182,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	todoList?: TodoItem[]
 
 	/** In-between steering messages to inject directly into the ongoing agent loop. */
-	public inBetweenMessages: { text: string; images?: string[] }[] = []
+	public inBetweenMessages: { text: string; images?: string[]; sayType?: "user_feedback" | "terminal_callback" }[] =
+		[]
 
 	readonly rootTask: Task | undefined = undefined
 	readonly parentTask: Task | undefined = undefined
@@ -1115,19 +1116,20 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		images?: string[],
 		sayType: "user_feedback" | "terminal_callback" = "user_feedback",
 	): Promise<void> {
-		this.inBetweenMessages.push({ text, images })
-		// If the task is currently waiting on an ask,
+		this.inBetweenMessages.push({ text, images, sayType })
+		// If the task is currently waiting on an ask and this is real user feedback,
 		// answer it immediately so the waiting ask promise unblocks.
+		// Terminal callbacks must never answer interactive asks as user messages.
 		const wasWaitingOnAsk = Boolean(this.isWaitingOnAsk || this.taskAsk !== undefined)
-		if (wasWaitingOnAsk) {
+		if (wasWaitingOnAsk && sayType === "user_feedback") {
 			this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
 		}
 
 		await this.say(sayType as any, text, images)
 
-		// If a terminal command is actively running in the foreground, interrupt/continue it
+		// If a terminal command is actively running in the foreground and user sent feedback, interrupt/continue it
 		// so the loop immediately yields back to the model with this steering message.
-		if (this.terminalProcess) {
+		if (this.terminalProcess && sayType === "user_feedback") {
 			try {
 				this.terminalProcess.continue()
 			} catch (e) {
@@ -1140,14 +1142,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.abort = false
 
 		// If the task loop is not currently running (and wasn't just unblocked via askResponse),
-		// reactivate initiateTaskLoop so the model immediately receives and acts on the user's steering message.
+		// reactivate initiateTaskLoop so the model immediately receives and acts on the message.
 		if (!this.isLoopActive && this._started && !wasWaitingOnAsk) {
 			const { formatResponse } = await import("../prompts/responses")
 			const imageBlocks = formatResponse.imageBlocks(images)
-			const userContent = [
-				{ type: "text" as const, text: `<user_message>\n${text}\n</user_message>` },
-				...imageBlocks,
-			]
+			const messageText = sayType === "terminal_callback" ? text : `<user_message>\n${text}\n</user_message>`
+			const userContent = [{ type: "text" as const, text: messageText }, ...imageBlocks]
 			void this.initiateTaskLoop(userContent)
 		}
 	}

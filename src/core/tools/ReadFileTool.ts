@@ -442,9 +442,19 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 				const readablePath = getReadablePath(task.cwd, relPath)
 
 				const lineSnippet = this.getLineSnippet(fileResult.entry!)
+				const startLine = fileResult.entry ? this.getStartLine(fileResult.entry) : undefined
+				const endLine = fileResult.entry ? this.getEndLine(fileResult.entry) : undefined
 				const key = `${readablePath}${lineSnippet ? ` (${lineSnippet})` : ""}`
 
-				return { path: readablePath, lineSnippet, isOutsideWorkspace, key, content: fullPath }
+				return {
+					path: readablePath,
+					lineSnippet,
+					isOutsideWorkspace,
+					key,
+					content: fullPath,
+					startLine,
+					endLine,
+				}
 			})
 
 			const completeMessage = JSON.stringify({ tool: "readFile", batchFiles } satisfies MirrorSayTool)
@@ -507,6 +517,7 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			const lineSnippet = this.getLineSnippet(fileResult.entry!)
 
 			const startLine = this.getStartLine(fileResult.entry!)
+			const endLine = this.getEndLine(fileResult.entry!)
 
 			const completeMessage = JSON.stringify({
 				tool: "readFile",
@@ -515,6 +526,7 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 				content: fullPath,
 				reason: lineSnippet,
 				startLine,
+				endLine,
 			} satisfies MirrorSayTool)
 
 			const { response, text, images } = await task.ask("tool", completeMessage, false)
@@ -538,13 +550,26 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 	/**
 	 * Get the starting line number for navigation purposes.
 	 */
-	private getStartLine(entry: InternalFileEntry): number | undefined {
+	private getStartLine(entry: InternalFileEntry): number {
 		if (entry.mode === "indentation") {
 			// For indentation mode, always return the effective anchor line
 			return entry.anchor_line ?? entry.offset ?? 1
 		}
-		const offset = entry.offset ?? 1
-		return offset > 1 ? offset : undefined
+		return entry.offset ?? 1
+	}
+
+	/**
+	 * Get the ending line number for highlight purposes.
+	 */
+	private getEndLine(entry: InternalFileEntry): number | undefined {
+		if (entry.mode === "indentation") {
+			return undefined
+		}
+		const start = entry.offset ?? 1
+		if (entry.limit) {
+			return start + entry.limit - 1
+		}
+		return undefined
 	}
 
 	/**
@@ -702,9 +727,13 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			// Request approval for single file
 			const isOutsideWorkspace = isPathOutsideWorkspace(fullPath)
 			let lineSnippet = ""
+			let startLine: number | undefined
+			let endLine: number | undefined
 			if (entry.lineRanges && entry.lineRanges.length > 0) {
 				const ranges = entry.lineRanges.map((range: LineRange) => `(lines ${range.start}-${range.end})`)
 				lineSnippet = ranges.join(", ")
+				startLine = entry.lineRanges[0].start
+				endLine = entry.lineRanges[0].end
 			}
 
 			const completeMessage = JSON.stringify({
@@ -713,6 +742,8 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 				isOutsideWorkspace,
 				content: fullPath,
 				reason: lineSnippet || undefined,
+				startLine,
+				endLine,
 			} satisfies MirrorSayTool)
 
 			const { response, text, images } = await task.ask("tool", completeMessage, false)

@@ -152,6 +152,8 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 		this.terminal.setActiveStream(undefined)
 		this.emitRemainingBufferIfListening()
 		this.stopHotTimer()
+		this.isHot = false
+		this.terminal.busy = false
 		this.emit("completed", this.fullOutput)
 		this.emit("continue")
 		this.subprocess = undefined
@@ -165,6 +167,9 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 
 	public override abort() {
 		this.aborted = true
+		this.stopHotTimer()
+		this.isHot = false
+		this.terminal.busy = false
 
 		// Function to perform the kill operations
 		const performKill = () => {

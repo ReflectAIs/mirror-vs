@@ -1003,6 +1003,7 @@ export interface MirrorSayTool {
 	additionalFileCount?: number // Number of additional files in the same read_file request
 	lineNumber?: number
 	startLine?: number // Starting line for read_file operations (for navigation on click)
+	endLine?: number // Ending line for read_file operations (for highlight on click)
 	query?: string
 	batchFiles?: Array<{
 		path: string
@@ -1010,6 +1011,8 @@ export interface MirrorSayTool {
 		isOutsideWorkspace?: boolean
 		key: string
 		content?: string
+		startLine?: number
+		endLine?: number
 	}>
 	batchDiffs?: Array<{
 		path: string

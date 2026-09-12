@@ -78,6 +78,7 @@ export abstract class BaseTerminal implements MirrorTerminal {
 		this.running = false
 
 		if (this.process) {
+			this.process.isHot = false
 			// Add to the front of the queue (most recent first).
 			if (this.process.hasUnretrievedOutput()) {
 				this.completedProcesses.unshift(this.process)

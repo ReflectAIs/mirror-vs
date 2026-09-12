@@ -8,12 +8,16 @@ interface OpenFileOptions {
 	create?: boolean
 	content?: string
 	line?: number
+	endLine?: number
 	/**
 	 * Whether to open the file in preview mode (single-click tab).
 	 * Defaults to false (pinned/kept-open).
 	 */
 	preview?: boolean
 }
+
+let fileHighlightDecoration: vscode.TextEditorDecorationType | undefined
+let fileHighlightTimeout: NodeJS.Timeout | undefined
 
 export async function openFile(filePath: string, options: OpenFileOptions = {}) {
 	try {
@@ -139,19 +143,80 @@ export async function openFile(filePath: string, options: OpenFileOptions = {}) 
 			}
 		} catch {} // not essential, sometimes tab operations fail
 
-		// Open markdown files in preview mode for a rendered view
-		if (uriToProcess.fsPath.endsWith(".md")) {
+		// Open markdown files in preview mode for a rendered view, UNLESS a line target was specified
+		if (uriToProcess.fsPath.endsWith(".md") && options.line === undefined) {
 			await vscode.commands.executeCommand("markdown.showPreview", uriToProcess)
 		} else {
 			const document = await vscode.workspace.openTextDocument(uriToProcess)
-			const selection =
-				options.line !== undefined
-					? new vscode.Selection(Math.max(options.line - 1, 0), 0, Math.max(options.line - 1, 0), 0)
-					: undefined
-			await vscode.window.showTextDocument(document, {
+			let selection: vscode.Selection | undefined
+			let range: vscode.Range | undefined
+
+			if (options.line !== undefined) {
+				const startLine0 = Math.max(options.line - 1, 0)
+				const maxLine = document.lineCount !== undefined ? Math.max(0, document.lineCount - 1) : startLine0
+				const boundedStart = Math.min(startLine0, maxLine)
+				const endLine0 =
+					options.endLine !== undefined ? Math.max(options.endLine - 1, boundedStart) : boundedStart
+				const boundedEnd = Math.min(endLine0, maxLine)
+				const endLineText = typeof document.lineAt === "function" ? document.lineAt(boundedEnd).text : ""
+				const endChar = endLineText ? endLineText.length : 0
+
+				selection = new vscode.Selection(boundedStart, 0, boundedEnd, endChar)
+				if (vscode.Range) {
+					range = new vscode.Range(boundedStart, 0, boundedEnd, endChar)
+				}
+			}
+
+			const editor = await vscode.window.showTextDocument(document, {
 				preview: options.preview ?? false,
 				selection,
 			})
+
+			// Explicitly set selection and reveal range on editor to guarantee focus/scroll even if document was already active
+			if (selection && editor) {
+				editor.selection = selection
+			}
+
+			if (range && editor?.revealRange) {
+				editor.revealRange(range, vscode.TextEditorRevealType?.InCenter ?? 1)
+			}
+
+			if (range && editor?.setDecorations) {
+				try {
+					if (!fileHighlightDecoration && vscode.window?.createTextEditorDecorationType) {
+						fileHighlightDecoration = vscode.window.createTextEditorDecorationType({
+							backgroundColor: vscode.ThemeColor
+								? new vscode.ThemeColor("editor.findMatchHighlightBackground")
+								: undefined,
+							isWholeLine: true,
+							overviewRulerColor: vscode.ThemeColor
+								? new vscode.ThemeColor("editorOverviewRuler.findMatchForeground")
+								: undefined,
+							overviewRulerLane: 2,
+						})
+					}
+
+					if (fileHighlightDecoration) {
+						if (fileHighlightTimeout) {
+							clearTimeout(fileHighlightTimeout)
+							fileHighlightTimeout = undefined
+						}
+
+						editor.setDecorations(fileHighlightDecoration, [range])
+
+						fileHighlightTimeout = setTimeout(() => {
+							try {
+								if (fileHighlightDecoration && editor?.setDecorations) {
+									editor.setDecorations(fileHighlightDecoration, [])
+								}
+							} catch {}
+							fileHighlightTimeout = undefined
+						}, 3000)
+					}
+				} catch {
+					// Silently ignore decoration failures in test environments
+				}
+			}
 		}
 	} catch (error) {
 		if (error instanceof Error) {
