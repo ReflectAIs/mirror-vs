@@ -2,6 +2,23 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.1] - 2026-09-12
+
+### Fixed & Improved
+
+- **Editor Code Highlighting on Click**:
+    - Clicking on files viewed or analyzed by the model in the chat webview now reliably reveals and highlights the specific lines in the active VS Code editor with full line selection and a temporary glowing decoration.
+    - Resolved intermittent highlighting failures when viewing files from line 1 or without explicit offsets.
+    - Extended line range parsing to support multi-file batch explorations (`batchFiles`) and codebase search results.
+    - Added active editor cursor and selection synchronization so highlighting triggers even when the target tab is already visible.
+    - Automatically open markdown files in the text editor (with highlight) when specific lines are targeted instead of rendered preview.
+- **Terminal Callbacks & Latency Stalls**:
+    - Resolved model loop pauses (up to 5-second stalls in `getEnvironmentDetails`) caused by unreset busy/hot flags on background terminal processes (`ExecaTerminal`).
+    - Fixed `terminal_callback` background notices mistakenly answering interactive ask promises as user input.
+    - Ensured pending `command_output` asks are superseded promptly upon command completion.
+- **Grouped Terminal UI Polish**:
+    - All commands in grouped/batch runs now render interactive collapsible chevron arrows to view output and status regardless of whether output was empty or streaming.
+
 ## [0.9.0] - 2026-09-11
 
 ### Added & Improved
