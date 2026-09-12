@@ -57,6 +57,13 @@ export class Terminal extends BaseTerminal {
 		// from selecting the terminal for use during that time.
 		this.busy = true
 
+		// Auto open/reveal terminal when it is running (preserve focus)
+		try {
+			this.terminal?.show?.(true)
+		} catch {
+			// Silently ignore if terminal cannot be shown
+		}
+
 		const process = new TerminalProcess(this)
 		process.command = command
 		this.process = process

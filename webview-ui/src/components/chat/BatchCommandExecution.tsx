@@ -35,7 +35,7 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 	const command = initialCommand || item.command
 	const executionId = item.executionId
 
-	const [isExpanded, setIsExpanded] = useState(false)
+	const [isExpanded, setIsExpanded] = useState(() => !initialOutput && !item.isAnswered)
 	const [streamingOutput, setStreamingOutput] = useState("")
 	const [status, setStatus] = useState<CommandExecutionStatus | null>(null)
 	const [interactiveInput, setInteractiveInput] = useState("")
@@ -67,9 +67,11 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 					switch (data.status) {
 						case "started":
 							setStatus(data)
+							setIsExpanded(true)
 							break
 						case "output":
 							setStreamingOutput(data.output)
+							setIsExpanded(true)
 							break
 						case "fallback":
 							setIsExpanded(true)

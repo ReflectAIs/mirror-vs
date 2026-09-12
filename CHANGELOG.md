@@ -18,6 +18,9 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Batch Command Execution UI**:
     - Added `BatchCommandExecution` component rendering grouped command batches as a single collapsible disclosure with per-command streaming output, status, and interactive input support.
     - Extended the message schema to persist `batchCommands` so batch executions survive history reloads.
+- **Auto-Open Running Terminals**:
+    - Terminal execution blocks in the chat webview now expand automatically when a command starts or streams output, while keeping completed commands neatly collapsed.
+    - Integrated VS Code terminal auto-reveals on command execution to give immediate visibility into running processes without stealing focus.
 - **Session Knowledge Management**:
     - Added delete controls in the Shared Context dialog: remove individual knowledge notes or clear all, backed by a new `deleteSessionKnowledge` message routed through `SessionContextManager.deleteKnowledgeNote`.
 - **Checkpoint Row & Menu Polish**:

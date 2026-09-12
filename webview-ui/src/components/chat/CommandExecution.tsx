@@ -55,8 +55,8 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 
 	const { command, output: parsedOutput } = useMemo(() => parseCommandAndOutput(text), [text])
 
-	// Default command execution output blocks to collapsed (closed) by default
-	const [isExpanded, setIsExpanded] = useState(false)
+	// Auto open terminal when running; keep collapsed by default once completed
+	const [isExpanded, setIsExpanded] = useState(() => !parsedOutput && !text?.includes(COMMAND_OUTPUT_STRING))
 	const [streamingOutput, setStreamingOutput] = useState("")
 	const [status, setStatus] = useState<CommandExecutionStatus | null>(null)
 	const [interactiveInput, setInteractiveInput] = useState("")
@@ -162,9 +162,11 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 					switch (data.status) {
 						case "started":
 							setStatus(data)
+							setIsExpanded(true)
 							break
 						case "output":
 							setStreamingOutput(data.output)
+							setIsExpanded(true)
 							break
 						case "fallback":
 							setIsExpanded(true)
