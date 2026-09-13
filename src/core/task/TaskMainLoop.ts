@@ -142,10 +142,24 @@ export const RECOVERY_STRATEGIES: Record<string, RecoveryStrategy> = {
 		pattern: /ENOENT|file.*not found|no such file or directory/i,
 		action: async (
 			_errorMessage: string,
-			_toolName: string,
+			toolName: string,
 			toolArgs: Record<string, unknown>,
 			ledger: StruggleLedger,
 		) => {
+			// Non-filesystem tools (e.g. ssh_session, execute_command, terminal, etc.) must not trigger local file recovery
+			const fileTools = new Set([
+				"read_file",
+				"write_to_file",
+				"apply_diff",
+				"list_files",
+				"search_files",
+				"insert_content",
+			])
+			const filePath = (toolArgs as any)?.path ?? (toolArgs as any)?.file_path ?? ""
+			if (!fileTools.has(toolName) || !filePath || typeof filePath !== "string" || filePath.trim() === "") {
+				return { type: "skip" as const }
+			}
+
 			const { shouldEscalate } = ledger.record("file_not_found")
 
 			if (shouldEscalate) {
@@ -156,7 +170,6 @@ export const RECOVERY_STRATEGIES: Record<string, RecoveryStrategy> = {
 			}
 
 			// Auto-fix: list the parent directory so the model can pick the right file
-			const filePath = (toolArgs as any)?.path ?? (toolArgs as any)?.file_path ?? ""
 			const dir = path.dirname(String(filePath))
 			try {
 				const [files] = await listFiles(dir, false, 50)

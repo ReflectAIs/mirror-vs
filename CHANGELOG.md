@@ -6,6 +6,9 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Fixed & Improved
 
+- **SSH Session Auto-Recovery & Error Isolation**:
+    - Fixed an issue where non-filesystem tools (`ssh_session`, `execute_command`) encountering remote command errors containing `ENOENT` or `no such file or directory` triggered local `file_not_found` auto-recovery.
+    - Restricted `file_not_found` auto-recovery strictly to filesystem tools (`read_file`, `write_to_file`, `apply_diff`, `list_files`, etc.) with non-empty paths, preventing bogus `[Auto-Recovery] File "" not found. Found files in "."` directory scans and subsequent false recovery escalations.
 - **Interactive Terminal Prompt Streaming & Input Handling**:
     - Resolved issue where terminal prompts without trailing newlines (`read -p "Enter name: "`, `input()`, `[y/n]? `) were blocked from streaming by switching to unbuffered stream iteration on `subprocess.all`.
     - Typed user input sent via `sendTerminalInput` is now immediately echoed to `fullOutput` and emitted via `line` events, rendering typed responses directly in the terminal output display.

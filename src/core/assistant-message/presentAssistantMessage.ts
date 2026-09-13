@@ -707,7 +707,7 @@ export async function presentAssistantMessage(mirror: Task) {
 					...(block.params ?? {}),
 					...(block.nativeArgs ?? {}),
 				}
-				for (const [, strategy] of Object.entries(RECOVERY_STRATEGIES)) {
+				for (const [strategyKey, strategy] of Object.entries(RECOVERY_STRATEGIES)) {
 					if (strategy.pattern.test(errorMsg)) {
 						try {
 							const recovery = await strategy.action(
@@ -728,7 +728,7 @@ export async function presentAssistantMessage(mirror: Task) {
 
 							if (recovery.type === "retry") {
 								// Successful auto-recovery: feed the corrected info back.
-								mirror.struggleLedger.resolve("file_not_found")
+								mirror.struggleLedger.resolve(strategyKey)
 								const recoveryMsg = `[Auto-Recovery] ${recovery.message}`
 								// Log it so the model sees the correction
 								await mirror.say("error", recoveryMsg)
@@ -741,6 +741,11 @@ export async function presentAssistantMessage(mirror: Task) {
 								)
 								pushToolResult(recoveryMsg)
 								return
+							}
+
+							if (recovery.type === "skip") {
+								// Not applicable to this tool/context; continue to next strategy or generic error
+								continue
 							}
 						} catch {
 							// If recovery itself throws, fall through to generic error
