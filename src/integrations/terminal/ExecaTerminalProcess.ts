@@ -50,10 +50,8 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 					// Ensure UTF-8 encoding for Ruby, CocoaPods, etc.
 					LANG: "en_US.UTF-8",
 					LC_ALL: "en_US.UTF-8",
-					CI: "true",
 					TERM: "dumb",
 					DOCKER_CLI_HINTS: "false",
-					DEBIAN_FRONTEND: "noninteractive",
 				},
 			})`${command}`
 
@@ -78,12 +76,22 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 				})
 			}
 
-			const rawStream = this.subprocess.iterable({ from: "all", preserveNewlines: true })
+			// Stream from unbuffered subprocess.all to ensure interactive prompts without trailing
+			// newlines (e.g. read -p "Name: ", [y/n]?) are yielded immediately rather than line-buffered.
+			const rawStream = this.subprocess.all ?? this.subprocess.iterable?.({ from: "all", preserveNewlines: true })
+			const decoder = new TextDecoder("utf-8")
 
-			// Wrap the stream to ensure all chunks are strings (execa can return Uint8Array)
 			const stream = (async function* () {
-				for await (const chunk of rawStream) {
-					yield typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk)
+				if (rawStream) {
+					for await (const chunk of rawStream) {
+						yield typeof chunk === "string"
+							? chunk
+							: decoder.decode(chunk as BufferSource, { stream: true })
+					}
+					const final = decoder.decode()
+					if (final) {
+						yield final
+					}
 				}
 			})()
 
@@ -268,6 +276,9 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 			try {
 				const text = input.endsWith("\n") ? input : input + "\n"
 				this.subprocess.stdin.write(text)
+				// Echo input directly to output so user sees their input in terminal
+				this.fullOutput += text
+				this.emit("line", text)
 				return true
 			} catch (err) {
 				console.error("[ExecaTerminalProcess] Failed writing to stdin:", err)

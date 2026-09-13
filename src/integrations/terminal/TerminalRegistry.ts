@@ -492,9 +492,9 @@ export class TerminalRegistry {
 	 */
 	public static sendInputToTerminal(id: number | undefined, input: string): boolean {
 		const target =
-			id !== undefined
-				? this.getTerminalById(id)
-				: this.terminals.find((t) => t.busy) || this.terminals[this.terminals.length - 1]
+			(id !== undefined ? this.getTerminalById(id) : undefined) ??
+			this.terminals.find((t) => t.busy) ??
+			this.terminals[this.terminals.length - 1]
 
 		if (!target) {
 			return false

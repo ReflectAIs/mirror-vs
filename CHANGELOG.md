@@ -6,6 +6,16 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ### Fixed & Improved
 
+- **Interactive Terminal Prompt Streaming & Input Handling**:
+    - Resolved issue where terminal prompts without trailing newlines (`read -p "Enter name: "`, `input()`, `[y/n]? `) were blocked from streaming by switching to unbuffered stream iteration on `subprocess.all`.
+    - Typed user input sent via `sendTerminalInput` is now immediately echoed to `fullOutput` and emitted via `line` events, rendering typed responses directly in the terminal output display.
+    - Added `terminalId` to `CommandExecutionStatus` to ensure input commands route directly to the exact executing terminal.
+    - Broadened prompt detection heuristics to identify prompts asking for `name:`, `email:`, `option:`, choice brackets, and trailing `?`/`:`, while keeping input controls accessible whenever a command is running and expanded.
+    - Removed `CI: "true"` and `DEBIAN_FRONTEND: "noninteractive"` environment flags that caused CLI programs to suppress interactive prompts.
+- **Provider Models Modernization & Deprecation Pruning**:
+    - Updated default models across Anthropic and OpenRouter to `claude-sonnet-4-6`.
+    - Marked discontinued legacy models as `deprecated: true` across Anthropic (Claude 3 Opus, Claude 3 Haiku), OpenAI (o1-preview, o1-mini), Google Gemini (early 2.5 preview checkpoints), AWS Bedrock, Vertex AI, and xAI (Grok 3 series).
+    - Expanded OpenRouter prompt caching and reasoning budget sets to include `gemini-3.1-pro-preview`, `gemini-3-flash-preview`, `gpt-5.4`, `gpt-5.4-mini`, and `deepseek-v4-flash`.
 - **Editor Code Highlighting on Click**:
     - Clicking on files viewed or analyzed by the model in the chat webview now reliably reveals and highlights the specific lines in the active VS Code editor with full line selection and a temporary glowing decoration.
     - Resolved intermittent highlighting failures when viewing files from line 1 or without explicit offsets.

@@ -22,7 +22,7 @@ import { TerminalOutput } from "./TerminalOutput"
 
 // Heuristic pattern to detect interactive prompts waiting for user input
 export const INTERACTIVE_PROMPT_REGEX =
-	/(?:\[[yYnN]\/[yYnN]\]|\([yYnN]\/[yYnN]\)|\b(?:password|passphrase|username):\s*$|\b(?:confirm|continue\?|proceed\?|are you sure\?)\s*$|\[\s*(?:yes|no)\s*\]|\?\s*\[[^\]]+\]|\(yes\/no\)\s*\??\s*$|Press\s+\[?Enter\]?\s+to\s+continue|Do you want to continue\?|\(Y\/n\)|\(y\/N\))/i
+	/(?:\[[yYnN]\/[yYnN]\]|\([yYnN]\/[yYnN]\)|\b(?:password|passphrase|username|name|email|path|choice|option):\s*$|\b(?:confirm|continue|proceed|are you sure)\??\s*$|\[\s*(?:yes|no)\s*\]|\?\s*\[[^\]]+\]|\(yes\/no\)\s*\??\s*$|Press\s+\[?Enter\]?\s+to\s+continue|Do you want to continue\?|\(Y\/n\)|\(y\/N\)|:\s*$|\?\s*$|>\s*$)/i
 
 export function detectInteractivePrompt(output: string): boolean {
 	if (!output) return false
@@ -66,15 +66,17 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 	const handleSendInput = useCallback(
 		(customVal?: string) => {
 			const textToSend = customVal !== undefined ? customVal : interactiveInput
+			if (!textToSend && customVal === undefined) return
 			vscode.postMessage({
 				type: "sendTerminalInput",
+				terminalId: status?.status === "started" ? status.terminalId : undefined,
 				terminalInput: textToSend,
 			})
 			setInteractiveInput("")
 			setInputSentFeedback(true)
 			setTimeout(() => setInputSentFeedback(false), 2500)
 		},
-		[interactiveInput],
+		[interactiveInput, status],
 	)
 
 	// The command's output can either come from the text associated with the
@@ -88,7 +90,8 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 		return detectInteractivePrompt(output)
 	}, [status?.status, output])
 
-	const shouldShowInteractiveInput = status?.status === "started" && (hasInteractivePrompt || showInputManually)
+	const shouldShowInteractiveInput =
+		status?.status === "started" && (hasInteractivePrompt || showInputManually || isExpanded)
 
 	// Extract command patterns from the actual command that was executed
 	const commandPatterns = useMemo<CommandPattern[]>(() => {
@@ -289,8 +292,13 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 					<button
 						type="button"
 						onClick={() => handleSendInput()}
-						className="h-5 px-2 text-[10px] rounded bg-vscode-button-background text-vscode-button-foreground cursor-pointer">
-						Send
+						className={cn(
+							"h-5 px-2 text-[10px] rounded text-vscode-button-foreground cursor-pointer transition-colors",
+							inputSentFeedback
+								? "bg-emerald-600 text-white font-medium"
+								: "bg-vscode-button-background hover:bg-vscode-button-hoverBackground",
+						)}>
+						{inputSentFeedback ? "Sent ✓" : "Send"}
 					</button>
 				</div>
 			)}

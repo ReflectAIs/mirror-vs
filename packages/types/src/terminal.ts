@@ -9,6 +9,7 @@ export const commandExecutionStatusSchema = z.discriminatedUnion("status", [
 		executionId: z.string(),
 		status: z.literal("started"),
 		pid: z.number().optional(),
+		terminalId: z.number().optional(),
 		command: z.string(),
 	}),
 	z.object({

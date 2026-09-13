@@ -571,7 +571,13 @@ export async function executeCommandInTerminal(
 			}
 		},
 		onShellExecutionStarted: (pid: number | undefined) => {
-			const status: CommandExecutionStatus = { executionId, status: "started", pid, command }
+			const status: CommandExecutionStatus = {
+				executionId,
+				status: "started",
+				pid,
+				terminalId: terminal.id,
+				command,
+			}
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 		},
 		onShellExecutionComplete: (details: ExitCodeDetails) => {

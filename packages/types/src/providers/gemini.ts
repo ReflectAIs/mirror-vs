@@ -140,6 +140,8 @@ export const geminiModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Early preview checkpoint. Use gemini-2.5-pro or gemini-3.1-pro-preview.",
 
 		inputPrice: 2.5, // This is the pricing for prompts above 200k tokens.
 		outputPrice: 15,
@@ -167,6 +169,8 @@ export const geminiModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Early preview checkpoint. Use gemini-2.5-pro or gemini-3.1-pro-preview.",
 
 		inputPrice: 2.5, // This is the pricing for prompts above 200k tokens.
 		outputPrice: 15,
@@ -192,6 +196,8 @@ export const geminiModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Early preview checkpoint. Use gemini-2.5-pro or gemini-3.1-pro-preview.",
 
 		inputPrice: 2.5, // This is the pricing for prompts above 200k tokens.
 		outputPrice: 15,
@@ -234,6 +240,8 @@ export const geminiModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Preview checkpoint. Use gemini-2.5-flash or gemini-flash-latest.",
 
 		inputPrice: 0.3,
 		outputPrice: 2.5,
@@ -275,6 +283,8 @@ export const geminiModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Preview checkpoint. Use gemini-flash-lite-latest.",
 
 		inputPrice: 0.1,
 		outputPrice: 0.4,

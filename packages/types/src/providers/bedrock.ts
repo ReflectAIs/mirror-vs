@@ -6,7 +6,7 @@ export type BedrockModelId = keyof typeof bedrockModels
 
 export const bedrockDefaultModelId: BedrockModelId = "anthropic.claude-sonnet-4-5-20250929-v1:0"
 
-export const bedrockDefaultPromptRouterModelId: BedrockModelId = "anthropic.claude-3-sonnet-20240229-v1:0"
+export const bedrockDefaultPromptRouterModelId: BedrockModelId = "anthropic.claude-3-5-haiku-20241022-v1:0"
 
 // March, 12 2025 - updated prices to match US-West-2 list price shown at
 // https://aws.amazon.com/bedrock/pricing, including older models that are part
@@ -256,6 +256,8 @@ export const bedrockModels = {
 		supportsPromptCache: false,
 		inputPrice: 3.0,
 		outputPrice: 15.0,
+		deprecated: true,
+		description: "[DEPRECATED] Superseded by Claude 3.5 Sonnet v2.",
 	},
 	"anthropic.claude-3-opus-20240229-v1:0": {
 		maxTokens: 4096,
@@ -264,6 +266,8 @@ export const bedrockModels = {
 		supportsPromptCache: false,
 		inputPrice: 15.0,
 		outputPrice: 75.0,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic/Bedrock.",
 	},
 	"anthropic.claude-3-sonnet-20240229-v1:0": {
 		maxTokens: 4096,
@@ -272,6 +276,8 @@ export const bedrockModels = {
 		supportsPromptCache: false,
 		inputPrice: 3.0,
 		outputPrice: 15.0,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic/Bedrock.",
 	},
 	"anthropic.claude-3-haiku-20240307-v1:0": {
 		maxTokens: 4096,
@@ -280,6 +286,8 @@ export const bedrockModels = {
 		supportsPromptCache: false,
 		inputPrice: 0.25,
 		outputPrice: 1.25,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic/Bedrock.",
 	},
 	"deepseek.r1-v1:0": {
 		maxTokens: 32_768,

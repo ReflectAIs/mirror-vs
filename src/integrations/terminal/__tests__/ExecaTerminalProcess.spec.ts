@@ -4,9 +4,18 @@ const mockPid = 12345
 
 vitest.mock("execa", () => {
 	const mockKill = vitest.fn()
+	const mockStdin = {
+		write: vitest.fn(),
+		destroyed: false,
+		writable: true,
+	}
 	const execa = vitest.fn((options: any) => {
 		return (_template: TemplateStringsArray, ...args: any[]) => ({
 			pid: mockPid,
+			stdin: mockStdin,
+			all: (async function* () {
+				yield "test output\n"
+			})(),
 			iterable: (_opts: any) =>
 				(async function* () {
 					yield "test output\n"
@@ -185,6 +194,26 @@ describe("ExecaTerminalProcess", () => {
 
 			expect(terminalProcess["fullOutput"]).toBe("")
 			expect(terminalProcess["lastRetrievedIndex"]).toBe(0)
+		})
+	})
+
+	describe("interactive write and stdin", () => {
+		it("should write to stdin and echo text into fullOutput and emit line", async () => {
+			const runPromise = terminalProcess.run("read name")
+
+			const lineSpy = vitest.fn()
+			terminalProcess.on("line", lineSpy)
+
+			const success = terminalProcess.write("Alice\n")
+			expect(success).toBe(true)
+
+			// Verify input was echoed to fullOutput
+			expect(terminalProcess.getUnretrievedOutput()).toContain("Alice\n")
+
+			// Verify line event was emitted with input
+			expect(lineSpy).toHaveBeenCalledWith("Alice\n")
+
+			await runPromise
 		})
 	})
 })

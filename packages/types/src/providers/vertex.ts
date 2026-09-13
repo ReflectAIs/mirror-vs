@@ -166,6 +166,8 @@ export const vertexModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Early preview checkpoint. Use gemini-2.5-pro or gemini-3.1-pro-preview.",
 
 		inputPrice: 2.5,
 		outputPrice: 15,
@@ -175,6 +177,8 @@ export const vertexModels = {
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
+		deprecated: true,
+		description: "[DEPRECATED] Early preview checkpoint. Use gemini-2.5-pro or gemini-3.1-pro-preview.",
 
 		inputPrice: 2.5,
 		outputPrice: 15,
@@ -468,6 +472,8 @@ export const vertexModels = {
 		outputPrice: 15.0,
 		cacheWritesPrice: 3.75,
 		cacheReadsPrice: 0.3,
+		deprecated: true,
+		description: "[DEPRECATED] Superseded by Claude 3.5 Sonnet v2.",
 	},
 	"claude-3-5-haiku@20241022": {
 		maxTokens: 8192,
@@ -488,6 +494,8 @@ export const vertexModels = {
 		outputPrice: 75.0,
 		cacheWritesPrice: 18.75,
 		cacheReadsPrice: 1.5,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic/Vertex.",
 	},
 	"claude-3-haiku@20240307": {
 		maxTokens: 4096,
@@ -498,6 +506,8 @@ export const vertexModels = {
 		outputPrice: 1.25,
 		cacheWritesPrice: 0.3,
 		cacheReadsPrice: 0.03,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic/Vertex.",
 	},
 	"gemini-2.5-flash-lite-preview-06-17": {
 		maxTokens: 64_000,

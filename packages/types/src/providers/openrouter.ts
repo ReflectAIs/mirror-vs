@@ -1,10 +1,10 @@
 import type { ModelInfo } from "../model.js"
 
 // https://openrouter.ai/models?order=newest&supported_parameters=tools
-export const openRouterDefaultModelId = "anthropic/claude-sonnet-4.5"
+export const openRouterDefaultModelId = "anthropic/claude-sonnet-4.6"
 
 export const openRouterDefaultModelInfo: ModelInfo = {
-	maxTokens: 8192,
+	maxTokens: 64_000,
 	contextWindow: 200_000,
 	supportsImages: true,
 	supportsPromptCache: true,
@@ -13,7 +13,7 @@ export const openRouterDefaultModelInfo: ModelInfo = {
 	cacheWritesPrice: 3.75,
 	cacheReadsPrice: 0.3,
 	description:
-		"Claude 3.7 Sonnet is an advanced large language model with improved reasoning, coding, and problem-solving capabilities. It introduces a hybrid reasoning approach, allowing users to choose between rapid responses and extended, step-by-step processing for complex tasks. The model demonstrates notable improvements in coding, particularly in front-end development and full-stack updates, and excels in agentic workflows, where it can autonomously navigate multi-step processes. Claude 3.7 Sonnet maintains performance parity with its predecessor in standard mode while offering an extended reasoning mode for enhanced accuracy in math, coding, and instruction-following tasks. Read more at the [blog post here](https://www.anthropic.com/news/claude-3-7-sonnet)",
+		"Claude Sonnet 4.6 provides frontier coding and reasoning performance with native thinking capabilities and extended 1M context support.",
 }
 
 export const OPENROUTER_DEFAULT_PROVIDER_NAME = "[default]"
@@ -44,6 +44,8 @@ export const OPEN_ROUTER_PROMPT_CACHING_MODELS = new Set([
 	"anthropic/claude-opus-4.5",
 	"anthropic/claude-opus-4.6",
 	"anthropic/claude-haiku-4.5",
+	"google/gemini-3.1-pro-preview",
+	"google/gemini-3-flash-preview",
 	"google/gemini-2.5-flash-preview",
 	"google/gemini-2.5-flash-preview:thinking",
 	"google/gemini-2.5-flash-preview-05-20",
@@ -57,6 +59,9 @@ export const OPEN_ROUTER_PROMPT_CACHING_MODELS = new Set([
 	"deepseek/deepseek-r1",
 	"deepseek/deepseek-r1:free",
 	"deepseek/deepseek-v3",
+	"deepseek/deepseek-v4-flash",
+	"openai/gpt-5.4",
+	"openai/gpt-5.4-mini",
 ])
 
 // When we first launched these models we didn't have support for
@@ -82,11 +87,16 @@ export const OPEN_ROUTER_REASONING_BUDGET_MODELS = new Set([
 	"anthropic/claude-sonnet-4.5",
 	"anthropic/claude-sonnet-4.6",
 	"anthropic/claude-haiku-4.5",
+	"google/gemini-3.1-pro-preview",
+	"google/gemini-3-flash-preview",
 	"google/gemini-2.5-pro-preview",
 	"google/gemini-2.5-pro",
 	"google/gemini-2.5-flash-preview-05-20",
 	"google/gemini-2.5-flash",
 	"google/gemini-2.5-flash-lite-preview-06-17",
+	"deepseek/deepseek-v4-flash",
+	"openai/gpt-5.4",
+	"openai/gpt-5.4-mini",
 	// Also include the models that require the reasoning budget to be enabled
 	// even though `OPEN_ROUTER_REQUIRED_REASONING_BUDGET_MODELS` takes precedence.
 	"anthropic/claude-3.7-sonnet:thinking",

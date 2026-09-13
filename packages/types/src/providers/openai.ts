@@ -481,6 +481,8 @@ export const openAiNativeModels = {
 		outputPrice: 60,
 		cacheReadsPrice: 7.5,
 		supportsTemperature: false,
+		deprecated: true,
+		description: "[DEPRECATED] Superseded by OpenAI o1 and o3-mini.",
 	},
 	"o1-mini": {
 		maxTokens: 65_536,
@@ -491,6 +493,8 @@ export const openAiNativeModels = {
 		outputPrice: 4.4,
 		cacheReadsPrice: 0.55,
 		supportsTemperature: false,
+		deprecated: true,
+		description: "[DEPRECATED] Superseded by OpenAI o3-mini and o4-mini.",
 	},
 	"gpt-4o": {
 		maxTokens: 16_384,

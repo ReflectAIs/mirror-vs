@@ -4,7 +4,7 @@ import type { ModelInfo } from "../model.js"
 // https://platform.claude.com/docs/en/about-claude/pricing
 
 export type AnthropicModelId = keyof typeof anthropicModels
-export const anthropicDefaultModelId: AnthropicModelId = "claude-sonnet-4-5"
+export const anthropicDefaultModelId: AnthropicModelId = "claude-sonnet-4-6"
 
 export const anthropicModels = {
 	"claude-sonnet-4-6": {
@@ -175,6 +175,8 @@ export const anthropicModels = {
 		outputPrice: 75.0,
 		cacheWritesPrice: 18.75,
 		cacheReadsPrice: 1.5,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic in favor of Claude 3.5 and 4.x models.",
 	},
 	"claude-3-haiku-20240307": {
 		maxTokens: 4096,
@@ -185,6 +187,8 @@ export const anthropicModels = {
 		outputPrice: 1.25,
 		cacheWritesPrice: 0.3,
 		cacheReadsPrice: 0.03,
+		deprecated: true,
+		description: "[DEPRECATED] Retired by Anthropic in favor of Claude 3.5 Haiku and Haiku 4.5.",
 	},
 	"claude-haiku-4-5-20251001": {
 		maxTokens: 64_000,
