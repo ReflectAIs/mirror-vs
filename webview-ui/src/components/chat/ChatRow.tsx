@@ -292,14 +292,17 @@ export const ChatRowContent = ({
 		vscode.postMessage({ type: "selectImages", context: "edit", messageTs: message.ts })
 	}, [message.ts])
 
-	const [cost, apiReqCancelReason, apiReqStreamingFailedMessage] = useMemo(() => {
+	const [cost, apiReqCancelReason, apiReqStreamingFailedMessage, reqApiProvider, reqModelId] = useMemo(() => {
 		if (message.text !== null && message.text !== undefined && message.say === "api_req_started") {
 			const info = safeJsonParse<MirrorApiReqInfo>(message.text)
-			return [info?.cost, info?.cancelReason, info?.streamingFailedMessage]
+			return [info?.cost, info?.cancelReason, info?.streamingFailedMessage, info?.apiProvider, info?.modelId]
 		}
 
-		return [undefined, undefined, undefined]
+		return [undefined, undefined, undefined, undefined, undefined]
 	}, [message.text, message.say])
+
+	const executingProvider = message.apiProvider || reqApiProvider
+	const executingModelId = message.modelId || reqModelId
 
 	// When resuming task, last won't be api_req_failed but a resume_task
 	// message, so api_req_started will show loading spinner. That's why we just
@@ -1420,6 +1423,8 @@ export const ChatRowContent = ({
 							message={message.text || ""}
 							expandable={true}
 							showCopyButton={true}
+							provider={executingProvider}
+							modelId={executingModelId}
 						/>
 					)
 				case "subtask_result":
@@ -1505,6 +1510,8 @@ export const ChatRowContent = ({
 											: undefined
 									}
 									errorDetails={apiReqStreamingFailedMessage}
+									provider={executingProvider}
+									modelId={executingModelId}
 								/>
 							)}
 						</>
@@ -1560,6 +1567,8 @@ export const ChatRowContent = ({
 							docsURL={docsURL}
 							additionalContent={retryInfo}
 							errorDetails={rawError}
+							provider={executingProvider}
+							modelId={executingModelId}
 						/>
 					)
 				case "api_req_rate_limit_wait": {
@@ -1770,6 +1779,8 @@ export const ChatRowContent = ({
 								title={t("chat:modelResponseIncomplete")}
 								message={t("chat:modelResponseErrors.noToolsUsed")}
 								errorDetails={t("chat:modelResponseErrors.noToolsUsedDetails")}
+								provider={executingProvider}
+								modelId={executingModelId}
 							/>
 						)
 					}
@@ -1781,13 +1792,21 @@ export const ChatRowContent = ({
 								title={t("chat:modelResponseIncomplete")}
 								message={t("chat:modelResponseErrors.noAssistantMessages")}
 								errorDetails={t("chat:modelResponseErrors.noAssistantMessagesDetails")}
+								provider={executingProvider}
+								modelId={executingModelId}
 							/>
 						)
 					}
 
 					// Fallback for generic errors
 					return (
-						<ErrorRow type="error" message={message.text || t("chat:error")} errorDetails={message.text} />
+						<ErrorRow
+							type="error"
+							message={message.text || t("chat:error")}
+							errorDetails={message.text}
+							provider={executingProvider}
+							modelId={executingModelId}
+						/>
 					)
 				case "completion_result":
 					return (
@@ -2051,7 +2070,15 @@ export const ChatRowContent = ({
 		case "ask":
 			switch (message.ask) {
 				case "mistake_limit_reached":
-					return <ErrorRow type="mistake_limit" message={message.text || ""} errorDetails={message.text} />
+					return (
+						<ErrorRow
+							type="mistake_limit"
+							message={message.text || ""}
+							errorDetails={message.text}
+							provider={executingProvider}
+							modelId={executingModelId}
+						/>
+					)
 				case "command":
 					if ((message as any).batchCommands && Array.isArray((message as any).batchCommands)) {
 						return <BatchCommandExecution batchCommands={(message as any).batchCommands} isLast={isLast} />

@@ -69,6 +69,8 @@ export interface ErrorRowProps {
 	code?: number
 	docsURL?: string // Optional documentation link
 	errorDetails?: string // Optional detailed error message shown in modal
+	provider?: string // Executing provider for the failed request/turn
+	modelId?: string // Executing model ID for the failed request/turn
 }
 
 /**
@@ -88,6 +90,8 @@ export const ErrorRow = memo(
 		docsURL,
 		code,
 		errorDetails,
+		provider: providerProp,
+		modelId: modelIdProp,
 	}: ErrorRowProps) => {
 		const { t } = useTranslation()
 		const [isExpanded, setIsExpanded] = useState(defaultExpanded)
@@ -96,9 +100,12 @@ export const ErrorRow = memo(
 		const [showDetailsCopySuccess, setShowDetailsCopySuccess] = useState(false)
 		const { copyWithFeedback } = useCopyToClipboard()
 		const { version, apiConfiguration } = useExtensionState()
-		const { provider, id: modelId } = useSelectedModel(apiConfiguration)
+		const globalSelectedModel = useSelectedModel(apiConfiguration)
 
-		const usesProxy = PROVIDERS.find((p) => p.value === provider)?.proxy ?? false
+		const effectiveProvider = providerProp || globalSelectedModel.provider
+		const effectiveModelId = modelIdProp || globalSelectedModel.id
+
+		const usesProxy = PROVIDERS.find((p) => p.value === effectiveProvider)?.proxy ?? false
 
 		// Format error details with metadata prepended
 		const formattedErrorDetails = useMemo(() => {
@@ -107,14 +114,14 @@ export const ErrorRow = memo(
 			const metadata = [
 				`Date/time: ${new Date().toISOString()}`,
 				`Extension version: ${version}`,
-				`Provider: ${provider}${usesProxy ? " (proxy)" : ""}`,
-				`Model: ${modelId}`,
+				`Provider: ${effectiveProvider}${usesProxy ? " (proxy)" : ""}`,
+				`Model: ${effectiveModelId}`,
 				"",
 				"",
 			].join("\n")
 
 			return metadata + errorDetails
-		}, [errorDetails, version, provider, modelId, usesProxy])
+		}, [errorDetails, version, effectiveProvider, effectiveModelId, usesProxy])
 
 		const handleDownloadDiagnostics = useCallback(
 			(e: React.MouseEvent) => {
@@ -124,13 +131,13 @@ export const ErrorRow = memo(
 					values: {
 						timestamp: new Date().toISOString(),
 						version,
-						provider,
-						model: modelId,
+						provider: effectiveProvider,
+						model: effectiveModelId,
 						details: errorDetails || "",
 					},
 				})
 			},
-			[version, provider, modelId, errorDetails],
+			[version, effectiveProvider, effectiveModelId, errorDetails],
 		)
 
 		// Default titles for different error types

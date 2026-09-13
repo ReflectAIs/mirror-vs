@@ -86,6 +86,14 @@ export class TaskMirrorMessages {
 	}
 
 	async addToMirrorMessages(message: MirrorMessage) {
+		if (!message.apiProvider && this.task.apiConfiguration?.apiProvider) {
+			message.apiProvider = this.task.apiConfiguration.apiProvider
+		}
+		if (!message.modelId && this.task.api) {
+			try {
+				message.modelId = this.task.api.getModel().id
+			} catch {}
+		}
 		this.mirrorMessages.push(message)
 		const provider = this.task.providerRef.deref()
 		if (provider) {
@@ -117,6 +125,14 @@ export class TaskMirrorMessages {
 	}, 1000)
 
 	async updateMirrorMessage(message: MirrorMessage) {
+		if (!message.apiProvider && this.task.apiConfiguration?.apiProvider) {
+			message.apiProvider = this.task.apiConfiguration.apiProvider
+		}
+		if (!message.modelId && this.task.api) {
+			try {
+				message.modelId = this.task.api.getModel().id
+			} catch {}
+		}
 		const provider = this.task.providerRef.deref()
 		await provider?.postMessageToWebview?.({
 			type: "messageUpdated",

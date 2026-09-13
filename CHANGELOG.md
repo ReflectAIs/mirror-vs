@@ -12,6 +12,10 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Added `terminalId` to `CommandExecutionStatus` to ensure input commands route directly to the exact executing terminal.
     - Broadened prompt detection heuristics to identify prompts asking for `name:`, `email:`, `option:`, choice brackets, and trailing `?`/`:`, while keeping input controls accessible whenever a command is running and expanded.
     - Removed `CI: "true"` and `DEBIAN_FRONTEND: "noninteractive"` environment flags that caused CLI programs to suppress interactive prompts.
+- **Accurate Model & Provider Tracking in Error Details**:
+    - Resolved bug where `ErrorRow` details modal, clipboard metadata, and diagnostics download displayed the global workspace profile (e.g. Fireworks / DeepSeek V3) rather than the model that actually executed the request (e.g. Gemini Flash).
+    - `MirrorApiReqInfo` and `mirrorMessageSchema` now record the active `apiProvider` and `modelId` directly on task messages and API requests.
+    - `ErrorRow` and `ChatRow` now pass and display the turn's true executing provider and model identity.
 - **Provider Models Modernization & Deprecation Pruning**:
     - Updated default models across Anthropic and OpenRouter to `claude-sonnet-4-6`.
     - Marked discontinued legacy models as `deprecated: true` across Anthropic (Claude 3 Opus, Claude 3 Haiku), OpenAI (o1-preview, o1-mini), Google Gemini (early 2.5 preview checkpoints), AWS Bedrock, Vertex AI, and xAI (Grok 3 series).

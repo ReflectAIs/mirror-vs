@@ -433,6 +433,8 @@ export class TaskMainLoop {
 				"api_req_started",
 				JSON.stringify({
 					apiProtocol,
+					apiProvider,
+					modelId,
 				}),
 			)
 
@@ -571,6 +573,8 @@ export class TaskMainLoop {
 
 					this.task.mirrorMessages[lastApiReqIndex].text = JSON.stringify({
 						...existingData,
+						apiProvider,
+						modelId,
 						tokensIn: costResult.totalInputTokens,
 						tokensOut: costResult.totalOutputTokens,
 						cacheWrites: cacheWriteTokens,

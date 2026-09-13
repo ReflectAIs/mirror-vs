@@ -79,4 +79,38 @@ describe("ErrorRow diagnostics download", () => {
 		// Timestamp is generated at runtime, but should be a string
 		expect(typeof payload.values.timestamp).toBe("string")
 	})
+
+	it("uses explicitly provided provider and modelId over global state in diagnostics", () => {
+		const mockPostMessage = vi.mocked(vscode.postMessage)
+		mockPostMessage.mockClear()
+
+		render(
+			<ErrorRow
+				type="error"
+				message="Explicit error"
+				errorDetails="Detailed body"
+				provider="gemini"
+				modelId="gemini-2.5-flash"
+			/>,
+		)
+
+		// Open the Error Details dialog via the info button
+		const infoButton = screen.getByRole("button", { name: "Error Details" })
+		fireEvent.click(infoButton)
+
+		// Click the diagnostics button
+		const downloadButton = screen.getByRole("button", { name: "Get detailed error info" })
+		fireEvent.click(downloadButton)
+
+		expect(mockPostMessage).toHaveBeenCalled()
+		const call = mockPostMessage.mock.calls.find(([arg]) => arg.type === "downloadErrorDiagnostics")
+		expect(call).toBeTruthy()
+
+		const payload = call![0] as { type: string; values?: any }
+		expect(payload.values).toMatchObject({
+			version: "1.0.0",
+			provider: "gemini",
+			model: "gemini-2.5-flash",
+		})
+	})
 })

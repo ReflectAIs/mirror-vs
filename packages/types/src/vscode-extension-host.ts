@@ -1086,6 +1086,8 @@ export interface MirrorApiReqInfo {
 	cancelReason?: MirrorApiReqCancelReason
 	streamingFailedMessage?: string
 	apiProtocol?: "anthropic" | "openai"
+	apiProvider?: string
+	modelId?: string
 }
 
 export type MirrorApiReqCancelReason = "streaming_failed" | "user_cancelled"
