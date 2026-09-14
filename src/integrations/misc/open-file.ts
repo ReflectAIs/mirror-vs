@@ -16,9 +16,6 @@ interface OpenFileOptions {
 	preview?: boolean
 }
 
-let fileHighlightDecoration: vscode.TextEditorDecorationType | undefined
-let fileHighlightTimeout: NodeJS.Timeout | undefined
-
 export async function openFile(filePath: string, options: OpenFileOptions = {}) {
 	try {
 		// Store the original path for error messages before any modifications
@@ -179,43 +176,6 @@ export async function openFile(filePath: string, options: OpenFileOptions = {}) 
 
 			if (range && editor?.revealRange) {
 				editor.revealRange(range, vscode.TextEditorRevealType?.InCenter ?? 1)
-			}
-
-			if (range && editor?.setDecorations) {
-				try {
-					if (!fileHighlightDecoration && vscode.window?.createTextEditorDecorationType) {
-						fileHighlightDecoration = vscode.window.createTextEditorDecorationType({
-							backgroundColor: vscode.ThemeColor
-								? new vscode.ThemeColor("editor.findMatchHighlightBackground")
-								: undefined,
-							isWholeLine: true,
-							overviewRulerColor: vscode.ThemeColor
-								? new vscode.ThemeColor("editorOverviewRuler.findMatchForeground")
-								: undefined,
-							overviewRulerLane: 2,
-						})
-					}
-
-					if (fileHighlightDecoration) {
-						if (fileHighlightTimeout) {
-							clearTimeout(fileHighlightTimeout)
-							fileHighlightTimeout = undefined
-						}
-
-						editor.setDecorations(fileHighlightDecoration, [range])
-
-						fileHighlightTimeout = setTimeout(() => {
-							try {
-								if (fileHighlightDecoration && editor?.setDecorations) {
-									editor.setDecorations(fileHighlightDecoration, [])
-								}
-							} catch {}
-							fileHighlightTimeout = undefined
-						}, 3000)
-					}
-				} catch {
-					// Silently ignore decoration failures in test environments
-				}
 			}
 		}
 	} catch (error) {

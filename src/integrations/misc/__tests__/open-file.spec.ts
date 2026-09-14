@@ -250,8 +250,8 @@ describe("openFile", () => {
 		})
 	})
 
-	describe("line highlighting and navigation", () => {
-		it("should select line range, reveal in center, and apply highlight decoration", async () => {
+	describe("line selection and navigation", () => {
+		it("should select line range and reveal in center", async () => {
 			const filePath = "./existing/file.ts"
 			vi.mocked(vscode.workspace.fs.stat).mockResolvedValue({
 				type: vscode.FileType.File,
@@ -267,7 +267,6 @@ describe("openFile", () => {
 			}
 			const mockEditor = {
 				revealRange: vi.fn(),
-				setDecorations: vi.fn(),
 			}
 
 			vi.mocked(vscode.workspace.openTextDocument).mockResolvedValue(mockDoc as any)
@@ -287,7 +286,6 @@ describe("openFile", () => {
 				}),
 			)
 			expect(mockEditor.revealRange).toHaveBeenCalledWith(expect.anything(), 1) // InCenter
-			expect(mockEditor.setDecorations).toHaveBeenCalled()
 		})
 	})
 })
