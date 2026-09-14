@@ -64,6 +64,7 @@ export const commandIds = [
 	"focusPanel",
 	"toggleAutoApprove",
 	"toggleAutonomousMode",
+	"resetWebview",
 ] as const
 
 export type CommandId = (typeof commandIds)[number]

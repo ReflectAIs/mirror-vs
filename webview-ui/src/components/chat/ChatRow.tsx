@@ -38,6 +38,7 @@ import McpResourceRow from "../mcp/McpResourceRow"
 
 import { Mention } from "./Mention"
 import { CheckpointSaved } from "./checkpoints/CheckpointSaved"
+import { ChatRowErrorBoundary } from "./ChatRowErrorBoundary"
 import { FollowUpSuggest } from "./FollowUpSuggest"
 import { BatchFilePermission } from "./BatchFilePermission"
 import { BatchDiffApproval } from "./BatchDiffApproval"
@@ -153,7 +154,9 @@ const ChatRow = memo(
 
 		const [chatrow, { height }] = useSize(
 			<div className="px-3 py-1.5" data-ts={message.ts}>
-				<ChatRowContent {...props} />
+				<ChatRowErrorBoundary message={message}>
+					<ChatRowContent {...props} />
+				</ChatRowErrorBoundary>
 			</div>,
 		)
 

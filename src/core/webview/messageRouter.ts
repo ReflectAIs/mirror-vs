@@ -229,9 +229,35 @@ import {
  */
 export async function routeMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	switch (message.type) {
-		// ── App Init ────────────────────────────────────────
+		// ── App Init & Lifecycle ────────────────────────────
 		case "webviewDidLaunch":
 			await handleWebviewDidLaunch(provider)
+			break
+		case "webviewError": {
+			const error = message.error || { message: message.text || "Unknown webview error" }
+			const errorLog = [
+				`[Webview Error] ${error.message}`,
+				error.stack ? `Stack: ${error.stack}` : undefined,
+				error.componentStack ? `Component Stack: ${error.componentStack}` : undefined,
+			]
+				.filter(Boolean)
+				.join("\n")
+
+			provider.log(errorLog)
+			vscode.window
+				.showErrorMessage(`Mirror VS Webview Error: ${error.message}`, "Reload Webview", "Show Output")
+				.then((action) => {
+					if (action === "Reload Webview") {
+						provider.reloadWebview()
+					} else if (action === "Show Output") {
+						provider.showOutput()
+					}
+				})
+			break
+		}
+		case "reloadWebview":
+			provider.log("[Webview] Reload requested from webview UI")
+			await provider.reloadWebview()
 			break
 
 		// ── Tasks ───────────────────────────────────────────

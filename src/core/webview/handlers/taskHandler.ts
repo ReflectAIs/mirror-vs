@@ -12,26 +12,34 @@ import { TaskState } from "../../task/Task"
  * Handles the webviewDidLaunch message - initializes custom modes, MCP, API config, theme.
  */
 export async function handleWebviewDidLaunch(provider: MirrorProvider): Promise<void> {
-	const customModes = await provider.customModesManager.getCustomModes()
-	await provider.contextProxy.setValue("customModes", customModes)
+	// Immediately post current state so the webview can hydrate and render without waiting for disk I/O
+	provider.postStateToWebview()
 
-	// Restore the persisted session ID so new tasks created during this session
-	// inherit the same sessionId for history grouping.
-	await provider.getOrCreateSession()
+	try {
+		const customModes = await provider.customModesManager.getCustomModes()
+		await provider.contextProxy.setValue("customModes", customModes)
 
-	// Restore the session's last active tab so the tab bar shows existing tabs
-	// from the current session. The task is created idle (startTask: false)
-	// so no AI loop runs — the user can interact with it by clicking.
-	await provider.restoreSessionTabs()
+		// Restore the persisted session ID so new tasks created during this session
+		// inherit the same sessionId for history grouping.
+		await provider.getOrCreateSession()
 
-	// If an empty task already exists in memory, switch to it.
-	const allTasks = provider.getAllTasksSorted()
-	const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0 && !t._started)
+		// Restore the session's last active tab so the tab bar shows existing tabs
+		// from the current session. The task is created idle (startTask: false)
+		// so no AI loop runs — the user can interact with it by clicking.
+		await provider.restoreSessionTabs()
 
-	if (emptyTask) {
-		await provider.switchToTask(emptyTask.taskId)
+		// If an empty task already exists in memory, switch to it.
+		const allTasks = provider.getAllTasksSorted()
+		const emptyTask = allTasks.find((t) => t.mirrorMessages.length === 0 && !t._started)
+
+		if (emptyTask) {
+			await provider.switchToTask(emptyTask.taskId)
+		}
+	} catch (error) {
+		provider.log(`Error restoring session/modes on launch: ${error}`)
 	}
 
+	// Post updated state after session and tab restoration
 	provider.postStateToWebview()
 	provider.workspaceTracker?.initializeFilePaths() // Don't await.
 

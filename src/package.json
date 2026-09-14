@@ -3,7 +3,7 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "DipeshMajithia",
-	"version": "0.9.1",
+	"version": "0.9.2",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#1a1a2e",
@@ -215,9 +215,22 @@
 				"command": "mirror-vs.closeTab",
 				"title": "%command.closeTab.title%",
 				"category": "%configuration.title%"
+			},
+			{
+				"command": "mirror-vs.resetWebview",
+				"title": "%command.resetWebview.title%",
+				"category": "%configuration.title%",
+				"icon": "$(refresh)"
 			}
 		],
 		"menus": {
+			"view/title": [
+				{
+					"command": "mirror-vs.resetWebview",
+					"group": "navigation",
+					"when": "view == mirror-vs.SidebarProvider"
+				}
+			],
 			"editor/context": [
 				{
 					"submenu": "mirror-vs.contextMenu",

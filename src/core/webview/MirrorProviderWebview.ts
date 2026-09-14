@@ -66,9 +66,9 @@ export class WebviewManager {
 
 		const localServerUrl = `localhost:${localPort}`
 
-		// Check if local dev server is running.
+		// Check if local dev server is running with a timeout.
 		try {
-			await axios.get(`http://${localServerUrl}`)
+			await axios.get(`http://${localServerUrl}`, { timeout: 1500 })
 		} catch (error) {
 			vscode.window.showErrorMessage(t("common:errors.hmr_not_running"))
 			return this.getHtmlContent(webview)
@@ -78,7 +78,7 @@ export class WebviewManager {
 
 		// Get the OpenRouter base URL from configuration
 		const { apiConfiguration } = await this.provider.getState()
-		const openRouterBaseUrl = apiConfiguration.openRouterBaseUrl || "https://openrouter.ai"
+		const openRouterBaseUrl = apiConfiguration?.openRouterBaseUrl || "https://openrouter.ai"
 		// Extract the domain for CSP
 		const openRouterDomain = openRouterBaseUrl.match(/^(https?:\/\/[^\/]+)/)?.[1] || "https://openrouter.ai"
 
@@ -107,7 +107,7 @@ export class WebviewManager {
 
 		const reactRefresh = /*html*/ `
 			<script nonce="${nonce}" type="module">
-				import RefreshRuntime from "http://localhost:${localPort}/@react-refresh"
+				import RefreshRuntime from "http://${localServerUrl}/@react-refresh"
 				RefreshRuntime.injectIntoGlobalHook(window)
 				window.$RefreshReg$ = () => {}
 				window.$RefreshSig$ = () => (type) => type
@@ -118,11 +118,11 @@ export class WebviewManager {
 		const csp = [
 			"default-src 'none'",
 			`font-src ${webview.cspSource} data:`,
-			`style-src ${webview.cspSource} 'unsafe-inline' https://* http://${localServerUrl} http://0.0.0.0:${localPort}`,
+			`style-src ${webview.cspSource} 'unsafe-inline' https://* http://${localServerUrl} http://localhost:${localPort} http://127.0.0.1:${localPort} http://0.0.0.0:${localPort}`,
 			`img-src ${webview.cspSource} https://storage.googleapis.com https://img.clerk.com data:`,
 			`media-src ${webview.cspSource}`,
-			`script-src 'unsafe-eval' ${webview.cspSource} https://* http://${localServerUrl} http://0.0.0.0:${localPort} 'nonce-${nonce}'`,
-			`connect-src ${webview.cspSource} ${openRouterDomain} https://* ws://${localServerUrl} ws://0.0.0.0:${localPort} http://${localServerUrl} http://0.0.0.0:${localPort}`,
+			`script-src 'unsafe-eval' ${webview.cspSource} https://* http://${localServerUrl} http://localhost:${localPort} http://127.0.0.1:${localPort} http://0.0.0.0:${localPort} 'nonce-${nonce}'`,
+			`connect-src ${webview.cspSource} ${openRouterDomain} https://* ws://${localServerUrl} ws://localhost:${localPort} ws://127.0.0.1:${localPort} ws://0.0.0.0:${localPort} http://${localServerUrl} http://localhost:${localPort} http://127.0.0.1:${localPort} http://0.0.0.0:${localPort}`,
 		]
 
 		return /*html*/ `
@@ -142,9 +142,17 @@ export class WebviewManager {
 					<title>Mirror VS</title>
 				</head>
 				<body>
-					<div id="root"></div>
+					<div id="root">
+						<div id="loading-spinner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:var(--vscode-font-family,sans-serif);color:var(--vscode-foreground,#ccc);background-color:var(--vscode-editor-background,#1e1e1e);text-align:center;">
+							<div style="width:24px;height:24px;border:2px solid var(--vscode-progressBar-background,#0078d4);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;"></div>
+							<div style="font-size:13px;font-weight:500;">Loading Mirror VS...</div>
+						</div>
+					</div>
+					<style>
+						@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+					</style>
 					${reactRefresh}
-					<script type="module" src="${scriptUri}"></script>
+					<script nonce="${nonce}" type="module" src="${scriptUri}"></script>
 				</body>
 			</html>
 		`
@@ -187,11 +195,15 @@ export class WebviewManager {
 		// Use a nonce to only allow a specific script to be run.
 		const nonce = getNonce()
 
-		// Get the OpenRouter base URL from configuration
-		const { apiConfiguration } = await this.provider.getState()
-		const openRouterBaseUrl = apiConfiguration.openRouterBaseUrl || "https://openrouter.ai"
-		// Extract the domain for CSP
-		const openRouterDomain = openRouterBaseUrl.match(/^(https?:\/\/[^\/]+)/)?.[1] || "https://openrouter.ai"
+		// Safely get the OpenRouter base URL from configuration
+		let openRouterDomain = "https://openrouter.ai"
+		try {
+			const { apiConfiguration } = await this.provider.getState()
+			const openRouterBaseUrl = apiConfiguration?.openRouterBaseUrl || "https://openrouter.ai"
+			openRouterDomain = openRouterBaseUrl.match(/^(https?:\/\/[^\/]+)/)?.[1] || "https://openrouter.ai"
+		} catch {
+			// Fallback domain
+		}
 
 		return /*html*/ `
         <!DOCTYPE html>
@@ -200,7 +212,7 @@ export class WebviewManager {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
             <meta name="theme-color" content="#000000">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https://storage.googleapis.com https://img.clerk.com data:; media-src ${webview.cspSource}; script-src ${webview.cspSource} 'wasm-unsafe-eval' 'nonce-${nonce}' 'strict-dynamic'; connect-src ${webview.cspSource} ${openRouterDomain} https://api.requesty.ai;">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https://* data: blob:; media-src ${webview.cspSource}; script-src ${webview.cspSource} 'wasm-unsafe-eval' 'unsafe-eval' 'nonce-${nonce}'; connect-src ${webview.cspSource} ${openRouterDomain} https://api.requesty.ai https://* http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; worker-src ${webview.cspSource} blob:;">
             <link rel="stylesheet" type="text/css" href="${stylesUri}">
 			<link href="${codiconsUri}" rel="stylesheet" />
 			<script nonce="${nonce}">
@@ -212,8 +224,45 @@ export class WebviewManager {
           </head>
           <body>
             <noscript>You need to enable JavaScript to run this app.</noscript>
-            <div id="root"></div>
+            <div id="root">
+				<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:var(--vscode-font-family,sans-serif);color:var(--vscode-foreground,#ccc);background-color:var(--vscode-editor-background,#1e1e1e);text-align:center;">
+					<div style="width:24px;height:24px;border:2px solid var(--vscode-progressBar-background,#0078d4);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;"></div>
+					<div style="font-size:13px;font-weight:500;">Loading Mirror VS...</div>
+				</div>
+			</div>
+			<style>
+				@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+			</style>
             <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
+          </body>
+        </html>
+      `
+	}
+
+	/**
+	 * Returns a self-contained fallback page when both HMR and production builds fail to load.
+	 */
+	public getFallbackHtmlContent(webview: vscode.Webview, errorMessage: string): string {
+		const nonce = getNonce()
+		return /*html*/ `
+        <!DOCTYPE html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+            <title>Mirror VS</title>
+          </head>
+          <body style="margin:0;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:system-ui,-apple-system,sans-serif;color:#ccc;background:#1e1e1e;box-sizing:border-box;text-align:center;">
+            <div style="font-size:16px;font-weight:600;margin-bottom:8px;color:#fff;">Unable to load Mirror VS</div>
+            <div style="font-size:12px;color:#888;margin-bottom:20px;max-width:320px;word-break:break-word;">${errorMessage || "Webview assets could not be loaded."}</div>
+            <button id="retryBtn" style="padding:8px 16px;font-size:13px;border-radius:4px;border:none;background:#0e639c;color:#fff;cursor:pointer;font-weight:500;">Reload Webview</button>
+            <script nonce="${nonce}">
+              const vscode = acquireVsCodeApi();
+              document.getElementById('retryBtn').addEventListener('click', () => {
+                vscode.postMessage({ type: 'reloadWebview' });
+              });
+            </script>
           </body>
         </html>
       `
@@ -230,6 +279,40 @@ export class WebviewManager {
 
 		const messageDisposable = webview.onDidReceiveMessage(onReceiveMessage)
 		this.provider.getWebviewDisposables().push(messageDisposable)
+	}
+
+	/**
+	 * Reloads the webview content without disrupting active tasks or state in the extension host.
+	 */
+	public async reloadWebview(): Promise<void> {
+		const view = this.provider.getView()
+		if (!view) {
+			this.provider.log("Cannot reload webview: view is not available")
+			return
+		}
+
+		try {
+			let html = ""
+			try {
+				html =
+					this.provider.contextProxy.extensionMode === vscode.ExtensionMode.Development
+						? await this.getHMRHtmlContent(view.webview)
+						: await this.getHtmlContent(view.webview)
+			} catch (devError) {
+				this.provider.log(`Development HTML load failed, falling back to production HTML: ${devError}`)
+				html = await this.getHtmlContent(view.webview)
+			}
+
+			// Aggressively clear HTML first to force VS Code to discard any dead iframe
+			view.webview.html = ""
+			setTimeout(() => {
+				view.webview.html = html
+			}, 50)
+		} catch (error) {
+			const errMsg = error instanceof Error ? error.message : String(error)
+			this.provider.log(`Failed to reload webview: ${errMsg}`)
+			view.webview.html = this.getFallbackHtmlContent(view.webview, errMsg)
+		}
 	}
 
 	// ── Resource cleanup ─────────────────────────────────────────────────────

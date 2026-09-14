@@ -390,7 +390,10 @@ export class TaskLifecycle {
 					throw new Error("Unexpected: Last message is not a user or assistant message")
 				}
 			} else {
-				throw new Error("Unexpected: No existing API conversation history")
+				// If existingApiConversationHistory is empty (e.g. after editing the initial message or rewinding to empty history),
+				// initialize empty history and old content instead of throwing.
+				modifiedApiConversationHistory = []
+				modifiedOldUserContent = []
 			}
 
 			let newUserContent: Anthropic.Messages.ContentBlockParam[] = [...modifiedOldUserContent]

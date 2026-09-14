@@ -14,6 +14,7 @@
 	"command.newTab.title": "New Tab",
 	"command.newSession.title": "New Session",
 	"command.closeTab.title": "Close Tab",
+	"command.resetWebview.title": "Reload / Reset Webview",
 	"command.explainCode.title": "Explain Code",
 	"command.fixCode.title": "Fix Code",
 	"command.improveCode.title": "Improve Code",

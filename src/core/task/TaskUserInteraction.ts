@@ -469,7 +469,7 @@ export class TaskUserInteraction {
 
 				this.task.emit(MirrorVSEventName.TaskUserMessage, this.task.taskId)
 
-				if (this.task.isLoopActive) {
+				if (this.task.isLoopActive || this.task.isWaitingOnAsk) {
 					// Handle the message directly instead of routing through the webview.
 					// This avoids a race condition where the webview's message state hasn't
 					// hydrated yet, causing it to interpret the message as a new task request.

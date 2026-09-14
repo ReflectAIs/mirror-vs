@@ -170,8 +170,52 @@ const App = () => {
 			}
 		}, [renderContext]),
 	)
+
+	const [hydrationTimeout, setHydrationTimeout] = useState(false)
+
+	useEffect(() => {
+		if (didHydrateState) {
+			setHydrationTimeout(false)
+			return
+		}
+
+		const timer = setTimeout(() => {
+			setHydrationTimeout(true)
+			// Auto-retry webviewDidLaunch in case the initial launch message was dropped
+			vscode.postMessage({ type: "webviewDidLaunch" })
+		}, 2500)
+
+		return () => clearTimeout(timer)
+	}, [didHydrateState])
+
 	if (!didHydrateState) {
-		return null
+		return (
+			<div className="flex flex-col items-center justify-center h-screen p-4 text-center select-none bg-[var(--vscode-editor-background)] text-[var(--vscode-foreground)]">
+				<div className="codicon codicon-loading codicon-modifier-spin text-2xl mb-3 text-[var(--vscode-progressBar-background)]" />
+				<p className="text-sm font-medium mb-1">Connecting to Mirror VS...</p>
+				<p className="text-xs text-[var(--vscode-descriptionForeground)] mb-4">
+					{hydrationTimeout
+						? "Initializing workspace state is taking longer than expected. You can retry or reload."
+						: "Initializing workspace state..."}
+				</p>
+				{hydrationTimeout && (
+					<div className="flex gap-2">
+						<button
+							type="button"
+							onClick={() => vscode.postMessage({ type: "webviewDidLaunch" })}
+							className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] cursor-pointer">
+							Retry Connection
+						</button>
+						<button
+							type="button"
+							onClick={() => vscode.postMessage({ type: "reloadWebview" })}
+							className="px-3 py-1.5 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] cursor-pointer">
+							Reload Webview
+						</button>
+					</div>
+				)}
+			</div>
+		)
 	}
 
 	// Do not conditionally load ChatView, it's expensive and there's state we
@@ -232,6 +276,7 @@ const App = () => {
 							messageTs: editMessageDialogState.messageTs,
 							text: editMessageDialogState.text,
 							restoreCheckpoint,
+							images: editMessageDialogState.images,
 						})
 						setEditMessageDialogState((prev) => ({ ...prev, isOpen: false }))
 					}}

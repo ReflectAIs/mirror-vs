@@ -193,7 +193,7 @@ describe("checkpointRestoreHandler", () => {
 			expect(mockProvider.createTaskWithHistoryItem).toHaveBeenCalledWith(expectedHistoryItem)
 		})
 
-		it("should not save messages or reinitialize for edit operation", async () => {
+		it("should save messages and not manually reinitialize for edit operation", async () => {
 			const editData = {
 				editedContent: "Edited content",
 				images: [],
@@ -210,10 +210,14 @@ describe("checkpointRestoreHandler", () => {
 				editData,
 			})
 
-			// Verify saveTaskMessages was NOT called for edit operation
-			expect(saveTaskMessages).not.toHaveBeenCalled()
+			// Verify saveTaskMessages was called for edit operation
+			expect(saveTaskMessages).toHaveBeenCalledWith({
+				messages: mockMirror.mirrorMessages,
+				taskId: "test-task-123",
+				globalStoragePath: "/test/storage",
+			})
 
-			// Verify createTaskWithHistoryItem was NOT called for edit operation
+			// Verify manual createTaskWithHistoryItem was NOT called for edit operation (cancelTask triggers it)
 			expect(mockProvider.createTaskWithHistoryItem).not.toHaveBeenCalled()
 		})
 

@@ -757,6 +757,9 @@ export interface WebviewMessage {
 		| "renameTask"
 		// Model change messages
 		| "modelChange"
+		// Webview error tracing & lifecycle
+		| "webviewError"
+		| "reloadWebview"
 	/** Session ID for session management operations */
 	sessionId?: string
 	/** New name for the session (for renameSession message) */
@@ -883,6 +886,12 @@ export interface WebviewMessage {
 	worktreeForce?: boolean
 	worktreeNewWindow?: boolean
 	worktreeIncludeContent?: string
+	/** Error payload for webviewError messages */
+	error?: {
+		message: string
+		stack?: string
+		componentStack?: string
+	}
 }
 
 export interface RequestOpenAiCodexRateLimitsMessage {

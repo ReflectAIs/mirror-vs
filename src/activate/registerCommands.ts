@@ -147,6 +147,12 @@ const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOpt
 			await handleCloseTaskTab(visibleProvider, currentTask.taskId)
 		}
 	},
+	resetWebview: async () => {
+		const targetProvider = MirrorProvider.getVisibleInstance() || provider
+
+		outputChannel.appendLine("Reloading Mirror VS webview...")
+		await targetProvider.reloadWebview()
+	},
 	setCustomStoragePath: async () => {
 		const { promptForCustomStoragePath } = await import("../utils/storage")
 		await promptForCustomStoragePath()

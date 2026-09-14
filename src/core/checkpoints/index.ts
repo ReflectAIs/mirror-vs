@@ -264,20 +264,22 @@ export async function checkpointRestore(
 			// Use MessageManager to properly handle context-management events
 			// This ensures orphaned Summary messages and truncation markers are cleaned up
 			await task.messageManager.rewindToTimestamp(ts, {
-				includeTargetMessage: operation === "edit",
+				includeTargetMessage: false,
 			})
 
-			// Report the deleted API request metrics
-			await task.say(
-				"api_req_deleted",
-				JSON.stringify({
-					tokensIn: totalTokensIn,
-					tokensOut: totalTokensOut,
-					cacheWrites: totalCacheWrites,
-					cacheReads: totalCacheReads,
-					cost: totalCost,
-				} satisfies MirrorApiReqInfo),
-			)
+			if (operation !== "edit") {
+				// Report the deleted API request metrics
+				await task.say(
+					"api_req_deleted",
+					JSON.stringify({
+						tokensIn: totalTokensIn,
+						tokensOut: totalTokensOut,
+						cacheWrites: totalCacheWrites,
+						cacheReads: totalCacheReads,
+						cost: totalCost,
+					} satisfies MirrorApiReqInfo),
+				)
+			}
 		}
 
 		// The task is already cancelled by the provider beforehand, but we

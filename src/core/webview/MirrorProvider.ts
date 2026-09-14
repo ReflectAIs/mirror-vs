@@ -1260,14 +1260,28 @@ export class MirrorProvider
 			localResourceRoots: resourceMirrorts,
 		}
 
-		webviewView.webview.html =
-			this.contextProxy.extensionMode === vscode.ExtensionMode.Development
-				? await this.getHMRHtmlContent(webviewView.webview)
-				: await this.getHtmlContent(webviewView.webview)
-
 		// Sets up an event listener to listen for messages passed from the webview view context
 		// and executes code based on the message that is received.
+		// Attach BEFORE assigning HTML so early messages (e.g. webviewDidLaunch) are never lost.
 		this.setWebviewMessageListener(webviewView.webview)
+
+		try {
+			webviewView.webview.html =
+				this.contextProxy.extensionMode === vscode.ExtensionMode.Development
+					? await this.getHMRHtmlContent(webviewView.webview)
+					: await this.getHtmlContent(webviewView.webview)
+		} catch (error) {
+			this.log(`Failed to initialize webview HTML: ${error}`)
+			try {
+				webviewView.webview.html = await this.getHtmlContent(webviewView.webview)
+			} catch (fallbackError) {
+				this.log(`Fallback getHtmlContent failed: ${fallbackError}`)
+				webviewView.webview.html = this.webviewManager.getFallbackHtmlContent(
+					webviewView.webview,
+					error instanceof Error ? error.message : String(error),
+				)
+			}
+		}
 
 		// Initialize code index status subscription for the current workspace.
 		this.updateCodeIndexStatusSubscription()
@@ -1542,66 +1556,35 @@ export class MirrorProvider
 
 			this.log(`[createTaskWithHistoryItem] Processing pending edit after checkpoint restoration`)
 
-			// Process the pending edit after a short delay to ensure the task is fully initialized
+			// Process the pending edit once the task is ready and waiting for resume response
 			setTimeout(async () => {
 				try {
 					// Wait until the resumed task has posted its resume ask (resume_task /
-					// resume_completed_task). This guarantees that:
-					// 1. resumeTaskFromHistory has finished re-reading mirror messages from
-					//    disk, so the slice below cannot be clobbered by a stale re-read.
-					// 2. ask() has already reset askResponse and is now blocking, so the
-					//    handleWebviewAskResponse call below resolves the resume ask instead
-					//    of being wiped by it. (Waiting on isInitialized alone is not safe:
-					//    it is set before ask() resets askResponse.)
+					// resume_completed_task) and is blocking on user input.
 					await pWaitFor(
 						() =>
+							task.isWaitingOnAsk &&
 							task.mirrorMessages.some(
 								(m) =>
 									m.type === "ask" && (m.ask === "resume_task" || m.ask === "resume_completed_task"),
 							),
 						{ interval: 50, timeout: 5_000 },
 					).catch(() => {
-						// Timeout: proceed anyway — the previous behavior was a blind 100ms
-						// delay, so attempting the edit is still strictly better than
-						// dropping it.
 						this.log(
 							`[createTaskWithHistoryItem] Timed out waiting for resume ask before processing pending edit for task ${task.taskId}`,
 						)
 					})
 
-					// Find the message index in the restored state
-					const { messageIndex, apiConversationHistoryIndex } = (() => {
-						const messageIndex = task.mirrorMessages.findIndex((msg) => msg.ts === pendingEdit.messageTs)
-						const apiConversationHistoryIndex = task.apiConversationHistory.findIndex(
-							(msg) => msg.ts === pendingEdit.messageTs,
-						)
-						return { messageIndex, apiConversationHistoryIndex }
-					})()
-
-					if (messageIndex !== -1) {
-						// Remove the target message and all subsequent messages
-						await task.overwriteMirrorMessages(task.mirrorMessages.slice(0, messageIndex))
-
-						if (apiConversationHistoryIndex !== -1) {
-							await task.overwriteApiConversationHistory(
-								task.apiConversationHistory.slice(0, apiConversationHistoryIndex),
-							)
-						}
-
-						// Immediately sync the truncated state to the webview to remove the old message before the new one is added
-						await this.postStateToWebview()
-
-						// Process the edited message
-						await task.handleWebviewAskResponse(
-							"messageResponse",
-							pendingEdit.editedContent,
-							pendingEdit.images,
-						)
-					}
+					// Process the edited message by providing the response to the waiting ask
+					await task.handleWebviewAskResponse(
+						"messageResponse",
+						pendingEdit.editedContent,
+						pendingEdit.images,
+					)
 				} catch (error) {
 					this.log(`[createTaskWithHistoryItem] Error processing pending edit: ${error}`)
 				}
-			}, 100) // Small delay to ensure task is fully ready
+			}, 50)
 		}
 
 		return task
@@ -1628,6 +1611,17 @@ export class MirrorProvider
 	 */
 	private async getHtmlContent(webview: vscode.Webview): Promise<string> {
 		return this.webviewManager.getHtmlContent(webview)
+	}
+
+	public getFallbackHtmlContent(webview: vscode.Webview, errorMessage: string): string {
+		return this.webviewManager.getFallbackHtmlContent(webview, errorMessage)
+	}
+
+	/**
+	 * Reloads the active webview panel.
+	 */
+	public async reloadWebview(): Promise<void> {
+		return this.webviewManager.reloadWebview()
 	}
 
 	/**
@@ -2033,6 +2027,14 @@ export class MirrorProvider
 	public log(message: string) {
 		this.outputChannel.appendLine(message)
 		console.log(message)
+	}
+
+	public showOutput(): void {
+		this.outputChannel.show()
+	}
+
+	public getOutputChannel(): vscode.OutputChannel {
+		return this.outputChannel
 	}
 
 	// getters

@@ -242,11 +242,8 @@ describe("Checkpoint functionality", () => {
 			expect(mockTask.overwriteApiConversationHistory).toHaveBeenCalledWith([
 				{ ts: 1, role: "user", content: [{ type: "text", text: "Message 1" }] },
 			])
-			// For edit operation, should include the message being edited
-			expect(mockTask.overwriteMirrorMessages).toHaveBeenCalledWith([
-				{ ts: 1, say: "user", text: "Message 1" },
-				{ ts: 2, say: "assistant", text: "Message 2" },
-			])
+			// For edit operation, target message is removed so edited message replaces it
+			expect(mockTask.overwriteMirrorMessages).toHaveBeenCalledWith([{ ts: 1, say: "user", text: "Message 1" }])
 			expect(mockProvider.cancelTask).toHaveBeenCalled()
 		})
 

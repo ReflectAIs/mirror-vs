@@ -61,17 +61,17 @@ export async function handleCheckpointRestoreOperation(config: CheckpointRestore
 			operation,
 		})
 
-		// For delete operations, we need to save messages and reinitialize
-		// For edit operations, the reinitialization happens automatically
+		// Save the updated messages to disk after checkpoint restoration
+		await saveTaskMessages({
+			messages: currentMirror.mirrorMessages,
+			taskId: currentMirror.taskId,
+			globalStoragePath: provider.contextProxy.globalStorageUri.fsPath,
+		})
+
+		// For delete operations, we need to explicitly reinitialize
+		// For edit operations, the reinitialization happens automatically via cancelTask
 		// and processes the pending edit
 		if (operation === "delete") {
-			// Save the updated messages to disk after checkpoint restoration
-			await saveTaskMessages({
-				messages: currentMirror.mirrorMessages,
-				taskId: currentMirror.taskId,
-				globalStoragePath: provider.contextProxy.globalStorageUri.fsPath,
-			})
-
 			// Get the updated history item and reinitialize
 			const { historyItem } = await provider.getTaskWithId(currentMirror.taskId)
 			await provider.createTaskWithHistoryItem(historyItem)
@@ -91,7 +91,10 @@ export async function handleCheckpointRestoreOperation(config: CheckpointRestore
  * Common checkpoint restore validation and initialization utility.
  * This can be used by any checkpoint restore flow that needs to wait for initialization.
  */
-export async function waitForMirrorInitialization(provider: MirrorProvider, timeoutMs: number = 3000): Promise<boolean> {
+export async function waitForMirrorInitialization(
+	provider: MirrorProvider,
+	timeoutMs: number = 3000,
+): Promise<boolean> {
 	try {
 		await pWaitFor(() => provider.getCurrentTask()?.isInitialized === true, {
 			timeout: timeoutMs,

@@ -2,6 +2,25 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.2] - 2026-09-14
+
+### Fixed & Improved
+
+- **Webview Gray Screen & Reload Stability**:
+    - Fixed an issue causing a persistent blank/gray screen on startup due to CSP `strict-dynamic` blocking dynamically code-split Vite chunks in production.
+    - Eliminated race condition in webview message listener registration where `webviewDidLaunch` could be dropped before the listener was attached.
+    - Replaced initial hydration `null` return in React with an active loading spinner and connection retry/reload controls.
+    - Added instant workspace state hydration on launch without blocking on asynchronous disk or SQLite tab restoration.
+    - Added self-contained fallback error UI and hardened `reloadWebview` command with multi-stage fallback.
+    - Added 1500ms timeout to Vite dev server check to prevent startup hangs when dev port is unresponsive.
+- **Message Edit & Checkpoint Restoration Replacement**:
+    - Fixed an issue where editing a message and selecting "Restore to Checkpoint" preserved the previous message in conversation history and appended the new message instead of replacing it.
+    - Checkpoint restore now properly excludes the target message from the conversation rewind for edit operations and suppresses redundant deleted-metrics messages.
+    - Added immediate on-disk synchronization of truncated messages prior to task rehydration.
+    - Hardened pending edit resumption with fallback index and timestamp resolution, ensuring trailing resume requests are cleaned up and the edited message cleanly replaces the original user turn.
+- **Code Highlighting on File Click**:
+    - Removed line glow decorations when clicking file tools, keeping only clean line selection in the active editor.
+
 ## [0.9.1] - 2026-09-12
 
 ### Fixed & Improved
