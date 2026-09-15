@@ -216,4 +216,50 @@ describe("ExecaTerminalProcess", () => {
 			await runPromise
 		})
 	})
+
+	describe("subprocess exit and stream draining", () => {
+		it("captures exit code from exit event and terminates stream cleanly", async () => {
+			const execaMock = vitest.mocked(execa)
+			const mockDestroy = vitest.fn()
+			let exitHandler: any
+
+			const mockReadable: any = (async function* () {
+				yield "first chunk\n"
+				// Hang until destroy is called
+				await new Promise((resolve) => {
+					mockDestroy.mockImplementation(resolve)
+				})
+			})()
+			mockReadable.destroy = mockDestroy
+
+			execaMock.mockImplementationOnce((() => {
+				return () => ({
+					pid: mockPid,
+					stdin: { write: vitest.fn(), destroyed: false, writable: true },
+					all: mockReadable,
+					once: vitest.fn((event, handler) => {
+						if (event === "exit") exitHandler = handler
+					}),
+					then: vitest.fn(),
+					catch: vitest.fn(),
+					kill: vitest.fn(),
+				})
+			}) as any)
+
+			const completeSpy = vitest.fn()
+			terminalProcess.on("shell_execution_complete", completeSpy)
+
+			const runPromise = terminalProcess.run("cmd with lingering child")
+
+			// Simulate process exit with code 0 after a short moment
+			setTimeout(() => {
+				exitHandler?.(0, null)
+			}, 50)
+
+			await runPromise
+
+			expect(completeSpy).toHaveBeenCalledWith({ exitCode: 0 })
+			expect(mockDestroy).toHaveBeenCalled()
+		})
+	})
 })

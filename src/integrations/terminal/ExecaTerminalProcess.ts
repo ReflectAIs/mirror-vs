@@ -76,6 +76,56 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 				})
 			}
 
+			let subprocessExited = false
+			let exitDetails: { exitCode: number; signalName?: string } = { exitCode: 0 }
+			let drainTimeoutId: NodeJS.Timeout | undefined
+
+			// Subprocess exit listener — captures real exit status even if child processes keep stdout/stderr open
+			const onProcessExit = (code: number | null, signal: NodeJS.Signals | null) => {
+				if (subprocessExited) return
+				subprocessExited = true
+				exitDetails = {
+					exitCode: code ?? (signal ? 1 : 0),
+					signalName: signal ? String(signal) : undefined,
+				}
+				// Allow up to 300ms for remaining in-flight buffered data to drain
+				drainTimeoutId = setTimeout(() => {
+					if (rawStream && typeof (rawStream as any).destroy === "function") {
+						try {
+							;(rawStream as any).destroy()
+						} catch {}
+					}
+				}, 300)
+			}
+
+			this.subprocess?.once?.("exit", onProcessExit)
+
+			this.subprocess
+				?.then?.((res: any) => {
+					if (!subprocessExited) {
+						subprocessExited = true
+						exitDetails = { exitCode: res?.exitCode ?? 0 }
+					}
+				})
+				?.catch?.((err: any) => {
+					if (!subprocessExited) {
+						subprocessExited = true
+						exitDetails = {
+							exitCode: err?.exitCode ?? 1,
+							signalName: err?.signal,
+						}
+					}
+					if (!drainTimeoutId) {
+						drainTimeoutId = setTimeout(() => {
+							if (rawStream && typeof (rawStream as any).destroy === "function") {
+								try {
+									;(rawStream as any).destroy()
+								} catch {}
+							}
+						}, 300)
+					}
+				})
+
 			// Stream from unbuffered subprocess.all to ensure interactive prompts without trailing
 			// newlines (e.g. read -p "Name: ", [y/n]?) are yielded immediately rather than line-buffered.
 			const rawStream = this.subprocess.all ?? this.subprocess.iterable?.({ from: "all", preserveNewlines: true })
@@ -114,6 +164,11 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 				this.startHotTimer(line)
 			}
 
+			if (drainTimeoutId) {
+				clearTimeout(drainTimeoutId)
+				drainTimeoutId = undefined
+			}
+
 			if (this.aborted) {
 				let timeoutId: NodeJS.Timeout | undefined
 
@@ -142,7 +197,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 				}
 			}
 
-			this.emit("shell_execution_complete", { exitCode: 0 })
+			this.emit("shell_execution_complete", exitDetails)
 		} catch (error) {
 			if (error instanceof ExecaError) {
 				console.error(`[ExecaTerminalProcess#run] shell execution error: ${error.message}`)

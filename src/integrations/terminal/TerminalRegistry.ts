@@ -167,12 +167,15 @@ export class TerminalRegistry {
 					}
 
 					if (!terminal.running) {
-						console.error(
-							"[TerminalRegistry] Shell execution end event received, but process is not running for terminal:",
+						console.warn(
+							"[TerminalRegistry] Shell execution end event received, but process was not marked running for terminal:",
 							{ terminalId: terminal?.id, command: process?.command, exitCode: e.exitCode },
 						)
 
 						terminal.busy = false
+						if (process) {
+							terminal.shellExecutionComplete(exitDetails)
+						}
 						return
 					}
 

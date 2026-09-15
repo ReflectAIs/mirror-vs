@@ -304,4 +304,32 @@ describe("TerminalProcess", () => {
 			await expect(merged).resolves.toBeUndefined()
 		})
 	})
+
+	describe("shellExecutionComplete fallback timeout", () => {
+		it("resolves and completes with fallback exit code when shellExecutionComplete is not emitted", async () => {
+			let completedOutput: string | undefined
+			terminalProcess.on("completed", (output) => {
+				completedOutput = output
+			})
+
+			// Mock stream data without emitting shell_execution_complete
+			const stream = (async function* () {
+				yield "\x1b]633;C\x07"
+				yield "Hello world"
+				yield "\x1b]633;D\x07"
+			})()
+
+			mockExecution = {
+				read: vi.fn().mockReturnValue(stream),
+			}
+			mockTerminal.shellIntegration.executeCommand.mockReturnValue(mockExecution)
+
+			const runPromise = terminalProcess.run("test without end event")
+			terminalProcess.emit("stream_available", stream)
+
+			await runPromise
+
+			expect(completedOutput).toBe("Hello world")
+		}, 5000)
+	})
 })

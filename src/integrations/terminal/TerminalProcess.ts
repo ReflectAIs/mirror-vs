@@ -194,13 +194,34 @@ export class TerminalProcess extends BaseTerminalProcess {
 			}
 
 			this.startHotTimer(data)
+
+			// If output contains shell integration execution end sequence (OSC 633;D or OSC 133;D),
+			// the command has finished executing in the terminal. Break early rather than hanging
+			// on an unclosed VS Code stream.
+			if (this.matchBeforeVsceEndMarkers(this.fullOutput) !== undefined) {
+				break
+			}
 		}
 
 		// Set streamClosed immediately after stream ends.
 		this.terminal.setActiveStream(undefined)
 
-		// Wait for shell execution to complete.
-		await shellExecutionComplete
+		// Wait for shell execution to complete with a safety timeout.
+		// If VS Code drops onDidEndTerminalShellExecution (common with subshells,
+		// custom prompts, aliases, etc.), we don't want to hang the model forever.
+		await Promise.race([
+			shellExecutionComplete,
+			new Promise<ExitCodeDetails>((resolve) => {
+				setTimeout(() => {
+					console.warn(
+						"[Terminal Process] shellExecutionComplete timed out after stream ended; resolving fallback exit code 0",
+					)
+					const fallbackDetails: ExitCodeDetails = { exitCode: 0 }
+					this.emit("shell_execution_complete", fallbackDetails)
+					resolve(fallbackDetails)
+				}, 1500)
+			}),
+		])
 
 		this.isHot = false
 

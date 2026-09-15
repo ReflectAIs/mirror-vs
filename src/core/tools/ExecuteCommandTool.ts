@@ -687,7 +687,7 @@ export async function executeCommandInTerminal(
 	// This ensures persistedResult is set before we try to use it, fixing the race
 	// condition where exitDetails is set (sync) before the async onCompleted finishes.
 	if (exitDetails && onCompletedPromise) {
-		await onCompletedPromise
+		await Promise.race([onCompletedPromise, delay(3000)])
 	}
 
 	// Double-check background notification in case onCompleted resolved after onShellExecutionComplete
