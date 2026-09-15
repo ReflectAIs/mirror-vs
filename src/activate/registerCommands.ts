@@ -152,6 +152,7 @@ const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOpt
 
 		outputChannel.appendLine("Reloading Mirror VS webview...")
 		await targetProvider.reloadWebview()
+		vscode.window.setStatusBarMessage("$(refresh) Mirror VS webview reloaded", 3000)
 	},
 	setCustomStoragePath: async () => {
 		const { promptForCustomStoragePath } = await import("../utils/storage")

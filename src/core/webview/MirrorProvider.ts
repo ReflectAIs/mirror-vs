@@ -1268,7 +1268,7 @@ export class MirrorProvider
 		try {
 			webviewView.webview.html =
 				this.contextProxy.extensionMode === vscode.ExtensionMode.Development
-					? await this.getHMRHtmlContent(webviewView.webview)
+					? await this.webviewManager.loadInitialHtml(webviewView.webview)
 					: await this.getHtmlContent(webviewView.webview)
 		} catch (error) {
 			this.log(`Failed to initialize webview HTML: ${error}`)
@@ -1620,8 +1620,8 @@ export class MirrorProvider
 	/**
 	 * Reloads the active webview panel.
 	 */
-	public async reloadWebview(): Promise<void> {
-		return this.webviewManager.reloadWebview()
+	public async reloadWebview(forceProduction?: boolean): Promise<void> {
+		return this.webviewManager.reloadWebview(forceProduction)
 	}
 
 	/**

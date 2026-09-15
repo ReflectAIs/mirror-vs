@@ -257,7 +257,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		}
 		case "reloadWebview":
 			provider.log("[Webview] Reload requested from webview UI")
-			await provider.reloadWebview()
+			await provider.reloadWebview(Boolean((message as any).forceProduction))
 			break
 
 		// ── Tasks ───────────────────────────────────────────

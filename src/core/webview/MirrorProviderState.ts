@@ -45,10 +45,14 @@ export class StateManager {
 	}
 
 	async postStateToWebview() {
-		const state = await this.getStateToPostToWebview()
-		const seq = this.provider.incrementMirrorMessagesSeq()
-		state.mirrorMessagesSeq = seq
-		this.provider.postMessageToWebview({ type: "state", state })
+		try {
+			const state = await this.getStateToPostToWebview()
+			const seq = this.provider.incrementMirrorMessagesSeq()
+			state.mirrorMessagesSeq = seq
+			this.provider.postMessageToWebview({ type: "state", state })
+		} catch (error) {
+			this.provider.log(`[StateManager] Failed to post state to webview: ${error}`)
+		}
 	}
 
 	/**
@@ -145,8 +149,11 @@ export class StateManager {
 	// ── State assembly ─────────────────────────────────────────────────────
 
 	async getStateToPostToWebview(): Promise<ExtensionState> {
-		// Ensure the store is initialized before reading task history
-		await this.provider.taskHistoryStore.initialized
+		// Ensure the store is initialized before reading task history, with a 1s timeout safeguard
+		await Promise.race([
+			this.provider.taskHistoryStore.initialized,
+			new Promise((resolve) => setTimeout(resolve, 1000)),
+		])
 
 		const {
 			apiConfiguration,

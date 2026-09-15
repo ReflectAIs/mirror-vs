@@ -162,6 +162,7 @@ export default defineConfig(({ mode }) => {
 		server: {
 			port: 3456,
 			strictPort: false,
+			origin: "http://localhost:3456",
 			hmr: {
 				host: "localhost",
 				protocol: "ws",
