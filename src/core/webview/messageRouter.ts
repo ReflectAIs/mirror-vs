@@ -11,6 +11,7 @@ import * as vscode from "vscode"
 
 import type { WebviewMessage } from "@mirror-vs/types"
 
+import { getCommand } from "../../utils/commands"
 import type { MirrorProvider } from "./MirrorProvider"
 
 // ── Task handlers ──────────────────────────────────────────────
@@ -258,6 +259,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "reloadWebview":
 			provider.log("[Webview] Reload requested from webview UI")
 			await provider.reloadWebview(Boolean((message as any).forceProduction))
+			try {
+				await vscode.commands.executeCommand(getCommand("openInNewTab"))
+			} catch {}
 			break
 
 		// ── Tasks ───────────────────────────────────────────

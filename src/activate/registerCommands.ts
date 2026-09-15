@@ -150,9 +150,23 @@ const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOpt
 	resetWebview: async () => {
 		const targetProvider = MirrorProvider.getVisibleInstance() || provider
 
-		outputChannel.appendLine("Reloading Mirror VS webview...")
-		await targetProvider.reloadWebview()
-		vscode.window.setStatusBarMessage("$(refresh) Mirror VS webview reloaded", 3000)
+		outputChannel.appendLine("Reloading Mirror VS webview and opening in new tab...")
+		try {
+			await targetProvider.reloadWebview(true)
+		} catch (err) {
+			outputChannel.appendLine(`Failed to reload existing webview: ${err}`)
+		}
+
+		// When the user clicks the reload button, also open a fresh new tab so that
+		// even if the sidebar webview's Chromium process crashed/grayed out,
+		// a brand-new, fully functional webview tab is created and focused immediately.
+		try {
+			await openMirrorInNewTab({ context, outputChannel, sourceProvider: targetProvider })
+			vscode.window.setStatusBarMessage("$(refresh) Mirror VS opened in new tab", 4000)
+		} catch (err) {
+			outputChannel.appendLine(`Failed to open Mirror VS in new tab: ${err}`)
+			vscode.window.setStatusBarMessage("$(refresh) Mirror VS webview reloaded", 4000)
+		}
 	},
 	setCustomStoragePath: async () => {
 		const { promptForCustomStoragePath } = await import("../utils/storage")
@@ -228,7 +242,11 @@ const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOpt
 	},
 })
 
-export const openMirrorInNewTab = async ({ context, outputChannel }: Omit<RegisterCommandOptions, "provider">) => {
+export const openMirrorInNewTab = async ({
+	context,
+	outputChannel,
+	sourceProvider,
+}: Omit<RegisterCommandOptions, "provider"> & { sourceProvider?: MirrorProvider }) => {
 	// (This example uses webviewProvider activation event which is necessary to
 	// deserialize cached webview, but since we use retainContextWhenHidden, we
 	// don't need to use that event).
@@ -266,6 +284,18 @@ export const openMirrorInNewTab = async ({ context, outputChannel }: Omit<Regist
 	}
 
 	await tabProvider.resolveWebviewView(newPanel)
+
+	// If a source provider had an active task, display it in the newly opened tab
+	if (sourceProvider) {
+		const activeTaskId = sourceProvider.getCurrentTask()?.taskId
+		if (activeTaskId) {
+			try {
+				await tabProvider.showTaskWithId(activeTaskId)
+			} catch (err) {
+				outputChannel.appendLine(`[openMirrorInNewTab] Failed to resume task ${activeTaskId}: ${err}`)
+			}
+		}
+	}
 
 	// Add listener for visibility changes to notify webview
 	newPanel.onDidChangeViewState(

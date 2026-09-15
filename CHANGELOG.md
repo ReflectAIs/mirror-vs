@@ -9,10 +9,11 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **Webview HMR Resilience & Automatic Production Fallback**:
     - Added automatic fallback to the production bundle when Vite HMR fails to hydrate within 3.5 seconds.
     - Updated `reloadWebview` to automatically force the production bundle if a previous HMR session remained unhydrated, eliminating the stuck gray screen cycle on reload.
+    - Added automatic new tab recovery on reload: clicking the reload button (`$(refresh)`) in the sidebar or requesting a reload now automatically creates and focuses a fresh editor tab webview and transfers the active task, instantly bypassing crashed or frozen Chromium sidebar webview processes across all environments.
     - Added multi-burst state hydration broadcasts (`100ms`, `300ms`, `700ms`, `1500ms`) to ensure reliable state delivery regardless of webview mount timing.
     - Added a 1000ms timeout safeguard on `taskHistoryStore.initialized` in `getStateToPostToWebview()` using `Promise.race` to prevent slow disk I/O from stalling state pushes.
     - Wrapped `postStateToWebview()` in a `try ... catch` block with logging to ensure unhandled state assembly exceptions are captured and logged.
-    - Added visual status bar feedback (`$(refresh) Mirror VS webview reloaded`) when triggering the reload command.
+    - Added visual status bar feedback (`$(refresh) Mirror VS opened in new tab`) when triggering the reload command.
     - Configured `server.origin` in Vite config to resolve absolute URLs for HMR modules.
 
 ## [0.9.2] - 2026-09-14
