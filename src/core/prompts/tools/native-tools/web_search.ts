@@ -1,20 +1,24 @@
 import type OpenAI from "openai"
 
-const WEB_SEARCH_DESCRIPTION = `Request to perform a web search to find information on the internet. Use this tool to search for current information, documentation, troubleshooting guides, code examples, or any other information that may not be available in your training data or the local codebase. The search is powered by a configurable search provider (default: DuckDuckGo) and automatically routes through the best available provider.
+const WEB_SEARCH_DESCRIPTION = `Search the web for current information, documentation, error fixes, code examples, or anything not available in the local codebase.
 
-Parameters:
-- query: (required) The search query string to search the web for. This should be a concise, well-formed search query similar to what you would type into a search engine. For best results, use specific keywords and phrases relevant to what you're looking for.
+Returns up to 8 results with titles, URLs, and snippets. For research-intent queries (e.g. "how to", "docs", "error", "example", "API"), the top results are automatically enriched with a full page content preview — so you often won't need a separate read_url call.
 
-Example: Searching for a documentation topic
-{ "query": "React useState hook documentation" }
+Best practices:
+- Use specific, targeted queries (treat it like a search engine)
+- Prefer this over read_url for initial discovery; use read_url to deep-read a specific URL afterward if needed
+- Queries work best in English
+
+Example: Searching for documentation
+{ "query": "React useEffect cleanup function" }
 
 Example: Searching for an error solution
-{ "query": "TypeError Cannot read property of undefined JavaScript fix" }
+{ "query": "TypeError Cannot read properties of undefined JavaScript fix" }
 
-Example: Searching for a library
-{ "query": "npm package zod validation" }`
+Example: Finding a library's API
+{ "query": "zod schema validation API reference" }`
 
-const QUERY_PARAMETER_DESCRIPTION = `The search query string to search the web for. Should be a well-formed search query with specific keywords.`
+const QUERY_PARAMETER_DESCRIPTION = `The search query. Use specific keywords, similar to what you would type into a search engine.`
 
 export default {
 	type: "function",

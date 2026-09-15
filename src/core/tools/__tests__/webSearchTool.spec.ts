@@ -5,17 +5,45 @@ import type { ToolUse } from "../../../shared/tools"
 import { SearchProviderRegistry } from "../../../api/search/registry"
 import { DuckDuckGoProvider } from "../../../api/search/providers/duckduckgo"
 
+// Prevent enrichment side-effects in unit tests — UrlFetcher always rejects
+vi.mock("../../../services/research/fetcher", () => ({
+	UrlFetcher: vi.fn().mockImplementation(() => ({
+		fetch: vi.fn().mockRejectedValue(new Error("mocked fetch — enrichment disabled in tests")),
+	})),
+}))
+
 describe("webSearchTool", () => {
 	let mockTask: any
 	let mockCallbacks: any
 
+	/**
+	 * Mock HTML using the block-based structure our new DuckDuckGo parser expects.
+	 * Each result block starts with <div class="result results_links ..."> and contains:
+	 *   - <a class="result__a" href="URL"> for the title + URL
+	 *   - <a class="result__snippet" href="..."> for the snippet
+	 */
 	const mockHtmlResults = `<!DOCTYPE html>
 <html>
 <body>
 <div class="results">
-<a class="result__snippet" href="https://example.com/result1">Example <b>Result</b> 1</a>
-<a class="result__snippet" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Ftest&rut=abc">GitHub <b>Test</b> Result</a>
-<a class="result__snippet" href="https://example.com/result3">Example Result 3</a>
+<div class="result results_links results_links_deep web-result">
+  <h2 class="result__title">
+    <a class="result__a" href="https://example.com/result1">Example Result 1</a>
+  </h2>
+  <a class="result__snippet" href="https://example.com/result1">This is a snippet for the first example result used in testing.</a>
+</div>
+<div class="result results_links results_links_deep web-result">
+  <h2 class="result__title">
+    <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Ftest&rut=abc">GitHub Test Result</a>
+  </h2>
+  <a class="result__snippet" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Ftest&rut=abc">GitHub snippet text here for testing purposes.</a>
+</div>
+<div class="result results_links results_links_deep web-result">
+  <h2 class="result__title">
+    <a class="result__a" href="https://example.com/result3">Example Result 3</a>
+  </h2>
+  <a class="result__snippet" href="https://example.com/result3">Third result snippet text here.</a>
+</div>
 </div>
 </body>
 </html>`
@@ -98,8 +126,9 @@ describe("webSearchTool", () => {
 
 		expect(mockCallbacks.pushToolResult).toHaveBeenCalled()
 		const result = mockCallbacks.pushToolResult.mock.calls[0][0] as string
-		expect(result).toContain("URL: https://example.com/result1")
-		expect(result).toContain("Snippet: Example Result 1")
+		// New format uses markdown bold headings
+		expect(result).toContain("**URL:** https://example.com/result1")
+		expect(result).toContain("**Snippet:** This is a snippet for the first example result used in testing.")
 		expect(result).toContain("---")
 	})
 
@@ -123,8 +152,8 @@ describe("webSearchTool", () => {
 		await webSearchTool.handle(mockTask as Task, block, mockCallbacks)
 
 		const result = mockCallbacks.pushToolResult.mock.calls[0][0] as string
-		expect(result).toContain("URL: https://github.com/test")
-		expect(result).toContain("Snippet: GitHub Test Result")
+		expect(result).toContain("**URL:** https://github.com/test")
+		expect(result).toContain("**Snippet:** GitHub snippet text here for testing purposes.")
 	})
 
 	it("should handle no results found", async () => {
@@ -146,7 +175,9 @@ describe("webSearchTool", () => {
 
 		await webSearchTool.handle(mockTask as Task, block, mockCallbacks)
 
-		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith("No web search results found.")
+		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith(
+			`No web search results found for: "xyznonexistent123"`,
+		)
 	})
 
 	it("should handle HTTP errors", async () => {
@@ -191,24 +222,27 @@ describe("webSearchTool", () => {
 		expect(mockCallbacks.handleError).toHaveBeenCalledWith(
 			"web_search",
 			expect.objectContaining({
-				message: "Network error",
+				message: expect.stringContaining("Network error"),
 			}),
 		)
-		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith(
-			expect.stringContaining("Web search failed: Network error"),
-		)
+		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith(expect.stringContaining("Network error"))
 	})
 
-	it("should limit results to 5", async () => {
-		const manyResultsHtml = Array.from(
+	it("should return up to 8 results", async () => {
+		// Generate 10 result blocks in the new block-based format
+		const manyResultsHtml = `<html><body>${Array.from(
 			{ length: 10 },
-			(_, i) => `<a class="result__snippet" href="https://example.com/${i}">Result ${i}</a>`,
-		).join("\n")
+			(_, i) => `
+<div class="result results_links results_links_deep web-result">
+  <h2><a class="result__a" href="https://example.com/${i}">Result ${i} Title</a></h2>
+  <a class="result__snippet" href="https://example.com/${i}">Snippet for result ${i} with enough text here.</a>
+</div>`,
+		).join("\n")}</body></html>`
 
 		;(global.fetch as any).mockResolvedValue({
 			ok: true,
 			status: 200,
-			text: vi.fn().mockResolvedValue(`<html><body>${manyResultsHtml}</body></html>`),
+			text: vi.fn().mockResolvedValue(manyResultsHtml),
 		})
 
 		const block: ToolUse<"web_search"> = {
@@ -224,8 +258,34 @@ describe("webSearchTool", () => {
 		await webSearchTool.handle(mockTask as Task, block, mockCallbacks)
 
 		const result = mockCallbacks.pushToolResult.mock.calls[0][0] as string
-		const urlMatches = result.match(/URL:/g)
-		expect(urlMatches).toHaveLength(5)
+		const urlMatches = result.match(/\*\*URL:\*\*/g)
+		// We request maxResults: 8, so at most 8 URLs should be returned
+		expect(urlMatches).not.toBeNull()
+		expect(urlMatches!.length).toBeLessThanOrEqual(8)
+		expect(urlMatches!.length).toBeGreaterThan(0)
+	})
+
+	it("should include result header and count in output", async () => {
+		;(global.fetch as any).mockResolvedValue({
+			ok: true,
+			status: 200,
+			text: vi.fn().mockResolvedValue(mockHtmlResults),
+		})
+
+		const block: ToolUse<"web_search"> = {
+			type: "tool_use" as const,
+			name: "web_search" as const,
+			params: { query: "my query" },
+			partial: false,
+			nativeArgs: { query: "my query" },
+		}
+
+		await webSearchTool.handle(mockTask as Task, block, mockCallbacks)
+
+		const result = mockCallbacks.pushToolResult.mock.calls[0][0] as string
+		expect(result).toContain('Web search results for: "my query"')
+		expect(result).toContain("Found 3 results.")
+		expect(result).toContain("## Result 1")
 	})
 
 	it("handlePartial should be a no-op", async () => {

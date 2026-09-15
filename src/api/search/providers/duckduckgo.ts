@@ -16,44 +16,41 @@ export class DuckDuckGoProvider implements SearchProvider {
 
 	async health(): Promise<HealthStatus> {
 		try {
-			console.log("[DuckDuckGo] health check to:", this.baseUrl)
 			const res = await fetch(this.baseUrl, {
 				method: "HEAD",
 				signal: AbortSignal.timeout(5000),
 				headers: { "User-Agent": this.userAgent },
 			})
-			console.log("[DuckDuckGo] health response:", res.status)
 			return { alive: res.ok, message: `HTTP ${res.status}` }
 		} catch (e) {
-			console.error("[DuckDuckGo] health error:", e)
 			return { alive: false, message: e instanceof Error ? e.message : String(e) }
 		}
 	}
 
 	async search(query: string, options?: SearchOptions): Promise<SearchResult[]> {
 		const maxResults = options?.maxResults ?? 5
-		console.log("[DuckDuckGo] search query:", query)
 
 		// Use POST with form data to avoid DuckDuckGo bot detection on GET requests.
-		// The /html/ endpoint requires a 'q' field in the POST body.
 		const body = new URLSearchParams({ q: query })
 
-		const res = await fetch(this.baseUrl, {
-			method: "POST",
-			headers: {
-				"User-Agent": this.userAgent,
-				Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-				"Accept-Language": "en-US,en;q=0.5",
-				"Content-Type": "application/x-www-form-urlencoded",
-			},
-			body: body.toString(),
-			signal: options?.signal,
-		})
-
-		console.log("[DuckDuckGo] fetch response status:", res.status, res.statusText)
+		let res: Response
+		try {
+			res = await fetch(this.baseUrl, {
+				method: "POST",
+				headers: {
+					"User-Agent": this.userAgent,
+					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+					"Accept-Language": "en-US,en;q=0.5",
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+				body: body.toString(),
+				signal: options?.signal,
+			})
+		} catch (e) {
+			throw new Error(`DuckDuckGo request failed: ${e instanceof Error ? e.message : String(e)}`)
+		}
 
 		// DuckDuckGo may return 200 (success) or 202 (accepted/challenge).
-		// Treat anything other than 200 as a failure to avoid parsing challenge pages.
 		if (res.status !== 200) {
 			throw new Error(
 				`DuckDuckGo search failed: HTTP ${res.status} ${res.statusText}${res.status === 202 ? " (bot challenge page)" : ""}`,
@@ -61,15 +58,8 @@ export class DuckDuckGoProvider implements SearchProvider {
 		}
 
 		const text = await res.text()
-		console.log("[DuckDuckGo] response body length:", text.length)
-
-		// Check for bot-detection indicators
-		if (text.includes("challenge") || text.includes("verify") || text.includes("canonical")) {
-			console.warn("[DuckDuckGo] Possible bot challenge page detected")
-		}
-
 		const results = this.parseResults(text, maxResults)
-		console.log("[DuckDuckGo] parsed results:", results.length)
+		console.log(`[DuckDuckGo] "${query}" → ${results.length} results`)
 		return results
 	}
 
@@ -87,28 +77,95 @@ export class DuckDuckGoProvider implements SearchProvider {
 
 	// ------------------------------------------------------------------ Private
 
+	/**
+	 * Parse DuckDuckGo HTML response into structured results.
+	 *
+	 * DuckDuckGo HTML structure (simplified):
+	 *   <div class="result results_links ...">
+	 *     <h2 class="result__title">
+	 *       <a class="result__a" href="//duckduckgo.com/l/?uddg=ENCODED_URL&...">Title text</a>
+	 *     </h2>
+	 *     <a class="result__snippet" href="...">Snippet text with <b>highlights</b></a>
+	 *   </div>
+	 *
+	 * Strategy: split on result blocks, then extract title+URL+snippet per block.
+	 * If no blocks are matched (e.g. simplified HTML), fall back to snippet anchors.
+	 */
 	private parseResults(html: string, maxResults: number): SearchResult[] {
 		const results: SearchResult[] = []
-		const regex = /<a class="result__snippet[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gs
-		let match: RegExpExecArray | null
 
-		while ((match = regex.exec(html)) !== null) {
-			if (results.length >= maxResults) break
+		// Split into result blocks at each result div
+		const blocks = html.split(/<div[^>]+class="[^"]*result[^"]*results_links[^"]*"[^>]*>/i)
 
-			let url = match[1]
-			if (url.startsWith("//duckduckgo.com/l/?uddg=")) {
-				url = decodeURIComponent(url.split("uddg=")[1].split("&")[0])
+		for (let i = 1; i < blocks.length && results.length < maxResults; i++) {
+			const block = blocks[i]
+
+			// Extract title + URL from <a class="result__a" href="...">TITLE</a>
+			const titleMatch = block.match(
+				/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i,
+			)
+			if (!titleMatch) continue
+
+			const url = this.cleanUrl(titleMatch[1])
+			if (!url.startsWith("http")) continue
+
+			const title = this.stripHtml(titleMatch[2]).trim()
+
+			// Extract snippet from <a class="result__snippet" ...>SNIPPET</a>
+			const snippetMatch = block.match(/<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
+			const snippet = snippetMatch ? this.stripHtml(snippetMatch[1]).trim() : ""
+
+			if (!title && !snippet) continue
+
+			results.push({ url, title: title || url, snippet })
+		}
+
+		// Fallback: parse standalone <a class="result__snippet" ...> if block parsing yielded no results
+		if (results.length === 0) {
+			const regex = /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
+			let match: RegExpExecArray | null
+			while ((match = regex.exec(html)) !== null && results.length < maxResults) {
+				const url = this.cleanUrl(match[1])
+				if (!url.startsWith("http")) continue
+
+				const snippet = this.stripHtml(match[2]).trim()
+				results.push({
+					url,
+					title: url,
+					snippet,
+				})
 			}
-			const snippet = match[2].replace(/<b>/g, "").replace(/<\/b>/g, "").trim()
-
-			results.push({
-				url,
-				title: "",
-				snippet,
-			})
 		}
 
 		return results
+	}
+
+	private cleanUrl(rawUrl: string): string {
+		let url = rawUrl
+		if (url.startsWith("//duckduckgo.com/l/?") || url.includes("duckduckgo.com/l/?")) {
+			const uddg = url.match(/[?&]uddg=([^&]+)/)
+			if (uddg) {
+				url = decodeURIComponent(uddg[1])
+			}
+		}
+		if (url.startsWith("//")) {
+			url = "https:" + url
+		}
+		return url
+	}
+
+	/** Strip HTML tags and decode common HTML entities */
+	private stripHtml(html: string): string {
+		return html
+			.replace(/<[^>]+>/g, " ")
+			.replace(/&amp;/g, "&")
+			.replace(/&lt;/g, "<")
+			.replace(/&gt;/g, ">")
+			.replace(/&quot;/g, '"')
+			.replace(/&#39;/g, "'")
+			.replace(/&nbsp;/g, " ")
+			.replace(/\s+/g, " ")
+			.trim()
 	}
 }
 

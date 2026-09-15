@@ -32,19 +32,8 @@ export class SearchProviderRouter {
 	 */
 	static getActiveProvider(): SearchProvider | undefined {
 		const key = activeProviderSelector()
-		console.log("[SearchProviderRouter] getActiveProvider: selector returned key =", JSON.stringify(key))
-		if (!key) {
-			console.warn("[SearchProviderRouter] Selector returned no key")
-			return undefined
-		}
-		const provider = SearchProviderRegistry.get(key)
-		console.log(
-			"[SearchProviderRouter] getActiveProvider: provider for key",
-			key,
-			"is",
-			provider?.name ?? "undefined",
-		)
-		return provider
+		if (!key) return undefined
+		return SearchProviderRegistry.get(key)
 	}
 
 	/**
@@ -52,31 +41,17 @@ export class SearchProviderRouter {
 	 * Falls back to DuckDuckGo if the active provider is unavailable.
 	 */
 	static async search(query: string, options?: SearchOptions): Promise<SearchResult[]> {
-		console.log("[SearchProviderRouter] search called with query:", query)
-
 		let provider = SearchProviderRouter.getActiveProvider()
-		console.log("[SearchProviderRouter] Active provider resolved to:", provider?.name ?? "none")
 
 		if (!provider) {
-			console.warn("[SearchProviderRouter] No active provider, falling back to DuckDuckGo")
 			// Fall back to DuckDuckGo
 			provider = SearchProviderRegistry.get("duckduckgo")
-			console.log("[SearchProviderRouter] DuckDuckGo fallback resolved:", provider?.name ?? "STILL undefined")
 		}
 		if (!provider) {
-			console.error("[SearchProviderRouter] No search provider available at all")
 			throw new Error("No search provider is configured or available.")
 		}
 
-		console.log("[SearchProviderRouter] Delegating search to provider:", provider.name)
-		try {
-			const results = await provider.search(query, options)
-			console.log("[SearchProviderRouter] Provider returned", results.length, "results")
-			return results
-		} catch (err) {
-			console.error("[SearchProviderRouter] Provider.search threw:", err)
-			throw err
-		}
+		return provider.search(query, options)
 	}
 
 	/**
