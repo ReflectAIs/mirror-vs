@@ -1313,4 +1313,43 @@ describe("ChatTextArea", () => {
 			expect(onModelChange).toHaveBeenCalledWith("claude-opus-4-5")
 		})
 	})
+
+	describe("commitSearchResults message handling", () => {
+		it("should handle commitSearchResults without throwing when commits is undefined", () => {
+			render(<ChatTextArea {...defaultProps} />)
+
+			expect(() => {
+				window.dispatchEvent(
+					new MessageEvent("message", {
+						data: {
+							type: "commitSearchResults",
+						},
+					}),
+				)
+			}).not.toThrow()
+		})
+
+		it("should handle commitSearchResults when results is provided instead of commits", () => {
+			render(<ChatTextArea {...defaultProps} />)
+
+			expect(() => {
+				window.dispatchEvent(
+					new MessageEvent("message", {
+						data: {
+							type: "commitSearchResults",
+							results: [
+								{
+									hash: "abc1234",
+									shortHash: "abc1234",
+									subject: "Fix bug",
+									author: "Alice",
+									date: "2026-09-17",
+								},
+							],
+						},
+					}),
+				)
+			}).not.toThrow()
+		})
+	})
 })

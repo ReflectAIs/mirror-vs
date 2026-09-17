@@ -926,9 +926,10 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			const { searchCommits } = await import("../../utils/git")
 			const { getCurrentCwd } = await import("./handlers/_helpers")
 			const cwd = getCurrentCwd(provider)
-			const searchResults = await searchCommits(cwd, message.query ?? "")
+			const searchResults = await searchCommits(message.query ?? "", cwd)
 			await provider.postMessageToWebview({
 				type: "commitSearchResults",
+				commits: searchResults,
 				results: searchResults as any,
 			})
 			break
