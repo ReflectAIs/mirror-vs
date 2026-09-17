@@ -2,6 +2,21 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.4] - 2026-09-17
+
+### Fixed & Improved
+
+- **Git Commit Search & Webview Crash Fix**:
+    - Fixed webview crash (`Uncaught TypeError: Cannot read properties of undefined (reading 'map')`) in `ChatTextArea` when typing `@` followed by hexadecimal characters or searching Git commits.
+    - Added safe fallbacks (`message.commits || message.results || []`) in webview message handling.
+    - Corrected inverted parameters in `searchCommits(query, cwd)` in extension backend and ensured both `commits` and `results` are provided in the payload.
+- **Web Search Tool Enhancements**:
+    - Improved web search tool with DuckDuckGo title extraction, content enrichment, and clean formatted output.
+- **Terminal Execution Stability**:
+    - Prevented command completion hangs on lingering pipes and missing shell integration markers.
+- **Webview Tab Recovery**:
+    - Automatically open in new tab and resume active task on webview reload.
+
 ## [0.9.3] - 2026-09-15
 
 ### Fixed & Improved
