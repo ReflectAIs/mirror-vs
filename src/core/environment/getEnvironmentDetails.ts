@@ -121,8 +121,21 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 	}
 
 	// 6. Workspace Pulse (semi-static signal about project health)
+	// Fetch git status once and share it with both the pulse (architect mode) and the
+	// volatile Git Status block below, avoiding duplicate `getGitStatus` calls.
+	const { maxGitStatusFiles = 0 } = state ?? {}
+	const needsGitStatus = maxGitStatusFiles > 0 || (includeFileDetails && effectiveMode === "architect")
+	const gitStatusLimit = maxGitStatusFiles > 0 ? maxGitStatusFiles : 50
+	const sharedGitStatus = needsGitStatus ? ((await getGitStatus(mirror.cwd, gitStatusLimit)) ?? undefined) : undefined
+
 	if (includeFileDetails) {
-		const pulse = await buildWorkspacePulse(mirror, effectiveMode)
+		// Pass the already-read recently-modified files: `getAndClearRecentlyModifiedFiles()`
+		// is a destructive read, so letting the pulse call it again would always yield an
+		// empty list and the pulse's "Recent Changes" section would never appear.
+		const pulse = await buildWorkspacePulse(mirror, effectiveMode, {
+			recentlyModifiedFiles,
+			gitStatus: sharedGitStatus,
+		})
 		details += pulse
 	} else {
 		details += `\n\n# Workspace Pulse\n(Use \`get_workspace_pulse\` for live project health data — diagnostics, git branch, terminals, recent changes.)`
@@ -211,13 +224,9 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 	}
 
 	// 8. Git Status (volatile — changes on edit/commit)
-	const { maxGitStatusFiles = 0 } = state ?? {}
-
-	if (maxGitStatusFiles > 0) {
-		const gitStatus = await getGitStatus(mirror.cwd, maxGitStatusFiles)
-		if (gitStatus) {
-			volatileDetails += `\n\n# Git Status\n${gitStatus}`
-		}
+	// Reuse the status fetched above (shared with the architect-mode pulse).
+	if (maxGitStatusFiles > 0 && sharedGitStatus) {
+		volatileDetails += `\n\n# Git Status\n${sharedGitStatus}`
 	}
 
 	// 9. Current Cost (disabled by default to prevent prefix cache invalidation across turns)

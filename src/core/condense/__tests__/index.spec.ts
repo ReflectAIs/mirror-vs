@@ -776,6 +776,55 @@ describe("summarizeConversation", () => {
 		expect(result.error).toBeUndefined()
 	})
 
+	it("should deduplicate consecutive failed exploratory searches before summarizing", async () => {
+		const messages: ApiMessage[] = [
+			{ role: "user", content: "Find the config", ts: 1 },
+			{
+				role: "assistant",
+				content: [
+					{ type: "tool_use", id: "search_1", name: "search_files", input: { query: "UNIQUE_FIRST_QUERY" } },
+				],
+				ts: 2,
+			},
+			{
+				role: "user",
+				content: [{ type: "tool_result", tool_use_id: "search_1", content: "" }],
+				ts: 3,
+			},
+			{
+				role: "assistant",
+				content: [
+					{ type: "tool_use", id: "search_2", name: "search_files", input: { query: "UNIQUE_SECOND_QUERY" } },
+				],
+				ts: 4,
+			},
+			{
+				role: "user",
+				content: [{ type: "tool_result", tool_use_id: "search_2", content: "src/config.ts" }],
+				ts: 5,
+			},
+			{ role: "assistant", content: "Found it", ts: 6 },
+			{ role: "user", content: "Thanks", ts: 7 },
+		]
+
+		await summarizeConversation({
+			messages,
+			apiHandler: mockApiHandler,
+			systemPrompt: defaultSystemPrompt,
+			taskId,
+		})
+
+		expect(mockApiHandler.createMessage).toHaveBeenCalled()
+		// The messages passed to the summarizer are the 2nd arg to createMessage.
+		const requestMessages = (mockApiHandler.createMessage as Mock).mock.calls[0][1] as ApiMessage[]
+		const serialized = JSON.stringify(requestMessages)
+
+		// The redundant empty first search must be stripped from the summarizer input...
+		expect(serialized).not.toContain("UNIQUE_FIRST_QUERY")
+		// ...while the productive search is preserved.
+		expect(serialized).toContain("UNIQUE_SECOND_QUERY")
+	})
+
 	it("should preserve command blocks from first message in summary", async () => {
 		const messages: ApiMessage[] = [
 			{

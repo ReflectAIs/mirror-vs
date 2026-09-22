@@ -143,20 +143,23 @@ export abstract class CacheStrategy {
 	}
 
 	/**
-	 * Apply cache points to content blocks based on placements
+	 * Apply cache points to content blocks based on placements.
+	 *
+	 * Returns new message objects with a new `content` array so the caller's input is
+	 * never mutated. The previous in-place `content.push(...)` leaked cache points into
+	 * the shared conversation history, which destabilized cache prefixes across turns.
+	 *
+	 * Uses a Set lookup (O(m)) instead of scanning placements per message (O(n*m)).
 	 */
 	protected applyCachePoints(messages: Message[], placements: CachePointPlacement[]): Message[] {
-		const result: Message[] = []
-		for (let i = 0; i < messages.length; i++) {
-			const placement = placements.find((p) => p.index === i)
+		const placementIndices = new Set(placements.map((p) => p.index))
 
-			if (placement) {
-				messages[i].content?.push(this.createCachePoint())
+		return messages.map((message, index) => {
+			if (placementIndices.has(index)) {
+				return { ...message, content: [...(message.content ?? []), this.createCachePoint()] }
 			}
-			result.push(messages[i])
-		}
-
-		return result
+			return message
+		})
 	}
 
 	/**

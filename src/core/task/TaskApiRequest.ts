@@ -21,6 +21,8 @@ import { maybeRemoveImageBlocks } from "../../api/transform/image-cleaning"
 import { getModelMaxOutputTokens } from "../../shared/api"
 import { Package } from "../../shared/package"
 import { SYSTEM_PROMPT } from "../prompts/system"
+import type { SystemPromptSettings } from "../prompts/types"
+import type { SkillsManager } from "../../services/skills/SkillsManager"
 import { WorktreeSandboxManager } from "../../integrations/git/WorktreeSandboxManager"
 import { McpHub } from "../../services/mcp/McpHub"
 import { McpServerManager } from "../../services/mcp/McpServerManager"
@@ -47,7 +49,23 @@ const MAX_CONTEXT_WINDOW_RETRIES = 3 // Maximum retries for context window error
  * Extracted from Task.ts to reduce its size and isolate concerns.
  */
 export class TaskApiRequest {
+	/**
+	 * Memoized system prompt. `getSystemPrompt()` is called 2-3x per request
+	 * (attemptApiRequest + condenseContext) and rebuilding it re-reads mode, skill,
+	 * and rule files. The signature covers every input that affects the output, so any
+	 * change self-invalidates the cache; it is also cleared at the start of each request.
+	 */
+	private systemPromptCache?: { signature: string; prompt: string }
+
 	constructor(private readonly task: Task) {}
+
+	/**
+	 * Clears the memoized system prompt. Called at the start of each API request so
+	 * external changes (e.g. edited rules files) are always picked up.
+	 */
+	public invalidateSystemPromptCache(): void {
+		this.systemPromptCache = undefined
+	}
 
 	// ──────────────────────────────────────────────────────────────
 	//  System Prompt
@@ -91,51 +109,140 @@ export class TaskApiRequest {
 			enableSubfolderRules,
 		} = state ?? {}
 
-		return await (async () => {
-			const provider = this.task.providerRef.deref()
+		const provider = this.task.providerRef.deref()
 
-			if (!provider) {
-				throw new Error("Provider not available")
-			}
+		if (!provider) {
+			throw new Error("Provider not available")
+		}
 
-			const modelInfo = this.task.api.getModel().info
+		const modelInfo = this.task.api.getModel().info
+		const modelId = this.task.api.getModel().id
+		const skillsManager = provider.getSkillsManager()
+		const sessionSharedContext = provider.buildStaticSessionContext(this.task.taskId)
+		const workspacePath = this.task.worktreePath || this.task.workspacePath
+		const sandboxBranch = this.task.sandboxPath ? WorktreeSandboxManager.getBranchName(this.task.taskId) : undefined
 
-			return SYSTEM_PROMPT(
-				provider.context,
-				this.task.cwd,
-				false,
-				mcpHub,
-				this.task.diffStrategy,
-				mode ?? defaultModeSlug,
-				customModePrompts,
-				customModes,
-				customInstructions,
-				experiments,
-				language,
-				mirrorIgnoreInstructions,
-				{
-					todoListEnabled: apiConfiguration?.todoListEnabled ?? true,
-					useAgentRules:
-						vscode.workspace.getConfiguration(Package.name).get<boolean>("useAgentRules") ?? true,
-					enableSubfolderRules: enableSubfolderRules ?? false,
-					newTaskRequireTodos: vscode.workspace
-						.getConfiguration(Package.name)
-						.get<boolean>("newTaskRequireTodos", false),
-					isStealthModel: modelInfo?.isStealthModel,
-					reasoningEffort: apiConfiguration?.reasoningEffort,
-					supportsNativeReasoning: !!(
-						modelInfo?.supportsReasoningBudget || modelInfo?.supportsReasoningEffort
-					),
-				},
-				undefined, // todoList
-				this.task.api.getModel().id,
-				provider.getSkillsManager(),
-				provider.buildStaticSessionContext(this.task.taskId),
-				this.task.worktreePath || this.task.workspacePath,
-				this.task.sandboxPath,
-				this.task.sandboxPath ? WorktreeSandboxManager.getBranchName(this.task.taskId) : undefined,
-			)
-		})()
+		const settings: SystemPromptSettings = {
+			todoListEnabled: apiConfiguration?.todoListEnabled ?? true,
+			useAgentRules: vscode.workspace.getConfiguration(Package.name).get<boolean>("useAgentRules") ?? true,
+			enableSubfolderRules: enableSubfolderRules ?? false,
+			newTaskRequireTodos: vscode.workspace
+				.getConfiguration(Package.name)
+				.get<boolean>("newTaskRequireTodos", false),
+			isStealthModel: modelInfo?.isStealthModel,
+			reasoningEffort: apiConfiguration?.reasoningEffort,
+			supportsNativeReasoning: !!(modelInfo?.supportsReasoningBudget || modelInfo?.supportsReasoningEffort),
+		}
+
+		// Memoize: return the cached prompt when every input that affects it is unchanged.
+		const signature = this.computeSystemPromptSignature({
+			mode: mode ?? defaultModeSlug,
+			modelId,
+			customModes,
+			customModePrompts,
+			customInstructions,
+			experiments,
+			language,
+			mirrorIgnoreInstructions,
+			settings,
+			mcpHub,
+			skillsManager,
+			sessionSharedContext,
+			workspacePath,
+			sandboxPath: this.task.sandboxPath,
+			sandboxBranch,
+			cwd: this.task.cwd,
+		})
+
+		if (this.systemPromptCache?.signature === signature) {
+			return this.systemPromptCache.prompt
+		}
+
+		const prompt = await SYSTEM_PROMPT(
+			provider.context,
+			this.task.cwd,
+			false,
+			mcpHub,
+			this.task.diffStrategy,
+			mode ?? defaultModeSlug,
+			customModePrompts,
+			customModes,
+			customInstructions,
+			experiments,
+			language,
+			mirrorIgnoreInstructions,
+			settings,
+			undefined, // todoList
+			modelId,
+			skillsManager,
+			sessionSharedContext,
+			workspacePath,
+			this.task.sandboxPath,
+			sandboxBranch,
+		)
+
+		this.systemPromptCache = { signature, prompt }
+		return prompt
+	}
+
+	/**
+	 * Builds a deterministic signature of every input that affects the system prompt.
+	 * Used to memoize `getSystemPrompt()` safely: any change to these inputs produces a
+	 * different signature and forces a rebuild.
+	 */
+	private computeSystemPromptSignature(inputs: {
+		mode: string
+		modelId: string
+		customModes?: unknown
+		customModePrompts?: unknown
+		customInstructions?: string
+		experiments?: unknown
+		language?: string
+		mirrorIgnoreInstructions?: string
+		settings: SystemPromptSettings
+		mcpHub?: McpHub
+		skillsManager?: SkillsManager
+		sessionSharedContext?: string
+		workspacePath?: string
+		sandboxPath?: string
+		sandboxBranch?: string
+		cwd: string
+	}): string {
+		const mcpSignature = inputs.mcpHub
+			? inputs.mcpHub
+					.getServers()
+					.map((server) => {
+						const tools = (server.tools ?? []).map((tool) => tool.name).join(",")
+						return `${server.name}:${server.status}:${server.instructions ?? ""}:${tools}`
+					})
+					.join("|")
+			: ""
+
+		const skillsSignature = inputs.skillsManager
+			? inputs.skillsManager
+					.getAllSkills()
+					.map((skill) => `${skill.name}:${skill.source}:${skill.description}`)
+					.join("|")
+			: ""
+
+		return JSON.stringify({
+			mode: inputs.mode,
+			modelId: inputs.modelId,
+			customModes: inputs.customModes,
+			customModePrompts: inputs.customModePrompts,
+			customInstructions: inputs.customInstructions,
+			experiments: inputs.experiments,
+			language: inputs.language,
+			mirrorIgnoreInstructions: inputs.mirrorIgnoreInstructions,
+			settings: inputs.settings,
+			mcp: mcpSignature,
+			skills: skillsSignature,
+			sessionSharedContext: inputs.sessionSharedContext,
+			workspacePath: inputs.workspacePath,
+			sandboxPath: inputs.sandboxPath,
+			sandboxBranch: inputs.sandboxBranch,
+			cwd: inputs.cwd,
+		})
 	}
 
 	// ──────────────────────────────────────────────────────────────
@@ -333,6 +440,10 @@ export class TaskApiRequest {
 	// ──────────────────────────────────────────────────────────────
 
 	async *attemptApiRequest(retryAttempt: number = 0, options: { skipProviderRateLimit?: boolean } = {}): ApiStream {
+		// Rebuild the system prompt at most once per request; subsequent calls within
+		// this request (e.g. condenseContext) reuse the memoized result.
+		this.invalidateSystemPromptCache()
+
 		const state = await this.task.providerRef.deref()?.getState()
 
 		const {

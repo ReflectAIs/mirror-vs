@@ -2,6 +2,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.5] - 2026-09-22
+
+### Performance & Reliability
+
+- **Environment Details — Workspace Pulse Recent Changes Fix**:
+    - Fixed a double destructive read of recently-modified files that caused the Workspace Pulse "Recent Changes" diff section to always be empty when full file details were included.
+    - Recently-modified files are now read once and shared with the Workspace Pulse.
+    - Deduplicated `getGitStatus` calls: git status is now fetched once per turn and shared between the architect-mode pulse and the volatile Git Status block.
+- **Context Condensing**:
+    - Wired up `deduplicateExploratoryTools` so redundant failed `search_files` → empty-result pairs are stripped from the summarizer input, reducing condensing token usage and improving summary quality.
+- **Prompt Cache Strategy**:
+    - Made `applyCachePoints` pure (no in-place mutation of message content) and reduced its complexity from O(n·m) to O(n+m).
+    - Replaced repeated per-message token re-estimation in multi-point cache placement with O(1) prefix sums, removing an O(n²) hot path on long conversations.
+- **System Prompt Caching**:
+    - Memoized system prompt generation with a comprehensive input signature; the prompt is now built once per API request and reused across `attemptApiRequest` and context condensing, instead of being rebuilt 2–3 times per turn. The cache is invalidated at the start of each request so external file changes are always picked up.
+
 ## [0.9.4] - 2026-09-17
 
 ### Fixed & Improved

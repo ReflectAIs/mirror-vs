@@ -9,6 +9,42 @@ import { logger } from "../../../utils/logging"
  */
 export class MultiPointStrategy extends CacheStrategy {
 	/**
+	 * Lazily-computed prefix sums of per-message token estimates.
+	 * `tokenPrefixSums[i]` is the sum of estimated tokens for messages `[0, i)`.
+	 */
+	private tokenPrefixSums: number[] | null = null
+
+	/**
+	 * Returns prefix sums of per-message token estimates, computed once per strategy
+	 * instance. Enables O(1) range sums instead of repeatedly re-estimating tokens over
+	 * message slices (which made cache-point placement O(n^2)).
+	 */
+	private getTokenPrefixSums(): number[] {
+		if (this.tokenPrefixSums) {
+			return this.tokenPrefixSums
+		}
+		const sums: number[] = [0]
+		for (const message of this.config.messages) {
+			sums.push(sums[sums.length - 1] + this.estimateTokenCount(message))
+		}
+		this.tokenPrefixSums = sums
+		return sums
+	}
+
+	/**
+	 * Sums estimated tokens for messages in the inclusive range `[startIndex, endIndex]`.
+	 */
+	private sumTokens(startIndex: number, endIndex: number): number {
+		const sums = this.getTokenPrefixSums()
+		const start = Math.max(0, startIndex)
+		const end = Math.min(endIndex + 1, sums.length - 1)
+		if (end <= start) {
+			return 0
+		}
+		return sums[end] - sums[start]
+	}
+
+	/**
 	 * Determine optimal cache point placements and return the formatted result
 	 */
 	public determineOptimalCachePoints(): CacheResult {
@@ -97,9 +133,7 @@ export class MultiPointStrategy extends CacheStrategy {
 
 		// Calculate tokens in new messages (added since last cache point placement)
 		const lastPreviousIndex = previousPlacements[previousPlacements.length - 1].index
-		const newMessagesTokens = this.config.messages
-			.slice(lastPreviousIndex + 1)
-			.reduce((acc, curr) => acc + this.estimateTokenCount(curr), 0)
+		const newMessagesTokens = this.sumTokens(lastPreviousIndex + 1, totalMessages - 1)
 
 		// If new messages have enough tokens for a cache point, we need to decide
 		// whether to keep all previous cache points or combine some
@@ -132,9 +166,7 @@ export class MultiPointStrategy extends CacheStrategy {
 				let startIdx = 0
 
 				for (const placement of previousPlacements) {
-					const tokens = this.config.messages
-						.slice(startIdx, placement.index + 1)
-						.reduce((acc, curr) => acc + this.estimateTokenCount(curr), 0)
+					const tokens = this.sumTokens(startIdx, placement.index)
 
 					tokensBetweenPlacements.push(tokens)
 					startIdx = placement.index + 1
@@ -281,9 +313,7 @@ export class MultiPointStrategy extends CacheStrategy {
 
 			// Calculate tokens from previous cache point (or start) to this cache point
 			const tokenStartIndex = previousCachePointIndex + 1
-			totalTokensCovered = this.config.messages
-				.slice(tokenStartIndex, lastUserMessageIndex + 1)
-				.reduce((acc, curr) => acc + this.estimateTokenCount(curr), 0)
+			totalTokensCovered = this.sumTokens(tokenStartIndex, lastUserMessageIndex)
 
 			// Guard clause: ensure we have enough tokens to justify a cache point
 			if (totalTokensCovered < minTokensPerPoint) {

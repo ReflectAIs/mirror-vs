@@ -17,7 +17,7 @@ import { ApiHandler } from "../../../api/index"
 import { MirrorProvider } from "../../webview/MirrorProvider"
 import { MirrorIgnoreController } from "../../ignore/MirrorIgnoreController"
 import { formatResponse } from "../../prompts/responses"
-import { getGitStatus } from "../../../utils/git"
+import { getGitStatus, getGitDiffForRelativeFile } from "../../../utils/git"
 import { Task } from "../../task/Task"
 
 vi.mock("vscode", () => ({
@@ -459,5 +459,38 @@ describe("getEnvironmentDetails", () => {
 		await getEnvironmentDetails(mockMirror as Task, true)
 
 		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 5)
+	})
+
+	it("should surface recently modified files in the workspace pulse's Recent Changes (no double-clear)", async () => {
+		const getAndClear = vi.fn().mockReturnValue(["modified1.ts"])
+		mockMirror.fileContextTracker = {
+			getAndClearRecentlyModifiedFiles: getAndClear,
+		} as unknown as FileContextTracker
+		;(getGitDiffForRelativeFile as Mock).mockResolvedValue("+added line")
+		mockProvider.getState.mockResolvedValue({ ...mockState, mode: "code" })
+
+		const result = await getEnvironmentDetails(mockMirror as Task, true)
+
+		// The recently-modified list must be consumed exactly once (it is a destructive read).
+		expect(getAndClear).toHaveBeenCalledTimes(1)
+		// And it must reach the pulse's "Recent Changes" section with the diff.
+		expect(result).toContain("### Recent Changes")
+		expect(result).toContain("modified1.ts")
+		expect(result).toContain("+added line")
+	})
+
+	it("should call getGitStatus only once in architect mode when maxGitStatusFiles > 0", async () => {
+		;(getGitStatus as Mock).mockResolvedValue("## main\nM file1.ts")
+		mockProvider.getState.mockResolvedValue({
+			...mockState,
+			mode: "architect",
+			maxGitStatusFiles: 10,
+		})
+
+		await getEnvironmentDetails(mockMirror as Task, true)
+
+		// Previously the pulse and the volatile Git Status block each called it.
+		expect(getGitStatus).toHaveBeenCalledTimes(1)
+		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 10)
 	})
 })

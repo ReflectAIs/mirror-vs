@@ -23,6 +23,21 @@ const gitPulseCache = new Map<string, GitPulseCacheEntry>()
 const GIT_PULSE_CACHE_TTL_MS = 5_000
 
 /**
+ * Optional precomputed inputs for {@link buildWorkspacePulse}.
+ *
+ * Callers that already fetched these values (e.g. `getEnvironmentDetails`) can pass
+ * them in to avoid duplicate work. In particular, `recentlyModifiedFiles` is a
+ * destructive read (`getAndClearRecentlyModifiedFiles`), so passing it in prevents
+ * the list from being cleared before the pulse can consume it.
+ */
+export interface WorkspacePulseOptions {
+	/** Recently modified files, already read via getAndClearRecentlyModifiedFiles(). */
+	recentlyModifiedFiles?: string[]
+	/** Precomputed git status output, to avoid a duplicate `getGitStatus` call. */
+	gitStatus?: string
+}
+
+/**
  * Builds a mode-appropriate "Workspace Pulse" — a compact, proactive context bundle
  * injected into environment details so the model can skip 2-4 probing tool calls.
  *
@@ -32,7 +47,11 @@ const GIT_PULSE_CACHE_TTL_MS = 5_000
  *   mid-code-block truncation that would corrupt the model's Markdown parser
  * - Stale diffs are cleared per-turn via getAndClearRecentlyModifiedFiles()
  */
-export async function buildWorkspacePulse(mirror: Task, currentMode: string): Promise<string> {
+export async function buildWorkspacePulse(
+	mirror: Task,
+	currentMode: string,
+	options: WorkspacePulseOptions = {},
+): Promise<string> {
 	const state = await mirror.providerRef.deref()?.getState()
 	const includeDiagnosticMessages = state?.includeDiagnosticMessages ?? true
 	const maxDiagnosticMessages = state?.maxDiagnosticMessages ?? 50
@@ -123,8 +142,12 @@ export async function buildWorkspacePulse(mirror: Task, currentMode: string): Pr
 			}
 		}
 
-		// Git diffs for recently modified files
-		const modifiedFiles = mirror.fileContextTracker.getAndClearRecentlyModifiedFiles()
+		// Git diffs for recently modified files.
+		// Prefer caller-provided files: `getAndClearRecentlyModifiedFiles()` is a
+		// destructive read, so calling it here after the caller already did would
+		// always yield an empty list (the pulse's "Recent Changes" would never show).
+		const modifiedFiles =
+			options.recentlyModifiedFiles ?? mirror.fileContextTracker.getAndClearRecentlyModifiedFiles()
 		if (modifiedFiles.length > 0) {
 			pulse += "\n### Recent Changes\n"
 			for (const filePath of modifiedFiles.slice(0, 5)) {
@@ -143,7 +166,8 @@ export async function buildWorkspacePulse(mirror: Task, currentMode: string): Pr
 	}
 
 	if (currentMode === "architect") {
-		const gitStatus = await getGitStatus(mirror.cwd, 50)
+		// Reuse a caller-provided git status when available to avoid a duplicate call.
+		const gitStatus = options.gitStatus ?? (await getGitStatus(mirror.cwd, 50))
 		if (gitStatus && pulse.length + gitStatus.length < MAX_PULSE_LENGTH) {
 			pulse += `\n### Git Status\n${gitStatus}\n`
 		}

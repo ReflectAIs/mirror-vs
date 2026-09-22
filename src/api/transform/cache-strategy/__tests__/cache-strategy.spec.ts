@@ -1109,4 +1109,46 @@ describe("Cache Strategy", () => {
 			})
 		})
 	})
+
+	// SECTION 4: Purity & token accounting
+	describe("Strategy purity and token accounting", () => {
+		it("applyCachePoints should not mutate the input messages", () => {
+			const config = createConfig({
+				messages: [{ role: "user", content: "Hello" }],
+				systemPrompt: "",
+			})
+			const strategy = new MultiPointStrategy(config) as any
+
+			const inputMessages = [{ role: "user", content: [{ text: "Hello" }] }]
+			const placements = [{ index: 0, type: "message", tokensCovered: 10 }]
+
+			const result = strategy.applyCachePoints(inputMessages, placements)
+
+			// Returned message has the cache point appended...
+			expect(result[0].content).toHaveLength(2)
+			// ...but the caller's input is untouched.
+			expect(inputMessages[0].content).toHaveLength(1)
+		})
+
+		it("should sum message tokens via prefix sums without re-estimating", () => {
+			const config = createConfig({
+				messages: [
+					{ role: "user", content: "one" },
+					{ role: "assistant", content: "two" },
+					{ role: "user", content: "three" },
+				],
+				systemPrompt: "",
+			})
+			const strategy = new MultiPointStrategy(config) as any
+
+			// Pin per-message estimates so the expected sums are deterministic.
+			strategy.estimateTokenCount = () => 10
+
+			expect(strategy.sumTokens(0, 2)).toBe(30)
+			expect(strategy.sumTokens(1, 1)).toBe(10)
+			// Out-of-range ranges clamp safely.
+			expect(strategy.sumTokens(2, 1)).toBe(0)
+			expect(strategy.sumTokens(0, 99)).toBe(30)
+		})
+	})
 })

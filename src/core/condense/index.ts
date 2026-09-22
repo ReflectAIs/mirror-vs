@@ -348,8 +348,11 @@ export async function summarizeConversation(options: SummarizeConversationOption
 
 	const response: SummarizeResponse = { messages, cost: 0, summary: "" }
 
-	// Get messages to summarize (all messages since the last summary, if any)
-	const messagesToSummarize = getMessagesSinceLastSummary(messages)
+	// Get messages to summarize (all messages since the last summary, if any).
+	// Strip redundant failed exploratory searches (search_files → empty/error result)
+	// before summarizing: this reduces summarizer input tokens and improves summary
+	// quality without mutating the stored conversation history.
+	const messagesToSummarize = deduplicateExploratoryTools(getMessagesSinceLastSummary(messages))
 
 	if (messagesToSummarize.length <= 1) {
 		const error =
