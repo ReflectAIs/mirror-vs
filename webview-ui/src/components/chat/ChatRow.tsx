@@ -1,5 +1,4 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSize } from "react-use"
 import { useTranslation, Trans } from "react-i18next"
 import deepEqual from "fast-deep-equal"
 import { VSCodeBadge } from "@vscode/webview-ui-toolkit/react"
@@ -148,53 +147,59 @@ interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
 const ChatRow = memo(
 	(props: ChatRowProps) => {
 		const { isLast, onHeightChange, message } = props
-		// Store the previous height to compare with the current height
+		const rowRef = useRef<HTMLDivElement | null>(null)
 		const prevHeightRef = useRef(0)
 		const debounceTimeoutRef = useRef<number | null>(null)
 
-		const [chatrow, { height }] = useSize(
-			<div className="px-3 py-1.5" data-ts={message.ts}>
-				<ChatRowErrorBoundary message={message}>
-					<ChatRowContent {...props} />
-				</ChatRowErrorBoundary>
-			</div>,
-		)
-
 		useEffect(() => {
-			if (!isLast) {
+			if (!isLast || !rowRef.current) {
 				if (debounceTimeoutRef.current !== null) {
 					window.clearTimeout(debounceTimeoutRef.current)
 					debounceTimeoutRef.current = null
 				}
 				return
 			}
-			const isHeightValid = height !== 0 && height !== Infinity
-			const isInitialRender = prevHeightRef.current === 0
 
-			// Require minimum 6px delta to prevent sub-pixel layout thrash and debounced execution
-			if (isHeightValid && Math.abs(height - prevHeightRef.current) >= 6) {
-				if (!isInitialRender) {
-					if (debounceTimeoutRef.current !== null) {
-						window.clearTimeout(debounceTimeoutRef.current)
+			const target = rowRef.current
+			const observer = new ResizeObserver((entries) => {
+				for (const entry of entries) {
+					const height = entry.contentRect.height
+					const isHeightValid = height > 0 && height !== Infinity
+					const isInitialRender = prevHeightRef.current === 0
+
+					if (isHeightValid && Math.abs(height - prevHeightRef.current) >= 6) {
+						if (!isInitialRender) {
+							if (debounceTimeoutRef.current !== null) {
+								window.clearTimeout(debounceTimeoutRef.current)
+							}
+							debounceTimeoutRef.current = window.setTimeout(() => {
+								onHeightChange(height > prevHeightRef.current)
+								debounceTimeoutRef.current = null
+							}, 50)
+						}
+						prevHeightRef.current = height
 					}
-					debounceTimeoutRef.current = window.setTimeout(() => {
-						onHeightChange(height > prevHeightRef.current)
-						debounceTimeoutRef.current = null
-					}, 50)
 				}
-				prevHeightRef.current = height
-			}
+			})
+
+			observer.observe(target)
 
 			return () => {
+				observer.disconnect()
 				if (debounceTimeoutRef.current !== null) {
 					window.clearTimeout(debounceTimeoutRef.current)
 					debounceTimeoutRef.current = null
 				}
 			}
-		}, [height, isLast, onHeightChange])
+		}, [isLast, onHeightChange])
 
-		// we cannot return null as virtuoso does not support it, so we use a separate visibleMessages array to filter out messages that should not be rendered
-		return chatrow
+		return (
+			<div ref={rowRef} className="px-3 py-1.5" data-ts={message.ts}>
+				<ChatRowErrorBoundary message={message}>
+					<ChatRowContent {...props} />
+				</ChatRowErrorBoundary>
+			</div>
+		)
 	},
 	// memo does shallow comparison of props, so we need to do deep comparison of arrays/objects whose properties might change
 	deepEqual,

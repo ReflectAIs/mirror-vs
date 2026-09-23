@@ -32,6 +32,7 @@ import { checkContextWindowExceededError } from "../context/context-management/c
 import { getEnvironmentDetails } from "../environment/getEnvironmentDetails"
 import { getMessagesSinceLastSummary, getEffectiveApiHistory } from "../condense"
 import { mergeConsecutiveApiMessages } from "./mergeConsecutiveApiMessages"
+import { pruneHistoricalToolResults } from "./pruneHistoricalToolResults"
 import { defaultModeSlug } from "../../shared/modes"
 import { type ApiMessage } from "../task-persistence"
 import { Task } from "./Task"
@@ -453,8 +454,9 @@ export class TaskApiRequest {
 			mode,
 			autoCondenseContext = true,
 			autoCondenseContextPercent = 80,
+			maxContextTokensBeforeCondense,
 			profileThresholds = {},
-		} = state ?? {}
+		} = (state as any) ?? {}
 
 		// Get condensing configuration for automatic triggers.
 		const customCondensingPrompt = state?.customSupportPrompts?.CONDENSE
@@ -505,12 +507,16 @@ export class TaskApiRequest {
 					: await this.task.api.countTokens([{ type: "text", text: lastMessageContent as string }])
 			}
 
+			const effectiveMaxContextTokens =
+				maxContextTokensBeforeCondense ?? (apiConfiguration as any)?.maxContextTokensBeforeCondense
+
 			const contextManagementWillRun = willManageContext({
 				totalTokens: contextTokens,
 				contextWindow,
 				maxTokens,
 				autoCondenseContext,
 				autoCondenseContextPercent,
+				maxContextTokensBeforeCondense: effectiveMaxContextTokens,
 				profileThresholds,
 				currentProfileId,
 				lastMessageTokens,
@@ -578,6 +584,7 @@ export class TaskApiRequest {
 							customCondensingPrompt,
 							profileThresholds,
 							currentProfileId,
+							maxContextTokensBeforeCondense: effectiveMaxContextTokens,
 							metadata: contextMgmtMetadata,
 							environmentDetails: contextMgmtEnvironmentDetails,
 							filesReadByMirror: contextMgmtFilesReadByMirror,
@@ -660,6 +667,9 @@ export class TaskApiRequest {
 		// For API only: merge consecutive user messages (excludes summary messages per
 		// mergeConsecutiveApiMessages implementation) without mutating stored history.
 		const mergedForApi = mergeConsecutiveApiMessages(messagesSinceLastSummary, { roles: ["user"] })
+		// Observation masking: prune large historical tool results from older turns
+		// to conserve context while keeping active working memory intact.
+		const prunedForApi = pruneHistoricalToolResults(mergedForApi)
 
 		// Create AbortController BEFORE maybeRemoveImageBlocks so the user can cancel
 		// even if Tesseract.js OCR hangs on a large user-attached image.
@@ -669,7 +679,7 @@ export class TaskApiRequest {
 		const imageCleanupAbortSignal = this.task.currentRequestAbortController.signal
 
 		const messagesWithoutImages = await Promise.race([
-			maybeRemoveImageBlocks(mergedForApi, this.task.api),
+			maybeRemoveImageBlocks(prunedForApi, this.task.api),
 			new Promise<never>((_, reject) => {
 				if (imageCleanupAbortSignal.aborted) {
 					reject(new Error("Request cancelled by user"))

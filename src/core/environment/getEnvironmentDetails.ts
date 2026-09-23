@@ -179,6 +179,11 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 
 			if (newOutput) {
 				newOutput = Terminal.compressTerminalOutput(newOutput)
+				if (newOutput.length > 2000) {
+					const head = newOutput.slice(0, 1000)
+					const tail = newOutput.slice(-800)
+					newOutput = `${head}\n\n[... Truncated ${newOutput.length - 1800} characters. Use read_command_output to inspect full output if needed ...]\n\n${tail}`
+				}
 				volatileDetails += `\n### New Output\n${newOutput}`
 			}
 		}

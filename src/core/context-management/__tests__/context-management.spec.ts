@@ -1695,5 +1695,84 @@ describe("Context Management", () => {
 			// With system prompt included, we expect roughly 50% of the messages remaining
 			expect(result.newContextTokensAfterTruncation).toBeGreaterThan(0)
 		})
+
+		it("should recount truncated context in a single batched countTokens call", async () => {
+			const modelInfo = createModelInfo(100000, 30000)
+			const totalTokens = 70001 // Above threshold to trigger truncation
+
+			const messages: ApiMessage[] = [
+				{ role: "user", content: "First message" },
+				{ role: "assistant", content: "Second message" },
+				{ role: "user", content: "Third message" },
+				{ role: "assistant", content: "Fourth message" },
+				{ role: "user", content: "" },
+			]
+
+			const systemPrompt = "System prompt for batching test"
+			const countTokensSpy = vi.spyOn(mockApiHandler, "countTokens")
+
+			try {
+				const result = await manageContext({
+					messages,
+					totalTokens,
+					contextWindow: modelInfo.contextWindow,
+					maxTokens: modelInfo.maxTokens,
+					apiHandler: mockApiHandler,
+					autoCondenseContext: false,
+					autoCondenseContextPercent: 100,
+					systemPrompt,
+					taskId,
+					profileThresholds: {},
+					currentProfileId: "default",
+				})
+
+				expect(result.truncationId).toBeDefined()
+
+				// The recount must be a single batched call (system prompt + all visible
+				// message blocks), not one call per message.
+				const batchedCalls = countTokensSpy.mock.calls.filter((args) => (args[0] as unknown[]).length > 1)
+				expect(batchedCalls).toHaveLength(1)
+				expect((batchedCalls[0][0] as Anthropic.Messages.ContentBlockParam[])[0]).toEqual({
+					type: "text",
+					text: systemPrompt,
+				})
+			} finally {
+				countTokensSpy.mockRestore()
+			}
+		})
+
+		it("should trigger context condensing early when maxContextTokensBeforeCondense is reached", () => {
+			const modelInfo = createModelInfo(200000, 30000) // 200k context window
+			// At 50,000 tokens, 50k / 200k = 25% (far below default 80% threshold)
+			const totalTokens = 50000
+			const lastMessageTokens = 500
+
+			// Without absolute cap: should NOT run
+			const willRunWithoutCap = willManageContext({
+				totalTokens,
+				contextWindow: modelInfo.contextWindow,
+				maxTokens: modelInfo.maxTokens,
+				autoCondenseContext: true,
+				autoCondenseContextPercent: 80,
+				profileThresholds: {},
+				currentProfileId: "default",
+				lastMessageTokens,
+			})
+			expect(willRunWithoutCap).toBe(false)
+
+			// With absolute cap set to 50,000 tokens: SHOULD run early
+			const willRunWithCap = willManageContext({
+				totalTokens,
+				contextWindow: modelInfo.contextWindow,
+				maxTokens: modelInfo.maxTokens,
+				autoCondenseContext: true,
+				autoCondenseContextPercent: 80,
+				profileThresholds: {},
+				currentProfileId: "default",
+				lastMessageTokens,
+				maxContextTokensBeforeCondense: 50000,
+			})
+			expect(willRunWithCap).toBe(true)
+		})
 	})
 })

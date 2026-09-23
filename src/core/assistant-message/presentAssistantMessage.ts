@@ -7,6 +7,7 @@ import { customToolRegistry } from "@mirror-vs/core"
 import { t } from "../../i18n"
 
 import { defaultModeSlug, getModeBySlug } from "../../shared/modes"
+import { experiments, EXPERIMENT_IDS } from "../../shared/experiments"
 import type { ToolParamName, ToolResponse, ToolUse, McpToolUse } from "../../shared/tools"
 import { RECOVERY_STRATEGIES } from "../task/TaskMainLoop"
 
@@ -864,11 +865,15 @@ export async function presentAssistantMessage(mirror: Task) {
 			}
 
 			// --- Parallel Read Batching ---
-			// When the parallelToolReads experiment is enabled, scan ahead for
+			// When parallelToolReads is enabled (default: true), scan ahead for
 			// consecutive non-partial read-only tool blocks and execute them all
 			// at once via Promise.all. This gives a 2-5x speedup on read-heavy
 			// turns without risking data races (reads are idempotent).
-			if (stateExperiments?.parallelToolReads && !block.partial && READ_TOOLS.has(block.name)) {
+			const isParallelReadsEnabled = experiments.isEnabled(
+				stateExperiments ?? ({} as any),
+				EXPERIMENT_IDS.PARALLEL_TOOL_READS,
+			)
+			if (isParallelReadsEnabled && !block.partial && READ_TOOLS.has(block.name)) {
 				await executeReadBatch(mirror, block, toolCallId, {
 					pushToolResult,
 					handleError,

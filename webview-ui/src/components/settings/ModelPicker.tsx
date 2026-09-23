@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 import { VSCodeLink } from "@vscode/webview-ui-toolkit/react"
 import { Trans } from "react-i18next"
-import { ChevronsUpDown, Check, X, Info } from "lucide-react"
+import { ChevronsUpDown, Check, X, Info, Trash2 } from "lucide-react"
 
 import { type ProviderSettings, type ModelInfo, type OrganizationAllowList, isRetiredProvider } from "@mirror-vs/types"
 
@@ -357,6 +357,56 @@ export const ModelPicker = ({
 					<label className="text-[11px] font-bold tracking-wide uppercase text-vscode-foreground opacity-90">
 						Custom Model Manager
 					</label>
+					<div className="flex items-center gap-2">
+						{deletedDefaultModels.length > 0 && (
+							<button
+								type="button"
+								className="text-[10px] text-vscode-descriptionForeground hover:text-vscode-foreground transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none p-0"
+								onClick={() => {
+									setDeletedDefaultModels([])
+									localStorage.removeItem(
+										`deleted_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+									)
+								}}
+								title="Restore hidden default models">
+								<span>Restore Defaults</span>
+							</button>
+						)}
+						{modelIds.length > 0 && (
+							<button
+								type="button"
+								className="text-[10px] text-vscode-descriptionForeground hover:text-vscode-errorForeground transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none p-0"
+								onClick={() => {
+									// 1. Clear all saved custom models
+									setSavedCustomModels([])
+									localStorage.removeItem(
+										`custom_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+									)
+
+									// 2. Mark any remaining default models as deleted/hidden
+									const currentDefaults = modelIds.filter((m) => !savedCustomModels.includes(m))
+									if (currentDefaults.length > 0) {
+										const nextDeleted = Array.from(
+											new Set([...deletedDefaultModels, ...currentDefaults]),
+										)
+										setDeletedDefaultModels(nextDeleted)
+										localStorage.setItem(
+											`deleted_models_${apiConfiguration.apiProvider}_${modelIdKey}`,
+											JSON.stringify(nextDeleted),
+										)
+									}
+
+									// 3. Fallback selected model if needed
+									if (modelIds.includes(displayValue || "")) {
+										onSelect(defaultModelId)
+									}
+								}}
+								title="Remove all models from the list">
+								<Trash2 className="size-3" />
+								<span>Clear All</span>
+							</button>
+						)}
+					</div>
 				</div>
 				<div className="flex gap-2">
 					<input

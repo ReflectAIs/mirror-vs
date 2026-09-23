@@ -6,9 +6,11 @@ import { EXPERIMENT_IDS, experimentConfigsMap, experimentDefault, experiments as
 
 describe("experiments", () => {
 	describe("graduated experiments", () => {
-		it("LSP_CODE_GRAPH and GIT_WORKTREE_SANDBOX are enabled by default", () => {
+		it("PARALLEL_TOOL_READS, LSP_CODE_GRAPH and GIT_WORKTREE_SANDBOX are enabled by default", () => {
+			expect(experimentDefault.parallelToolReads).toBe(true)
 			expect(experimentDefault.lspCodeGraph).toBe(true)
 			expect(experimentDefault.gitWorktreeSandbox).toBe(true)
+			expect(experimentConfigsMap.PARALLEL_TOOL_READS).toMatchObject({ enabled: true })
 			expect(experimentConfigsMap.LSP_CODE_GRAPH).toMatchObject({ enabled: true })
 			expect(experimentConfigsMap.GIT_WORKTREE_SANDBOX).toMatchObject({ enabled: true })
 		})
@@ -33,8 +35,12 @@ describe("experiments", () => {
 			}
 			// Simulate absence by deleting the keys (runtime allows it even though the type doesn't)
 			const partial = experiments as Partial<Record<ExperimentId, boolean>>
+			delete partial.parallelToolReads
 			delete partial.lspCodeGraph
 			delete partial.gitWorktreeSandbox
+			expect(
+				Experiments.isEnabled(experiments as Record<ExperimentId, boolean>, EXPERIMENT_IDS.PARALLEL_TOOL_READS),
+			).toBe(true)
 			expect(
 				Experiments.isEnabled(experiments as Record<ExperimentId, boolean>, EXPERIMENT_IDS.LSP_CODE_GRAPH),
 			).toBe(true)

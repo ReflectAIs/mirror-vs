@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import * as path from "path"
 
-import { listFiles } from "../../services/glob/list-files"
+import { listFiles, invalidateListFilesCache } from "../../services/glob/list-files"
 import { MirrorProvider } from "../../core/webview/MirrorProvider"
 import { toRelativePath, getWorkspacePath } from "../../utils/path"
 
@@ -44,6 +44,10 @@ class WorkspaceTracker {
 		this.disposables.push(
 			watcher.onDidCreate(async (uri) => {
 				await this.addFilePath(uri.fsPath)
+				// Drop the cached directory listing so the next environment-details build
+				// (and the workspace file tree) reflects the new file immediately instead of
+				// waiting up to the cache TTL.
+				invalidateListFilesCache(this.cwd)
 				this.workspaceDidUpdate()
 			}),
 		)
@@ -52,6 +56,7 @@ class WorkspaceTracker {
 		this.disposables.push(
 			watcher.onDidDelete(async (uri) => {
 				if (await this.removeFilePath(uri.fsPath)) {
+					invalidateListFilesCache(this.cwd)
 					this.workspaceDidUpdate()
 				}
 			}),

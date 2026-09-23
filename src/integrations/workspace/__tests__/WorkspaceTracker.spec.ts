@@ -2,7 +2,7 @@ import type { Mock } from "vitest"
 import * as vscode from "vscode"
 import WorkspaceTracker from "../WorkspaceTracker"
 import { MirrorProvider } from "../../../core/webview/MirrorProvider"
-import { listFiles } from "../../../services/glob/list-files"
+import { listFiles, invalidateListFilesCache } from "../../../services/glob/list-files"
 import { getWorkspacePath } from "../../../utils/path"
 
 // Mock functions - must be defined before vitest.mock calls
@@ -63,6 +63,7 @@ vitest.mock("vscode", () => ({
 
 vitest.mock("../../../services/glob/list-files", () => ({
 	listFiles: vitest.fn(),
+	invalidateListFilesCache: vitest.fn(),
 }))
 
 describe("WorkspaceTracker", () => {
@@ -117,6 +118,8 @@ describe("WorkspaceTracker", () => {
 			filePaths: ["newfile.ts"],
 			openedTabs: [],
 		})
+		// The directory-listing cache must be dropped so the file tree refreshes immediately.
+		expect(invalidateListFilesCache).toHaveBeenCalledWith("/test/workspace")
 	})
 
 	it("should handle file deletion events", async () => {
@@ -136,6 +139,8 @@ describe("WorkspaceTracker", () => {
 			filePaths: [],
 			openedTabs: [],
 		})
+		// Deletion must also invalidate the directory-listing cache.
+		expect(invalidateListFilesCache).toHaveBeenCalledWith("/test/workspace")
 	})
 
 	it("should handle directory paths correctly", async () => {

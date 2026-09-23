@@ -251,4 +251,27 @@ describe("ModelPicker", () => {
 			expect(screen.queryByText(errorMessage)).not.toBeInTheDocument()
 		})
 	})
+
+	describe("Custom Model Manager", () => {
+		it("clears all custom models when Clear All is clicked", async () => {
+			const provider = (defaultProps.apiConfiguration as any).apiProvider
+			const storageKey = `custom_models_${provider}_${defaultProps.modelIdKey}`
+			localStorage.setItem(storageKey, JSON.stringify(["custom-model-1", "custom-model-2"]))
+
+			render(
+				<QueryClientProvider client={queryClient}>
+					<ModelPicker {...defaultProps} />
+				</QueryClientProvider>,
+			)
+
+			const clearAllButton = screen.getByTitle("Remove all models from the list")
+			expect(clearAllButton).toBeInTheDocument()
+
+			await act(async () => {
+				fireEvent.click(clearAllButton)
+			})
+
+			expect(localStorage.getItem(storageKey)).toBeNull()
+		})
+	})
 })

@@ -143,6 +143,8 @@ export type WillManageContextOptions = {
 	profileThresholds: Record<string, number>
 	currentProfileId: string
 	lastMessageTokens: number
+	/** Optional absolute token limit to trigger condensing early on massive context windows */
+	maxContextTokensBeforeCondense?: number
 }
 
 /**
@@ -163,6 +165,7 @@ export function willManageContext({
 	profileThresholds,
 	currentProfileId,
 	lastMessageTokens,
+	maxContextTokensBeforeCondense,
 }: WillManageContextOptions): boolean {
 	if (!autoCondenseContext) {
 		// When auto-condense is disabled, only truncation can occur
@@ -189,7 +192,9 @@ export function willManageContext({
 	}
 
 	const contextPercent = (100 * prevContextTokens) / contextWindow
-	return contextPercent >= effectiveThreshold || prevContextTokens > allowedTokens
+	const exceededAbsoluteThreshold =
+		maxContextTokensBeforeCondense !== undefined && prevContextTokens >= maxContextTokensBeforeCondense
+	return contextPercent >= effectiveThreshold || prevContextTokens > allowedTokens || exceededAbsoluteThreshold
 }
 
 /**
@@ -215,6 +220,8 @@ export type ContextManagementOptions = {
 	customCondensingPrompt?: string
 	profileThresholds: Record<string, number>
 	currentProfileId: string
+	/** Optional absolute token limit to trigger condensing early on massive context windows */
+	maxContextTokensBeforeCondense?: number
 	/** Optional metadata to pass through to the condensing API call (tools, taskId, etc.) */
 	metadata?: ApiHandlerCreateMessageMetadata
 	/** Optional environment details string to include in the condensed summary */
@@ -238,7 +245,7 @@ export type ContextManagementResult = SummarizeResponse & {
  * Conditionally manages conversation context (condense and fallback truncation).
  *
  * @param {ContextManagementOptions} options - The options for truncation/condensation
- * @returns {Promise<ApiMessage[]>} The original, condensed, or truncated conversation messages.
+ * @returns {Promise<ContextManagementResult>} The result of context management.
  */
 export async function manageContext({
 	messages,
@@ -253,6 +260,7 @@ export async function manageContext({
 	customCondensingPrompt,
 	profileThresholds,
 	currentProfileId,
+	maxContextTokensBeforeCondense,
 	metadata,
 	environmentDetails,
 	filesReadByMirror,
@@ -301,7 +309,9 @@ export async function manageContext({
 
 	if (autoCondenseContext) {
 		const contextPercent = (100 * prevContextTokens) / contextWindow
-		if (contextPercent >= effectiveThreshold || prevContextTokens > allowedTokens) {
+		const exceededAbsoluteThreshold =
+			maxContextTokensBeforeCondense !== undefined && prevContextTokens >= maxContextTokensBeforeCondense
+		if (contextPercent >= effectiveThreshold || prevContextTokens > allowedTokens || exceededAbsoluteThreshold) {
 			// Attempt to intelligently condense the context
 			const result = await summarizeConversation({
 				messages,
@@ -338,22 +348,19 @@ export async function manageContext({
 
 		// Include system prompt tokens so this value matches what we send to the API.
 		// Note: `prevContextTokens` is computed locally here (totalTokens + lastMessageTokens).
-		let newContextTokensAfterTruncation = await estimateTokenCount(
-			[{ type: "text", text: systemPrompt }],
-			apiHandler,
-		)
-
+		// Collect every block (system prompt + visible messages) and count them in a single
+		// call: token counting is additive over blocks, and one batched call avoids N
+		// sequential worker round-trips on long conversations.
+		const blocksToCount: Array<Anthropic.Messages.ContentBlockParam> = [{ type: "text", text: systemPrompt }]
 		for (const msg of effectiveMessages) {
 			const content = msg.content
 			if (Array.isArray(content)) {
-				newContextTokensAfterTruncation += await estimateTokenCount(content, apiHandler)
+				blocksToCount.push(...content)
 			} else if (typeof content === "string") {
-				newContextTokensAfterTruncation += await estimateTokenCount(
-					[{ type: "text", text: content }],
-					apiHandler,
-				)
+				blocksToCount.push({ type: "text", text: content })
 			}
 		}
+		const newContextTokensAfterTruncation = await estimateTokenCount(blocksToCount, apiHandler)
 
 		return {
 			messages: truncationResult.messages,

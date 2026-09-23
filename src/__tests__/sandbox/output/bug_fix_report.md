@@ -1,52 +1,61 @@
 # 📊 Sandbox Test Report: bug_fix
+
 **Model**: accounts/fireworks/models/glm-5p3-flash
 **Status**: ✅ Completed
 
 ## Turn Efficiency
-| Metric | Value |
-|--------|-------|
-| Total Turns | 3 |
-| Wasted Turns | 0 |
-| Turns to Completion | 3 |
+
+| Metric              | Value |
+| ------------------- | ----- |
+| Total Turns         | 5     |
+| Wasted Turns        | 0     |
+| Turns to Completion | 5     |
 
 ## Token Usage
-| Metric | Value |
-|--------|-------|
-| Total Input Tokens | 5,438 |
-| Total Output Tokens | 1,151 |
-| Avg Input/Turn | 1,813 |
-| Avg Output/Turn | 384 |
-| Token Efficiency (out/in) | 0.212 |
-| Estimated Cost | $0.00089 |
+
+| Metric                    | Value    |
+| ------------------------- | -------- |
+| Total Input Tokens        | 10,403   |
+| Total Output Tokens       | 1,403    |
+| Avg Input/Turn            | 2,081    |
+| Avg Output/Turn           | 281      |
+| Token Efficiency (out/in) | 0.135    |
+| Estimated Cost            | $0.00146 |
 
 ## Tool Usage
-| Metric | Value |
-|--------|-------|
-| Total Tool Calls | 3 |
-| Unique Tools Used | apply_diff, execute_command, attempt_completion |
-| Redundant Reads | 0 |
-| Failed Tool Calls | 0 |
+
+| Metric            | Value                                                          |
+| ----------------- | -------------------------------------------------------------- |
+| Total Tool Calls  | 5                                                              |
+| Unique Tools Used | apply_diff, execute_command, write_to_file, attempt_completion |
+| Redundant Reads   | 0                                                              |
+| Failed Tool Calls | 1                                                              |
 
 ### Tool Call Breakdown
-| Tool | Count |
-|------|-------|
-| apply_diff | 1 |
-| execute_command | 1 |
-| attempt_completion | 1 |
+
+| Tool               | Count |
+| ------------------ | ----- |
+| execute_command    | 2     |
+| apply_diff         | 1     |
+| write_to_file      | 1     |
+| attempt_completion | 1     |
 
 ## Latency
-| Metric | Value |
-|--------|-------|
-| Total Latency | 10.0s |
-| Avg per Turn | 3.3s |
-| Fastest Turn | 2.3s |
-| Slowest Turn | 5.2s |
+
+| Metric        | Value |
+| ------------- | ----- |
+| Total Latency | 10.6s |
+| Avg per Turn  | 2.1s  |
+| Fastest Turn  | 0.5s  |
+| Slowest Turn  | 4.1s  |
 
 ## Reasoning
-| Metric | Value |
-|--------|-------|
-| Turns with Reasoning | 3 / 3 |
-| Avg Reasoning Chars/Turn | 872 |
+
+| Metric                   | Value |
+| ------------------------ | ----- |
+| Turns with Reasoning     | 3 / 5 |
+| Avg Reasoning Chars/Turn | 502   |
 
 ## Behavioral Signals
-- ✅ Excellent turn efficiency — completed in 3 turn(s)
+
+- ❌ 1 tool call(s) returned errors

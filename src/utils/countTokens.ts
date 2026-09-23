@@ -17,8 +17,12 @@ export async function countTokens(
 	// Lazily create the worker pool if it doesn't exist.
 	if (useWorker && typeof pool === "undefined") {
 		pool = workerpool.pool(__dirname + "/workers/countTokens.js", {
+			// A single worker keeps the (expensive-to-construct) tiktoken encoder resident.
+			// A generous queue lets bursts of counts from multiple tabs queue up instead of
+			// overflowing: an overflow throws and falls back to running tiktoken on the main
+			// thread, which blocks the VS Code extension host.
 			maxWorkers: 1,
-			maxQueueSize: 10,
+			maxQueueSize: 100,
 		})
 	}
 
@@ -38,7 +42,12 @@ export async function countTokens(
 
 		return result.count
 	} catch (error) {
-		pool = null
+		// Reset to undefined so a subsequent call can lazily recreate the worker pool
+		// rather than permanently degrading to the main thread (typeof null === "object").
+		try {
+			await pool?.terminate()
+		} catch {}
+		pool = undefined
 		console.error(error)
 		return tiktoken(content)
 	}

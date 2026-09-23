@@ -151,12 +151,15 @@ export async function buildNativeToolsArrayWithRestrictions(options: BuildToolsO
 
 	// Combine filtered tools (for backward compatibility and for allowedFunctionNames)
 	const filteredTools = [...filteredNativeTools, ...filteredMcpTools, ...nativeCustomTools]
+	// Sort deterministically by tool name to guarantee prompt cache prefix stability across turns
+	filteredTools.sort((a, b) => getToolName(a).localeCompare(getToolName(b)))
 
 	// If includeAllToolsWithRestrictions is true, return ALL tools but provide
 	// allowed names based on mode filtering
 	if (includeAllToolsWithRestrictions) {
 		// Combine ALL tools (unfiltered native + all MCP + custom)
 		const allTools = [...nativeTools, ...mcpTools, ...nativeCustomTools]
+		allTools.sort((a, b) => getToolName(a).localeCompare(getToolName(b)))
 
 		// Extract names of tools that are allowed based on mode filtering.
 		// Resolve any alias names to canonical names to ensure consistency with allTools

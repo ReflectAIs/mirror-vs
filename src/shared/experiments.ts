@@ -39,8 +39,8 @@ export const experimentConfigsMap: Record<ExperimentKey, ExperimentConfig> = {
 	RUN_SLASH_COMMAND: { enabled: false },
 	CUSTOM_TOOLS: { enabled: false },
 	BROWSER: { enabled: false },
-	PARALLEL_TOOL_READS: { enabled: false },
 	// Enabled by default (no longer experimental toggles in the UI)
+	PARALLEL_TOOL_READS: { enabled: true },
 	LSP_CODE_GRAPH: { enabled: true },
 	GIT_WORKTREE_SANDBOX: { enabled: true },
 }

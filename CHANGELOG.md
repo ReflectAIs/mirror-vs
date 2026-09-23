@@ -2,10 +2,24 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.9.5] - 2026-09-22
+## [0.9.5] - 2026-09-23
 
 ### Performance & Reliability
 
+- **Parallel Tool Execution**:
+    - Enabled concurrent parallel read tool execution (`read_file`, `search_files`, `list_files`, `list_code_definition_names`) reducing multi-read tool latency by ~80%.
+- **Token Counter Worker Pool Self-Healing**:
+    - Fixed worker recreation bug where worker crashes set pool to `null` and lazy recreation checked `undefined`, permanently disabling parallel token counting.
+- **Deterministic Tool Ordering for Prompt Caching**:
+    - Alphabetically sorted tool declarations ensuring 100% stable schema serialization and eliminating cache busts across conversational turns.
+- **Observation Masking & Historical Tool Result Folding**:
+    - Automatically folds stale tool results (>1,200 chars) older than 3 turns into compact line-count tombstones on API projections, slashing conversation token consumption by up to 96% while preserving errors and active turns.
+- **Context Condensing Safety Ceiling**:
+    - Introduced absolute token cap (`maxContextTokensBeforeCondense`) to prevent context blowouts before condensation triggers.
+- **Active Terminal Safety Clamp**:
+    - Capped active/busy terminal outputs in environment details to 2,000 characters to match inactive terminals and prevent prompt overflow.
+- **Custom Model Manager**:
+    - Added "Clear All" custom models action in Settings under the Custom Model Manager.
 - **Environment Details — Workspace Pulse Recent Changes Fix**:
     - Fixed a double destructive read of recently-modified files that caused the Workspace Pulse "Recent Changes" diff section to always be empty when full file details were included.
     - Recently-modified files are now read once and shared with the Workspace Pulse.
