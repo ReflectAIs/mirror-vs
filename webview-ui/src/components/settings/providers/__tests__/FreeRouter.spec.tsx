@@ -115,6 +115,28 @@ describe("FreeRouter component", () => {
 
 		expect(screen.getByText("Automated Model Routing Active")).toBeInTheDocument()
 		expect(screen.queryByText("Primary Preferred Model")).not.toBeInTheDocument()
+		expect(screen.getByTestId("free-router-active-badge")).toHaveTextContent("Active: Gemma 4 31B")
+		expect(screen.getByTestId("free-router-current-model-tag")).toHaveTextContent("Currently in Use")
+	})
+
+	it("reflects active model when apiModelId is set in apiConfiguration", () => {
+		render(
+			<FreeRouter
+				apiConfiguration={{
+					...defaultApiConfiguration,
+					apiModelId: "qwen/qwen3.8-27b:free",
+					freeRouterModels: ["google/gemma-4-31b-it:free", "qwen/qwen3.8-27b:free"],
+				}}
+				setApiConfigurationField={mockSetApiConfigurationField}
+				selectedModelId="qwen/qwen3.8-27b:free"
+				uriScheme="vscode"
+				organizationAllowList={{ allowList: {}, providers: {} } as any}
+			/>,
+			{ wrapper: createWrapper() },
+		)
+
+		expect(screen.getByTestId("free-router-active-badge")).toHaveTextContent("Active: Qwen 3.8 27B")
+		expect(screen.getByTestId("free-router-current-model-tag")).toHaveTextContent("Currently in Use")
 	})
 
 	it("renders all default models in the failover pool", () => {

@@ -9,6 +9,8 @@ import {
 	DEFAULT_FREE_ROUTER_MODELS,
 	freeRouterDefaultModelId,
 	freeRouterModels,
+	getFreeRouterActiveModelId,
+	getFreeRouterActiveModelName,
 } from "@mirror-vs/types"
 
 import { useAppTranslation } from "@src/i18n/TranslationContext"
@@ -58,6 +60,14 @@ export const FreeRouter = ({
 		}
 		return DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
 	}, [apiConfiguration?.freeRouterModels])
+
+	const activeModelId = useMemo(() => {
+		return getFreeRouterActiveModelId(apiConfiguration)
+	}, [apiConfiguration])
+
+	const activeModelName = useMemo(() => {
+		return getFreeRouterActiveModelName(activeModelId)
+	}, [activeModelId])
 
 	const toggleModelInPool = useCallback(
 		(modelId: string, checked: boolean) => {
@@ -145,16 +155,29 @@ export const FreeRouter = ({
 			</div>
 
 			{/* Automatic Model Routing Indicator (Manual Selection Disabled) */}
-			<div className="rounded-lg border border-vscode-charts-green/30 bg-vscode-charts-green/10 p-3 flex items-start gap-2.5">
-				<CheckCircle2 className="size-4 text-vscode-charts-green flex-shrink-0 mt-0.5" />
-				<div className="flex flex-col gap-0.5">
-					<span className="text-xs font-semibold text-vscode-foreground">Automated Model Routing Active</span>
-					<p className="text-xs text-vscode-descriptionForeground leading-relaxed">
-						Model selection is fully automated. Mirror VS continuously monitors endpoint health and routes
-						requests across the healthy free models in your pool below. Manual model selection is disabled
-						to avoid unavailable endpoints.
-					</p>
+			<div className="rounded-lg border border-vscode-charts-green/30 bg-vscode-charts-green/10 p-3 flex flex-col gap-2">
+				<div className="flex items-center justify-between flex-wrap gap-2">
+					<div className="flex items-center gap-2">
+						<CheckCircle2 className="size-4 text-vscode-charts-green flex-shrink-0" />
+						<span className="text-xs font-semibold text-vscode-foreground">
+							Automated Model Routing Active
+						</span>
+					</div>
+					<span
+						data-testid="free-router-active-badge"
+						className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-vscode-badge-background text-vscode-badge-foreground flex items-center gap-1 border border-vscode-panel-border/40">
+						<Zap className="size-3 text-vscode-charts-yellow" />
+						<span>Active: {activeModelName}</span>
+					</span>
 				</div>
+				<p className="text-xs text-vscode-descriptionForeground leading-relaxed">
+					Model selection is fully automated. Mirror VS is currently using{" "}
+					<code className="text-vscode-textLink-foreground font-mono text-[11px] px-1 py-0.5 rounded bg-vscode-textCodeBlock-background">
+						{activeModelId}
+					</code>
+					. If this endpoint hits rate limits or downtime, requests seamlessly fail over to the next healthy
+					model in your pool below.
+				</p>
 			</div>
 
 			{/* Cooldown Settings */}
@@ -194,13 +217,16 @@ export const FreeRouter = ({
 				<div className="flex flex-col gap-2">
 					{DEFAULT_FREE_ROUTER_MODELS.map((model, idx) => {
 						const isEnabled = currentPool.includes(model.id)
+						const isCurrentActive = model.id === activeModelId
 						return (
 							<div
 								key={model.id}
 								className={`flex items-start justify-between p-2.5 rounded border transition-colors ${
-									isEnabled
-										? "border-vscode-panel-border bg-vscode-editor-background"
-										: "border-vscode-panel-border/40 opacity-60 bg-vscode-editor-inactiveSelectionBackground/10"
+									isCurrentActive
+										? "border-vscode-charts-yellow/60 bg-vscode-editor-background ring-1 ring-vscode-charts-yellow/30"
+										: isEnabled
+											? "border-vscode-panel-border bg-vscode-editor-background"
+											: "border-vscode-panel-border/40 opacity-60 bg-vscode-editor-inactiveSelectionBackground/10"
 								}`}>
 								<div className="flex items-start gap-2.5">
 									<div className="pt-0.5">
@@ -214,10 +240,19 @@ export const FreeRouter = ({
 											<span className="font-semibold text-xs text-vscode-foreground">
 												{model.name}
 											</span>
-											<span className="text-[10px] px-1.5 py-0.2 rounded bg-vscode-charts-green/20 text-vscode-charts-green font-mono flex items-center gap-0.5">
-												<CheckCircle2 className="size-2.5" />
-												Ready
-											</span>
+											{isCurrentActive ? (
+												<span
+													data-testid="free-router-current-model-tag"
+													className="text-[10px] px-1.5 py-0.2 rounded bg-vscode-charts-yellow/20 text-vscode-charts-yellow font-semibold flex items-center gap-0.5 border border-vscode-charts-yellow/40">
+													<Zap className="size-2.5 fill-current" />
+													Currently in Use
+												</span>
+											) : (
+												<span className="text-[10px] px-1.5 py-0.2 rounded bg-vscode-charts-green/20 text-vscode-charts-green font-mono flex items-center gap-0.5">
+													<CheckCircle2 className="size-2.5" />
+													Ready
+												</span>
+											)}
 										</div>
 										<span className="text-[11px] text-vscode-descriptionForeground">
 											{model.description}
@@ -237,27 +272,44 @@ export const FreeRouter = ({
 					{/* Custom Models in the pool */}
 					{currentPool
 						.filter((id) => !DEFAULT_FREE_ROUTER_MODELS.some((m) => m.id === id))
-						.map((customId, idx) => (
-							<div
-								key={customId}
-								className="flex items-center justify-between p-2.5 rounded border border-vscode-panel-border bg-vscode-editor-background">
-								<div className="flex items-center gap-2">
-									<Zap className="size-3.5 text-vscode-textLink-foreground" />
-									<div className="flex flex-col">
-										<span className="text-xs font-mono font-medium">{customId}</span>
-										<span className="text-[10px] text-vscode-descriptionForeground">
-											Custom Free Model
-										</span>
+						.map((customId, idx) => {
+							const isCurrentActive = customId === activeModelId
+							return (
+								<div
+									key={customId}
+									className={`flex items-center justify-between p-2.5 rounded border ${
+										isCurrentActive
+											? "border-vscode-charts-yellow/60 bg-vscode-editor-background ring-1 ring-vscode-charts-yellow/30"
+											: "border-vscode-panel-border bg-vscode-editor-background"
+									}`}>
+									<div className="flex items-center gap-2">
+										<Zap className="size-3.5 text-vscode-textLink-foreground" />
+										<div className="flex flex-col">
+											<div className="flex items-center gap-1.5">
+												<span className="text-xs font-mono font-medium">{customId}</span>
+												{isCurrentActive && (
+													<span
+														data-testid="free-router-current-model-tag"
+														className="text-[10px] px-1.5 py-0.2 rounded bg-vscode-charts-yellow/20 text-vscode-charts-yellow font-semibold flex items-center gap-0.5 border border-vscode-charts-yellow/40">
+														<Zap className="size-2.5 fill-current" />
+														Currently in Use
+													</span>
+												)}
+											</div>
+											<span className="text-[10px] text-vscode-descriptionForeground">
+												Custom Free Model
+											</span>
+										</div>
 									</div>
+									<VSCodeButton
+										appearance="icon"
+										onClick={() => removeCustomModel(customId)}
+										title="Remove model">
+										<Trash2 className="size-3.5 text-vscode-errorForeground" />
+									</VSCodeButton>
 								</div>
-								<VSCodeButton
-									appearance="icon"
-									onClick={() => removeCustomModel(customId)}
-									title="Remove model">
-									<Trash2 className="size-3.5 text-vscode-errorForeground" />
-								</VSCodeButton>
-							</div>
-						))}
+							)
+						})}
 				</div>
 
 				{/* Add Custom Free Model */}

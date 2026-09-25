@@ -158,6 +158,7 @@ export class FreeRouterHandler extends BaseProvider {
 	private readonly options: ApiHandlerOptions
 	private readonly apiKey?: string
 	private readonly cooldownMs: number
+	private currentActiveModelId?: string
 
 	constructor(options: ApiHandlerOptions) {
 		super()
@@ -187,6 +188,11 @@ export class FreeRouterHandler extends BaseProvider {
 	 * Returns the currently active healthy model ID and info.
 	 */
 	override getModel(): { id: string; info: ModelInfo } {
+		if (this.currentActiveModelId && !isModelExhausted(this.currentActiveModelId)) {
+			const info = freeRouterModels[this.currentActiveModelId] || freeRouterDefaultModelInfo
+			return { id: this.currentActiveModelId, info }
+		}
+
 		const pool = this.getModelPool()
 		const healthyId = pool.find((id) => !isModelExhausted(id)) || pool[0] || freeRouterDefaultModelId
 		const info = freeRouterModels[healthyId] || freeRouterDefaultModelInfo
@@ -246,7 +252,11 @@ export class FreeRouterHandler extends BaseProvider {
 				const stream = candidateHandler.createMessage(systemPrompt, messages, metadata)
 
 				for await (const chunk of stream) {
-					firstChunkYielded = true
+					if (!firstChunkYielded) {
+						firstChunkYielded = true
+						this.currentActiveModelId = candidateModelId
+						this.options.apiModelId = candidateModelId
+					}
 					yield chunk
 				}
 

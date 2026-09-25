@@ -4,6 +4,16 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.9.6] - 2026-09-25
 
+### Auto-Router Active Model Visibility
+
+- **Live Active Model Display in Chat Toolbar**:
+    - The chat toolbar's Auto-Router badge now dynamically reflects the exact model actively serving requests (e.g., `⚡ Auto-Router: Gemma 4 31B`), with a rich hover tooltip displaying full model ID and circuit-breaker behavior.
+- **Active Model Status & Failover Pool Highlighting in Settings**:
+    - The Auto-Router settings view now displays an `⚡ Active: <Model Name>` status badge alongside the active model ID.
+    - The currently utilized model in the failover pool is highlighted with a gold accent border and a `⚡ Currently in Use` tag.
+- **Runtime Active Model Tracking**:
+    - `FreeRouterHandler` dynamically tracks active streaming models and candidate switchovers across requests.
+
 ### Terminal Execution & Callback Reliability
 
 - **Unclosed Stream & Piped Command Hang Resolution**:

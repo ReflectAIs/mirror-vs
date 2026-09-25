@@ -236,5 +236,30 @@ describe("FreeRouterHandler", () => {
 
 			expect(isModelExhausted("model-1")).toBe(false)
 		})
+
+		it("updates active model when stream begins on candidate model", async () => {
+			const handler = new FreeRouterHandler({
+				freeRouterModels: ["model-failing", "model-active"],
+			})
+
+			;(OpenRouterHandler as any).mockImplementation((opts: any) => {
+				return {
+					createMessage: async function* () {
+						if (opts.openRouterModelId === "model-failing") {
+							const err: any = new Error("429 Too Many Requests")
+							err.status = 429
+							throw err
+						}
+						yield { type: "text", text: "streaming..." }
+					},
+				}
+			})
+
+			for await (const _chunk of handler.createMessage("system", [])) {
+				// consume stream
+			}
+
+			expect(handler.getModel().id).toBe("model-active")
+		})
 	})
 })

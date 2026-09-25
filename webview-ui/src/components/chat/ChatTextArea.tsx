@@ -3,7 +3,7 @@ import { useEvent } from "react-use"
 import DynamicTextArea from "react-textarea-autosize"
 import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square, Zap } from "lucide-react"
 
-import type { ExtensionMessage } from "@mirror-vs/types"
+import { getFreeRouterActiveModelId, getFreeRouterActiveModelName, type ExtensionMessage } from "@mirror-vs/types"
 
 import { mentionRegex, mentionRegexGlobal, commandRegexGlobal, unescapeSpaces } from "@shared/context-mentions"
 import { WebviewMessage } from "@shared/WebviewMessage"
@@ -121,6 +121,14 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 				displayName: currentApiConfigName || "", // Use the name directly for display.
 			}
 		}, [listApiConfigMeta, currentApiConfigName])
+
+		const freeRouterActiveModelId = useMemo(() => {
+			return getFreeRouterActiveModelId(apiConfiguration)
+		}, [apiConfiguration])
+
+		const freeRouterActiveModelName = useMemo(() => {
+			return getFreeRouterActiveModelName(freeRouterActiveModelId)
+		}, [freeRouterActiveModelId])
 
 		const [gitCommits, setGitCommits] = useState<any[]>([])
 		const [showDropdown, setShowDropdown] = useState(false)
@@ -1319,9 +1327,9 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							<div
 								data-testid="auto-router-indicator"
 								className="h-6 px-2 text-[11px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded flex items-center gap-1 select-none cursor-default border border-vscode-panel-border/30 flex-shrink-0"
-								title="Auto-Router automatically selects healthy free models. Manual model selection is disabled.">
+								title={`Auto-Router active model: ${freeRouterActiveModelId}. Automatically routes across free models if rate-limited.`}>
 								<Zap className="size-3 text-vscode-charts-yellow" />
-								<span>Auto-Router (Free)</span>
+								<span>Auto-Router: {freeRouterActiveModelName}</span>
 							</div>
 						) : (
 							modelId !== undefined &&

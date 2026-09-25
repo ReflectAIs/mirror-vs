@@ -36,6 +36,7 @@ import {
 	getProviderDefaultModelId,
 	freeRouterModels,
 	freeRouterDefaultModelInfo,
+	getFreeRouterActiveModelId,
 } from "@mirror-vs/types"
 
 import { useRouterModels } from "./useRouterModels"
@@ -352,7 +353,7 @@ function getSelectedModel({
 			return { id, info }
 		}
 		case "free-router": {
-			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const id = getFreeRouterActiveModelId(apiConfiguration)
 			const info = freeRouterModels[id as keyof typeof freeRouterModels] ?? freeRouterDefaultModelInfo
 			return { id, info }
 		}

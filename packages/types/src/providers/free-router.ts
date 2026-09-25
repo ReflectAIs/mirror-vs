@@ -263,3 +263,37 @@ export const DEFAULT_FREE_ROUTER_MODELS: FreeRouterModelEntry[] = [
 		description: "1M token context reasoning model for whole-codebase comprehension",
 	},
 ]
+
+/**
+ * Resolves the model ID currently in use for the Free Router.
+ * If apiModelId is set and present in the pool, it is returned.
+ * Otherwise, the first model in the configured pool (or default model) is returned.
+ */
+export function getFreeRouterActiveModelId(apiConfiguration?: {
+	apiModelId?: string
+	freeRouterModels?: string[]
+}): string {
+	if (apiConfiguration?.apiModelId) {
+		return apiConfiguration.apiModelId
+	}
+
+	const pool =
+		Array.isArray(apiConfiguration?.freeRouterModels) && apiConfiguration.freeRouterModels.length > 0
+			? apiConfiguration.freeRouterModels
+			: DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
+
+	return pool[0] ?? freeRouterDefaultModelId
+}
+
+/**
+ * Returns a clean, user-friendly display name for a free router model ID.
+ * E.g., "google/gemma-4-31b-it:free" -> "Gemma 4 31B"
+ */
+export function getFreeRouterActiveModelName(modelId: string): string {
+	const entry = DEFAULT_FREE_ROUTER_MODELS.find((m) => m.id === modelId)
+	if (entry?.name) {
+		return entry.name.replace(/ \(OpenRouter Free\)$/, "").replace(/^Google /, "")
+	}
+	const parts = modelId.replace(/:free$/, "").split("/")
+	return parts.length > 1 && parts[1] ? parts[1] : modelId
+}

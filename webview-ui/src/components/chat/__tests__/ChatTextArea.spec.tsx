@@ -1258,7 +1258,7 @@ describe("ChatTextArea", () => {
 			)
 
 			expect(screen.getByTestId("auto-router-indicator")).toBeInTheDocument()
-			expect(screen.getByText("Auto-Router (Free)")).toBeInTheDocument()
+			expect(screen.getByText(/Auto-Router: Gemma 4 31B/)).toBeInTheDocument()
 			expect(screen.queryByTestId("model-selector")).not.toBeInTheDocument()
 			expect(screen.queryByTestId("model-input")).not.toBeInTheDocument()
 		})
