@@ -26,6 +26,7 @@ export * from "./vercel-ai-gateway.js"
 export * from "./zai.js"
 export * from "./minimax.js"
 export * from "./custom.js"
+export * from "./free-router.js"
 
 import { anthropicDefaultModelId } from "./anthropic.js"
 import { basetenDefaultModelId } from "./baseten.js"
@@ -52,6 +53,7 @@ import { vercelAiGatewayDefaultModelId } from "./vercel-ai-gateway.js"
 import { internationalZAiDefaultModelId, mainlandZAiDefaultModelId } from "./zai.js"
 import { minimaxDefaultModelId } from "./minimax.js"
 import { customDefaultModelId } from "./custom.js"
+import { freeRouterDefaultModelId } from "./free-router.js"
 
 // Import the ProviderName type from provider-settings to avoid duplication
 import type { ProviderName } from "../provider-settings.js"
@@ -120,6 +122,8 @@ export function getProviderDefaultModelId(
 			return unboundDefaultModelId
 		case "vercel-ai-gateway":
 			return vercelAiGatewayDefaultModelId
+		case "free-router":
+			return freeRouterDefaultModelId
 		case "anthropic":
 		case "gemini-cli":
 		case "fake-ai":

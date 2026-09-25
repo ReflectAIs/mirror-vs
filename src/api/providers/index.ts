@@ -29,3 +29,10 @@ export { VercelAiGatewayHandler } from "./vercel-ai-gateway"
 export { MiniMaxHandler } from "./minimax"
 export { BasetenHandler } from "./baseten"
 export { CustomHandler } from "./custom"
+export {
+	FreeRouterHandler,
+	getModelHealthMap,
+	resetModelCooldown,
+	isModelExhausted,
+	isExhaustionError,
+} from "./free-router"

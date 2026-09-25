@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useEvent } from "react-use"
 import DynamicTextArea from "react-textarea-autosize"
-import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square } from "lucide-react"
+import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square, Zap } from "lucide-react"
 
 import type { ExtensionMessage } from "@mirror-vs/types"
 
@@ -110,6 +110,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			commands,
 			enterBehavior,
 			lockApiConfigAcrossModes,
+			apiConfiguration,
 		} = useExtensionState()
 
 		// Find the ID and display text for the currently selected API configuration.
@@ -1314,7 +1315,16 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							customModes={customModes}
 							customModePrompts={customModePrompts}
 						/>
-						{modelId !== undefined &&
+						{apiConfiguration?.apiProvider === "free-router" ? (
+							<div
+								data-testid="auto-router-indicator"
+								className="h-6 px-2 text-[11px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded flex items-center gap-1 select-none cursor-default border border-vscode-panel-border/30 flex-shrink-0"
+								title="Auto-Router automatically selects healthy free models. Manual model selection is disabled.">
+								<Zap className="size-3 text-vscode-charts-yellow" />
+								<span>Auto-Router (Free)</span>
+							</div>
+						) : (
+							modelId !== undefined &&
 							onModelChange &&
 							(modelOptions && modelOptions.length > 0 ? (
 								<select
@@ -1362,7 +1372,8 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									title="Model"
 									className="min-w-0 w-[140px] h-6 px-1.5 text-[11px] bg-transparent text-vscode-foreground border border-vscode-input-border rounded focus:outline-none focus:border-vscode-focusBorder"
 								/>
-							))}
+							))
+						)}
 						<ThinkingSelector className="flex-shrink-0" />
 						<AutoApproveDropdown triggerClassName="min-w-[28px] text-ellipsis overflow-hidden flex-shrink" />
 						<TerminalStatusBadge />

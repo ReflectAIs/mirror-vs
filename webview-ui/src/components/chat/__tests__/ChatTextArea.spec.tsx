@@ -1236,6 +1236,33 @@ describe("ChatTextArea", () => {
 			expect(screen.queryByTestId("model-input")).not.toBeInTheDocument()
 		})
 
+		it("should display Auto-Router indicator and disable model selector when apiProvider is free-router", () => {
+			;(useExtensionState as ReturnType<typeof vi.fn>).mockReturnValue({
+				filePaths: [],
+				openedTabs: [],
+				apiConfiguration: {
+					apiProvider: "free-router",
+				},
+				taskHistory: [],
+				cwd: "/test/workspace",
+			})
+
+			const onModelChange = vi.fn()
+			render(
+				<ChatTextArea
+					{...defaultProps}
+					modelId="google/gemma-4-31b-it:free"
+					modelOptions={modelOptions}
+					onModelChange={onModelChange}
+				/>,
+			)
+
+			expect(screen.getByTestId("auto-router-indicator")).toBeInTheDocument()
+			expect(screen.getByText("Auto-Router (Free)")).toBeInTheDocument()
+			expect(screen.queryByTestId("model-selector")).not.toBeInTheDocument()
+			expect(screen.queryByTestId("model-input")).not.toBeInTheDocument()
+		})
+
 		it("should commit the typed model on Enter", () => {
 			const onModelChange = vi.fn()
 			render(

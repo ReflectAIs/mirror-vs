@@ -87,4 +87,54 @@ describe("pruneHistoricalToolResults", () => {
 		const result = pruneHistoricalToolResults(messages, { keepRecentTurns: 1, maxToolResultChars: 100 })
 		expect(result).toEqual(messages)
 	})
+
+	it("folds historical environment_details in older turns while preserving turn 0 and recent turns", () => {
+		const envBlock =
+			"<environment_details>\n# Files\n" +
+			"src/index.ts\n".repeat(50) +
+			"# Terminals\nLots of terminal text\n</environment_details>"
+		const messages: ApiMessage[] = [
+			// Turn 0 (Initial user message - should NOT fold)
+			{
+				role: "user",
+				content: [
+					{ type: "text", text: "Create feature" },
+					{ type: "text", text: envBlock },
+				],
+			},
+			{ role: "assistant", content: "ok" },
+			// Turn 1 (Historical intermediate turn - SHOULD fold)
+			{
+				role: "user",
+				content: [
+					{ type: "tool_result", tool_use_id: "t1", content: "done" },
+					{ type: "text", text: envBlock },
+				],
+			},
+			{ role: "assistant", content: "ok" },
+			// Turn 2 (Recent turn - should NOT fold)
+			{
+				role: "user",
+				content: [
+					{ type: "tool_result", tool_use_id: "t2", content: "done" },
+					{ type: "text", text: envBlock },
+				],
+			},
+		]
+
+		const result = pruneHistoricalToolResults(messages, { keepRecentTurns: 1 })
+
+		// Turn 0 should preserve original environment details
+		const turn0Env = (result[0].content as any[])[1].text
+		expect(turn0Env).toBe(envBlock)
+
+		// Turn 1 should be folded
+		const turn1Env = (result[2].content as any[])[1].text
+		expect(turn1Env).toContain("Historical environment details folded")
+		expect(turn1Env.length).toBeLessThan(envBlock.length)
+
+		// Turn 2 (recent) should preserve original environment details
+		const turn2Env = (result[4].content as any[])[1].text
+		expect(turn2Env).toBe(envBlock)
+	})
 })

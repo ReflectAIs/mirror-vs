@@ -1,13 +1,14 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 
-import type { MirrorMessage } from "@mirror-vs/types"
+import type { MirrorMessage, MirrorSayTool } from "@mirror-vs/types"
+import { safeJsonParse } from "@shared/core"
 
 import { vscode } from "@src/utils/vscode"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 import Announcement from "./Announcement"
-import ChatRow from "./ChatRow"
+import ChatRow, { getPreviousTodos } from "./ChatRow"
 import WarningRow from "./WarningRow"
 import { ChatTextArea } from "./ChatTextArea"
 import ProfileViolationWarning from "./ProfileViolationWarning"
@@ -253,6 +254,29 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		(index: number, messageOrGroup: MirrorMessage) => {
 			const hasCheckpoint = modifiedMessages.some((message) => message.say === "checkpoint_saved")
 
+			const isAskTool = messageOrGroup.type === "ask" && messageOrGroup.ask === "tool"
+			const isUpdateTodoList = isAskTool && messageOrGroup.text?.includes("updateTodoList")
+			const previousTodos = isUpdateTodoList ? getPreviousTodos(displayedMessages, messageOrGroup.ts) : undefined
+
+			let childTaskId: string | undefined = undefined
+			let isFollowedBySubtaskResult: boolean | undefined = undefined
+			if (isAskTool && messageOrGroup.text?.includes("newTask")) {
+				const newTaskMessages = displayedMessages.filter((msg) => {
+					if (msg.type === "ask" && msg.ask === "tool") {
+						const t = safeJsonParse<MirrorSayTool>(msg.text)
+						return t?.tool === "newTask"
+					}
+					return false
+				})
+				const thisNewTaskIndex = newTaskMessages.findIndex((msg) => msg.ts === messageOrGroup.ts)
+				const childIds = currentTaskItem?.childIds || []
+				childTaskId =
+					thisNewTaskIndex >= 0 && thisNewTaskIndex < childIds.length ? childIds[thisNewTaskIndex] : undefined
+
+				const nextMessage = displayedMessages[index + 1]
+				isFollowedBySubtaskResult = nextMessage?.type === "say" && nextMessage?.say === "subtask_result"
+			}
+
 			return (
 				<ChatRow
 					key={messageOrGroup.ts}
@@ -269,8 +293,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					isFollowUpAnswered={messageOrGroup.isAnswered === true || messageOrGroup.ts === currentFollowUpTs}
 					isFollowUpAutoApprovalPaused={msg.isFollowUpAutoApprovalPaused}
 					editable={
-						messageOrGroup.type === "ask" &&
-						messageOrGroup.ask === "tool" &&
+						isAskTool &&
 						(() => {
 							let tool: any = {}
 							try {
@@ -287,6 +310,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					onJumpToPreviousCheckpoint={handleScrollToLatestCheckpoint}
 					isSticky={false}
 					onNavigateToMessage={handleNavigateToMessageSafe}
+					previousTodos={previousTodos}
+					childTaskId={childTaskId}
+					isFollowedBySubtaskResult={isFollowedBySubtaskResult}
 				/>
 			)
 		},
@@ -294,7 +320,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 			expandedRows,
 			msg.toggleRowExpansion,
 			modifiedMessages,
-			displayedMessages.length,
+			displayedMessages,
+			currentTaskItem,
 			handleRowHeightChange2,
 			isStreaming,
 			handleSuggestionClickInRow,

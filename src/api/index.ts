@@ -35,6 +35,7 @@ import {
 	MiniMaxHandler,
 	BasetenHandler,
 	CustomHandler,
+	FreeRouterHandler,
 } from "./providers"
 import { NativeOllamaHandler } from "./providers/native-ollama"
 
@@ -184,6 +185,8 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 				return new CustomHandler(options)
 			case "poe":
 				return new PoeHandler(options)
+			case "free-router":
+				return new FreeRouterHandler(options)
 			default:
 				return new AnthropicHandler(options)
 		}

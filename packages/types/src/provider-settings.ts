@@ -21,6 +21,7 @@ import {
 	xaiModels,
 	internationalZAiModels,
 	minimaxModels,
+	freeRouterModels,
 } from "./providers/index.js"
 
 /**
@@ -128,6 +129,7 @@ export const providerNames = [
 	"vertex",
 	"xai",
 	"zai",
+	"free-router",
 ] as const
 
 export const providerNamesSchema = z.enum(providerNames)
@@ -403,6 +405,12 @@ const basetenSchema = apiModelIdProviderModelSchema.extend({
 	basetenApiKey: z.string().optional(),
 })
 
+const freeRouterSchema = apiModelIdProviderModelSchema.extend({
+	freeRouterApiKey: z.string().optional(),
+	freeRouterModels: z.array(z.string()).optional(),
+	freeRouterCooldownMinutes: z.number().optional(),
+})
+
 const defaultSchema = z.object({
 	apiProvider: z.undefined(),
 })
@@ -438,6 +446,7 @@ export const providerSettingsSchemaDiscriminated = z.discriminatedUnion("apiProv
 	fireworksSchema.merge(z.object({ apiProvider: z.literal("fireworks") })),
 	qwenCodeSchema.merge(z.object({ apiProvider: z.literal("qwen-code") })),
 	vercelAiGatewaySchema.merge(z.object({ apiProvider: z.literal("vercel-ai-gateway") })),
+	freeRouterSchema.merge(z.object({ apiProvider: z.literal("free-router") })),
 	defaultSchema,
 ])
 
@@ -473,6 +482,7 @@ export const providerSettingsSchema = z.object({
 	...fireworksSchema.shape,
 	...qwenCodeSchema.shape,
 	...vercelAiGatewaySchema.shape,
+	...freeRouterSchema.shape,
 	...codebaseIndexProviderSchema.shape,
 })
 
@@ -549,6 +559,7 @@ export const modelIdKeysByProvider: Record<TypicalProvider, ModelIdKey> = {
 	zai: "apiModelId",
 	fireworks: "apiModelId",
 	"vercel-ai-gateway": "vercelAiGatewayModelId",
+	"free-router": "apiModelId",
 }
 
 /**
@@ -669,4 +680,11 @@ export const MODELS_BY_PROVIDER: Record<
 	// Local providers; models discovered from localhost endpoints.
 	lmstudio: { id: "lmstudio", label: "LM Studio", models: [] },
 	ollama: { id: "ollama", label: "Ollama", models: [] },
+
+	// Free Router provider
+	"free-router": {
+		id: "free-router",
+		label: "Free Models (Auto-Router)",
+		models: Object.keys(freeRouterModels),
+	},
 }

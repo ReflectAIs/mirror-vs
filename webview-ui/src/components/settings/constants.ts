@@ -18,6 +18,7 @@ import {
 	fireworksModels,
 	minimaxModels,
 	basetenModels,
+	freeRouterModels,
 } from "@mirror-vs/types"
 
 export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, ModelInfo>>> = {
@@ -38,6 +39,7 @@ export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, Mod
 	fireworks: fireworksModels,
 	minimax: minimaxModels,
 	baseten: basetenModels,
+	"free-router": freeRouterModels,
 }
 
 export const PROVIDERS = [
@@ -69,4 +71,5 @@ export const PROVIDERS = [
 	{ value: "unbound", label: "Unbound", proxy: false },
 	{ value: "poe", label: "Poe", proxy: false },
 	{ value: "custom", label: "Custom API", proxy: true },
+	{ value: "free-router", label: "Free Models (Auto-Router)", proxy: false },
 ].sort((a, b) => a.label.localeCompare(b.label))

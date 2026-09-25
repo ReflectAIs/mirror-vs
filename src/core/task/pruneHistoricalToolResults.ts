@@ -70,6 +70,26 @@ export function pruneHistoricalToolResults(
 
 		let didModify = false
 		const newContent = msg.content.map((block) => {
+			// Fold historical environment details in intermediate turns to conserve thousands of tokens.
+			// We preserve turn 0 (initial request) to retain workspace root and baseline instructions.
+			if (block.type === "text" && typeof (block as any).text === "string") {
+				const text = (block as any).text as string
+				if (index > 0 && text.includes("<environment_details>") && text.includes("</environment_details>")) {
+					const foldedText = text.replace(
+						/<environment_details>[\s\S]*?<\/environment_details>/g,
+						"<environment_details>\n[... Historical environment details folded to conserve context ...]\n</environment_details>",
+					)
+					if (foldedText !== text && foldedText.length < text.length) {
+						didModify = true
+						return {
+							...block,
+							text: foldedText,
+						}
+					}
+				}
+				return block
+			}
+
 			if (block.type !== "tool_result") {
 				return block
 			}

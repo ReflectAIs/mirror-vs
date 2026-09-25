@@ -14,6 +14,8 @@ import {
 	minimaxDefaultModelId,
 	minimaxModels,
 	openRouterDefaultModelId,
+	freeRouterDefaultModelId,
+	freeRouterModels,
 } from "@mirror-vs/types"
 
 import { useSelectedModel } from "../useSelectedModel"
@@ -113,7 +115,7 @@ describe("useSelectedModel", () => {
 			mockUseRouterModels.mockReturnValue({
 				data: {
 					openrouter: {
-						"anthropic/claude-sonnet-4.5": {
+						[openRouterDefaultModelId]: {
 							maxTokens: 8192,
 							contextWindow: 200_000,
 							supportsImages: true,
@@ -149,7 +151,7 @@ describe("useSelectedModel", () => {
 			const { result } = renderHook(() => useSelectedModel(apiConfiguration), { wrapper })
 
 			// Should fall back to provider default since "test-model" doesn't exist
-			expect(result.current.id).toBe("anthropic/claude-sonnet-4.5")
+			expect(result.current.id).toBe(openRouterDefaultModelId)
 			// Should still use specific provider info for the default model if specified
 			expect(result.current.info).toEqual({
 				...{
@@ -270,7 +272,7 @@ describe("useSelectedModel", () => {
 			mockUseRouterModels.mockReturnValue({
 				data: {
 					openrouter: {
-						"anthropic/claude-sonnet-4.5": {
+						[openRouterDefaultModelId]: {
 							// Default model - using correct default model name
 							maxTokens: 8192,
 							contextWindow: 200_000,
@@ -305,7 +307,7 @@ describe("useSelectedModel", () => {
 			const { result } = renderHook(() => useSelectedModel(apiConfiguration), { wrapper })
 
 			// Should fall back to provider default since "non-existent-model" doesn't exist
-			expect(result.current.id).toBe("anthropic/claude-sonnet-4.5")
+			expect(result.current.id).toBe(openRouterDefaultModelId)
 			// Should use base model info since provider doesn't exist
 			expect(result.current.info).toEqual({
 				maxTokens: 8192,
@@ -770,6 +772,36 @@ describe("useSelectedModel", () => {
 			expect(result.current.provider).toBe("minimax")
 			expect(result.current.id).toBe("MiniMax-M2.7")
 			expect(result.current.info).toEqual(minimaxModels["MiniMax-M2.7"])
+		})
+	})
+
+	describe("free-router provider", () => {
+		it("should return default free-router model when no model is specified", () => {
+			const apiConfiguration: ProviderSettings = {
+				apiProvider: "free-router",
+			}
+
+			const wrapper = createWrapper()
+			const { result } = renderHook(() => useSelectedModel(apiConfiguration), { wrapper })
+
+			expect(result.current.provider).toBe("free-router")
+			expect(result.current.id).toBe(freeRouterDefaultModelId)
+			expect(result.current.info).toEqual(freeRouterModels[freeRouterDefaultModelId])
+		})
+
+		it("should return specified free model when configured", () => {
+			const targetModel = "deepseek/deepseek-r1:free"
+			const apiConfiguration: ProviderSettings = {
+				apiProvider: "free-router",
+				apiModelId: targetModel,
+			}
+
+			const wrapper = createWrapper()
+			const { result } = renderHook(() => useSelectedModel(apiConfiguration), { wrapper })
+
+			expect(result.current.provider).toBe("free-router")
+			expect(result.current.id).toBe(targetModel)
+			expect(result.current.info).toEqual(freeRouterModels[targetModel])
 		})
 	})
 })

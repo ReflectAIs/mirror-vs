@@ -1221,7 +1221,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		serviceName: string
 		serviceUrl: string
 	} | null>(() => {
-		if (!provider || isRetiredProvider(provider)) return null
+		if (!provider || isRetiredProvider(provider) || provider === "free-router") return null
 
 		const routerModelConfigs: Record<
 			string,

@@ -34,6 +34,8 @@ import {
 	isDynamicProvider,
 	isRetiredProvider,
 	getProviderDefaultModelId,
+	freeRouterModels,
+	freeRouterDefaultModelInfo,
 } from "@mirror-vs/types"
 
 import { useRouterModels } from "./useRouterModels"
@@ -347,6 +349,11 @@ function getSelectedModel({
 		case "custom": {
 			const id = apiConfiguration.customModelId ?? customDefaultModelId
 			const info = apiConfiguration.customModelInfo ?? customDefaultModelInfo
+			return { id, info }
+		}
+		case "free-router": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = freeRouterModels[id as keyof typeof freeRouterModels] ?? freeRouterDefaultModelInfo
 			return { id, info }
 		}
 		// case "anthropic":

@@ -95,6 +95,7 @@ import {
 	VercelAiGateway,
 	MiniMax,
 	Custom,
+	FreeRouter,
 } from "./providers"
 
 import { MODELS_BY_PROVIDER, PROVIDERS } from "./constants"
@@ -720,6 +721,18 @@ const ApiOptions = ({
 							organizationAllowList={organizationAllowList}
 							modelValidationError={modelValidationError}
 							simplifySettings={fromWelcomeView}
+						/>
+					)}
+
+					{selectedProvider === "free-router" && (
+						<FreeRouter
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+							selectedModelId={selectedModelId}
+							uriScheme={uriScheme}
+							simplifySettings={fromWelcomeView}
+							organizationAllowList={organizationAllowList}
+							modelValidationError={modelValidationError}
 						/>
 					)}
 

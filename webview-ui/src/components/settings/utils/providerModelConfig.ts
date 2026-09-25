@@ -17,6 +17,7 @@ import {
 	fireworksDefaultModelId,
 	minimaxDefaultModelId,
 	basetenDefaultModelId,
+	freeRouterDefaultModelId,
 } from "@mirror-vs/types"
 
 import { MODELS_BY_PROVIDER } from "../constants"
@@ -68,6 +69,7 @@ export const PROVIDER_DEFAULT_MODEL_IDS: Partial<Record<ProviderName, string>> =
 	fireworks: fireworksDefaultModelId,
 	minimax: minimaxDefaultModelId,
 	baseten: basetenDefaultModelId,
+	"free-router": freeRouterDefaultModelId,
 }
 
 export const getProviderServiceConfig = (provider: ProviderName): ProviderServiceConfig => {
@@ -129,6 +131,7 @@ export const PROVIDERS_WITH_CUSTOM_MODEL_UI: ProviderName[] = [
 	"ollama",
 	"lmstudio",
 	"vscode-lm",
+	"free-router",
 ]
 
 /**

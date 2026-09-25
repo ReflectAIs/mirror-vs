@@ -89,7 +89,7 @@ import { PathTooltip } from "../ui/PathTooltip"
 import { OpenMarkdownPreviewButton } from "./OpenMarkdownPreviewButton"
 
 // Helper function to get previous todos before a specific message
-function getPreviousTodos(messages: MirrorMessage[], currentMessageTs: number): any[] {
+export function getPreviousTodos(messages: MirrorMessage[], currentMessageTs: number): any[] {
 	// Find the previous updateTodoList message before the current one
 	const previousUpdateIndex = messages
 		.slice()
@@ -139,6 +139,9 @@ interface ChatRowProps {
 	onJumpToPreviousCheckpoint?: () => void
 	isSticky?: boolean
 	onNavigateToMessage?: (ts: number) => void
+	previousTodos?: any[]
+	childTaskId?: string
+	isFollowedBySubtaskResult?: boolean
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -222,10 +225,13 @@ export const ChatRowContent = ({
 	onJumpToPreviousCheckpoint,
 	isSticky,
 	onNavigateToMessage,
+	previousTodos: propPreviousTodos,
+	childTaskId: propChildTaskId,
+	isFollowedBySubtaskResult: propIsFollowedBySubtaskResult,
 }: ChatRowContentProps) => {
 	const { t, i18n } = useTranslation()
 
-	const { mcpServers, alwaysAllowMcp, currentCheckpoint, mode, apiConfiguration, mirrorMessages, currentTaskItem } =
+	const { mcpServers, alwaysAllowMcp, currentCheckpoint, mode, apiConfiguration, currentTaskItem } =
 		useExtensionState()
 	const { info: model } = useSelectedModel(apiConfiguration)
 	const [isEditing, setIsEditing] = useState(false)
@@ -621,8 +627,7 @@ export const ChatRowContent = ({
 			}
 			case "updateTodoList" as any: {
 				const todos = (tool as any).todos || []
-				// Get previous todos from the latest todos in the task context
-				const previousTodos = getPreviousTodos(mirrorMessages, message.ts)
+				const previousTodos = propPreviousTodos || []
 
 				return <TodoChangeDisplay previousTodos={previousTodos} newTodos={todos} />
 			}
@@ -980,29 +985,8 @@ export const ChatRowContent = ({
 					</>
 				)
 			case "newTask":
-				// Find all newTask messages to determine which child task ID corresponds to this message
-				const newTaskMessages = mirrorMessages.filter((msg) => {
-					if (msg.type === "ask" && msg.ask === "tool") {
-						const t = safeJsonParse<MirrorSayTool>(msg.text)
-						return t?.tool === "newTask"
-					}
-					return false
-				})
-				const thisNewTaskIndex = newTaskMessages.findIndex((msg) => msg.ts === message.ts)
-				const childIds = currentTaskItem?.childIds || []
-
-				// Only get the child task ID if this newTask has been approved (has a corresponding entry in childIds)
-				// This prevents showing a link to a previous task when the current newTask is still awaiting approval
-				// Note: We don't use delegatedToId here because it persists after child tasks complete and would
-				// incorrectly point to the previous task when a new newTask is awaiting approval
-				const childTaskId =
-					thisNewTaskIndex >= 0 && thisNewTaskIndex < childIds.length ? childIds[thisNewTaskIndex] : undefined
-
-				// Check if the next message is a subtask_result - if so, don't show the button
-				// since the result is displayed right after this message
-				const currentMessageIndex = mirrorMessages.findIndex((msg) => msg.ts === message.ts)
-				const nextMessage = currentMessageIndex >= 0 ? mirrorMessages[currentMessageIndex + 1] : undefined
-				const isFollowedBySubtaskResult = nextMessage?.type === "say" && nextMessage?.say === "subtask_result"
+				const childTaskId = propChildTaskId ?? currentTaskItem?.childIds?.[0]
+				const isFollowedBySubtaskResult = propIsFollowedBySubtaskResult
 
 				return (
 					<>
