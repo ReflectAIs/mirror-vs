@@ -110,10 +110,14 @@ export class Terminal extends BaseTerminal {
 					// Clean up temporary directory if shell integration is not available
 					ShellIntegrationManager.zshCleanupTmpDir(this.id)
 
-					process.emit(
-						"no_shell_integration",
-						`Shell integration initialization sequence '\\x1b]633;A' was not received within ${Terminal.getShellIntegrationTimeout() / 1000}s. Shell integration has been disabled for this terminal instance. Increase the timeout in the settings if necessary.`,
-					)
+					const errorMsg = `Shell integration initialization sequence '\\x1b]633;A' was not received within ${Terminal.getShellIntegrationTimeout() / 1000}s. Shell integration has been disabled for this terminal instance. Increase the timeout in the settings if necessary.`
+					this.busy = false
+
+					process.emit("no_shell_integration", errorMsg)
+					process.emit("shell_execution_complete", { exitCode: 1 })
+					process.emit("completed", `<${errorMsg}>`)
+					process.emit("continue")
+					resolve()
 				})
 		})
 

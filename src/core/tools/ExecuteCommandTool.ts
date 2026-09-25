@@ -492,10 +492,10 @@ export async function executeCommandInTerminal(
 			return
 		}
 
-		if (completed && exitDetails !== undefined) {
+		if (completed || exitDetails !== undefined) {
 			hasEmittedBackgroundCompletion = true
 			const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
-			const exitStatus = formatExitStatus(exitDetails)
+			const exitStatus = exitDetails !== undefined ? formatExitStatus(exitDetails) : "Command finished"
 			const previewSnippet =
 				result && result.length > 0 ? (result.length > 2000 ? result.slice(-2000) : result) : ""
 			const notification = [
@@ -551,24 +551,38 @@ export async function executeCommandInTerminal(
 				// We await finalize() to ensure the artifact file is fully flushed
 				// before we advertise the artifact_id to the LLM.
 				if (interceptor) {
-					persistedResult = await interceptor.finalize()
+					try {
+						persistedResult = await interceptor.finalize()
+					} catch (e) {
+						console.error("[ExecuteCommandTool] Failed to finalize interceptor:", e)
+					}
 				}
 
 				// Continue using compressed output for UI display
 				result = Terminal.compressTerminalOutput(output ?? "") ?? output ?? ""
 				latestCompressedOutput = result
 
+				// Mark completed before async say chain so status is never lost
+				completed = true
+
 				// Preserve order: wait for queued partial updates, then emit the final
 				// non-partial command_output update.
-				await commandOutputSayChain
-				await queueCommandOutputMessage(result, false, true)
-				completed = true
+				try {
+					await commandOutputSayChain
+					await queueCommandOutputMessage(result, false, true)
+				} catch (e) {
+					console.error("[ExecuteCommandTool] Failed to queue final command output:", e)
+				}
 			} finally {
+				completed = true
 				// Immediately dismiss any pending command_output ask and signal completion
 				task.supersedePendingAsk?.()
 				resolveOnCompleted?.()
 				checkAndNotifyBackgroundCompletion()
 			}
+		},
+		onNoShellIntegration: (msg: string) => {
+			shellIntegrationError = msg
 		},
 		onShellExecutionStarted: (pid: number | undefined) => {
 			const status: CommandExecutionStatus = {
@@ -585,6 +599,18 @@ export async function executeCommandInTerminal(
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			exitDetails = details
 			checkAndNotifyBackgroundCompletion()
+
+			// Safety fallback: if the command exited but onCompleted hasn't fired after 2s, force continue
+			setTimeout(() => {
+				if (!completed) {
+					completed = true
+					resolveOnCompleted?.()
+					checkAndNotifyBackgroundCompletion()
+					try {
+						process?.continue?.()
+					} catch {}
+				}
+			}, 2000)
 		},
 	}
 

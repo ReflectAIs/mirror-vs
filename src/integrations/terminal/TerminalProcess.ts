@@ -7,6 +7,7 @@ import { Terminal } from "./Terminal"
 
 export class TerminalProcess extends BaseTerminalProcess {
 	private terminalRef: WeakRef<Terminal>
+	private stopStreamReading?: () => void
 
 	constructor(terminal: Terminal) {
 		super()
@@ -160,68 +161,108 @@ export class TerminalProcess extends BaseTerminalProcess {
 		 * - OSC 633 ; E ; <commandline> [; <nonce>] ST - Explicitly set command line with optional nonce
 		 */
 
-		// Process stream data
-		for await (let data of stream) {
-			// Check for command output start marker
-			if (!commandOutputStarted) {
-				preOutput += data
-				const match = this.matchAfterVsceStartMarkers(data)
+		let executionCompleted = false
+		let stopStreamReading: (() => void) | undefined
+		const streamStopPromise = new Promise<void>((resolve) => {
+			stopStreamReading = resolve
+		})
+		this.stopStreamReading = stopStreamReading
 
-				if (match !== undefined) {
-					commandOutputStarted = true
-					data = match
-					this.fullOutput = "" // Reset fullOutput when command actually starts
-					this.emit("line", "") // Trigger UI to proceed
-				} else {
-					continue
+		const onExecutionComplete = () => {
+			if (executionCompleted) return
+			executionCompleted = true
+			// Give a brief 300ms drain window for any in-flight chunks before forcing stream loop to exit
+			setTimeout(() => {
+				stopStreamReading?.()
+			}, 300)
+		}
+		this.once("shell_execution_complete", onExecutionComplete)
+
+		// Process stream data with cancellation support when execution completes
+		const asyncIterator = stream[Symbol.asyncIterator]()
+		try {
+			while (true) {
+				const nextResult = await Promise.race([
+					asyncIterator.next(),
+					streamStopPromise.then(() => ({ done: true as const, value: undefined })),
+				])
+
+				if (nextResult.done) {
+					break
+				}
+
+				let data = nextResult.value
+				if (!data) continue
+
+				// Check for command output start marker
+				if (!commandOutputStarted) {
+					preOutput += data
+					// Check against accumulated preOutput in case marker was split across chunks
+					const match = this.matchAfterVsceStartMarkers(preOutput)
+
+					if (match !== undefined) {
+						commandOutputStarted = true
+						data = match
+						this.fullOutput = "" // Reset fullOutput when command actually starts
+						this.emit("line", "") // Trigger UI to proceed
+					} else {
+						continue
+					}
+				}
+
+				// Command output started, accumulate data without filtering.
+				// notice to future programmers: do not add escape sequence
+				// filtering here: fullOutput cannot change in length (see getUnretrievedOutput),
+				// and chunks may not be complete so you cannot rely on detecting or removing escape sequences mid-stream.
+				this.fullOutput += data
+
+				// For non-immediately returning commands we want to show loading spinner
+				// right away but this wouldn't happen until it emits a line break, so
+				// as soon as we get any output we emit to let webview know to show spinner
+				const now = Date.now()
+
+				if (this.isListening && (now - this.lastEmitTime_ms > 100 || this.lastEmitTime_ms === 0)) {
+					this.emitRemainingBufferIfListening()
+					this.lastEmitTime_ms = now
+				}
+
+				this.startHotTimer(data)
+
+				// If output contains shell integration execution end sequence (OSC 633;D or OSC 133;D),
+				// the command has finished executing in the terminal. Break early rather than hanging
+				// on an unclosed VS Code stream.
+				if (this.matchBeforeVsceEndMarkers(this.fullOutput) !== undefined) {
+					break
 				}
 			}
-
-			// Command output started, accumulate data without filtering.
-			// notice to future programmers: do not add escape sequence
-			// filtering here: fullOutput cannot change in length (see getUnretrievedOutput),
-			// and chunks may not be complete so you cannot rely on detecting or removing escape sequences mid-stream.
-			this.fullOutput += data
-
-			// For non-immediately returning commands we want to show loading spinner
-			// right away but this wouldn't happen until it emits a line break, so
-			// as soon as we get any output we emit to let webview know to show spinner
-			const now = Date.now()
-
-			if (this.isListening && (now - this.lastEmitTime_ms > 100 || this.lastEmitTime_ms === 0)) {
-				this.emitRemainingBufferIfListening()
-				this.lastEmitTime_ms = now
-			}
-
-			this.startHotTimer(data)
-
-			// If output contains shell integration execution end sequence (OSC 633;D or OSC 133;D),
-			// the command has finished executing in the terminal. Break early rather than hanging
-			// on an unclosed VS Code stream.
-			if (this.matchBeforeVsceEndMarkers(this.fullOutput) !== undefined) {
-				break
-			}
+		} finally {
+			try {
+				void asyncIterator.return?.().catch?.(() => {})
+			} catch {}
+			this.removeListener("shell_execution_complete", onExecutionComplete)
 		}
 
 		// Set streamClosed immediately after stream ends.
 		this.terminal.setActiveStream(undefined)
 
-		// Wait for shell execution to complete with a safety timeout.
+		// Wait for shell execution to complete with a safety timeout if it hasn't completed yet.
 		// If VS Code drops onDidEndTerminalShellExecution (common with subshells,
 		// custom prompts, aliases, etc.), we don't want to hang the model forever.
-		await Promise.race([
-			shellExecutionComplete,
-			new Promise<ExitCodeDetails>((resolve) => {
-				setTimeout(() => {
-					console.warn(
-						"[Terminal Process] shellExecutionComplete timed out after stream ended; resolving fallback exit code 0",
-					)
-					const fallbackDetails: ExitCodeDetails = { exitCode: 0 }
-					this.emit("shell_execution_complete", fallbackDetails)
-					resolve(fallbackDetails)
-				}, 1500)
-			}),
-		])
+		if (!executionCompleted) {
+			await Promise.race([
+				shellExecutionComplete,
+				new Promise<ExitCodeDetails>((resolve) => {
+					setTimeout(() => {
+						console.warn(
+							"[Terminal Process] shellExecutionComplete timed out after stream ended; resolving fallback exit code 0",
+						)
+						const fallbackDetails: ExitCodeDetails = { exitCode: 0 }
+						this.emit("shell_execution_complete", fallbackDetails)
+						resolve(fallbackDetails)
+					}, 1500)
+				}),
+			])
+		}
 
 		this.isHot = false
 
@@ -277,6 +318,7 @@ export class TerminalProcess extends BaseTerminalProcess {
 	}
 
 	public override abort() {
+		this.stopStreamReading?.()
 		// Always send SIGINT using CTRL+C
 		this.terminal.terminal.sendText("\x03")
 

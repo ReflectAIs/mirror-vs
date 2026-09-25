@@ -12,6 +12,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 	private pid?: number
 	private subprocess?: ReturnType<typeof execa>
 	private pidUpdatePromise?: Promise<void>
+	private stopStreamReading?: () => void
 
 	constructor(terminal: MirrorTerminal) {
 		super()
@@ -79,6 +80,24 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 			let subprocessExited = false
 			let exitDetails: { exitCode: number; signalName?: string } = { exitCode: 0 }
 			let drainTimeoutId: NodeJS.Timeout | undefined
+			let stopStreamReading: (() => void) | undefined
+			const exitDrainPromise = new Promise<void>((resolve) => {
+				stopStreamReading = resolve
+			})
+			this.stopStreamReading = stopStreamReading
+
+			const scheduleExitDrain = () => {
+				if (!drainTimeoutId) {
+					drainTimeoutId = setTimeout(() => {
+						if (rawStream && typeof (rawStream as any).destroy === "function") {
+							try {
+								;(rawStream as any).destroy()
+							} catch {}
+						}
+						stopStreamReading?.()
+					}, 400)
+				}
+			}
 
 			// Subprocess exit listener — captures real exit status even if child processes keep stdout/stderr open
 			const onProcessExit = (code: number | null, signal: NodeJS.Signals | null) => {
@@ -88,14 +107,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 					exitCode: code ?? (signal ? 1 : 0),
 					signalName: signal ? String(signal) : undefined,
 				}
-				// Allow up to 300ms for remaining in-flight buffered data to drain
-				drainTimeoutId = setTimeout(() => {
-					if (rawStream && typeof (rawStream as any).destroy === "function") {
-						try {
-							;(rawStream as any).destroy()
-						} catch {}
-					}
-				}, 300)
+				scheduleExitDrain()
 			}
 
 			this.subprocess?.once?.("exit", onProcessExit)
@@ -106,6 +118,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 						subprocessExited = true
 						exitDetails = { exitCode: res?.exitCode ?? 0 }
 					}
+					scheduleExitDrain()
 				})
 				?.catch?.((err: any) => {
 					if (!subprocessExited) {
@@ -115,15 +128,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 							signalName: err?.signal,
 						}
 					}
-					if (!drainTimeoutId) {
-						drainTimeoutId = setTimeout(() => {
-							if (rawStream && typeof (rawStream as any).destroy === "function") {
-								try {
-									;(rawStream as any).destroy()
-								} catch {}
-							}
-						}, 300)
-					}
+					scheduleExitDrain()
 				})
 
 			// Stream from unbuffered subprocess.all to ensure interactive prompts without trailing
@@ -147,26 +152,51 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 
 			this.terminal.setActiveStream(stream, this.pid)
 
-			for await (const line of stream) {
-				if (this.aborted) {
-					break
+			const asyncIterator = stream[Symbol.asyncIterator]()
+			try {
+				while (true) {
+					if (this.aborted) {
+						break
+					}
+
+					const raceResult = await Promise.race([
+						asyncIterator.next(),
+						exitDrainPromise.then(() => ({ done: true as const, value: undefined })),
+					])
+
+					if (raceResult.done) {
+						break
+					}
+
+					const line = raceResult.value
+					if (!line) continue
+
+					this.fullOutput += line
+
+					const now = Date.now()
+
+					if (this.isListening && (now - this.lastEmitTime_ms > 500 || this.lastEmitTime_ms === 0)) {
+						this.emitRemainingBufferIfListening()
+						this.lastEmitTime_ms = now
+					}
+
+					this.startHotTimer(line)
 				}
-
-				this.fullOutput += line
-
-				const now = Date.now()
-
-				if (this.isListening && (now - this.lastEmitTime_ms > 500 || this.lastEmitTime_ms === 0)) {
-					this.emitRemainingBufferIfListening()
-					this.lastEmitTime_ms = now
-				}
-
-				this.startHotTimer(line)
+			} finally {
+				try {
+					void asyncIterator.return?.().catch?.(() => {})
+				} catch {}
 			}
 
 			if (drainTimeoutId) {
 				clearTimeout(drainTimeoutId)
 				drainTimeoutId = undefined
+			}
+
+			if (this.subprocess?.stdin && !this.subprocess.stdin.destroyed) {
+				try {
+					this.subprocess.stdin.end()
+				} catch {}
 			}
 
 			if (this.aborted) {
@@ -230,6 +260,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 
 	public override abort() {
 		this.aborted = true
+		this.stopStreamReading?.()
 		this.stopHotTimer()
 		this.isHot = false
 		this.terminal.busy = false

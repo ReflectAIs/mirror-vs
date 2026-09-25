@@ -2,6 +2,23 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.6] - 2026-09-25
+
+### Terminal Execution & Callback Reliability
+
+- **Unclosed Stream & Piped Command Hang Resolution**:
+    - Fixed an issue where commands with pipes (e.g. `cmd | tail`), subshells, or commands lacking VS Code end markers caused terminal processes to hang indefinitely waiting for unclosed streams.
+    - Stream iteration in both `TerminalProcess` (VS Code Shell Integration) and `ExecaTerminalProcess` (Background execution) now races stream reading with process exit and execution completion events, ensuring the process always breaks out and completes after a brief drain window.
+- **Non-blocking Async Generator Teardown**:
+    - Replaced blocking `await asyncIterator.return?.()` with non-blocking cleanup, preventing suspended async generator iterators from deadlocking process termination when streams hang.
+- **Split Escape Sequence Detection**:
+    - Enhanced VS Code shell integration start marker detection to match against accumulated `preOutput` across chunk boundaries rather than isolated single chunks, preventing false "markers not found" errors when escape sequences arrive split across stream chunks.
+- **Shell Integration Timeout Resolution**:
+    - Fixed `Terminal.runCommand()` shell integration timeout handling where timed-out terminal instances failed to resolve promises or emit completion events, leaving the UI stuck in the "Running" state.
+- **Background & Foreground Callback Watchdog**:
+    - Hardened `ExecuteCommandTool` background notification dispatch and completion tracking to trigger reliably when either `completed` or `exitDetails` are available.
+    - Added an automatic 2-second completion fallback watchdog following shell execution completion to guarantee callbacks are always returned to the model and UI even if output queuing stalls.
+
 ## [0.9.5] - 2026-09-25
 
 ### Free Models Auto-Router

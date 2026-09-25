@@ -261,5 +261,44 @@ describe("ExecaTerminalProcess", () => {
 			expect(completeSpy).toHaveBeenCalledWith({ exitCode: 0 })
 			expect(mockDestroy).toHaveBeenCalled()
 		})
+
+		it("terminates stream cleanly even when rawStream has no destroy method", async () => {
+			const execaMock = vitest.mocked(execa)
+			let exitHandler: any
+
+			const mockReadable: any = (async function* () {
+				yield "first chunk\n"
+				// Hangs waiting forever without closing
+				await new Promise(() => {})
+			})()
+			// Deliberately no destroy method
+
+			execaMock.mockImplementationOnce((() => {
+				return () => ({
+					pid: mockPid,
+					stdin: { write: vitest.fn(), destroyed: false, writable: true },
+					all: mockReadable,
+					once: vitest.fn((event, handler) => {
+						if (event === "exit") exitHandler = handler
+					}),
+					then: vitest.fn(),
+					catch: vitest.fn(),
+					kill: vitest.fn(),
+				})
+			}) as any)
+
+			const completeSpy = vitest.fn()
+			terminalProcess.on("shell_execution_complete", completeSpy)
+
+			const runPromise = terminalProcess.run("cmd without destroy")
+
+			setTimeout(() => {
+				exitHandler?.(0, null)
+			}, 50)
+
+			await runPromise
+
+			expect(completeSpy).toHaveBeenCalledWith({ exitCode: 0 })
+		})
 	})
 })

@@ -331,5 +331,65 @@ describe("TerminalProcess", () => {
 
 			expect(completedOutput).toBe("Hello world")
 		}, 5000)
+
+		it("breaks stream reading and completes when shell_execution_complete is emitted on an unclosed stream without end markers", async () => {
+			let completedOutput: string | undefined
+			terminalProcess.on("completed", (output) => {
+				completedOutput = output
+			})
+
+			// Create a stream that never yields end markers and stays open
+			let streamNeverResolves: Promise<string> = new Promise(() => {})
+			const stream = (async function* () {
+				yield "\x1b]633;C\x07"
+				yield "Piped command output line 1\n"
+				yield "Piped command output line 2\n"
+				// Hangs waiting for more data without 633;D or stream close
+				yield await streamNeverResolves
+			})()
+
+			mockExecution = {
+				read: vi.fn().mockReturnValue(stream),
+			}
+			mockTerminal.shellIntegration.executeCommand.mockReturnValue(mockExecution)
+
+			const runPromise = terminalProcess.run("bash script.sh | tail -20")
+			terminalProcess.emit("stream_available", stream)
+
+			// Wait a bit for initial stream chunks to be processed, then emit shell execution complete
+			await new Promise((resolve) => setTimeout(resolve, 50))
+			terminalProcess.emit("shell_execution_complete", { exitCode: 0 })
+
+			await runPromise
+
+			expect(completedOutput).toContain("Piped command output line 1")
+			expect(completedOutput).toContain("Piped command output line 2")
+		}, 5000)
+
+		it("detects start marker split across chunk boundaries in preOutput", async () => {
+			let completedOutput: string | undefined
+			terminalProcess.on("completed", (output) => {
+				completedOutput = output
+			})
+
+			const stream = (async function* () {
+				// Marker split across two chunks: "\x1b]633;" and "C\x07Hello split marker\n"
+				yield "\x1b]633;"
+				yield "C\x07Hello split marker\n"
+				yield "\x1b]633;D\x07"
+			})()
+
+			mockExecution = {
+				read: vi.fn().mockReturnValue(stream),
+			}
+			mockTerminal.shellIntegration.executeCommand.mockReturnValue(mockExecution)
+
+			const runPromise = terminalProcess.run("test split marker")
+			terminalProcess.emit("stream_available", stream)
+
+			await runPromise
+
+			expect(completedOutput).toContain("Hello split marker")
+		}, 5000)
 	})
 })
