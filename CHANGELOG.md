@@ -2,9 +2,23 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.9.5] - 2026-09-23
+## [0.9.5] - 2026-09-25
+
+### Free Models Auto-Router
+
+- **Automated Free Models Router (`free-router`)**:
+    - Introduced a dedicated **"Free Models (Auto-Router)"** provider that dynamically routes tasks across high-capability free-tier models via OpenRouter (`google/gemma-4-31b-it:free`, `qwen/qwen3.8-27b:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, `z-ai/glm-5.2:free`, `nex-agi/nex-n2.5-pro:free`, `thinkingmachines/inkling:free`).
+    - **Circuit-Breaker & Real-time Cooldown**: Detects rate limits (HTTP 429), quota limits (HTTP 402), endpoint downtime (HTTP 404 "No endpoints found"), and server outages (HTTP 502/503/504), placing exhausted models into temporary cooldown (configurable, default: 10m) with exponential backoff on repeated failures.
+    - **Seamless Task Failover**: If an endpoint is offline or exhausts quota, the router transparently switches to the next healthy candidate in the pool without aborting the task or breaking token streaming.
+    - **Automated Routing Enforcement**: Disabled manual model selection in Settings and the Chat input bar when Auto-Router is active, showing a live `⚡ Auto-Router (Free)` status badge instead.
 
 ### Performance & Reliability
+
+- **Long Chat Gray Screen Fix (Streaming Render Isolation)**:
+    - Decoupled individual `ChatRowContent` components from the global `mirrorMessages` stream, computing row metadata at the virtualized list level in `ChatView`. Historical message rows no longer re-render on incoming streaming tokens, eliminating gray screen freezes and latency spikes in long conversations.
+- **Historical Environment Details Folding**:
+
+    - Replaces stale `<environment_details>` blocks in historical conversation turns with lightweight 1-line tombstones, preserving prompt cache continuity while stopping prompt bloat across extended tasks.
 
 - **Parallel Tool Execution**:
     - Enabled concurrent parallel read tool execution (`read_file`, `search_files`, `list_files`, `list_code_definition_names`) reducing multi-read tool latency by ~80%.
