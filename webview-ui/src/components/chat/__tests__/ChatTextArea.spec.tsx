@@ -1132,10 +1132,10 @@ describe("ChatTextArea", () => {
 
 			expect(sendButton).toBeInTheDocument()
 
-			// Check that the button is visible (has opacity-100 class when content exists)
-			expect(sendButton).toHaveClass("opacity-100")
+			// Check that the button is visible (has opacity-90 class when content exists)
+			expect(sendButton).toHaveClass("opacity-90")
 			expect(sendButton).toHaveClass("pointer-events-auto")
-			expect(sendButton).not.toHaveClass("opacity-0")
+			expect(sendButton).not.toHaveClass("hidden")
 			expect(sendButton).not.toHaveClass("pointer-events-none")
 		})
 
@@ -1150,10 +1150,10 @@ describe("ChatTextArea", () => {
 
 			expect(sendButton).toBeInTheDocument()
 
-			// Check that the button is hidden (has opacity-0 class when no content)
-			expect(sendButton).toHaveClass("opacity-0")
+			// Check that the button is hidden (has hidden class when no content)
+			expect(sendButton).toHaveClass("hidden")
 			expect(sendButton).toHaveClass("pointer-events-none")
-			expect(sendButton).not.toHaveClass("opacity-100")
+			expect(sendButton).not.toHaveClass("opacity-90")
 			expect(sendButton).not.toHaveClass("pointer-events-auto")
 		})
 
@@ -1169,7 +1169,7 @@ describe("ChatTextArea", () => {
 			expect(sendButton).toBeInTheDocument()
 
 			// Check that the button is visible
-			expect(sendButton).toHaveClass("opacity-100")
+			expect(sendButton).toHaveClass("opacity-90")
 			expect(sendButton).toHaveClass("pointer-events-auto")
 		})
 
@@ -1191,7 +1191,7 @@ describe("ChatTextArea", () => {
 			expect(sendButton).toBeInTheDocument()
 
 			// Check that the button is visible
-			expect(sendButton).toHaveClass("opacity-100")
+			expect(sendButton).toHaveClass("opacity-90")
 			expect(sendButton).toHaveClass("pointer-events-auto")
 		})
 	})
@@ -1259,8 +1259,14 @@ describe("ChatTextArea", () => {
 
 			expect(screen.getByTestId("auto-router-indicator")).toBeInTheDocument()
 			expect(screen.getByText(/Auto-Router: Gemma 4 31B/)).toBeInTheDocument()
+			expect(screen.getByTestId("free-router-model-selector")).toBeInTheDocument()
 			expect(screen.queryByTestId("model-selector")).not.toBeInTheDocument()
 			expect(screen.queryByTestId("model-input")).not.toBeInTheDocument()
+
+			fireEvent.change(screen.getByTestId("free-router-model-selector"), {
+				target: { value: "qwen/qwen3.8-27b:free" },
+			})
+			expect(onModelChange).toHaveBeenCalledWith("qwen/qwen3.8-27b:free")
 		})
 
 		it("should commit the typed model on Enter", () => {

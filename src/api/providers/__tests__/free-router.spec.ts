@@ -119,6 +119,15 @@ describe("FreeRouterHandler", () => {
 			const selected = handler.getModel()
 			expect(selected.id).toBe("model-2")
 		})
+
+		it("prioritizes apiModelId when specified for quick change", () => {
+			const handler = new FreeRouterHandler({
+				apiModelId: "qwen/qwen3.8-27b:free",
+			})
+			const pool = handler.getModelPool()
+			expect(pool[0]).toBe("qwen/qwen3.8-27b:free")
+			expect(handler.getModel().id).toBe("qwen/qwen3.8-27b:free")
+		})
 	})
 
 	describe("Circuit-Breaker Failover Streaming", () => {

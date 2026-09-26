@@ -551,9 +551,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				onStop={handleStopTask}
 				onEnqueueMessage={handleEnqueueCurrentMessage}
 				modelId={
-					modelPickerConfig
-						? (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
-						: undefined
+					apiConfiguration?.apiProvider === "free-router"
+						? apiConfiguration?.apiModelId || ""
+						: modelPickerConfig
+							? (apiConfiguration?.[modelPickerConfig.modelIdKey] as string) || modelId
+							: undefined
 				}
 				modelOptions={modelOptions}
 				onModelChange={handleModelChange}

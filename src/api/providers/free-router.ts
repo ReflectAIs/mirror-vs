@@ -175,13 +175,22 @@ export class FreeRouterHandler extends BaseProvider {
 	 * In Auto-Router mode, models are managed automatically based on the curated free models pool.
 	 */
 	public getModelPool(): string[] {
+		let basePool: string[]
 		// 1. If user specified custom model list in settings, use that
 		if (Array.isArray(this.options.freeRouterModels) && this.options.freeRouterModels.length > 0) {
-			return this.options.freeRouterModels
+			basePool = [...this.options.freeRouterModels]
+		} else {
+			// 2. Default pool: all active default free models in curated priority order
+			basePool = DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
 		}
 
-		// 2. Default pool: all active default free models in curated priority order
-		return DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
+		// If user selected a preferred primary model via quick change, prioritize it
+		if (this.options.apiModelId && this.options.apiModelId.trim()) {
+			const preferred = this.options.apiModelId.trim()
+			return [preferred, ...basePool.filter((id) => id !== preferred)]
+		}
+
+		return basePool
 	}
 
 	/**

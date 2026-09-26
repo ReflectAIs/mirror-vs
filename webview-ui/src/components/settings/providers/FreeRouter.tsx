@@ -178,6 +178,24 @@ export const FreeRouter = ({
 					. If this endpoint hits rate limits or downtime, requests seamlessly fail over to the next healthy
 					model in your pool below.
 				</p>
+				<div className="flex items-center justify-between gap-2 pt-2 border-t border-vscode-charts-green/20">
+					<label htmlFor="free-router-primary-select" className="text-xs text-vscode-descriptionForeground">
+						Quick Change / Preferred Model:
+					</label>
+					<select
+						id="free-router-primary-select"
+						data-testid="free-router-primary-select"
+						value={apiConfiguration?.apiModelId || ""}
+						onChange={(e) => setApiConfigurationField("apiModelId", e.target.value || undefined)}
+						className="h-6 px-1.5 text-xs bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-vscode-dropdown-border rounded focus:outline-none cursor-pointer">
+						<option value="">⚡ Auto (Dynamic Failover Pool)</option>
+						{DEFAULT_FREE_ROUTER_MODELS.map((m) => (
+							<option key={m.id} value={m.id}>
+								{getFreeRouterActiveModelName(m.id)}
+							</option>
+						))}
+					</select>
+				</div>
 			</div>
 
 			{/* Cooldown Settings */}
@@ -262,8 +280,27 @@ export const FreeRouter = ({
 										</span>
 									</div>
 								</div>
-								<div className="text-[10px] text-vscode-descriptionForeground/60 font-mono pl-2">
-									#{idx + 1}
+								<div className="flex items-center gap-1.5 pl-2 flex-shrink-0">
+									{!isCurrentActive ? (
+										<VSCodeButton
+											appearance="secondary"
+											className="text-[10px] h-5 py-0 px-1.5"
+											title="Quick switch: set this model as preferred primary"
+											onClick={() => setApiConfigurationField("apiModelId", model.id)}>
+											Use Now
+										</VSCodeButton>
+									) : apiConfiguration?.apiModelId ? (
+										<VSCodeButton
+											appearance="secondary"
+											className="text-[10px] h-5 py-0 px-1.5"
+											title="Reset to dynamic auto routing"
+											onClick={() => setApiConfigurationField("apiModelId", undefined)}>
+											Reset Auto
+										</VSCodeButton>
+									) : null}
+									<span className="text-[10px] text-vscode-descriptionForeground/60 font-mono">
+										#{idx + 1}
+									</span>
 								</div>
 							</div>
 						)

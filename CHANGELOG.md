@@ -4,15 +4,25 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.9.6] - 2026-09-25
 
-### Auto-Router Active Model Visibility
+### Auto-Router Active Model Visibility & Quick Change
 
+- **Quick Change Model Selector in Chat Toolbar**:
+    - The chat toolbar's Auto-Router indicator now features an interactive quick-change dropdown (`⚡ Auto-Router: <Model>`), allowing instantaneous switching between free models (Gemma 4 31B, Qwen 3.8 27B, Cohere North Mini Code, Nemotron 3 Ultra, etc.) or pure Auto failover right from the prompt bar without opening settings.
+- **Quick Change & Primary Model Control in Settings**:
+    - Added a "Quick Change / Preferred Model" dropdown in the Auto-Router settings card, plus one-click "Use Now" and "Reset Auto" buttons on every model in the failover pool table.
+    - `FreeRouterHandler` prioritizes user-selected models as first in the pool while seamlessly retaining automatic circuit-breaker failover if the selected model encounters 429/404/503 limits.
 - **Live Active Model Display in Chat Toolbar**:
-    - The chat toolbar's Auto-Router badge now dynamically reflects the exact model actively serving requests (e.g., `⚡ Auto-Router: Gemma 4 31B`), with a rich hover tooltip displaying full model ID and circuit-breaker behavior.
+    - The chat toolbar's Auto-Router badge dynamically reflects the exact model actively serving requests, with a rich hover tooltip displaying full model ID and circuit-breaker behavior.
 - **Active Model Status & Failover Pool Highlighting in Settings**:
-    - The Auto-Router settings view now displays an `⚡ Active: <Model Name>` status badge alongside the active model ID.
+    - The Auto-Router settings view displays an `⚡ Active: <Model Name>` status badge alongside the active model ID.
     - The currently utilized model in the failover pool is highlighted with a gold accent border and a `⚡ Currently in Use` tag.
 - **Runtime Active Model Tracking**:
     - `FreeRouterHandler` dynamically tracks active streaming models and candidate switchovers across requests.
+
+### Free Router API Key Persistence Fix
+
+- **SecretStorage Registration for `freeRouterApiKey`**:
+    - Fixed an issue where entering a Free Router API key caused it to disappear upon VS Code reload or window refresh. Registered `freeRouterApiKey` in `SECRET_STATE_KEYS` so it is securely persisted in VS Code's `SecretStorage` alongside other provider API keys.
 
 ### Terminal Execution & Callback Reliability
 

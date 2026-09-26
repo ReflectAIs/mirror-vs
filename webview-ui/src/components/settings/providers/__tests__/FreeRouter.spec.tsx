@@ -200,4 +200,29 @@ describe("FreeRouter component", () => {
 
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("freeRouterCooldownMinutes", 15)
 	})
+
+	it("allows quick changing preferred primary model via select dropdown and Use Now button", () => {
+		render(
+			<FreeRouter
+				apiConfiguration={defaultApiConfiguration}
+				setApiConfigurationField={mockSetApiConfigurationField}
+				selectedModelId="google/gemma-4-31b-it:free"
+				uriScheme="vscode"
+				organizationAllowList={{ allowList: {}, providers: {} } as any}
+			/>,
+			{ wrapper: createWrapper() },
+		)
+
+		const select = screen.getByTestId("free-router-primary-select")
+		expect(select).toBeInTheDocument()
+
+		fireEvent.change(select, { target: { value: "qwen/qwen3.8-27b:free" } })
+		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("apiModelId", "qwen/qwen3.8-27b:free")
+
+		// Click "Use Now" on another model
+		const useNowButtons = screen.getAllByText("Use Now")
+		expect(useNowButtons.length).toBeGreaterThan(0)
+		fireEvent.click(useNowButtons[0])
+		expect(mockSetApiConfigurationField).toHaveBeenCalled()
+	})
 })

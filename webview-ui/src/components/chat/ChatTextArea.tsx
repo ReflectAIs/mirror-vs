@@ -3,7 +3,13 @@ import { useEvent } from "react-use"
 import DynamicTextArea from "react-textarea-autosize"
 import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square, Zap } from "lucide-react"
 
-import { getFreeRouterActiveModelId, getFreeRouterActiveModelName, type ExtensionMessage } from "@mirror-vs/types"
+import {
+	getFreeRouterActiveModelId,
+	getFreeRouterActiveModelName,
+	DEFAULT_FREE_ROUTER_MODELS,
+	freeRouterModels,
+	type ExtensionMessage,
+} from "@mirror-vs/types"
 
 import { mentionRegex, mentionRegexGlobal, commandRegexGlobal, unescapeSpaces } from "@shared/context-mentions"
 import { WebviewMessage } from "@shared/WebviewMessage"
@@ -129,6 +135,18 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const freeRouterActiveModelName = useMemo(() => {
 			return getFreeRouterActiveModelName(freeRouterActiveModelId)
 		}, [freeRouterActiveModelId])
+
+		const freeRouterModelOptions = useMemo(() => {
+			const pool =
+				Array.isArray(apiConfiguration?.freeRouterModels) && apiConfiguration.freeRouterModels.length > 0
+					? apiConfiguration.freeRouterModels
+					: DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
+			const allIds = Array.from(new Set([...pool, ...Object.keys(freeRouterModels)]))
+			return allIds.map((id) => ({
+				value: id,
+				label: `${getFreeRouterActiveModelName(id)} (Free)`,
+			}))
+		}, [apiConfiguration?.freeRouterModels])
 
 		const [gitCommits, setGitCommits] = useState<any[]>([])
 		const [showDropdown, setShowDropdown] = useState(false)
@@ -1326,10 +1344,39 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						{apiConfiguration?.apiProvider === "free-router" ? (
 							<div
 								data-testid="auto-router-indicator"
-								className="h-6 px-2 text-[11px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded flex items-center gap-1 select-none cursor-default border border-vscode-panel-border/30 flex-shrink-0"
-								title={`Auto-Router active model: ${freeRouterActiveModelId}. Automatically routes across free models if rate-limited.`}>
-								<Zap className="size-3 text-vscode-charts-yellow" />
-								<span>Auto-Router: {freeRouterActiveModelName}</span>
+								className="h-6 px-1.5 text-[11px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded flex items-center gap-1 border border-vscode-panel-border/30 flex-shrink-0"
+								title={`Auto-Router active model: ${freeRouterActiveModelId}. Select to quickly switch model.`}>
+								<Zap className="size-3 text-vscode-charts-yellow flex-shrink-0" />
+								<select
+									data-testid="free-router-model-selector"
+									aria-label="Free Router model"
+									value={apiConfiguration?.apiModelId || ""}
+									onChange={(e) => {
+										if (onModelChange) {
+											onModelChange(e.target.value)
+										}
+									}}
+									className="bg-transparent text-vscode-badge-foreground text-[11px] font-medium focus:outline-none cursor-pointer border-none p-0 pr-3.5 appearance-none max-w-[170px] truncate"
+									style={{
+										backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+										backgroundPosition: "right 0px center",
+										backgroundRepeat: "no-repeat",
+										backgroundSize: "12px 12px",
+									}}>
+									<option
+										value=""
+										className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+										Auto-Router: {freeRouterActiveModelName}
+									</option>
+									{freeRouterModelOptions.map((opt) => (
+										<option
+											key={opt.value}
+											value={opt.value}
+											className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+											{opt.label}
+										</option>
+									))}
+								</select>
 							</div>
 						) : (
 							modelId !== undefined &&

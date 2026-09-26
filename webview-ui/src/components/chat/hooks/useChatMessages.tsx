@@ -1349,6 +1349,17 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 
 	const handleModelChange = useCallback(
 		(newModelId: string) => {
+			if (provider === "free-router") {
+				setApiConfigurationField("apiModelId", newModelId)
+				vscode.postMessage({
+					type: "modelChange",
+					apiConfiguration: {
+						...apiConfiguration,
+						apiModelId: newModelId,
+					},
+				})
+				return
+			}
 			if (modelPickerConfig) {
 				setApiConfigurationField(modelPickerConfig.modelIdKey, newModelId)
 				vscode.postMessage({
@@ -1360,7 +1371,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				})
 			}
 		},
-		[modelPickerConfig, setApiConfigurationField, apiConfiguration],
+		[provider, modelPickerConfig, setApiConfigurationField, apiConfiguration],
 	)
 
 	// ── Message handler (window event) ──
