@@ -4,6 +4,15 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.9.6] - 2026-09-25
 
+### File Changes Panel Redesign & Compact Layout
+
+- **Compact Bottom Accessory Placement**:
+    - Relocated the file changes review panel from spanning full width across the chat view to a compact pill button aligned directly alongside the `WorktreeSelector` right above the prompt textarea.
+    - Uses the same refined glass/pill aesthetic as other bottom accessories, showing the changed file count, `+added -removed` stats badge, and chevron indicator.
+- **Compact Floating Review Card**:
+    - When expanded, renders as a clean, constrained card (`max-w-[420px]` with max height `240px` and custom scrollbar) rather than taking over the entire bottom viewport.
+    - Includes a streamlined header with quick-action "Accept All" button when reviews are active.
+
 ### Auto-Router Active Model Visibility & Quick Change
 
 - **Quick Change Model Selector in Chat Toolbar**:

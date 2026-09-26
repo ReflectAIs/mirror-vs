@@ -439,7 +439,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							onScrollToCheckpoint={handleScrollToLatestCheckpoint}
 						/>
 					</div>
-					<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />
 					{areButtonsVisible && (
 						<ChatActionBar
 							showScrollToBottom={showScrollToBottom2}
@@ -521,11 +520,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					/>
 				</div>
 			)}
-			{showWorktreesInHomeScreen && (
-				<div className="px-3 mb-1">
-					<WorktreeSelector />
-				</div>
-			)}
+			<div className="px-3 mb-1 flex items-center gap-2 flex-wrap empty:hidden">
+				{showWorktreesInHomeScreen && <WorktreeSelector />}
+				<FileChangesPanel mirrorMessages={messages} fileEdits={fileEdits} />
+			</div>
 			<ChatTextArea
 				ref={textAreaRef as any}
 				inputValue={inputValue}

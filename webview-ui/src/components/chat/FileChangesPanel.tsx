@@ -118,40 +118,42 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 	const fileCount = byPath.size
 
 	return (
-		<Collapsible open={panelExpanded} onOpenChange={setPanelExpanded} className={cn("px-3", className)}>
-			<div className="flex items-center justify-between gap-2 w-full">
+		<Collapsible open={panelExpanded} onOpenChange={setPanelExpanded} className={cn("inline-block", className)}>
+			<div className="inline-flex items-center gap-2">
 				<CollapsibleTrigger
 					className={cn(
-						"flex items-center gap-2 py-2 rounded-md text-left text-vscode-foreground flex-grow min-w-0",
-						"hover:bg-vscode-list-hoverBackground",
+						"inline-flex gap-1.5 items-center relative whitespace-nowrap px-2.5 py-1",
+						"bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-md text-vscode-foreground text-left text-xs",
+						"transition-all duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
+						"opacity-85 hover:opacity-100 hover:bg-[rgba(255,255,255,0.07)] hover:border-[rgba(255,255,255,0.15)] cursor-pointer",
 					)}>
-					{panelExpanded ? (
-						<ChevronDown className="size-4 shrink-0" aria-hidden />
-					) : (
-						<ChevronRight className="size-4 shrink-0" aria-hidden />
-					)}
-					<FileDiff className="size-4 shrink-0" aria-hidden />
-					<span className="text-sm font-medium truncate">
+					<FileDiff className="size-3 text-mirror-brand-via shrink-0" aria-hidden />
+					<span className="font-semibold text-xs">
 						{t("chat:fileChangesInConversation.header", { count: fileCount })}
 					</span>
 					{totalStats.added > 0 || totalStats.removed > 0 ? (
 						<div
-							className="flex items-center gap-2 ml-2 shrink-0"
+							className="flex items-center gap-1 ml-0.5 shrink-0 font-mono text-[10px]"
 							aria-label={`${totalStats.added} lines added, ${totalStats.removed} lines removed`}>
-							<span className="text-xs font-medium text-vscode-charts-green" data-testid="total-added">
+							<span className="text-vscode-charts-green" data-testid="total-added">
 								+{totalStats.added}
 							</span>
-							<span className="text-xs font-medium text-vscode-charts-red" data-testid="total-removed">
+							<span className="text-vscode-charts-red" data-testid="total-removed">
 								-{totalStats.removed}
 							</span>
 						</div>
 					) : null}
+					{panelExpanded ? (
+						<ChevronDown className="size-3 opacity-60 shrink-0" aria-hidden />
+					) : (
+						<ChevronRight className="size-3 opacity-60 shrink-0" aria-hidden />
+					)}
 				</CollapsibleTrigger>
 				{hasActiveReviews && (
 					<Button
 						variant="secondary"
 						size="sm"
-						className="shrink-0 text-xs px-2.5 py-1 h-7 border border-vscode-button-border hover:bg-vscode-button-hoverBackground hover:text-vscode-button-hoverForeground"
+						className="shrink-0 text-[11px] px-2 py-0.5 h-6 bg-vscode-button-background text-vscode-button-foreground hover:bg-vscode-button-hoverBackground border-none font-medium"
 						onClick={(e) => {
 							e.stopPropagation()
 							vscode.postMessage({ type: "acceptAllReviews" })
@@ -160,49 +162,75 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 					</Button>
 				)}
 			</div>
-			<CollapsibleContent>
-				<div className="flex flex-col gap-1 pb-2 pl-6 max-h-[300px] overflow-y-auto pr-1">
-					{Array.from(byPath.entries()).map(([path, entries]) => {
-						const originalContent = entries[0].originalContent
-						const lookupPath = path.startsWith("./") ? path.slice(2) : path
-						const finalContent = finalContentByPath[lookupPath]
-						const hasMergedDiff =
-							originalContent !== undefined && finalContent != null && finalContent !== ""
-						const displayDiff = hasMergedDiff
-							? createTwoFilesPatch(path, path, originalContent, finalContent)
-							: entries.map((e) => e.diff).join("\n\n")
-						const combinedStats = entries.reduce(
-							(acc, e) => ({
-								added: acc.added + (e.diffStats?.added ?? 0),
-								removed: acc.removed + (e.diffStats?.removed ?? 0),
-							}),
-							{ added: 0, removed: 0 },
-						)
-						const isExpanded = expandedPaths.has(path)
-						return (
-							<div key={path} className="rounded border border-vscode-panel-border overflow-hidden">
-								<CodeAccordion
-									path={path}
-									code={displayDiff}
-									language="diff"
-									isExpanded={isExpanded}
-									onToggleExpand={() => togglePath(path)}
-									diffStats={
-										combinedStats.added > 0 || combinedStats.removed > 0 ? combinedStats : undefined
-									}
-									onJumpToFile={
-										path
-											? () =>
-													vscode.postMessage({
-														type: "openFile",
-														text: path.startsWith("./") ? path : "./" + path,
-													})
-											: undefined
-									}
-								/>
-							</div>
-						)
-					})}
+			<CollapsibleContent className="mt-1.5 w-full max-w-[420px]">
+				<div className="flex flex-col rounded-lg border border-vscode-panel-border/80 bg-vscode-editor-background/95 backdrop-blur-sm shadow-md overflow-hidden">
+					{/* Compact card header */}
+					<div className="flex items-center justify-between px-2.5 py-1.5 bg-vscode-sideBar-background/60 border-b border-vscode-panel-border/40 text-[11px]">
+						<div className="flex items-center gap-1.5 font-medium text-vscode-foreground">
+							<FileDiff className="size-3 text-mirror-brand-via" />
+							<span>Changed Files ({fileCount})</span>
+						</div>
+						{hasActiveReviews && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation()
+									vscode.postMessage({ type: "acceptAllReviews" })
+								}}
+								className="text-[10px] text-mirror-brand-via hover:underline font-semibold cursor-pointer bg-transparent border-none p-0">
+								Accept All
+							</button>
+						)}
+					</div>
+
+					{/* Scrollable compact file rows list */}
+					<div className="flex flex-col gap-1 p-1.5 max-h-[240px] overflow-y-auto">
+						{Array.from(byPath.entries()).map(([path, entries]) => {
+							const originalContent = entries[0].originalContent
+							const lookupPath = path.startsWith("./") ? path.slice(2) : path
+							const finalContent = finalContentByPath[lookupPath]
+							const hasMergedDiff =
+								originalContent !== undefined && finalContent != null && finalContent !== ""
+							const displayDiff = hasMergedDiff
+								? createTwoFilesPatch(path, path, originalContent, finalContent)
+								: entries.map((e) => e.diff).join("\n\n")
+							const combinedStats = entries.reduce(
+								(acc, e) => ({
+									added: acc.added + (e.diffStats?.added ?? 0),
+									removed: acc.removed + (e.diffStats?.removed ?? 0),
+								}),
+								{ added: 0, removed: 0 },
+							)
+							const isExpanded = expandedPaths.has(path)
+							return (
+								<div
+									key={path}
+									className="rounded border border-vscode-panel-border/40 bg-vscode-sideBar-background/30 overflow-hidden">
+									<CodeAccordion
+										path={path}
+										code={displayDiff}
+										language="diff"
+										isExpanded={isExpanded}
+										onToggleExpand={() => togglePath(path)}
+										diffStats={
+											combinedStats.added > 0 || combinedStats.removed > 0
+												? combinedStats
+												: undefined
+										}
+										onJumpToFile={
+											path
+												? () =>
+														vscode.postMessage({
+															type: "openFile",
+															text: path.startsWith("./") ? path : "./" + path,
+														})
+												: undefined
+										}
+									/>
+								</div>
+							)
+						})}
+					</div>
 				</div>
 			</CollapsibleContent>
 		</Collapsible>
