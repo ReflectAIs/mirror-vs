@@ -4,14 +4,33 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.9.6] - 2026-09-25
 
+### OpenRouter App Attribution
+
+- **Standardized Attribution Headers**:
+    - Added compliant OpenRouter app attribution headers (`HTTP-Referer: https://github.com/ReflectAIs/mirror-vs`, `X-OpenRouter-Title: Mirror VS`, and `X-OpenRouter-Categories: ide-extension,cli-agent`) across all OpenRouter API requests, embedders, image generation, and cloud runtimes while preserving `X-Title` for backward compatibility.
+    - Enables accurate tracking in OpenRouter public rankings, model app leaderboards, and developer analytics.
+
+### Free Router Dropdown Selection & Persistence Fix
+
+- **Instant Model Switching from Input Dropdown**:
+    - Fixed model resolution in `FreeRouterHandler.getModel()` to prioritize the user's selected `apiModelId` over cached runtime models, allowing seamless model changes directly from the prompt input dropdown without having to navigate to Settings.
+    - Fixed an issue where `this.options.apiModelId` was inadvertently overwritten during message streaming, corrupting the user's selected model preference.
+- **Backend Configuration Persistence**:
+    - Ensured `handleModelChange` persists settings to profile storage and syncs mode config even when `currentApiConfigName` is initially unset (defaulting to `"default"`).
+    - Kept active task sticky profile in sync upon model changes to prevent task restarts or mode switching from resetting the chosen model.
+- **Frontend Dropdown Sync & Stable Auto-Router Label**:
+    - Bound prompt selector directly to active model ID state and stabilized the default option label (`Auto-Router: <Default Model>`) to prevent the auto-router option label from dynamically mirroring selected models.
+
 ### File Changes Panel Redesign & Compact Layout
 
 - **Compact Bottom Accessory Placement**:
     - Relocated the file changes review panel from spanning full width across the chat view to a compact pill button aligned directly alongside the `WorktreeSelector` right above the prompt textarea.
     - Uses the same refined glass/pill aesthetic as other bottom accessories, showing the changed file count, `+added -removed` stats badge, and chevron indicator.
-- **Compact Floating Review Card**:
+- **Compact Floating Review Card & Legibility Fixes**:
     - When expanded, renders as a clean, constrained card (`max-w-[420px]` with max height `240px` and custom scrollbar) rather than taking over the entire bottom viewport.
     - Includes a streamlined header with quick-action "Accept All" button when reviews are active.
+    - Added an instant search filter to quickly find modified files across large changesets.
+    - Fixed file rows becoming compressed into bare lines when many files are changed, ensuring file names, paths, and status badges remain fully legible.
 
 ### Auto-Router Active Model Visibility & Quick Change
 

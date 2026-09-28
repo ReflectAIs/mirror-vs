@@ -8,6 +8,7 @@ import {
 	getFreeRouterActiveModelName,
 	DEFAULT_FREE_ROUTER_MODELS,
 	freeRouterModels,
+	freeRouterDefaultModelId,
 	type ExtensionMessage,
 } from "@mirror-vs/types"
 
@@ -135,6 +136,18 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const freeRouterActiveModelName = useMemo(() => {
 			return getFreeRouterActiveModelName(freeRouterActiveModelId)
 		}, [freeRouterActiveModelId])
+
+		const autoRouterDefaultModelId = useMemo(() => {
+			const pool =
+				Array.isArray(apiConfiguration?.freeRouterModels) && apiConfiguration.freeRouterModels.length > 0
+					? apiConfiguration.freeRouterModels
+					: DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
+			return pool[0] ?? freeRouterDefaultModelId
+		}, [apiConfiguration?.freeRouterModels])
+
+		const autoRouterDefaultModelName = useMemo(() => {
+			return getFreeRouterActiveModelName(autoRouterDefaultModelId)
+		}, [autoRouterDefaultModelId])
 
 		const freeRouterModelOptions = useMemo(() => {
 			const pool =
@@ -1350,7 +1363,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 								<select
 									data-testid="free-router-model-selector"
 									aria-label="Free Router model"
-									value={apiConfiguration?.apiModelId || ""}
+									value={modelId !== undefined ? modelId : apiConfiguration?.apiModelId || ""}
 									onChange={(e) => {
 										if (onModelChange) {
 											onModelChange(e.target.value)
@@ -1366,7 +1379,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									<option
 										value=""
 										className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
-										Auto-Router: {freeRouterActiveModelName}
+										Auto-Router: {autoRouterDefaultModelName}
 									</option>
 									{freeRouterModelOptions.map((opt) => (
 										<option

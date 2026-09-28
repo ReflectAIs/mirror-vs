@@ -7,6 +7,8 @@ describe("DEFAULT_HEADERS", () => {
 	it("should contain all required headers", () => {
 		expect(DEFAULT_HEADERS).toHaveProperty("HTTP-Referer")
 		expect(DEFAULT_HEADERS).toHaveProperty("X-Title")
+		expect(DEFAULT_HEADERS).toHaveProperty("X-OpenRouter-Title")
+		expect(DEFAULT_HEADERS).toHaveProperty("X-OpenRouter-Categories")
 		expect(DEFAULT_HEADERS).toHaveProperty("User-Agent")
 	})
 
@@ -16,6 +18,14 @@ describe("DEFAULT_HEADERS", () => {
 
 	it("should have correct X-Title value", () => {
 		expect(DEFAULT_HEADERS["X-Title"]).toBe("Mirror VS")
+	})
+
+	it("should have correct X-OpenRouter-Title value", () => {
+		expect(DEFAULT_HEADERS["X-OpenRouter-Title"]).toBe("Mirror VS")
+	})
+
+	it("should have correct X-OpenRouter-Categories value", () => {
+		expect(DEFAULT_HEADERS["X-OpenRouter-Categories"]).toBe("ide-extension,cli-agent")
 	})
 
 	it("should have correct User-Agent format", () => {
@@ -52,9 +62,15 @@ describe("DEFAULT_HEADERS", () => {
 		})
 	})
 
-	it("should have exactly 3 headers", () => {
+	it("should have exactly 5 headers", () => {
 		const headerKeys = Object.keys(DEFAULT_HEADERS)
-		expect(headerKeys).toHaveLength(3)
-		expect(headerKeys).toEqual(["HTTP-Referer", "X-Title", "User-Agent"])
+		expect(headerKeys).toHaveLength(5)
+		expect(headerKeys).toEqual([
+			"HTTP-Referer",
+			"X-Title",
+			"X-OpenRouter-Title",
+			"X-OpenRouter-Categories",
+			"User-Agent",
+		])
 	})
 })

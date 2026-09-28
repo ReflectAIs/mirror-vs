@@ -56,8 +56,10 @@ export class AtlasCloudRuntime {
 				headers: {
 					Authorization: `Bearer ${apiKey}`,
 					"Content-Type": "application/json",
-					"HTTP-Referer": "https://github.com/mirror-vs/extension",
+					"HTTP-Referer": "https://github.com/ReflectAIs/mirror-vs",
 					"X-Title": "Mirror VS Code Extension",
+					"X-OpenRouter-Title": "Mirror VS Code Extension",
+					"X-OpenRouter-Categories": "ide-extension,cli-agent",
 				},
 				body: JSON.stringify({
 					model: modelSlug,

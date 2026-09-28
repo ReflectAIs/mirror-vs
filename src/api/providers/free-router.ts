@@ -197,6 +197,13 @@ export class FreeRouterHandler extends BaseProvider {
 	 * Returns the currently active healthy model ID and info.
 	 */
 	override getModel(): { id: string; info: ModelInfo } {
+		// If user selected a preferred model and it's healthy, prioritize it
+		const preferred = this.options.apiModelId?.trim()
+		if (preferred && !isModelExhausted(preferred)) {
+			const info = freeRouterModels[preferred] || freeRouterDefaultModelInfo
+			return { id: preferred, info }
+		}
+
 		if (this.currentActiveModelId && !isModelExhausted(this.currentActiveModelId)) {
 			const info = freeRouterModels[this.currentActiveModelId] || freeRouterDefaultModelInfo
 			return { id: this.currentActiveModelId, info }
@@ -264,7 +271,6 @@ export class FreeRouterHandler extends BaseProvider {
 					if (!firstChunkYielded) {
 						firstChunkYielded = true
 						this.currentActiveModelId = candidateModelId
-						this.options.apiModelId = candidateModelId
 					}
 					yield chunk
 				}

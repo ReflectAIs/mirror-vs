@@ -72,6 +72,8 @@ export async function generateImageWithProvider(options: ImageGenerationOptions)
 				"Content-Type": "application/json",
 				"HTTP-Referer": "https://github.com/ReflectAIs/mirror-vs",
 				"X-Title": "Mirror VS",
+				"X-OpenRouter-Title": "Mirror VS",
+				"X-OpenRouter-Categories": "ide-extension,cli-agent",
 			},
 			body: JSON.stringify({
 				model,
@@ -218,6 +220,8 @@ export async function generateImageWithImagesApi(options: ImagesApiOptions): Pro
 				"Content-Type": "application/json",
 				"HTTP-Referer": "https://github.com/ReflectAIs/mirror-vs",
 				"X-Title": "Mirror VS",
+				"X-OpenRouter-Title": "Mirror VS",
+				"X-OpenRouter-Categories": "ide-extension,cli-agent",
 			},
 			body: JSON.stringify(requestBody),
 		}

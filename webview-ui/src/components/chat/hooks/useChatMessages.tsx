@@ -1350,12 +1350,13 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	const handleModelChange = useCallback(
 		(newModelId: string) => {
 			if (provider === "free-router") {
-				setApiConfigurationField("apiModelId", newModelId)
+				const modelVal = newModelId || undefined
+				setApiConfigurationField("apiModelId", modelVal as any)
 				vscode.postMessage({
 					type: "modelChange",
 					apiConfiguration: {
 						...apiConfiguration,
-						apiModelId: newModelId,
+						apiModelId: modelVal,
 					},
 				})
 				return

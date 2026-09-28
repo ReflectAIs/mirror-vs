@@ -165,7 +165,7 @@ export class ProfileManager {
 
 	// ── Sticky provider profile ───────────────────────────────────────────────
 
-	private async persistStickyProviderProfileToCurrentTask(apiConfigName: string): Promise<void> {
+	async persistStickyProviderProfileToCurrentTask(apiConfigName: string): Promise<void> {
 		const task = this.provider.getCurrentTask()
 		if (!task) {
 			return
