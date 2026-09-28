@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { ChevronDown, FileDiff } from "lucide-react"
+import { ChevronDown, FileDiff, Search } from "lucide-react"
 import { createTwoFilesPatch } from "diff"
 
 import type { MirrorMessage, ExtensionMessage, FileEditRecord } from "@mirror-vs/types"
@@ -25,15 +25,17 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 	const { t } = useTranslation()
 	const { hasActiveReviews } = useExtensionState()
 	const [panelOpen, setPanelOpen] = useState(false)
+	const [filterText, setFilterText] = useState("")
 	const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
 	const [finalContentByPath, setFinalContentByPath] = useState<Record<string, string | null>>({})
 	const pendingPathsRef = useRef<Set<string>>(new Set())
 	const portalContainer = useMirrorPortal("mirror-portal")
 
-	// Reset expanded file rows and final content cache when switching to a different task
+	// Reset expanded file rows, search filter, and final content cache when switching tasks
 	useEffect(() => {
 		setExpandedPaths(new Set())
 		setFinalContentByPath({})
+		setFilterText("")
 		pendingPathsRef.current = new Set()
 	}, [mirrorMessages])
 
@@ -84,6 +86,14 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 		}
 		return map
 	}, [fileChanges])
+
+	// Filtered list of files based on user search query
+	const filteredEntries = useMemo(() => {
+		const entries = Array.from(byPath.entries())
+		if (!filterText.trim()) return entries
+		const q = filterText.trim().toLowerCase()
+		return entries.filter(([path]) => path.toLowerCase().includes(q))
+	}, [byPath, filterText])
 
 	// Aggregate total lines added/removed across all files for the panel header
 	const totalStats = useMemo(() => {
@@ -183,13 +193,16 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 					align="start"
 					sideOffset={6}
 					container={portalContainer}
-					className="p-0 overflow-hidden w-[440px] max-w-[92vw] shadow-2xl border border-vscode-panel-border/80 bg-vscode-editor-background rounded-lg z-50">
-					<div className="flex flex-col w-full max-h-[420px]">
+					className="p-0 overflow-hidden w-[460px] max-w-[94vw] shadow-2xl border border-vscode-panel-border/80 bg-vscode-editor-background rounded-lg z-50">
+					<div className="flex flex-col w-full max-h-[500px]">
 						{/* Compact header */}
-						<div className="flex items-center justify-between px-3 py-2 bg-vscode-sideBar-background/70 border-b border-vscode-panel-border/40 text-[11px]">
+						<div className="flex items-center justify-between px-3 py-2 bg-vscode-sideBar-background/70 border-b border-vscode-panel-border/40 text-[11px] shrink-0">
 							<div className="flex items-center gap-1.5 font-medium text-vscode-foreground">
 								<FileDiff className="size-3.5 text-mirror-brand-via" />
-								<span>Changed Files ({fileCount})</span>
+								<span>
+									Changed Files ({filteredEntries.length}
+									{filteredEntries.length !== fileCount ? ` of ${fileCount}` : ""})
+								</span>
 								{(totalStats.added > 0 || totalStats.removed > 0) && (
 									<div className="flex items-center gap-1 font-mono text-[10px] ml-1">
 										<span className="text-vscode-charts-green">+{totalStats.added}</span>
@@ -210,129 +223,159 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 							)}
 						</div>
 
-						{/* Scrollable file rows list */}
-						<div className="flex flex-col gap-1.5 p-2 overflow-y-auto max-h-[340px]">
-							{Array.from(byPath.entries()).map(([path, entries]) => {
-								const originalContent = entries[0].originalContent
-								const lookupPath = path.startsWith("./") ? path.slice(2) : path
-								const finalContent = finalContentByPath[lookupPath]
-								const hasMergedDiff =
-									originalContent !== undefined && finalContent != null && finalContent !== ""
-								const displayDiff = hasMergedDiff
-									? createTwoFilesPatch(path, path, originalContent, finalContent)
-									: entries
-											.map((e) => e.diff)
-											.filter(Boolean)
-											.join("\n\n")
-								const combinedStats = entries.reduce(
-									(acc, e) => ({
-										added: acc.added + (e.diffStats?.added ?? 0),
-										removed: acc.removed + (e.diffStats?.removed ?? 0),
-									}),
-									{ added: 0, removed: 0 },
-								)
-								const isExpanded = expandedPaths.has(path)
-								const { fileName, displayPath } = parsePathAndLines(path)
-								const dirPath = displayPath.includes("/")
-									? displayPath.substring(0, displayPath.lastIndexOf("/") + 1)
-									: ""
+						{/* Quick filter input when there are multiple files */}
+						{fileCount > 5 && (
+							<div className="px-2 py-1.5 border-b border-vscode-panel-border/30 bg-vscode-sideBar-background/30 shrink-0">
+								<div className="flex items-center gap-1.5 px-2 py-1 bg-vscode-input-background border border-vscode-input-border/70 rounded text-xs">
+									<Search className="size-3 text-vscode-descriptionForeground shrink-0" />
+									<input
+										type="text"
+										placeholder="Filter files..."
+										value={filterText}
+										onChange={(e) => setFilterText(e.target.value)}
+										className="bg-transparent border-none outline-none text-vscode-input-foreground w-full text-xs placeholder:text-vscode-descriptionForeground/50"
+									/>
+									{filterText && (
+										<button
+											type="button"
+											onClick={() => setFilterText("")}
+											className="text-vscode-descriptionForeground hover:text-vscode-foreground text-xs p-0 bg-transparent border-none cursor-pointer">
+											✕
+										</button>
+									)}
+								</div>
+							</div>
+						)}
 
-								return (
-									<div
-										key={path}
-										className="rounded border border-vscode-panel-border/50 bg-vscode-sideBar-background/30 overflow-hidden">
-										{/* File item row */}
+						{/* Scrollable file rows list */}
+						<div className="flex flex-col gap-1.5 p-2 overflow-y-auto flex-1 min-h-0">
+							{filteredEntries.length === 0 ? (
+								<div className="py-6 text-center text-xs text-vscode-descriptionForeground">
+									No files match &quot;{filterText}&quot;
+								</div>
+							) : (
+								filteredEntries.map(([path, entries]) => {
+									const originalContent = entries[0].originalContent
+									const lookupPath = path.startsWith("./") ? path.slice(2) : path
+									const finalContent = finalContentByPath[lookupPath]
+									const hasMergedDiff =
+										originalContent !== undefined && finalContent != null && finalContent !== ""
+									const displayDiff = hasMergedDiff
+										? createTwoFilesPatch(path, path, originalContent, finalContent)
+										: entries
+												.map((e) => e.diff)
+												.filter(Boolean)
+												.join("\n\n")
+									const combinedStats = entries.reduce(
+										(acc, e) => ({
+											added: acc.added + (e.diffStats?.added ?? 0),
+											removed: acc.removed + (e.diffStats?.removed ?? 0),
+										}),
+										{ added: 0, removed: 0 },
+									)
+									const isExpanded = expandedPaths.has(path)
+									const { fileName, displayPath } = parsePathAndLines(path)
+									const dirPath = displayPath.includes("/")
+										? displayPath.substring(0, displayPath.lastIndexOf("/") + 1)
+										: ""
+
+									return (
 										<div
-											onClick={() => togglePath(path)}
-											className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-vscode-list-hoverBackground/60 cursor-pointer text-xs select-none transition-colors">
-											{getFileIcon(displayPath)}
-											<div className="flex items-baseline gap-1.5 min-w-0 flex-1">
-												<span
-													className="font-semibold text-vscode-foreground truncate text-[11.5px]"
-													title={displayPath}>
-													{fileName}
-												</span>
-												{dirPath && (
+											key={path}
+											className="rounded border border-vscode-panel-border/50 bg-vscode-sideBar-background/30 overflow-hidden shrink-0">
+											{/* File item row with guaranteed min-height */}
+											<div
+												onClick={() => togglePath(path)}
+												className="flex items-center gap-2 px-2.5 py-1.5 min-h-[34px] hover:bg-vscode-list-hoverBackground/60 cursor-pointer text-xs select-none transition-colors">
+												{getFileIcon(displayPath)}
+												<div className="flex items-baseline gap-1.5 min-w-0 flex-1 overflow-hidden">
 													<span
-														className="text-[10.5px] text-vscode-descriptionForeground/60 truncate"
+														className="font-semibold text-vscode-foreground truncate text-xs shrink-0 max-w-[220px]"
 														title={displayPath}>
-														{dirPath}
+														{fileName}
+													</span>
+													{dirPath && (
+														<span
+															className="text-[10.5px] text-vscode-descriptionForeground/60 truncate min-w-0 flex-1"
+															title={displayPath}>
+															{dirPath}
+														</span>
+													)}
+												</div>
+												{(combinedStats.added > 0 || combinedStats.removed > 0) && (
+													<span className="font-mono text-[10px] shrink-0 flex items-center gap-1 font-medium mr-1">
+														{combinedStats.added > 0 && (
+															<span className="text-vscode-charts-green">
+																+{combinedStats.added}
+															</span>
+														)}
+														{combinedStats.removed > 0 && (
+															<span className="text-vscode-charts-red">
+																-{combinedStats.removed}
+															</span>
+														)}
 													</span>
 												)}
-											</div>
-											{(combinedStats.added > 0 || combinedStats.removed > 0) && (
-												<span className="font-mono text-[10px] shrink-0 flex items-center gap-1 font-medium mr-1">
-													{combinedStats.added > 0 && (
-														<span className="text-vscode-charts-green">
-															+{combinedStats.added}
-														</span>
-													)}
-													{combinedStats.removed > 0 && (
-														<span className="text-vscode-charts-red">
-															-{combinedStats.removed}
-														</span>
-													)}
-												</span>
-											)}
-											<button
-												type="button"
-												title="Open file in editor"
-												onClick={(e) => {
-													e.stopPropagation()
-													vscode.postMessage({
-														type: "openFile",
-														text: path.startsWith("./") ? path : "./" + path,
-													})
-												}}
-												className="p-0.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer">
-												<span className="codicon codicon-go-to-file text-xs" />
-											</button>
-											<ChevronDown
-												className={cn(
-													"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
-													isExpanded ? "rotate-180" : "rotate-0",
-												)}
-											/>
-										</div>
-
-										{/* Expanded Diff Preview */}
-										{isExpanded && (
-											<div className="border-t border-vscode-panel-border/40 p-1 bg-vscode-editor-background">
-												<CodeAccordion
-													path={path}
-													code={displayDiff}
-													language="diff"
-													isExpanded={true}
-													hideHeader={true}
-													onToggleExpand={() => togglePath(path)}
-													diffStats={
-														combinedStats.added > 0 || combinedStats.removed > 0
-															? combinedStats
-															: undefined
-													}
-													onJumpToFile={() =>
+												<button
+													type="button"
+													title="Open file in editor"
+													onClick={(e) => {
+														e.stopPropagation()
 														vscode.postMessage({
 															type: "openFile",
 															text: path.startsWith("./") ? path : "./" + path,
 														})
-													}
+													}}
+													className="p-0.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer">
+													<span className="codicon codicon-go-to-file text-xs" />
+												</button>
+												<ChevronDown
+													className={cn(
+														"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
+														isExpanded ? "rotate-180" : "rotate-0",
+													)}
 												/>
 											</div>
-										)}
 
-										{/* Preserved mock container for unit tests */}
-										<div className="hidden" aria-hidden="true">
-											<CodeAccordion
-												path={path}
-												code={displayDiff}
-												language="diff"
-												isExpanded={isExpanded}
-												onToggleExpand={() => togglePath(path)}
-											/>
+											{/* Expanded Diff Preview */}
+											{isExpanded && (
+												<div className="border-t border-vscode-panel-border/40 p-1 bg-vscode-editor-background">
+													<CodeAccordion
+														path={path}
+														code={displayDiff}
+														language="diff"
+														isExpanded={true}
+														hideHeader={true}
+														onToggleExpand={() => togglePath(path)}
+														diffStats={
+															combinedStats.added > 0 || combinedStats.removed > 0
+																? combinedStats
+																: undefined
+														}
+														onJumpToFile={() =>
+															vscode.postMessage({
+																type: "openFile",
+																text: path.startsWith("./") ? path : "./" + path,
+															})
+														}
+													/>
+												</div>
+											)}
+
+											{/* Preserved mock container for unit tests */}
+											<div className="hidden" aria-hidden="true">
+												<CodeAccordion
+													path={path}
+													code={displayDiff}
+													language="diff"
+													isExpanded={isExpanded}
+													onToggleExpand={() => togglePath(path)}
+												/>
+											</div>
 										</div>
-									</div>
-								)
-							})}
+									)
+								})
+							)}
 						</div>
 					</div>
 				</PopoverContent>
