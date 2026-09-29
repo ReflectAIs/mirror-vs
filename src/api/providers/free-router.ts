@@ -105,22 +105,34 @@ export function isExhaustionError(error: unknown): boolean {
 		return false
 	}
 
-	// HTTP status code checks indicating endpoint or provider unavailability:
-	// 429: Rate Limit / Too Many Requests
+	// HTTP status code checks indicating endpoint or provider unavailability / permissions:
+	// 400: Bad Request (deprecated or unsupported model on provider)
 	// 402: Payment Required / Free Credits Exhausted
+	// 403: Forbidden / Permission Denied / Cloudflare Geoblock
 	// 404: Endpoint / Model Not Found (e.g. OpenRouter "404 No endpoints found for <model>")
+	// 408: Request Timeout
+	// 410: Gone / Endpoint Disabled / Missing Public API Endpoints permission (e.g. NVIDIA NIM)
+	// 429: Rate Limit / Too Many Requests
 	// 500: Upstream Server Error
 	// 502: Bad Gateway (upstream free provider failure)
 	// 503: Service Unavailable (upstream overloaded)
 	// 504: Gateway Timeout (upstream unresponsive)
 	// 520-529: Cloudflare / Edge timeout & origin down
 	if (
-		status === 429 ||
-		status === "429" ||
+		status === 400 ||
+		status === "400" ||
 		status === 402 ||
 		status === "402" ||
+		status === 403 ||
+		status === "403" ||
 		status === 404 ||
 		status === "404" ||
+		status === 408 ||
+		status === "408" ||
+		status === 410 ||
+		status === "410" ||
+		status === 429 ||
+		status === "429" ||
 		status === 500 ||
 		status === "500" ||
 		status === 502 ||
@@ -188,6 +200,13 @@ export function isExhaustionError(error: unknown): boolean {
 		"stopped responding",
 		"empty response",
 		"streaming error",
+		"410",
+		"gone",
+		"403",
+		"forbidden",
+		"permission",
+		"public api endpoints",
+		"entitlement",
 	]
 
 	return exhaustionKeywords.some((keyword) => msgLower.includes(keyword))
@@ -484,11 +503,15 @@ export class FreeRouterHandler extends BaseProvider {
 				}
 
 				// Check for user-initiated abort - do not cooldown or failover
-				if (err?.name === "AbortError" || err?.message?.includes("Request cancelled by user")) {
+				if (
+					err?.name === "AbortError" ||
+					err?.message?.includes("Request cancelled by user") ||
+					err?.message?.includes("request aborted by user")
+				) {
 					throw err
 				}
 
-				// If error is a deterministic client/format error and not an exhaustion/capacity/timeout issue, rethrow immediately
+				// If error is a deterministic client/format error and not an exhaustion/capacity/timeout/permission issue, rethrow immediately
 				if (!isExhaustionError(err)) {
 					throw err
 				}
@@ -507,14 +530,49 @@ export class FreeRouterHandler extends BaseProvider {
 					isExhausted: true,
 					exhaustedUntil,
 					failureCount,
-					lastError: err.message,
+					lastError: err?.message || String(err),
 				})
+
+				// If this is a provider-wide auth, permission, or entitlement error (e.g. 401 Unauthorized, 403 Forbidden, 410 Gone),
+				// also cool down any other models from the same provider prefix to avoid redundant round-trip delays
+				const errStatus = err?.status ?? err?.statusCode ?? err?.code ?? err?.error?.code
+				const errMsgLower = String(err?.message || "").toLowerCase()
+				const isProviderLevelError =
+					errStatus === 401 ||
+					errStatus === "401" ||
+					errStatus === 403 ||
+					errStatus === "403" ||
+					errStatus === 410 ||
+					errStatus === "410" ||
+					errMsgLower.includes("410") ||
+					errMsgLower.includes("unauthorized") ||
+					errMsgLower.includes("invalid api key") ||
+					errMsgLower.includes("forbidden") ||
+					errMsgLower.includes("permission")
+
+				if (isProviderLevelError) {
+					const prefixMatch = candidateModelId.match(/^([a-z0-9_-]+)\//i)
+					if (prefixMatch) {
+						const providerPrefix = prefixMatch[1]
+						for (const candidate of candidatesToTry) {
+							if (candidate.startsWith(`${providerPrefix}/`)) {
+								modelHealthMap.set(candidate, {
+									modelId: candidate,
+									isExhausted: true,
+									exhaustedUntil,
+									failureCount,
+									lastError: err?.message || String(err),
+								})
+							}
+						}
+					}
+				}
 
 				const cooldownMins = Math.round(cooldownMs / 60000)
 				const nextCandidate = candidatesToTry[i + 1]
 
 				console.warn(
-					`[FreeRouter] Model "${candidateModelId}" failed (${err.message}). ` +
+					`[FreeRouter] Model "${candidateModelId}" failed (${err?.message || err}). ` +
 						`Cooling down for ${cooldownMins}m. ` +
 						(nextCandidate
 							? `Auto-routing to next available free model: "${nextCandidate}"...`

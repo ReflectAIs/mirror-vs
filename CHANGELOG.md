@@ -19,6 +19,10 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Added an initial connection watchdog (25s) and per-chunk watchdog (35s) that monitors streaming models. If a free-tier model stops responding or hangs indefinitely, the router immediately catches the timeout, places the failing model into circuit-breaker cooldown, and automatically routes to the next healthy candidate in the free pool without failing the task.
 - **Pre-Token Chunk Buffering & Clean Recovery**:
     - Buffers initial stream chunks until substantive content or reasoning is generated. If an upstream error (HTTP 429, 402, 404, 500, 502, 503, 504, 520–529, empty response, or streaming error chunk) occurs before content is yielded, the router catches it cleanly and fails over to the next candidate model invisibly.
+- **HTTP 410 / Account Permission Failover & Provider-Wide Cooldown**:
+    - Added detection for HTTP 410 Gone (missing Public API Endpoints permission or unverified developer accounts, common on NVIDIA NIM), 403 Forbidden, and endpoint errors.
+    - When an account-level entitlement error occurs on a provider, Free Router cools down all models associated with that provider prefix to eliminate round-trip latency and seamlessly auto-routes to the next free provider (Groq, Cerebras, SambaNova, Gemini, OpenRouter).
+    - Enriched NVIDIA NIM error messaging to provide actionable resolution steps (account verification on build.nvidia.com) while keeping Free Auto-Router fully resilient.
 - **Verified 100% Free Model Pool**:
     - Live verified all models in the Free Router pool against OpenRouter specifications to ensure $0 prompt and $0 completion pricing.
     - Updated pool with active models: `google/gemma-4-31b-it:free`, `google/gemma-4-26b-a4b-it:free`, `qwen/qwen3.8-27b:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `thinkingmachines/inkling:free`, and `poolside/laguna-s-2.1:free`.

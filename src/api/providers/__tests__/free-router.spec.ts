@@ -10,8 +10,12 @@ import {
 	getModelHealthMap,
 } from "../free-router"
 import { OpenRouterHandler } from "../openrouter"
+import { NvidiaHandler } from "../nvidia"
+import { GroqHandler } from "../groq"
 
 vitest.mock("../openrouter")
+vitest.mock("../nvidia")
+vitest.mock("../groq")
 
 describe("FreeRouterHandler", () => {
 	beforeEach(() => {
@@ -20,7 +24,10 @@ describe("FreeRouterHandler", () => {
 	})
 
 	describe("isExhaustionError", () => {
-		it("detects HTTP 429, 402, 404, 502, 503, 504 status codes", () => {
+		it("detects HTTP 410, 429, 402, 403, 404, 502, 503, 504 status codes", () => {
+			expect(isExhaustionError({ status: 410 })).toBe(true)
+			expect(isExhaustionError({ statusCode: 410 })).toBe(true)
+			expect(isExhaustionError({ status: 403 })).toBe(true)
 			expect(isExhaustionError({ status: 429 })).toBe(true)
 			expect(isExhaustionError({ statusCode: 429 })).toBe(true)
 			expect(isExhaustionError({ code: 429 })).toBe(true)
@@ -32,6 +39,7 @@ describe("FreeRouterHandler", () => {
 		})
 
 		it("detects exhaustion and endpoint unavailability keywords in error messages", () => {
+			expect(isExhaustionError(new Error("410 status code (no body)"))).toBe(true)
 			expect(isExhaustionError(new Error("Rate limit exceeded for free tier"))).toBe(true)
 			expect(isExhaustionError(new Error("User quota exhausted"))).toBe(true)
 			expect(isExhaustionError(new Error("Too many requests, please slow down"))).toBe(true)
@@ -347,6 +355,41 @@ describe("FreeRouterHandler", () => {
 			expect(chunks[0].text).toBe("all good on model-ok")
 			expect(isModelExhausted("model-error-chunk")).toBe(true)
 			expect(isModelExhausted("model-ok")).toBe(false)
+		})
+
+		it("fails over when a provider returns 410 Gone / no body and cools down provider", async () => {
+			const handler = new FreeRouterHandler({
+				freeRouterModels: [
+					"nvidia/meta/llama-3.3-70b-instruct",
+					"nvidia/deepseek-ai/deepseek-r1",
+					"groq/llama-3.3-70b-versatile",
+				],
+			})
+
+			;(NvidiaHandler as any).mockImplementation(() => ({
+				createMessage: async function* () {
+					const err: any = new Error("410 status code (no body)")
+					err.status = 410
+					throw err
+				},
+			}))
+			;(GroqHandler as any).mockImplementation(() => ({
+				createMessage: async function* () {
+					yield { type: "text", text: "Response from Groq after NVIDIA 410 failover" }
+				},
+			}))
+
+			const chunks: any[] = []
+			for await (const chunk of handler.createMessage("system", [])) {
+				chunks.push(chunk)
+			}
+
+			expect(chunks.length).toBe(1)
+			expect(chunks[0].text).toBe("Response from Groq after NVIDIA 410 failover")
+			// Both NVIDIA models should be in cooldown due to provider-level 410 error
+			expect(isModelExhausted("nvidia/meta/llama-3.3-70b-instruct")).toBe(true)
+			expect(isModelExhausted("nvidia/deepseek-ai/deepseek-r1")).toBe(true)
+			expect(isModelExhausted("groq/llama-3.3-70b-versatile")).toBe(false)
 		})
 	})
 })

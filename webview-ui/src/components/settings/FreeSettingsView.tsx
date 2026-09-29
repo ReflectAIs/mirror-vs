@@ -97,7 +97,8 @@ const FREE_PROVIDERS_CONFIG: FreeProviderItem[] = [
 		name: "NVIDIA NIM",
 		badge: "1,000 Free Trial Credits",
 		icon: <Sparkles className="w-4 h-4 text-green-400" />,
-		description: "Enterprise NVIDIA DGX Cloud hosting Nemotron 70B, Llama 3.3, and full DeepSeek R1.",
+		description:
+			"Enterprise NVIDIA DGX Cloud hosting Nemotron 70B, Llama 3.3, and full DeepSeek R1. Requires verified developer account on build.nvidia.com for public inference; Free Auto-Router auto-fails over if unverified.",
 		keyUrl: "https://build.nvidia.com",
 		keyLabel: "Get Free NVIDIA Key",
 		keyField: "nvidiaApiKey",
