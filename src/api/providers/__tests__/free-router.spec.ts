@@ -325,6 +325,34 @@ describe("FreeRouterHandler", () => {
 			expect(isModelExhausted("model-fallback")).toBe(false)
 		})
 
+		it("fails over when primary model yields only usage chunk without substantive content", async () => {
+			const handler = new FreeRouterHandler({
+				freeRouterModels: ["model-usage-only", "model-fallback"],
+			})
+
+			;(OpenRouterHandler as any).mockImplementation((opts: any) => {
+				return {
+					createMessage: async function* () {
+						if (opts.openRouterModelId === "model-usage-only") {
+							// Return only usage chunk, no text or reasoning
+							yield { type: "usage", inputTokens: 50, outputTokens: 0 }
+							return
+						}
+						yield { type: "text", text: "recovered from usage-only model" }
+					},
+				}
+			})
+
+			const chunks: any[] = []
+			for await (const chunk of handler.createMessage("system", [])) {
+				chunks.push(chunk)
+			}
+
+			expect(chunks.some((c) => c.type === "text" && c.text === "recovered from usage-only model")).toBe(true)
+			expect(isModelExhausted("model-usage-only")).toBe(true)
+			expect(isModelExhausted("model-fallback")).toBe(false)
+		})
+
 		it("fails over when primary model yields an error chunk before substantive content", async () => {
 			const handler = new FreeRouterHandler({
 				freeRouterModels: ["model-error-chunk", "model-ok"],

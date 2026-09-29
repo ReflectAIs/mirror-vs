@@ -23,6 +23,9 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Added detection for HTTP 410 Gone (missing Public API Endpoints permission or unverified developer accounts, common on NVIDIA NIM), 403 Forbidden, and endpoint errors.
     - When an account-level entitlement error occurs on a provider, Free Router cools down all models associated with that provider prefix to eliminate round-trip latency and seamlessly auto-routes to the next free provider (Groq, Cerebras, SambaNova, Gemini, OpenRouter).
     - Enriched NVIDIA NIM error messaging to provide actionable resolution steps (account verification on build.nvidia.com) while keeping Free Auto-Router fully resilient.
+- **Usage-Only / Empty Response Detection & Main Loop Auto-Reroute**:
+    - Fixed stream completion checking to guarantee failover when a model produces 0 substantive text/tool tokens (even if usage metadata was emitted by the provider), preventing `MODEL_NO_ASSISTANT_MESSAGES` retry loops.
+    - Added defense-in-depth in `TaskMainLoop`: if an empty response or stream failure occurs under Free Router, the failing model is immediately placed into cooldown so that any task-level retry automatically reroutes to a working free model.
 - **Verified 100% Free Model Pool**:
     - Live verified all models in the Free Router pool against OpenRouter specifications to ensure $0 prompt and $0 completion pricing.
     - Updated pool with active models: `google/gemma-4-31b-it:free`, `google/gemma-4-26b-a4b-it:free`, `qwen/qwen3.8-27b:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `thinkingmachines/inkling:free`, and `poolside/laguna-s-2.1:free`.

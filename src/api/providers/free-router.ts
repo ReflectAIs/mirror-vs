@@ -446,8 +446,10 @@ export class FreeRouterHandler extends BaseProvider {
 					const result = await getNextChunk(timeoutMs)
 
 					if (result.done) {
-						if (!hasSubstantiveContent && bufferedChunks.length === 0) {
-							throw new Error(`Model "${candidateModelId}" returned an empty response.`)
+						if (!hasSubstantiveContent) {
+							throw new Error(
+								`Model "${candidateModelId}" returned an empty response (no text or tool calls generated).`,
+							)
 						}
 						// Flush any buffered chunks before completing
 						for (const chunk of bufferedChunks) {

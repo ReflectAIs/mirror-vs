@@ -33,6 +33,7 @@ import type { GroundingSource } from "../../api/transform/stream"
 import { Task } from "./Task"
 import { isTransientProviderError } from "./transient-error"
 import { WorktreeSandboxManager } from "../../integrations/git/WorktreeSandboxManager"
+import { getModelHealthMap } from "../../api/providers/free-router"
 
 // ────────────────────────────────────────────────────────────
 //  Struggle Ledger — Auto-Recovery Engine
@@ -1014,6 +1015,23 @@ export class TaskMainLoop {
 								`[Task#${this.task.taskId}.${this.task.instanceId}] Stream failed, will retry: ${streamingFailedMessage}`,
 							)
 
+							if (this.task.apiConfiguration.apiProvider === "free-router") {
+								const currentModel = this.task.cachedStreamingModel?.id || this.task.api.getModel().id
+								if (currentModel) {
+									const healthMap = getModelHealthMap()
+									healthMap.set(currentModel, {
+										modelId: currentModel,
+										isExhausted: true,
+										exhaustedUntil: Date.now() + 10 * 60 * 1000,
+										failureCount: 1,
+										lastError: rawErrorMessage,
+									})
+									console.warn(
+										`[FreeRouter] Model "${currentModel}" stream failed. Marked in cooldown to auto-reroute on retry.`,
+									)
+								}
+							}
+
 							// Apply exponential backoff similar to first-chunk errors when auto-resubmit is
 							// enabled. Transient provider capacity errors (overloaded 529, rate limit 429,
 							// unavailable 503) also auto-retry even without auto-approval so concurrent
@@ -1369,6 +1387,23 @@ export class TaskMainLoop {
 
 					// Increment consecutive no-assistant-messages counter
 					this.task.consecutiveNoAssistantMessagesCount++
+
+					if (this.task.apiConfiguration.apiProvider === "free-router") {
+						const currentModel = this.task.cachedStreamingModel?.id || this.task.api.getModel().id
+						if (currentModel) {
+							const healthMap = getModelHealthMap()
+							healthMap.set(currentModel, {
+								modelId: currentModel,
+								isExhausted: true,
+								exhaustedUntil: Date.now() + 10 * 60 * 1000,
+								failureCount: 1,
+								lastError: "No assistant messages generated",
+							})
+							console.warn(
+								`[FreeRouter] Model "${currentModel}" produced no assistant messages. Marked in cooldown to auto-reroute on retry.`,
+							)
+						}
+					}
 
 					// Only show error and count toward mistake limit after 2 consecutive failures
 					// This provides a "grace retry" - first failure retries silently
