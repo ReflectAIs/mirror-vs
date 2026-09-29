@@ -25,6 +25,8 @@ import {
 	type ExtensionState,
 	MirrorVSEventName,
 	DEFAULT_MODES,
+	isFreeProvider,
+	freeRouterDefaultModelId,
 } from "@mirror-vs/types"
 import { type AggregatedCosts } from "./aggregateTaskCosts"
 
@@ -1679,8 +1681,34 @@ export class MirrorProvider
 		}
 
 		// Load the saved API config for the new mode if it exists.
-		const savedConfigId = await this.providerSettingsManager.getModeConfigId(newMode)
+		let savedConfigId = await this.providerSettingsManager.getModeConfigId(newMode)
 		const listApiConfig = await this.providerSettingsManager.listConfig()
+
+		if (newMode === "free") {
+			const currentSettings = this.contextProxy.getProviderSettings()
+			const isCurrentFree = isFreeProvider(currentSettings.apiProvider)
+
+			if (!savedConfigId && !isCurrentFree) {
+				const freeConfig = listApiConfig.find((c) => c.apiProvider === "free-router")
+				if (freeConfig?.name) {
+					await this.activateProviderProfile({ name: freeConfig.name })
+					if (freeConfig.id) {
+						await this.providerSettingsManager.setModeConfig(newMode, freeConfig.id)
+						savedConfigId = freeConfig.id
+					}
+				} else {
+					const freeId = await this.providerSettingsManager.saveConfig("Free Models (Auto-Router)", {
+						apiProvider: "free-router",
+						apiModelId: freeRouterDefaultModelId,
+					})
+					if (freeId) {
+						await this.activateProviderProfile({ name: "Free Models (Auto-Router)" })
+						await this.providerSettingsManager.setModeConfig(newMode, freeId)
+						savedConfigId = freeId
+					}
+				}
+			}
+		}
 
 		// Update listApiConfigMeta first to ensure UI has latest data.
 		await this.updateGlobalState("listApiConfigMeta", listApiConfig)

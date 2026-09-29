@@ -36,3 +36,6 @@ export {
 	isModelExhausted,
 	isExhaustionError,
 } from "./free-router"
+export { NvidiaHandler } from "./nvidia"
+export { GroqHandler } from "./groq"
+export { CerebrasHandler } from "./cerebras"

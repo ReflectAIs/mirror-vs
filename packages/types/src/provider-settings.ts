@@ -22,6 +22,9 @@ import {
 	internationalZAiModels,
 	minimaxModels,
 	freeRouterModels,
+	nvidiaModels,
+	groqModels,
+	cerebrasModels,
 } from "./providers/index.js"
 
 /**
@@ -130,6 +133,9 @@ export const providerNames = [
 	"xai",
 	"zai",
 	"free-router",
+	"nvidia",
+	"groq",
+	"cerebras",
 ] as const
 
 export const providerNamesSchema = z.enum(providerNames)
@@ -144,11 +150,9 @@ export const isProviderName = (key: unknown): key is ProviderName =>
  */
 
 export const retiredProviderNames = [
-	"cerebras",
 	"chutes",
 	"doubao",
 	"featherless",
-	"groq",
 	"huggingface",
 	"io-intelligence",
 	"mirror",
@@ -411,6 +415,18 @@ const freeRouterSchema = apiModelIdProviderModelSchema.extend({
 	freeRouterCooldownMinutes: z.number().optional(),
 })
 
+const nvidiaSchema = apiModelIdProviderModelSchema.extend({
+	nvidiaApiKey: z.string().optional(),
+})
+
+const groqSchema = apiModelIdProviderModelSchema.extend({
+	groqApiKey: z.string().optional(),
+})
+
+const cerebrasSchema = apiModelIdProviderModelSchema.extend({
+	cerebrasApiKey: z.string().optional(),
+})
+
 const defaultSchema = z.object({
 	apiProvider: z.undefined(),
 })
@@ -447,6 +463,9 @@ export const providerSettingsSchemaDiscriminated = z.discriminatedUnion("apiProv
 	qwenCodeSchema.merge(z.object({ apiProvider: z.literal("qwen-code") })),
 	vercelAiGatewaySchema.merge(z.object({ apiProvider: z.literal("vercel-ai-gateway") })),
 	freeRouterSchema.merge(z.object({ apiProvider: z.literal("free-router") })),
+	nvidiaSchema.merge(z.object({ apiProvider: z.literal("nvidia") })),
+	groqSchema.merge(z.object({ apiProvider: z.literal("groq") })),
+	cerebrasSchema.merge(z.object({ apiProvider: z.literal("cerebras") })),
 	defaultSchema,
 ])
 
@@ -483,6 +502,9 @@ export const providerSettingsSchema = z.object({
 	...qwenCodeSchema.shape,
 	...vercelAiGatewaySchema.shape,
 	...freeRouterSchema.shape,
+	...nvidiaSchema.shape,
+	...groqSchema.shape,
+	...cerebrasSchema.shape,
 	...codebaseIndexProviderSchema.shape,
 })
 
@@ -560,6 +582,9 @@ export const modelIdKeysByProvider: Record<TypicalProvider, ModelIdKey> = {
 	fireworks: "apiModelId",
 	"vercel-ai-gateway": "vercelAiGatewayModelId",
 	"free-router": "apiModelId",
+	nvidia: "apiModelId",
+	groq: "apiModelId",
+	cerebras: "apiModelId",
 }
 
 /**
@@ -687,4 +712,36 @@ export const MODELS_BY_PROVIDER: Record<
 		label: "Free Models (Auto-Router)",
 		models: Object.keys(freeRouterModels),
 	},
+	nvidia: {
+		id: "nvidia",
+		label: "NVIDIA",
+		models: Object.keys(nvidiaModels),
+	},
+	groq: {
+		id: "groq",
+		label: "Groq",
+		models: Object.keys(groqModels),
+	},
+	cerebras: {
+		id: "cerebras",
+		label: "Cerebras",
+		models: Object.keys(cerebrasModels),
+	},
 }
+
+/**
+ * Providers offering 100% free models or free tiers.
+ */
+export const FREE_PROVIDERS: readonly ProviderName[] = [
+	"free-router",
+	"nvidia",
+	"groq",
+	"cerebras",
+	"sambanova",
+	"gemini",
+] as const
+
+export type FreeProviderName = (typeof FREE_PROVIDERS)[number]
+
+export const isFreeProvider = (provider?: string): provider is FreeProviderName =>
+	typeof provider === "string" && (FREE_PROVIDERS as readonly string[]).includes(provider)

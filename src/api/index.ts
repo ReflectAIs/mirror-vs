@@ -36,6 +36,9 @@ import {
 	BasetenHandler,
 	CustomHandler,
 	FreeRouterHandler,
+	NvidiaHandler,
+	GroqHandler,
+	CerebrasHandler,
 } from "./providers"
 import { NativeOllamaHandler } from "./providers/native-ollama"
 
@@ -187,6 +190,12 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 				return new PoeHandler(options)
 			case "free-router":
 				return new FreeRouterHandler(options)
+			case "nvidia":
+				return new NvidiaHandler(options)
+			case "groq":
+				return new GroqHandler(options)
+			case "cerebras":
+				return new CerebrasHandler(options)
 			default:
 				return new AnthropicHandler(options)
 		}

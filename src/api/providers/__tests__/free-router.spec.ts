@@ -270,5 +270,65 @@ describe("FreeRouterHandler", () => {
 
 			expect(handler.getModel().id).toBe("model-active")
 		})
+
+		it("fails over when primary model returns an empty response", async () => {
+			const handler = new FreeRouterHandler({
+				freeRouterModels: ["model-empty", "model-fallback"],
+			})
+
+			;(OpenRouterHandler as any).mockImplementation((opts: any) => {
+				return {
+					createMessage: async function* () {
+						if (opts.openRouterModelId === "model-empty") {
+							// Return immediately with empty stream
+							return
+						}
+						yield { type: "text", text: "recovered from empty model" }
+					},
+				}
+			})
+
+			const chunks: any[] = []
+			for await (const chunk of handler.createMessage("system", [])) {
+				chunks.push(chunk)
+			}
+
+			expect(chunks.length).toBe(1)
+			expect(chunks[0].text).toBe("recovered from empty model")
+			expect(isModelExhausted("model-empty")).toBe(true)
+			expect(isModelExhausted("model-fallback")).toBe(false)
+		})
+
+		it("fails over when primary model yields an error chunk before substantive content", async () => {
+			const handler = new FreeRouterHandler({
+				freeRouterModels: ["model-error-chunk", "model-ok"],
+			})
+
+			;(OpenRouterHandler as any).mockImplementation((opts: any) => {
+				return {
+					createMessage: async function* () {
+						if (opts.openRouterModelId === "model-error-chunk") {
+							yield {
+								type: "error",
+								error: "upstream_overloaded",
+								message: "Free tier capacity exceeded",
+							}
+							return
+						}
+						yield { type: "text", text: "all good on model-ok" }
+					},
+				}
+			})
+
+			const chunks: any[] = []
+			for await (const chunk of handler.createMessage("system", [])) {
+				chunks.push(chunk)
+			}
+
+			expect(chunks.length).toBe(1)
+			expect(chunks[0].text).toBe("all good on model-ok")
+			expect(isModelExhausted("model-error-chunk")).toBe(true)
+			expect(isModelExhausted("model-ok")).toBe(false)
+		})
 	})
 })

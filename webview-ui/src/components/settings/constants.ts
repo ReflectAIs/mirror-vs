@@ -19,6 +19,9 @@ import {
 	minimaxModels,
 	basetenModels,
 	freeRouterModels,
+	nvidiaModels,
+	groqModels,
+	cerebrasModels,
 } from "@mirror-vs/types"
 
 export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, ModelInfo>>> = {
@@ -40,6 +43,9 @@ export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, Mod
 	minimax: minimaxModels,
 	baseten: basetenModels,
 	"free-router": freeRouterModels,
+	nvidia: nvidiaModels,
+	groq: groqModels,
+	cerebras: cerebrasModels,
 }
 
 export const PROVIDERS = [
@@ -72,4 +78,7 @@ export const PROVIDERS = [
 	{ value: "poe", label: "Poe", proxy: false },
 	{ value: "custom", label: "Custom API", proxy: true },
 	{ value: "free-router", label: "Free Models (Auto-Router)", proxy: false },
+	{ value: "nvidia", label: "NVIDIA", proxy: false },
+	{ value: "groq", label: "Groq", proxy: false },
+	{ value: "cerebras", label: "Cerebras", proxy: false },
 ].sort((a, b) => a.label.localeCompare(b.label))

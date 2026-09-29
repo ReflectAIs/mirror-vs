@@ -90,7 +90,13 @@ export function isExhaustionError(error: unknown): boolean {
 
 	const msgLower = String(rawMsg).toLowerCase()
 
-	if (msgLower.includes("invalid api key") || msgLower.includes("unauthorized") || msgLower.includes("abort")) {
+	// Do not failover on user-initiated cancellation or invalid key configuration
+	if (
+		msgLower.includes("invalid api key") ||
+		msgLower.includes("unauthorized") ||
+		msgLower.includes("request aborted by user") ||
+		msgLower.includes("request cancelled by user")
+	) {
 		return false
 	}
 
@@ -98,9 +104,11 @@ export function isExhaustionError(error: unknown): boolean {
 	// 429: Rate Limit / Too Many Requests
 	// 402: Payment Required / Free Credits Exhausted
 	// 404: Endpoint / Model Not Found (e.g. OpenRouter "404 No endpoints found for <model>")
+	// 500: Upstream Server Error
 	// 502: Bad Gateway (upstream free provider failure)
 	// 503: Service Unavailable (upstream overloaded)
 	// 504: Gateway Timeout (upstream unresponsive)
+	// 520-529: Cloudflare / Edge timeout & origin down
 	if (
 		status === 429 ||
 		status === "429" ||
@@ -108,12 +116,24 @@ export function isExhaustionError(error: unknown): boolean {
 		status === "402" ||
 		status === 404 ||
 		status === "404" ||
+		status === 500 ||
+		status === "500" ||
 		status === 502 ||
 		status === "502" ||
 		status === 503 ||
 		status === "503" ||
 		status === 504 ||
-		status === "504"
+		status === "504" ||
+		status === 520 ||
+		status === "520" ||
+		status === 521 ||
+		status === "521" ||
+		status === 522 ||
+		status === "522" ||
+		status === 524 ||
+		status === "524" ||
+		status === 529 ||
+		status === "529"
 	) {
 		return true
 	}
@@ -149,10 +169,26 @@ export function isExhaustionError(error: unknown): boolean {
 		"provider offline",
 		"temporarily offline",
 		"no provider available",
+		"timeout",
+		"timed out",
+		"econnreset",
+		"etimedout",
+		"esockettimedout",
+		"socket hang up",
+		"fetch failed",
+		"network error",
+		"premature close",
+		"stream closed",
+		"unresponsive",
+		"stopped responding",
+		"empty response",
+		"streaming error",
 	]
 
 	return exhaustionKeywords.some((keyword) => msgLower.includes(keyword))
 }
+
+const FIRST_CHUNK_TIMEOUT_MS = 25_000
 
 export class FreeRouterHandler extends BaseProvider {
 	private readonly options: ApiHandlerOptions
@@ -266,13 +302,71 @@ export class FreeRouterHandler extends BaseProvider {
 				})
 
 				const stream = candidateHandler.createMessage(systemPrompt, messages, metadata)
+				const iterator = stream[Symbol.asyncIterator]()
 
-				for await (const chunk of stream) {
-					if (!firstChunkYielded) {
-						firstChunkYielded = true
-						this.currentActiveModelId = candidateModelId
+				// Helper to fetch next chunk with timeout watchdog
+				const getNextChunk = async (timeoutMs: number): Promise<IteratorResult<ApiStreamChunk>> => {
+					let timer: NodeJS.Timeout | undefined
+					const timeoutPromise = new Promise<never>((_, reject) => {
+						timer = setTimeout(() => {
+							reject(
+								new Error(
+									`Model "${candidateModelId}" stopped responding (${timeoutMs / 1000}s limit exceeded).`,
+								),
+							)
+						}, timeoutMs)
+					})
+					try {
+						return await Promise.race([iterator.next(), timeoutPromise])
+					} finally {
+						if (timer) clearTimeout(timer)
 					}
-					yield chunk
+				}
+
+				const bufferedChunks: ApiStreamChunk[] = []
+				let hasSubstantiveContent = false
+
+				while (true) {
+					const timeoutMs = !hasSubstantiveContent ? FIRST_CHUNK_TIMEOUT_MS : 35_000
+					const result = await getNextChunk(timeoutMs)
+
+					if (result.done) {
+						if (!hasSubstantiveContent && bufferedChunks.length === 0) {
+							throw new Error(`Model "${candidateModelId}" returned an empty response.`)
+						}
+						// Flush any buffered chunks before completing
+						for (const chunk of bufferedChunks) {
+							yield chunk
+						}
+						break
+					}
+
+					const chunk = result.value
+					if (chunk && "type" in chunk && chunk.type === "error") {
+						const errMsg = (chunk as any).message || (chunk as any).error || "Stream returned error"
+						throw new Error(`Model "${candidateModelId}" streaming error: ${errMsg}`)
+					}
+
+					if (!hasSubstantiveContent) {
+						bufferedChunks.push(chunk)
+						const isSubstantive =
+							(chunk.type === "text" && chunk.text.trim().length > 0) ||
+							(chunk.type === "reasoning" && chunk.text.trim().length > 0) ||
+							chunk.type.startsWith("tool_call")
+
+						if (isSubstantive) {
+							hasSubstantiveContent = true
+							firstChunkYielded = true
+							this.currentActiveModelId = candidateModelId
+							// Flush initial buffered chunks to caller
+							for (const bChunk of bufferedChunks) {
+								yield bChunk
+							}
+							bufferedChunks.length = 0
+						}
+					} else {
+						yield chunk
+					}
 				}
 
 				// If stream completed successfully, mark model healthy
@@ -288,46 +382,51 @@ export class FreeRouterHandler extends BaseProvider {
 			} catch (err: any) {
 				lastError = err
 
-				// If we already started streaming tokens to the user, we cannot cleanly restart
+				// If we already started streaming real tokens to the user, we cannot cleanly restart
 				if (firstChunkYielded) {
 					throw err
 				}
 
-				// Check if this error is an exhaustion / rate-limit error
-				if (isExhaustionError(err)) {
-					const now = Date.now()
-					const prev = modelHealthMap.get(candidateModelId)
-					const failureCount = (prev?.failureCount ?? 0) + 1
-					// Exponential backoff multiplier for repeated failures up to 30 min
-					const backoffMultiplier = Math.min(3, failureCount)
-					const cooldownMs = this.cooldownMs * backoffMultiplier
-					const exhaustedUntil = now + cooldownMs
-
-					modelHealthMap.set(candidateModelId, {
-						modelId: candidateModelId,
-						isExhausted: true,
-						exhaustedUntil,
-						failureCount,
-						lastError: err.message,
-					})
-
-					const cooldownMins = Math.round(cooldownMs / 60000)
-					const nextCandidate = candidatesToTry[i + 1]
-
-					console.warn(
-						`[FreeRouter] Model "${candidateModelId}" hit rate limit/exhaustion (${err.message}). ` +
-							`Cooling down for ${cooldownMins}m. ` +
-							(nextCandidate
-								? `Auto-routing to next available free model: "${nextCandidate}"...`
-								: "No remaining healthy models in candidate pool."),
-					)
-
-					// Continue loop to try next model
-					continue
+				// Check for user-initiated abort - do not cooldown or failover
+				if (err?.name === "AbortError" || err?.message?.includes("Request cancelled by user")) {
+					throw err
 				}
 
-				// Non-exhaustion error (e.g. abort, invalid syntax), rethrow immediately
-				throw err
+				// If error is a deterministic client/format error and not an exhaustion/capacity/timeout issue, rethrow immediately
+				if (!isExhaustionError(err)) {
+					throw err
+				}
+
+				// If failed before first chunk yielded, record failure in circuit breaker
+				const now = Date.now()
+				const prev = modelHealthMap.get(candidateModelId)
+				const failureCount = (prev?.failureCount ?? 0) + 1
+				// Exponential backoff multiplier for repeated failures up to 30 min
+				const backoffMultiplier = Math.min(3, failureCount)
+				const cooldownMs = this.cooldownMs * backoffMultiplier
+				const exhaustedUntil = now + cooldownMs
+
+				modelHealthMap.set(candidateModelId, {
+					modelId: candidateModelId,
+					isExhausted: true,
+					exhaustedUntil,
+					failureCount,
+					lastError: err.message,
+				})
+
+				const cooldownMins = Math.round(cooldownMs / 60000)
+				const nextCandidate = candidatesToTry[i + 1]
+
+				console.warn(
+					`[FreeRouter] Model "${candidateModelId}" failed (${err.message}). ` +
+						`Cooling down for ${cooldownMins}m. ` +
+						(nextCandidate
+							? `Auto-routing to next available free model: "${nextCandidate}"...`
+							: "No remaining healthy models in candidate pool."),
+				)
+
+				// Continue loop to try next model
+				continue
 			}
 		}
 

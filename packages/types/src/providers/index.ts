@@ -27,6 +27,9 @@ export * from "./zai.js"
 export * from "./minimax.js"
 export * from "./custom.js"
 export * from "./free-router.js"
+export * from "./nvidia.js"
+export * from "./groq.js"
+export * from "./cerebras.js"
 
 import { anthropicDefaultModelId } from "./anthropic.js"
 import { basetenDefaultModelId } from "./baseten.js"
@@ -54,6 +57,9 @@ import { internationalZAiDefaultModelId, mainlandZAiDefaultModelId } from "./zai
 import { minimaxDefaultModelId } from "./minimax.js"
 import { customDefaultModelId } from "./custom.js"
 import { freeRouterDefaultModelId } from "./free-router.js"
+import { nvidiaDefaultModelId } from "./nvidia.js"
+import { groqDefaultModelId } from "./groq.js"
+import { cerebrasDefaultModelId } from "./cerebras.js"
 
 // Import the ProviderName type from provider-settings to avoid duplication
 import type { ProviderName } from "../provider-settings.js"
@@ -124,6 +130,12 @@ export function getProviderDefaultModelId(
 			return vercelAiGatewayDefaultModelId
 		case "free-router":
 			return freeRouterDefaultModelId
+		case "nvidia":
+			return nvidiaDefaultModelId
+		case "groq":
+			return groqDefaultModelId
+		case "cerebras":
+			return cerebrasDefaultModelId
 		case "anthropic":
 		case "gemini-cli":
 		case "fake-ai":

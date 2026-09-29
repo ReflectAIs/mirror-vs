@@ -33,6 +33,7 @@ import {
 	vercelAiGatewayDefaultModelId,
 	minimaxDefaultModelId,
 	unboundDefaultModelId,
+	isFreeProvider,
 } from "@mirror-vs/types"
 
 import {
@@ -96,6 +97,9 @@ import {
 	MiniMax,
 	Custom,
 	FreeRouter,
+	Nvidia,
+	Groq,
+	Cerebras,
 } from "./providers"
 
 import { MODELS_BY_PROVIDER, PROVIDERS } from "./constants"
@@ -134,7 +138,7 @@ const ApiOptions = ({
 	setErrorMessage,
 }: ApiOptionsProps) => {
 	const { t } = useAppTranslation()
-	const { organizationAllowList, openAiCodexIsAuthenticated } = useExtensionState()
+	const { organizationAllowList, openAiCodexIsAuthenticated, mode } = useExtensionState()
 
 	const [customHeaders, setCustomHeaders] = useState<[string, string][]>(() => {
 		const headers = apiConfiguration?.openAiHeaders || {}
@@ -407,10 +411,22 @@ const ApiOptions = ({
 		}
 	}, [selectedProvider])
 
+	// In Free Mode, ensure a free provider is selected
+	useEffect(() => {
+		if (mode === "free" && selectedProvider && !isFreeProvider(selectedProvider)) {
+			onProviderChange("free-router")
+		}
+	}, [mode, selectedProvider, onProviderChange])
+
 	// Convert providers to SearchableSelect options
 	const providerOptions = useMemo(() => {
 		// First filter by organization allow list
-		const allowedProviders = filterProviders(PROVIDERS, organizationAllowList)
+		let allowedProviders = filterProviders(PROVIDERS, organizationAllowList)
+
+		// When in Free mode, only allow free providers
+		if (mode === "free") {
+			allowedProviders = allowedProviders.filter(({ value }) => isFreeProvider(value))
+		}
 
 		// Then filter out static providers that have no models (unless currently selected)
 		const providersWithModels = allowedProviders.filter(({ value }) => {
@@ -449,10 +465,16 @@ const ApiOptions = ({
 		}
 
 		return options
-	}, [organizationAllowList, apiConfiguration.apiProvider, fromWelcomeView])
+	}, [organizationAllowList, apiConfiguration.apiProvider, fromWelcomeView, mode])
 
 	return (
 		<div className="flex flex-col gap-3">
+			{mode === "free" && (
+				<div className="flex items-center gap-2 p-2.5 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-300">
+					<span className="font-semibold">⚡ Free Mode:</span>
+					<span>Only 100% free-tier providers and models with automatic routing & failover are shown.</span>
+				</div>
+			)}
 			<div className="flex flex-col gap-1 relative">
 				<div className="flex justify-between items-center">
 					<label className="block font-medium">{t("settings:providers.apiProvider")}</label>
@@ -733,6 +755,24 @@ const ApiOptions = ({
 							simplifySettings={fromWelcomeView}
 							organizationAllowList={organizationAllowList}
 							modelValidationError={modelValidationError}
+						/>
+					)}
+
+					{selectedProvider === "nvidia" && (
+						<Nvidia
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "groq" && (
+						<Groq apiConfiguration={apiConfiguration} setApiConfigurationField={setApiConfigurationField} />
+					)}
+
+					{selectedProvider === "cerebras" && (
+						<Cerebras
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
 						/>
 					)}
 

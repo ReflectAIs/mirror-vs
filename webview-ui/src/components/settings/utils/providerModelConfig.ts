@@ -18,6 +18,9 @@ import {
 	minimaxDefaultModelId,
 	basetenDefaultModelId,
 	freeRouterDefaultModelId,
+	nvidiaDefaultModelId,
+	groqDefaultModelId,
+	cerebrasDefaultModelId,
 } from "@mirror-vs/types"
 
 import { MODELS_BY_PROVIDER } from "../constants"
@@ -44,6 +47,9 @@ export const PROVIDER_SERVICE_CONFIG: Partial<Record<ProviderName, ProviderServi
 	fireworks: { serviceName: "Fireworks AI", serviceUrl: "https://fireworks.ai" },
 	minimax: { serviceName: "MiniMax", serviceUrl: "https://minimax.chat" },
 	baseten: { serviceName: "Baseten", serviceUrl: "https://baseten.co" },
+	nvidia: { serviceName: "NVIDIA NIM", serviceUrl: "https://build.nvidia.com" },
+	groq: { serviceName: "Groq", serviceUrl: "https://console.groq.com" },
+	cerebras: { serviceName: "Cerebras", serviceUrl: "https://cloud.cerebras.ai" },
 	ollama: { serviceName: "Ollama", serviceUrl: "https://ollama.ai" },
 	lmstudio: { serviceName: "LM Studio", serviceUrl: "https://lmstudio.ai/docs" },
 	"vscode-lm": {
@@ -70,6 +76,9 @@ export const PROVIDER_DEFAULT_MODEL_IDS: Partial<Record<ProviderName, string>> =
 	minimax: minimaxDefaultModelId,
 	baseten: basetenDefaultModelId,
 	"free-router": freeRouterDefaultModelId,
+	nvidia: nvidiaDefaultModelId,
+	groq: groqDefaultModelId,
+	cerebras: cerebrasDefaultModelId,
 }
 
 export const getProviderServiceConfig = (provider: ProviderName): ProviderServiceConfig => {

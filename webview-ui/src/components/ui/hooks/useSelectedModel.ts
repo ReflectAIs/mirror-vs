@@ -37,6 +37,9 @@ import {
 	freeRouterModels,
 	freeRouterDefaultModelInfo,
 	getFreeRouterActiveModelId,
+	nvidiaModels,
+	groqModels,
+	cerebrasModels,
 } from "@mirror-vs/types"
 
 import { useRouterModels } from "./useRouterModels"
@@ -355,6 +358,21 @@ function getSelectedModel({
 		case "free-router": {
 			const id = getFreeRouterActiveModelId(apiConfiguration)
 			const info = freeRouterModels[id as keyof typeof freeRouterModels] ?? freeRouterDefaultModelInfo
+			return { id, info }
+		}
+		case "nvidia": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = nvidiaModels[id as keyof typeof nvidiaModels]
+			return { id, info }
+		}
+		case "groq": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = groqModels[id as keyof typeof groqModels]
+			return { id, info }
+		}
+		case "cerebras": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = cerebrasModels[id as keyof typeof cerebrasModels]
 			return { id, info }
 		}
 		// case "anthropic":
