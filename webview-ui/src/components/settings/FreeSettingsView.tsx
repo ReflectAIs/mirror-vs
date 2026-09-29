@@ -15,6 +15,8 @@ import {
 	Layers,
 	Globe,
 	Laptop,
+	RotateCcw,
+	CheckCircle2,
 } from "lucide-react"
 
 import {
@@ -27,12 +29,17 @@ import {
 	sambaNovaDefaultModelId,
 	geminiDefaultModelId,
 	DEFAULT_FREE_ROUTER_MODELS,
+	getAvailableFreeRouterModels,
+	getSelectedFreeRouterModels,
+	getFreeRouterActiveModelName,
+	type FreeRouterModelEntry,
 } from "@mirror-vs/types"
 
 import { ExtensionStateContextType } from "@src/context/ExtensionStateContext"
 import { cn } from "@src/lib/utils"
 import { Button } from "@src/components/ui"
 import { VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
+import { Checkbox } from "vscrui"
 import { SetCachedStateField } from "./types"
 import { vscode } from "@src/utils/vscode"
 
@@ -173,6 +180,13 @@ const FREE_PROVIDERS_CONFIG: FreeProviderItem[] = [
 	},
 ]
 
+function getRouterModelId(providerId: ProviderName, modelId: string): string {
+	if (providerId === "openrouter" || providerId === "free-router" || providerId === "ollama") {
+		return modelId
+	}
+	return `${providerId}/${modelId}`
+}
+
 export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 	cachedState,
 	setCachedStateField,
@@ -201,10 +215,78 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 		return count
 	}, [apiConfig])
 
+	const availableModels = useMemo(() => {
+		return getAvailableFreeRouterModels(apiConfig)
+	}, [apiConfig])
+
+	const selectedModels = useMemo(() => {
+		return getSelectedFreeRouterModels(apiConfig)
+	}, [apiConfig])
+
+	const handleToggleModel = useCallback(
+		(modelId: string, checked: boolean) => {
+			const updated = checked
+				? Array.from(new Set([...selectedModels, modelId]))
+				: selectedModels.filter((id) => id !== modelId)
+
+			setApiConfigurationField("freeRouterModels", updated)
+
+			const nextApiModelId = !checked && apiConfig.apiModelId === modelId ? "" : apiConfig.apiModelId
+			if (!checked && apiConfig.apiModelId === modelId) {
+				setApiConfigurationField("apiModelId", "")
+			}
+
+			vscode.postMessage({
+				type: "upsertApiConfiguration",
+				text: cachedState.currentApiConfigName,
+				apiConfiguration: {
+					...apiConfig,
+					freeRouterModels: updated,
+					apiModelId: nextApiModelId,
+				},
+			})
+		},
+		[selectedModels, apiConfig, cachedState.currentApiConfigName, setApiConfigurationField],
+	)
+
+	const handleSelectAll = useCallback(() => {
+		const allIds = availableModels.map((m) => m.id)
+		setApiConfigurationField("freeRouterModels", allIds)
+		vscode.postMessage({
+			type: "upsertApiConfiguration",
+			text: cachedState.currentApiConfigName,
+			apiConfiguration: {
+				...apiConfig,
+				freeRouterModels: allIds,
+			},
+		})
+	}, [availableModels, apiConfig, cachedState.currentApiConfigName, setApiConfigurationField])
+
+	const handleDeselectAll = useCallback(() => {
+		setApiConfigurationField("freeRouterModels", [])
+		setApiConfigurationField("apiModelId", "")
+		vscode.postMessage({
+			type: "upsertApiConfiguration",
+			text: cachedState.currentApiConfigName,
+			apiConfiguration: {
+				...apiConfig,
+				freeRouterModels: [],
+				apiModelId: "",
+			},
+		})
+	}, [apiConfig, cachedState.currentApiConfigName, setApiConfigurationField])
+
 	const handleActivateProvider = useCallback(
 		(providerId: ProviderName, defaultModel: string) => {
+			const cleanModel = defaultModel
+				.replace(/^groq\//, "")
+				.replace(/^cerebras\//, "")
+				.replace(/^nvidia\//, "")
+				.replace(/^sambanova\//, "")
+				.replace(/^gemini\//, "")
+
 			setApiConfigurationField("apiProvider", providerId)
-			setApiConfigurationField("apiModelId", defaultModel)
+			setApiConfigurationField("apiModelId", cleanModel)
 
 			// Persist immediately via upsertApiConfiguration
 			vscode.postMessage({
@@ -213,7 +295,7 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 				apiConfiguration: {
 					...apiConfig,
 					apiProvider: providerId,
-					apiModelId: defaultModel,
+					apiModelId: cleanModel,
 				},
 			})
 		},
@@ -344,6 +426,165 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 						</Button>
 					</div>
 				</div>
+			</div>
+
+			{/* Selected Models for Auto-Routing & Dropdown Section */}
+			<div className="rounded-xl border border-vscode-editorGroup-border/80 bg-vscode-editor-background p-5 flex flex-col gap-4 shadow-xs">
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-vscode-editorGroup-border/60">
+					<div className="flex items-center gap-2.5">
+						<div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+							<ShieldCheck className="w-5 h-5" />
+						</div>
+						<div>
+							<div className="flex items-center gap-2">
+								<h3 className="text-sm font-bold text-vscode-foreground m-0">
+									Active Free Models Pool
+								</h3>
+								<span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 rounded border border-emerald-500/30">
+									{selectedModels.length} of {availableModels.length} Selected
+								</span>
+							</div>
+							<p className="text-xs text-vscode-descriptionForeground mt-0.5 m-0">
+								Only models whose provider API key is added appear below. Only selected models will be
+								visible in the chat dropdown and used for auto-routing.
+							</p>
+						</div>
+					</div>
+
+					{availableModels.length > 0 && (
+						<div className="flex items-center gap-2 shrink-0">
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={handleSelectAll}
+								disabled={selectedModels.length === availableModels.length}
+								className="text-xs h-7 px-2.5">
+								Select All
+							</Button>
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={handleDeselectAll}
+								disabled={selectedModels.length === 0}
+								className="text-xs h-7 px-2.5">
+								Deselect All
+							</Button>
+						</div>
+					)}
+				</div>
+
+				{availableModels.length === 0 ? (
+					<div className="rounded-lg border border-dashed border-vscode-editorGroup-border/80 bg-vscode-editor-inactiveSelectionBackground/10 p-6 flex flex-col items-center text-center gap-2">
+						<Sparkles className="w-7 h-7 text-vscode-descriptionForeground/60" />
+						<h4 className="text-sm font-semibold text-vscode-foreground m-0">
+							No Provider Keys Connected Yet
+						</h4>
+						<p className="text-xs text-vscode-descriptionForeground max-w-md m-0">
+							Paste your free API key for <strong>Groq</strong>, <strong>Cerebras</strong>,{" "}
+							<strong>NVIDIA NIM</strong>, <strong>Google Gemini</strong>, <strong>SambaNova</strong>, or{" "}
+							<strong>OpenRouter</strong> in the cards below. Once a key is added, its models will
+							immediately appear here so you can select and deselect them for auto-routing and the chat
+							dropdown.
+						</p>
+					</div>
+				) : (
+					<div className="grid grid-cols-1 gap-2.5">
+						{availableModels.map((model) => {
+							const isSelected = selectedModels.includes(model.id)
+							const isCurrentActive = apiConfig.apiModelId === model.id
+							const providerConfig = FREE_PROVIDERS_CONFIG.find((p) => p.id === model.provider)
+
+							return (
+								<div
+									key={model.id}
+									onClick={() => handleToggleModel(model.id, !isSelected)}
+									className={cn(
+										"flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer select-none",
+										isSelected
+											? "border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60"
+											: "border-vscode-editorGroup-border/40 bg-vscode-editor-background opacity-60 hover:opacity-80",
+										isCurrentActive &&
+											"ring-1 ring-amber-500/50 border-amber-500/50 bg-amber-500/5",
+									)}>
+									<div className="flex items-center gap-3 min-w-0">
+										<div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+											<Checkbox
+												checked={isSelected}
+												onChange={(checked: boolean) => handleToggleModel(model.id, checked)}
+											/>
+										</div>
+
+										<div className="flex flex-col min-w-0">
+											<div className="flex items-center gap-2 flex-wrap">
+												<span className="text-xs font-semibold text-vscode-foreground truncate">
+													{model.name}
+												</span>
+
+												{providerConfig && (
+													<span className="inline-flex items-center gap-1 px-1.5 py-0.2 text-[10px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded border border-vscode-panel-border/30">
+														{providerConfig.icon}
+														{providerConfig.name}
+													</span>
+												)}
+
+												{isCurrentActive ? (
+													<span className="text-[10px] px-2 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 flex items-center gap-1">
+														<Zap className="w-2.5 h-2.5 fill-current" />
+														Primary Preferred
+													</span>
+												) : isSelected ? (
+													<span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-medium flex items-center gap-1 border border-emerald-500/30">
+														<Check className="w-2.5 h-2.5" />
+														In Dropdown & Auto-Routing
+													</span>
+												) : (
+													<span className="text-[10px] px-1.5 py-0.2 rounded bg-vscode-editor-inactiveSelectionBackground text-vscode-descriptionForeground font-medium">
+														Deselected (Hidden)
+													</span>
+												)}
+											</div>
+
+											<div className="flex items-center gap-2 mt-0.5 text-[11px] text-vscode-descriptionForeground">
+												<span className="font-mono text-[10px] opacity-80">{model.id}</span>
+												<span>•</span>
+												<span>{(model.contextWindow / 1024).toFixed(0)}k context</span>
+												{model.description && (
+													<>
+														<span>•</span>
+														<span className="truncate max-w-sm">{model.description}</span>
+													</>
+												)}
+											</div>
+										</div>
+									</div>
+
+									<div
+										className="flex items-center gap-2 shrink-0 pl-3"
+										onClick={(e) => e.stopPropagation()}>
+										{isSelected && !isCurrentActive && (
+											<Button
+												variant="secondary"
+												size="sm"
+												onClick={() => setApiConfigurationField("apiModelId", model.id)}
+												className="text-[11px] h-6 px-2 hover:border-amber-500/40">
+												Set Primary
+											</Button>
+										)}
+										{isCurrentActive && (
+											<Button
+												variant="secondary"
+												size="sm"
+												onClick={() => setApiConfigurationField("apiModelId", "")}
+												className="text-[11px] h-6 px-2 text-amber-300">
+												Reset Auto
+											</Button>
+										)}
+									</div>
+								</div>
+							)
+						})}
+					</div>
+				)}
 			</div>
 
 			{/* Section Header */}
@@ -489,6 +730,45 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 											))}
 										</select>
 									</div>
+
+									{isKeyConfigured && (
+										<div className="col-span-full pt-2.5 border-t border-vscode-editorGroup-border/30">
+											<label className="block text-[11px] font-medium text-vscode-foreground mb-1.5">
+												Include in Auto-Routing Pool & Dropdown:
+											</label>
+											<div className="flex flex-wrap gap-2">
+												{provider.models.map((m) => {
+													const fullId = getRouterModelId(provider.id, m.id)
+													const isSelected = selectedModels.includes(fullId)
+													return (
+														<label
+															key={m.id}
+															className={cn(
+																"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs cursor-pointer select-none transition-colors",
+																isSelected
+																	? "border-emerald-500/50 bg-emerald-500/10 text-vscode-foreground font-medium"
+																	: "border-vscode-editorGroup-border/50 bg-vscode-editor-background opacity-60 text-vscode-descriptionForeground hover:opacity-80",
+															)}>
+															<input
+																type="checkbox"
+																checked={isSelected}
+																onChange={(e) =>
+																	handleToggleModel(fullId, e.target.checked)
+																}
+																className="rounded cursor-pointer"
+															/>
+															<span>{m.label}</span>
+															{m.tag && (
+																<span className="text-[10px] opacity-75 font-mono">
+																	({m.tag})
+																</span>
+															)}
+														</label>
+													)
+												})}
+											</div>
+										</div>
+									)}
 								</div>
 							)}
 						</div>

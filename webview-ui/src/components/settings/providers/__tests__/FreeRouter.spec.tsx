@@ -156,7 +156,7 @@ describe("FreeRouter component", () => {
 		expect(screen.getByText("Cohere North Mini Code (OpenRouter Free)")).toBeInTheDocument()
 		expect(screen.getByText("NVIDIA Nemotron 3 Ultra (OpenRouter Free)")).toBeInTheDocument()
 		expect(screen.getByText("NVIDIA Nemotron 3 Nano Omni (OpenRouter Free)")).toBeInTheDocument()
-		expect(screen.getByText("Z.ai GLM 5.2 (OpenRouter Free)")).toBeInTheDocument()
+		expect(screen.getByText("Thinking Machines Inkling (OpenRouter Free)")).toBeInTheDocument()
 	})
 
 	it("allows adding a custom free model to the pool", () => {

@@ -1,4 +1,5 @@
 import type { ModelInfo } from "../model.js"
+import type { ProviderSettings } from "../provider-settings.js"
 
 export type FreeRouterProviderName =
 	| "openrouter"
@@ -511,23 +512,82 @@ export const DEFAULT_FREE_ROUTER_MODELS: FreeRouterModelEntry[] = [
 ]
 
 /**
- * Resolves the model ID currently in use for the Free Router.
- * If apiModelId is set and present in the pool, it is returned.
- * Otherwise, the first model in the configured pool (or default model) is returned.
+ * Checks whether the API key for a given free-tier provider is present and non-empty.
  */
-export function getFreeRouterActiveModelId(apiConfiguration?: {
-	apiModelId?: string
-	freeRouterModels?: string[]
-}): string {
-	if (apiConfiguration?.apiModelId) {
-		return apiConfiguration.apiModelId
+export function isFreeProviderKeyConfigured(
+	provider: FreeRouterProviderName,
+	settings?: Partial<ProviderSettings>,
+): boolean {
+	if (!settings) return false
+	switch (provider) {
+		case "groq":
+			return Boolean(settings.groqApiKey && settings.groqApiKey.trim())
+		case "cerebras":
+			return Boolean(settings.cerebrasApiKey && settings.cerebrasApiKey.trim())
+		case "nvidia":
+			return Boolean(settings.nvidiaApiKey && settings.nvidiaApiKey.trim())
+		case "sambanova":
+			return Boolean(settings.sambaNovaApiKey && settings.sambaNovaApiKey.trim())
+		case "gemini":
+			return Boolean(settings.geminiApiKey && settings.geminiApiKey.trim())
+		case "openrouter":
+			return Boolean(
+				(settings.openRouterApiKey && settings.openRouterApiKey.trim()) ||
+					(settings.freeRouterApiKey && settings.freeRouterApiKey.trim()),
+			)
+		case "ollama":
+			return true
+		case "custom":
+			return true
+		default:
+			return false
+	}
+}
+
+/**
+ * Returns all models from the default free model registry whose provider API key is added.
+ * If no provider keys have been added yet, returns the baseline OpenRouter free models.
+ */
+export function getAvailableFreeRouterModels(settings?: Partial<ProviderSettings>): FreeRouterModelEntry[] {
+	if (!settings) return []
+	const hasConfiguredKeys = Boolean(
+		settings.groqApiKey?.trim() ||
+			settings.cerebrasApiKey?.trim() ||
+			settings.nvidiaApiKey?.trim() ||
+			settings.sambaNovaApiKey?.trim() ||
+			settings.geminiApiKey?.trim() ||
+			settings.openRouterApiKey?.trim() ||
+			settings.freeRouterApiKey?.trim(),
+	)
+
+	if (!hasConfiguredKeys) {
+		return DEFAULT_FREE_ROUTER_MODELS.filter((m) => m.provider === "openrouter")
 	}
 
-	const pool =
-		Array.isArray(apiConfiguration?.freeRouterModels) && apiConfiguration.freeRouterModels.length > 0
-			? apiConfiguration.freeRouterModels
-			: DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
+	return DEFAULT_FREE_ROUTER_MODELS.filter((model) => isFreeProviderKeyConfigured(model.provider, settings))
+}
 
+export function getSelectedFreeRouterModels(settings?: Partial<ProviderSettings>): string[] {
+	if (!settings) return []
+
+	if (Array.isArray(settings.freeRouterModels)) {
+		return settings.freeRouterModels
+	}
+
+	const available = getAvailableFreeRouterModels(settings)
+	return available.map((m) => m.id)
+}
+
+/**
+ * Resolves the model ID currently in use for the Free Router.
+ * If apiModelId is set and present in the selected pool, it is returned.
+ * Otherwise, the first model in the configured pool (or default model) is returned.
+ */
+export function getFreeRouterActiveModelId(settings?: Partial<ProviderSettings>): string {
+	const pool = getSelectedFreeRouterModels(settings)
+	if (settings?.apiModelId && pool.includes(settings.apiModelId)) {
+		return settings.apiModelId
+	}
 	return pool[0] ?? freeRouterDefaultModelId
 }
 

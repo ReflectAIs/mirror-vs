@@ -4,6 +4,8 @@ import {
 	freeRouterDefaultModelInfo,
 	freeRouterModels,
 	DEFAULT_FREE_ROUTER_MODELS,
+	getSelectedFreeRouterModels,
+	getAvailableFreeRouterModels,
 	type ModelInfo,
 } from "@mirror-vs/types"
 
@@ -290,16 +292,17 @@ export class FreeRouterHandler extends BaseProvider {
 
 	/**
 	 * Returns the list of configured model IDs in priority order.
-	 * Dynamically incorporates models from all free providers with configured API keys,
-	 * backed by OpenRouter zero-cost models.
+	 * Only models whose provider API key is added AND that are selected by the user are included.
 	 */
 	public getModelPool(): string[] {
-		// 1. If user explicitly specified custom models in settings, use them
+		// 1. If user explicitly specified models in settings (custom/selected models), use them
 		if (Array.isArray(this.options.freeRouterModels) && this.options.freeRouterModels.length > 0) {
 			const pool = [...this.options.freeRouterModels]
 			if (this.options.apiModelId && this.options.apiModelId.trim()) {
 				const preferred = this.options.apiModelId.trim()
-				return [preferred, ...pool.filter((id) => id !== preferred)]
+				if (pool.includes(preferred)) {
+					return [preferred, ...pool.filter((id) => id !== preferred)]
+				}
 			}
 			return pool
 		}
@@ -354,19 +357,24 @@ export class FreeRouterHandler extends BaseProvider {
 	 * Returns the currently active healthy model ID and info.
 	 */
 	override getModel(): { id: string; info: ModelInfo } {
-		// If user selected a preferred model and it's healthy, prioritize it
+		const pool = this.getModelPool()
+
+		// If user selected a preferred model that exists in pool and it's healthy, prioritize it
 		const preferred = this.options.apiModelId?.trim()
-		if (preferred && !isModelExhausted(preferred)) {
+		if (preferred && pool.includes(preferred) && !isModelExhausted(preferred)) {
 			const info = freeRouterModels[preferred] || freeRouterDefaultModelInfo
 			return { id: preferred, info }
 		}
 
-		if (this.currentActiveModelId && !isModelExhausted(this.currentActiveModelId)) {
+		if (
+			this.currentActiveModelId &&
+			pool.includes(this.currentActiveModelId) &&
+			!isModelExhausted(this.currentActiveModelId)
+		) {
 			const info = freeRouterModels[this.currentActiveModelId] || freeRouterDefaultModelInfo
 			return { id: this.currentActiveModelId, info }
 		}
 
-		const pool = this.getModelPool()
 		const healthyId = pool.find((id) => !isModelExhausted(id)) || pool[0] || freeRouterDefaultModelId
 		const info = freeRouterModels[healthyId] || freeRouterDefaultModelInfo
 

@@ -6,6 +6,7 @@ import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square, Zap }
 import {
 	getFreeRouterActiveModelId,
 	getFreeRouterActiveModelName,
+	getSelectedFreeRouterModels,
 	DEFAULT_FREE_ROUTER_MODELS,
 	freeRouterModels,
 	freeRouterDefaultModelId,
@@ -150,16 +151,12 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		}, [autoRouterDefaultModelId])
 
 		const freeRouterModelOptions = useMemo(() => {
-			const pool =
-				Array.isArray(apiConfiguration?.freeRouterModels) && apiConfiguration.freeRouterModels.length > 0
-					? apiConfiguration.freeRouterModels
-					: DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
-			const allIds = Array.from(new Set([...pool, ...Object.keys(freeRouterModels)]))
-			return allIds.map((id) => ({
+			const pool = getSelectedFreeRouterModels(apiConfiguration)
+			return pool.map((id) => ({
 				value: id,
 				label: `${getFreeRouterActiveModelName(id)} (Free)`,
 			}))
-		}, [apiConfiguration?.freeRouterModels])
+		}, [apiConfiguration])
 
 		const [gitCommits, setGitCommits] = useState<any[]>([])
 		const [showDropdown, setShowDropdown] = useState(false)
@@ -1379,7 +1376,9 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									<option
 										value=""
 										className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
-										Auto-Router: {autoRouterDefaultModelName}
+										{freeRouterModelOptions.length > 0
+											? `Auto-Router: ${autoRouterDefaultModelName} (${freeRouterModelOptions.length} models)`
+											: "Auto-Router (No models selected)"}
 									</option>
 									{freeRouterModelOptions.map((opt) => (
 										<option

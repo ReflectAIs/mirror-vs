@@ -11,6 +11,8 @@ import {
 	freeRouterModels,
 	getFreeRouterActiveModelId,
 	getFreeRouterActiveModelName,
+	getAvailableFreeRouterModels,
+	getSelectedFreeRouterModels,
 } from "@mirror-vs/types"
 
 import { useAppTranslation } from "@src/i18n/TranslationContext"
@@ -53,13 +55,14 @@ export const FreeRouter = ({
 		[setApiConfigurationField],
 	)
 
+	const availableModels = useMemo(() => {
+		return getAvailableFreeRouterModels(apiConfiguration)
+	}, [apiConfiguration])
+
 	// Enabled models in router pool
 	const currentPool = useMemo<string[]>(() => {
-		if (Array.isArray(apiConfiguration?.freeRouterModels) && apiConfiguration.freeRouterModels.length > 0) {
-			return apiConfiguration.freeRouterModels
-		}
-		return DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
-	}, [apiConfiguration?.freeRouterModels])
+		return getSelectedFreeRouterModels(apiConfiguration)
+	}, [apiConfiguration])
 
 	const activeModelId = useMemo(() => {
 		return getFreeRouterActiveModelId(apiConfiguration)
@@ -75,9 +78,24 @@ export const FreeRouter = ({
 				? Array.from(new Set([...currentPool, modelId]))
 				: currentPool.filter((id) => id !== modelId)
 			setApiConfigurationField("freeRouterModels", updated)
+			if (!checked && apiConfiguration?.apiModelId === modelId) {
+				setApiConfigurationField("apiModelId", undefined)
+			}
 		},
-		[currentPool, setApiConfigurationField],
+		[currentPool, apiConfiguration?.apiModelId, setApiConfigurationField],
 	)
+
+	const selectAllModels = useCallback(() => {
+		setApiConfigurationField(
+			"freeRouterModels",
+			availableModels.map((m) => m.id),
+		)
+	}, [availableModels, setApiConfigurationField])
+
+	const deselectAllModels = useCallback(() => {
+		setApiConfigurationField("freeRouterModels", [])
+		setApiConfigurationField("apiModelId", undefined)
+	}, [setApiConfigurationField])
 
 	const addCustomModel = useCallback(() => {
 		const trimmed = newCustomModel.trim()
@@ -101,9 +119,9 @@ export const FreeRouter = ({
 	const resetPoolToDefault = useCallback(() => {
 		setApiConfigurationField(
 			"freeRouterModels",
-			DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id),
+			availableModels.map((m) => m.id),
 		)
-	}, [setApiConfigurationField])
+	}, [availableModels, setApiConfigurationField])
 
 	const effectiveApiKey = apiConfiguration?.freeRouterApiKey || apiConfiguration?.openRouterApiKey || ""
 
@@ -189,7 +207,7 @@ export const FreeRouter = ({
 						onChange={(e) => setApiConfigurationField("apiModelId", e.target.value || undefined)}
 						className="h-6 px-1.5 text-xs bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-vscode-dropdown-border rounded focus:outline-none cursor-pointer">
 						<option value="">⚡ Auto (Dynamic Failover Pool)</option>
-						{DEFAULT_FREE_ROUTER_MODELS.map((m) => (
+						{availableModels.map((m) => (
 							<option key={m.id} value={m.id}>
 								{getFreeRouterActiveModelName(m.id)}
 							</option>
@@ -220,20 +238,38 @@ export const FreeRouter = ({
 				<div className="flex justify-between items-center">
 					<div className="flex items-center gap-1.5 font-medium text-sm">
 						<ShieldCheck className="size-4 text-vscode-charts-green" />
-						<span>Auto-Router Failover Pool ({currentPool.length} active)</span>
+						<span>
+							Auto-Router Failover Pool ({currentPool.length} of {availableModels.length} selected)
+						</span>
 					</div>
-					<VSCodeButton
-						appearance="icon"
-						title="Reset to default free models"
-						onClick={resetPoolToDefault}
-						className="text-xs">
-						<RotateCcw className="size-3.5 inline mr-1" />
-						Reset Pool
-					</VSCodeButton>
+					<div className="flex items-center gap-1">
+						<VSCodeButton
+							appearance="secondary"
+							onClick={selectAllModels}
+							disabled={currentPool.length === availableModels.length}
+							className="text-[11px] h-6 px-2">
+							Select All
+						</VSCodeButton>
+						<VSCodeButton
+							appearance="secondary"
+							onClick={deselectAllModels}
+							disabled={currentPool.length === 0}
+							className="text-[11px] h-6 px-2">
+							Deselect All
+						</VSCodeButton>
+						<VSCodeButton
+							appearance="icon"
+							title="Reset to default free models"
+							onClick={resetPoolToDefault}
+							className="text-xs">
+							<RotateCcw className="size-3.5 inline mr-1" />
+							Reset Pool
+						</VSCodeButton>
+					</div>
 				</div>
 
 				<div className="flex flex-col gap-2">
-					{DEFAULT_FREE_ROUTER_MODELS.map((model, idx) => {
+					{availableModels.map((model, idx) => {
 						const isEnabled = currentPool.includes(model.id)
 						const isCurrentActive = model.id === activeModelId
 						return (

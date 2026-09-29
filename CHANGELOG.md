@@ -15,6 +15,11 @@ All notable changes to the "Mirror VS" extension will be documented in this file
         - **Google Gemini** (`gemini-2.5-flash`, `gemini-2.0-flash`)
         - **OpenRouter Free Tier** (10 curated zero-cost models)
     - If any provider encounters rate-limiting (429), quota exhaustion (402), or network hangs, the router automatically fails over to the next provider and model in the pool seamlessly.
+- **Selective Free Models Pool & Filtered Chat Dropdown**:
+    - Settings now dynamically displays only models whose provider API key is added (Groq, Cerebras, NVIDIA NIM, SambaNova, Gemini, OpenRouter).
+    - Added checkboxes to select or deselect any model with instant "Select All" and "Deselect All" controls.
+    - The chat model selector dropdown strictly displays only user-selected models, removing unselected or deselected models from view.
+    - Free Auto-Router strictly routes requests exclusively across the user-selected models.
 - **Automatic Failover for Hangs & Timeouts**:
     - Added an initial connection watchdog (25s) and per-chunk watchdog (35s) that monitors streaming models. If a free-tier model stops responding or hangs indefinitely, the router immediately catches the timeout, places the failing model into circuit-breaker cooldown, and automatically routes to the next healthy candidate in the free pool without failing the task.
 - **Pre-Token Chunk Buffering & Clean Recovery**:
