@@ -290,10 +290,11 @@ export const globalSettingsSchema = z.object({
 
 	/**
 	 * Setup and settings view mode:
+	 * - "free": Free models view with zero API cost providers and auto-routing.
 	 * - "normal": Simple, streamlined setup and settings with predefined safe defaults.
 	 * - "advanced": Full configuration with all sections and granular parameters.
 	 */
-	settingsMode: z.enum(["normal", "advanced"]).optional(),
+	settingsMode: z.enum(["free", "normal", "advanced"]).optional(),
 
 	/**
 	 * Per-type active pipeline slug override for ComfyUI.
@@ -465,3 +466,5 @@ export const GLOBAL_STATE_KEYS = [...GLOBAL_SETTINGS_KEYS, ...PROVIDER_SETTINGS_
 
 export const isGlobalStateKey = (key: string): key is Keys<GlobalState> =>
 	GLOBAL_STATE_KEYS.includes(key as Keys<GlobalState>)
+
+export type SettingsMode = "free" | "normal" | "advanced"

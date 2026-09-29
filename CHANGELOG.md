@@ -4,8 +4,17 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 
 ## [0.9.7] - 2026-09-29
 
-### Free Models Resilient Auto-Failover & Watchdog
+### Free Models Resilient Auto-Failover & Multi-Provider Routing
 
+- **True Multi-Provider Free Routing & Dynamic Failover**:
+    - Upgraded `FreeRouterHandler` from single-provider OpenRouter routing to true cross-provider multi-model routing. Dynamically detects and incorporates free models from all configured free providers:
+        - **Groq** (`llama-3.3-70b-versatile`, `deepseek-r1-distill-llama-70b`, `llama-3.1-8b-instant`)
+        - **Cerebras** (`llama-3.3-70b`, `llama3.1-8b`)
+        - **NVIDIA NIM** (`meta/llama-3.3-70b-instruct`, `deepseek-ai/deepseek-r1`, `nvidia/llama-3.1-nemotron-70b-instruct`)
+        - **SambaNova** (`Meta-Llama-3.3-70B-Instruct`, `DeepSeek-R1-Distill-Llama-70B`)
+        - **Google Gemini** (`gemini-2.5-flash`, `gemini-2.0-flash`)
+        - **OpenRouter Free Tier** (10 curated zero-cost models)
+    - If any provider encounters rate-limiting (429), quota exhaustion (402), or network hangs, the router automatically fails over to the next provider and model in the pool seamlessly.
 - **Automatic Failover for Hangs & Timeouts**:
     - Added an initial connection watchdog (25s) and per-chunk watchdog (35s) that monitors streaming models. If a free-tier model stops responding or hangs indefinitely, the router immediately catches the timeout, places the failing model into circuit-breaker cooldown, and automatically routes to the next healthy candidate in the free pool without failing the task.
 - **Pre-Token Chunk Buffering & Clean Recovery**:
@@ -14,6 +23,21 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Live verified all models in the Free Router pool against OpenRouter specifications to ensure $0 prompt and $0 completion pricing.
     - Updated pool with active models: `google/gemma-4-31b-it:free`, `google/gemma-4-26b-a4b-it:free`, `qwen/qwen3.8-27b:free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, `nvidia/nemotron-3-super-120b-a12b:free`, `thinkingmachines/inkling:free`, and `poolside/laguna-s-2.1:free`.
     - Removed decommissioned models (`z-ai/glm-5.2:free`, `nex-agi/nex-n2.5-pro:free`) that triggered 404 endpoint errors.
+
+### Dedicated `⚡ Free` Mode in Settings & Chat
+
+- **Dedicated Free Mode in Settings (`⚡ Free`)**:
+    - Added a dedicated Free Mode in Settings accessible via the header switcher pill (`[ ⚡ Free | Normal | Advanced ]`).
+    - In Free Mode, all free-tier providers are displayed in a clean, unified view:
+        - Quick links to generate free API keys (Groq, Cerebras, NVIDIA NIM, Gemini, SambaNova, OpenRouter).
+        - API key inputs with show/hide password toggles that securely store keys in `SecretStorage`.
+        - Model selection dropdowns for each provider's free models.
+        - One-click "Start Using" buttons to immediately activate that provider and model.
+        - Integrated "Start Using Auto-Router" button for multi-provider automatic failover across all entered keys.
+- **Built-in Free Chat Mode (`DEFAULT_MODES`)**:
+    - Introduced a dedicated `⚡ Free` mode equipped with full coding capabilities (`read`, `edit`, `command`, `browser`, `mcp`) that operates strictly on zero-cost models and free-tier providers.
+- **Automatic Free Profile Activation**:
+    - Switching to `⚡ Free` mode automatically provisions and activates a `Free Models (Auto-Router)` profile if no free provider is already configured.
 
 ### NVIDIA NIM, Groq & Cerebras Free-Tier Providers
 
@@ -25,15 +49,6 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Integrated Cerebras Cloud free tier providing ultra-fast inference on wafer-scale hardware for Llama 3.3 70B and Llama 3.1 8B.
 - **Secure Key Storage**:
     - Registered `nvidiaApiKey`, `groqApiKey`, and `cerebrasApiKey` in `SECRET_STATE_KEYS` with VS Code `SecretStorage`.
-
-### Dedicated `⚡ Free` Mode
-
-- **Built-in Free Mode (`DEFAULT_MODES`)**:
-    - Introduced a dedicated `⚡ Free` mode equipped with full coding capabilities (`read`, `edit`, `command`, `browser`, `mcp`) that operates strictly on zero-cost models and free-tier providers.
-- **Automatic Free Profile Activation**:
-    - Switching to `⚡ Free` mode automatically provisions and activates a `Free Models (Auto-Router)` profile if no free provider is already configured.
-- **Filtered Free Provider Settings**:
-    - When `⚡ Free` mode is active, the settings provider selector is constrained strictly to free providers (`free-router`, `nvidia`, `groq`, `cerebras`, `sambanova`, `gemini`), complete with an active Free Mode indicator badge.
 
 ## [0.9.6] - 2026-09-25
 

@@ -128,6 +128,24 @@ describe("FreeRouterHandler", () => {
 			expect(pool[0]).toBe("qwen/qwen3.8-27b:free")
 			expect(handler.getModel().id).toBe("qwen/qwen3.8-27b:free")
 		})
+
+		it("dynamically includes Groq, Cerebras, and NVIDIA models when keys are configured", () => {
+			const handler = new FreeRouterHandler({
+				groqApiKey: "gsk_test123",
+				cerebrasApiKey: "csk_test456",
+				nvidiaApiKey: "nvapi_test789",
+			})
+			const pool = handler.getModelPool()
+
+			// Must contain Groq models
+			expect(pool).toContain("groq/llama-3.3-70b-versatile")
+			// Must contain Cerebras models
+			expect(pool).toContain("cerebras/llama-3.3-70b")
+			// Must contain NVIDIA models
+			expect(pool).toContain("nvidia/meta/llama-3.3-70b-instruct")
+			// Must still contain OpenRouter free models
+			expect(pool).toContain("google/gemma-4-31b-it:free")
+		})
 	})
 
 	describe("Circuit-Breaker Failover Streaming", () => {

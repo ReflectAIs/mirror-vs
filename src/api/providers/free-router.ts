@@ -13,6 +13,11 @@ import { ApiStreamChunk } from "../transform/stream"
 
 import { BaseProvider } from "./base-provider"
 import { OpenRouterHandler } from "./openrouter"
+import { GroqHandler } from "./groq"
+import { CerebrasHandler } from "./cerebras"
+import { NvidiaHandler } from "./nvidia"
+import { SambaNovaHandler } from "./sambanova"
+import { GeminiHandler } from "./gemini"
 
 export interface ModelHealth {
 	modelId: string
@@ -207,26 +212,123 @@ export class FreeRouterHandler extends BaseProvider {
 	}
 
 	/**
+	 * Builds an appropriate API handler instance for the candidate free model.
+	 * Dispatches to Groq, Cerebras, NVIDIA, SambaNova, Gemini, or OpenRouter based on model prefix.
+	 */
+	public buildCandidateHandler(candidateModelId: string) {
+		if (candidateModelId.startsWith("groq/")) {
+			const modelId = candidateModelId.replace(/^groq\//, "")
+			return new GroqHandler({
+				...this.options,
+				apiModelId: modelId,
+				groqApiKey: this.options.groqApiKey,
+			})
+		}
+
+		if (candidateModelId.startsWith("cerebras/")) {
+			const modelId = candidateModelId.replace(/^cerebras\//, "")
+			return new CerebrasHandler({
+				...this.options,
+				apiModelId: modelId,
+				cerebrasApiKey: this.options.cerebrasApiKey,
+			})
+		}
+
+		if (candidateModelId.startsWith("nvidia/")) {
+			const modelId = candidateModelId.replace(/^nvidia\//, "")
+			return new NvidiaHandler({
+				...this.options,
+				apiModelId: modelId,
+				nvidiaApiKey: this.options.nvidiaApiKey,
+			})
+		}
+
+		if (candidateModelId.startsWith("sambanova/")) {
+			const modelId = candidateModelId.replace(/^sambanova\//, "")
+			return new SambaNovaHandler({
+				...this.options,
+				apiModelId: modelId,
+				sambaNovaApiKey: this.options.sambaNovaApiKey,
+			})
+		}
+
+		if (candidateModelId.startsWith("gemini/")) {
+			const modelId = candidateModelId.replace(/^gemini\//, "")
+			return new GeminiHandler({
+				...this.options,
+				apiModelId: modelId,
+				geminiApiKey: this.options.geminiApiKey,
+			})
+		}
+
+		return new OpenRouterHandler({
+			...this.options,
+			openRouterModelId: candidateModelId,
+			openRouterApiKey: this.apiKey,
+			openRouterBaseUrl: this.options.openRouterBaseUrl || "https://openrouter.ai/api/v1",
+		})
+	}
+
+	/**
 	 * Returns the list of configured model IDs in priority order.
-	 * In Auto-Router mode, models are managed automatically based on the curated free models pool.
+	 * Dynamically incorporates models from all free providers with configured API keys,
+	 * backed by OpenRouter zero-cost models.
 	 */
 	public getModelPool(): string[] {
-		let basePool: string[]
-		// 1. If user specified custom model list in settings, use that
+		// 1. If user explicitly specified custom models in settings, use them
 		if (Array.isArray(this.options.freeRouterModels) && this.options.freeRouterModels.length > 0) {
-			basePool = [...this.options.freeRouterModels]
-		} else {
-			// 2. Default pool: all active default free models in curated priority order
-			basePool = DEFAULT_FREE_ROUTER_MODELS.map((m) => m.id)
+			const pool = [...this.options.freeRouterModels]
+			if (this.options.apiModelId && this.options.apiModelId.trim()) {
+				const preferred = this.options.apiModelId.trim()
+				return [preferred, ...pool.filter((id) => id !== preferred)]
+			}
+			return pool
+		}
+
+		// 2. Multi-provider free pool: include models from providers where keys are set
+		const pool: string[] = []
+
+		if (this.options.groqApiKey) {
+			pool.push("groq/llama-3.3-70b-versatile", "groq/deepseek-r1-distill-llama-70b", "groq/llama-3.1-8b-instant")
+		}
+
+		if (this.options.cerebrasApiKey) {
+			pool.push("cerebras/llama-3.3-70b", "cerebras/llama3.1-8b")
+		}
+
+		if (this.options.nvidiaApiKey) {
+			pool.push(
+				"nvidia/meta/llama-3.3-70b-instruct",
+				"nvidia/deepseek-ai/deepseek-r1",
+				"nvidia/nvidia/llama-3.1-nemotron-70b-instruct",
+			)
+		}
+
+		if (this.options.sambaNovaApiKey) {
+			pool.push("sambanova/Meta-Llama-3.3-70B-Instruct", "sambanova/DeepSeek-R1-Distill-Llama-70B")
+		}
+
+		if (this.options.geminiApiKey) {
+			pool.push("gemini/gemini-2.5-flash", "gemini/gemini-2.0-flash")
+		}
+
+		// Always include OpenRouter free models as resilient baseline
+		const defaultOpenRouterModels = DEFAULT_FREE_ROUTER_MODELS.filter((m) => m.provider === "openrouter").map(
+			(m) => m.id,
+		)
+		for (const id of defaultOpenRouterModels) {
+			if (!pool.includes(id)) {
+				pool.push(id)
+			}
 		}
 
 		// If user selected a preferred primary model via quick change, prioritize it
 		if (this.options.apiModelId && this.options.apiModelId.trim()) {
 			const preferred = this.options.apiModelId.trim()
-			return [preferred, ...basePool.filter((id) => id !== preferred)]
+			return [preferred, ...pool.filter((id) => id !== preferred)]
 		}
 
-		return basePool
+		return pool
 	}
 
 	/**
@@ -293,14 +395,8 @@ export class FreeRouterHandler extends BaseProvider {
 			let firstChunkYielded = false
 
 			try {
-				// Build an OpenRouterHandler configured for this free model
-				const candidateHandler = new OpenRouterHandler({
-					...this.options,
-					openRouterModelId: candidateModelId,
-					openRouterApiKey: this.apiKey,
-					openRouterBaseUrl: this.options.openRouterBaseUrl || "https://openrouter.ai/api/v1",
-				})
-
+				// Build handler for this candidate (Groq, Cerebras, NVIDIA, SambaNova, Gemini, or OpenRouter)
+				const candidateHandler = this.buildCandidateHandler(candidateModelId)
 				const stream = candidateHandler.createMessage(systemPrompt, messages, metadata)
 				const iterator = stream[Symbol.asyncIterator]()
 

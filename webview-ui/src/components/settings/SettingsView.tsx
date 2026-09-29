@@ -85,6 +85,7 @@ import { WorktreesView } from "../worktrees/WorktreesView"
 import { SettingsSearch } from "./SettingsSearch"
 import { useSearchIndexRegistry, SearchIndexProvider } from "./useSettingsSearch"
 import NormalSettingsView from "./NormalSettingsView"
+import { FreeSettingsView } from "./FreeSettingsView"
 
 export const settingsTabsContainer = "flex flex-col flex-1 overflow-hidden"
 export const settingsTabList =
@@ -703,10 +704,13 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		[handleTabChange],
 	)
 
+	const isFreeMode =
+		!targetSection &&
+		(cachedState.settingsMode === "free" || (cachedState.mode === "free" && !cachedState.settingsMode))
 	const isNormalMode = !targetSection && cachedState.settingsMode === "normal"
 
 	const handleSwitchMode = useCallback(
-		(mode: "normal" | "advanced") => {
+		(mode: "free" | "normal" | "advanced") => {
 			setCachedStateField("settingsMode", mode)
 			vscode.postMessage({
 				type: "updateSettings",
@@ -734,6 +738,17 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					<div className="inline-flex p-0.5 rounded-md bg-vscode-input-background/60 border border-vscode-editorGroup-border/60 ml-2 shrink-0">
 						<button
 							type="button"
+							onClick={() => handleSwitchMode("free")}
+							className={cn(
+								"px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1.5 border-none",
+								isFreeMode
+									? "bg-emerald-500/20 text-emerald-300 font-semibold shadow-xs"
+									: "text-vscode-foreground/60 hover:text-vscode-foreground bg-transparent",
+							)}>
+							<Zap className="w-3 h-3 text-emerald-400" />⚡ Free
+						</button>
+						<button
+							type="button"
 							onClick={() => handleSwitchMode("normal")}
 							className={cn(
 								"px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1.5 border-none",
@@ -741,7 +756,6 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 									? "bg-mirror-brand-via/20 text-mirror-brand-via font-semibold shadow-xs"
 									: "text-vscode-foreground/60 hover:text-vscode-foreground bg-transparent",
 							)}>
-							<Zap className="w-3 h-3" />
 							Normal
 						</button>
 						<button
@@ -749,7 +763,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 							onClick={() => handleSwitchMode("advanced")}
 							className={cn(
 								"px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1.5 border-none",
-								!isNormalMode
+								!isNormalMode && !isFreeMode
 									? "bg-mirror-brand-via/20 text-mirror-brand-via font-semibold shadow-xs"
 									: "text-vscode-foreground/60 hover:text-vscode-foreground bg-transparent",
 							)}>
@@ -759,7 +773,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					</div>
 				</div>
 				<div className="flex items-center gap-2 shrink-0">
-					{!isNormalMode && isIndexingComplete && (
+					{!isNormalMode && !isFreeMode && isIndexingComplete && (
 						<SettingsSearch index={searchIndex} onNavigate={handleSearchNavigate} sections={sections} />
 					)}
 					<StandardTooltip
@@ -782,7 +796,19 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 				</div>
 			</TabHeader>
 
-			{isNormalMode ? (
+			{isFreeMode ? (
+				<TabContent
+					ref={contentRef}
+					className="px-5 py-4 flex-1 overflow-auto"
+					data-testid="free-settings-content">
+					<FreeSettingsView
+						cachedState={cachedState}
+						setCachedStateField={setCachedStateField}
+						setApiConfigurationField={setApiConfigurationField}
+						onSwitchToAdvanced={() => handleSwitchMode("advanced")}
+					/>
+				</TabContent>
+			) : isNormalMode ? (
 				<TabContent
 					ref={contentRef}
 					className="px-5 py-4 flex-1 overflow-auto"
