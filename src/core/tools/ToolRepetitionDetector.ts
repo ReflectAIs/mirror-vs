@@ -44,6 +44,8 @@ export class ToolRepetitionDetector {
 	private previousBaseCommand: string | null = null
 	private consecutiveBaseCommandCount: number = 0
 
+	private recentToolCalls: string[] = []
+
 	/**
 	 * Checks if the current tool call is identical to the previous one
 	 * and determines if execution should be allowed
@@ -67,6 +69,12 @@ export class ToolRepetitionDetector {
 		} else {
 			this.consecutiveIdenticalToolCallCount = 0 // Reset to 0 for a new tool
 			this.previousToolCallJson = currentToolCallJson
+		}
+
+		// Track recent tool calls for cycle detection (e.g. A -> B -> A -> B -> A -> B)
+		this.recentToolCalls.push(currentToolCallJson)
+		if (this.recentToolCalls.length > 8) {
+			this.recentToolCalls.shift()
 		}
 
 		let isPollingOrWaitCommand = false
@@ -109,7 +117,18 @@ export class ToolRepetitionDetector {
 			this.consecutiveIdenticalToolCallLimit > 0 &&
 			this.consecutiveBaseCommandCount >= Math.max(this.consecutiveIdenticalToolCallLimit + 2, 5)
 
-		if (reachedIdenticalLimit || reachedCliLoopLimit) {
+		// Check for alternating 2-step tool loop (A -> B -> A -> B -> A -> B)
+		const n = this.recentToolCalls.length
+		const reachedAlternatingCycle =
+			this.consecutiveIdenticalToolCallLimit > 0 &&
+			n >= 6 &&
+			this.recentToolCalls[n - 1] === this.recentToolCalls[n - 3] &&
+			this.recentToolCalls[n - 3] === this.recentToolCalls[n - 5] &&
+			this.recentToolCalls[n - 2] === this.recentToolCalls[n - 4] &&
+			this.recentToolCalls[n - 4] === this.recentToolCalls[n - 6] &&
+			this.recentToolCalls[n - 1] !== this.recentToolCalls[n - 2]
+
+		if (reachedIdenticalLimit || reachedCliLoopLimit || reachedAlternatingCycle) {
 			const stuckCommand = this.previousBaseCommand || "command"
 
 			// Reset counters to allow recovery if user guides the AI past this point
@@ -117,10 +136,13 @@ export class ToolRepetitionDetector {
 			this.previousToolCallJson = null
 			this.consecutiveBaseCommandCount = 0
 			this.previousBaseCommand = null
+			this.recentToolCalls = []
 
 			const loopDetail = reachedCliLoopLimit
 				? `Repeated CLI execution loop detected for '${stuckCommand}'. If the command requires non-interactive flags (e.g., '--non-interactive' for Firebase), browser authentication, or is stuck waiting for input, please guide the model or provide the required input.`
-				: t("tools:toolRepetitionLimitReached", { toolName: currentToolCallBlock.name })
+				: reachedAlternatingCycle
+					? `Alternating tool repetition loop detected between tools. Please try a different approach.`
+					: t("tools:toolRepetitionLimitReached", { toolName: currentToolCallBlock.name })
 
 			// Return result indicating execution should not be allowed
 			return {

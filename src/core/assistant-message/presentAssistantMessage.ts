@@ -1437,6 +1437,17 @@ async function executeReadBatch(
 		const b = content[i]
 		if (b.type !== "tool_use" || b.partial) break
 		if (!READ_TOOLS.has(b.name as string)) break
+
+		// For blocks after the first block (first was checked prior to executeReadBatch),
+		// run tool repetition check. If repetition limit is reached, stop the batch so the
+		// subsequent block is processed individually and triggers the user prompt.
+		if (i > startIndex) {
+			const repetitionCheck = mirror.toolRepetitionDetector.check(b)
+			if (!repetitionCheck.allowExecution) {
+				break
+			}
+		}
+
 		readBlocks.push({ block: b, toolCallId: (b as any).id as string })
 	}
 

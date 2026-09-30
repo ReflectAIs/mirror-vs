@@ -2,6 +2,22 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.9] - 2026-09-30
+
+### Anti-Repetition & Infinite Loop Protection
+
+- **OpenRouter DeepSeek Model Stabilization**:
+    - Automatically applies `defaultTemperature: 0.3` (instead of 0) and `frequency_penalty: 0.1` to all DeepSeek models (`deepseek/deepseek-v4-flash-0731`, `deepseek-chat`, `deepseek-v3`, etc.) on OpenRouter, preventing greedy sampling degeneration into infinite text and tool loops.
+- **In-Stream Sentence Repetition Detection**:
+    - Real-time sentence and line repetition watchdog in `TaskMainLoop` that monitors assistant streaming output.
+    - Gracefully halts runaway text loops and prompts the user or model to proceed with the next step or attempt completion.
+    - **Markdown Tables & Formatting Exemption**:
+        - Strictly exempts markdown table rows and headers (`|`), table creation formatting (`------`), ASCII borders (`+---+`), divider lines (`---`, `===`, `***`), and code blocks to avoid false positives during legitimate tabular outputs.
+- **Parallel Read Batching Repetition Guard**:
+    - Integrated tool repetition validation into `executeReadBatch` so batched read tools (`read_file`, `search_files`, `list_files`) cannot loop on repeated identical operations.
+- **Alternating Tool Loop Detection**:
+    - Enhanced `ToolRepetitionDetector` to detect 2-step alternating cycles (A ➔ B ➔ A ➔ B ➔ A ➔ B) across turns, preventing cyclic tool execution loops.
+
 ## [0.9.8] - 2026-09-30
 
 ### Settings Page Revamp & Responsive Layout

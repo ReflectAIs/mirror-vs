@@ -20,6 +20,7 @@ import { getEnvironmentDetails } from "../environment/getEnvironmentDetails"
 import { processUserContentMentions } from "../mentions/processUserContentMentions"
 import { presentAssistantMessage } from "../assistant-message"
 import { NativeToolCallParser } from "../assistant-message/NativeToolCallParser"
+import { detectSentenceRepetition } from "../assistant-message/detectSentenceRepetition"
 import { calculateApiCostAnthropic, calculateApiCostOpenAI } from "../../shared/cost"
 import { sanitizeToolUseId } from "../../utils/tool-id"
 import { defaultModeSlug, getModeBySlug } from "../../shared/modes"
@@ -966,6 +967,25 @@ export class TaskMainLoop {
 							assistantMessage +=
 								"\n\n[Response interrupted by a tool use result. Only one tool may be used at a time and should be placed at the end of the message.]"
 							break
+						}
+
+						if (chunk.type === "text" && assistantMessage.length >= 60) {
+							const repetitionCheck = detectSentenceRepetition(assistantMessage)
+							if (repetitionCheck.hasLoop) {
+								console.warn(
+									"[TaskMainLoop] Repetition loop detected in stream, interrupting:",
+									repetitionCheck.repeatedContent,
+								)
+								assistantMessage +=
+									"\n\n[Response interrupted due to repetitive loop detected. Please continue with the next step or use attempt_completion.]"
+								const lastBlock =
+									this.task.assistantMessageContent[this.task.assistantMessageContent.length - 1]
+								if (lastBlock?.type === "text") {
+									lastBlock.content = assistantMessage
+								}
+								presentAssistantMessage(this.task)
+								break
+							}
 						}
 					}
 

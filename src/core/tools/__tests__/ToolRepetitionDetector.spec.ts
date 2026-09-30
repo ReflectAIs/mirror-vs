@@ -566,5 +566,23 @@ describe("ToolRepetitionDetector", () => {
 			expect(result.allowExecution).toBe(false)
 			expect(result.askUser?.messageDetail).toContain("firebase")
 		})
+
+		it("should detect alternating 2-tool loops (A -> B -> A -> B -> A -> B)", () => {
+			const detector = new ToolRepetitionDetector(3)
+			const toolA = createToolUse("read_file", "read_file", { path: "src/a.ts" })
+			const toolB = createToolUse("read_file", "read_file", { path: "src/b.ts" })
+
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+			expect(detector.check(toolA).allowExecution).toBe(true)
+
+			// 6th call completes the 3rd A-B cycle and should be blocked
+			const result = detector.check(toolB)
+			expect(result.allowExecution).toBe(false)
+			expect(result.askUser).toBeDefined()
+			expect(result.askUser?.messageDetail).toContain("Alternating tool repetition loop detected")
+		})
 	})
 })

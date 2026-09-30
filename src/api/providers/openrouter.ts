@@ -308,6 +308,7 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 			messages: openAiMessages,
 			stream: true,
 			stream_options: { include_usage: true },
+			...(modelId.toLowerCase().includes("deepseek") && { frequency_penalty: 0.1 }),
 			// Only include provider if openRouterSpecificProvider is not "[default]".
 			...(this.options.openRouterSpecificProvider &&
 				this.options.openRouterSpecificProvider !== OPENROUTER_DEFAULT_PROVIDER_NAME && {
@@ -525,13 +526,14 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 		info = applyRouterToolPreferences(id, info)
 
 		const isDeepSeekR1 = id.startsWith("deepseek/deepseek-r1") || id === "perplexity/sonar-reasoning"
+		const isDeepSeek = id.toLowerCase().includes("deepseek") || isDeepSeekR1
 
 		const params = getModelParams({
 			format: "openrouter",
 			modelId: id,
 			model: info,
 			settings: this.options,
-			defaultTemperature: isDeepSeekR1 ? DEEP_SEEK_DEFAULT_TEMPERATURE : 0,
+			defaultTemperature: isDeepSeek ? DEEP_SEEK_DEFAULT_TEMPERATURE : 0,
 		})
 
 		return { id, info, topP: isDeepSeekR1 ? 0.95 : undefined, ...params }
@@ -546,6 +548,7 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 			temperature,
 			messages: [{ role: "user", content: prompt }],
 			stream: false,
+			...(modelId.toLowerCase().includes("deepseek") && { frequency_penalty: 0.1 }),
 			// Only include provider if openRouterSpecificProvider is not "[default]".
 			...(this.options.openRouterSpecificProvider &&
 				this.options.openRouterSpecificProvider !== OPENROUTER_DEFAULT_PROVIDER_NAME && {
