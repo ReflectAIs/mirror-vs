@@ -316,21 +316,21 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 
 	return (
 		<div className="space-y-6 max-w-2xl mx-auto pb-8">
-			{/* Normal Mode Banner */}
+			{/* Simple Settings Banner */}
 			<div className="p-3.5 rounded-lg bg-vscode-sideBar-background/60 border border-vscode-editorGroup-border/60 flex items-center justify-between gap-3 shadow-sm">
 				<div className="flex items-center gap-2.5">
-					<div className="w-8 h-8 rounded-md bg-mirror-brand-via/15 flex items-center justify-center text-mirror-brand-via shrink-0">
+					<div className="w-8 h-8 rounded-md bg-blue-500/15 flex items-center justify-center text-blue-400 shrink-0">
 						<Sparkles className="w-4 h-4" />
 					</div>
 					<div>
 						<div className="text-xs font-semibold text-vscode-foreground flex items-center gap-1.5">
-							Normal Setup Mode
-							<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-mirror-brand-via/20 text-mirror-brand-via font-mono">
-								Streamlined
+							Simple Settings
+							<span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
+								Essentials only
 							</span>
 						</div>
 						<div className="text-[11px] text-vscode-descriptionForeground">
-							Clean essentials with recommended safety and behavior defaults.
+							Your provider, safety level, and the settings that matter most — nothing else.
 						</div>
 					</div>
 				</div>
@@ -340,7 +340,7 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 					className="h-7 text-xs px-2.5 shrink-0 gap-1"
 					onClick={onSwitchToAdvanced}>
 					<SlidersHorizontal className="w-3 h-3" />
-					Advanced Mode
+					All Settings
 				</Button>
 			</div>
 
@@ -711,16 +711,16 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 				</div>
 			</div>
 
-			{/* Section 5: Need Deeper Control? Callout */}
+			{/* Bottom: Advanced Settings Callout */}
 			<div className="p-4 rounded-lg border border-dashed border-vscode-editorGroup-border/80 bg-vscode-sideBar-background/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<div className="space-y-1">
 					<div className="text-xs font-semibold text-vscode-foreground flex items-center gap-1.5">
-						<SlidersHorizontal className="w-3.5 h-3.5 text-mirror-brand-via" />
-						Need Advanced Settings?
+						<SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
+						Want full control?
 					</div>
 					<p className="text-[11px] text-vscode-descriptionForeground m-0 max-w-md leading-relaxed">
-						Switch to Advanced Mode to configure MCP servers, custom prompts, slash commands, custom
-						terminal integration, image generation pipelines, and all 20+ LLM providers.
+						Advanced Settings gives you complete control over every aspect of Mirror — MCP servers, custom
+						prompts, slash commands, terminal integration, image pipelines, and all 20+ providers.
 					</p>
 				</div>
 				<Button

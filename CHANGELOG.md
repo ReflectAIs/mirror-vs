@@ -2,6 +2,19 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.8] - 2026-09-30
+
+### Settings Page Revamp & Responsive Layout
+
+- **Three Distinct Settings Modes**:
+    - **⚡ Free Mode**: Clean, streamlined view for zero-cost AI models. Features a compact Provider API Keys section with auto-save and masked inputs, followed by a dynamic, collapsible Model Pool grouped by provider. Completely eliminated redundant duplicate model selection dropdowns.
+    - **Simple Mode**: Redesigned essential settings view (renamed from "Normal") focusing purely on daily driver essentials — primary API keys, default model choice, sound effects, and telemetry — without visual overwhelm.
+    - **Advanced Mode**: Full granular control across all 16 configuration sections (Telemetry, System Prompts, Context, Terminal, Features, Browser, etc.).
+- **Header & Responsive Sidebar Improvements**:
+    - Clean, modern header with a sleek 3-way segmented mode switch (⚡ Free | Simple | Advanced) and prominent Done/Save actions.
+    - Responsive Advanced sidebar: smoothly collapses to an icon-only navigation bar with native tooltip labels when panel width is narrow (< 320px), preventing text wrapping or layout overflow.
+    - Improved responsive padding and layout resilience for narrow panels across all three modes.
+
 ## [0.9.7] - 2026-09-29
 
 ### Free Models Resilient Auto-Failover & Multi-Provider Routing

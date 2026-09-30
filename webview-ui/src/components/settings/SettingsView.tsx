@@ -87,13 +87,13 @@ import { useSearchIndexRegistry, SearchIndexProvider } from "./useSettingsSearch
 import NormalSettingsView from "./NormalSettingsView"
 import { FreeSettingsView } from "./FreeSettingsView"
 
-export const settingsTabsContainer = "flex flex-col flex-1 overflow-hidden"
+export const settingsTabsContainer = "flex flex-row flex-1 overflow-hidden"
 export const settingsTabList =
-	"flex-shrink-0 flex flex-row overflow-x-auto overflow-y-hidden border-b border-vscode-editorGroup-border/50 bg-vscode-sideBar-background/40 backdrop-blur-md py-1.5 px-2 gap-1.5 w-full scrollbar-none [&_.tab-label]:hidden"
+	"flex-shrink-0 flex flex-col overflow-y-auto overflow-x-hidden border-r border-vscode-editorGroup-border/50 bg-vscode-sideBar-background/50 backdrop-blur-md py-2 px-1.5 gap-0.5 scrollbar-none transition-all duration-200"
 export const settingsTabTrigger =
-	"whitespace-nowrap overflow-hidden h-8 w-8 rounded-md flex items-center justify-center text-vscode-foreground opacity-70 hover:opacity-100 hover:bg-vscode-list-hoverBackground transition-all duration-150 cursor-pointer"
+	"w-full px-2.5 h-8 rounded-md flex items-center gap-2.5 text-vscode-foreground opacity-60 hover:opacity-100 hover:bg-vscode-list-hoverBackground transition-all duration-150 cursor-pointer text-left text-[12px] overflow-hidden"
 export const settingsTabTriggerActive =
-	"opacity-100 font-semibold bg-gradient-to-b from-mirror-brand-from/15 to-mirror-brand-to/5 border-b-2 border-mirror-brand-via shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
+	"opacity-100 font-semibold bg-gradient-to-r from-mirror-brand-from/20 to-mirror-brand-to/5 border-l-2 border-mirror-brand-via shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] text-vscode-foreground"
 
 export interface SettingsViewRef {
 	checkUnsaveChanges: (then: () => void) => void
@@ -555,26 +555,19 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		Object.fromEntries(sectionNames.map((name) => [name, null])) as Record<SectionName, HTMLButtonElement | null>,
 	)
 
-	// Track whether we're in compact mode
-	const [isCompactMode, setIsCompactMode] = useState(false)
+	// Responsive sidebar — collapses to icon-only when container < 260px
+	const [isNarrow, setIsNarrow] = useState(false)
 	const containerRef = useRef<HTMLDivElement>(null)
 
-	// Setup resize observer to detect when we should switch to compact mode
 	useEffect(() => {
 		if (!containerRef.current) return
-
 		const observer = new ResizeObserver((entries) => {
 			for (const entry of entries) {
-				// If container width is less than 500px, switch to compact mode
-				setIsCompactMode(entry.contentRect.width < 500)
+				setIsNarrow(entry.contentRect.width < 320)
 			}
 		})
-
 		observer.observe(containerRef.current)
-
-		return () => {
-			observer?.disconnect()
-		}
+		return () => observer.disconnect()
 	}, [])
 
 	const sections: { id: SectionName; icon: LucideIcon }[] = useMemo(
@@ -707,7 +700,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const isFreeMode =
 		!targetSection &&
 		(cachedState.settingsMode === "free" || (cachedState.mode === "free" && !cachedState.settingsMode))
-	const isNormalMode = !targetSection && cachedState.settingsMode === "normal"
+	// "normal" in storage = "Simple Settings" view (stored value stays "normal" for backward compat)
+	const isSimpleMode = !targetSection && cachedState.settingsMode === "normal"
 
 	const handleSwitchMode = useCallback(
 		(mode: "free" | "normal" | "advanced") => {
@@ -724,56 +718,74 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 
 	return (
 		<Tab>
-			<TabHeader className="flex justify-between items-center gap-2">
-				<div className="flex items-center gap-2 grow">
+			{/* ── Header ── */}
+			<TabHeader className="flex items-center justify-between gap-2 px-3 py-1.5 min-h-[40px]">
+				{/* Left: back + title */}
+				<div className="flex items-center gap-1.5 min-w-0">
 					<StandardTooltip content={t("settings:header.doneButtonTooltip")}>
-						<Button variant="ghost" className="px-1.5 -ml-2" onClick={() => checkUnsaveChanges(onDone)}>
-							<ArrowLeft />
-							<span className="sr-only">{t("settings:common.done")}</span>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="px-1 h-7 shrink-0"
+							onClick={() => checkUnsaveChanges(onDone)}>
+							<ArrowLeft className="w-4 h-4" />
 						</Button>
 					</StandardTooltip>
-					<h3 className="text-vscode-foreground m-0 flex-shrink-0">{t("settings:header.title")}</h3>
-
-					{/* Mode Switcher Pill */}
-					<div className="inline-flex p-0.5 rounded-md bg-vscode-input-background/60 border border-vscode-editorGroup-border/60 ml-2 shrink-0">
-						<button
-							type="button"
-							onClick={() => handleSwitchMode("free")}
-							className={cn(
-								"px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1.5 border-none",
-								isFreeMode
-									? "bg-emerald-500/20 text-emerald-300 font-semibold shadow-xs"
-									: "text-vscode-foreground/60 hover:text-vscode-foreground bg-transparent",
-							)}>
-							<Zap className="w-3 h-3 text-emerald-400" />⚡ Free
-						</button>
-						<button
-							type="button"
-							onClick={() => handleSwitchMode("normal")}
-							className={cn(
-								"px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1.5 border-none",
-								isNormalMode
-									? "bg-mirror-brand-via/20 text-mirror-brand-via font-semibold shadow-xs"
-									: "text-vscode-foreground/60 hover:text-vscode-foreground bg-transparent",
-							)}>
-							Normal
-						</button>
-						<button
-							type="button"
-							onClick={() => handleSwitchMode("advanced")}
-							className={cn(
-								"px-2.5 py-0.5 text-xs font-medium rounded transition-all cursor-pointer flex items-center gap-1.5 border-none",
-								!isNormalMode && !isFreeMode
-									? "bg-mirror-brand-via/20 text-mirror-brand-via font-semibold shadow-xs"
-									: "text-vscode-foreground/60 hover:text-vscode-foreground bg-transparent",
-							)}>
-							<SlidersHorizontal className="w-3 h-3" />
-							Advanced
-						</button>
-					</div>
+					<span className="text-[13px] font-semibold text-vscode-foreground whitespace-nowrap">
+						{t("settings:header.title")}
+					</span>
 				</div>
-				<div className="flex items-center gap-2 shrink-0">
-					{!isNormalMode && !isFreeMode && isIndexingComplete && (
+
+				{/* Centre: 3-way mode toggle */}
+				<div className="flex items-center gap-0.5 px-0.5 py-0.5 rounded-lg bg-vscode-input-background border border-vscode-editorGroup-border/60 shrink-0">
+					{/* Free */}
+					<button
+						type="button"
+						onClick={() => handleSwitchMode("free")}
+						title="Free AI Mode — use the extension for free with rate-limited providers"
+						className={cn(
+							"h-6 px-2.5 text-[11px] font-medium rounded-md transition-all duration-150 cursor-pointer flex items-center gap-1 border-none leading-none whitespace-nowrap",
+							isFreeMode
+								? "bg-emerald-500/25 text-emerald-300 font-semibold"
+								: "text-vscode-foreground/45 hover:text-vscode-foreground/70 bg-transparent",
+						)}>
+						<Zap className="w-3 h-3" />
+						Free
+					</button>
+					<div className="w-px h-4 bg-vscode-editorGroup-border/40" />
+					{/* Simple */}
+					<button
+						type="button"
+						onClick={() => handleSwitchMode("normal")}
+						title="Simple Settings — essential settings without the clutter"
+						className={cn(
+							"h-6 px-2.5 text-[11px] font-medium rounded-md transition-all duration-150 cursor-pointer flex items-center gap-1 border-none leading-none whitespace-nowrap",
+							isSimpleMode
+								? "bg-blue-500/20 text-blue-300 font-semibold"
+								: "text-vscode-foreground/45 hover:text-vscode-foreground/70 bg-transparent",
+						)}>
+						Simple
+					</button>
+					<div className="w-px h-4 bg-vscode-editorGroup-border/40" />
+					{/* Advanced */}
+					<button
+						type="button"
+						onClick={() => handleSwitchMode("advanced")}
+						title="Advanced Settings — full control over all extension settings"
+						className={cn(
+							"h-6 px-2.5 text-[11px] font-medium rounded-md transition-all duration-150 cursor-pointer flex items-center gap-1 border-none leading-none whitespace-nowrap",
+							!isSimpleMode && !isFreeMode
+								? "bg-purple-500/20 text-purple-300 font-semibold"
+								: "text-vscode-foreground/45 hover:text-vscode-foreground/70 bg-transparent",
+						)}>
+						<SlidersHorizontal className="w-3 h-3" />
+						Advanced
+					</button>
+				</div>
+
+				{/* Right: search + save */}
+				<div className="flex items-center gap-1.5 shrink-0">
+					{!isSimpleMode && !isFreeMode && isIndexingComplete && (
 						<SettingsSearch index={searchIndex} onNavigate={handleSearchNavigate} sections={sections} />
 					)}
 					<StandardTooltip
@@ -786,7 +798,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						}>
 						<Button
 							variant={isSettingValid ? "primary" : "secondary"}
-							className={!isSettingValid ? "!border-vscode-errorForeground" : ""}
+							size="sm"
+							className={cn("h-7", !isSettingValid && "!border-vscode-errorForeground")}
 							onClick={handleSubmit}
 							disabled={!isChangeDetected || !isSettingValid}
 							data-testid="save-button">
@@ -799,7 +812,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 			{isFreeMode ? (
 				<TabContent
 					ref={contentRef}
-					className="px-5 py-4 flex-1 overflow-auto"
+					className="px-4 py-4 flex-1 overflow-auto"
 					data-testid="free-settings-content">
 					<FreeSettingsView
 						cachedState={cachedState}
@@ -808,11 +821,11 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						onSwitchToAdvanced={() => handleSwitchMode("advanced")}
 					/>
 				</TabContent>
-			) : isNormalMode ? (
+			) : isSimpleMode ? (
 				<TabContent
 					ref={contentRef}
-					className="px-5 py-4 flex-1 overflow-auto"
-					data-testid="normal-settings-content">
+					className="px-4 py-4 flex-1 overflow-auto"
+					data-testid="simple-settings-content">
 					<NormalSettingsView
 						cachedState={cachedState}
 						setCachedStateField={setCachedStateField}
@@ -822,61 +835,50 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					/>
 				</TabContent>
 			) : (
-				/* Vertical tabs layout */
-				<div ref={containerRef} className={cn(settingsTabsContainer, isCompactMode && "narrow")}>
-					{/* Tab sidebar */}
+				/* Advanced: left sidebar + scrollable content */
+				<div ref={containerRef} className={cn(settingsTabsContainer)}>
+					{/* Left sidebar — responsive: collapses to icon-only when narrow */}
 					<TabList
 						value={activeTab}
 						onValueChange={(value) => handleTabChange(value as SectionName)}
-						className={cn(settingsTabList)}
-						data-compact={isCompactMode}
+						className={cn(settingsTabList, isNarrow ? "w-10 min-w-[40px] px-1" : "w-[152px] min-w-[152px]")}
 						data-testid="settings-tab-list">
 						{sections.map(({ id, icon: Icon }) => {
 							const isSelected = id === activeTab
-							const onSelect = () => handleTabChange(id)
+							const label = t(`settings:sections.${id}`)
 
-							// Base TabTrigger component definition
-							// We pass isSelected manually for styling, but onSelect is handled conditionally
-							const triggerComponent = (
+							const trigger = (
 								<TabTrigger
+									key={id}
 									ref={(element) => (tabRefs.current[id] = element)}
 									value={id}
-									isSelected={isSelected} // Pass manually for styling state
+									isSelected={isSelected}
 									className={cn(
-										isSelected // Use manual isSelected for styling
+										isSelected
 											? `${settingsTabTrigger} ${settingsTabTriggerActive}`
 											: settingsTabTrigger,
-										"cursor-pointer focus:ring-0", // Remove the focus ring styling
+										"cursor-pointer focus:ring-0",
+										isNarrow && "justify-center px-0",
 									)}
-									data-testid={`tab-${id}`}
-									data-compact={isCompactMode}>
-									<div className={cn("flex items-center gap-2", isCompactMode && "justify-center")}>
-										<Icon className="w-4 h-4" />
-										<span className="tab-label">{t(`settings:sections.${id}`)}</span>
-									</div>
+									data-testid={`tab-${id}`}>
+									<Icon className="w-3.5 h-3.5 shrink-0" />
+									{!isNarrow && <span className="truncate">{label}</span>}
 								</TabTrigger>
 							)
 
-							if (isCompactMode) {
-								// Wrap in Tooltip and manually add onClick to the trigger
+							if (isNarrow) {
 								return (
-									<TooltipProvider key={id} delayDuration={300}>
+									<TooltipProvider key={id} delayDuration={400}>
 										<Tooltip>
-											<TooltipTrigger asChild onClick={onSelect}>
-												{/* Clone to avoid ref issues if triggerComponent itself had a key */}
-												{React.cloneElement(triggerComponent)}
-											</TooltipTrigger>
-											<TooltipContent side="right" className="text-base">
-												<p className="m-0">{t(`settings:sections.${id}`)}</p>
+											<TooltipTrigger asChild>{trigger}</TooltipTrigger>
+											<TooltipContent side="right" className="text-xs">
+												{label}
 											</TooltipContent>
 										</Tooltip>
 									</TooltipProvider>
 								)
-							} else {
-								// Render trigger directly; TabList will inject onSelect via cloning
-								// Ensure the element passed to TabList has the key
-								return React.cloneElement(triggerComponent, { key: id })
 							}
+							return trigger
 						})}
 					</TabList>
 

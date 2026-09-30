@@ -7,39 +7,25 @@ import {
 	Check,
 	Sparkles,
 	SlidersHorizontal,
-	Bot,
-	ArrowRight,
-	ShieldCheck,
-	Cpu,
-	Flame,
-	Layers,
-	Globe,
-	Laptop,
-	RotateCcw,
 	CheckCircle2,
+	Circle,
+	Key,
+	ChevronDown,
+	ChevronUp,
 } from "lucide-react"
 
 import {
 	type ProviderName,
 	type ProviderSettings,
 	freeRouterDefaultModelId,
-	nvidiaDefaultModelId,
-	groqDefaultModelId,
-	cerebrasDefaultModelId,
-	sambaNovaDefaultModelId,
-	geminiDefaultModelId,
-	DEFAULT_FREE_ROUTER_MODELS,
 	getAvailableFreeRouterModels,
 	getSelectedFreeRouterModels,
-	getFreeRouterActiveModelName,
-	type FreeRouterModelEntry,
 } from "@mirror-vs/types"
 
 import { ExtensionStateContextType } from "@src/context/ExtensionStateContext"
 import { cn } from "@src/lib/utils"
 import { Button } from "@src/components/ui"
 import { VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
-import { Checkbox } from "vscrui"
 import { SetCachedStateField } from "./types"
 import { vscode } from "@src/utils/vscode"
 
@@ -54,137 +40,96 @@ interface FreeSettingsViewProps {
 	onSwitchToAdvanced: () => void
 }
 
-interface FreeProviderItem {
+interface ProviderEntry {
 	id: ProviderName
 	name: string
-	badge: string
-	icon: React.ReactNode
-	description: string
-	keyUrl?: string
-	keyLabel?: string
-	keyField?: keyof ProviderSettings
-	defaultModel: string
-	models: Array<{ id: string; label: string; tag?: string }>
+	keyField: keyof ProviderSettings
+	keyUrl: string
+	keyLabel: string
+	keyPlaceholder: string
+	accentColor: string
 }
 
-const FREE_PROVIDERS_CONFIG: FreeProviderItem[] = [
+const PROVIDER_ENTRIES: ProviderEntry[] = [
 	{
 		id: "groq",
 		name: "Groq",
-		badge: "Ultra-Fast LPU (Free Tier)",
-		icon: <Flame className="w-4 h-4 text-orange-400" />,
-		description: "High-speed inference on Meta Llama 3.3 70B & DeepSeek R1 Distill on specialized LPUs.",
-		keyUrl: "https://console.groq.com/keys",
-		keyLabel: "Get Free Groq Key",
 		keyField: "groqApiKey",
-		defaultModel: groqDefaultModelId,
-		models: [
-			{ id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile", tag: "Recommended" },
-			{ id: "deepseek-r1-distill-llama-70b", label: "DeepSeek R1 Distill 70B", tag: "Reasoning" },
-			{ id: "llama-3.1-8b-instant", label: "Llama 3.1 8B Instant", tag: "Fast" },
-		],
+		keyUrl: "https://console.groq.com/keys",
+		keyLabel: "Get Free Key",
+		keyPlaceholder: "gsk_...",
+		accentColor: "orange",
 	},
 	{
 		id: "cerebras",
 		name: "Cerebras",
-		badge: "Wafer-Scale Speed (~2000 tps)",
-		icon: <Cpu className="w-4 h-4 text-cyan-400" />,
-		description: "Blazing fast wafer-scale engine inference on Meta Llama 3.3 70B with free daily quota.",
-		keyUrl: "https://cloud.cerebras.ai",
-		keyLabel: "Get Free Cerebras Key",
 		keyField: "cerebrasApiKey",
-		defaultModel: cerebrasDefaultModelId,
-		models: [
-			{ id: "llama-3.3-70b", label: "Llama 3.3 70B", tag: "Fastest 70B" },
-			{ id: "llama3.1-8b", label: "Llama 3.1 8B", tag: "Instant" },
-		],
+		keyUrl: "https://cloud.cerebras.ai",
+		keyLabel: "Get Free Key",
+		keyPlaceholder: "csk_...",
+		accentColor: "cyan",
 	},
 	{
 		id: "nvidia",
 		name: "NVIDIA NIM",
-		badge: "1,000 Free Trial Credits",
-		icon: <Sparkles className="w-4 h-4 text-green-400" />,
-		description:
-			"Enterprise NVIDIA DGX Cloud hosting Nemotron 70B, Llama 3.3, and full DeepSeek R1. Requires verified developer account on build.nvidia.com for public inference; Free Auto-Router auto-fails over if unverified.",
-		keyUrl: "https://build.nvidia.com",
-		keyLabel: "Get Free NVIDIA Key",
 		keyField: "nvidiaApiKey",
-		defaultModel: nvidiaDefaultModelId,
-		models: [
-			{ id: "meta/llama-3.3-70b-instruct", label: "Meta Llama 3.3 70B Instruct", tag: "Recommended" },
-			{ id: "deepseek-ai/deepseek-r1", label: "DeepSeek R1 (671B Full)", tag: "Reasoning" },
-			{ id: "nvidia/llama-3.1-nemotron-70b-instruct", label: "Nemotron 70B Instruct", tag: "Coding" },
-		],
+		keyUrl: "https://build.nvidia.com",
+		keyLabel: "Get Free Key",
+		keyPlaceholder: "nvapi-...",
+		accentColor: "green",
 	},
 	{
 		id: "gemini",
 		name: "Google Gemini",
-		badge: "1M Context Window (Free Tier)",
-		icon: <Globe className="w-4 h-4 text-blue-400" />,
-		description: "Google's Gemini 2.5 Flash with massive 1M token context, multimodal vision, and high speed.",
-		keyUrl: "https://aistudio.google.com/app/apikey",
-		keyLabel: "Get Free Gemini Key",
 		keyField: "geminiApiKey",
-		defaultModel: geminiDefaultModelId,
-		models: [
-			{ id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tag: "1M Context" },
-			{ id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", tag: "Fast" },
-		],
+		keyUrl: "https://aistudio.google.com/app/apikey",
+		keyLabel: "Get Free Key",
+		keyPlaceholder: "AIza...",
+		accentColor: "blue",
 	},
 	{
 		id: "sambanova",
 		name: "SambaNova",
-		badge: "SN40L Cloud (Free Tier)",
-		icon: <Layers className="w-4 h-4 text-purple-400" />,
-		description: "High-throughput cloud inference on Llama 3.3 70B and DeepSeek R1 running on SambaNova RDUs.",
-		keyUrl: "https://cloud.sambanova.ai/apis",
-		keyLabel: "Get Free SambaNova Key",
 		keyField: "sambaNovaApiKey",
-		defaultModel: sambaNovaDefaultModelId,
-		models: [
-			{ id: "Meta-Llama-3.3-70B-Instruct", label: "Llama 3.3 70B Instruct", tag: "Recommended" },
-			{ id: "DeepSeek-R1-Distill-Llama-70B", label: "DeepSeek R1 Distill", tag: "Reasoning" },
-		],
+		keyUrl: "https://cloud.sambanova.ai/apis",
+		keyLabel: "Get Free Key",
+		keyPlaceholder: "snova_...",
+		accentColor: "purple",
 	},
 	{
 		id: "openrouter",
-		name: "OpenRouter (Free Tier)",
-		badge: "10+ Zero-Cost Models",
-		icon: <Bot className="w-4 h-4 text-emerald-400" />,
-		description: "OpenRouter's free-tier pool featuring Gemma 4 31B, Qwen 3.8 27B, Cohere Code, and Nemotron.",
-		keyUrl: "https://openrouter.ai/keys",
-		keyLabel: "Get OpenRouter Key",
+		name: "OpenRouter",
 		keyField: "openRouterApiKey",
-		defaultModel: "google/gemma-4-31b-it:free",
-		models: [
-			{ id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B (Free)", tag: "Recommended" },
-			{ id: "qwen/qwen3.8-27b:free", label: "Qwen 3.8 27B (Free)", tag: "Coding" },
-			{ id: "cohere/north-mini-code:free", label: "Cohere North Mini Code (Free)", tag: "Fast" },
-			{ id: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "Nemotron 3 Ultra 550B (Free)", tag: "1M Context" },
-		],
-	},
-	{
-		id: "ollama",
-		name: "Ollama (Local AI)",
-		badge: "100% Free & Offline",
-		icon: <Laptop className="w-4 h-4 text-amber-400" />,
-		description: "Run open models completely locally on your hardware with 0 API fees and maximum privacy.",
-		keyUrl: "https://ollama.ai",
-		keyLabel: "Download Ollama",
-		defaultModel: "qwen2.5-coder:latest",
-		models: [
-			{ id: "qwen2.5-coder:latest", label: "Qwen 2.5 Coder", tag: "Local Code" },
-			{ id: "deepseek-r1:latest", label: "DeepSeek R1 Local", tag: "Reasoning" },
-			{ id: "llama3.2:latest", label: "Llama 3.2", tag: "General" },
-		],
+		keyUrl: "https://openrouter.ai/keys",
+		keyLabel: "Get Key",
+		keyPlaceholder: "sk-or-...",
+		accentColor: "emerald",
 	},
 ]
 
-function getRouterModelId(providerId: ProviderName, modelId: string): string {
-	if (providerId === "openrouter" || providerId === "free-router" || providerId === "ollama") {
-		return modelId
-	}
-	return `${providerId}/${modelId}`
+const ACCENT_CLASSES: Record<string, { dot: string; badge: string; ring: string }> = {
+	orange: {
+		dot: "bg-orange-400",
+		badge: "bg-orange-500/15 text-orange-300 border-orange-500/30",
+		ring: "ring-orange-500/20",
+	},
+	cyan: { dot: "bg-cyan-400", badge: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30", ring: "ring-cyan-500/20" },
+	green: {
+		dot: "bg-green-400",
+		badge: "bg-green-500/15 text-green-300 border-green-500/30",
+		ring: "ring-green-500/20",
+	},
+	blue: { dot: "bg-blue-400", badge: "bg-blue-500/15 text-blue-300 border-blue-500/30", ring: "ring-blue-500/20" },
+	purple: {
+		dot: "bg-purple-400",
+		badge: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+		ring: "ring-purple-500/20",
+	},
+	emerald: {
+		dot: "bg-emerald-400",
+		badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+		ring: "ring-emerald-500/20",
+	},
 }
 
 export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
@@ -194,34 +139,24 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 	onSwitchToAdvanced,
 }) => {
 	const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
+	const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({})
 
 	const toggleKeyVisibility = useCallback((id: string) => {
 		setVisibleKeys((prev) => ({ ...prev, [id]: !prev[id] }))
 	}, [])
 
 	const apiConfig = cachedState.apiConfiguration ?? {}
-	const currentProvider = apiConfig.apiProvider || "free-router"
-	const isAutoRouterActive = currentProvider === "free-router"
+	const isAutoRouterActive = apiConfig.apiProvider === "free-router"
 
-	// Count configured free keys
-	const configuredKeysCount = useMemo(() => {
-		let count = 0
-		if (apiConfig.groqApiKey) count++
-		if (apiConfig.cerebrasApiKey) count++
-		if (apiConfig.nvidiaApiKey) count++
-		if (apiConfig.geminiApiKey) count++
-		if (apiConfig.sambaNovaApiKey) count++
-		if (apiConfig.openRouterApiKey || apiConfig.freeRouterApiKey) count++
-		return count
+	const configuredCount = useMemo(() => {
+		return PROVIDER_ENTRIES.filter((p) => {
+			const val = apiConfig[p.keyField] as string | undefined
+			return !!val?.trim()
+		}).length
 	}, [apiConfig])
 
-	const availableModels = useMemo(() => {
-		return getAvailableFreeRouterModels(apiConfig)
-	}, [apiConfig])
-
-	const selectedModels = useMemo(() => {
-		return getSelectedFreeRouterModels(apiConfig)
-	}, [apiConfig])
+	const availableModels = useMemo(() => getAvailableFreeRouterModels(apiConfig), [apiConfig])
+	const selectedModels = useMemo(() => getSelectedFreeRouterModels(apiConfig), [apiConfig])
 
 	const handleToggleModel = useCallback(
 		(modelId: string, checked: boolean) => {
@@ -230,8 +165,6 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 				: selectedModels.filter((id) => id !== modelId)
 
 			setApiConfigurationField("freeRouterModels", updated)
-
-			const nextApiModelId = !checked && apiConfig.apiModelId === modelId ? "" : apiConfig.apiModelId
 			if (!checked && apiConfig.apiModelId === modelId) {
 				setApiConfigurationField("apiModelId", "")
 			}
@@ -242,7 +175,7 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 				apiConfiguration: {
 					...apiConfig,
 					freeRouterModels: updated,
-					apiModelId: nextApiModelId,
+					apiModelId: !checked && apiConfig.apiModelId === modelId ? "" : apiConfig.apiModelId,
 				},
 			})
 		},
@@ -255,10 +188,7 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 		vscode.postMessage({
 			type: "upsertApiConfiguration",
 			text: cachedState.currentApiConfigName,
-			apiConfiguration: {
-				...apiConfig,
-				freeRouterModels: allIds,
-			},
+			apiConfiguration: { ...apiConfig, freeRouterModels: allIds },
 		})
 	}, [availableModels, apiConfig, cachedState.currentApiConfigName, setApiConfigurationField])
 
@@ -268,318 +198,323 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 		vscode.postMessage({
 			type: "upsertApiConfiguration",
 			text: cachedState.currentApiConfigName,
-			apiConfiguration: {
-				...apiConfig,
-				freeRouterModels: [],
-				apiModelId: "",
-			},
+			apiConfiguration: { ...apiConfig, freeRouterModels: [], apiModelId: "" },
 		})
 	}, [apiConfig, cachedState.currentApiConfigName, setApiConfigurationField])
-
-	const handleActivateProvider = useCallback(
-		(providerId: ProviderName, defaultModel: string) => {
-			const cleanModel = defaultModel
-				.replace(/^groq\//, "")
-				.replace(/^cerebras\//, "")
-				.replace(/^nvidia\//, "")
-				.replace(/^sambanova\//, "")
-				.replace(/^gemini\//, "")
-
-			setApiConfigurationField("apiProvider", providerId)
-			setApiConfigurationField("apiModelId", cleanModel)
-
-			// Persist immediately via upsertApiConfiguration
-			vscode.postMessage({
-				type: "upsertApiConfiguration",
-				text: cachedState.currentApiConfigName,
-				apiConfiguration: {
-					...apiConfig,
-					apiProvider: providerId,
-					apiModelId: cleanModel,
-				},
-			})
-		},
-		[apiConfig, cachedState.currentApiConfigName, setApiConfigurationField],
-	)
 
 	const handleActivateAutoRouter = useCallback(() => {
 		setApiConfigurationField("apiProvider", "free-router")
 		setApiConfigurationField("apiModelId", freeRouterDefaultModelId)
-
 		vscode.postMessage({
 			type: "upsertApiConfiguration",
 			text: cachedState.currentApiConfigName,
-			apiConfiguration: {
-				...apiConfig,
-				apiProvider: "free-router",
-				apiModelId: freeRouterDefaultModelId,
-			},
+			apiConfiguration: { ...apiConfig, apiProvider: "free-router", apiModelId: freeRouterDefaultModelId },
 		})
 	}, [apiConfig, cachedState.currentApiConfigName, setApiConfigurationField])
 
-	return (
-		<div className="flex flex-col gap-6 max-w-4xl mx-auto py-2 px-1">
-			{/* Hero Banner */}
-			<div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-transparent border border-emerald-500/30 p-5">
-				<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-					<div>
-						<div className="flex items-center gap-2 mb-1.5">
-							<span className="px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/40">
-								⚡ Free AI Mode
-							</span>
-							<span className="text-xs text-vscode-descriptionForeground">
-								Zero API Cost • Auto Multi-Model Failover
-							</span>
-						</div>
-						<h2 className="text-lg font-bold text-vscode-foreground m-0">
-							Free Tier AI Providers & Models
-						</h2>
-						<p className="text-xs text-vscode-descriptionForeground mt-1 max-w-xl">
-							Add free API keys from any provider below to start coding with zero costs. Mirror VS
-							automatically routes requests and recovers seamlessly if any model encounters rate limits or
-							connection drops.
-						</p>
-					</div>
+	const groupedAvailableModels = useMemo(() => {
+		const grouped: Record<string, typeof availableModels> = {}
+		for (const m of availableModels) {
+			if (!grouped[m.provider]) grouped[m.provider] = []
+			grouped[m.provider].push(m)
+		}
+		return grouped
+	}, [availableModels])
 
-					<div className="flex items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={onSwitchToAdvanced}
-							className="text-xs border-vscode-editorGroup-border hover:bg-vscode-toolbar-hoverBackground">
-							<SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
-							Advanced Settings
-						</Button>
+	return (
+		<div className="flex flex-col gap-5 max-w-3xl mx-auto py-2 px-1">
+			{/* Hero / Status Bar */}
+			<div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-transparent border border-emerald-500/20">
+				<div className="flex items-center gap-3">
+					<div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+						<Zap className="w-4 h-4 text-emerald-400" />
 					</div>
+					<div>
+						<div className="text-[13px] font-semibold text-vscode-foreground leading-tight">
+							Free AI Auto-Router
+						</div>
+						<div className="text-[11px] text-vscode-descriptionForeground mt-0.5">
+							{configuredCount > 0
+								? `${configuredCount} provider${configuredCount > 1 ? "s" : ""} connected · ${selectedModels.length} model${selectedModels.length !== 1 ? "s" : ""} active`
+								: "Add at least one free API key below to get started"}
+						</div>
+					</div>
+				</div>
+				<div className="flex items-center gap-2 shrink-0">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={onSwitchToAdvanced}
+						className="text-[11px] h-7 px-2.5 border-vscode-editorGroup-border/60 hover:bg-vscode-toolbar-hoverBackground">
+						<SlidersHorizontal className="w-3 h-3 mr-1.5" />
+						Advanced
+					</Button>
+					<Button
+						variant={isAutoRouterActive ? "primary" : "secondary"}
+						size="sm"
+						onClick={handleActivateAutoRouter}
+						disabled={isAutoRouterActive}
+						className={cn(
+							"text-[11px] h-7 px-3 font-medium",
+							isAutoRouterActive ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "",
+						)}>
+						{isAutoRouterActive ? (
+							<>
+								<Check className="w-3 h-3 mr-1" />
+								Active
+							</>
+						) : (
+							<>
+								<Zap className="w-3 h-3 mr-1" />
+								Activate Router
+							</>
+						)}
+					</Button>
 				</div>
 			</div>
 
-			{/* Auto-Router Supercard */}
-			<div
-				className={cn(
-					"rounded-xl border transition-all p-5",
-					isAutoRouterActive
-						? "bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-amber-500/50 shadow-md ring-1 ring-amber-500/20"
-						: "bg-vscode-editor-background border-vscode-editorGroup-border/60 hover:border-amber-500/30",
-				)}>
-				<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-					<div className="flex items-start gap-3.5">
-						<div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-							<Zap className="w-5 h-5" />
-						</div>
-						<div>
-							<div className="flex items-center gap-2">
-								<h3 className="text-sm font-bold text-vscode-foreground m-0">
-									⚡ Free Models Auto-Router (Recommended)
-								</h3>
-								{isAutoRouterActive ? (
-									<span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-300 rounded border border-amber-500/40 flex items-center gap-1">
-										<Check className="w-3 h-3" /> Active Mode
+			{/* Section: Provider API Keys */}
+			<div className="flex flex-col gap-2">
+				<div className="flex items-center gap-2 px-1">
+					<Key className="w-3.5 h-3.5 text-vscode-descriptionForeground" />
+					<span className="text-[12px] font-semibold text-vscode-foreground uppercase tracking-wide">
+						Provider API Keys
+					</span>
+					<span className="text-[11px] text-vscode-descriptionForeground">
+						— paste your free keys (at least one required)
+					</span>
+				</div>
+
+				<div className="grid grid-cols-1 gap-2">
+					{PROVIDER_ENTRIES.map((provider) => {
+						const keyVal = (apiConfig[provider.keyField] as string) || ""
+						const hasKey = !!keyVal.trim()
+						const isVisible = visibleKeys[provider.id]
+						const accent = ACCENT_CLASSES[provider.accentColor] || ACCENT_CLASSES.emerald
+
+						return (
+							<div
+								key={provider.id}
+								className={cn(
+									"flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all",
+									hasKey
+										? `border-vscode-editorGroup-border/60 bg-vscode-editor-background ring-1 ${accent.ring}`
+										: "border-vscode-editorGroup-border/40 bg-vscode-editor-background/60",
+								)}>
+								<div
+									className={cn(
+										"w-2 h-2 rounded-full shrink-0 transition-colors",
+										hasKey ? accent.dot : "bg-vscode-descriptionForeground/30",
+									)}
+								/>
+								<div className="w-24 shrink-0">
+									<span className="text-[12px] font-semibold text-vscode-foreground">
+										{provider.name}
+									</span>
+								</div>
+								<div className="relative flex items-center flex-1 min-w-0">
+									<VSCodeTextField
+										type={isVisible ? "text" : "password"}
+										value={keyVal}
+										onInput={(e: any) =>
+											setApiConfigurationField(provider.keyField, e.target.value)
+										}
+										placeholder={provider.keyPlaceholder}
+										className="w-full text-xs"
+									/>
+									<button
+										type="button"
+										onClick={() => toggleKeyVisibility(provider.id)}
+										className="absolute right-2 text-vscode-descriptionForeground hover:text-vscode-foreground p-0.5 border-none bg-transparent cursor-pointer">
+										{isVisible ? (
+											<EyeOff className="w-3.5 h-3.5" />
+										) : (
+											<Eye className="w-3.5 h-3.5" />
+										)}
+									</button>
+								</div>
+								{hasKey ? (
+									<span
+										className={cn(
+											"shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border",
+											accent.badge,
+										)}>
+										<Check className="w-2.5 h-2.5" />
+										Connected
 									</span>
 								) : (
-									<span className="px-2 py-0.5 text-[10px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded">
-										Multi-Provider Failover
-									</span>
+									<a
+										href={provider.keyUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="shrink-0 inline-flex items-center gap-1 text-[11px] text-vscode-textLink-foreground hover:underline whitespace-nowrap">
+										{provider.keyLabel}
+										<ExternalLink className="w-2.5 h-2.5" />
+									</a>
 								)}
 							</div>
-							<p className="text-xs text-vscode-descriptionForeground mt-1 max-w-xl">
-								Automatically routes across all your configured free providers (Groq, Cerebras, NVIDIA,
-								Gemini, SambaNova, and OpenRouter). If a free model gets rate-limited or hangs, it
-								instantly failovers to the next available model without interrupting your task.
-							</p>
-							<div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-vscode-descriptionForeground">
-								<span className="flex items-center gap-1">
-									<ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-									{configuredKeysCount > 0
-										? `${configuredKeysCount} custom provider keys connected`
-										: "Using OpenRouter 100% free models pool"}
-								</span>
-								<span>•</span>
-								<span>Watchdog: 25s timeout auto-recovery</span>
-							</div>
-						</div>
-					</div>
-
-					<div className="shrink-0 flex items-center gap-2">
-						<Button
-							variant={isAutoRouterActive ? "primary" : "secondary"}
-							size="sm"
-							onClick={handleActivateAutoRouter}
-							disabled={isAutoRouterActive}
-							className={cn(
-								"font-medium",
-								isAutoRouterActive
-									? "bg-amber-500 text-black hover:bg-amber-400 font-semibold"
-									: "hover:border-amber-500/50",
-							)}>
-							{isAutoRouterActive ? (
-								<>
-									<Check className="w-3.5 h-3.5 mr-1" />
-									Active Auto-Router
-								</>
-							) : (
-								<>
-									<Zap className="w-3.5 h-3.5 mr-1" />
-									Start Using Auto-Router
-								</>
-							)}
-						</Button>
-					</div>
+						)
+					})}
 				</div>
 			</div>
 
-			{/* Selected Models for Auto-Routing & Dropdown Section */}
-			<div className="rounded-xl border border-vscode-editorGroup-border/80 bg-vscode-editor-background p-5 flex flex-col gap-4 shadow-xs">
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-vscode-editorGroup-border/60">
-					<div className="flex items-center gap-2.5">
-						<div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-							<ShieldCheck className="w-5 h-5" />
-						</div>
-						<div>
-							<div className="flex items-center gap-2">
-								<h3 className="text-sm font-bold text-vscode-foreground m-0">
-									Active Free Models Pool
-								</h3>
-								<span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 rounded border border-emerald-500/30">
-									{selectedModels.length} of {availableModels.length} Selected
-								</span>
-							</div>
-							<p className="text-xs text-vscode-descriptionForeground mt-0.5 m-0">
-								Only models whose provider API key is added appear below. Only selected models will be
-								visible in the chat dropdown and used for auto-routing.
-							</p>
-						</div>
+			{/* Section: Active Model Pool */}
+			<div className="flex flex-col gap-2">
+				<div className="flex items-center justify-between px-1">
+					<div className="flex items-center gap-2">
+						<Sparkles className="w-3.5 h-3.5 text-vscode-descriptionForeground" />
+						<span className="text-[12px] font-semibold text-vscode-foreground uppercase tracking-wide">
+							Active Model Pool
+						</span>
+						{availableModels.length > 0 && (
+							<span className="text-[11px] text-vscode-descriptionForeground">
+								— {selectedModels.length} of {availableModels.length} selected for routing &amp;
+								dropdown
+							</span>
+						)}
 					</div>
-
 					{availableModels.length > 0 && (
-						<div className="flex items-center gap-2 shrink-0">
-							<Button
-								variant="secondary"
-								size="sm"
+						<div className="flex items-center gap-1.5">
+							<button
+								type="button"
 								onClick={handleSelectAll}
 								disabled={selectedModels.length === availableModels.length}
-								className="text-xs h-7 px-2.5">
-								Select All
-							</Button>
-							<Button
-								variant="secondary"
-								size="sm"
+								className="text-[11px] text-vscode-textLink-foreground hover:underline disabled:opacity-40 cursor-pointer border-none bg-transparent px-0">
+								Select all
+							</button>
+							<span className="text-vscode-descriptionForeground/40">·</span>
+							<button
+								type="button"
 								onClick={handleDeselectAll}
 								disabled={selectedModels.length === 0}
-								className="text-xs h-7 px-2.5">
-								Deselect All
-							</Button>
+								className="text-[11px] text-vscode-textLink-foreground hover:underline disabled:opacity-40 cursor-pointer border-none bg-transparent px-0">
+								Deselect all
+							</button>
 						</div>
 					)}
 				</div>
 
 				{availableModels.length === 0 ? (
-					<div className="rounded-lg border border-dashed border-vscode-editorGroup-border/80 bg-vscode-editor-inactiveSelectionBackground/10 p-6 flex flex-col items-center text-center gap-2">
-						<Sparkles className="w-7 h-7 text-vscode-descriptionForeground/60" />
-						<h4 className="text-sm font-semibold text-vscode-foreground m-0">
-							No Provider Keys Connected Yet
-						</h4>
-						<p className="text-xs text-vscode-descriptionForeground max-w-md m-0">
-							Paste your free API key for <strong>Groq</strong>, <strong>Cerebras</strong>,{" "}
-							<strong>NVIDIA NIM</strong>, <strong>Google Gemini</strong>, <strong>SambaNova</strong>, or{" "}
-							<strong>OpenRouter</strong> in the cards below. Once a key is added, its models will
-							immediately appear here so you can select and deselect them for auto-routing and the chat
-							dropdown.
+					<div className="flex flex-col items-center text-center gap-2 py-8 px-4 rounded-lg border border-dashed border-vscode-editorGroup-border/60 bg-vscode-editor-background/40">
+						<Sparkles className="w-6 h-6 text-vscode-descriptionForeground/40" />
+						<p className="text-[12px] text-vscode-descriptionForeground max-w-sm m-0">
+							No provider keys connected yet. Paste a free API key above and models will appear here
+							automatically.
 						</p>
 					</div>
 				) : (
-					<div className="grid grid-cols-1 gap-2.5">
-						{availableModels.map((model) => {
-							const isSelected = selectedModels.includes(model.id)
-							const isCurrentActive = apiConfig.apiModelId === model.id
-							const providerConfig = FREE_PROVIDERS_CONFIG.find((p) => p.id === model.provider)
+					<div className="flex flex-col gap-1">
+						{Object.entries(groupedAvailableModels).map(([providerId, models]) => {
+							const providerEntry = PROVIDER_ENTRIES.find((p) => p.id === providerId)
+							const accent = ACCENT_CLASSES[providerEntry?.accentColor || "emerald"]
+							const allSelected = models.every((m) => selectedModels.includes(m.id))
+							const someSelected = models.some((m) => selectedModels.includes(m.id))
+							const isExpanded = expandedProviders[providerId] !== false
 
 							return (
 								<div
-									key={model.id}
-									onClick={() => handleToggleModel(model.id, !isSelected)}
-									className={cn(
-										"flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer select-none",
-										isSelected
-											? "border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60"
-											: "border-vscode-editorGroup-border/40 bg-vscode-editor-background opacity-60 hover:opacity-80",
-										isCurrentActive &&
-											"ring-1 ring-amber-500/50 border-amber-500/50 bg-amber-500/5",
-									)}>
-									<div className="flex items-center gap-3 min-w-0">
-										<div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-											<Checkbox
-												checked={isSelected}
-												onChange={(checked: boolean) => handleToggleModel(model.id, checked)}
-											/>
-										</div>
-
-										<div className="flex flex-col min-w-0">
-											<div className="flex items-center gap-2 flex-wrap">
-												<span className="text-xs font-semibold text-vscode-foreground truncate">
-													{model.name}
-												</span>
-
-												{providerConfig && (
-													<span className="inline-flex items-center gap-1 px-1.5 py-0.2 text-[10px] font-medium bg-vscode-badge-background text-vscode-badge-foreground rounded border border-vscode-panel-border/30">
-														{providerConfig.icon}
-														{providerConfig.name}
-													</span>
-												)}
-
-												{isCurrentActive ? (
-													<span className="text-[10px] px-2 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 flex items-center gap-1">
-														<Zap className="w-2.5 h-2.5 fill-current" />
-														Primary Preferred
-													</span>
-												) : isSelected ? (
-													<span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-medium flex items-center gap-1 border border-emerald-500/30">
-														<Check className="w-2.5 h-2.5" />
-														In Dropdown & Auto-Routing
-													</span>
-												) : (
-													<span className="text-[10px] px-1.5 py-0.2 rounded bg-vscode-editor-inactiveSelectionBackground text-vscode-descriptionForeground font-medium">
-														Deselected (Hidden)
-													</span>
-												)}
-											</div>
-
-											<div className="flex items-center gap-2 mt-0.5 text-[11px] text-vscode-descriptionForeground">
-												<span className="font-mono text-[10px] opacity-80">{model.id}</span>
-												<span>•</span>
-												<span>{(model.contextWindow / 1024).toFixed(0)}k context</span>
-												{model.description && (
-													<>
-														<span>•</span>
-														<span className="truncate max-w-sm">{model.description}</span>
-													</>
-												)}
-											</div>
-										</div>
-									</div>
-
-									<div
-										className="flex items-center gap-2 shrink-0 pl-3"
-										onClick={(e) => e.stopPropagation()}>
-										{isSelected && !isCurrentActive && (
-											<Button
-												variant="secondary"
-												size="sm"
-												onClick={() => setApiConfigurationField("apiModelId", model.id)}
-												className="text-[11px] h-6 px-2 hover:border-amber-500/40">
-												Set Primary
-											</Button>
+									key={providerId}
+									className="rounded-lg border border-vscode-editorGroup-border/50 bg-vscode-editor-background overflow-hidden">
+									<button
+										type="button"
+										onClick={() =>
+											setExpandedProviders((prev) => ({ ...prev, [providerId]: !isExpanded }))
+										}
+										className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-vscode-list-hoverBackground/50 transition-colors cursor-pointer border-none bg-transparent text-left">
+										<div className={cn("w-2 h-2 rounded-full shrink-0", accent.dot)} />
+										<span className="text-[12px] font-semibold text-vscode-foreground flex-1">
+											{providerEntry?.name ?? providerId}
+										</span>
+										<span className="text-[11px] text-vscode-descriptionForeground">
+											{models.filter((m) => selectedModels.includes(m.id)).length}/{models.length}{" "}
+											selected
+										</span>
+										{allSelected ? (
+											<CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+										) : someSelected ? (
+											<Circle className="w-3.5 h-3.5 text-vscode-descriptionForeground/60 shrink-0" />
+										) : (
+											<Circle className="w-3.5 h-3.5 text-vscode-descriptionForeground/30 shrink-0" />
 										)}
-										{isCurrentActive && (
-											<Button
-												variant="secondary"
-												size="sm"
-												onClick={() => setApiConfigurationField("apiModelId", "")}
-												className="text-[11px] h-6 px-2 text-amber-300">
-												Reset Auto
-											</Button>
+										{isExpanded ? (
+											<ChevronUp className="w-3.5 h-3.5 text-vscode-descriptionForeground/60 shrink-0" />
+										) : (
+											<ChevronDown className="w-3.5 h-3.5 text-vscode-descriptionForeground/60 shrink-0" />
 										)}
-									</div>
+									</button>
+
+									{isExpanded && (
+										<div className="border-t border-vscode-editorGroup-border/30">
+											{models.map((model) => {
+												const isSelected = selectedModels.includes(model.id)
+												const isCurrentActive = apiConfig.apiModelId === model.id
+
+												return (
+													<div
+														key={model.id}
+														onClick={() => handleToggleModel(model.id, !isSelected)}
+														className={cn(
+															"flex items-center gap-3 px-4 py-2 cursor-pointer select-none transition-colors",
+															isSelected
+																? "hover:bg-emerald-500/5"
+																: "opacity-60 hover:opacity-80 hover:bg-vscode-list-hoverBackground/30",
+														)}>
+														<div
+															className={cn(
+																"w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+																isSelected
+																	? "bg-emerald-500/20 border-emerald-500/60"
+																	: "border-vscode-editorGroup-border/60 bg-transparent",
+															)}>
+															{isSelected && (
+																<Check className="w-2.5 h-2.5 text-emerald-400" />
+															)}
+														</div>
+														<div className="flex items-center gap-2 flex-1 min-w-0">
+															<span className="text-[12px] font-medium text-vscode-foreground truncate">
+																{model.name}
+															</span>
+															{isCurrentActive && (
+																<span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium border border-amber-500/30">
+																	Primary
+																</span>
+															)}
+															{model.description && (
+																<span className="text-[11px] text-vscode-descriptionForeground truncate hidden sm:block">
+																	{model.description}
+																</span>
+															)}
+														</div>
+														<span className="text-[11px] text-vscode-descriptionForeground shrink-0 font-mono">
+															{(model.contextWindow / 1024).toFixed(0)}k
+														</span>
+														{isSelected && !isCurrentActive && (
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation()
+																	setApiConfigurationField("apiModelId", model.id)
+																}}
+																className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-vscode-editorGroup-border/50 text-vscode-descriptionForeground hover:text-vscode-foreground hover:border-amber-500/40 transition-colors cursor-pointer bg-transparent">
+																Set primary
+															</button>
+														)}
+														{isCurrentActive && (
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation()
+																	setApiConfigurationField("apiModelId", "")
+																}}
+																className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-amber-500/30 text-amber-300 hover:border-amber-500/60 transition-colors cursor-pointer bg-transparent">
+																Reset
+															</button>
+														)}
+													</div>
+												)
+											})}
+										</div>
+									)}
 								</div>
 							)
 						})}
@@ -587,194 +522,10 @@ export const FreeSettingsView: React.FC<FreeSettingsViewProps> = ({
 				)}
 			</div>
 
-			{/* Section Header */}
-			<div className="flex items-center justify-between border-b border-vscode-editorGroup-border/60 pb-2">
-				<h3 className="text-sm font-semibold text-vscode-foreground m-0 flex items-center gap-2">
-					<span>Free-Tier Providers & API Keys</span>
-					<span className="text-xs font-normal text-vscode-descriptionForeground">
-						(Paste your free API key and click "Start Using")
-					</span>
-				</h3>
-			</div>
-
-			{/* Free Providers Cards List */}
-			<div className="grid grid-cols-1 gap-4">
-				{FREE_PROVIDERS_CONFIG.map((provider) => {
-					const isCurrent = currentProvider === provider.id
-					const keyField = provider.keyField
-					const currentKeyVal = keyField ? (apiConfig[keyField] as string) || "" : ""
-					const isKeyConfigured = !!currentKeyVal.trim()
-					const isVisible = visibleKeys[provider.id] || false
-
-					return (
-						<div
-							key={provider.id}
-							className={cn(
-								"rounded-lg border p-4.5 transition-all bg-vscode-editor-background",
-								isCurrent
-									? "border-mirror-brand-via/60 ring-1 ring-mirror-brand-via/20 bg-mirror-brand-via/5"
-									: "border-vscode-editorGroup-border/70 hover:border-vscode-editorGroup-border",
-							)}>
-							<div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<div className="p-2 rounded-md bg-vscode-input-background border border-vscode-editorGroup-border/60 shrink-0">
-										{provider.icon}
-									</div>
-									<div>
-										<div className="flex items-center gap-2">
-											<h4 className="text-sm font-semibold text-vscode-foreground m-0">
-												{provider.name}
-											</h4>
-											<span className="px-2 py-0.2 text-[10px] font-medium bg-emerald-500/15 text-emerald-300 rounded border border-emerald-500/30">
-												{provider.badge}
-											</span>
-											{isKeyConfigured && (
-												<span className="px-1.5 py-0.2 text-[10px] font-medium bg-blue-500/15 text-blue-300 rounded flex items-center gap-1">
-													<Check className="w-2.5 h-2.5" /> Key Connected
-												</span>
-											)}
-										</div>
-										<p className="text-xs text-vscode-descriptionForeground mt-1">
-											{provider.description}
-										</p>
-									</div>
-								</div>
-
-								<div className="flex items-center gap-2 shrink-0">
-									{provider.keyUrl && (
-										<a
-											href={provider.keyUrl}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="inline-flex items-center gap-1 text-xs text-vscode-textLink-foreground hover:underline px-2 py-1 rounded hover:bg-vscode-toolbar-hoverBackground transition-colors">
-											<span>{provider.keyLabel || "Get Free Key"}</span>
-											<ExternalLink className="w-3 h-3" />
-										</a>
-									)}
-
-									<Button
-										variant={isCurrent ? "primary" : "secondary"}
-										size="sm"
-										onClick={() => handleActivateProvider(provider.id, provider.defaultModel)}
-										className={cn(
-											"text-xs font-medium h-7 px-3",
-											isCurrent && "font-semibold shadow-xs",
-										)}>
-										{isCurrent ? (
-											<>
-												<Check className="w-3.5 h-3.5 mr-1" />
-												Active
-											</>
-										) : (
-											<>
-												Start Using {provider.name}
-												<ArrowRight className="w-3 h-3 ml-1" />
-											</>
-										)}
-									</Button>
-								</div>
-							</div>
-
-							{/* API Key Input & Model Selector */}
-							{keyField && (
-								<div className="mt-3.5 pt-3.5 border-t border-vscode-editorGroup-border/40 grid grid-cols-1 md:grid-cols-2 gap-3">
-									<div>
-										<label className="block text-xs font-medium text-vscode-foreground mb-1">
-											{provider.name} API Key
-										</label>
-										<div className="relative flex items-center">
-											<VSCodeTextField
-												type={isVisible ? "text" : "password"}
-												value={currentKeyVal}
-												onInput={(e: any) => {
-													const val = e.target.value
-													setApiConfigurationField(keyField, val)
-												}}
-												placeholder={`Paste your ${provider.name} API key...`}
-												className="w-full text-xs"
-											/>
-											<button
-												type="button"
-												onClick={() => toggleKeyVisibility(provider.id)}
-												className="absolute right-2 text-vscode-descriptionForeground hover:text-vscode-foreground p-1 border-none bg-transparent cursor-pointer">
-												{isVisible ? (
-													<EyeOff className="w-3.5 h-3.5" />
-												) : (
-													<Eye className="w-3.5 h-3.5" />
-												)}
-											</button>
-										</div>
-									</div>
-
-									<div>
-										<label className="block text-xs font-medium text-vscode-foreground mb-1">
-											Selected Model
-										</label>
-										<select
-											value={
-												isCurrent
-													? apiConfig.apiModelId || provider.defaultModel
-													: provider.defaultModel
-											}
-											onChange={(e) => {
-												if (isCurrent) {
-													setApiConfigurationField("apiModelId", e.target.value)
-												}
-											}}
-											disabled={!isCurrent}
-											className="w-full h-7 bg-vscode-dropdown-background text-vscode-dropdown-foreground border border-vscode-dropdown-border rounded px-2 text-xs focus:outline-none focus:ring-1 focus:ring-vscode-focusBorder cursor-pointer disabled:opacity-60">
-											{provider.models.map((m) => (
-												<option key={m.id} value={m.id}>
-													{m.label} {m.tag ? `(${m.tag})` : ""}
-												</option>
-											))}
-										</select>
-									</div>
-
-									{isKeyConfigured && (
-										<div className="col-span-full pt-2.5 border-t border-vscode-editorGroup-border/30">
-											<label className="block text-[11px] font-medium text-vscode-foreground mb-1.5">
-												Include in Auto-Routing Pool & Dropdown:
-											</label>
-											<div className="flex flex-wrap gap-2">
-												{provider.models.map((m) => {
-													const fullId = getRouterModelId(provider.id, m.id)
-													const isSelected = selectedModels.includes(fullId)
-													return (
-														<label
-															key={m.id}
-															className={cn(
-																"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs cursor-pointer select-none transition-colors",
-																isSelected
-																	? "border-emerald-500/50 bg-emerald-500/10 text-vscode-foreground font-medium"
-																	: "border-vscode-editorGroup-border/50 bg-vscode-editor-background opacity-60 text-vscode-descriptionForeground hover:opacity-80",
-															)}>
-															<input
-																type="checkbox"
-																checked={isSelected}
-																onChange={(e) =>
-																	handleToggleModel(fullId, e.target.checked)
-																}
-																className="rounded cursor-pointer"
-															/>
-															<span>{m.label}</span>
-															{m.tag && (
-																<span className="text-[10px] opacity-75 font-mono">
-																	({m.tag})
-																</span>
-															)}
-														</label>
-													)
-												})}
-											</div>
-										</div>
-									)}
-								</div>
-							)}
-						</div>
-					)
-				})}
-			</div>
+			<p className="text-[11px] text-vscode-descriptionForeground/60 text-center m-0 pb-2">
+				The auto-router seamlessly failovers between selected models if one gets rate-limited or times out.
+				Selected models also appear in the chat model dropdown.
+			</p>
 		</div>
 	)
 }
