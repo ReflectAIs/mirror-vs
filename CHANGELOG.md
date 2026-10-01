@@ -2,12 +2,16 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
-## [0.9.9] - 2026-09-30
+## [0.9.9] - 2026-10-01
 
 ### Anti-Repetition & Infinite Loop Protection
 
+- **Provider Stream-Level Token Degeneration Detection**:
+    - Integrated `StreamDegenerationDetector` into the OpenRouter streaming loop to catch single-token and short n-gram runaway loops immediately at the stream layer, gracefully terminating repetitive output before wasting tokens and context window.
+- **Broader Open-Source Model Penalty Tuning**:
+    - Expanded `frequency_penalty` (0.1–0.15) and `presence_penalty` (0.1) across all repetition-vulnerable open-source models (DeepSeek, Llama, Qwen, Mistral, Gemma, etc.) in both `createMessage` and `completePrompt`.
 - **OpenRouter DeepSeek Model Stabilization**:
-    - Automatically applies `defaultTemperature: 0.3` (instead of 0) and `frequency_penalty: 0.1` to all DeepSeek models (`deepseek/deepseek-v4-flash-0731`, `deepseek-chat`, `deepseek-v3`, etc.) on OpenRouter, preventing greedy sampling degeneration into infinite text and tool loops.
+    - Automatically applies `defaultTemperature: 0.3` (instead of 0) and `frequency_penalty: 0.15` + `presence_penalty: 0.1` to all DeepSeek models (`deepseek/deepseek-v4-flash-0731`, `deepseek-chat`, `deepseek-v3`, etc.) on OpenRouter, preventing greedy sampling degeneration into infinite text and tool loops.
 - **In-Stream Sentence Repetition Detection**:
     - Real-time sentence and line repetition watchdog in `TaskMainLoop` that monitors assistant streaming output.
     - Gracefully halts runaway text loops and prompts the user or model to proceed with the next step or attempt completion.
@@ -17,6 +21,8 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Integrated tool repetition validation into `executeReadBatch` so batched read tools (`read_file`, `search_files`, `list_files`) cannot loop on repeated identical operations.
 - **Alternating Tool Loop Detection**:
     - Enhanced `ToolRepetitionDetector` to detect 2-step alternating cycles (A ➔ B ➔ A ➔ B ➔ A ➔ B) across turns, preventing cyclic tool execution loops.
+- **Release Announcement**:
+    - Refreshed announcement popup trigger (`oct-2026-v0-9-9`) to highlight new stability protections.
 
 ## [0.9.8] - 2026-09-30
 

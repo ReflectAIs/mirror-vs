@@ -163,7 +163,7 @@ export class MirrorProvider
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
-	public readonly latestAnnouncementId = "sep-2026-v0-9-5" // Mirror VS v0.9.5 performance & reliability update.
+	public readonly latestAnnouncementId = "oct-2026-v0-9-9" // Mirror VS v0.9.9 loop prevention & settings revamp update.
 	public readonly providerSettingsManager: ProviderSettingsManager
 	public readonly customModesManager: CustomModesManager
 	/**

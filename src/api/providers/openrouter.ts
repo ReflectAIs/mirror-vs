@@ -22,6 +22,7 @@ import {
 } from "../transform/openai-format"
 import { normalizeMistralToolCallId } from "../transform/mistral-format"
 import { ApiStreamChunk } from "../transform/stream"
+import { StreamDegenerationDetector } from "../transform/StreamDegenerationDetector"
 import { convertToR1Format } from "../transform/r1-format"
 import { addCacheBreakpoints as addAnthropicCacheBreakpoints } from "../transform/caching/anthropic"
 import { addCacheBreakpoints as addGeminiCacheBreakpoints } from "../transform/caching/gemini"
@@ -300,6 +301,15 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 		}
 
 		// https://openrouter.ai/docs/transforms
+		// Anti-repetition: Apply frequency_penalty broadly to prevent greedy decoding
+		// degeneration loops. Anthropic/Gemini models handle repetition internally;
+		// all other providers (especially DeepSeek, Llama, Qwen, Mistral variants on
+		// OpenRouter) benefit from a small nudge away from repeated tokens.
+		const isAnthropicModel = modelId.startsWith("anthropic/")
+		const isGeminiModel = modelId.startsWith("google/")
+		const isDeepSeekModel = modelId.toLowerCase().includes("deepseek")
+		const needsRepetitionPenalty = !isAnthropicModel && !isGeminiModel
+
 		const completionParams: OpenRouterChatCompletionParams = {
 			model: modelId,
 			...(maxTokens && maxTokens > 0 && { max_tokens: maxTokens }),
@@ -308,7 +318,12 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 			messages: openAiMessages,
 			stream: true,
 			stream_options: { include_usage: true },
-			...(modelId.toLowerCase().includes("deepseek") && { frequency_penalty: 0.1 }),
+			// Apply frequency & presence penalties to prevent repetition loops.
+			// DeepSeek models are especially prone; other open-source models also benefit.
+			...(needsRepetitionPenalty && {
+				frequency_penalty: isDeepSeekModel ? 0.15 : 0.1,
+				presence_penalty: isDeepSeekModel ? 0.1 : 0,
+			}),
 			// Only include provider if openRouterSpecificProvider is not "[default]".
 			...(this.options.openRouterSpecificProvider &&
 				this.options.openRouterSpecificProvider !== OPENROUTER_DEFAULT_PROVIDER_NAME && {
@@ -359,6 +374,9 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 		// When reasoning_details has displayable content (reasoning.text or reasoning.summary),
 		// we skip yielding the top-level reasoning field to avoid duplicate display.
 		let hasYieldedReasoningFromDetails = false
+
+		// Token-level degeneration detector (catches fastest loops at API layer)
+		const degenerationDetector = new StreamDegenerationDetector()
 
 		for await (const chunk of stream) {
 			// OpenRouter returns an error object instead of the OpenAI SDK throwing an error.
@@ -460,6 +478,19 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 				}
 
 				if (delta.content) {
+					// Token-level degeneration detection: catch infinite single-token or
+					// short n-gram loops at the provider stream level, before they waste
+					// context window and tokens.
+					if (degenerationDetector.check(delta.content)) {
+						console.warn(
+							`[OpenRouter] Token degeneration loop detected for model ${modelId}. Terminating stream.`,
+						)
+						yield {
+							type: "text",
+							text: "\n\n[Generation stopped: Repetitive token loop detected from provider stream.]",
+						}
+						break
+					}
 					yield { type: "text", text: delta.content }
 				}
 			}
@@ -542,13 +573,21 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 	async completePrompt(prompt: string) {
 		let { id: modelId, maxTokens, temperature, reasoning } = await this.fetchModel()
 
+		const isAnthropicModel = modelId.startsWith("anthropic/")
+		const isGeminiModel = modelId.startsWith("google/")
+		const isDeepSeekModel = modelId.toLowerCase().includes("deepseek")
+		const needsRepetitionPenalty = !isAnthropicModel && !isGeminiModel
+
 		const completionParams: OpenRouterChatCompletionParams = {
 			model: modelId,
 			max_tokens: maxTokens,
 			temperature,
 			messages: [{ role: "user", content: prompt }],
 			stream: false,
-			...(modelId.toLowerCase().includes("deepseek") && { frequency_penalty: 0.1 }),
+			...(needsRepetitionPenalty && {
+				frequency_penalty: isDeepSeekModel ? 0.15 : 0.1,
+				presence_penalty: isDeepSeekModel ? 0.1 : 0,
+			}),
 			// Only include provider if openRouterSpecificProvider is not "[default]".
 			...(this.options.openRouterSpecificProvider &&
 				this.options.openRouterSpecificProvider !== OPENROUTER_DEFAULT_PROVIDER_NAME && {
