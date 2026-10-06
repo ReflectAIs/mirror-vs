@@ -2,6 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [0.9.10] - 2026-10-06
+
+### Session Tab Isolation & Welcome UX
+
+- **Session Isolation & Tab Stacking Fix**:
+    - Ensured closing tabs or switching sessions properly cleans up in-memory tasks (`clearOtherSessionTasks`), preventing tasks from previous sessions from lingering or stacking.
+    - Preserved browser-like 0-tab behavior within the current active session without accidentally jumping to older sessions when closing the last tab.
+- **Empty State "Start a New Chat" Action**:
+    - Added an intuitive "Start a New Chat" welcome card with a "New Tab" button in `ChatWelcomeContent` for empty session states.
+- **Release Announcement**:
+    - Updated announcement popup trigger (`oct-2026-v0-9-10`).
+
 ## [0.9.9] - 2026-10-01
 
 ### Anti-Repetition & Infinite Loop Protection

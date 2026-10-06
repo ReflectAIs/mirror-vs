@@ -296,11 +296,8 @@ export class TaskLifecycleManager {
 	 * Used when the user cancels a task that is not a subtask.
 	 */
 	public async clearTask(): Promise<void> {
-		if (this.provider.mirrorStack.length > 0) {
-			const task = this.provider.mirrorStack[this.provider.mirrorStack.length - 1]
-			console.log(`[clearTask] clearing task ${task.taskId}.${task.instanceId}`)
-			await this.provider.removeMirrorFromStack()
-		}
+		// Clean up all in-memory tasks across mirrorStack and backgroundTasks so sessions do not stack
+		await this.provider.clearOtherSessionTasks()
 		// Create a brand new session and notify webview
 		await this.provider.sessionManager.createSession()
 		await this.provider.postStateToWebview()

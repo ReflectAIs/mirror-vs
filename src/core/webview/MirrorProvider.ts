@@ -163,7 +163,7 @@ export class MirrorProvider
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
-	public readonly latestAnnouncementId = "oct-2026-v0-9-9" // Mirror VS v0.9.9 loop prevention & settings revamp update.
+	public readonly latestAnnouncementId = "oct-2026-v0-9-10" // Mirror VS v0.9.10 session tab isolation & UX update.
 	public readonly providerSettingsManager: ProviderSettingsManager
 	public readonly customModesManager: CustomModesManager
 	/**
@@ -803,10 +803,54 @@ export class MirrorProvider
 	}
 
 	/**
+	 * Disposes and clears in-memory tasks (mirrorStack and backgroundTasks)
+	 * belonging to other sessions, preventing sessions from stacking on top of each other.
+	 * If keepSessionId is provided, tasks belonging to keepSessionId are retained.
+	 * If keepSessionId is omitted, all in-memory tasks are cleaned up.
+	 */
+	public async clearOtherSessionTasks(keepSessionId?: string): Promise<void> {
+		const tasksToClean: Task[] = []
+
+		for (let i = this.mirrorStack.length - 1; i >= 0; i--) {
+			const task = this.mirrorStack[i]
+			if (!keepSessionId || task.sessionId !== keepSessionId) {
+				this.mirrorStack.splice(i, 1)
+				tasksToClean.push(task)
+			}
+		}
+
+		for (const [taskId, task] of this.backgroundTasks) {
+			if (!keepSessionId || task.sessionId !== keepSessionId) {
+				this.backgroundTasks.delete(taskId)
+				tasksToClean.push(task)
+			}
+		}
+
+		for (const task of tasksToClean) {
+			try {
+				await task.abortTask(true)
+			} catch {}
+			const cleanupFunctions = this.taskEventListeners.get(task)
+			if (cleanupFunctions) {
+				cleanupFunctions.forEach((cleanup) => cleanup())
+				this.taskEventListeners.delete(task)
+			}
+			task.dispose?.()
+		}
+
+		if (tasksToClean.length > 0) {
+			this.log(
+				`[clearOtherSessionTasks] Cleaned up ${tasksToClean.length} in-memory tasks outside session ${keepSessionId ?? "(none)"}`,
+			)
+		}
+	}
+
+	/**
 	 * Closes a task tab — aborts the task if it's still running and removes it
 	 * from both mirrorStack and backgroundTasks. If the closed task is the current
-	 * (active) task, its previous tab (in tab bar order) is focused instead. If no
-	 * tasks remain, the webview shows the welcome/empty state.
+	 * (active) task, its previous tab (in tab bar order within the SAME session)
+	 * is focused instead. If no tasks remain in the session, it stays in the
+	 * current session and shows the welcome/empty state.
 	 *
 	 * NOTE: The frontend is expected to have already confirmed with the user before
 	 * sending closeTaskTab. This method does NOT prompt for confirmation.
@@ -825,12 +869,18 @@ export class MirrorProvider
 			return
 		}
 
-		// Capture the ordered tabs BEFORE removal so we can determine which tab
-		// should become active after closing (browser-like: previous tab wins).
-		const orderedBeforeClose = this.getAllTasksSorted()
-		const closedIndex = orderedBeforeClose.findIndex((t) => t.taskId === taskId)
-		// Prefer the previous tab (index - 1); fall back to the next tab (index + 1).
-		const previousTab = closedIndex > 0 ? orderedBeforeClose[closedIndex - 1] : orderedBeforeClose[closedIndex + 1]
+		const activeSessionId = this.getCurrentSessionId()
+
+		// Capture the ordered tabs of THIS SESSION BEFORE removal.
+		// Crucial: Only consider tabs within the same session so closing all tabs
+		// never jumps to or revives a previous session.
+		const sessionTasksBeforeClose = this.getAllTasksSorted().filter((t) =>
+			activeSessionId ? t.sessionId === activeSessionId : true,
+		)
+		const closedIndex = sessionTasksBeforeClose.findIndex((t) => t.taskId === taskId)
+		// Prefer the previous tab (index - 1); fall back to the next tab (index + 1) in current session.
+		const previousTab =
+			closedIndex > 0 ? sessionTasksBeforeClose[closedIndex - 1] : sessionTasksBeforeClose[closedIndex + 1]
 
 		// Collect and dispose of ALL matching instances of taskId
 		const tasksToClose: Task[] = []
@@ -865,10 +915,17 @@ export class MirrorProvider
 		this.log(`[closeTask] Task ${taskId} closed and removed (${tasksToClose.length} instances disposed)`)
 
 		if (isCurrent && previousTab && previousTab.taskId !== taskId) {
+			// Sibling tab exists in current session: switch to it
 			await this.switchToTask(previousTab.taskId)
+		} else {
+			// No other tabs remain in the current session.
+			// Stay in the current session! Ensure no tasks from other sessions linger on the stack.
+			if (activeSessionId) {
+				await this.clearOtherSessionTasks(activeSessionId)
+			}
 		}
 
-		// Post updated state (browser-like 0-tab support)
+		// Post updated state (browser-like 0-tab support in current session)
 		await this.postStateToWebview()
 	}
 
@@ -1860,9 +1917,18 @@ export class MirrorProvider
 
 		const { historyItem } = await this.getTaskWithId(id)
 
-		if (historyItem.sessionId) {
-			this.setCurrentSessionId(historyItem.sessionId)
-			await this.contextProxy.setValue("currentSessionId", historyItem.sessionId)
+		const prevSessionId = this.getCurrentSessionId()
+		const targetSessionId = historyItem.sessionId
+
+		if (targetSessionId) {
+			this.setCurrentSessionId(targetSessionId)
+			await this.contextProxy.setValue("currentSessionId", targetSessionId)
+		}
+
+		// Sessions should not stack: If opening a task from a different session,
+		// clean up previous session's in-memory tasks so they do not linger.
+		if (targetSessionId && prevSessionId && targetSessionId !== prevSessionId) {
+			await this.clearOtherSessionTasks(targetSessionId)
 		}
 
 		// Check if this task is already running in the background or mirror stack
@@ -1872,7 +1938,7 @@ export class MirrorProvider
 		} else if (this.mirrorStack.some((t) => t.taskId === id)) {
 			await this.switchToTask(id)
 		} else {
-			// Park the current task (don't abort it — keep streaming in background)
+			// Park the current task if one is active in this session
 			await this.parkCurrentTask()
 
 			// Create a fresh task from history for the requested chat
