@@ -224,13 +224,6 @@
 			}
 		],
 		"menus": {
-			"view/title": [
-				{
-					"command": "mirror-vs.resetWebview",
-					"group": "navigation",
-					"when": "view == mirror-vs.SidebarProvider"
-				}
-			],
 			"editor/context": [
 				{
 					"submenu": "mirror-vs.contextMenu",

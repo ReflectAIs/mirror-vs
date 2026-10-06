@@ -131,24 +131,17 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 			throw new Error("Shadow git repo already initialized")
 		}
 
-		const nestedGitPath = await this.getNestedGitRepository()
-
-		if (nestedGitPath) {
-			// Show persistent error message with the offending path
-			const relativePath = path.relative(this.workspaceDir, nestedGitPath)
-			const message = t("common:errors.nested_git_repos_warning", { path: relativePath })
-			vscode.window.showErrorMessage(message)
-
-			throw new Error(
-				`Checkpoints are disabled because a nested git repository was detected at: ${relativePath}. ` +
-					"Please remove or relocate nested git repositories to use the checkpoints feature.",
-			)
-		}
-
 		await fs.mkdir(this.checkpointsDir, { recursive: true })
 		const git = createSanitizedGit(this.checkpointsDir)
 		const gitVersion = await git.version()
 		this.log(`[${this.constructor.name}#create] git = ${gitVersion}`)
+
+		const nestedGitRepos = await this.getNestedGitRepositories()
+		if (nestedGitRepos.length > 0) {
+			this.log(
+				`[${this.constructor.name}#initShadowGit] detected ${nestedGitRepos.length} nested git repos: ${nestedGitRepos.join(", ")}. These will be isolated in the shadow repository.`,
+			)
+		}
 
 		let created = false
 		const startTime = Date.now()
@@ -214,6 +207,17 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 	protected async writeExcludeFile() {
 		await fs.mkdir(path.join(this.dotGitDir, "info"), { recursive: true })
 		const patterns = await getExcludePatterns(this.workspaceDir)
+
+		// Exclude nested git repositories so git doesn't mistake them for uninitialized/submodule repos
+		const nestedGitRepos = await this.getNestedGitRepositories()
+		for (const nestedRepo of nestedGitRepos) {
+			const relativeNested = path.relative(this.workspaceDir, nestedRepo).replace(/\\/g, "/")
+			if (relativeNested && !relativeNested.startsWith("..")) {
+				// Exclude the nested repo directory (both leading slash and root relative)
+				patterns.push(`/${relativeNested}/`, `${relativeNested}/`)
+			}
+		}
+
 		await fs.writeFile(path.join(this.dotGitDir, "info", "exclude"), patterns.join("\n"))
 	}
 
@@ -227,7 +231,7 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 		}
 	}
 
-	private async getNestedGitRepository(): Promise<string | null> {
+	public async getNestedGitRepositories(): Promise<string[]> {
 		try {
 			// Find all .git/HEAD files that are not at the root level.
 			const args = ["--files", "--hidden", "--follow", "-g", "**/.git/HEAD", this.workspaceDir]
@@ -250,32 +254,37 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 			})
 
 			if (nestedGitPaths.length > 0) {
-				// Get the first nested git repository path
-				// Remove .git/HEAD from the path to get the repository directory
-				const headPath = nestedGitPaths[0].path
-
-				// Use path module to properly extract the repository directory
-				// The HEAD file is at .git/HEAD, so we need to go up two directories
-				const gitDir = path.dirname(headPath) // removes HEAD, gives us .git
-				const repoDir = path.dirname(gitDir) // removes .git, gives us the repo directory
-
-				const absolutePath = path.join(this.workspaceDir, repoDir)
+				const nestedRepos: string[] = []
+				for (const nested of nestedGitPaths) {
+					const headPath = nested.path
+					const gitDir = path.dirname(headPath)
+					const repoDir = path.dirname(gitDir)
+					const absolutePath = path.join(this.workspaceDir, repoDir)
+					if (!nestedRepos.includes(absolutePath)) {
+						nestedRepos.push(absolutePath)
+					}
+				}
 
 				this.log(
-					`[${this.constructor.name}#getNestedGitRepository] found ${nestedGitPaths.length} nested git repositories, first at: ${repoDir}`,
+					`[${this.constructor.name}#getNestedGitRepositories] found ${nestedRepos.length} nested git repositories: ${nestedRepos.join(", ")}`,
 				)
-				return absolutePath
+				return nestedRepos
 			}
 
-			return null
+			return []
 		} catch (error) {
 			this.log(
-				`[${this.constructor.name}#getNestedGitRepository] failed to check for nested git repos: ${error instanceof Error ? error.message : String(error)}`,
+				`[${this.constructor.name}#getNestedGitRepositories] failed to check for nested git repos: ${error instanceof Error ? error.message : String(error)}`,
 			)
 
 			// If we can't check, assume there are no nested repos to avoid blocking the feature.
-			return null
+			return []
 		}
+	}
+
+	private async getNestedGitRepository(): Promise<string | null> {
+		const repos = await this.getNestedGitRepositories()
+		return repos.length > 0 ? repos[0] : null
 	}
 
 	private async getShadowGitConfigWorktree(git: SimpleGit) {

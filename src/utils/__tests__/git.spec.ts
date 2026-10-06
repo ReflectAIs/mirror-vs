@@ -44,6 +44,13 @@ vitest.mock("vscode", () => ({
 		get workspaceFolders() {
 			return mockWorkspaceFolders()
 		},
+		getWorkspaceFolder: vitest.fn(),
+	},
+	window: {
+		activeTextEditor: undefined,
+	},
+	Uri: {
+		file: (f: string) => ({ fsPath: f }),
 	},
 }))
 

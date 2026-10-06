@@ -379,7 +379,7 @@ describe.each([[RepoPerTaskCheckpointService, "RepoPerTaskCheckpointService"]])(
 		})
 
 		describe(`${klass.name}#hasNestedGitRepositories`, () => {
-			it("throws error when nested git repositories are detected during initialization", async () => {
+			it("initializes successfully and excludes nested git repositories", async () => {
 				// Create a new temporary workspace and service for this test.
 				const shadowDir = path.join(tmpDir, `${prefix}-nested-git-${Date.now()}`)
 				const workspaceDir = path.join(tmpDir, `workspace-nested-git-${Date.now()}`)
@@ -437,11 +437,20 @@ describe.each([[RepoPerTaskCheckpointService, "RepoPerTaskCheckpointService"]])(
 
 				const service = new klass(taskId, shadowDir, workspaceDir, () => {})
 
-				// Verify that initialization throws an error when nested git repos are detected
-				// The error message now includes the specific path of the nested repository
-				await expect(service.initShadowGit()).rejects.toThrowError(
-					/Checkpoints are disabled because a nested git repository was detected at:/,
-				)
+				// Verify that initialization succeeds rather than throwing an error
+				const result = await service.initShadowGit()
+				expect(result.created).toBe(true)
+
+				// Verify that exclude file contains the nested project
+				const excludeContent = await fs.readFile(path.join(shadowDir, ".git", "info", "exclude"), "utf-8")
+				expect(excludeContent).toContain("nested-project/")
+
+				// Make a change to the main workspace file to trigger a checkpoint
+				await fs.writeFile(mainFile, "Content in main repo updated")
+
+				// Verify that checkpoint can be saved
+				const checkpoint = await service.saveCheckpoint("test checkpoint with nested repo")
+				expect(checkpoint).toBeDefined()
 
 				// Clean up.
 				vitest.restoreAllMocks()

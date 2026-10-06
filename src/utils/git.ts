@@ -178,17 +178,45 @@ export function extractRepositoryName(url: string): string {
 
 /**
  * Gets git repository information for the current VSCode workspace
+ * @param targetPath Optional path within a specific workspace folder or repo
  * @returns Git repository information or empty object if not available
  */
-export async function getWorkspaceGitInfo(): Promise<GitRepositoryInfo> {
-	const workspaceFolders = vscode.workspace.workspaceFolders
+export async function getWorkspaceGitInfo(targetPath?: string): Promise<GitRepositoryInfo> {
+	if (targetPath) {
+		const workspaceFolder = vscode.workspace?.getWorkspaceFolder?.(vscode.Uri.file(targetPath))
+		const folderPath = workspaceFolder?.uri.fsPath || targetPath
+		const info = await getGitRepositoryInfo(folderPath)
+		if (info.repositoryUrl || info.repositoryName) {
+			return info
+		}
+	}
+
+	const activeUri = vscode.window?.activeTextEditor?.document?.uri
+	if (activeUri) {
+		const activeFolder = vscode.workspace?.getWorkspaceFolder?.(activeUri)
+		if (activeFolder) {
+			const info = await getGitRepositoryInfo(activeFolder.uri.fsPath)
+			if (info.repositoryUrl || info.repositoryName) {
+				return info
+			}
+		}
+	}
+
+	const workspaceFolders = vscode.workspace?.workspaceFolders
 	if (!workspaceFolders || workspaceFolders.length === 0) {
 		return {}
 	}
 
-	// Use the first workspace folder.
-	const workspaceMirrort = workspaceFolders[0].uri.fsPath
-	return getGitRepositoryInfo(workspaceMirrort)
+	// Try folders in order until we find git repo info
+	for (const folder of workspaceFolders) {
+		const info = await getGitRepositoryInfo(folder.uri.fsPath)
+		if (info.repositoryUrl || info.repositoryName) {
+			return info
+		}
+	}
+
+	// Fallback to first folder
+	return getGitRepositoryInfo(workspaceFolders[0].uri.fsPath)
 }
 
 async function checkGitRepo(cwd: string): Promise<boolean> {
