@@ -3,7 +3,8 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "DipeshMajithia",
-	"version": "0.9.10",
+	"version": "1.0.0",
+	"license": "Apache-2.0",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {
 		"color": "#1a1a2e",
@@ -184,6 +185,11 @@
 			{
 				"command": "mirror-vs.acceptAllReviews",
 				"title": "%command.acceptAllReviews.title%",
+				"category": "%configuration.title%"
+			},
+			{
+				"command": "mirror-vs.rejectAllReviews",
+				"title": "%command.rejectAllReviews.title%",
 				"category": "%configuration.title%"
 			},
 			{

@@ -177,6 +177,23 @@ export class ReviewManager
 		)
 
 		context.subscriptions.push(
+			vscode.commands.registerCommand("mirror-vs.rejectAllReviews", async () => {
+				const filePaths = Array.from(this._activeReviews.keys())
+				if (filePaths.length === 0) {
+					vscode.window.showInformationMessage("No active changes to reject.")
+					return
+				}
+				for (const filePath of filePaths) {
+					const review = this._activeReviews.get(filePath)
+					if (review) {
+						await this.resolveReview(review.filePath, false)
+					}
+				}
+				vscode.window.showInformationMessage("All active changes rejected.")
+			}),
+		)
+
+		context.subscriptions.push(
 			vscode.commands.registerCommand("mirror-vs.prevChange", async () => {
 				await this.navigateToChange("prev")
 			}),

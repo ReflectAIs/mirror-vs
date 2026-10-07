@@ -358,11 +358,13 @@
 		"triggerLabelAll": "BRRR"
 	},
 	"announcement": {
-		"title": "Mirror VS {{version}} Released",
+		"title": "Mirror VS {{version}}",
+		"intro": "Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. This is our official 1.0.0 release and we hope you love it!",
 		"support": "Please support Mirror VS by starring us on <githubLink>GitHub</githubLink>.",
+		"feedback": "If you encounter any issues or have suggestions, please let us know on <githubLink>GitHub</githubLink>.",
 		"beta": {
-			"title": "Mirror VS {{version}} Beta",
-			"intro": "Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. We're currently in beta and we hope you like it!",
+			"title": "Mirror VS {{version}}",
+			"intro": "Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. This is our official 1.0.0 release and we hope you love it!",
 			"feedback": "If you encounter any issues or have suggestions, please let us know on <githubLink>GitHub</githubLink>."
 		},
 		"release": {

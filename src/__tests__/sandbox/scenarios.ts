@@ -278,6 +278,61 @@ export const dbSchemaMigration: TestScenario = {
 		"Add tags feature: (1) Create `src/migrations/002_add_tags.ts` that creates a `tags` table (id, name unique, timestamps) and a `post_tags` join table (postId FK->posts, tagId FK->tags, composite PK). (2) Create `src/models/Tag.ts` Sequelize model. (3) Update `src/models/Post.ts` to add many-to-many association with Tag through post_tags.",
 }
 
+export const eventEmitterRefactor: TestScenario = {
+	name: "event_emitter_refactor",
+	description: "Refactor loosely-typed event handling to a strongly typed EventEmitter with unsubscribe tokens",
+	expectedMaxTurns: 5,
+	tags: ["refactor", "typescript", "advanced"],
+	files: {
+		"src/events.ts": `type Handler = (...args: any[]) => void\n\nexport class LegacyEmitter {\n  private events: Record<string, Handler[]> = {}\n\n  on(event: string, handler: Handler): void {\n    if (!this.events[event]) this.events[event] = []\n    this.events[event].push(handler)\n  }\n\n  emit(event: string, ...args: any[]): void {\n    const handlers = this.events[event] || []\n    for (const h of handlers) h(...args)\n  }\n}\n`,
+		"src/app.ts": `import { LegacyEmitter } from "./events"\n\nconst emitter = new LegacyEmitter()\nemitter.on("data", (chunk) => console.log("Received:", chunk))\nemitter.emit("data", "hello world")\n`,
+		"package.json": `{\n  "name": "typed-events",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"In `src/events.ts`, replace `LegacyEmitter` with a strongly-typed `TypedEventEmitter<EventMap extends Record<string, any>>`: (1) `on<K extends keyof EventMap>(event: K, listener: (data: EventMap[K]) => void): () => void` returning an unsubscribe function. (2) `emit<K extends keyof EventMap>(event: K, data: EventMap[K]): void`. (3) In `src/app.ts`, define an `AppEvents` interface with `data: string` and `error: Error`, instantiate `TypedEventEmitter<AppEvents>`, and use the returned unsubscribe function.",
+}
+
+export const circuitBreakerImplementation: TestScenario = {
+	name: "circuit_breaker",
+	description: "Implement a 3-state Circuit Breaker for resilient external API calls",
+	expectedMaxTurns: 5,
+	tags: ["feature", "resilience", "advanced"],
+	files: {
+		"src/circuitBreaker.ts": `export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN"\n\nexport interface CircuitBreakerOptions {\n  failureThreshold: number\n  recoveryTimeoutMs: number\n}\n\nexport class CircuitBreaker {\n  private state: CircuitState = "CLOSED"\n  // Needs implementation\n  constructor(private options: CircuitBreakerOptions) {}\n\n  getState(): CircuitState {\n    return this.state\n  }\n\n  async execute<T>(action: () => Promise<T>): Promise<T> {\n    // Needs implementation\n    return action()\n  }\n}\n`,
+		"src/index.ts": `import { CircuitBreaker } from "./circuitBreaker"\n\nconst breaker = new CircuitBreaker({ failureThreshold: 3, recoveryTimeoutMs: 1000 })\nconsole.log("Breaker state:", breaker.getState())\n`,
+		"package.json": `{\n  "name": "resilience-kit",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"In `src/circuitBreaker.ts`, implement the full Circuit Breaker state machine: (1) When CLOSED: actions execute normally. If failures reach `failureThreshold`, transition to OPEN and record the trip timestamp. (2) When OPEN: immediate throw with `Error('Circuit breaker is OPEN')` without calling action. If `recoveryTimeoutMs` has passed since tripping, transition to HALF_OPEN. (3) When HALF_OPEN: allow one probe execution. If it succeeds, transition back to CLOSED and reset failure count. If it fails, transition back to OPEN and reset timeout.",
+}
+
+export const lruCacheImplementation: TestScenario = {
+	name: "lru_cache",
+	description: "Implement an in-memory O(1) LRU Cache with capacity limit and eviction",
+	expectedMaxTurns: 4,
+	tags: ["perf", "algorithms", "advanced"],
+	files: {
+		"src/lruCache.ts": `export class LRUCache<K, V> {\n  private capacity: number\n  private cache: Map<K, V> = new Map()\n\n  constructor(capacity: number) {\n    this.capacity = capacity\n  }\n\n  get(key: K): V | undefined {\n    // Needs implementation: retrieve and mark as most recently used\n    return undefined\n  }\n\n  set(key: K, value: V): void {\n    // Needs implementation: insert/update and evict least recently used if exceeding capacity\n  }\n\n  size(): number {\n    return this.cache.size\n  }\n}\n`,
+		"src/index.ts": `import { LRUCache } from "./lruCache"\nconst cache = new LRUCache<string, number>(2)\ncache.set("a", 1)\ncache.set("b", 2)\nconsole.log(cache.get("a"))\n`,
+		"package.json": `{\n  "name": "cache-lib",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"In `src/lruCache.ts`, implement the `get` and `set` methods using Map iteration order for O(1) operations: (1) `get(key)`: if present, re-insert to refresh recency and return value; otherwise return undefined. (2) `set(key, value)`: if key already exists, delete it first before re-setting. If cache size exceeds `capacity`, delete the oldest entry (the first key in Map keys iterator). (3) Add `has(key: K): boolean` without updating recency.",
+}
+
+export const rateLimiterMiddleware: TestScenario = {
+	name: "rate_limiter",
+	description: "Implement a sliding-window rate limiting middleware for HTTP handlers",
+	expectedMaxTurns: 4,
+	tags: ["feature", "security", "advanced"],
+	files: {
+		"src/rateLimiter.ts": `export interface RateLimitOptions {\n  windowMs: number\n  maxRequests: number\n}\n\nexport interface Request {\n  ip: string\n}\n\nexport interface Response {\n  status: (code: number) => Response\n  json: (data: any) => void\n}\n\nexport function createRateLimiter(options: RateLimitOptions) {\n  // Needs implementation: track timestamps per IP\n  return (req: Request, res: Response, next: () => void) => {\n    next()\n  }\n}\n`,
+		"package.json": `{\n  "name": "rate-limiter",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"In `src/rateLimiter.ts`, implement `createRateLimiter`: (1) Store an in-memory map of `ip -> number[]` (timestamps of requests). (2) On each request, prune timestamps older than `Date.now() - options.windowMs`. (3) If remaining requests >= `options.maxRequests`, respond with `res.status(429).json({ error: 'Too Many Requests', retryAfterMs })` where retryAfterMs is time until oldest request leaves the window. (4) Otherwise record current timestamp and call `next()`.",
+}
+
 // ────────────────────────────────────────────────────────────
 //  All Scenarios (basic → advanced)
 // ────────────────────────────────────────────────────────────
@@ -305,4 +360,8 @@ export const ALL_SCENARIOS: TestScenario[] = [
 	apiIntegration,
 	dependencyInjection,
 	dbSchemaMigration,
+	eventEmitterRefactor,
+	circuitBreakerImplementation,
+	lruCacheImplementation,
+	rateLimiterMiddleware,
 ]

@@ -987,6 +987,53 @@ export class TaskMainLoop {
 								break
 							}
 						}
+
+						if (chunk.type === "reasoning" && reasoningMessage.length >= 80) {
+							const repetitionCheck = detectSentenceRepetition(reasoningMessage)
+							if (repetitionCheck.hasLoop) {
+								console.warn(
+									"[TaskMainLoop] Thinking loop detected in reasoning stream, interrupting:",
+									repetitionCheck.repeatedContent,
+								)
+								reasoningMessage +=
+									"\n\n[Thinking interrupted: repetitive reasoning loop detected. Proceeding directly to action.]"
+								await finalizeReasoning()
+								if (this.task.assistantMessageContent.length === 0) {
+									this.task.assistantMessageContent.push({
+										type: "text",
+										content:
+											"[Thinking loop detected in model reasoning. Stream interrupted to prevent runaway loop.]",
+										partial: false,
+									})
+									presentAssistantMessage(this.task)
+								}
+								break
+							}
+
+							// Guard against runaway reasoning timeout (> 120s of continuous thinking without tools/text)
+							const MAX_REASONING_DURATION_MS = 120_000
+							if (
+								reasoningStartTime !== undefined &&
+								Date.now() - reasoningStartTime > MAX_REASONING_DURATION_MS
+							) {
+								console.warn(
+									`[TaskMainLoop] Thinking exceeded max duration (${MAX_REASONING_DURATION_MS}ms), interrupting.`,
+								)
+								reasoningMessage +=
+									"\n\n[Thinking interrupted: maximum reasoning duration reached (120s). Proceeding to action.]"
+								await finalizeReasoning()
+								if (this.task.assistantMessageContent.length === 0) {
+									this.task.assistantMessageContent.push({
+										type: "text",
+										content:
+											"[Maximum reasoning time limit reached. Stream interrupted to proceed with action.]",
+										partial: false,
+									})
+									presentAssistantMessage(this.task)
+								}
+								break
+							}
+						}
 					}
 
 					// Persist final token usage to the API request message

@@ -974,6 +974,202 @@ export interface RetryOptions {
 }
 
 // ────────────────────────────────────────────────────────────
+// Scenario R10: Multi-Repo Workspace Git Status Aggregator
+// ────────────────────────────────────────────────────────────
+
+export const mirrorMultiRepoSync: TestScenario = {
+	name: "mirror_multi_repo_sync",
+	description: "Implement multi-repo status detection across git roots in a workspace",
+	expectedMaxTurns: 5,
+	tags: ["feature", "mirror-vs", "multi-repo", "advanced"],
+	files: {
+		"src/utils/multiRepoGit.ts": `import path from "path"
+
+export interface RepoStatus {
+	repoRoot: string
+	relativePath: string
+	hasChanges: boolean
+	branch: string
+}
+
+/**
+ * Finds all git repositories within a multi-repo workspace.
+ * Stub implementation to be expanded.
+ */
+export async function findGitRepositories(workspaceRoot: string): Promise<string[]> {
+	return [workspaceRoot]
+}
+`,
+		"src/core/checkpoint/MultiRepoCheckpointManager.ts": `import { findGitRepositories, RepoStatus } from "../../utils/multiRepoGit"
+
+export class MultiRepoCheckpointManager {
+	private workspaceRoot: string
+
+	constructor(workspaceRoot: string) {
+		this.workspaceRoot = workspaceRoot
+	}
+
+	/**
+	 * Gets git repositories in the workspace.
+	 */
+	async getRepositories(): Promise<string[]> {
+		return findGitRepositories(this.workspaceRoot)
+	}
+
+	/**
+	 * Matches a file path to its closest containing git repository root.
+	 * Returns null if no repository contains the file.
+	 */
+	findContainingRepo(filePath: string, repoRoots: string[]): string | null {
+		// Needs implementation: find repo root that is an ancestor of filePath
+		return null
+	}
+}
+`,
+	},
+	userPrompt: `Implement repo matching and aggregation in \`src/core/checkpoint/MultiRepoCheckpointManager.ts\`:
+1. In \`findContainingRepo(filePath: string, repoRoots: string[]): string | null\`:
+   - Normalize paths (handle relative vs absolute)
+   - Find the repository root from \`repoRoots\` that filePath is located inside (i.e. filePath starts with repoRoot path).
+   - If multiple repo roots match (e.g. nested submodules), pick the most specific (longest) repo root path.
+   - Return null if no repo root contains filePath.
+2. Add a new method \`groupFilesByRepo(filePaths: string[]): Promise<Map<string, string[]>>\` that:
+   - Gets repo roots via \`this.getRepositories()\`
+   - Returns a Map where keys are repo roots and values are arrays of file paths belonging to that repo.
+   - Unmatched files should be grouped under a special key \`"__untracked_root__"\`.`,
+}
+
+// ────────────────────────────────────────────────────────────
+// Scenario R11: Thinking Loop Watchdog & Stream Guard
+// ────────────────────────────────────────────────────────────
+
+export const mirrorThinkingLoopGuard: TestScenario = {
+	name: "mirror_thinking_loop_guard",
+	description: "Add thinking loop watchdog and timeout guards to prevent runaway reasoning",
+	expectedMaxTurns: 4,
+	tags: ["bugfix", "mirror-vs", "reasoning", "advanced"],
+	files: {
+		"src/core/task/ThinkingWatchdog.ts": `export interface WatchdogResult {
+	shouldAbort: boolean
+	reason?: "loop_detected" | "timeout_exceeded"
+	userNotice?: string
+}
+
+export class ThinkingWatchdog {
+	private startTime: number = 0
+	private readonly maxDurationMs: number
+
+	constructor(maxDurationMs: number = 120_000) {
+		this.maxDurationMs = maxDurationMs
+	}
+
+	start(): void {
+		this.startTime = Date.now()
+	}
+
+	check(accumulatedReasoning: string): WatchdogResult {
+		// Needs implementation:
+		// 1. Check if (Date.now() - this.startTime) > this.maxDurationMs -> timeout_exceeded
+		// 2. Return shouldAbort: false by default
+		return { shouldAbort: false }
+	}
+}
+`,
+	},
+	userPrompt: `Enhance \`src/core/task/ThinkingWatchdog.ts\`:
+1. Add an optional \`repetitionDetector\` callback \`(text: string) => { hasLoop: boolean; repeatedContent?: string }\` to constructor or method.
+2. In \`check(accumulatedReasoning: string): WatchdogResult\`:
+   - If \`this.startTime > 0\` and elapsed time exceeds \`this.maxDurationMs\`, return \`{ shouldAbort: true, reason: "timeout_exceeded", userNotice: "Thinking duration exceeded limit" }\`.
+   - If accumulatedReasoning has length >= 80 and the repetition detector detects a loop, return \`{ shouldAbort: true, reason: "loop_detected", userNotice: "Repetitive reasoning loop detected" }\`.
+   - Otherwise return \`{ shouldAbort: false }\`.
+3. Add a \`reset()\` method to reset \`startTime\` to 0.`,
+}
+
+// ────────────────────────────────────────────────────────────
+// Scenario R12: N-Step Tool Cycle Detection
+// ────────────────────────────────────────────────────────────
+
+export const mirrorNStepCycleDetection: TestScenario = {
+	name: "mirror_n_step_cycle_detection",
+	description: "Verify and expand cycle detection for 2-step, 3-step and 4-step tool loops",
+	expectedMaxTurns: 4,
+	tags: ["feature", "mirror-vs", "loop-detection"],
+	files: {
+		"src/core/tools/CycleDetector.ts": `export class CycleDetector {
+	private history: string[] = []
+	private readonly maxHistory: number
+
+	constructor(maxHistory: number = 20) {
+		this.maxHistory = maxHistory
+	}
+
+	record(toolSignature: string): void {
+		this.history.push(toolSignature)
+		if (this.history.length > this.maxHistory) {
+			this.history.shift()
+		}
+	}
+
+	detectCycle(): { hasCycle: boolean; cycleLength: number } {
+		// Check for repeating cycles of length L in [2, 3, 4]
+		return { hasCycle: false, cycleLength: 0 }
+	}
+}
+`,
+	},
+	userPrompt: `In \`src/core/tools/CycleDetector.ts\`, implement the \`detectCycle()\` method:
+- Check cycle periods L = 2, 3, and 4 from the tail of \`this.history\`.
+- For L = 2: requires at least 3 repetitions (6 items total).
+- For L = 3: requires at least 3 repetitions (9 items total).
+- For L = 4: requires at least 2 repetitions (8 items total).
+- Ensure not all elements in the cycle are identical (e.g. [A, A, A, A, A, A] is consecutive repetition, not a multi-step cycle).
+- If a cycle is detected, return \`{ hasCycle: true, cycleLength: L }\` with the matching period L.
+- Otherwise return \`{ hasCycle: false, cycleLength: 0 }\`.`,
+}
+
+// ────────────────────────────────────────────────────────────
+// Scenario R13: Context Condensing Pre-Send Pruner
+// ────────────────────────────────────────────────────────────
+
+export const mirrorContextCondensingPruner: TestScenario = {
+	name: "mirror_context_condensing_pruner",
+	description: "Implement pre-send pruning of older read_file results before context condensation",
+	expectedMaxTurns: 4,
+	tags: ["perf", "mirror-vs", "context"],
+	files: {
+		"src/core/condense/pruneHistory.ts": `export interface MessageBlock {
+	type: "text" | "tool_use" | "tool_result"
+	name?: string
+	content?: string
+	tool_use_id?: string
+}
+
+export interface ConversationTurn {
+	role: "user" | "assistant"
+	content: MessageBlock[]
+}
+
+/**
+ * Prunes oversized tool results from older conversation turns to conserve tokens.
+ */
+export function pruneToolResults(
+	turns: ConversationTurn[],
+	options: { keepLastNReads?: number; maxOlderLength?: number } = {}
+): ConversationTurn[] {
+	// Needs implementation
+	return turns
+}
+`,
+	},
+	userPrompt: `In \`src/core/condense/pruneHistory.ts\`, implement \`pruneToolResults\`:
+- Default options: \`keepLastNReads = 3\`, \`maxOlderLength = 200\`.
+- Identify \`tool_result\` blocks. Count how many read results exist from the end of conversation backwards.
+- For the most recent \`keepLastNReads\` read tool results, keep their \`content\` untouched.
+- For all older read tool results whose content length exceeds \`maxOlderLength\`, truncate the content to the first \`maxOlderLength\` characters and append \`\\n[...remaining content pruned to save context...]\`.
+- Do not mutate the original input array or objects; return a new array with shallowly copied turns/blocks where updated.`,
+}
+
+// ────────────────────────────────────────────────────────────
 // All mirror-vs scenarios
 // ────────────────────────────────────────────────────────────
 
@@ -987,4 +1183,8 @@ export const MIRROR_VS_SCENARIOS: TestScenario[] = [
 	mirrorFixControlledComponent,
 	mirrorRenameAcrossFiles,
 	mirrorAddRetryLogic,
+	mirrorMultiRepoSync,
+	mirrorThinkingLoopGuard,
+	mirrorNStepCycleDetection,
+	mirrorContextCondensingPruner,
 ]

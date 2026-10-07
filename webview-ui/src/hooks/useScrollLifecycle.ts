@@ -172,6 +172,7 @@ export function useScrollLifecycle({
 	const enterUserBrowsingHistory = useCallback(
 		(_source: ScrollFollowDisengageSource) => {
 			scrollPhaseRef.current = "USER_BROWSING_HISTORY"
+			isAtBottomRef.current = false
 			lastUserScrollInputRef.current = performance.now()
 			clearHydrationWindow()
 			cancelReanchorFrame()
@@ -211,8 +212,11 @@ export function useScrollLifecycle({
 				align: "end",
 				behavior: "auto",
 			})
+			if (scrollContainerRef.current) {
+				scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
+			}
 		})
-	}, [virtuosoRef])
+	}, [scrollContainerRef, virtuosoRef])
 
 	const finishHydrationWindow = useCallback(() => {
 		if (!isMountedRef.current || !isHydratingRef.current) {
@@ -278,13 +282,13 @@ export function useScrollLifecycle({
 		scrollPhaseRef.current = scrollPhase
 	}, [scrollPhase])
 
-	// Task switch: reset and begin a short hydration window
+	// Task switch or un-hide: reset and begin a short hydration window
 	useEffect(() => {
 		isAtBottomRef.current = false
 		clearHydrationWindow()
 		cancelReanchorFrame()
 
-		if (taskId) {
+		if (taskId && !isHidden) {
 			transitionScrollPhase("HYDRATING_PINNED_TO_BOTTOM")
 			setShowScrollToBottom(false)
 			startHydrationWindow()
@@ -297,7 +301,7 @@ export function useScrollLifecycle({
 			clearHydrationWindow()
 			cancelReanchorFrame()
 		}
-	}, [cancelReanchorFrame, clearHydrationWindow, startHydrationWindow, taskId, transitionScrollPhase])
+	}, [cancelReanchorFrame, clearHydrationWindow, isHidden, startHydrationWindow, taskId, transitionScrollPhase])
 
 	// -----------------------------------------------------------------------
 	// Row height change handler
@@ -375,21 +379,20 @@ export function useScrollLifecycle({
 	// Virtuoso callback: followOutput
 	// -----------------------------------------------------------------------
 
-	const followOutputCallback = useCallback((isAtBottom?: boolean): "auto" | false => {
-		// If a programmatic navigation is in progress, NEVER follow output
-		if (performance.now() - navigationStartedAtRef.current < 2000) {
-			return false
-		}
-		// If at bottom, ALWAYS follow output so streaming stays pinned
-		if (isAtBottom || isAtBottomRef.current) {
-			return "auto"
-		}
-		const phase = scrollPhaseRef.current
-		if (phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM") {
-			return "auto"
-		}
-		return false
-	}, [])
+	const followOutputCallback = useCallback(
+		(_isAtBottom?: boolean): "auto" | false => {
+			// If a programmatic navigation is in progress, NEVER follow output
+			if (performance.now() - navigationStartedAtRef.current < 2000) {
+				return false
+			}
+			const phase = scrollPhaseRef.current
+			const follow =
+				phase !== "USER_BROWSING_HISTORY" &&
+				(isStreaming || phase === "ANCHORED_FOLLOWING" || phase === "HYDRATING_PINNED_TO_BOTTOM")
+			return follow ? "auto" : false
+		},
+		[isStreaming],
+	)
 
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: atBottomStateChange
@@ -405,8 +408,20 @@ export function useScrollLifecycle({
 				return
 			}
 
+			if (scrollPhaseRef.current === "USER_BROWSING_HISTORY") {
+				if (!isAtBottom) {
+					setShowScrollToBottom(true)
+				}
+				return
+			}
+
 			if (isAtBottom) {
 				enterAnchoredFollowing()
+				setShowScrollToBottom(false)
+				return
+			}
+
+			if (!isAtBottom && (isHydratingRef.current || scrollPhaseRef.current === "HYDRATING_PINNED_TO_BOTTOM")) {
 				setShowScrollToBottom(false)
 				return
 			}
@@ -435,7 +450,10 @@ export function useScrollLifecycle({
 	const handleWheel = useCallback(
 		(event: Event) => {
 			const wheelEvent = event as WheelEvent
-			if (scrollContainerRef.current?.contains(wheelEvent.target as Node)) {
+			const isInside =
+				scrollContainerRef.current?.contains(wheelEvent.target as Node) ||
+				Boolean((wheelEvent.target as HTMLElement | null)?.closest?.(".scrollable"))
+			if (isInside) {
 				// Always timestamp user scroll input (any direction) so the
 				// compensation RAF loop knows not to fight user intent.
 				lastUserScrollInputRef.current = performance.now()
@@ -465,7 +483,9 @@ export function useScrollLifecycle({
 				return
 			}
 
-			if (!scrollContainerRef.current?.contains(pointerTarget)) {
+			const isInside =
+				scrollContainerRef.current?.contains(pointerTarget) || Boolean(pointerTarget.closest?.(".scrollable"))
+			if (!isInside) {
 				pointerScrollActiveRef.current = false
 				pointerScrollElementRef.current = null
 				pointerScrollLastTopRef.current = null
@@ -500,7 +520,9 @@ export function useScrollLifecycle({
 				return
 			}
 
-			if (!scrollContainerRef.current?.contains(scrollTarget)) {
+			const isInside =
+				scrollContainerRef.current?.contains(scrollTarget) || Boolean(scrollTarget.closest?.(".scrollable"))
+			if (!isInside) {
 				return
 			}
 

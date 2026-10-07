@@ -7,6 +7,7 @@
  */
 import OpenAI from "openai"
 import { executeTool, type ToolInvocation, type SandboxProject } from "./mock-tools"
+import { ToolRepetitionDetector } from "../../core/tools/ToolRepetitionDetector"
 
 // ────────────────────────────────────────────────────────────
 //  Types
@@ -99,6 +100,22 @@ const SANDBOX_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
 					},
 				},
 				required: ["path", "diff"],
+			},
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "edit_file",
+			description: "Edit an existing file by replacing exact search text with replacement text.",
+			parameters: {
+				type: "object",
+				properties: {
+					path: { type: "string", description: "File path relative to the project root." },
+					search: { type: "string", description: "Exact string or lines to find in the file." },
+					replace: { type: "string", description: "Replacement string." },
+				},
+				required: ["path", "search", "replace"],
 			},
 		},
 	},
@@ -225,6 +242,7 @@ ${fileSection}`
 export class SandboxHarness {
 	private client: OpenAI
 	private config: HarnessConfig
+	private repetitionDetector: ToolRepetitionDetector = new ToolRepetitionDetector(3)
 
 	constructor(config: HarnessConfig) {
 		this.config = config
@@ -235,6 +253,7 @@ export class SandboxHarness {
 	}
 
 	async runScenario(scenarioName: string, userPrompt: string, project: SandboxProject): Promise<ConversationTrace> {
+		this.repetitionDetector = new ToolRepetitionDetector(3)
 		const fileList = Object.keys(project.files)
 		const systemPrompt = buildSystemPrompt(project.rootDir, fileList, project.files)
 
@@ -335,8 +354,33 @@ export class SandboxHarness {
 					toolArgs = { _raw: tc.function?.arguments }
 				}
 
-				// Execute the tool
-				const { result, invocation } = executeTool(toolName, toolArgs, project)
+				// Check repetition detector to prevent runaway loops or alternating tool oscillation
+				const repCheck = this.repetitionDetector.check({
+					type: "tool_use",
+					name: toolName as any,
+					params: toolArgs,
+					partial: false,
+				})
+
+				let result: string
+				let invocation: ToolInvocation
+
+				if (!repCheck.allowExecution) {
+					const loopMsg = `[LOOP_GUARD] ${repCheck.askUser?.messageDetail || "Repeated tool calls detected."} Please break this loop by changing your strategy or calling attempt_completion.`
+					result = loopMsg
+					invocation = {
+						name: toolName,
+						args: toolArgs,
+						result: loopMsg,
+						durationMs: 0,
+						timestamp: Date.now(),
+					}
+				} else {
+					const toolExec = executeTool(toolName, toolArgs, project)
+					result = toolExec.result
+					invocation = toolExec.invocation
+				}
+
 				toolCalls.push(invocation)
 
 				// Add tool result to messages

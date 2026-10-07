@@ -584,5 +584,54 @@ describe("ToolRepetitionDetector", () => {
 			expect(result.askUser).toBeDefined()
 			expect(result.askUser?.messageDetail).toContain("Alternating tool repetition loop detected")
 		})
+
+		it("should detect 3-step cyclic tool loops (A -> B -> C -> A -> B -> C -> A -> B -> C)", () => {
+			const detector = new ToolRepetitionDetector(3)
+			const toolA = createToolUse("read_file", "read_file", { path: "src/a.ts" })
+			const toolB = createToolUse("edit_file", "edit_file", { path: "src/b.ts" })
+			const toolC = createToolUse("execute_command", "execute_command", { command: "npm test" })
+
+			// 2 full cycles (6 calls)
+			for (let i = 0; i < 2; i++) {
+				expect(detector.check(toolA).allowExecution).toBe(true)
+				expect(detector.check(toolB).allowExecution).toBe(true)
+				expect(detector.check(toolC).allowExecution).toBe(true)
+			}
+
+			// 3rd cycle: A and B allowed
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+
+			// 9th call completes the 3rd A-B-C cycle and should be blocked
+			const result = detector.check(toolC)
+			expect(result.allowExecution).toBe(false)
+			expect(result.askUser).toBeDefined()
+			expect(result.askUser?.messageDetail).toContain("Cyclic tool repetition loop detected across 3 tools")
+		})
+
+		it("should detect 4-step cyclic tool loops (A -> B -> C -> D -> A -> B -> C -> D)", () => {
+			const detector = new ToolRepetitionDetector(3)
+			const toolA = createToolUse("read_file", "read_file", { path: "src/a.ts" })
+			const toolB = createToolUse("search_files", "search_files", { path: "src" })
+			const toolC = createToolUse("edit_file", "edit_file", { path: "src/c.ts" })
+			const toolD = createToolUse("execute_command", "execute_command", { command: "tsc" })
+
+			// 1st cycle (4 calls)
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+			expect(detector.check(toolC).allowExecution).toBe(true)
+			expect(detector.check(toolD).allowExecution).toBe(true)
+
+			// 2nd cycle: A, B, C allowed
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+			expect(detector.check(toolC).allowExecution).toBe(true)
+
+			// 8th call completes the 2nd A-B-C-D cycle and should be blocked
+			const result = detector.check(toolD)
+			expect(result.allowExecution).toBe(false)
+			expect(result.askUser).toBeDefined()
+			expect(result.askUser?.messageDetail).toContain("Cyclic tool repetition loop detected across 4 tools")
+		})
 	})
 })

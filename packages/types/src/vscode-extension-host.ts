@@ -728,6 +728,7 @@ export interface WebviewMessage {
 		| "updateSkillModes"
 		| "openSkillFile"
 		| "acceptAllReviews"
+		| "rejectAllReviews"
 		// Pipeline messages
 		| "requestPipelines"
 		| "importPipeline"

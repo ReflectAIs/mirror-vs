@@ -199,12 +199,11 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 				</div>
 			)}
 			<div
-				className="flex items-center justify-between gap-2 py-1 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 cursor-pointer select-none group transition-colors text-xs"
+				className="flex items-center justify-between gap-1.5 py-0.5 px-1 rounded hover:bg-vscode-list-hoverBackground/30 cursor-pointer select-none group transition-colors text-xs"
 				onClick={() => setIsExpanded(!isExpanded)}>
-				<div className="flex items-center gap-2 min-w-0 flex-1">
-					<TerminalIcon className="size-3.5 text-vscode-descriptionForeground shrink-0" />
+				<div className="flex items-center gap-1.5 min-w-0 flex-1">
 					<span className="text-vscode-descriptionForeground/70 text-[11px] shrink-0 font-normal">
-						{isRunning ? "Running" : isSuccess ? "Ran command" : isFailed ? "Command failed" : "Terminal"}
+						{isRunning ? "Running" : isSuccess ? "Ran" : isFailed ? "Failed" : "Ran"}
 					</span>
 					<code
 						data-testid="code-block"
@@ -242,14 +241,18 @@ export const CommandExecution = ({ executionId, text, icon, title }: CommandExec
 
 			<div
 				className={cn(
-					"ml-3 pl-2.5 border-l border-vscode-panel-border/20 flex flex-col gap-1.5 overflow-hidden transition-all duration-150",
+					"ml-2 pl-2 border-l border-vscode-panel-border/20 flex flex-col gap-1.5 overflow-hidden transition-all duration-150",
 					{
 						"max-h-0 opacity-0 pointer-events-none": !isExpanded,
 						"max-h-[600px] opacity-100 my-1": isExpanded,
 					},
 				)}>
 				{output.length > 0 && (
-					<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[220px] overflow-auto">
+					<div className="rounded-lg bg-[#141416] border border-white/5 p-2.5 font-mono text-xs max-h-[260px] overflow-auto shadow-inner text-[#d4d4d8]">
+						<div className="text-[10.5px] text-vscode-descriptionForeground/60 pb-1 mb-1 border-b border-white/5 select-none font-mono flex items-center gap-1">
+							<span className="text-vscode-descriptionForeground/40">~ $</span>
+							<span className="text-vscode-foreground/80 font-medium truncate">{command}</span>
+						</div>
 						<TerminalOutput content={output} />
 					</div>
 				)}

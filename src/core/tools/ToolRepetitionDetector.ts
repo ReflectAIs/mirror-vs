@@ -72,8 +72,9 @@ export class ToolRepetitionDetector {
 		}
 
 		// Track recent tool calls for cycle detection (e.g. A -> B -> A -> B -> A -> B)
+		// Track recent tool calls for cycle detection (e.g. A -> B -> A -> B or A -> B -> C -> A -> B -> C)
 		this.recentToolCalls.push(currentToolCallJson)
-		if (this.recentToolCalls.length > 8) {
+		if (this.recentToolCalls.length > 16) {
 			this.recentToolCalls.shift()
 		}
 
@@ -117,18 +118,41 @@ export class ToolRepetitionDetector {
 			this.consecutiveIdenticalToolCallLimit > 0 &&
 			this.consecutiveBaseCommandCount >= Math.max(this.consecutiveIdenticalToolCallLimit + 2, 5)
 
-		// Check for alternating 2-step tool loop (A -> B -> A -> B -> A -> B)
-		const n = this.recentToolCalls.length
-		const reachedAlternatingCycle =
-			this.consecutiveIdenticalToolCallLimit > 0 &&
-			n >= 6 &&
-			this.recentToolCalls[n - 1] === this.recentToolCalls[n - 3] &&
-			this.recentToolCalls[n - 3] === this.recentToolCalls[n - 5] &&
-			this.recentToolCalls[n - 2] === this.recentToolCalls[n - 4] &&
-			this.recentToolCalls[n - 4] === this.recentToolCalls[n - 6] &&
-			this.recentToolCalls[n - 1] !== this.recentToolCalls[n - 2]
+		// Check for repeating cyclic tool loops (periods of 2, 3, or 4 steps)
+		let reachedCycle = false
+		let detectedCycleLength = 0
+		if (this.consecutiveIdenticalToolCallLimit > 0) {
+			const n = this.recentToolCalls.length
+			for (const cycleLen of [2, 3, 4]) {
+				const requiredRepeats = cycleLen === 4 ? 2 : 3
+				const neededCalls = cycleLen * requiredRepeats
+				if (n >= neededCalls) {
+					// Verify that not all elements in the period are identical (handled separately by reachedIdenticalLimit)
+					const uniqueInPeriod = new Set(this.recentToolCalls.slice(n - cycleLen))
+					if (uniqueInPeriod.size > 1) {
+						let isMatch = true
+						for (let rep = 1; rep < requiredRepeats; rep++) {
+							for (let i = 0; i < cycleLen; i++) {
+								if (
+									this.recentToolCalls[n - 1 - i] !== this.recentToolCalls[n - 1 - i - rep * cycleLen]
+								) {
+									isMatch = false
+									break
+								}
+							}
+							if (!isMatch) break
+						}
+						if (isMatch) {
+							reachedCycle = true
+							detectedCycleLength = cycleLen
+							break
+						}
+					}
+				}
+			}
+		}
 
-		if (reachedIdenticalLimit || reachedCliLoopLimit || reachedAlternatingCycle) {
+		if (reachedIdenticalLimit || reachedCliLoopLimit || reachedCycle) {
 			const stuckCommand = this.previousBaseCommand || "command"
 
 			// Reset counters to allow recovery if user guides the AI past this point
@@ -140,8 +164,10 @@ export class ToolRepetitionDetector {
 
 			const loopDetail = reachedCliLoopLimit
 				? `Repeated CLI execution loop detected for '${stuckCommand}'. If the command requires non-interactive flags (e.g., '--non-interactive' for Firebase), browser authentication, or is stuck waiting for input, please guide the model or provide the required input.`
-				: reachedAlternatingCycle
-					? `Alternating tool repetition loop detected between tools. Please try a different approach.`
+				: reachedCycle
+					? detectedCycleLength === 2
+						? `Alternating tool repetition loop detected between tools. Please try a different approach.`
+						: `Cyclic tool repetition loop detected across ${detectedCycleLength} tools. Please try a different approach.`
 					: t("tools:toolRepetitionLimitReached", { toolName: currentToolCallBlock.name })
 
 			// Return result indicating execution should not be allowed

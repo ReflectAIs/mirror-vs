@@ -58,8 +58,15 @@ export function executeTool(
 	const start = performance.now()
 	let result: string
 
+	// Sanitize toolName of any XML tag fragments or whitespace artifacts from LLM generation
+	const cleanToolName =
+		toolName
+			.trim()
+			.replace(/<[^>]*>/g, "")
+			.split(/[^a-zA-Z0-9_]/)[0] || toolName
+
 	try {
-		switch (toolName) {
+		switch (cleanToolName) {
 			case "read_file":
 				result = handleReadFile(args, project)
 				break
@@ -113,14 +120,14 @@ export function executeTool(
 				result = "Slept."
 				break
 			default:
-				result = `Tool "${toolName}" executed (sandbox stub).`
+				result = `Tool "${cleanToolName}" executed (sandbox stub).`
 		}
 	} catch (e: any) {
 		result = `Error: ${e.message}`
 	}
 
 	const durationMs = performance.now() - start
-	const invocation: ToolInvocation = { name: toolName, args, result, durationMs, timestamp: Date.now() }
+	const invocation: ToolInvocation = { name: cleanToolName, args, result, durationMs, timestamp: Date.now() }
 
 	return { result, invocation }
 }
@@ -171,23 +178,29 @@ function handleApplyDiff(args: Record<string, unknown>, project: SandboxProject)
 
 	if (!fs.existsSync(fullPath)) return `Error: File not found: ${filePath}`
 
-	const searchReplaceRegex = /<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
 	let content = fs.readFileSync(fullPath, "utf-8")
+	const normalizedContent = content.replace(/\r\n/g, "\n")
+	const normalizedDiff = diff.replace(/\r\n/g, "\n")
+
+	// Allow flexible whitespace on marker lines
+	const searchReplaceRegex = /<<<<<<< SEARCH[^\S\n]*\n([\s\S]*?)\n=======[^\S\n]*\n([\s\S]*?)\n>>>>>>> REPLACE/g
 	let match
 	let applied = 0
+	let updatedContent = normalizedContent
 
-	while ((match = searchReplaceRegex.exec(diff)) !== null) {
+	while ((match = searchReplaceRegex.exec(normalizedDiff)) !== null) {
 		const search = match[1]
 		const replace = match[2]
-		if (content.includes(search)) {
-			content = content.replace(search, replace)
+		if (updatedContent.includes(search)) {
+			updatedContent = updatedContent.replace(search, replace)
 			applied++
 		} else {
 			// Fallback: trimmed-line matching (handles indentation / leading whitespace variations)
-			const searchLines = search.split(/\r?\n/)
-			const contentLines = content.split(/\r?\n/)
+			const searchLines = search.split("\n")
+			const contentLines = updatedContent.split("\n")
 			const trimmedSearch = searchLines.map((l) => l.trim()).filter((l) => l.length > 0)
 
+			let matchedIndex = -1
 			for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
 				const candidate = contentLines.slice(i, i + searchLines.length)
 				const trimmedCandidate = candidate.map((l) => l.trim()).filter((l) => l.length > 0)
@@ -195,21 +208,25 @@ function handleApplyDiff(args: Record<string, unknown>, project: SandboxProject)
 					trimmedCandidate.length === trimmedSearch.length &&
 					trimmedCandidate.every((l, idx) => l === trimmedSearch[idx])
 				) {
-					contentLines.splice(i, searchLines.length, replace)
-					content = contentLines.join("\n")
-					applied++
+					matchedIndex = i
 					break
 				}
+			}
+
+			if (matchedIndex !== -1) {
+				contentLines.splice(matchedIndex, searchLines.length, replace)
+				updatedContent = contentLines.join("\n")
+				applied++
 			}
 		}
 	}
 
 	if (applied > 0) {
-		fs.writeFileSync(fullPath, content, "utf-8")
-		project.files[filePath] = content
+		fs.writeFileSync(fullPath, updatedContent, "utf-8")
+		project.files[filePath] = updatedContent
 		return `Applied ${applied} diff hunk(s) to ${filePath}.`
 	}
-	return `Error: Could not apply diff to ${filePath}. Search content not found.`
+	return `Error: Could not apply diff to ${filePath}. Search content not found. Ensure SEARCH block matches exact lines from the file.`
 }
 
 function handleSearchReplace(args: Record<string, unknown>, project: SandboxProject): string {

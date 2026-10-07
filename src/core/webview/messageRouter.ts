@@ -921,6 +921,9 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "acceptAllReviews":
 			await vscode.commands.executeCommand("mirror-vs.acceptAllReviews")
 			break
+		case "rejectAllReviews":
+			await vscode.commands.executeCommand("mirror-vs.rejectAllReviews")
+			break
 
 		case "searchCommits": {
 			const { searchCommits } = await import("../../utils/git")

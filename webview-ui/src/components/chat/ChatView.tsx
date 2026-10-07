@@ -23,6 +23,7 @@ import ChatToolbar from "./ChatToolbar"
 import ChatActionBar from "./ChatActionBar"
 import ChatWelcomeContent from "./ChatWelcomeContent"
 import FloatingChatHud from "./FloatingChatHud"
+import { StickyUserMessageHud } from "./StickyUserMessageHud"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -169,7 +170,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		handleScrollToBottomAndResetCheckpointCursor: _handleScrollToBottomAndResetCheckpointCursor,
 		handleScrollToLatestCheckpoint,
 		handleNavigateToMessage,
-		handleRangeChanged,
+		handleRangeChanged: _handleRangeChanged,
 		virtuosoComponents,
 	} = msg
 
@@ -237,16 +238,37 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		prevExpandedRef.current = expandedRows
 	}, [expandedRows, enterUserBrowsingHistory2])
 
+	const [visibleRange, setVisibleRange] = useState<{ startIndex: number; endIndex: number }>({
+		startIndex: 0,
+		endIndex: 0,
+	})
+	const handleRangeChanged = useCallback(
+		(range: { startIndex: number; endIndex: number }) => {
+			_handleRangeChanged?.(range)
+			setVisibleRange(range)
+		},
+		[_handleRangeChanged],
+	)
+
 	const handleNavigateToMessageSafe = useCallback(
 		(ts: number) => {
-			console.log("[ChatView] handleNavigateToMessageSafe triggered for ts:", ts)
 			const messageIndex = displayedMessages.findIndex((msg) => msg.ts === ts)
-			console.log("[ChatView] Target index:", messageIndex, "total displayedMessages:", displayedMessages.length)
 			if (messageIndex >= 0) {
 				navigateToIndex2(messageIndex)
 			}
 		},
 		[displayedMessages, navigateToIndex2],
+	)
+
+	const handleJumpToMessage = useCallback(
+		(index: number) => {
+			if (index >= displayedMessages.length - 1) {
+				handleScrollToBottomAndResetCheckpointCursor()
+			} else {
+				navigateToIndex2(index)
+			}
+		},
+		[displayedMessages.length, handleScrollToBottomAndResetCheckpointCursor, navigateToIndex2],
 	)
 
 	// ── itemContent: Virtuoso item renderer (needs child components) ──
@@ -350,7 +372,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	}))
 
 	// ── Button visibility ──
-	const areButtonsVisible = showScrollToBottom2 || primaryButtonText || secondaryButtonText
+	const areButtonsVisible = Boolean(primaryButtonText || secondaryButtonText)
 
 	// ── Select images handler ──
 	const selectImages = useCallback(() => vscode.postMessage({ type: "selectImages" }), [])
@@ -408,19 +430,19 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 			{task && (
 				<>
-					<div
-						className="scrollable grow flex flex-col overflow-y-auto overflow-x-hidden min-w-0 max-w-full relative"
-						ref={scrollContainerRef as any}>
+					<div className="relative grow flex flex-col min-h-0 min-w-0 max-w-full">
 						<Virtuoso
 							ref={virtuosoRef as any}
+							scrollerRef={(ref) => {
+								;(scrollContainerRef as any).current = ref as HTMLDivElement | null
+							}}
 							key={
 								activeTabId ||
 								currentTaskId ||
 								currentTaskItem?.id ||
 								(task?.ts ? String(task.ts) : "chat-virtuoso")
 							}
-							className="grow mb-1"
-							customScrollParent={scrollContainerRef.current || undefined}
+							className="scrollable grow overflow-y-auto overflow-x-hidden min-w-0 max-w-full"
 							increaseViewportBy={{ top: 800, bottom: 800 }}
 							initialTopMostItemIndex={displayedMessages.length > 0 ? displayedMessages.length - 1 : 0}
 							data={displayedMessages}
@@ -428,7 +450,14 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							followOutput={followOutputCallback2}
 							atBottomStateChange={atBottomStateChangeCallback2}
 							atBottomThreshold={48}
+							rangeChanged={handleRangeChanged}
 							components={virtuosoComponents}
+						/>
+						<StickyUserMessageHud
+							displayedMessages={displayedMessages}
+							visibleRange={visibleRange}
+							onJumpToMessage={handleJumpToMessage}
+							hasFloatingChatHud={showScrollToBottom2}
 						/>
 						<FloatingChatHud
 							show={showScrollToBottom2}
@@ -441,15 +470,11 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					</div>
 					{areButtonsVisible && (
 						<ChatActionBar
-							showScrollToBottom={showScrollToBottom2}
 							primaryButtonText={primaryButtonText}
 							secondaryButtonText={secondaryButtonText}
 							enableButtons={enableButtons}
-							hasLatestCheckpoint={hasLatestCheckpoint}
 							inputValue={inputValue}
 							selectedImages={selectedImages}
-							onScrollToBottom={handleScrollToBottomAndResetCheckpointCursor}
-							onScrollToCheckpoint={handleScrollToLatestCheckpoint}
 							onPrimaryButtonClick={(text, images) =>
 								handlePrimaryButtonClick(text ?? inputValue, images ?? selectedImages)
 							}

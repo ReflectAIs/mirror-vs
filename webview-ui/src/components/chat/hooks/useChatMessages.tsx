@@ -661,7 +661,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 							setSendingDisabled(isPartial)
 							setMirrorAsk("completion_result")
 							setEnableButtons(!isPartial)
-							setPrimaryButtonText(undefined)
+							setPrimaryButtonText(t("chat:startNewTask.title"))
 							setSecondaryButtonText(undefined)
 							break
 						case "resume_task":
@@ -674,7 +674,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 									(msg) => msg.ask === "completion_result" || msg.say === "completion_result",
 								)
 							if (isCompletedSubtask) {
-								setPrimaryButtonText(undefined)
+								setPrimaryButtonText(t("chat:startNewTask.title"))
 								setSecondaryButtonText(undefined)
 							} else {
 								setPrimaryButtonText(t("chat:resumeTask.title"))
@@ -686,7 +686,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 							setSendingDisabled(false)
 							setMirrorAsk("resume_completed_task")
 							setEnableButtons(true)
-							setPrimaryButtonText(undefined)
+							setPrimaryButtonText(t("chat:startNewTask.title"))
 							setSecondaryButtonText(undefined)
 							setDidClickCancel(false)
 							break
@@ -726,7 +726,7 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 				(msg) => msg.ask === "completion_result" || msg.say === "completion_result",
 			)
 			if (hasCompletionResult) {
-				setPrimaryButtonText(undefined)
+				setPrimaryButtonText(t("chat:startNewTask.title"))
 				setSecondaryButtonText(undefined)
 			}
 		}
@@ -1101,6 +1101,11 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 					break
 				case "completion_result":
 				case "resume_completed_task":
+					vscode.postMessage({
+						type: "newTask",
+						text: "",
+						images: [],
+					})
 					break
 				case "command_output":
 					vscode.postMessage({

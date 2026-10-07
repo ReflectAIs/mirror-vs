@@ -36,17 +36,15 @@ const Announcement = ({ hideAnnouncement }: AnnouncementProps) => {
 			}}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>{t("chat:announcement.beta.title", { version: Package.version })}</DialogTitle>
+					<DialogTitle>{t("chat:announcement.title", { version: Package.version || "1.0.0" })}</DialogTitle>
 				</DialogHeader>
 				<div className="text-sm leading-relaxed text-vscode-descriptionForeground">
-					<p className="mt-0">{t("chat:announcement.beta.intro")}</p>
+					<p className="mt-0">{t("chat:announcement.intro", { version: Package.version || "1.0.0" })}</p>
 					<p className="mb-0">
 						<Trans
-							i18nKey="chat:announcement.beta.feedback"
+							i18nKey="chat:announcement.feedback"
 							components={{
-								githubLink: (
-									<ExternalLink href="https://github.com/dipeshmajithia/mirror-vs/issues" />
-								),
+								githubLink: <ExternalLink href="https://github.com/ReflectAIs/mirror-vs/issues" />,
 							}}
 						/>
 					</p>

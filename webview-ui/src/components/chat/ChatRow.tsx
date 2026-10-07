@@ -54,7 +54,7 @@ import { MIRROR_LOGO_DATA_URI } from "@/assets/logoData"
 import { AutoApprovedRequestLimitWarning } from "./AutoApprovedRequestLimitWarning"
 import { InProgressRow, CondensationResultRow, CondensationErrorRow, TruncationResultRow } from "./context-management"
 import CodebaseSearchResultsDisplay from "./CodebaseSearchResultsDisplay"
-import { FileOperationItem, parsePathAndLines } from "./FileOperationItem"
+import { FileOperationItem, getFileBadge, parsePathAndLines } from "./FileOperationItem"
 import { ToolDisclosure } from "./ToolDisclosure"
 import { appendImages } from "@src/utils/imageUtils"
 import { McpExecution } from "./McpExecution"
@@ -238,6 +238,7 @@ export const ChatRowContent = ({
 	const [editedContent, setEditedContent] = useState("")
 	const [editMode, setEditMode] = useState<Mode>(mode || "code")
 	const [editImages, setEditImages] = useState<string[]>([])
+	const [isUserMessageExpanded, setIsUserMessageExpanded] = useState(false)
 
 	// Handle message events for image selection during edit mode
 	useEffect(() => {
@@ -540,17 +541,15 @@ export const ChatRowContent = ({
 				const isEditInProgress = (isLast && isStreaming) || message.partial
 				return (
 					<ToolDisclosure
-						title={isEditInProgress ? `Editing ${editFileName}` : `Edited ${editFileName}`}
-						defaultExpanded={false}
-						onRowClick={() => {
-							if (tool.path) {
-								vscode.postMessage({ type: "openFile", text: tool.path })
-							}
-						}}
-						status={
-							<span className="flex items-center gap-2">
+						title={
+							<div className="flex items-center gap-1.5 min-w-0 flex-1">
+								<span className="text-vscode-descriptionForeground/70 font-normal shrink-0">
+									{isEditInProgress ? "Editing" : "Edited"}
+								</span>
+								{getFileBadge(tool.path || "")}
+								<span className="font-semibold text-vscode-foreground truncate">{editFileName}</span>
 								{tool.diffStats && (tool.diffStats.added > 0 || tool.diffStats.removed > 0) && (
-									<span className="text-[10px] font-mono flex items-center gap-1.5 font-medium">
+									<span className="text-[11px] font-mono flex items-center gap-1 font-medium ml-1 shrink-0">
 										{tool.diffStats.added > 0 && (
 											<span className="text-vscode-charts-green">+{tool.diffStats.added}</span>
 										)}
@@ -559,12 +558,20 @@ export const ChatRowContent = ({
 										)}
 									</span>
 								)}
-								{message.isAnswered ? (
-									<span className="text-emerald-400">✓ Applied</span>
-								) : isLast && isStreaming ? (
-									<span className="text-mirror-brand-via animate-pulse">Running...</span>
-								) : null}
-							</span>
+							</div>
+						}
+						defaultExpanded={false}
+						onRowClick={() => {
+							if (tool.path) {
+								vscode.postMessage({ type: "openFile", text: tool.path })
+							}
+						}}
+						status={
+							message.isAnswered ? (
+								<span className="text-emerald-400 font-medium text-[11px]">✓</span>
+							) : isLast && isStreaming ? (
+								<span className="text-mirror-brand-via animate-pulse text-[11px]">...</span>
+							) : null
 						}>
 						<CodeAccordion
 							path={tool.path}
@@ -641,7 +648,7 @@ export const ChatRowContent = ({
 
 					return (
 						<ToolDisclosure
-							title={`Exploring ${fileCount} ${fileCount === 1 ? "file" : "files"}`}
+							title={`Explored ${fileCount} ${fileCount === 1 ? "file" : "files"}`}
 							isExpanded={isBatchExpanded}
 							onToggle={handleToggleBatchExpand}
 							status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
@@ -669,8 +676,8 @@ export const ChatRowContent = ({
 
 				return (
 					<ToolDisclosure
-						title="Exploring 1 file"
-						defaultExpanded={true}
+						title="Explored 1 file"
+						defaultExpanded={false}
 						status={message.isAnswered ? <span className="text-emerald-400">✓ Done</span> : undefined}>
 						<FileOperationItem
 							verb="Analyzed"
@@ -1644,69 +1651,68 @@ export const ChatRowContent = ({
 							/>
 						)
 					}
+					const isCollapsible =
+						!isLast &&
+						!isEditing &&
+						!!message.text &&
+						(message.text.length > 180 || message.text.split("\n").length > 3)
+
 					return (
 						<div
 							className={cn(
-								"group my-1.5 p-3 rounded-lg transition-all relative overflow-hidden",
+								"group my-2 p-3.5 rounded-2xl transition-all relative overflow-hidden text-sm",
+								isCollapsible && !isUserMessageExpanded && "cursor-pointer hover:bg-[#232328]",
 								isSticky
-									? "border border-vscode-focusBorder bg-vscode-sideBar-background shadow-sm"
-									: "border border-vscode-panel-border/30 bg-vscode-input-background/40 hover:bg-vscode-input-background/60",
-							)}>
-							<div
-								className="flex justify-between items-center w-full mb-1 cursor-pointer select-none"
-								onClick={(e) => {
-									e.stopPropagation()
-									onNavigateToMessage?.(message.ts)
-								}}
-								title="Click to scroll to this message">
-								<div className="flex items-center gap-1.5">
-									<div className="size-4 rounded-full bg-vscode-button-background/20 flex items-center justify-center text-vscode-button-background shrink-0">
-										<CircleUser className="size-2.5" aria-label="User icon" />
-									</div>
-									<span className="text-[11px] font-semibold text-vscode-descriptionForeground tracking-wider uppercase">
-										{t("chat:feedback.youSaid")}
-									</span>
+									? "border border-vscode-focusBorder bg-[#232328] shadow-sm"
+									: "border border-white/[0.08] bg-[#1d1d21] hover:border-white/[0.14]",
+							)}
+							onClick={() => {
+								if (isCollapsible && !isUserMessageExpanded) {
+									const selection = window.getSelection()?.toString()
+									if (!selection) {
+										setIsUserMessageExpanded(true)
+									}
+								}
+							}}>
+							{!isEditing && !isStreaming && (
+								<div
+									className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10 bg-[#1d1d21]/90 backdrop-blur rounded-md p-0.5 border border-white/5"
+									onClick={(e) => e.stopPropagation()}>
+									<button
+										className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded hover:bg-white/10 transition-colors shrink-0"
+										title="Revert chat to this message"
+										onClick={(e) => {
+											e.stopPropagation()
+											vscode.postMessage({
+												type: "revertHistory",
+												messageTs: message.ts,
+												inclusive: false,
+											})
+										}}>
+										<RotateCcw className="size-3" aria-label="Revert to here icon" />
+									</button>
+									<button
+										className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded hover:bg-white/10 transition-colors shrink-0"
+										title="Edit message"
+										onClick={(e) => {
+											e.stopPropagation()
+											handleEditClick()
+										}}>
+										<Edit className="size-3" aria-label="Edit message icon" />
+									</button>
+									<button
+										className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-1 rounded hover:bg-white/10 transition-colors shrink-0"
+										title="Delete message"
+										onClick={(e) => {
+											e.stopPropagation()
+											vscode.postMessage({ type: "deleteMessage", value: message.ts })
+										}}>
+										<Trash2 className="size-3" aria-label="Delete message icon" />
+									</button>
 								</div>
-								{!isEditing && !isStreaming && (
-									<div
-										className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 mr-1 shrink-0"
-										onClick={(e) => e.stopPropagation()}>
-										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
-											title="Revert chat to this message"
-											onClick={(e) => {
-												e.stopPropagation()
-												vscode.postMessage({
-													type: "revertHistory",
-													messageTs: message.ts,
-													inclusive: false,
-												})
-											}}>
-											<RotateCcw className="size-3.5" aria-label="Revert to here icon" />
-										</button>
-										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-foreground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
-											title="Edit message"
-											onClick={(e) => {
-												e.stopPropagation()
-												handleEditClick()
-											}}>
-											<Edit className="size-3.5" aria-label="Edit message icon" />
-										</button>
-										<button
-											className="cursor-pointer text-vscode-descriptionForeground hover:text-vscode-errorForeground p-1 rounded-md hover:bg-vscode-toolbar-hoverBackground transition-colors shrink-0"
-											title="Delete message"
-											onClick={(e) => {
-												e.stopPropagation()
-												vscode.postMessage({ type: "deleteMessage", value: message.ts })
-											}}>
-											<Trash2 className="size-3.5" aria-label="Delete message icon" />
-										</button>
-									</div>
-								)}
-							</div>
+							)}
 							{isEditing ? (
-								<div className="flex flex-col gap-2 ml-1 mt-1">
+								<div className="flex flex-col gap-2">
 									<ChatTextArea
 										inputValue={editedContent}
 										setInputValue={setEditedContent}
@@ -1726,23 +1732,56 @@ export const ChatRowContent = ({
 									/>
 								</div>
 							) : (
-								<div className="flex justify-between items-start ml-1 mt-1">
+								<div className="w-full">
 									<div
-										className="flex-grow wrap-anywhere text-vscode-foreground whitespace-pre-wrap select-text cursor-pointer"
+										className={cn(
+											"flex-grow wrap-anywhere text-zinc-100 whitespace-pre-wrap select-text leading-relaxed font-normal text-[13px]",
+											isCollapsible && !isUserMessageExpanded && "line-clamp-4 overflow-hidden",
+										)}
 										onClick={(e) => {
 											const selection = window.getSelection()?.toString()
 											if (!selection) {
-												onNavigateToMessage?.(message.ts)
+												if (isCollapsible) {
+													setIsUserMessageExpanded((prev) => !prev)
+												} else {
+													onNavigateToMessage?.(message.ts)
+												}
 											}
 										}}
-										title="Click to focus message">
+										title={
+											isCollapsible
+												? isUserMessageExpanded
+													? "Click to collapse message"
+													: "Click to expand message"
+												: "Click to focus message"
+										}>
 										<Mention text={message.text} withShadow />
 									</div>
+									{isCollapsible && (
+										<button
+											type="button"
+											className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-vscode-textLink-foreground hover:underline cursor-pointer select-none"
+											onClick={(e) => {
+												e.stopPropagation()
+												setIsUserMessageExpanded((prev) => !prev)
+											}}>
+											<span>{isUserMessageExpanded ? "Show less" : "Show more"}</span>
+											<ChevronDown
+												className={cn(
+													"size-3 transition-transform duration-200",
+													isUserMessageExpanded && "rotate-180",
+												)}
+											/>
+										</button>
+									)}
 								</div>
 							)}
-							{!isEditing && message.images && message.images.length > 0 && (
-								<Thumbnails images={message.images} style={{ marginTop: "8px" }} />
-							)}
+							{!isEditing &&
+								message.images &&
+								message.images.length > 0 &&
+								(!isCollapsible || isUserMessageExpanded) && (
+									<Thumbnails images={message.images} style={{ marginTop: "8px" }} />
+								)}
 						</div>
 					)
 				}

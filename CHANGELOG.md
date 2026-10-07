@@ -2,6 +2,31 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.0] - 2026-10-07
+
+### Official 1.0.0 Public Release
+
+- **Ultra-Compact Action Rows & Modern IDE UI**:
+    - Re-engineered chat rows into streamlined, single-line collapsible action items (`Explored N files >`, `Edited TS file.ts +X -Y`, `Ran command >`).
+    - Added dedicated file extension badges (`TS`, `JS`, `JSON`, `PY`, etc.) with real-time green/red git diff statistics.
+    - Sleek dark terminal box container for terminal command output with copy and expand/collapse support.
+    - Compacted padding, margins, and message bubbles across the entire webview to eliminate wasted vertical scroll space.
+- **Collapsible Chat History & Sticky Prompt HUD**:
+    - Multi-paragraph user messages in chat history collapse into compact 3-line previews with a click-to-expand toggle, keeping threads scannable.
+    - Context-aware sticky HUD: pinned active prompt header at top and instant "Next prompt" jump pill at bottom.
+- **Unified Action Dock & Clean Controls**:
+    - Contextual action dock cleanly presenting "Start New Task", "Resume Task", and "Terminate" when appropriate without duplicating floating scroll controls.
+    - Streamlined floating HUD with "Jump to bottom" and "Checkpoint" shortcuts.
+- **Accurate File Changes Panel & Diff Review**:
+    - Precise file change tracking and intuitive "Accept All" and "Reject All" controls with verified file content diffs.
+- **Thinking Loop Watchdog & Stream Safeguards**:
+    - Real-time sentence repetition detection wired directly into model reasoning / thinking streams (`reasoningMessage`).
+    - Added a 120-second continuous reasoning watchdog that gracefully interrupts runaway model monologues and prompts immediate tool execution.
+- **Generalized N-Step Tool Repetition Detector**:
+    - Expanded cycle detector to identify 2-step (`A→B`), 3-step (`A→B→C`), and 4-step (`A→B→C→D`) tool loops with a 16-call history buffer.
+- **Enterprise & Marketplace Compliance**:
+    - Comprehensive audit of all manifest dependencies, security configurations, telemetry disclosures, and licenses for public marketplace readiness.
+
 ## [0.9.10] - 2026-10-06
 
 ### Session Tab Isolation & Welcome UX

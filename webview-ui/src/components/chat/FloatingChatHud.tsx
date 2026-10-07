@@ -68,13 +68,14 @@ export const FloatingChatHud = memo(
 								Jump to bottom
 							</span>
 						)}
-						<ChevronDown className="size-3 text-vscode-descriptionForeground shrink-0" />
+						<span className="codicon codicon-chevron-down text-xs text-vscode-descriptionForeground shrink-0"></span>
 					</button>
 
 					{/* Checkpoint button if available */}
 					{hasLatestCheckpoint && onScrollToCheckpoint && (
 						<button
 							onClick={onScrollToCheckpoint}
+							aria-label="chat:scrollToLatestCheckpoint"
 							className={cn(
 								"h-6.5 px-2 rounded-md flex items-center gap-1 text-xs font-medium cursor-pointer transition-colors duration-150",
 								"bg-vscode-editor-background hover:bg-vscode-sideBar-background text-vscode-descriptionForeground hover:text-vscode-foreground",

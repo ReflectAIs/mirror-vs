@@ -33,6 +33,7 @@
 	"command.acceptReview.title": "Accept Changes",
 	"command.rejectReview.title": "Reject Changes",
 	"command.acceptAllReviews.title": "Accept All Changes",
+	"command.rejectAllReviews.title": "Reject All Changes",
 	"command.diffReview.title": "Compare Changes",
 	"command.prevChange.title": "Previous Review Change",
 	"command.nextChange.title": "Next Review Change",

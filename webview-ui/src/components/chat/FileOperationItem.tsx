@@ -14,6 +14,57 @@ interface FileOperationItemProps {
 	className?: string
 }
 
+export function getFileBadge(filePath: string) {
+	const ext = filePath.split(".").pop()?.toLowerCase() || ""
+	if (ext === "ts" || ext === "tsx") {
+		return (
+			<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-blue-500/20 text-blue-400 font-mono shrink-0 leading-none">
+				TS
+			</span>
+		)
+	}
+	if (ext === "js" || ext === "jsx" || ext === "mjs" || ext === "cjs") {
+		return (
+			<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-amber-500/20 text-amber-300 font-mono shrink-0 leading-none">
+				JS
+			</span>
+		)
+	}
+	if (ext === "py") {
+		return (
+			<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/20 text-emerald-300 font-mono shrink-0 leading-none">
+				PY
+			</span>
+		)
+	}
+	if (ext === "json") {
+		return (
+			<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-yellow-500/20 text-yellow-300 font-mono shrink-0 leading-none">
+				JSON
+			</span>
+		)
+	}
+	if (ext === "css" || ext === "scss" || ext === "sass" || ext === "html") {
+		return (
+			<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-sky-500/20 text-sky-300 font-mono shrink-0 leading-none">
+				CSS
+			</span>
+		)
+	}
+	if (ext === "md" || ext === "mdx") {
+		return (
+			<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-purple-500/20 text-purple-300 font-mono shrink-0 leading-none">
+				MD
+			</span>
+		)
+	}
+	return (
+		<span className="px-1 py-0.5 rounded text-[9.5px] font-bold bg-zinc-500/20 text-zinc-300 font-mono shrink-0 uppercase leading-none">
+			{ext.slice(0, 4) || "FILE"}
+		</span>
+	)
+}
+
 export function getFileIcon(filePath: string) {
 	const ext = filePath.split(".").pop()?.toLowerCase() || ""
 	if (ext === "tsx" || ext === "jsx") {
@@ -126,14 +177,12 @@ export const FileOperationItem = memo(
 			<div
 				onClick={handleClick}
 				className={cn(
-					"flex items-center gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/40 cursor-pointer text-xs group transition-colors select-none min-w-0 max-w-full overflow-hidden",
+					"flex items-center gap-1.5 py-0.5 px-1 rounded hover:bg-vscode-list-hoverBackground/30 cursor-pointer text-xs group transition-colors select-none min-w-0 max-w-full overflow-hidden",
 					className,
 				)}
 				title={`${displayPath}${effectiveLineRange ? ` #${effectiveLineRange}` : ""}`}>
-				<span className="text-vscode-descriptionForeground/70 text-[11px] font-normal w-14 shrink-0 truncate">
-					{verb}
-				</span>
-				{getFileIcon(displayPath)}
+				<span className="text-vscode-descriptionForeground/70 text-[11px] font-normal shrink-0">{verb}</span>
+				{getFileBadge(displayPath)}
 				<span className="font-semibold text-vscode-foreground text-[11.5px] truncate min-w-0 flex-1">
 					{fileName}
 				</span>
@@ -143,7 +192,7 @@ export const FileOperationItem = memo(
 					</span>
 				)}
 				{diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
-					<span className="text-[10px] font-mono shrink-0 ml-auto flex items-center gap-1.5 font-medium">
+					<span className="text-[10px] font-mono shrink-0 ml-auto flex items-center gap-1 font-medium">
 						{diffStats.added > 0 && <span className="text-vscode-charts-green">+{diffStats.added}</span>}
 						{diffStats.removed > 0 && <span className="text-vscode-charts-red">-{diffStats.removed}</span>}
 					</span>

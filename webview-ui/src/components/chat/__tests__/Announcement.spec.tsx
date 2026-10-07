@@ -26,7 +26,7 @@ vi.mock("@vscode/webview-ui-toolkit/react", () => ({
 
 vi.mock("react-i18next", () => ({
 	Trans: ({ i18nKey, components }: { i18nKey: string; components?: Record<string, React.ReactElement> }) => {
-		if (i18nKey === "chat:announcement.beta.feedback") {
+		if (i18nKey === "chat:announcement.feedback" || i18nKey === "chat:announcement.beta.feedback") {
 			return (
 				<span>
 					If you encounter any issues or have suggestions, please let us know on{" "}
@@ -43,13 +43,13 @@ vi.mock("@src/i18n/TranslationContext", () => ({
 	useAppTranslation: () => ({
 		t: (key: string, options?: { version?: string }) => {
 			const translations: Record<string, string> = {
-				"chat:announcement.beta.title": "Mirror VS {{version}} Beta",
-				"chat:announcement.beta.intro":
-					"Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. We're currently in beta and we hope you like it!",
+				"chat:announcement.title": "Mirror VS {{version}}",
+				"chat:announcement.intro":
+					"Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. This is our official 1.0.0 release and we hope you love it!",
 			}
 
-			if (key === "chat:announcement.beta.title") {
-				return `Mirror VS 0.5.0 Beta`
+			if (key === "chat:announcement.title") {
+				return `Mirror VS 1.0.0`
 			}
 
 			return translations[key] ?? key
@@ -58,13 +58,13 @@ vi.mock("@src/i18n/TranslationContext", () => ({
 }))
 
 describe("Announcement", () => {
-	it("renders the beta welcome announcement", () => {
+	it("renders the 1.0.0 official release announcement", () => {
 		render(<Announcement hideAnnouncement={vi.fn()} />)
 
-		expect(screen.getByText("Mirror VS 0.5.0 Beta")).toBeInTheDocument()
+		expect(screen.getByText("Mirror VS 1.0.0")).toBeInTheDocument()
 		expect(
 			screen.getByText(
-				"Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. We're currently in beta and we hope you like it!",
+				"Welcome to Mirror VS — an intelligent AI pair programmer that transforms your development workflow. This is our official 1.0.0 release and we hope you love it!",
 			),
 		).toBeInTheDocument()
 	})
@@ -74,7 +74,7 @@ describe("Announcement", () => {
 
 		expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
 			"href",
-			"https://github.com/dipeshmajithia/mirror-vs/issues",
+			"https://github.com/ReflectAIs/mirror-vs/issues",
 		)
 	})
 

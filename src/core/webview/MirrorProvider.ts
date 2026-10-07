@@ -163,7 +163,7 @@ export class MirrorProvider
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
-	public readonly latestAnnouncementId = "oct-2026-v0-9-10" // Mirror VS v0.9.10 session tab isolation & UX update.
+	public readonly latestAnnouncementId = "oct-2026-v1-0-0" // Mirror VS v1.0.0 official release: compact UX & loop protection.
 	public readonly providerSettingsManager: ProviderSettingsManager
 	public readonly customModesManager: CustomModesManager
 	/**

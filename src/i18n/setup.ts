@@ -13,7 +13,13 @@ if (!isTestEnv) {
 		const fs = require("fs")
 		const path = require("path")
 
-		const localesDir = path.join(__dirname, "i18n", "locales")
+		let localesDir = path.join(__dirname, "i18n", "locales")
+		if (!fs.existsSync(localesDir)) {
+			const fallbackDir = path.join(__dirname, "locales")
+			if (fs.existsSync(fallbackDir)) {
+				localesDir = fallbackDir
+			}
+		}
 
 		try {
 			// Find all language directories
