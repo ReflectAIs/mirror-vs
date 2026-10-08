@@ -483,6 +483,30 @@ export async function executeCommandInTerminal(
 		}, BACKGROUND_NOTICE_INTERVAL_MS)
 	}
 
+	const emitBackgroundNotification = () => {
+		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
+			return
+		}
+
+		hasEmittedBackgroundCompletion = true
+		const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
+		const exitStatus = exitDetails !== undefined ? formatExitStatus(exitDetails) : "Command finished"
+		const rawOutput = result || latestCompressedOutput || accumulatedOutput || ""
+		const outputToPreview = rawOutput ? (Terminal.compressTerminalOutput(rawOutput) ?? rawOutput) : ""
+		const previewSnippet =
+			outputToPreview && outputToPreview.length > 0
+				? outputToPreview.length > 2000
+					? outputToPreview.slice(-2000)
+					: outputToPreview
+				: ""
+		const notification = [
+			`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus}]`,
+			previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
+		].join("")
+
+		void task.injectInBetweenMessage(notification, undefined, "terminal_callback")
+	}
+
 	const checkAndNotifyBackgroundCompletion = () => {
 		if (backgroundNoticeTimer) {
 			clearInterval(backgroundNoticeTimer)
@@ -492,18 +516,13 @@ export async function executeCommandInTerminal(
 			return
 		}
 
-		if (completed || exitDetails !== undefined) {
-			hasEmittedBackgroundCompletion = true
-			const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
-			const exitStatus = exitDetails !== undefined ? formatExitStatus(exitDetails) : "Command finished"
-			const previewSnippet =
-				result && result.length > 0 ? (result.length > 2000 ? result.slice(-2000) : result) : ""
-			const notification = [
-				`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus}]`,
-				previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
-			].join("")
-
-			void task.injectInBetweenMessage(notification, undefined, "terminal_callback")
+		if (completed && exitDetails !== undefined) {
+			emitBackgroundNotification()
+		} else if (completed && exitDetails === undefined) {
+			// If output stream completed but exit code event is still arriving, allow a brief window
+			setTimeout(() => {
+				emitBackgroundNotification()
+			}, 150)
 		}
 	}
 
@@ -598,7 +617,11 @@ export async function executeCommandInTerminal(
 			const status: CommandExecutionStatus = { executionId, status: "exited", exitCode: details.exitCode }
 			provider?.postMessageToWebview({ type: "commandExecutionStatus", text: JSON.stringify(status) })
 			exitDetails = details
-			checkAndNotifyBackgroundCompletion()
+			// If onCompleted has already processed the output stream, notify immediately.
+			// Otherwise, wait for onCompleted to drain and format the final output.
+			if (completed) {
+				checkAndNotifyBackgroundCompletion()
+			}
 
 			// Safety fallback: if the command exited but onCompleted hasn't fired after 2s, force continue
 			setTimeout(() => {

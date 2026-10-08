@@ -113,3 +113,118 @@ describe("Queued message processing in initiateTaskLoop", () => {
 		expect(taskB.messageQueueService.isEmpty()).toBe(false)
 	})
 })
+
+describe("injectInBetweenMessage with terminal_callback", () => {
+	function createProvider(): any {
+		const storageUri = { fsPath: path.join(os.tmpdir(), "test-storage") }
+		const ctx = {
+			globalState: {
+				get: vi.fn().mockImplementation((_key: keyof GlobalState) => undefined),
+				update: vi.fn().mockResolvedValue(undefined),
+				keys: vi.fn().mockReturnValue([]),
+			},
+			globalStorageUri: storageUri,
+			workspaceState: {
+				get: vi.fn().mockImplementation((_key) => undefined),
+				update: vi.fn().mockResolvedValue(undefined),
+				keys: vi.fn().mockReturnValue([]),
+			},
+			secrets: {
+				get: vi.fn().mockResolvedValue(undefined),
+				store: vi.fn().mockResolvedValue(undefined),
+				delete: vi.fn().mockResolvedValue(undefined),
+			},
+			extensionUri: { fsPath: "/mock/extension/path" },
+			extension: { packageJSON: { version: "1.0.0" } },
+		} as unknown as vscode.ExtensionContext
+
+		const output = {
+			appendLine: vi.fn(),
+			append: vi.fn(),
+			clear: vi.fn(),
+			show: vi.fn(),
+			hide: vi.fn(),
+			dispose: vi.fn(),
+		}
+
+		const provider = new MirrorProvider(ctx, output as any, "sidebar", new ContextProxy(ctx)) as any
+		provider.postMessageToWebview = vi.fn().mockResolvedValue(undefined)
+		provider.postStateToWebview = vi.fn().mockResolvedValue(undefined)
+		provider.postStateToWebviewWithoutTaskHistory = vi.fn().mockResolvedValue(undefined)
+		provider.getState = vi.fn().mockResolvedValue({})
+		return provider
+	}
+
+	const apiConfig: ProviderSettings = {
+		apiProvider: "anthropic",
+		apiModelId: "claude-3-5-sonnet-20241022",
+		apiKey: "test-api-key",
+	} as any
+
+	it("supersedes command_output ask and reactivates task loop on terminal_callback", async () => {
+		const provider = createProvider()
+		const task = new Task({
+			provider,
+			apiConfiguration: apiConfig,
+			task: "initial task",
+			startTask: false,
+		})
+
+		const initiateTaskLoopSpy = vi.spyOn(task, "initiateTaskLoop").mockResolvedValue(undefined)
+		const supersedePendingAskSpy = vi.spyOn(task, "supersedePendingAsk")
+
+		// Simulate task started, loop idle, but waiting on command_output ask
+		task._started = true
+		task.isLoopActive = false
+		task.isWaitingOnAsk = true
+		;(task as any).mirrorMessages = [{ ts: 12345, type: "ask", ask: "command_output" }]
+
+		await task.injectInBetweenMessage(
+			"[Terminal Callback: Background process for 'test' finished. Exit code: 0]",
+			undefined,
+			"terminal_callback",
+		)
+
+		expect(supersedePendingAskSpy).toHaveBeenCalled()
+		expect(initiateTaskLoopSpy).toHaveBeenCalledWith([])
+		expect(task.inBetweenMessages).toEqual([
+			{
+				text: "[Terminal Callback: Background process for 'test' finished. Exit code: 0]",
+				images: undefined,
+				sayType: "terminal_callback",
+			},
+		])
+	})
+
+	it("does not answer interactive asks with terminal_callback", async () => {
+		const provider = createProvider()
+		const task = new Task({
+			provider,
+			apiConfiguration: apiConfig,
+			task: "initial task",
+			startTask: false,
+		})
+
+		const handleWebviewAskResponseSpy = vi.spyOn((task as any).userInteractionManager, "handleWebviewAskResponse")
+		const initiateTaskLoopSpy = vi.spyOn(task, "initiateTaskLoop").mockResolvedValue(undefined)
+
+		// Simulate waiting on interactive ask (e.g. command approval)
+		task._started = true
+		task.isLoopActive = false
+		task.isWaitingOnAsk = true
+		;(task as any).mirrorMessages = [{ ts: 12345, type: "ask", ask: "command" }]
+
+		await task.injectInBetweenMessage(
+			"[Terminal Callback: Background process for 'test' finished. Exit code: 0]",
+			undefined,
+			"terminal_callback",
+		)
+
+		// Terminal callback must NOT answer the interactive approval ask
+		expect(handleWebviewAskResponseSpy).not.toHaveBeenCalled()
+		// And should not initiate the task loop while awaiting interactive user decision
+		expect(initiateTaskLoopSpy).not.toHaveBeenCalled()
+		// But should be queued in inBetweenMessages
+		expect(task.inBetweenMessages.length).toBe(1)
+	})
+})

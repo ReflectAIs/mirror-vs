@@ -326,6 +326,32 @@ export class TaskMainLoop {
 				// as he can.
 
 				if (didEndLoop) {
+					// Check for any pending in-between messages (e.g. terminal callbacks or steering messages)
+					// that arrived while the assistant was thinking or finishing its turn.
+					if (this.task.inBetweenMessages.length > 0) {
+						const pendingInBetweens: Anthropic.Messages.ContentBlockParam[] = []
+						while (this.task.inBetweenMessages.length > 0) {
+							const inBetween = this.task.inBetweenMessages.shift()
+							if (inBetween) {
+								const isTerminalCallback = inBetween.sayType === "terminal_callback"
+								pendingInBetweens.push(
+									{
+										type: "text" as const,
+										text: isTerminalCallback
+											? inBetween.text
+											: `<user_message>\n${inBetween.text}\n</user_message>`,
+									},
+									...formatResponse.imageBlocks(inBetween.images),
+								)
+							}
+						}
+						if (pendingInBetweens.length > 0) {
+							nextUserContent = pendingInBetweens
+							includeFileDetails = false
+							continue
+						}
+					}
+
 					// Process one queued message at a time after each task loop
 					// completes. Instead of draining all messages at once, we take
 					// one, submit it as a new user message, and continue the loop.

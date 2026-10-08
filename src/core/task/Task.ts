@@ -1119,11 +1119,25 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		sayType: "user_feedback" | "terminal_callback" = "user_feedback",
 	): Promise<void> {
 		this.inBetweenMessages.push({ text, images, sayType })
-		// If the task is currently waiting on an ask and this is real user feedback,
-		// answer it immediately so the waiting ask promise unblocks.
-		// Terminal callbacks must never answer interactive asks as user messages.
-		const wasWaitingOnAsk = Boolean(this.isWaitingOnAsk || this.taskAsk !== undefined)
-		if (wasWaitingOnAsk && sayType === "user_feedback") {
+
+		// Terminal callbacks must never answer interactive asks as user messages,
+		// but should supersede any non-interactive command_output ask.
+		const isCommandOutputAsk =
+			this.taskAsk?.ask === "command_output" ||
+			(this.isWaitingOnAsk && this.mirrorMessages.at(-1)?.ask === "command_output")
+
+		if (isCommandOutputAsk && sayType === "terminal_callback") {
+			this.supersedePendingAsk()
+		}
+
+		// Check if the task is actively blocked waiting on an interactive ask requiring user input.
+		const isInteractiveAskWaiting = Boolean(
+			this.interactiveAsk ||
+				(this.isWaitingOnAsk && !isCommandOutputAsk) ||
+				(this.taskAsk !== undefined && !isCommandOutputAsk && this.taskAsk.ask !== "command_output"),
+		)
+
+		if (isInteractiveAskWaiting && sayType === "user_feedback") {
 			this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
 		}
 
@@ -1139,18 +1153,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			}
 		}
 
-		// If the user sends a steering message, they want to resume the task loop.
-		// Reset abort status to allow the loop to start/continue.
+		// If the user sends a steering message or a terminal callback completes, allow the loop to start/continue.
 		this.abort = false
 
 		// If the task loop is not currently running (and wasn't just unblocked via askResponse),
 		// reactivate initiateTaskLoop so the model immediately receives and acts on the message.
-		if (!this.isLoopActive && this._started && !wasWaitingOnAsk) {
-			const { formatResponse } = await import("../prompts/responses")
-			const imageBlocks = formatResponse.imageBlocks(images)
-			const messageText = sayType === "terminal_callback" ? text : `<user_message>\n${text}\n</user_message>`
-			const userContent = [{ type: "text" as const, text: messageText }, ...imageBlocks]
-			void this.initiateTaskLoop(userContent)
+		// Passing [] drains the message cleanly from inBetweenMessages without duplicating it.
+		if (!this.isLoopActive && this._started && !isInteractiveAskWaiting) {
+			void this.initiateTaskLoop([])
 		}
 	}
 
