@@ -208,6 +208,9 @@ export class TaskLifecycleManager {
 		const rootTask = task.rootTask
 		const parentTask = task.parentTask
 
+		// Capture queued messages from the task being cancelled
+		const queuedMessages = task.messageQueueService?.messages ? [...task.messageQueueService.messages] : []
+
 		// Mark this as a user-initiated cancellation so provider-only rehydration can occur
 		task.abortReason = "user_cancelled"
 
@@ -281,12 +284,15 @@ export class TaskLifecycleManager {
 		await task.mirrorMessagesManager.saveMirrorMessages()
 
 		// Rehydrate task in place with full history
-		await this.provider.createTaskWithHistoryItem({
-			...historyItem,
-			number: historyItem.number ?? 1,
-			rootTask,
-			parentTask,
-		})
+		await this.provider.createTaskWithHistoryItem(
+			{
+				...historyItem,
+				number: historyItem.number ?? 1,
+				rootTask,
+				parentTask,
+			},
+			{ queuedMessages },
+		)
 	}
 
 	// ── Clear ──────────────────────────────────────────────────────────────────

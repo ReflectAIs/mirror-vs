@@ -52,7 +52,7 @@ export function fileChangesFromMessages(messages: MirrorMessage[] | undefined): 
 
 		// Single file
 		if (!tool.path) continue
-		const diff = tool.diff ?? tool.content ?? ""
+		const diff = tool.content && tool.content.includes("@@") ? tool.content : (tool.diff ?? tool.content ?? "")
 		if (diff) {
 			entries.push({
 				path: tool.path,

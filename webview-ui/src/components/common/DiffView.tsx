@@ -3,6 +3,8 @@ import { parseUnifiedDiff, type DiffLine } from "@src/utils/parseUnifiedDiff"
 import { normalizeLanguage } from "@src/utils/highlighter"
 import { getLanguageFromPath } from "@src/utils/getLanguageFromPath"
 import { highlightHunks } from "@src/utils/highlightDiff"
+import { vscode } from "@src/utils/vscode"
+import { cn } from "@src/lib/utils"
 
 interface DiffViewProps {
 	source: string
@@ -256,8 +258,27 @@ const DiffView = memo(({ source, filePath }: DiffViewProps) => {
 
 								const sign = line.type === "addition" ? "+" : line.type === "deletion" ? "-" : ""
 
+								const targetLine = line.newLineNum ?? line.oldLineNum
+								const handleRowClick = () => {
+									if (filePath && targetLine) {
+										vscode.postMessage({
+											type: "openFile",
+											text: filePath.startsWith("./") ? filePath : "./" + filePath,
+											values: { line: targetLine },
+										})
+									}
+								}
+
 								return (
-									<tr key={globalIndex} className={rowBgClass}>
+									<tr
+										key={globalIndex}
+										className={cn(rowBgClass, filePath && targetLine && "cursor-pointer")}
+										onClick={handleRowClick}
+										title={
+											filePath && targetLine
+												? `Open ${filePath} at line ${targetLine}`
+												: undefined
+										}>
 										{/* Old line number */}
 										<td
 											className={`w-[45px] text-right pr-1 pl-1 select-none align-top whitespace-nowrap ${gutterTextClass} ${borderAccentClass}`}>

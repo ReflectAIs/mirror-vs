@@ -321,15 +321,18 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 	// ── Optimistic Queue ──
 	const [optimisticQueue, setOptimisticQueue] = useState<QueuedMessage[]>([])
 	const effectiveQueue = useMemo(() => {
-		if (messageQueue.length > 0) {
-			return messageQueue
+		if (!messageQueue || messageQueue.length === 0) {
+			return optimisticQueue
 		}
-		return optimisticQueue
+		const backendTexts = new Set(messageQueue.map((m) => m.text))
+		const pendingOptimistic = optimisticQueue.filter((m) => !backendTexts.has(m.text))
+		return [...messageQueue, ...pendingOptimistic]
 	}, [messageQueue, optimisticQueue])
 
 	useEffect(() => {
 		if (messageQueue.length > 0) {
-			setOptimisticQueue([])
+			const backendTexts = new Set(messageQueue.map((m) => m.text))
+			setOptimisticQueue((prev) => prev.filter((m) => !backendTexts.has(m.text)))
 		}
 	}, [messageQueue])
 

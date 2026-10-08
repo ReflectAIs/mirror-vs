@@ -99,6 +99,8 @@ export interface CreateTaskOptions {
 	sessionId?: string
 	/** Custom workspace directory path for multi-root or cross-workspace branching */
 	workspacePath?: string
+	/** Preserved queued messages across task cancellation/rehydration */
+	queuedMessages?: QueuedMessage[]
 }
 
 export enum TaskStatus {

@@ -43,6 +43,7 @@ export async function handleQueueMessage(provider: MirrorProvider, message: Webv
 export async function handleRemoveQueuedMessage(provider: MirrorProvider, message: WebviewMessage): Promise<void> {
 	const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 	currentTask?.messageQueueService.removeMessage(message.text ?? "")
+	await provider.postStateToWebviewWithoutMirrorMessages()
 }
 
 /**
@@ -53,6 +54,7 @@ export async function handleEditQueuedMessage(provider: MirrorProvider, message:
 		const { id, text, images } = message.payload as EditQueuedMessagePayload
 		const currentTask = provider.getLiveTask ? provider.getLiveTask(message.taskId) : provider.getCurrentTask?.()
 		currentTask?.messageQueueService.updateMessage(id, text, images)
+		await provider.postStateToWebviewWithoutMirrorMessages()
 	}
 }
 

@@ -164,6 +164,7 @@ export interface TaskOptions extends CreateTaskOptions {
 	worktreePath?: string
 	/** Initial status for the task's history item (e.g., "active" for child tasks) */
 	initialStatus?: "active" | "delegated" | "completed"
+	queuedMessages?: QueuedMessage[]
 }
 
 export class Task extends EventEmitter<TaskEvents> implements TaskLike {
@@ -572,6 +573,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		worktreePath: initialWorktreePath,
 		initialStatus,
 		sessionId,
+		queuedMessages,
 	}: TaskOptions) {
 		super()
 		this.experiments = experimentsConfig
@@ -654,7 +656,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		this.assistantMessageParser = undefined
 
-		this.messageQueueService = new MessageQueueService()
+		this.messageQueueService = new MessageQueueService(queuedMessages ?? [])
 
 		this.messageQueueStateChangedHandler = () => {
 			this.emit(MirrorVSEventName.TaskUserMessage, this.taskId)

@@ -652,7 +652,7 @@ describe("SettingsView - Allowed Commands", () => {
 			fireEvent.click(soundCheckbox)
 
 			// Click the Done button
-			const doneButton = screen.getByText("settings:common.done")
+			const doneButton = within(screen.getByTitle("settings:header.doneButtonTooltip")).getByRole("button")
 			fireEvent.click(doneButton)
 
 			// Check that unsaved changes dialog is shown

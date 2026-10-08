@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { ChevronDown, FileDiff, Search, FileText, ArrowLeft } from "lucide-react"
-import { createTwoFilesPatch } from "diff"
+import { createTwoFilesPatch, parsePatch } from "diff"
 
 import type { MirrorMessage, ExtensionMessage, FileEditRecord } from "@mirror-vs/types"
 
@@ -15,8 +15,31 @@ import { fileChangesFromMessages, type FileChangeEntry } from "./utils/fileChang
 import { getFileIcon, parsePathAndLines } from "./FileOperationItem"
 import CodeAccordion from "../common/CodeAccordion"
 
-function getFirstDiffLine(diff?: string): number | undefined {
+export function getFirstDiffLine(diff?: string): number | undefined {
 	if (!diff) return undefined
+	try {
+		const patches = parsePatch(diff)
+		if (patches && patches.length > 0) {
+			for (const patch of patches) {
+				for (const hunk of patch.hunks || []) {
+					let newLine = hunk.newStart
+					for (const line of hunk.lines || []) {
+						if (typeof line === "string") {
+							if (line.startsWith("+")) {
+								return newLine
+							}
+							if (line.startsWith("-")) {
+								return Math.max(1, newLine)
+							}
+						}
+						newLine++
+					}
+					if (hunk.newStart) return hunk.newStart
+				}
+			}
+		}
+	} catch {}
+
 	const match = diff.match(/@@\s*-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@/)
 	if (match && match[1]) {
 		const line = parseInt(match[1], 10)
@@ -335,100 +358,122 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 											<div
 												key={path}
 												className="rounded border border-vscode-panel-border/50 bg-vscode-sideBar-background/30 overflow-hidden shrink-0">
-												{/* File item row with guaranteed min-height */}
-												<div
-													onClick={() => togglePath(path)}
-													className="flex items-center gap-2 px-2.5 py-1.5 min-h-[34px] hover:bg-vscode-list-hoverBackground/60 cursor-pointer text-xs select-none transition-colors">
-													{getFileIcon(displayPath)}
-													<div className="flex items-baseline gap-1.5 min-w-0 flex-1 overflow-hidden">
-														<span
-															className="font-semibold text-vscode-foreground truncate text-xs shrink-0 max-w-[220px]"
-															title={displayPath}>
-															{fileName}
-														</span>
-														{dirPath && (
-															<span
-																className="text-[10.5px] text-vscode-descriptionForeground/60 truncate min-w-0 flex-1"
-																title={displayPath}>
-																{dirPath}
-															</span>
-														)}
-													</div>
-													{(combinedStats.added > 0 || combinedStats.removed > 0) && (
-														<span className="font-mono text-[10px] shrink-0 flex items-center gap-1 font-medium mr-1">
-															{combinedStats.added > 0 && (
-																<span className="text-vscode-charts-green">
-																	+{combinedStats.added}
-																</span>
-															)}
-															{combinedStats.removed > 0 && (
-																<span className="text-vscode-charts-red">
-																	-{combinedStats.removed}
-																</span>
-															)}
-														</span>
-													)}
-													{(() => {
-														const fileTargetLine =
-															parsePathAndLines(path).startLine ??
-															getFirstDiffLine(displayDiff)
-														return (
-															<button
-																type="button"
+												{(() => {
+													const fileTargetLine =
+														parsePathAndLines(path).startLine ??
+														getFirstDiffLine(displayDiff)
+													const openInEditor = (e?: React.MouseEvent) => {
+														e?.stopPropagation()
+														vscode.postMessage({
+															type: "openFile",
+															text: path.startsWith("./") ? path : "./" + path,
+															values: fileTargetLine
+																? { line: fileTargetLine }
+																: undefined,
+														})
+													}
+
+													return (
+														<>
+															{/* File item row with guaranteed min-height */}
+															<div
+																onClick={openInEditor}
 																title={
 																	fileTargetLine
-																		? `Open in editor at review line ${fileTargetLine}`
-																		: "Open file in editor"
+																		? `Open ${fileName} in editor at line ${fileTargetLine}`
+																		: `Open ${fileName} in editor`
 																}
-																onClick={(e) => {
-																	e.stopPropagation()
-																	vscode.postMessage({
-																		type: "openFile",
-																		text: path.startsWith("./")
-																			? path
-																			: "./" + path,
-																		values: fileTargetLine
-																			? { line: fileTargetLine }
-																			: undefined,
-																	})
-																}}
-																className="p-0.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer">
-																<span className="codicon codicon-go-to-file text-xs" />
-															</button>
-														)
-													})()}
-													<ChevronDown
-														className={cn(
-															"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
-															isExpanded ? "rotate-180" : "rotate-0",
-														)}
-													/>
-												</div>
+																className="flex items-center gap-2 px-2.5 py-1.5 min-h-[34px] hover:bg-vscode-list-hoverBackground/60 cursor-pointer text-xs select-none transition-colors group">
+																{getFileIcon(displayPath)}
+																<div className="flex items-baseline gap-1.5 min-w-0 flex-1 overflow-hidden">
+																	<span
+																		className="font-semibold text-vscode-foreground truncate text-xs shrink-0 max-w-[220px]"
+																		title={displayPath}>
+																		{fileName}
+																	</span>
+																	{dirPath && (
+																		<span
+																			className="text-[10.5px] text-vscode-descriptionForeground/60 truncate min-w-0 flex-1"
+																			title={displayPath}>
+																			{dirPath}
+																		</span>
+																	)}
+																</div>
+																{(combinedStats.added > 0 ||
+																	combinedStats.removed > 0) && (
+																	<span className="font-mono text-[10px] shrink-0 flex items-center gap-1 font-medium mr-1">
+																		{combinedStats.added > 0 && (
+																			<span className="text-vscode-charts-green">
+																				+{combinedStats.added}
+																			</span>
+																		)}
+																		{combinedStats.removed > 0 && (
+																			<span className="text-vscode-charts-red">
+																				-{combinedStats.removed}
+																			</span>
+																		)}
+																	</span>
+																)}
+																{fileTargetLine && (
+																	<span className="text-[10px] text-vscode-descriptionForeground/70 font-mono bg-vscode-badge-background/20 px-1 py-0.5 rounded mr-0.5 shrink-0">
+																		:{fileTargetLine}
+																	</span>
+																)}
+																<button
+																	type="button"
+																	title={
+																		fileTargetLine
+																			? `Open in editor at review line ${fileTargetLine}`
+																			: "Open file in editor"
+																	}
+																	onClick={openInEditor}
+																	className="p-0.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer">
+																	<span className="codicon codicon-go-to-file text-xs" />
+																</button>
+																<button
+																	type="button"
+																	title={
+																		isExpanded
+																			? "Collapse diff"
+																			: "Show diff preview"
+																	}
+																	onClick={(e) => {
+																		e.stopPropagation()
+																		togglePath(path)
+																	}}
+																	className="p-0.5 rounded text-vscode-descriptionForeground/70 hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer flex items-center justify-center">
+																	<ChevronDown
+																		className={cn(
+																			"size-3.5 transition-transform duration-150",
+																			isExpanded ? "rotate-180" : "rotate-0",
+																		)}
+																	/>
+																</button>
+															</div>
 
-												{/* Expanded Diff Preview */}
-												{isExpanded && (
-													<div className="border-t border-vscode-panel-border/40 p-1 bg-vscode-editor-background">
-														<CodeAccordion
-															path={path}
-															code={displayDiff}
-															language="diff"
-															isExpanded={true}
-															hideHeader={true}
-															onToggleExpand={() => togglePath(path)}
-															diffStats={
-																combinedStats.added > 0 || combinedStats.removed > 0
-																	? combinedStats
-																	: undefined
-															}
-															onJumpToFile={() =>
-																vscode.postMessage({
-																	type: "openFile",
-																	text: path.startsWith("./") ? path : "./" + path,
-																})
-															}
-														/>
-													</div>
-												)}
+															{/* Expanded Diff Preview */}
+															{isExpanded && (
+																<div className="border-t border-vscode-panel-border/40 p-1 bg-vscode-editor-background">
+																	<CodeAccordion
+																		path={path}
+																		code={displayDiff}
+																		language="diff"
+																		isExpanded={true}
+																		hideHeader={true}
+																		onToggleExpand={() => togglePath(path)}
+																		diffStats={
+																			combinedStats.added > 0 ||
+																			combinedStats.removed > 0
+																				? combinedStats
+																				: undefined
+																		}
+																		onJumpToFile={openInEditor}
+																	/>
+																</div>
+															)}
+														</>
+													)
+												})()}
 
 												{/* Preserved mock container for unit tests */}
 												<div className="hidden" aria-hidden="true">

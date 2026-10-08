@@ -19,6 +19,7 @@ import {
 	type TerminalActionPromptType,
 	type HistoryItem,
 	type CreateTaskOptions,
+	type QueuedMessage,
 	type TokenUsage,
 	type ToolUsage,
 	type ExtensionMessage,
@@ -380,6 +381,9 @@ export class MirrorProvider
 			const onTaskUserMessage = (taskId: string) => this.emit(MirrorVSEventName.TaskUserMessage, taskId)
 			const onTaskTokenUsageUpdated = (taskId: string, tokenUsage: TokenUsage, toolUsage: ToolUsage) =>
 				this.emit(MirrorVSEventName.TaskTokenUsageUpdated, taskId, tokenUsage, toolUsage)
+			const onQueuedMessagesUpdated = () => {
+				this.postStateToWebviewWithoutMirrorMessages()
+			}
 
 			// Attach the listeners.
 			instance.on(MirrorVSEventName.TaskStarted, onTaskStarted)
@@ -396,6 +400,7 @@ export class MirrorProvider
 			instance.on(MirrorVSEventName.TaskSpawned, onTaskSpawned)
 			instance.on(MirrorVSEventName.TaskUserMessage, onTaskUserMessage)
 			instance.on(MirrorVSEventName.TaskTokenUsageUpdated, onTaskTokenUsageUpdated)
+			instance.on(MirrorVSEventName.QueuedMessagesUpdated, onQueuedMessagesUpdated)
 
 			// Store the cleanup functions for later removal.
 			this.taskEventListeners.set(instance, [
@@ -413,6 +418,7 @@ export class MirrorProvider
 				() => instance.off(MirrorVSEventName.TaskUnpaused, onTaskUnpaused),
 				() => instance.off(MirrorVSEventName.TaskSpawned, onTaskSpawned),
 				() => instance.off(MirrorVSEventName.TaskTokenUsageUpdated, onTaskTokenUsageUpdated),
+				() => instance.off(MirrorVSEventName.QueuedMessagesUpdated, onQueuedMessagesUpdated),
 			])
 		}
 
@@ -1421,7 +1427,12 @@ export class MirrorProvider
 
 	public async createTaskWithHistoryItem(
 		historyItem: HistoryItem & { rootTask?: Task; parentTask?: Task },
-		options?: { startTask?: boolean; skipStackCleanup?: boolean; skipGlobalStateChanges?: boolean },
+		options?: {
+			startTask?: boolean
+			skipStackCleanup?: boolean
+			skipGlobalStateChanges?: boolean
+			queuedMessages?: QueuedMessage[]
+		},
 	) {
 		const isCliRuntime = process.env.MIRROR_CLI_RUNTIME === "1"
 		// CLI injects runtime provider settings from command flags/env at startup.
@@ -1543,6 +1554,12 @@ export class MirrorProvider
 
 		const { apiConfiguration, enableCheckpoints, checkpointTimeout, experiments } = await this.getState()
 
+		// Preserve queued messages from the existing task instance if rehydrating
+		const existingTask = options?.queuedMessages ? undefined : this.getLiveTask(historyItem.id)
+		const preservedQueuedMessages =
+			options?.queuedMessages ??
+			(existingTask?.messageQueueService?.messages ? [...existingTask.messageQueueService.messages] : undefined)
+
 		const task = new Task({
 			provider: this,
 			apiConfiguration,
@@ -1560,6 +1577,7 @@ export class MirrorProvider
 			startTask: options?.startTask ?? true,
 			// Preserve the status from the history item to avoid overwriting it when the task saves messages
 			initialStatus: historyItem.status,
+			queuedMessages: preservedQueuedMessages,
 		})
 
 		if (options?.startTask === false) {

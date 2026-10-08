@@ -1010,8 +1010,9 @@ export class TaskMainLoop {
 								break
 							}
 
-							// Guard against runaway reasoning timeout (> 120s of continuous thinking without tools/text)
-							const MAX_REASONING_DURATION_MS = 120_000
+							// Guard against runaway reasoning timeout (> 10m of continuous thinking without tools/text)
+							// Deep thinking models (Claude 3.7 Thinking, o1/o3, DeepSeek-R1) legitimately think for several minutes on complex tasks.
+							const MAX_REASONING_DURATION_MS = 600_000
 							if (
 								reasoningStartTime !== undefined &&
 								Date.now() - reasoningStartTime > MAX_REASONING_DURATION_MS
@@ -1020,7 +1021,7 @@ export class TaskMainLoop {
 									`[TaskMainLoop] Thinking exceeded max duration (${MAX_REASONING_DURATION_MS}ms), interrupting.`,
 								)
 								reasoningMessage +=
-									"\n\n[Thinking interrupted: maximum reasoning duration reached (120s). Proceeding to action.]"
+									"\n\n[Thinking interrupted: maximum reasoning duration reached (10m). Proceeding to action.]"
 								await finalizeReasoning()
 								if (this.task.assistantMessageContent.length === 0) {
 									this.task.assistantMessageContent.push({

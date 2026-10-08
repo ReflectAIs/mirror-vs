@@ -237,9 +237,11 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		setChangeDetected(false)
 	}, [currentApiConfigName, extensionState])
 
-	// Bust the cache when settings are imported.
+	// Bust the cache only when settings are newly imported (not on every streaming update)
+	const prevSettingsImportedAt = useRef(settingsImportedAt)
 	useEffect(() => {
-		if (settingsImportedAt) {
+		if (settingsImportedAt && prevSettingsImportedAt.current !== settingsImportedAt) {
+			prevSettingsImportedAt.current = settingsImportedAt
 			setCachedState((prevCachedState) => ({ ...prevCachedState, ...extensionState }))
 			setChangeDetected(false)
 		}
@@ -636,41 +638,24 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const getSectionLabel = useCallback((section: SectionName) => t(`settings:sections.${section}`), [t])
 	const { contextValue: searchContextValue, index: searchIndex } = useSearchIndexRegistry(getSectionLabel)
 
-	// Track which tabs have been indexed (visited at least once)
-	const [indexingTabIndex, setIndexingTabIndex] = useState(0)
-	const initialTab = useRef<SectionName>(activeTab)
-	const isIndexing = indexingTabIndex < sectionNames.length
-	const isIndexingComplete = !isIndexing
+	// Register tab titles as searchable items on mount
 	const tabTitlesRegistered = useRef(false)
-
-	// Index all tabs by cycling through them on mount
-	useLayoutEffect(() => {
-		if (indexingTabIndex >= sectionNames.length) {
-			// All tabs indexed, now register tab titles as searchable items
-			if (!tabTitlesRegistered.current && searchContextValue) {
-				sections.forEach(({ id }) => {
-					const tabTitle = t(`settings:sections.${id}`)
-					// Register each tab title as a searchable item
-					// Using a special naming convention for tab titles: "tab-{sectionName}"
-					searchContextValue.registerSetting({
-						settingId: `tab-${id}`,
-						section: id,
-						label: tabTitle,
-					})
+	useEffect(() => {
+		if (!tabTitlesRegistered.current && searchContextValue) {
+			sections.forEach(({ id }) => {
+				const tabTitle = t(`settings:sections.${id}`)
+				searchContextValue.registerSetting({
+					settingId: `tab-${id}`,
+					section: id,
+					label: tabTitle,
 				})
-				tabTitlesRegistered.current = true
-				// Return to initial tab
-				setActiveTab(initialTab.current)
-			}
-			return
+			})
+			tabTitlesRegistered.current = true
 		}
+	}, [searchContextValue, sections, t])
 
-		// Move to the next tab on next render
-		setIndexingTabIndex((prev) => prev + 1)
-	}, [indexingTabIndex, searchContextValue, sections, t])
-
-	// Determine which tab content to render (for indexing or active display)
-	const renderTab = isIndexing ? sectionNames[indexingTabIndex] : activeTab
+	// Render the active tab directly without cycling or opacity-0 flashing
+	const renderTab = activeTab
 
 	// Handle search navigation - switch to the correct tab and scroll to the element
 	const handleSearchNavigate = useCallback(
@@ -785,7 +770,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 
 				{/* Right: search + save */}
 				<div className="flex items-center gap-1.5 shrink-0">
-					{!isSimpleMode && !isFreeMode && isIndexingComplete && (
+					{!isSimpleMode && !isFreeMode && (
 						<SettingsSearch index={searchIndex} onNavigate={handleSearchNavigate} sections={sections} />
 					)}
 					<StandardTooltip
@@ -882,10 +867,10 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						})}
 					</TabList>
 
-					{/* Content area - renders only the active tab (or indexing tab during initial indexing) */}
+					{/* Content area - renders only the active tab */}
 					<TabContent
 						ref={contentRef}
-						className={cn("px-5 py-4 flex-1 overflow-auto", isIndexing && "opacity-0")}
+						className="px-5 py-4 flex-1 overflow-auto"
 						data-testid="settings-content">
 						<SearchIndexProvider value={searchContextValue}>
 							{/* Providers Section */}

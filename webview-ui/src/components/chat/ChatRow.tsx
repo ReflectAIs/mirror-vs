@@ -55,6 +55,7 @@ import { AutoApprovedRequestLimitWarning } from "./AutoApprovedRequestLimitWarni
 import { InProgressRow, CondensationResultRow, CondensationErrorRow, TruncationResultRow } from "./context-management"
 import CodebaseSearchResultsDisplay from "./CodebaseSearchResultsDisplay"
 import { FileOperationItem, getFileBadge, parsePathAndLines } from "./FileOperationItem"
+import { getFirstDiffLine } from "./FileChangesPanel"
 import { ToolDisclosure } from "./ToolDisclosure"
 import { appendImages } from "@src/utils/imageUtils"
 import { McpExecution } from "./McpExecution"
@@ -563,7 +564,14 @@ export const ChatRowContent = ({
 						defaultExpanded={false}
 						onRowClick={() => {
 							if (tool.path) {
-								vscode.postMessage({ type: "openFile", text: tool.path })
+								const targetLine =
+									parsePathAndLines(tool.path).startLine ??
+									getFirstDiffLine(unifiedDiff ?? tool.diff ?? (tool.content as string | undefined))
+								vscode.postMessage({
+									type: "openFile",
+									text: tool.path,
+									values: targetLine ? { line: targetLine } : undefined,
+								})
 							}
 						}}
 						status={
@@ -595,7 +603,14 @@ export const ChatRowContent = ({
 						defaultExpanded={false}
 						onRowClick={() => {
 							if (tool.path) {
-								vscode.postMessage({ type: "openFile", text: tool.path })
+								const targetLine =
+									parsePathAndLines(tool.path).startLine ??
+									getFirstDiffLine(unifiedDiff ?? tool.diff ?? (tool.content as string | undefined))
+								vscode.postMessage({
+									type: "openFile",
+									text: tool.path,
+									values: targetLine ? { line: targetLine } : undefined,
+								})
 							}
 						}}
 						status={message.isAnswered ? <span className="text-emerald-400">✓ Applied</span> : undefined}>

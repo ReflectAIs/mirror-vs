@@ -84,6 +84,8 @@ const App = () => {
 		}
 	}, [])
 
+	const handleDoneToChat = useCallback(() => switchTab("chat"), [switchTab])
+
 	const [currentSection, setCurrentSection] = useState<string | undefined>(undefined)
 
 	const onMessage = useCallback(
@@ -224,11 +226,11 @@ const App = () => {
 		<WelcomeView />
 	) : (
 		<>
-			{tab === "history" && <HistoryView onDone={() => switchTab("chat")} />}
-			{tab === "brain" && <BrainView onDone={() => switchTab("chat")} />}
-			{tab === "analytics" && <AnalyticsView onDone={() => switchTab("chat")} />}
+			{tab === "history" && <HistoryView onDone={handleDoneToChat} />}
+			{tab === "brain" && <BrainView onDone={handleDoneToChat} />}
+			{tab === "analytics" && <AnalyticsView onDone={handleDoneToChat} />}
 			{tab === "settings" && (
-				<SettingsView ref={settingsRef} onDone={() => setTab("chat")} targetSection={currentSection} />
+				<SettingsView ref={settingsRef} onDone={handleDoneToChat} targetSection={currentSection} />
 			)}
 			<ChatView
 				ref={chatViewRef}
