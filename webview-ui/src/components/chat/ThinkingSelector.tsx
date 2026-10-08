@@ -9,33 +9,56 @@ interface ThinkingSelectorProps {
 	className?: string
 }
 
+export type ThinkingOption = "none" | "low" | "medium" | "high"
+
 export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ className }) => {
 	const { apiConfiguration, setApiConfiguration } = useExtensionState()
 	const rawEffort = apiConfiguration?.reasoningEffort
-	const currentEffort: ReasoningEffort =
-		rawEffort === "low" || rawEffort === "high" || rawEffort === "medium"
-			? (rawEffort as ReasoningEffort)
+	const isThinkingDisabled =
+		apiConfiguration?.enableReasoningEffort === false || rawEffort === "none" || rawEffort === "disable"
+
+	const currentEffort: ThinkingOption = isThinkingDisabled
+		? "none"
+		: rawEffort === "low" || rawEffort === "high" || rawEffort === "medium"
+			? rawEffort
 			: "medium"
 
 	const handleChange = useCallback(
 		(e: React.ChangeEvent<HTMLSelectElement>) => {
-			const value = e.target.value as ReasoningEffort
-			const updatedConfig = {
-				...apiConfiguration,
-				reasoningEffort: value,
-				enableReasoningEffort: true,
+			const value = e.target.value as ThinkingOption
+			if (value === "none") {
+				const updatedConfig = {
+					...apiConfiguration,
+					reasoningEffort: "none" as const,
+					enableReasoningEffort: false,
+					modelMaxThinkingTokens: 0,
+				}
+				setApiConfiguration(updatedConfig)
+				vscode.postMessage({
+					type: "modelChange",
+					apiConfiguration: updatedConfig,
+				})
+			} else {
+				const updatedConfig = {
+					...apiConfiguration,
+					reasoningEffort: value as ReasoningEffort,
+					enableReasoningEffort: true,
+					...(apiConfiguration?.modelMaxThinkingTokens === 0 ? { modelMaxThinkingTokens: undefined } : {}),
+				}
+				setApiConfiguration(updatedConfig)
+				vscode.postMessage({
+					type: "modelChange",
+					apiConfiguration: updatedConfig,
+				})
 			}
-			setApiConfiguration(updatedConfig)
-			vscode.postMessage({
-				type: "modelChange",
-				apiConfiguration: updatedConfig,
-			})
 		},
 		[apiConfiguration, setApiConfiguration],
 	)
 
-	const getTooltipText = (effort: ReasoningEffort) => {
+	const getTooltipText = (effort: ThinkingOption) => {
 		switch (effort) {
+			case "none":
+				return "No Thinking: Reasoning disabled for instant responses and zero thinking tokens"
 			case "low":
 				return "Low Thinking Mode: Minimum thinking tokens for fast, simple edits"
 			case "high":
@@ -62,13 +85,28 @@ export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ className })
 						backgroundRepeat: "no-repeat",
 						backgroundSize: "14px 14px",
 					}}>
-					<option key="low" value="low" className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+					<option
+						key="none"
+						value="none"
+						className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+						None
+					</option>
+					<option
+						key="low"
+						value="low"
+						className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 						Low
 					</option>
-					<option key="medium" value="medium" className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+					<option
+						key="medium"
+						value="medium"
+						className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 						Medium
 					</option>
-					<option key="high" value="high" className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
+					<option
+						key="high"
+						value="high"
+						className="bg-vscode-dropdown-background text-vscode-dropdown-foreground">
 						High
 					</option>
 				</select>

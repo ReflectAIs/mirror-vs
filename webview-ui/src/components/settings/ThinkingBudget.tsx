@@ -236,11 +236,12 @@ export const ThinkingBudget = ({ apiConfiguration, setApiConfigurationField, mod
 				value={currentReasoningEffort}
 				onValueChange={(value: ReasoningEffortOption) => {
 					// "disable" turns off reasoning entirely; "none" is a valid reasoning level
-					if (value === "disable") {
+					if (value === "disable" || value === "none") {
 						setApiConfigurationField("enableReasoningEffort", false)
 						setApiConfigurationField("reasoningEffort", "disable")
+						setApiConfigurationField("modelMaxThinkingTokens", 0)
 					} else {
-						// "none", "minimal", "low", "medium", "high" all enable reasoning
+						// "minimal", "low", "medium", "high" all enable reasoning
 						setApiConfigurationField("enableReasoningEffort", true)
 						setApiConfigurationField("reasoningEffort", value as ReasoningEffortWithMinimal)
 					}

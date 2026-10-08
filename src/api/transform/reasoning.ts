@@ -46,14 +46,18 @@ export const getOpenRouterReasoning = ({
 	reasoningBudget,
 	reasoningEffort,
 	settings,
-}: GetModelReasoningOptions): OpenRouterReasoningParams | undefined =>
-	shouldUseReasoningBudget({ model, settings })
+}: GetModelReasoningOptions): OpenRouterReasoningParams | undefined => {
+	if (settings?.enableReasoningEffort === false || reasoningEffort === "disable" || reasoningEffort === "none") {
+		return { exclude: true }
+	}
+	return shouldUseReasoningBudget({ model, settings })
 		? { max_tokens: reasoningBudget }
 		: shouldUseReasoningEffort({ model, settings })
-			? reasoningEffort && reasoningEffort !== "disable"
+			? reasoningEffort
 				? { effort: reasoningEffort as ReasoningEffortExtended }
 				: undefined
 			: undefined
+}
 
 export const getMirrorReasoning = ({
 	model,
@@ -131,6 +135,13 @@ export const getGeminiReasoning = ({
 	reasoningEffort,
 	settings,
 }: GetModelReasoningOptions): GeminiReasoningParams | undefined => {
+	if (settings?.enableReasoningEffort === false || reasoningEffort === "disable" || reasoningEffort === "none") {
+		if (model.supportsReasoningBudget) {
+			return { thinkingBudget: 0 }
+		}
+		return undefined
+	}
+
 	// Budget-based (2.5) models: use thinkingBudget, not thinkingLevel.
 	if (shouldUseReasoningBudget({ model, settings })) {
 		return { thinkingBudget: reasoningBudget!, includeThoughts: true }
@@ -146,7 +157,7 @@ export const getGeminiReasoning = ({
 		| undefined
 
 	// Respect "off" / unset semantics from the effort selector itself.
-	if (!selectedEffort || selectedEffort === "disable") {
+	if (!selectedEffort || selectedEffort === "disable" || selectedEffort === "none") {
 		return undefined
 	}
 

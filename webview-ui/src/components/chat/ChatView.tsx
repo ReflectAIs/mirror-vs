@@ -197,7 +197,6 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		isAtBottomRef: isAtBottomRef2,
 		scrollPhaseRef: scrollPhaseRef2,
 	} = scrollLifecycle
-
 	// ── Wrap scroll-to-bottom to integrate hook + scroll lifecycle ──
 	const handleScrollToBottomAndResetCheckpointCursor = useCallback(() => {
 		_handleScrollToBottomAndResetCheckpointCursor()

@@ -99,6 +99,7 @@ export function useScrollLifecycle({
 	const isHydratingRef = useRef(false)
 	const hydrationTimeoutRef = useRef<number | null>(null)
 	const hydrationRetryUsedRef = useRef(false)
+	const userEscapedHydrationRef = useRef(false)
 
 	// --- Pointer scroll tracking ---
 	const pointerScrollActiveRef = useRef(false)
@@ -164,6 +165,7 @@ export function useScrollLifecycle({
 	}, [])
 
 	const enterAnchoredFollowing = useCallback(() => {
+		userEscapedHydrationRef.current = false
 		scrollPhaseRef.current = "ANCHORED_FOLLOWING"
 		transitionScrollPhase("ANCHORED_FOLLOWING")
 		setShowScrollToBottom(false)
@@ -171,6 +173,9 @@ export function useScrollLifecycle({
 
 	const enterUserBrowsingHistory = useCallback(
 		(_source: ScrollFollowDisengageSource) => {
+			if (isHydratingRef.current) {
+				userEscapedHydrationRef.current = true
+			}
 			scrollPhaseRef.current = "USER_BROWSING_HISTORY"
 			isAtBottomRef.current = false
 			lastUserScrollInputRef.current = performance.now()
@@ -248,6 +253,7 @@ export function useScrollLifecycle({
 	const startHydrationWindow = useCallback(() => {
 		isHydratingRef.current = true
 		hydrationRetryUsedRef.current = false
+		userEscapedHydrationRef.current = false
 		if (hydrationTimeoutRef.current !== null) {
 			window.clearTimeout(hydrationTimeoutRef.current)
 		}
@@ -285,6 +291,7 @@ export function useScrollLifecycle({
 	// Task switch or un-hide: reset and begin a short hydration window
 	useEffect(() => {
 		isAtBottomRef.current = false
+		userEscapedHydrationRef.current = false
 		clearHydrationWindow()
 		cancelReanchorFrame()
 
@@ -409,7 +416,16 @@ export function useScrollLifecycle({
 			}
 
 			if (scrollPhaseRef.current === "USER_BROWSING_HISTORY") {
-				if (!isAtBottom) {
+				if (userEscapedHydrationRef.current) {
+					if (!isAtBottom) {
+						setShowScrollToBottom(true)
+					}
+					return
+				}
+				if (isAtBottom) {
+					enterAnchoredFollowing()
+					setShowScrollToBottom(false)
+				} else {
 					setShowScrollToBottom(true)
 				}
 				return

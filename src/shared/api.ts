@@ -47,7 +47,16 @@ export const shouldUseReasoningBudget = ({
 }: {
 	model: ModelInfo
 	settings?: ProviderSettings
-}): boolean => !!model.requiredReasoningBudget || (!!model.supportsReasoningBudget && !!settings?.enableReasoningEffort)
+}): boolean => {
+	if (
+		settings?.enableReasoningEffort === false ||
+		settings?.reasoningEffort === "disable" ||
+		settings?.reasoningEffort === "none"
+	) {
+		return false
+	}
+	return !!model.requiredReasoningBudget || (!!model.supportsReasoningBudget && !!settings?.enableReasoningEffort)
+}
 
 export const shouldUseReasoningEffort = ({
 	model,
@@ -73,6 +82,11 @@ export const shouldUseReasoningEffort = ({
 	if (selectedEffort === "disable") return false
 
 	const cap = model.supportsReasoningEffort as unknown
+
+	// "none" explicitly turns off reasoning unless the model capability specifically requires/supports the string "none"
+	if (selectedEffort === "none") {
+		return Array.isArray(cap) && (cap as ReadonlyArray<string>).includes("none")
+	}
 
 	// Capability array: use only if selected is included (treat "none"/"minimal" as valid)
 	if (Array.isArray(cap)) {

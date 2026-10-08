@@ -165,7 +165,7 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 		})
 	}, [fileChanges])
 
-	if (!hasActiveReviews || filesWithChanges.length === 0) return null
+	if (filesWithChanges.length === 0) return null
 
 	const fileCount = byPath.size
 	const latestFile = filesWithChanges[filesWithChanges.length - 1]
@@ -177,7 +177,8 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 
 	return (
 		<div className={cn("flex flex-col w-full gap-1.5 select-none", className)}>
-			{latestFile &&
+			{hasActiveReviews &&
+				latestFile &&
 				hasLatestChanges &&
 				(() => {
 					const latestTargetLine =
@@ -447,26 +448,28 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 						</div>
 					</PopoverContent>
 				</Popover>
-				<div className="flex items-center gap-2 shrink-0">
-					<button
-						type="button"
-						onClick={(e) => {
-							e.stopPropagation()
-							vscode.postMessage({ type: "rejectAllReviews" })
-						}}
-						className="text-xs text-zinc-400 hover:text-zinc-200 bg-transparent border-none py-1 px-1.5 cursor-pointer font-normal transition-colors">
-						Reject all
-					</button>
-					<button
-						type="button"
-						onClick={(e) => {
-							e.stopPropagation()
-							vscode.postMessage({ type: "acceptAllReviews" })
-						}}
-						className="inline-flex items-center bg-[#007acc] hover:bg-[#0062a3] text-white text-xs font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer border-none shadow-sm">
-						<span>Accept all</span>
-					</button>
-				</div>
+				{hasActiveReviews && (
+					<div className="flex items-center gap-2 shrink-0">
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation()
+								vscode.postMessage({ type: "rejectAllReviews" })
+							}}
+							className="text-xs text-zinc-400 hover:text-zinc-200 bg-transparent border-none py-1 px-1.5 cursor-pointer font-normal transition-colors">
+							Reject all
+						</button>
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation()
+								vscode.postMessage({ type: "acceptAllReviews" })
+							}}
+							className="inline-flex items-center bg-[#007acc] hover:bg-[#0062a3] text-white text-xs font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer border-none shadow-sm">
+							<span>Accept all</span>
+						</button>
+					</div>
+				)}
 			</div>
 		</div>
 	)
