@@ -15,6 +15,16 @@ import { fileChangesFromMessages, type FileChangeEntry } from "./utils/fileChang
 import { getFileIcon, parsePathAndLines } from "./FileOperationItem"
 import CodeAccordion from "../common/CodeAccordion"
 
+function getFirstDiffLine(diff?: string): number | undefined {
+	if (!diff) return undefined
+	const match = diff.match(/@@\s*-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@/)
+	if (match && match[1]) {
+		const line = parseInt(match[1], 10)
+		return isNaN(line) ? undefined : line
+	}
+	return undefined
+}
+
 interface FileChangesPanelProps {
 	mirrorMessages: MirrorMessage[] | undefined
 	fileEdits?: FileEditRecord[]
@@ -167,28 +177,47 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 
 	return (
 		<div className={cn("flex flex-col w-full gap-1.5 select-none", className)}>
-			{latestFile && hasLatestChanges && (
-				<div
-					onClick={() => {
-						vscode.postMessage({
-							type: "openFile",
-							text: latestFile.path.startsWith("./") ? latestFile.path : "./" + latestFile.path,
-						})
-					}}
-					className="w-full flex items-center gap-2.5 py-1.5 px-3 rounded-lg bg-[#18181b] border border-white/[0.08] hover:bg-[#202024] cursor-pointer text-xs min-w-0 transition-colors">
-					<div className="size-3.5 rounded-[3px] border border-amber-500/80 bg-amber-500/10 flex items-center justify-center shrink-0">
-						<div className="size-1 rounded-full bg-amber-400" />
-					</div>
-					<span className="font-mono text-[11px] flex items-center gap-1.5 font-medium shrink-0">
-						{latestStats.added > 0 && <span className="text-[#4ade80]">+{latestStats.added}</span>}
-						{latestStats.removed > 0 && <span className="text-[#f87171]">-{latestStats.removed}</span>}
-					</span>
-					<span className="font-medium text-zinc-100 truncate">{latestFileName}</span>
-					{latestDirPath && (
-						<span className="text-[11px] text-zinc-400/60 truncate font-mono">{latestDirPath}</span>
-					)}
-				</div>
-			)}
+			{latestFile &&
+				hasLatestChanges &&
+				(() => {
+					const latestTargetLine =
+						parsePathAndLines(latestFile.path).startLine ?? getFirstDiffLine(latestFile.diff)
+					return (
+						<div
+							onClick={() => {
+								vscode.postMessage({
+									type: "openFile",
+									text: latestFile.path.startsWith("./") ? latestFile.path : "./" + latestFile.path,
+									values: latestTargetLine ? { line: latestTargetLine } : undefined,
+								})
+							}}
+							title={
+								latestTargetLine
+									? `Open ${latestFileName} at review line ${latestTargetLine}`
+									: `Open ${latestFileName}`
+							}
+							className="w-full flex items-center gap-2.5 py-1.5 px-3 rounded-lg bg-[#18181b] border border-white/[0.08] hover:bg-[#202024] cursor-pointer text-xs min-w-0 transition-colors">
+							<div className="size-3.5 rounded-[3px] border border-amber-500/80 bg-amber-500/10 flex items-center justify-center shrink-0">
+								<div className="size-1 rounded-full bg-amber-400" />
+							</div>
+							<span className="font-mono text-[11px] flex items-center gap-1.5 font-medium shrink-0">
+								{latestStats.added > 0 && <span className="text-[#4ade80]">+{latestStats.added}</span>}
+								{latestStats.removed > 0 && (
+									<span className="text-[#f87171]">-{latestStats.removed}</span>
+								)}
+							</span>
+							<span className="font-medium text-zinc-100 truncate">{latestFileName}</span>
+							{latestDirPath && (
+								<span className="text-[11px] text-zinc-400/60 truncate font-mono">{latestDirPath}</span>
+							)}
+							{latestTargetLine && (
+								<span className="text-[10px] text-zinc-400/80 font-mono ml-auto shrink-0 bg-white/5 px-1 py-0.5 rounded border border-white/5">
+									:{latestTargetLine}
+								</span>
+							)}
+						</div>
+					)
+				})()}
 
 			<div className="flex items-center justify-between w-full text-xs pt-0.5">
 				<Popover open={panelOpen} onOpenChange={setPanelOpen}>
@@ -196,17 +225,16 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 						<button
 							type="button"
 							className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 bg-transparent border-none py-1 px-0.5 cursor-pointer text-xs select-none transition-colors">
-							<ArrowLeft className="size-3.5 opacity-70 hover:opacity-100 shrink-0" />
-							<FileText className="size-3.5 opacity-70 shrink-0" />
-							<span className="font-medium">
-								{fileCount} {fileCount === 1 ? "File With Changes" : "Files With Changes"}
-							</span>
+							<FileDiff className="size-3.5 opacity-80 text-mirror-brand-via shrink-0" />
+							<span className="font-medium">Review files ({fileCount})</span>
 							{totalStats.added > 0 || totalStats.removed > 0 ? (
-								<div
-									className="flex items-center gap-1 ml-0.5 shrink-0 font-mono text-[10px]"
-									data-testid="total-added">
-									<span className="text-[#4ade80]">+{totalStats.added}</span>
-									<span className="text-[#f87171]">-{totalStats.removed}</span>
+								<div className="flex items-center gap-1 ml-0.5 shrink-0 font-mono text-[10px]">
+									<span className="text-[#4ade80]" data-testid="total-added">
+										+{totalStats.added}
+									</span>
+									<span className="text-[#f87171]" data-testid="total-removed">
+										-{totalStats.removed}
+									</span>
 								</div>
 							) : null}
 						</button>
@@ -339,19 +367,35 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 															)}
 														</span>
 													)}
-													<button
-														type="button"
-														title="Open file in editor"
-														onClick={(e) => {
-															e.stopPropagation()
-															vscode.postMessage({
-																type: "openFile",
-																text: path.startsWith("./") ? path : "./" + path,
-															})
-														}}
-														className="p-0.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer">
-														<span className="codicon codicon-go-to-file text-xs" />
-													</button>
+													{(() => {
+														const fileTargetLine =
+															parsePathAndLines(path).startLine ??
+															getFirstDiffLine(displayDiff)
+														return (
+															<button
+																type="button"
+																title={
+																	fileTargetLine
+																		? `Open in editor at review line ${fileTargetLine}`
+																		: "Open file in editor"
+																}
+																onClick={(e) => {
+																	e.stopPropagation()
+																	vscode.postMessage({
+																		type: "openFile",
+																		text: path.startsWith("./")
+																			? path
+																			: "./" + path,
+																		values: fileTargetLine
+																			? { line: fileTargetLine }
+																			: undefined,
+																	})
+																}}
+																className="p-0.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground hover:bg-vscode-toolbar-hoverBackground shrink-0 bg-transparent border-none cursor-pointer">
+																<span className="codicon codicon-go-to-file text-xs" />
+															</button>
+														)
+													})()}
 													<ChevronDown
 														className={cn(
 															"size-3 text-vscode-descriptionForeground/70 transition-transform duration-150 shrink-0",
@@ -419,9 +463,8 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 							e.stopPropagation()
 							vscode.postMessage({ type: "acceptAllReviews" })
 						}}
-						className="inline-flex items-center gap-1 bg-[#007acc] hover:bg-[#0062a3] text-white text-xs font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer border-none shadow-sm">
+						className="inline-flex items-center bg-[#007acc] hover:bg-[#0062a3] text-white text-xs font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer border-none shadow-sm">
 						<span>Accept all</span>
-						<ChevronDown className="size-3" />
 					</button>
 				</div>
 			</div>

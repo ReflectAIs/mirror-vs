@@ -225,7 +225,7 @@ export async function handleEditMessageConfirm(
 		// Find the nearest preceding user message to ensure we replace the original, not just the assistant reply
 		for (let i = messageIndex; i >= 0; i--) {
 			const m = currentMirror.mirrorMessages[i]
-			if (m?.say === "user_feedback" || m?.say === "text" || i === 0) {
+			if (m?.say === "user_feedback" || i === 0) {
 				deleteFromMessageIndex = i
 				const userTs = m.ts
 				if (typeof userTs === "number") {
@@ -237,6 +237,18 @@ export async function handleEditMessageConfirm(
 				break
 			}
 		}
+
+		// Ensure any active loop or ask is cleanly aborted before rewinding,
+		// preventing the edited message from being swallowed by a stale ask handler
+		if (currentMirror.isLoopActive || currentMirror.isWaitingOnAsk) {
+			await currentMirror.abortTask()
+		}
+		currentMirror.abort = false
+		currentMirror.isLoopActive = false
+		currentMirror.isWaitingOnAsk = false
+		currentMirror.askResponse = undefined
+		currentMirror.askResponseText = undefined
+		currentMirror.askResponseImages = undefined
 
 		const targetMsg = currentMirror.mirrorMessages[deleteFromMessageIndex]
 		const isInitialPrompt = deleteFromMessageIndex === 0 && targetMsg?.say !== "user_feedback"

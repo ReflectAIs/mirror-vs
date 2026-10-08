@@ -6,7 +6,7 @@ import FileChangesPanel from "../components/chat/FileChangesPanel"
 
 vi.mock("@src/context/ExtensionStateContext", () => ({
 	useExtensionState: vi.fn(() => ({
-		hasActiveReviews: false,
+		hasActiveReviews: true,
 	})),
 }))
 
@@ -136,9 +136,9 @@ describe("FileChangesPanel", () => {
 		const messages = [createFileEditMessage("src/foo.ts", "@@ -1 +1 @@\n+line")]
 		renderPanel(messages)
 
-		expect(screen.getByText("1 file(s) changed in this conversation")).toBeInTheDocument()
+		expect(screen.getByText("Review files (1)")).toBeInTheDocument()
 		// Expand panel so file row is in DOM (CollapsibleContent may not render when closed in some setups)
-		fireEvent.click(screen.getByText("1 file(s) changed in this conversation").closest("button")!)
+		fireEvent.click(screen.getByText("Review files (1)").closest("button")!)
 		expect(screen.getByTestId("accordian-path")).toHaveTextContent("src/foo.ts")
 	})
 
@@ -146,9 +146,9 @@ describe("FileChangesPanel", () => {
 		const messages = [createFileEditMessage("src/a.ts", "diff a"), createFileEditMessage("src/b.ts", "diff b")]
 		renderPanel(messages)
 
-		expect(screen.getByText("2 file(s) changed in this conversation")).toBeInTheDocument()
+		expect(screen.getByText("Review files (2)")).toBeInTheDocument()
 		// Expand panel so file rows are rendered
-		fireEvent.click(screen.getByText("2 file(s) changed in this conversation").closest("button")!)
+		fireEvent.click(screen.getByText("Review files (2)").closest("button")!)
 		const paths = screen.getAllByTestId("accordian-path")
 		expect(paths).toHaveLength(2)
 		expect(paths.map((el) => el.textContent)).toEqual(expect.arrayContaining(["src/a.ts", "src/b.ts"]))
@@ -159,7 +159,7 @@ describe("FileChangesPanel", () => {
 		renderPanel(messages)
 
 		// Header visible
-		const headerText = screen.getByText("1 file(s) changed in this conversation")
+		const headerText = screen.getByText("Review files (1)")
 		expect(headerText).toBeInTheDocument()
 		// Trigger is the button that contains the header text
 		const trigger = headerText.closest("button")
@@ -175,7 +175,7 @@ describe("FileChangesPanel", () => {
 		renderPanel(messages)
 
 		// Expand panel first so the file row is rendered
-		const headerText = screen.getByText("1 file(s) changed in this conversation")
+		const headerText = screen.getByText("Review files (1)")
 		fireEvent.click(headerText.closest("button")!)
 
 		const accordianToggle = screen.getByTestId("accordian-toggle")
