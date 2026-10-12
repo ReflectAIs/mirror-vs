@@ -250,10 +250,10 @@ export class TerminalRegistry {
 			})
 		}
 
-		// Second priority: Find any available terminal with matching directory.
+		// Second priority: Find any available unassigned terminal with matching directory.
 		if (!terminal) {
 			terminal = terminals.find((t) => {
-				if (t.busy || t.provider !== provider) {
+				if (t.busy || t.provider !== provider || (t.taskId !== undefined && t.taskId !== taskId)) {
 					return false
 				}
 

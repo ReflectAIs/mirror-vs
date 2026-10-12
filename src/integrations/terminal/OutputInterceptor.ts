@@ -17,6 +17,11 @@ export interface OutputInterceptorOptions {
 	storageDir: string
 	/** Size category for the preview buffer (small/medium/large) */
 	previewSize: TerminalOutputPreviewSize
+	/**
+	 * When true, writes all output directly to disk log file regardless of preview threshold,
+	 * ensuring logs are always available for LLM inspection.
+	 */
+	alwaysPersistLog?: boolean
 }
 
 /**
@@ -119,6 +124,13 @@ export class OutputInterceptor {
 
 		// Always update the head/tail preview buffers
 		this.addToPreviewBuffers(chunk)
+
+		// When alwaysPersistLog is enabled, immediately start persisting all chunks to disk
+		if (this.options.alwaysPersistLog && !this.spilledToDisk) {
+			this.pendingChunks.push(chunk)
+			this.spillToDisk()
+			return
+		}
 
 		// Handle disk spilling for full output preservation
 		if (!this.spilledToDisk) {
@@ -310,6 +322,10 @@ export class OutputInterceptor {
 	 * ```
 	 */
 	async finalize(): Promise<PersistedCommandOutput> {
+		if (this.options.alwaysPersistLog && !this.spilledToDisk) {
+			this.spillToDisk()
+		}
+
 		// Close write stream if open and wait for it to fully flush.
 		// This ensures the artifact is completely written before we advertise the artifact_id.
 		if (this.writeStream) {
@@ -317,6 +333,16 @@ export class OutputInterceptor {
 				this.writeStream!.end(() => resolve())
 				this.writeStream!.on("error", reject)
 			})
+			this.writeStream = null
+		} else if (this.options.alwaysPersistLog) {
+			// Even if 0 bytes were written, ensure empty file exists
+			const dir = path.dirname(this.artifactPath)
+			if (!fs.existsSync(dir)) {
+				fs.mkdirSync(dir, { recursive: true })
+			}
+			if (!fs.existsSync(this.artifactPath)) {
+				fs.writeFileSync(this.artifactPath, "", "utf8")
+			}
 		}
 
 		// Prepare preview: head + [omission indicator] + tail
@@ -329,11 +355,15 @@ export class OutputInterceptor {
 			preview = this.headBuffer + this.tailBuffer
 		}
 
+		const isTruncated = this.options.alwaysPersistLog
+			? this.omittedBytes > 0 || this.totalBytes > this.previewBytes
+			: this.spilledToDisk
+
 		return {
 			preview,
 			totalBytes: this.totalBytes,
-			artifactPath: this.spilledToDisk ? this.artifactPath : null,
-			truncated: this.spilledToDisk,
+			artifactPath: this.spilledToDisk || this.options.alwaysPersistLog ? this.artifactPath : null,
+			truncated: isTruncated,
 		}
 	}
 
@@ -355,12 +385,26 @@ export class OutputInterceptor {
 	 * Get the artifact file path for this command execution.
 	 *
 	 * Returns the path where the full output would be/is stored on disk.
-	 * The file may not exist if output hasn't exceeded the preview threshold.
+	 * The file may not exist if output hasn't exceeded the preview threshold and alwaysPersistLog is false.
 	 *
 	 * @returns The absolute path to the artifact file
 	 */
 	getArtifactPath(): string {
 		return this.artifactPath
+	}
+
+	/**
+	 * Get the artifact ID (e.g. cmd-1234567.txt) for this execution.
+	 */
+	getArtifactId(): string {
+		return path.basename(this.artifactPath)
+	}
+
+	/**
+	 * Get total byte count written to the interceptor so far.
+	 */
+	getTotalBytes(): number {
+		return this.totalBytes
 	}
 
 	/**

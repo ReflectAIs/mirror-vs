@@ -1,6 +1,6 @@
 {
 	"name": "mirror-vs",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"license": "Apache-2.0",
 	"packageManager": "pnpm@10.8.1",
 	"engines": {

@@ -18,7 +18,7 @@ export function isTransientProviderError(error: unknown): boolean {
 		}
 	}
 
-	// Fall back to error code (e.g. "overloaded_error", "rate_limit_exceeded")
+	// Fall back to error code (e.g. "overloaded_error", "rate_limit_exceeded", connection resets)
 	const code = typeof anyErr?.code === "string" ? anyErr.code.toLowerCase() : ""
 	if (code) {
 		if (
@@ -28,7 +28,12 @@ export function isTransientProviderError(error: unknown): boolean {
 			code.includes("busy") ||
 			code.includes("unavailable") ||
 			code.includes("capacity") ||
-			code.includes("provider_error")
+			code.includes("provider_error") ||
+			code.includes("econnreset") ||
+			code.includes("etimedout") ||
+			code.includes("econnrefused") ||
+			code.includes("err_stream_premature_close") ||
+			code.includes("und_err")
 		) {
 			return true
 		}
@@ -52,6 +57,16 @@ export function isTransientProviderError(error: unknown): boolean {
 		message.includes("busy") ||
 		message.includes("try again") ||
 		message.includes("capacity") ||
-		message.includes("provider error")
+		message.includes("provider error") ||
+		message.includes("socket hang up") ||
+		message.includes("premature close") ||
+		message.includes("econnreset") ||
+		message.includes("etimedout") ||
+		message.includes("network error") ||
+		message.includes("fetch failed") ||
+		message.includes("stream terminated") ||
+		message.includes("stream closed") ||
+		message.includes("stream error") ||
+		message.includes("terminated by provider")
 	)
 }

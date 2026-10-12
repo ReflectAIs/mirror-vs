@@ -39,14 +39,19 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 		}
 
 		// Matches "[Terminal Notice: Background process for '<command>' in '<cwd>' ...]"
-		const noticeMatch = text.match(/\[Terminal Notice: Background process for '([^']+)' in '([^']*)'\s*([^\]]+)\]/)
+		const noticeMatch = text.match(
+			/\[Terminal Notice: Background process for '([^']+)' in '([^']*)'\s*([\s\S]*?)\](?:\s*([\s\S]*))?/,
+		)
 
 		if (noticeMatch) {
+			const noticeDetails = (noticeMatch[3] || "").trim()
+			const extra = (noticeMatch[4] || "").trim()
+			const fullOutput = [noticeDetails, extra].filter(Boolean).join("\n")
 			return {
 				command: noticeMatch[1] || "",
 				cwd: noticeMatch[2] || "",
 				exitStatus: "Running",
-				output: "",
+				output: fullOutput,
 				isNotice: true,
 			}
 		}

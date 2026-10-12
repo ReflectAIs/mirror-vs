@@ -356,6 +356,9 @@ export async function executeCommandInTerminal(
 	let message: { text?: string; images?: string[] } | undefined
 	let runInBackground = false
 	let completed = false
+	const commandStartedAt = Date.now()
+	let lastProgressLineCount = 0
+	let lastProgressByteCount = 0
 	let result: string = ""
 	let persistedResult: PersistedCommandOutput | undefined
 	let exitDetails: ExitCodeDetails | undefined
@@ -368,13 +371,12 @@ export async function executeCommandInTerminal(
 	const terminalProvider = terminalShellIntegrationDisabled ? "execa" : "vscode"
 	const provider = await task.providerRef.deref()
 
-	// Get global storage path for persisted output artifacts
-	const globalStoragePath = provider?.context?.globalStorageUri?.fsPath
+	// Get storage path for persisted output artifacts and execution logs
+	const baseStoragePath = provider?.context?.globalStorageUri?.fsPath ?? path.join(os.tmpdir(), "mirror-vs-storage")
 	let interceptor: OutputInterceptor | undefined
 
-	// Create OutputInterceptor if we have storage available
-	if (globalStoragePath) {
-		const taskDir = await getTaskDirectoryPath(globalStoragePath, task.taskId)
+	try {
+		const taskDir = await getTaskDirectoryPath(baseStoragePath, task.taskId)
 		const storageDir = path.join(taskDir, "command-output")
 		const providerState = await provider?.getState()
 		const terminalOutputPreviewSize =
@@ -386,7 +388,10 @@ export async function executeCommandInTerminal(
 			command,
 			storageDir,
 			previewSize: terminalOutputPreviewSize,
+			alwaysPersistLog: true,
 		})
+	} catch (e) {
+		console.error("[ExecuteCommandTool] Failed to initialize OutputInterceptor:", e)
 	}
 
 	let accumulatedOutput = ""
@@ -464,7 +469,8 @@ export async function executeCommandInTerminal(
 	})
 
 	let hasEmittedBackgroundCompletion = false
-	const BACKGROUND_NOTICE_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+	// Fallback interval: 90 seconds (1.5 minutes) to notify and wake model if terminal has not returned callback
+	const BACKGROUND_NOTICE_INTERVAL_MS = 90 * 1000
 	let backgroundNoticeTimer: NodeJS.Timeout | undefined
 
 	const startBackgroundNoticeTimer = () => {
@@ -472,7 +478,48 @@ export async function executeCommandInTerminal(
 		backgroundNoticeTimer = setInterval(() => {
 			if (!completed && !hasEmittedBackgroundCompletion && !task.abandoned && runInBackground) {
 				const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
-				const notice = `[Terminal Notice: Background process for '${command}' in '${currentWorkingDir}' is still running (5+ minutes). You can check its status or continue with other tasks.]`
+				const elapsedMs = Date.now() - commandStartedAt
+				const elapsedStr = formatDuration(elapsedMs)
+
+				const rawOutput = latestCompressedOutput || accumulatedOutput || ""
+				const lines = rawOutput ? rawOutput.trim().split("\n") : []
+				const lineCount = lines.length
+				const byteCount = rawOutput.length
+				const recentSnippet = lines.slice(-10).join("\n")
+				const isOutputStalled = lineCount === lastProgressLineCount && byteCount === lastProgressByteCount
+				lastProgressLineCount = lineCount
+				lastProgressByteCount = byteCount
+
+				const artifactId = persistedResult?.artifactPath
+					? path.basename(persistedResult.artifactPath)
+					: (interceptor?.getArtifactId() ?? `cmd-${executionId}.txt`)
+
+				// Check if process has already exited behind the scenes (fallback exit check)
+				const proc = terminal.process as any
+				const underlyingSubprocess = proc?.subprocess
+				if (
+					underlyingSubprocess &&
+					underlyingSubprocess.exitCode !== null &&
+					underlyingSubprocess.exitCode !== undefined
+				) {
+					completed = true
+					exitDetails = { exitCode: underlyingSubprocess.exitCode ?? 0 }
+					emitBackgroundNotification()
+					return
+				}
+
+				const noticeLines = [
+					`[Terminal Notice: Background process for '${command}' in '${currentWorkingDir}' is still running (Elapsed: ${elapsedStr}).`,
+					`Progress: ${lineCount} lines (${formatBytes(byteCount)}) logged so far.${isOutputStalled ? " (No new output in last 90 seconds)" : ""}`,
+					recentSnippet ? `Recent output:\n${recentSnippet}\n` : "",
+					`Logs: Continuous full output is saved on disk. Artifact ID: ${artifactId}`,
+					`Instructions for Model:`,
+					`- Inform the user of this task's progress (e.g. elapsed time: ${elapsedStr}, current status/output).`,
+					`- If output is stalled or you want to inspect full details, use read_command_output with artifact_id '${artifactId}'.`,
+					`- If the command completed its intended work (as seen in recent output/logs), proceed with the task.`,
+					`- Otherwise, inform the user and wait for the next callback or finish independent work.]`,
+				]
+				const notice = noticeLines.filter(Boolean).join("\n")
 				void task.injectInBetweenMessage(notice, undefined, "terminal_callback")
 			} else if (completed || hasEmittedBackgroundCompletion || task.abandoned) {
 				if (backgroundNoticeTimer) {
@@ -499,9 +546,16 @@ export async function executeCommandInTerminal(
 					? outputToPreview.slice(-2000)
 					: outputToPreview
 				: ""
+		const artifactId = persistedResult?.artifactPath
+			? path.basename(persistedResult.artifactPath)
+			: (interceptor?.getArtifactId() ?? `cmd-${executionId}.txt`)
+		const elapsedMs = Date.now() - commandStartedAt
+		const elapsedStr = formatDuration(elapsedMs)
+
 		const notification = [
-			`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus}]`,
-			previewSnippet ? `\nOutput:\n${previewSnippet}` : "",
+			`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus} (Duration: ${elapsedStr})]`,
+			previewSnippet ? `\nOutput:\n${previewSnippet}` : "\nOutput: <No output captured in terminal stream>",
+			`\nLogs: Full execution log saved to disk. Artifact ID: ${artifactId}. You can use read_command_output with artifact_id '${artifactId}' to view complete logs instead of rerunning.`,
 		].join("")
 
 		void task.injectInBetweenMessage(notification, undefined, "terminal_callback")
@@ -795,26 +849,34 @@ export async function executeCommandInTerminal(
 
 		const outputStr = result ?? ""
 		let outputText = outputStr
+		const artifactId = persistedResult?.artifactPath
+			? path.basename(persistedResult.artifactPath)
+			: (interceptor?.getArtifactId() ?? `cmd-${executionId}.txt`)
+
 		if (!persistedResult?.truncated && outputStr.length > 12_000) {
 			const head = outputStr.slice(0, 4_000)
 			const tail = outputStr.slice(-8_000)
-			const artifactHint = persistedResult?.artifactPath
-				? `Artifact ID: ${path.basename(persistedResult.artifactPath)}. Use read_command_output tool with artifact_id to search or read the full output in parts using offset and limit if needed.`
-				: `Use read_command_output or execute_command with specific flags/grep to inspect specific sections if needed.`
+			const artifactHint = `Artifact ID: ${artifactId}. Use read_command_output tool with artifact_id '${artifactId}' to search or read the full output in parts using offset and limit if needed.`
 			outputText = `${head}\n\n[... Truncated ${outputStr.length - 12_000} characters to preserve context window and cache. ${artifactHint} ...]\n\n${tail}`
 		}
 
 		return [
 			false,
-			`Command executed in terminal within working directory '${currentWorkingDir}'. ${exitStatus}\nOutput:\n${outputText}`,
+			`Command executed in terminal within working directory '${currentWorkingDir}'. ${exitStatus}\nLogs: Artifact ID: ${artifactId} (Continuous execution log saved on disk. Use read_command_output if output was lost or truncated).\nOutput:\n${outputText}`,
 		]
 	} else {
+		const artifactId = persistedResult?.artifactPath
+			? path.basename(persistedResult.artifactPath)
+			: (interceptor?.getArtifactId() ?? `cmd-${executionId}.txt`)
 		return [
 			false,
 			[
 				`Command is running in background in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
+				`Logs: Full execution log is being continuously saved to disk. Artifact ID: ${artifactId}`,
 				result && result.length > 0 ? `Output so far:\n${result}\n` : "\n",
-				"IMPORTANT: The command has moved to the background. The terminal callback will automatically notify and wake you up when the command finishes. If you have no other independent tasks to perform right now, END YOUR TURN IMMEDIATELY WITHOUT CALLING ANY TOOLS. Do NOT call read_command_output, sleep, or check on the terminal in a loop — wait patiently for the callback.",
+				"IMPORTANT: The command has moved to the background. The terminal callback will automatically notify and wake you up when the command finishes.",
+				"A periodic fallback notice will wake you every 90 seconds (1.5 minutes) with elapsed time, progress metrics, and recent output if the process takes longer, so you can inform the user.",
+				"If you have no other independent tasks to perform right now, END YOUR TURN IMMEDIATELY WITHOUT CALLING ANY TOOLS. Do NOT poll in a loop with sleep, echo, or read_command_output — wait for the background callback or 90-second progress notice.",
 			].join("\n"),
 		]
 	}
@@ -883,6 +945,19 @@ function formatBytes(bytes: number): string {
 		return `${(bytes / 1024).toFixed(1)}KB`
 	}
 	return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+/**
+ * Format milliseconds to human-readable duration (e.g. "45s", "2m 15s")
+ */
+function formatDuration(ms: number): string {
+	const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+	if (totalSeconds < 60) {
+		return `${totalSeconds}s`
+	}
+	const minutes = Math.floor(totalSeconds / 60)
+	const remainingSeconds = totalSeconds % 60
+	return `${minutes}m ${remainingSeconds}s`
 }
 
 export const executeCommandTool = new ExecuteCommandTool()

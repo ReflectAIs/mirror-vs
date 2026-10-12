@@ -150,6 +150,12 @@ export class ReadCommandOutputTool extends BaseTool<"read_command_output"> {
 			const stats = await fs.stat(artifactPath)
 			const totalSize = stats.size
 
+			// Handle empty log file cleanly
+			if (totalSize === 0) {
+				pushToolResult(`Artifact "${artifact_id}" contains 0 bytes (command produced no stdout/stderr output).`)
+				return
+			}
+
 			// Validate offset
 			if (offset < 0 || offset >= totalSize) {
 				const errorMsg = `Invalid offset: ${offset}. File size is ${totalSize} bytes. Offset must be between 0 and ${totalSize - 1}.`

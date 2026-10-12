@@ -432,8 +432,8 @@ export async function handleClearTask(provider: MirrorProvider): Promise<void> {
 /**
  * Handles the cancelTask message.
  */
-export async function handleCancelTask(provider: MirrorProvider): Promise<void> {
-	await provider.cancelTask()
+export async function handleCancelTask(provider: MirrorProvider, taskId?: string): Promise<void> {
+	await provider.cancelTask(taskId)
 }
 
 /**

@@ -2,6 +2,20 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.1] - 2026-10-12
+
+### Improvements & Fixes
+
+- **Multi-Tab Stream Stability**:
+    - Fixed stream cut-offs when working across multiple tabs simultaneously: backgrounded active tasks are parked instead of aborted during tab switches.
+    - Scoped `cancelTask` requests to target specific task IDs instead of terminating whichever task is currently active on top of the stack.
+    - Isolated terminal instances per task to prevent concurrent tasks from claiming or hijacking each other's terminals.
+    - Added retry resiliency for transient socket drops (`socket hang up`, `ECONNRESET`, `premature close`, `fetch failed`) during concurrent multi-tab model streaming.
+- **Terminal Fallback & Progress Tracking**:
+    - Added a 90-second fallback progress notice for long-running terminal executions that haven't returned a callback, alerting the model with runtime duration, line/byte counts, and output status.
+    - Continuous terminal log persistence (`storageDir/cmd-${executionId}.txt`) so full logs can be inspected via `read_command_output` with `artifact_id` without re-running commands.
+    - Live progress details formatted in terminal callbacks and expandable within the webview UI.
+
 ## [1.0.0] - 2026-10-07
 
 ### Official 1.0.0 Public Release

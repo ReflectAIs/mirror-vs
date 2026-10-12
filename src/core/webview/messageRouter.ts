@@ -913,7 +913,7 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 
 		// ── Simple operations (inlined) ─────────────────────
 		case "cancelTask":
-			await provider.cancelTask()
+			await provider.cancelTask(message.taskId)
 			break
 		case "cancelAutoApproval":
 			provider.getCurrentTask()?.cancelAutoApprovalTimeout()

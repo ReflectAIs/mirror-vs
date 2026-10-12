@@ -1445,7 +1445,18 @@ export class MirrorProvider
 		const isRehydratingCurrentTask = currentTask && currentTask.taskId === historyItem.id
 
 		if (!isRehydratingCurrentTask && !options?.skipStackCleanup) {
-			await this.removeMirrorFromStack()
+			if (
+				currentTask &&
+				(currentTask.isStreaming || currentTask.isLoopActive || currentTask.isWaitingForFirstChunk)
+			) {
+				try {
+					await this.parkCurrentTask()
+				} catch {
+					await this.removeMirrorFromStack()
+				}
+			} else {
+				await this.removeMirrorFromStack()
+			}
 		}
 
 		// If the history item has a saved mode, restore it and its associated API configuration.
@@ -2453,8 +2464,8 @@ export class MirrorProvider
 		return newTask
 	}
 
-	public async cancelTask(): Promise<void> {
-		return this.taskLifecycleManager.cancelTask()
+	public async cancelTask(targetTaskId?: string): Promise<void> {
+		return this.taskLifecycleManager.cancelTask(targetTaskId)
 	}
 
 	// Clear the current task without treating it as a subtask.

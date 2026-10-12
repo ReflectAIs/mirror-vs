@@ -179,10 +179,10 @@ export class TaskLifecycleManager {
 	// ── Cancel ─────────────────────────────────────────────────────────────────
 
 	/**
-	 * Cancels the current task, preserving history for rehydration.
+	 * Cancels the specified or current task, preserving history for rehydration.
 	 */
-	public async cancelTask(): Promise<void> {
-		const task = this.provider.getCurrentTask()
+	public async cancelTask(targetTaskId?: string): Promise<void> {
+		const task = targetTaskId ? this.provider.getLiveTask(targetTaskId) : this.provider.getCurrentTask()
 
 		if (!task) {
 			return
@@ -195,7 +195,7 @@ export class TaskLifecycleManager {
 			const history = await this.provider.getTaskWithId(task.taskId)
 			historyItem = history.historyItem
 		} catch (error) {
-			// During task startup there is a short window where currentTask exists
+			// During task startup there is a short window where task exists
 			// but task history has not been persisted yet.
 			if (error instanceof Error && error.message === "Task not found") {
 				this.provider.log(`[cancelTask] task history missing for ${task.taskId}; skipping rehydrate`)
@@ -227,11 +227,7 @@ export class TaskLifecycleManager {
 		task.abandoned = true
 
 		await pWaitFor(
-			() =>
-				this.provider.getCurrentTask()! === undefined ||
-				this.provider.getCurrentTask()!.isStreaming === false ||
-				this.provider.getCurrentTask()!.didFinishAbortingStream ||
-				this.provider.getCurrentTask()!.isWaitingForFirstChunk,
+			() => task.isStreaming === false || task.didFinishAbortingStream || task.isWaitingForFirstChunk,
 			{
 				timeout: 3_000,
 			},
@@ -239,17 +235,19 @@ export class TaskLifecycleManager {
 			console.error("Failed to abort task")
 		})
 
-		// Defensive safeguard: if current instance already changed, skip rehydrate
-		const current = this.provider.getCurrentTask()
-		if (current && current.instanceId !== originalInstanceId) {
-			this.provider.log(
-				`[cancelTask] Skipping rehydrate: current instance ${current.instanceId} != original ${originalInstanceId}`,
-			)
-			return
-		}
+		const isCurrent = this.provider.getCurrentTask()?.taskId === task.taskId
 
-		// Final race check before rehydrate
-		{
+		if (isCurrent) {
+			// Defensive safeguard: if current instance already changed, skip rehydrate
+			const current = this.provider.getCurrentTask()
+			if (current && current.instanceId !== originalInstanceId) {
+				this.provider.log(
+					`[cancelTask] Skipping rehydrate: current instance ${current.instanceId} != original ${originalInstanceId}`,
+				)
+				return
+			}
+
+			// Final race check before rehydrate
 			const currentAfterCheck = this.provider.getCurrentTask()
 			if (currentAfterCheck && currentAfterCheck.instanceId !== originalInstanceId) {
 				this.provider.log(
@@ -291,7 +289,7 @@ export class TaskLifecycleManager {
 				rootTask,
 				parentTask,
 			},
-			{ queuedMessages },
+			{ queuedMessages, skipStackCleanup: !isCurrent },
 		)
 	}
 
