@@ -497,13 +497,21 @@ export async function executeCommandInTerminal(
 				// Check if process has already exited behind the scenes (fallback exit check)
 				const proc = terminal.process as any
 				const underlyingSubprocess = proc?.subprocess
-				if (
-					underlyingSubprocess &&
-					underlyingSubprocess.exitCode !== null &&
-					underlyingSubprocess.exitCode !== undefined
-				) {
+				const isExited =
+					proc?.isCompleted ||
+					terminal.process === undefined ||
+					(underlyingSubprocess &&
+						underlyingSubprocess.exitCode !== null &&
+						underlyingSubprocess.exitCode !== undefined)
+				if (isExited) {
 					completed = true
-					exitDetails = { exitCode: underlyingSubprocess.exitCode ?? 0 }
+					if (terminal) {
+						terminal.busy = false
+						terminal.running = false
+					}
+					task.terminalProcess = undefined
+					exitDetails = exitDetails ?? proc?.exitDetails ?? { exitCode: underlyingSubprocess?.exitCode ?? 0 }
+					provider?.postStateToWebviewWithoutTaskHistory?.()
 					emitBackgroundNotification()
 					return
 				}
@@ -603,9 +611,10 @@ export async function executeCommandInTerminal(
 			hasAskedForCommandOutput = true
 
 			try {
-				const { response, text, images } = await task.ask("command_output", "")
 				runInBackground = true
 				startBackgroundNoticeTimer()
+				provider?.postStateToWebviewWithoutTaskHistory?.()
+				const { response, text, images } = await task.ask("command_output", "")
 
 				if (response === "messageResponse") {
 					message = { text, images }
@@ -648,6 +657,12 @@ export async function executeCommandInTerminal(
 				}
 			} finally {
 				completed = true
+				if (terminal) {
+					terminal.busy = false
+					terminal.running = false
+				}
+				task.terminalProcess = undefined
+				provider?.postStateToWebviewWithoutTaskHistory?.()
 				// Immediately dismiss any pending command_output ask and signal completion
 				task.supersedePendingAsk?.()
 				resolveOnCompleted?.()
@@ -681,6 +696,12 @@ export async function executeCommandInTerminal(
 			setTimeout(() => {
 				if (!completed) {
 					completed = true
+					if (terminal) {
+						terminal.busy = false
+						terminal.running = false
+					}
+					task.terminalProcess = undefined
+					provider?.postStateToWebviewWithoutTaskHistory?.()
 					resolveOnCompleted?.()
 					checkAndNotifyBackgroundCompletion()
 					try {
@@ -702,12 +723,17 @@ export async function executeCommandInTerminal(
 
 	const process = terminal.runCommand(command, callbacks)
 	task.terminalProcess = process
+	terminal.busy = true
+	terminal.running = true
+	provider?.postStateToWebviewWithoutTaskHistory?.()
 
 	// Dual-timeout logic:
-	// - Agent timeout: transitions the command to background (continues running)
+	// - Agent/fallback timeout: transitions the command to background (continues running)
+	//   If agent specified a timeout (e.g. 5-15s), use it.
+	//   Otherwise, use the 90-second fallback so foreground commands never hang indefinitely without callback.
 	// - User timeout: aborts the command (kills it)
 	// Both timers run independently — the user timeout remains active as a safety net
-	// even after the agent timeout moves the command to the background.
+	// even after the agent/fallback timeout moves the command to the background.
 	let agentTimeoutId: NodeJS.Timeout | undefined
 	let userTimeoutId: NodeJS.Timeout | undefined
 	let isUserTimedOut = false
@@ -715,20 +741,20 @@ export async function executeCommandInTerminal(
 	try {
 		const racers: Promise<void>[] = [process]
 
-		// Agent timeout: transition to background (command keeps running)
-		if (agentTimeout > 0) {
-			racers.push(
-				new Promise<void>((resolve) => {
-					agentTimeoutId = setTimeout(() => {
-						runInBackground = true
-						startBackgroundNoticeTimer()
-						process.continue()
-						task.supersedePendingAsk()
-						resolve()
-					}, agentTimeout)
-				}),
-			)
-		}
+		// Agent/fallback timeout: transition to background (command keeps running)
+		const fallbackTimeoutMs = agentTimeout > 0 ? agentTimeout : BACKGROUND_NOTICE_INTERVAL_MS
+		racers.push(
+			new Promise<void>((resolve) => {
+				agentTimeoutId = setTimeout(() => {
+					runInBackground = true
+					startBackgroundNoticeTimer()
+					process.continue()
+					task.supersedePendingAsk()
+					provider?.postStateToWebviewWithoutTaskHistory?.()
+					resolve()
+				}, fallbackTimeoutMs)
+			}),
+		)
 
 		// User timeout: abort the command (existing behavior)
 		if (commandExecutionTimeout > 0) {
@@ -751,6 +777,11 @@ export async function executeCommandInTerminal(
 			await task.say("error", t("common:errors:command_timeout", { seconds: commandExecutionTimeoutSeconds }))
 			task.didToolFailInCurrentTurn = true
 			task.terminalProcess = undefined
+			if (terminal) {
+				terminal.busy = false
+				terminal.running = false
+			}
+			provider?.postStateToWebviewWithoutTaskHistory?.()
 
 			return [
 				false,
@@ -763,15 +794,19 @@ export async function executeCommandInTerminal(
 		clearTimeout(userTimeoutId)
 		clearTimeout(pendingCommandOutputEmitTimer)
 		task.supersedePendingAsk?.()
-		task.terminalProcess = undefined
-		if (terminal) {
-			terminal.busy = false
-			if (terminal.process) {
-				try {
-					;(terminal.process as any).stopHotTimer?.()
-					;(terminal.process as any).isHot = false
-				} catch {}
+		if (!runInBackground) {
+			task.terminalProcess = undefined
+			if (terminal) {
+				terminal.busy = false
+				terminal.running = false
+				if (terminal.process) {
+					try {
+						;(terminal.process as any).stopHotTimer?.()
+						;(terminal.process as any).isHot = false
+					} catch {}
+				}
 			}
+			provider?.postStateToWebviewWithoutTaskHistory?.()
 		}
 	}
 

@@ -2,10 +2,15 @@ import { EventEmitter } from "events"
 
 import type { MirrorTerminalProcess, MirrorTerminalProcessEvents, ExitCodeDetails } from "./types"
 
-export abstract class BaseTerminalProcess extends EventEmitter<MirrorTerminalProcessEvents> implements MirrorTerminalProcess {
+export abstract class BaseTerminalProcess
+	extends EventEmitter<MirrorTerminalProcessEvents>
+	implements MirrorTerminalProcess
+{
 	public command: string = ""
 
 	public isHot: boolean = false
+	public isCompleted: boolean = false
+	public exitDetails?: ExitCodeDetails
 	protected hotTimer: NodeJS.Timeout | null = null
 
 	protected isListening: boolean = true

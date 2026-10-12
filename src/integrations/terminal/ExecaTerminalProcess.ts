@@ -36,6 +36,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 
 	public override async run(command: string) {
 		this.command = command
+		let exitDetails: { exitCode: number; signalName?: string } = { exitCode: 0 }
 
 		try {
 			this.isHot = true
@@ -78,7 +79,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 			}
 
 			let subprocessExited = false
-			let exitDetails: { exitCode: number; signalName?: string } = { exitCode: 0 }
+			exitDetails = { exitCode: 0 }
 			let drainTimeoutId: NodeJS.Timeout | undefined
 			let stopStreamReading: (() => void) | undefined
 			const exitDrainPromise = new Promise<void>((resolve) => {
@@ -246,7 +247,10 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 		this.emitRemainingBufferIfListening()
 		this.stopHotTimer()
 		this.isHot = false
+		this.isCompleted = true
+		this.exitDetails = exitDetails
 		this.terminal.busy = false
+		this.terminal.running = false
 		this.emit("completed", this.fullOutput)
 		this.emit("continue")
 		this.subprocess = undefined

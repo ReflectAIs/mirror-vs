@@ -306,6 +306,9 @@ export class TerminalProcess extends BaseTerminalProcess {
 		// command is finished, we still want to consider it 'hot' in case
 		// so that api request stalls to let diagnostics catch up").
 		this.stopHotTimer()
+		this.isCompleted = true
+		this.terminal.busy = false
+		this.terminal.running = false
 		this.emit("completed", this.stripCursorSequences(this.removeVSCodeShellIntegration(this.fullOutput)))
 		this.emit("continue")
 	}

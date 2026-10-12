@@ -32,6 +32,8 @@ export interface MirrorTerminalCallbacks {
 export interface MirrorTerminalProcess extends EventEmitter<MirrorTerminalProcessEvents> {
 	command: string
 	isHot: boolean
+	isCompleted?: boolean
+	exitDetails?: ExitCodeDetails
 	run: (command: string) => Promise<void>
 	continue: () => void
 	abort: () => void

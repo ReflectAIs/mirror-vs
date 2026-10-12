@@ -306,8 +306,11 @@ export class TerminalRegistry {
 	 */
 	public static getTerminals(busy: boolean, taskId?: string): MirrorTerminal[] {
 		return this.getAllTerminals().filter((t) => {
-			// Filter by busy state.
-			if (t.busy !== busy) {
+			const isTerminalActive = Boolean(
+				t.busy || t.running || (t.process && !(t.process as any).aborted && !(t.process as any).isCompleted),
+			)
+
+			if (busy ? !isTerminalActive : isTerminalActive) {
 				return false
 			}
 
