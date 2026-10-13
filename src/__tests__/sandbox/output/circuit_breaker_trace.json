@@ -1,0 +1,68 @@
+{
+	"scenarioName": "circuit_breaker",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-m2haeA\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/circuitBreaker.ts\n```\nexport type CircuitState = \"CLOSED\" | \"OPEN\" | \"HALF_OPEN\"\n\nexport interface CircuitBreakerOptions {\n  failureThreshold: number\n  recoveryTimeoutMs: number\n}\n\nexport class CircuitBreaker {\n  private state: CircuitState = \"CLOSED\"\n  // Needs implementation\n  constructor(private options: CircuitBreakerOptions) {}\n\n  getState(): CircuitState {\n    return this.state\n  }\n\n  async execute<T>(action: () => Promise<T>): Promise<T> {\n    // Needs implementation\n    return action()\n  }\n}\n\n```\n\n### src/index.ts\n```\nimport { CircuitBreaker } from \"./circuitBreaker\"\n\nconst breaker = new CircuitBreaker({ failureThreshold: 3, recoveryTimeoutMs: 1000 })\nconsole.log(\"Breaker state:\", breaker.getState())\n\n```\n\n### package.json\n```\n{\n  \"name\": \"resilience-kit\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1791859603753,
+			"responseTimestamp": 1791859614427,
+			"latencyMs": 10674.02345800001,
+			"timeToFirstTokenMs": 10674.02345800001,
+			"inputTokens": 1779,
+			"outputTokens": 3004,
+			"totalTokens": 4783,
+			"assistantText": "I'll implement the full Circuit Breaker state machine in `src/circuitBreaker.ts`.\n\n",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "write_to_file",
+					"args": {
+						"path": "src/circuitBreaker.ts",
+						"content": "export type CircuitState = \"CLOSED\" | \"OPEN\" | \"HALF_OPEN\"\n\nexport interface CircuitBreakerOptions {\n  failureThreshold: number\n  recoveryTimeoutMs: number\n}\n\nexport class CircuitBreaker {\n  private state: CircuitState = \"CLOSED\"\n  private failureCount = 0\n  private tripTimestamp: number | null = null\n\n  constructor(private options: CircuitBreakerOptions) {}\n\n  getState(): CircuitState {\n    return this.state\n  }\n\n  async execute<T>(action: () => Promise<T>): Promise<T> {\n    if (this.state === \"OPEN\") {\n      if (this.tripTimestamp !== null && Date.now() - this.tripTimestamp >= this.options.recoveryTimeoutMs) {\n        this.state = \"HALF_OPEN\"\n      } else {\n        throw new Error(\"Circuit breaker is OPEN\")\n      }\n    }\n\n    try {\n      const result = await action()\n      this.handleSuccess()\n      return result\n    } catch (error) {\n      this.handleFailure()\n      throw error\n    }\n  }\n\n  private handleSuccess(): void {\n    if (this.state === \"HALF_OPEN\") {\n      this.state = \"CLOSED\"\n      this.failureCount = 0\n    } else if (this.state === \"CLOSED\") {\n      this.failureCount = 0\n    }\n  }\n\n  private handleFailure(): void {\n    if (this.state === \"HALF_OPEN\") {\n      this.state = \"OPEN\"\n      this.tripTimestamp = Date.now()\n      return\n    }\n\n    this.failureCount++\n    if (this.failureCount >= this.options.failureThreshold) {\n      this.state = \"OPEN\"\n      this.tripTimestamp = Date.now()\n    }\n  }\n}\n```\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name=\"attempt_completion\">\n",
+						"result": "Implemented the full Circuit Breaker state machine in `src/circuitBreaker.ts`:\n\n- **CLOSED**: Actions execute normally. Each failure increments `failureCount`; when it reaches `failureThreshold`, the breaker transitions to OPEN and records `tripTimestamp`. A successful action resets the failure count.\n- **OPEN**: `execute` throws `Error('Circuit breaker is OPEN')` without invoking the action. If `recoveryTimeoutMs` has elapsed since tripping, the state transitions to HALF_OPEN before proceeding.\n- **HALF_OPEN**: Allows one probe execution. On success, transitions back to CLOSED and resets the failure count. On failure, transitions back to OPEN and resets the trip timestamp (restarting the recovery timeout)."
+					},
+					"result": "File written successfully to src/circuitBreaker.ts (65 lines).",
+					"durationMs": 1.0409590000053868,
+					"timestamp": 1791859614428
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1791859614428,
+			"responseTimestamp": 1791859615938,
+			"latencyMs": 1510.0456249999988,
+			"timeToFirstTokenMs": 1510.0456249999988,
+			"inputTokens": 4814,
+			"outputTokens": 234,
+			"totalTokens": 5048,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Implemented the full Circuit Breaker state machine in `src/circuitBreaker.ts`:\n\n- **CLOSED**: Actions execute normally. Each failure increments `failureCount`; when it reaches `failureThreshold`, the breaker transitions to OPEN and records `tripTimestamp`. A successful action resets the failure count.\n- **OPEN**: `execute` throws `Error('Circuit breaker is OPEN')` without invoking the action. If `recoveryTimeoutMs` has elapsed since tripping, the state transitions to HALF_OPEN before proceeding.\n- **HALF_OPEN**: Allows one probe execution. On success, transitions back to CLOSED and resets the failure count. On failure, transitions back to OPEN and resets the trip timestamp (restarting the recovery timeout)."
+					},
+					"result": "[TASK_COMPLETED] Implemented the full Circuit Breaker state machine in `src/circuitBreaker.ts`:\n\n- **CLOSED**: Actions execute normally. Each failure increments `failureCount`; when it reaches `failureThreshold`, the breaker transitions to OPEN and records `tripTimestamp`. A successful action resets the failure count.\n- **OPEN**: `execute` throws `Error('Circuit breaker is OPEN')` without invoking the action. If `recoveryTimeoutMs` has elapsed since tripping, the state transitions to HALF_OPEN before proceeding.\n- **HALF_OPEN**: Allows one probe execution. On success, transitions back to CLOSED and resets the failure count. On failure, transitions back to OPEN and resets the trip timestamp (restarting the recovery timeout).",
+					"durationMs": 0.028458999993745238,
+					"timestamp": 1791859615938
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 12185.379209000006,
+	"totalInputTokens": 6593,
+	"totalOutputTokens": 3238,
+	"totalToolCalls": 2,
+	"completed": true
+}

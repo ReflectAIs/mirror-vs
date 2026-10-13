@@ -1,6 +1,6 @@
 # 📊 Sandbox Test Report: duplicate_code_blocks
 
-**Model**: accounts/fireworks/models/glm-5p3-flash
+**Model**: deepseek/deepseek-v4-flash-0731
 **Status**: ✅ Completed
 
 ## Turn Efficiency
@@ -15,45 +15,46 @@
 
 | Metric                    | Value    |
 | ------------------------- | -------- |
-| Total Input Tokens        | 2,698    |
-| Total Output Tokens       | 201      |
-| Avg Input/Turn            | 1,349    |
-| Avg Output/Turn           | 101      |
-| Token Efficiency (out/in) | 0.074    |
-| Estimated Cost            | $0.00033 |
+| Total Input Tokens        | 3,471    |
+| Total Output Tokens       | 253      |
+| Avg Input/Turn            | 1,736    |
+| Avg Output/Turn           | 127      |
+| Token Efficiency (out/in) | 0.073    |
+| Estimated Cost            | $0.00042 |
 
 ## Tool Usage
 
-| Metric            | Value                          |
-| ----------------- | ------------------------------ |
-| Total Tool Calls  | 2                              |
-| Unique Tools Used | apply_diff, attempt_completion |
-| Redundant Reads   | 0                              |
-| Failed Tool Calls | 0                              |
+| Metric            | Value                         |
+| ----------------- | ----------------------------- |
+| Total Tool Calls  | 2                             |
+| Unique Tools Used | edit_file, attempt_completion |
+| Redundant Reads   | 0                             |
+| Failed Tool Calls | 0                             |
 
 ### Tool Call Breakdown
 
 | Tool               | Count |
 | ------------------ | ----- |
-| apply_diff         | 1     |
+| edit_file          | 1     |
 | attempt_completion | 1     |
 
 ## Latency
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 4.3s  |
-| Avg per Turn  | 2.2s  |
-| Fastest Turn  | 1.4s  |
-| Slowest Turn  | 2.9s  |
+| Total Latency | 2.9s  |
+| Avg per Turn  | 1.5s  |
+| Fastest Turn  | 1.3s  |
+| Slowest Turn  | 1.6s  |
 
 ## Reasoning
 
 | Metric                   | Value |
 | ------------------------ | ----- |
-| Turns with Reasoning     | 1 / 2 |
-| Avg Reasoning Chars/Turn | 161   |
+| Turns with Reasoning     | 0 / 2 |
+| Avg Reasoning Chars/Turn | 0     |
 
 ## Behavioral Signals
 
 - ✅ Excellent turn efficiency — completed in 2 turn(s)
+- 🧠 No reasoning detected — model may not be using thinking mode

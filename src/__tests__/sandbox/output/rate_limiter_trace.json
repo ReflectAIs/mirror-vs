@@ -1,0 +1,67 @@
+{
+	"scenarioName": "rate_limiter",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-i84DfU\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/rateLimiter.ts\n```\nexport interface RateLimitOptions {\n  windowMs: number\n  maxRequests: number\n}\n\nexport interface Request {\n  ip: string\n}\n\nexport interface Response {\n  status: (code: number) => Response\n  json: (data: any) => void\n}\n\nexport function createRateLimiter(options: RateLimitOptions) {\n  // Needs implementation: track timestamps per IP\n  return (req: Request, res: Response, next: () => void) => {\n    next()\n  }\n}\n\n```\n\n### package.json\n```\n{\n  \"name\": \"rate-limiter\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1791859619269,
+			"responseTimestamp": 1791859624936,
+			"latencyMs": 5667.158832999994,
+			"timeToFirstTokenMs": 5667.158832999994,
+			"inputTokens": 1745,
+			"outputTokens": 756,
+			"totalTokens": 2501,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "write_to_file",
+					"args": {
+						"path": "src/rateLimiter.ts",
+						"content": "export interface RateLimitOptions {\n  windowMs: number\n  maxRequests: number\n}\n\nexport interface Request {\n  ip: string\n}\n\nexport interface Response {\n  status: (code: number) => Response\n  json: (data: any) => void\n}\n\nexport function createRateLimiter(options: RateLimitOptions) {\n  const timestamps = new Map<string, number[]>()\n\n  return (req: Request, res: Response, next: () => void) => {\n    const now = Date.now()\n    const cutoff = now - options.windowMs\n    const ip = req.ip\n\n    // Prune timestamps older than the window\n    const current = (timestamps.get(ip) ?? []).filter((ts) => ts >= cutoff)\n\n    if (current.length >= options.maxRequests) {\n      const oldest = current[0]\n      const retryAfterMs = oldest + options.windowMs - now\n      res.status(429).json({ error: 'Too Many Requests', retryAfterMs })\n      return\n    }\n\n    current.push(now)\n    timestamps.set(ip, current)\n    next()\n  }\n}"
+					},
+					"result": "File written successfully to src/rateLimiter.ts (37 lines).",
+					"durationMs": 0.35812499999883585,
+					"timestamp": 1791859624937
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1791859624937,
+			"responseTimestamp": 1791859627029,
+			"latencyMs": 2092.567292000007,
+			"timeToFirstTokenMs": 2092.567292000007,
+			"inputTokens": 2525,
+			"outputTokens": 263,
+			"totalTokens": 2788,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Implemented `createRateLimiter` in `src/rateLimiter.ts`:\n\n- Maintains an in-memory `Map<string, number[]>` tracking request timestamps per IP.\n- On each request, prunes timestamps older than `Date.now() - options.windowMs`.\n- If the remaining request count meets or exceeds `options.maxRequests`, responds with `res.status(429).json({ error: 'Too Many Requests', retryAfterMs })`, where `retryAfterMs` is the time until the oldest request leaves the window (`oldest + windowMs - now`).\n- Otherwise records the current timestamp and calls `next()`."
+					},
+					"result": "[TASK_COMPLETED] Implemented `createRateLimiter` in `src/rateLimiter.ts`:\n\n- Maintains an in-memory `Map<string, number[]>` tracking request timestamps per IP.\n- On each request, prunes timestamps older than `Date.now() - options.windowMs`.\n- If the remaining request count meets or exceeds `options.maxRequests`, responds with `res.status(429).json({ error: 'Too Many Requests', retryAfterMs })`, where `retryAfterMs` is the time until the oldest request leaves the window (`oldest + windowMs - now`).\n- Otherwise records the current timestamp and calls `next()`.",
+					"durationMs": 0.025875000006635673,
+					"timestamp": 1791859627029
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 7760.314500000008,
+	"totalInputTokens": 4270,
+	"totalOutputTokens": 1019,
+	"totalToolCalls": 2,
+	"completed": true
+}

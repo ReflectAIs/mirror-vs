@@ -1,6 +1,6 @@
 # 📊 Sandbox Test Report: feature_add
 
-**Model**: accounts/fireworks/models/glm-5p3-flash
+**Model**: deepseek/deepseek-v4-flash-0731
 **Status**: ✅ Completed
 
 ## Turn Efficiency
@@ -15,12 +15,12 @@
 
 | Metric                    | Value    |
 | ------------------------- | -------- |
-| Total Input Tokens        | 7,456    |
-| Total Output Tokens       | 1,916    |
-| Avg Input/Turn            | 2,485    |
-| Avg Output/Turn           | 639      |
-| Token Efficiency (out/in) | 0.257    |
-| Estimated Cost            | $0.00132 |
+| Total Input Tokens        | 6,102    |
+| Total Output Tokens       | 711      |
+| Avg Input/Turn            | 2,034    |
+| Avg Output/Turn           | 237      |
+| Token Efficiency (out/in) | 0.117    |
+| Estimated Cost            | $0.00082 |
 
 ## Tool Usage
 
@@ -42,18 +42,19 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 13.8s |
-| Avg per Turn  | 4.6s  |
-| Fastest Turn  | 1.2s  |
-| Slowest Turn  | 11.3s |
+| Total Latency | 6.3s  |
+| Avg per Turn  | 2.1s  |
+| Fastest Turn  | 1.5s  |
+| Slowest Turn  | 3.0s  |
 
 ## Reasoning
 
 | Metric                   | Value |
 | ------------------------ | ----- |
-| Turns with Reasoning     | 1 / 3 |
-| Avg Reasoning Chars/Turn | 1946  |
+| Turns with Reasoning     | 0 / 3 |
+| Avg Reasoning Chars/Turn | 0     |
 
 ## Behavioral Signals
 
 - ✅ Excellent turn efficiency — completed in 3 turn(s)
+- 🧠 No reasoning detected — model may not be using thinking mode

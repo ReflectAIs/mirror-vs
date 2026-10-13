@@ -32,9 +32,9 @@ const EXTENDED_SCENARIOS: TestScenario[] = [...ALL_SCENARIOS, ...MIRROR_VS_SCENA
 //  Configuration
 // ────────────────────────────────────────────────────────────
 
-const API_KEY = process.env.API_KEY || "fw_QFKmUeeh2qWuvgymSrpbbV"
-const BASE_URL = process.env.BASE_URL || "https://api.fireworks.ai/inference/v1"
-const MODEL = process.env.MODEL || "accounts/fireworks/models/glm-5p3-flash"
+const API_KEY = process.env.API_KEY || ""
+const BASE_URL = process.env.BASE_URL || "https://openrouter.ai/api/v1"
+const MODEL = process.env.MODEL || "deepseek/deepseek-v4-flash-0731"
 const MAX_TURNS = parseInt(process.env.MAX_TURNS || "15", 10)
 
 const OUTPUT_DIR = path.join(__dirname, "output")

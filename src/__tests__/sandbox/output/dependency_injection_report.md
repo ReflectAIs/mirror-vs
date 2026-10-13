@@ -1,52 +1,59 @@
 # 📊 Sandbox Test Report: dependency_injection
-**Model**: accounts/fireworks/models/glm-5p3-flash
+
+**Model**: deepseek/deepseek-v4-flash-0731
 **Status**: ✅ Completed
 
 ## Turn Efficiency
-| Metric | Value |
-|--------|-------|
-| Total Turns | 5 |
-| Wasted Turns | 0 |
-| Turns to Completion | 5 |
+
+| Metric              | Value |
+| ------------------- | ----- |
+| Total Turns         | 4     |
+| Wasted Turns        | 0     |
+| Turns to Completion | 4     |
 
 ## Token Usage
-| Metric | Value |
-|--------|-------|
-| Total Input Tokens | 20,744 |
-| Total Output Tokens | 3,836 |
-| Avg Input/Turn | 4,149 |
-| Avg Output/Turn | 767 |
-| Token Efficiency (out/in) | 0.185 |
-| Estimated Cost | $0.00323 |
+
+| Metric                    | Value   |
+| ------------------------- | ------- |
+| Total Input Tokens        | 12,474  |
+| Total Output Tokens       | 2,192   |
+| Avg Input/Turn            | 3,119   |
+| Avg Output/Turn           | 548     |
+| Token Efficiency (out/in) | 0.176   |
+| Estimated Cost            | $0.0019 |
 
 ## Tool Usage
-| Metric | Value |
-|--------|-------|
-| Total Tool Calls | 5 |
-| Unique Tools Used | list_files, write_to_file, apply_diff, attempt_completion |
-| Redundant Reads | 0 |
-| Failed Tool Calls | 0 |
+
+| Metric            | Value                             |
+| ----------------- | --------------------------------- |
+| Total Tool Calls  | 4                                 |
+| Unique Tools Used | write_to_file, attempt_completion |
+| Redundant Reads   | 0                                 |
+| Failed Tool Calls | 0                                 |
 
 ### Tool Call Breakdown
-| Tool | Count |
-|------|-------|
-| apply_diff | 2 |
-| list_files | 1 |
-| write_to_file | 1 |
-| attempt_completion | 1 |
+
+| Tool               | Count |
+| ------------------ | ----- |
+| write_to_file      | 3     |
+| attempt_completion | 1     |
 
 ## Latency
-| Metric | Value |
-|--------|-------|
-| Total Latency | 36.5s |
-| Avg per Turn | 7.3s |
-| Fastest Turn | 1.5s |
-| Slowest Turn | 26.7s |
+
+| Metric        | Value |
+| ------------- | ----- |
+| Total Latency | 7.8s  |
+| Avg per Turn  | 2.0s  |
+| Fastest Turn  | 1.1s  |
+| Slowest Turn  | 3.7s  |
 
 ## Reasoning
-| Metric | Value |
-|--------|-------|
-| Turns with Reasoning | 2 / 5 |
-| Avg Reasoning Chars/Turn | 2677 |
+
+| Metric                   | Value |
+| ------------------------ | ----- |
+| Turns with Reasoning     | 0 / 4 |
+| Avg Reasoning Chars/Turn | 0     |
 
 ## Behavioral Signals
+
+- 🧠 No reasoning detected — model may not be using thinking mode

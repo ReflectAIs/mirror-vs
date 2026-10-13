@@ -218,7 +218,9 @@ function buildSystemPrompt(projectRoot: string, fileList: string[], fileContents
 ## Efficiency Rules — CRITICAL
 - ALL workspace file contents are provided in the "Workspace Files" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.
 - Only call read_file for files NOT listed below, or files you created/modified mid-task.
-- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.
+- ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.
+- NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.
+- IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.
 - If a tool fails twice with the same approach, change strategy immediately.
 - Be concise. Do not engage in conversation. Never start with "Great", "Sure", "Okay", "Certainly".
 

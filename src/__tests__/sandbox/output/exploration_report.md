@@ -1,26 +1,26 @@
 # 📊 Sandbox Test Report: exploration
 
-**Model**: accounts/fireworks/models/glm-5p3-flash
+**Model**: deepseek/deepseek-v4-flash-0731
 **Status**: ✅ Completed
 
 ## Turn Efficiency
 
 | Metric              | Value |
 | ------------------- | ----- |
-| Total Turns         | 1     |
-| Wasted Turns        | 0     |
-| Turns to Completion | 1     |
+| Total Turns         | 2     |
+| Wasted Turns        | 1     |
+| Turns to Completion | 2     |
 
 ## Token Usage
 
 | Metric                    | Value    |
 | ------------------------- | -------- |
-| Total Input Tokens        | 1,368    |
-| Total Output Tokens       | 1,051    |
-| Avg Input/Turn            | 1,368    |
-| Avg Output/Turn           | 1,051    |
-| Token Efficiency (out/in) | 0.768    |
-| Estimated Cost            | $0.00045 |
+| Total Input Tokens        | 4,432    |
+| Total Output Tokens       | 957      |
+| Avg Input/Turn            | 2,216    |
+| Avg Output/Turn           | 479      |
+| Token Efficiency (out/in) | 0.216    |
+| Estimated Cost            | $0.00073 |
 
 ## Tool Usage
 
@@ -41,18 +41,20 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 9.3s  |
-| Avg per Turn  | 9.3s  |
-| Fastest Turn  | 9.3s  |
-| Slowest Turn  | 9.3s  |
+| Total Latency | 5.8s  |
+| Avg per Turn  | 2.9s  |
+| Fastest Turn  | 2.0s  |
+| Slowest Turn  | 3.7s  |
 
 ## Reasoning
 
 | Metric                   | Value |
 | ------------------------ | ----- |
-| Turns with Reasoning     | 1 / 1 |
-| Avg Reasoning Chars/Turn | 2595  |
+| Turns with Reasoning     | 0 / 2 |
+| Avg Reasoning Chars/Turn | 0     |
 
 ## Behavioral Signals
 
-- ✅ Excellent turn efficiency — completed in 1 turn(s)
+- 🔄 1 wasted turn(s) with no useful tool calls
+- ✅ Excellent turn efficiency — completed in 2 turn(s)
+- 🧠 No reasoning detected — model may not be using thinking mode

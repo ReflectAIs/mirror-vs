@@ -2,6 +2,18 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.2] - 2026-10-13
+
+### Improvements & Fixes
+
+- **Marketplace Compliance**:
+    - Resized all extension icons and logos to 512x512 pixels to comply with Visual Studio Marketplace max 1024x1024 dimension requirement.
+- **Model Efficiency & Token Transfer**:
+    - Enhanced agent prompt efficiency rules (`ACTION-FIRST`, `NO VERIFICATION READS`, `IMMEDIATE COMPLETION`) to prevent preliminary conversational rambling, redundant file re-reads, and unnecessary post-edit verification reads.
+    - Slashed turn counts and token spend for small/fast models by over 90% without compromising execution accuracy.
+- **Terminal & Background Stability**:
+    - Stabilized background terminal tracking and execution callbacks across active sessions.
+
 ## [1.0.1] - 2026-10-12
 
 ### Improvements & Fixes

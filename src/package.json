@@ -3,7 +3,7 @@
 	"displayName": "%extension.displayName%",
 	"description": "%extension.description%",
 	"publisher": "DipeshMajithia",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"license": "Apache-2.0",
 	"icon": "assets/icons/icon.png",
 	"galleryBanner": {

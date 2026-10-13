@@ -1,0 +1,67 @@
+{
+	"scenarioName": "mirror_thinking_loop_guard",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-xhRM06\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/core/task/ThinkingWatchdog.ts\n```\nexport interface WatchdogResult {\n\tshouldAbort: boolean\n\treason?: \"loop_detected\" | \"timeout_exceeded\"\n\tuserNotice?: string\n}\n\nexport class ThinkingWatchdog {\n\tprivate startTime: number = 0\n\tprivate readonly maxDurationMs: number\n\n\tconstructor(maxDurationMs: number = 120_000) {\n\t\tthis.maxDurationMs = maxDurationMs\n\t}\n\n\tstart(): void {\n\t\tthis.startTime = Date.now()\n\t}\n\n\tcheck(accumulatedReasoning: string): WatchdogResult {\n\t\t// Needs implementation:\n\t\t// 1. Check if (Date.now() - this.startTime) > this.maxDurationMs -> timeout_exceeded\n\t\t// 2. Return shouldAbort: false by default\n\t\treturn { shouldAbort: false }\n\t}\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1791859793517,
+			"responseTimestamp": 1791859795616,
+			"latencyMs": 2099.0969579999946,
+			"timeToFirstTokenMs": 2099.0969579999946,
+			"inputTokens": 1868,
+			"outputTokens": 594,
+			"totalTokens": 2462,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "write_to_file",
+					"args": {
+						"path": "src/core/task/ThinkingWatchdog.ts",
+						"content": "export interface WatchdogResult {\n\tshouldAbort: boolean\n\treason?: \"loop_detected\" | \"timeout_exceeded\"\n\tuserNotice?: string\n}\n\nexport interface RepetitionDetectorResult {\n\thasLoop: boolean\n\trepeatedContent?: string\n}\n\nexport type RepetitionDetector = (text: string) => RepetitionDetectorResult\n\nexport class ThinkingWatchdog {\n\tprivate startTime: number = 0\n\tprivate readonly maxDurationMs: number\n\tprivate readonly repetitionDetector?: RepetitionDetector\n\n\tconstructor(maxDurationMs: number = 120_000, repetitionDetector?: RepetitionDetector) {\n\t\tthis.maxDurationMs = maxDurationMs\n\t\tthis.repetitionDetector = repetitionDetector\n\t}\n\n\tstart(): void {\n\t\tthis.startTime = Date.now()\n\t}\n\n\tcheck(accumulatedReasoning: string): WatchdogResult {\n\t\t// 1. Check if (Date.now() - this.startTime) > this.maxDurationMs -> timeout_exceeded\n\t\tif (this.startTime > 0 && Date.now() - this.startTime > this.maxDurationMs) {\n\t\t\treturn {\n\t\t\t\tshouldAbort: true,\n\t\t\t\treason: \"timeout_exceeded\",\n\t\t\t\tuserNotice: \"Thinking duration exceeded limit\",\n\t\t\t}\n\t\t}\n\n\t\t// 2. Check for repetitive reasoning loop\n\t\tif (\n\t\t\taccumulatedReasoning.length >= 80 &&\n\t\t\tthis.repetitionDetector !== undefined\n\t\t) {\n\t\t\tconst result = this.repetitionDetector(accumulatedReasoning)\n\t\t\tif (result.hasLoop) {\n\t\t\t\treturn {\n\t\t\t\t\tshouldAbort: true,\n\t\t\t\t\treason: \"loop_detected\",\n\t\t\t\t\tuserNotice: \"Repetitive reasoning loop detected\",\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\t// 3. Default: no abort\n\t\treturn { shouldAbort: false }\n\t}\n\n\treset(): void {\n\t\tthis.startTime = 0\n\t}\n}"
+					},
+					"result": "File written successfully to src/core/task/ThinkingWatchdog.ts (60 lines).",
+					"durationMs": 1.6569579999923008,
+					"timestamp": 1791859795618
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1791859795618,
+			"responseTimestamp": 1791859797644,
+			"latencyMs": 2026.1739170000073,
+			"timeToFirstTokenMs": 2026.1739170000073,
+			"inputTokens": 2489,
+			"outputTokens": 498,
+			"totalTokens": 2987,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Enhanced `src/core/task/ThinkingWatchdog.ts`:\n\n1. **Repetition detector callback**: Added `RepetitionDetector` type (`(text: string) => { hasLoop: boolean; repeatedContent?: string }`) and an optional `repetitionDetector` parameter to the constructor (second argument, after `maxDurationMs`).\n\n2. **Updated `check(accumulatedReasoning: string): WatchdogResult`**:\n   - Returns `{ shouldAbort: true, reason: \"timeout_exceeded\", userNotice: \"Thinking duration exceeded limit\" }` when `startTime > 0` and elapsed time (`Date.now() - startTime`) exceeds `maxDurationMs`.\n   - Returns `{ shouldAbort: true, reason: \"loop_detected\", userNotice: \"Repetitive reasoning loop detected\" }` when `accumulatedReasoning.length >= 80` and the repetition detector reports `hasLoop: true`.\n   - Otherwise returns `{ shouldAbort: false }`.\n\n3. **Added `reset()` method** that sets `startTime` back to `0`."
+					},
+					"result": "[TASK_COMPLETED] Enhanced `src/core/task/ThinkingWatchdog.ts`:\n\n1. **Repetition detector callback**: Added `RepetitionDetector` type (`(text: string) => { hasLoop: boolean; repeatedContent?: string }`) and an optional `repetitionDetector` parameter to the constructor (second argument, after `maxDurationMs`).\n\n2. **Updated `check(accumulatedReasoning: string): WatchdogResult`**:\n   - Returns `{ shouldAbort: true, reason: \"timeout_exceeded\", userNotice: \"Thinking duration exceeded limit\" }` when `startTime > 0` and elapsed time (`Date.now() - startTime`) exceeds `maxDurationMs`.\n   - Returns `{ shouldAbort: true, reason: \"loop_detected\", userNotice: \"Repetitive reasoning loop detected\" }` when `accumulatedReasoning.length >= 80` and the repetition detector reports `hasLoop: true`.\n   - Otherwise returns `{ shouldAbort: false }`.\n\n3. **Added `reset()` method** that sets `startTime` back to `0`.",
+					"durationMs": 0.026209000003291294,
+					"timestamp": 1791859797645
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 4127.287083000003,
+	"totalInputTokens": 4357,
+	"totalOutputTokens": 1092,
+	"totalToolCalls": 2,
+	"completed": true
+}

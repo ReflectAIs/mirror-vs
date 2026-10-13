@@ -1,0 +1,68 @@
+{
+	"scenarioName": "lru_cache",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- After a successful write_to_file, apply_diff, or edit_file — do NOT re-read to verify. Trust the tool success response.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-ig0fbY\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/lruCache.ts\n```\nexport class LRUCache<K, V> {\n  private capacity: number\n  private cache: Map<K, V> = new Map()\n\n  constructor(capacity: number) {\n    this.capacity = capacity\n  }\n\n  get(key: K): V | undefined {\n    // Needs implementation: retrieve and mark as most recently used\n    return undefined\n  }\n\n  set(key: K, value: V): void {\n    // Needs implementation: insert/update and evict least recently used if exceeding capacity\n  }\n\n  size(): number {\n    return this.cache.size\n  }\n}\n\n```\n\n### src/index.ts\n```\nimport { LRUCache } from \"./lruCache\"\nconst cache = new LRUCache<string, number>(2)\ncache.set(\"a\", 1)\ncache.set(\"b\", 2)\nconsole.log(cache.get(\"a\"))\n\n```\n\n### package.json\n```\n{\n  \"name\": \"cache-lib\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1791859615942,
+			"responseTimestamp": 1791859617705,
+			"latencyMs": 1762.4429999999993,
+			"timeToFirstTokenMs": 1762.4429999999993,
+			"inputTokens": 1764,
+			"outputTokens": 369,
+			"totalTokens": 2133,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "edit_file",
+					"args": {
+						"path": "src/lruCache.ts",
+						"search": "  get(key: K): V | undefined {\n    // Needs implementation: retrieve and mark as most recently used\n    return undefined\n  }\n\n  set(key: K, value: V): void {\n    // Needs implementation: insert/update and evict least recently used if exceeding capacity\n  }\n\n  size(): number {\n    return this.cache.size\n  }",
+						"replace": "  get(key: K): V | undefined {\n    if (!this.cache.has(key)) {\n      return undefined\n    }\n    const value = this.cache.get(key)!\n    // Re-insert to refresh recency (moves to end of Map iteration order)\n    this.cache.delete(key)\n    this.cache.set(key, value)\n    return value\n  }\n\n  set(key: K, value: V): void {\n    if (this.cache.has(key)) {\n      this.cache.delete(key)\n    }\n    this.cache.set(key, value)\n    if (this.cache.size > this.capacity) {\n      // Evict the least recently used entry (first key in iteration order)\n      const oldestKey = this.cache.keys().next().value\n      this.cache.delete(oldestKey)\n    }\n  }\n\n  has(key: K): boolean {\n    return this.cache.has(key)\n  }\n\n  size(): number {\n    return this.cache.size\n  }"
+					},
+					"result": "Applied 1 search/replace operation(s) to src/lruCache.ts.",
+					"durationMs": 1.0470419999910519,
+					"timestamp": 1791859617706
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1791859617706,
+			"responseTimestamp": 1791859619264,
+			"latencyMs": 1558.7987500000017,
+			"timeToFirstTokenMs": 1558.7987500000017,
+			"inputTokens": 2147,
+			"outputTokens": 150,
+			"totalTokens": 2297,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Implemented the LRU cache in `src/lruCache.ts`:\n\n- `get(key)`: returns the value if present, re-inserting the key to refresh its recency (O(1)); otherwise returns `undefined`.\n- `set(key, value)`: deletes the key first if it already exists, then sets it; if size exceeds capacity, evicts the oldest entry (first key in the Map's iteration order).\n- `has(key)`: returns whether the key exists without updating recency."
+					},
+					"result": "[TASK_COMPLETED] Implemented the LRU cache in `src/lruCache.ts`:\n\n- `get(key)`: returns the value if present, re-inserting the key to refresh its recency (O(1)); otherwise returns `undefined`.\n- `set(key, value)`: deletes the key first if it already exists, then sets it; if size exceeds capacity, evicts the oldest entry (first key in the Map's iteration order).\n- `has(key)`: returns whether the key exists without updating recency.",
+					"durationMs": 0.023499999995692633,
+					"timestamp": 1791859619265
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 3322.732833999995,
+	"totalInputTokens": 3911,
+	"totalOutputTokens": 519,
+	"totalToolCalls": 2,
+	"completed": true
+}
