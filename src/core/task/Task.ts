@@ -424,6 +424,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 * @see MirrorProviderState — inclusion in ExtensionState
 	 */
 	fileEdits: FileEditRecord[] = []
+	pendingEditFilePath?: string
 
 	// Extracted managers
 	readonly conversationHistory!: TaskConversationHistory
@@ -1441,6 +1442,47 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	public async checkpointDiff(options: CheckpointDiffOptions) {
 		return checkpointDiff(this, options)
+	}
+
+	/**
+	 * Returns the list of relative file paths that have been edited, created,
+	 * or are pending edit by this specific task (tab).
+	 */
+	public getTouchedFiles(): string[] {
+		const fileSet = new Set<string>()
+		const cwd = this.cwd || getWorkspacePath() || ""
+
+		for (const edit of this.fileEdits) {
+			if (edit.path) {
+				const relPath = path.isAbsolute(edit.path) ? path.relative(cwd, edit.path) : edit.path
+				const normalized = path.normalize(relPath).replace(/\\/g, "/")
+				if (normalized && !normalized.startsWith("..")) {
+					fileSet.add(normalized)
+				}
+			}
+		}
+
+		if (this.pendingEditFilePath) {
+			const relPath = path.isAbsolute(this.pendingEditFilePath)
+				? path.relative(cwd, this.pendingEditFilePath)
+				: this.pendingEditFilePath
+			const normalized = path.normalize(relPath).replace(/\\/g, "/")
+			if (normalized && !normalized.startsWith("..")) {
+				fileSet.add(normalized)
+			}
+		}
+
+		if (this.fileContextTracker) {
+			for (const file of this.fileContextTracker.getCheckpointPossibleFiles()) {
+				const relPath = path.isAbsolute(file) ? path.relative(cwd, file) : file
+				const normalized = path.normalize(relPath).replace(/\\/g, "/")
+				if (normalized && !normalized.startsWith("..")) {
+					fileSet.add(normalized)
+				}
+			}
+		}
+
+		return Array.from(fileSet)
 	}
 
 	// Metrics

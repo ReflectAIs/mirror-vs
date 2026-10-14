@@ -1046,4 +1046,69 @@ describe("worktree path comparison", () => {
 			await fs.rm(workspaceDir, { recursive: true, force: true })
 		}
 	})
+
+	it("restores only what a particular tab (task) did without overwriting other tabs' changes", async () => {
+		const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "multitab-checkpoint-test-"))
+		const shadowDirTab1 = path.join(baseDir, "shadow1")
+		const shadowDirTab2 = path.join(baseDir, "shadow2")
+		const workspaceDir = path.join(baseDir, "workspace")
+
+		try {
+			await fs.mkdir(workspaceDir, { recursive: true })
+			vitest.spyOn(fileSearch, "executeRipgrep").mockResolvedValue([])
+
+			const serviceTab1 = new RepoPerTaskCheckpointService("task-tab1", shadowDirTab1, workspaceDir, () => {})
+			await serviceTab1.initShadowGit()
+
+			const serviceTab2 = new RepoPerTaskCheckpointService("task-tab2", shadowDirTab2, workspaceDir, () => {})
+			await serviceTab2.initShadowGit()
+
+			const fileA = path.join(workspaceDir, "fileA.txt")
+			const fileB = path.join(workspaceDir, "fileB.txt")
+			const fileANew = path.join(workspaceDir, "fileA_new.txt")
+			const fileBNew = path.join(workspaceDir, "fileB_new.txt")
+
+			// Initial state
+			await fs.writeFile(fileA, "tab1 initial")
+			await fs.writeFile(fileB, "tab2 initial")
+
+			const commitTab1_1 = await serviceTab1.saveCheckpoint("Tab 1 - initial", { files: ["fileA.txt"] })
+			expect(commitTab1_1?.commit).toBeTruthy()
+
+			const commitTab2_1 = await serviceTab2.saveCheckpoint("Tab 2 - initial", { files: ["fileB.txt"] })
+			expect(commitTab2_1?.commit).toBeTruthy()
+
+			// Tab 1 makes changes and creates fileA_new
+			await fs.writeFile(fileA, "tab1 updated")
+			await fs.writeFile(fileANew, "tab1 new file")
+			const commitTab1_2 = await serviceTab1.saveCheckpoint("Tab 1 - update", {
+				files: ["fileA.txt", "fileA_new.txt"],
+			})
+			expect(commitTab1_2?.commit).toBeTruthy()
+
+			// Tab 2 makes changes and creates fileB_new
+			await fs.writeFile(fileB, "tab2 updated in another tab")
+			await fs.writeFile(fileBNew, "tab2 new file in another tab")
+			const commitTab2_2 = await serviceTab2.saveCheckpoint("Tab 2 - update", {
+				files: ["fileB.txt", "fileB_new.txt"],
+			})
+			expect(commitTab2_2?.commit).toBeTruthy()
+
+			// Tab 1 restores its first checkpoint!
+			await serviceTab1.restoreCheckpoint(commitTab1_1!.commit, ["fileA.txt", "fileA_new.txt"])
+
+			// Assert: Tab 1's fileA is reverted to initial state
+			expect(await fs.readFile(fileA, "utf-8")).toBe("tab1 initial")
+			// Assert: Tab 1's created file is removed
+			await expect(fs.readFile(fileANew, "utf-8")).rejects.toThrow()
+
+			// Assert: Tab 2's fileB is completely preserved and NOT reverted!
+			expect(await fs.readFile(fileB, "utf-8")).toBe("tab2 updated in another tab")
+			// Assert: Tab 2's new file is preserved and NOT deleted!
+			expect(await fs.readFile(fileBNew, "utf-8")).toBe("tab2 new file in another tab")
+		} finally {
+			vitest.restoreAllMocks()
+			await fs.rm(baseDir, { recursive: true, force: true })
+		}
+	})
 })

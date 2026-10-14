@@ -215,9 +215,16 @@ export async function checkpointSave(task: Task, force = false, suppressMessage 
 		return
 	}
 
+	const touchedFiles = typeof task.getTouchedFiles === "function" ? task.getTouchedFiles() : []
+
 	// Start the checkpoint process in the background.
 	return service
-		.saveCheckpoint(`Task: ${task.taskId}, Time: ${Date.now()}`, { allowEmpty: force, suppressMessage })
+		.saveCheckpoint(
+			`Task: ${task.taskId}, Time: ${Date.now()}`,
+			touchedFiles.length > 0
+				? { allowEmpty: force, suppressMessage, files: touchedFiles }
+				: { allowEmpty: force, suppressMessage },
+		)
 		.catch((err) => {
 			console.error("[Task#checkpointSave] caught unexpected error, disabling checkpoints", err)
 			task.enableCheckpoints = false
@@ -250,7 +257,12 @@ export async function checkpointRestore(
 	const provider = task.providerRef.deref()
 
 	try {
-		await service.restoreCheckpoint(commitHash)
+		const touchedFiles = typeof task.getTouchedFiles === "function" ? task.getTouchedFiles() : []
+		if (touchedFiles.length > 0) {
+			await service.restoreCheckpoint(commitHash, touchedFiles)
+		} else {
+			await service.restoreCheckpoint(commitHash)
+		}
 		await provider?.postMessageToWebview({ type: "currentCheckpointUpdated", text: commitHash })
 
 		if (mode === "restore") {
@@ -360,7 +372,12 @@ export async function checkpointDiff(task: Task, { ts, previousCommitHash, commi
 	}
 
 	try {
-		const changes = await service.getDiff({ from: fromHash, to: toHash })
+		const touchedFiles = typeof task.getTouchedFiles === "function" ? task.getTouchedFiles() : []
+		const changes = await service.getDiff(
+			touchedFiles.length > 0
+				? { from: fromHash, to: toHash, files: touchedFiles }
+				: { from: fromHash, to: toHash },
+		)
 
 		if (!changes?.length) {
 			vscode.window.showInformationMessage(t("common:errors.checkpoint_no_changes"))

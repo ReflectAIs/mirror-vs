@@ -301,9 +301,51 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 		return this.shadowGitConfigWorktree
 	}
 
+	private async stageFiles(git: SimpleGit, files: string[]) {
+		try {
+			const cwdPath = (await this.getShadowGitConfigWorktree(git)) || this.workspaceDir || ""
+			const validFiles: string[] = []
+			for (const file of files) {
+				const relPath = path.isAbsolute(file) ? path.relative(cwdPath, file) : file
+				const normalizedRel = path.normalize(relPath).replace(/\\/g, "/")
+				if (!normalizedRel || normalizedRel.startsWith("..")) {
+					continue
+				}
+				const absPath = path.resolve(cwdPath, normalizedRel)
+				let existsOnDisk = false
+				try {
+					await fs.stat(absPath)
+					existsOnDisk = true
+				} catch {
+					existsOnDisk = false
+				}
+
+				if (existsOnDisk) {
+					validFiles.push(normalizedRel)
+				} else {
+					// Check if tracked in git (e.g. was deleted)
+					try {
+						await git.raw(["ls-files", "--error-unmatch", normalizedRel])
+						validFiles.push(normalizedRel)
+					} catch {
+						// Not on disk and not tracked in git
+					}
+				}
+			}
+
+			if (validFiles.length > 0) {
+				await git.add([...validFiles, "--ignore-errors"])
+			}
+		} catch (error) {
+			this.log(
+				`[${this.constructor.name}#stageFiles] failed to add files to git: ${error instanceof Error ? error.message : String(error)}`,
+			)
+		}
+	}
+
 	public async saveCheckpoint(
 		message: string,
-		options?: { allowEmpty?: boolean; suppressMessage?: boolean },
+		options?: { allowEmpty?: boolean; suppressMessage?: boolean; files?: string[] },
 	): Promise<CheckpointResult | undefined> {
 		try {
 			this.log(
@@ -315,7 +357,11 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 			}
 
 			const startTime = Date.now()
-			await this.stageAll(this.git)
+			if (options?.files !== undefined) {
+				await this.stageFiles(this.git, options.files)
+			} else {
+				await this.stageAll(this.git)
+			}
 			const commitArgs = options?.allowEmpty ? { "--allow-empty": null } : undefined
 			const result = await this.git.commit(message, commitArgs)
 			const fromHash = this._checkpoints[this._checkpoints.length - 1] ?? this.baseHash!
@@ -350,7 +396,7 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 		}
 	}
 
-	public async restoreCheckpoint(commitHash: string) {
+	public async restoreCheckpoint(commitHash: string, files?: string[]) {
 		try {
 			this.log(`[${this.constructor.name}#restoreCheckpoint] starting checkpoint restore`)
 
@@ -359,8 +405,67 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 			}
 
 			const start = Date.now()
-			await this.git.clean("f", ["-d", "-f"])
-			await this.git.reset(["--hard", commitHash])
+			const cwdPath = (await this.getShadowGitConfigWorktree(this.git)) || this.workspaceDir || ""
+
+			// Determine which files to restore:
+			// If a specific list of files was provided (e.g. from the current task/tab),
+			// only restore those files so changes made by other tabs are never touched.
+			// If no file list was provided, determine files that changed in this shadow repo between commitHash and HEAD.
+			let filesToRestore: string[] = []
+
+			if (files !== undefined) {
+				// Deduplicate and normalize
+				filesToRestore = Array.from(
+					new Set(
+						files
+							.map((f) => {
+								const rel = path.isAbsolute(f) ? path.relative(cwdPath, f) : f
+								return path.normalize(rel).replace(/\\/g, "/")
+							})
+							.filter((f) => f && !f.startsWith("..")),
+					),
+				)
+			} else {
+				// Fallback: diff between commitHash and working tree + HEAD in this repo
+				const diffOutput = await this.git.raw(["diff", "--name-only", commitHash]).catch(() => "")
+				const headDiff = await this.git.raw(["diff", "--name-only", commitHash, "HEAD"]).catch(() => "")
+				const set = new Set([
+					...diffOutput
+						.split("\n")
+						.map((f) => f.trim())
+						.filter(Boolean),
+					...headDiff
+						.split("\n")
+						.map((f) => f.trim())
+						.filter(Boolean),
+				])
+				filesToRestore = Array.from(set)
+			}
+
+			// Reset HEAD and index to commitHash without touching working tree
+			await this.git.reset(["--mixed", commitHash])
+
+			for (const relPath of filesToRestore) {
+				if (!relPath) continue
+				const absPath = path.resolve(cwdPath, relPath)
+
+				let existsAtCommit = false
+				try {
+					await this.git.catFile(["-e", `${commitHash}:${relPath}`])
+					existsAtCommit = true
+				} catch {
+					existsAtCommit = false
+				}
+
+				if (existsAtCommit) {
+					// Checkout the exact version from commitHash into the working tree
+					await this.git.checkout([commitHash, "--", relPath])
+				} else {
+					// The file was created by this task after commitHash, so remove it
+					await fs.rm(absPath, { recursive: true, force: true }).catch(() => {})
+					await this.git.rm(["-f", "--ignore-unmatch", relPath]).catch(() => {})
+				}
+			}
 
 			// Remove all checkpoints after the specified commitHash.
 			const checkpointIndex = this._checkpoints.indexOf(commitHash)
@@ -380,7 +485,15 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 		}
 	}
 
-	public async getDiff({ from, to }: { from?: string; to?: string }): Promise<CheckpointDiff[]> {
+	public async getDiff({
+		from,
+		to,
+		files,
+	}: {
+		from?: string
+		to?: string
+		files?: string[]
+	}): Promise<CheckpointDiff[]> {
 		if (!this.git) {
 			throw new Error("Shadow git repo not initialized")
 		}
@@ -391,16 +504,34 @@ export abstract class ShadowCheckpointService extends EventEmitter {
 			from = (await this.git.raw(["rev-list", "--max-parents=0", "HEAD"])).trim()
 		}
 
-		// Stage all changes so that untracked files appear in diff summary.
-		await this.stageAll(this.git)
+		if (files !== undefined) {
+			await this.stageFiles(this.git, files)
+		} else {
+			await this.stageAll(this.git)
+		}
 
 		this.log(`[${this.constructor.name}#getDiff] diffing ${to ? `${from}..${to}` : `${from}..HEAD`}`)
-		const { files } = to ? await this.git.diffSummary([`${from}..${to}`]) : await this.git.diffSummary([from])
+		const { files: diffSummaryFiles } = to
+			? await this.git.diffSummary([`${from}..${to}`])
+			: await this.git.diffSummary([from])
 
 		const cwdPath = (await this.getShadowGitConfigWorktree(this.git)) || this.workspaceDir || ""
 
-		for (const file of files) {
+		const targetFileSet =
+			files !== undefined
+				? new Set(
+						files.map((f) => {
+							const rel = path.isAbsolute(f) ? path.relative(cwdPath, f) : f
+							return path.normalize(rel).replace(/\\/g, "/")
+						}),
+					)
+				: null
+
+		for (const file of diffSummaryFiles) {
 			const relPath = file.file
+			if (targetFileSet && !targetFileSet.has(relPath)) {
+				continue
+			}
 			const absPath = path.join(cwdPath, relPath)
 			const before = await this.git.show([`${from}:${relPath}`]).catch(() => "")
 

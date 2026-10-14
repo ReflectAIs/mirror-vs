@@ -2,6 +2,15 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.3] - 2026-10-14
+
+### Improvements & Fixes
+
+- **Multi-Tab Checkpoint Isolation**:
+    - Scoped checkpoint saves, diffs, and restores to the specific files edited or created by the current task/tab.
+    - Replaced global `git clean -df` and `git reset --hard` during checkpoint restore with per-file restore (`git checkout <commit> -- <file>`) and targeted deletion of files created after the checkpoint by the current task.
+    - Changes made by other open tabs and untracked files from concurrent tasks are now completely preserved when restoring a checkpoint in any tab.
+
 ## [1.0.2] - 2026-10-13
 
 ### Improvements & Fixes

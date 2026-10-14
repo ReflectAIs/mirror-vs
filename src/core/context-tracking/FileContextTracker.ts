@@ -365,6 +365,10 @@ export class FileContextTracker {
 		return files
 	}
 
+	getCheckpointPossibleFiles(): string[] {
+		return Array.from(this.checkpointPossibleFiles)
+	}
+
 	// Marks a file as edited by Mirror VS to prevent false positives in file watchers
 	markFileAsEditedByMirror(filePath: string): void {
 		this.recentlyEditedByMirror.add(filePath)

@@ -884,13 +884,18 @@ export async function presentAssistantMessage(mirror: Task) {
 
 			switch (block.name) {
 				case "write_to_file":
-					await checkpointSaveAndMark(mirror)
-					await writeToFileTool.handle(mirror, block as ToolUse<"write_to_file">, {
-						askApproval,
-						handleError,
-						pushToolResult,
-					})
-					recordFileEdit(mirror, block)
+					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
+					try {
+						await checkpointSaveAndMark(mirror)
+						await writeToFileTool.handle(mirror, block as ToolUse<"write_to_file">, {
+							askApproval,
+							handleError,
+							pushToolResult,
+						})
+						recordFileEdit(mirror, block)
+					} finally {
+						mirror.pendingEditFilePath = undefined
+					}
 					break
 				case "update_todo_list":
 					await updateTodoListTool.handle(mirror, block as ToolUse<"update_todo_list">, {
@@ -900,50 +905,75 @@ export async function presentAssistantMessage(mirror: Task) {
 					})
 					break
 				case "apply_diff":
-					await checkpointSaveAndMark(mirror)
-					await applyDiffToolClass.handle(mirror, block as ToolUse<"apply_diff">, {
-						askApproval,
-						handleError,
-						pushToolResult,
-					})
-					recordFileEdit(mirror, block)
+					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
+					try {
+						await checkpointSaveAndMark(mirror)
+						await applyDiffToolClass.handle(mirror, block as ToolUse<"apply_diff">, {
+							askApproval,
+							handleError,
+							pushToolResult,
+						})
+						recordFileEdit(mirror, block)
+					} finally {
+						mirror.pendingEditFilePath = undefined
+					}
 					break
 				case "edit":
 				case "search_and_replace":
-					await checkpointSaveAndMark(mirror)
-					await editTool.handle(mirror, block as ToolUse<"edit">, {
-						askApproval,
-						handleError,
-						pushToolResult,
-					})
-					recordFileEdit(mirror, block)
+					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
+					try {
+						await checkpointSaveAndMark(mirror)
+						await editTool.handle(mirror, block as ToolUse<"edit">, {
+							askApproval,
+							handleError,
+							pushToolResult,
+						})
+						recordFileEdit(mirror, block)
+					} finally {
+						mirror.pendingEditFilePath = undefined
+					}
 					break
 				case "search_replace":
-					await checkpointSaveAndMark(mirror)
-					await searchReplaceTool.handle(mirror, block as ToolUse<"search_replace">, {
-						askApproval,
-						handleError,
-						pushToolResult,
-					})
-					recordFileEdit(mirror, block)
+					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
+					try {
+						await checkpointSaveAndMark(mirror)
+						await searchReplaceTool.handle(mirror, block as ToolUse<"search_replace">, {
+							askApproval,
+							handleError,
+							pushToolResult,
+						})
+						recordFileEdit(mirror, block)
+					} finally {
+						mirror.pendingEditFilePath = undefined
+					}
 					break
 				case "edit_file":
-					await checkpointSaveAndMark(mirror)
-					await editFileTool.handle(mirror, block as ToolUse<"edit_file">, {
-						askApproval,
-						handleError,
-						pushToolResult,
-					})
-					recordFileEdit(mirror, block)
+					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
+					try {
+						await checkpointSaveAndMark(mirror)
+						await editFileTool.handle(mirror, block as ToolUse<"edit_file">, {
+							askApproval,
+							handleError,
+							pushToolResult,
+						})
+						recordFileEdit(mirror, block)
+					} finally {
+						mirror.pendingEditFilePath = undefined
+					}
 					break
 				case "apply_patch":
-					await checkpointSaveAndMark(mirror)
-					await applyPatchTool.handle(mirror, block as ToolUse<"apply_patch">, {
-						askApproval,
-						handleError,
-						pushToolResult,
-					})
-					recordFileEdit(mirror, block)
+					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
+					try {
+						await checkpointSaveAndMark(mirror)
+						await applyPatchTool.handle(mirror, block as ToolUse<"apply_patch">, {
+							askApproval,
+							handleError,
+							pushToolResult,
+						})
+						recordFileEdit(mirror, block)
+					} finally {
+						mirror.pendingEditFilePath = undefined
+					}
 					break
 				case "read_file":
 					// Type assertion is safe here because we're in the "read_file" case
