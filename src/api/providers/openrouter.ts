@@ -469,7 +469,19 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 
 				// Emit raw tool call chunks - NativeToolCallParser handles state management
 				if ("tool_calls" in delta && Array.isArray(delta.tool_calls)) {
+					let shouldAbortForDegeneration = false
 					for (const toolCall of delta.tool_calls) {
+						if (toolCall.function?.arguments && degenerationDetector.check(toolCall.function.arguments)) {
+							console.warn(
+								`[OpenRouter] Token degeneration loop detected in tool arguments for model ${modelId}. Terminating stream.`,
+							)
+							yield {
+								type: "text",
+								text: "\n\n[Generation stopped: Repetitive token loop detected from provider stream.]",
+							}
+							shouldAbortForDegeneration = true
+							break
+						}
 						yield {
 							type: "tool_call_partial",
 							index: toolCall.index,
@@ -477,6 +489,9 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 							name: toolCall.function?.name,
 							arguments: toolCall.function?.arguments,
 						}
+					}
+					if (shouldAbortForDegeneration) {
+						break
 					}
 				}
 

@@ -40,21 +40,76 @@ export class StreamDegenerationDetector {
 			}
 		}
 
-		// 2. Check repeating n-gram phrase patterns in recent buffer window (length 2..35 chars)
+		// 2. Check intra-word / token stem repetition (e.g., paddingTopTopTopTopTopTop or ClipPathClipPathClipPath)
+		// Any alphanumeric/symbol word stem of 2..30 characters repeating consecutively 6+ times with no spaces
+		if (this.fullBuffer.length >= 20) {
+			const recentWindow = this.fullBuffer.slice(-300)
+			const stemMatch = /([a-zA-Z0-9_$]{2,30})\1{5,}/.exec(recentWindow)
+			if (stemMatch) {
+				const stem = stemMatch[1]
+				// Ignore repetitive numeric zeroes or pure single repeated chars
+				const isUniformChar = stem.split("").every((c) => c === stem[0])
+				if (!isUniformChar) {
+					return true
+				}
+			}
+		}
+
+		// 3. Check line-level repetition and cyclic loops (e.g., repeating functions, lines, or alternating markers)
+		const lines = this.fullBuffer.split("\n")
+		if (lines.length >= 4) {
+			const recentLines = lines
+				.slice(-15)
+				.map((l) => l.trim())
+				.filter((l) => l.length > 0)
+			const isStructuralLine = (l: string) => /^[{}\[\]();,\s\-|:=_+*#`~]+$/.test(l)
+
+			// 3a. Identical non-structural line repeating 4+ times consecutively
+			if (recentLines.length >= 4) {
+				let repeatCount = 1
+				for (let i = recentLines.length - 1; i > 0; i--) {
+					if (recentLines[i] === recentLines[i - 1] && !isStructuralLine(recentLines[i])) {
+						repeatCount++
+						if (repeatCount >= 4) {
+							return true
+						}
+					} else {
+						break
+					}
+				}
+			}
+
+			// 3b. Two-line alternating cyclic loop (e.g., ======= followed by function LineChart() {}) repeating 3+ times
+			if (recentLines.length >= 6) {
+				const l1 = recentLines[recentLines.length - 1]
+				const l2 = recentLines[recentLines.length - 2]
+				if (l1 !== l2 && (!isStructuralLine(l1) || !isStructuralLine(l2))) {
+					if (
+						recentLines[recentLines.length - 3] === l1 &&
+						recentLines[recentLines.length - 4] === l2 &&
+						recentLines[recentLines.length - 5] === l1 &&
+						recentLines[recentLines.length - 6] === l2
+					) {
+						return true
+					}
+				}
+			}
+		}
+
+		// 4. Check repeating n-gram phrase patterns in recent buffer window (length 2..60 chars)
 		const bufLen = this.fullBuffer.length
 		if (bufLen >= 40) {
-			const sampleWindow = this.fullBuffer.slice(-150)
-			for (let patternLen = 2; patternLen <= 35; patternLen++) {
+			const sampleWindow = this.fullBuffer.slice(-300)
+			for (let patternLen = 2; patternLen <= 60; patternLen++) {
 				const pattern = sampleWindow.slice(-patternLen)
 
 				// Don't flag formatting characters or table syntax (e.g., '---', '|---|', ' - ', spaces)
-				// Pure formatting/delimiter repeating patterns are common in Markdown tables, rules, headers, etc.
 				if (/^[\s\-|:=_+*#`~]+$/.test(pattern)) {
 					continue
 				}
 
 				// Check if the pattern repeats consecutively at least maxConsecutiveSubstrings times
-				const repeatTarget = Math.max(3, Math.min(this.maxConsecutiveSubstrings, Math.floor(100 / patternLen)))
+				const repeatTarget = Math.max(3, Math.min(this.maxConsecutiveSubstrings, Math.floor(120 / patternLen)))
 				const expectedRepeat = pattern.repeat(repeatTarget)
 				if (sampleWindow.endsWith(expectedRepeat)) {
 					return true

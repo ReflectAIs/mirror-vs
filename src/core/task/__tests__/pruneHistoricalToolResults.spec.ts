@@ -137,4 +137,45 @@ describe("pruneHistoricalToolResults", () => {
 		const turn2Env = (result[4].content as any[])[1].text
 		expect(turn2Env).toBe(envBlock)
 	})
+
+	it("sanitizes degenerated assistant tool_use diffs to prevent autoregressive priming", () => {
+		const degeneratedDiff =
+			"<<<<<<< SEARCH\nfunction LineChart() {}\n=======\n" +
+			"=======\nfunction LineChart() {}\n".repeat(10) +
+			">>>>>>> REPLACE"
+
+		const messages: ApiMessage[] = [
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "tool_use",
+						id: "t_diff_1",
+						name: "apply_diff",
+						input: {
+							path: "file.ts",
+							diff: degeneratedDiff,
+						},
+					} as any,
+				],
+			},
+			{
+				role: "user",
+				content: [
+					{
+						type: "tool_result",
+						tool_use_id: "t_diff_1",
+						content: "ERROR: Special marker found",
+						is_error: true,
+					},
+				],
+			},
+		]
+
+		const result = pruneHistoricalToolResults(messages, { keepRecentTurns: 5 })
+		const assistantMsg = result[0]
+		const toolUseBlock = (assistantMsg.content as any[])[0]
+		expect(toolUseBlock.input.diff).toContain("sanitized to prevent context poisoning")
+		expect(toolUseBlock.input.diff).not.toContain("=======\n=======")
+	})
 })

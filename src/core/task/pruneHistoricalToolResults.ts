@@ -42,13 +42,47 @@ export function pruneHistoricalToolResults(
 	const keepRecentTurns = options.keepRecentTurns ?? DEFAULT_KEEP_RECENT_TURNS
 	const maxToolResultChars = options.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS
 
+	// 0. Always sanitize degenerated assistant tool_use diffs across messages to prevent autoregressive priming loops
+	const sanitizedMessages = messages.map((msg) => {
+		if (msg.role !== "assistant" || !Array.isArray(msg.content)) {
+			return msg
+		}
+
+		let didModifyAssistant = false
+		const newContent = msg.content.map((block) => {
+			if (block.type === "tool_use" && (block as any).name === "apply_diff") {
+				const input = (block as any).input
+				if (input && typeof input.diff === "string") {
+					const diff = input.diff
+					const sepCount = (diff.match(/=======/g) || []).length
+					const hasDegenerateLines = /(?:^|\n)(.+)\n(?:\1\n){3,}/.test(diff)
+					const hasStemLoop = /([a-zA-Z0-9_$]{2,30})\1{5,}/.test(diff)
+
+					if (sepCount > 2 || hasDegenerateLines || hasStemLoop) {
+						didModifyAssistant = true
+						return {
+							...block,
+							input: {
+								...input,
+								diff: "[Failed diff content contained repetitive degeneration - sanitized to prevent context poisoning]",
+							},
+						}
+					}
+				}
+			}
+			return block
+		})
+
+		return didModifyAssistant ? { ...msg, content: newContent } : msg
+	})
+
 	// Find the cutoff index for recent turns.
 	// We count user messages from the end. A user message indicates a turn boundary.
 	let userMessageCount = 0
 	let cutoffIndex = 0
 
-	for (let i = messages.length - 1; i >= 0; i--) {
-		if (messages[i].role === "user") {
+	for (let i = sanitizedMessages.length - 1; i >= 0; i--) {
+		if (sanitizedMessages[i].role === "user") {
 			userMessageCount++
 			if (userMessageCount > keepRecentTurns) {
 				cutoffIndex = i + 1
@@ -57,12 +91,12 @@ export function pruneHistoricalToolResults(
 		}
 	}
 
-	// If the entire conversation fits within keepRecentTurns, nothing to prune
+	// If the entire conversation fits within keepRecentTurns, return sanitized messages
 	if (cutoffIndex === 0 && userMessageCount <= keepRecentTurns) {
-		return messages
+		return sanitizedMessages
 	}
 
-	return messages.map((msg, index) => {
+	return sanitizedMessages.map((msg, index) => {
 		// Only prune messages that precede the active working memory window
 		if (index >= cutoffIndex || msg.role !== "user" || !Array.isArray(msg.content)) {
 			return msg

@@ -136,7 +136,9 @@ export class MultiSearchReplaceDiffStrategy implements DiffStrategy {
 				"You may use multiple diff blocks in a single diff request, but ANY of ONLY the following separators that occur within SEARCH or REPLACE content must be escaped, as follows:\n" +
 				`\\${SEARCH}\n` +
 				`\\${SEP}\n` +
-				`\\${REPLACE}\n`,
+				`\\${REPLACE}\n` +
+				"\n" +
+				"Note: If this was NOT a merge conflict marker, you have duplicate or unclosed '=======' separators. Each SEARCH block must have only ONE '=======' dividing SEARCH from REPLACE. If you continue to experience diff issues, use the 'write_to_file' tool to rewrite the file completely.\n",
 		})
 
 		const reportInvalidDiffError = (found: string, expected: string) => ({

@@ -173,7 +173,19 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 
 			// Emit raw tool call chunks - NativeToolCallParser handles state management
 			if (delta?.tool_calls) {
+				let shouldAbortForDegeneration = false
 				for (const toolCall of delta.tool_calls) {
+					if (toolCall.function?.arguments && degenerationDetector.check(toolCall.function.arguments)) {
+						console.warn(
+							`[${this.providerName}] Token degeneration loop detected in tool arguments. Terminating stream generation.`,
+						)
+						yield {
+							type: "text",
+							text: "\n\n[Generation stopped: Repetitive token loop detected from provider stream.]",
+						}
+						shouldAbortForDegeneration = true
+						break
+					}
 					if (toolCall.id) {
 						activeToolCallIds.add(toolCall.id)
 					}
@@ -184,6 +196,9 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 						name: toolCall.function?.name,
 						arguments: toolCall.function?.arguments,
 					}
+				}
+				if (shouldAbortForDegeneration) {
+					break
 				}
 			}
 

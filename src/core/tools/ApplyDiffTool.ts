@@ -107,7 +107,28 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 				}
 
 				if (currentCount >= 2) {
+					formattedError += `\n\n<hint>apply_diff has failed ${currentCount} times on '${relPath}'. To avoid further diff marker issues, you can either:\n1. Use 'write_to_file' to rewrite the file cleanly without diff markers.\n2. Or provide a single, focused SEARCH/REPLACE block matching exact lines without duplicate markers.</hint>`
 					await task.say("diff_error", formattedError)
+				}
+
+				// Check for degenerated or repeating markers in the failed diff to prevent autoregressive priming
+				const sepMatches = (diffContent.match(/=======/g) || []).length
+				const hasDegenerateLines = /(?:^|\n)(.+)\n(?:\1\n){3,}/.test(diffContent)
+				const hasStemLoop = /([a-zA-Z0-9_$]{2,30})\1{5,}/.test(diffContent)
+
+				if (sepMatches > 2 || hasDegenerateLines || hasStemLoop) {
+					const lastMsg = task.apiConversationHistory[task.apiConversationHistory.length - 1]
+					if (lastMsg && lastMsg.role === "assistant" && Array.isArray(lastMsg.content)) {
+						for (const block of lastMsg.content) {
+							if (block.type === "tool_use" && (block as any).name === "apply_diff") {
+								const input = (block as any).input
+								if (input && typeof input.diff === "string") {
+									input.diff =
+										"[Failed diff content contained repetitive degeneration - sanitized to prevent context poisoning]"
+								}
+							}
+						}
+					}
 				}
 
 				task.recordToolError("apply_diff", formattedError)

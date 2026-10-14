@@ -62,4 +62,37 @@ describe("StreamDegenerationDetector", () => {
 			}
 		}
 	})
+
+	it("should detect intra-word token stem repetition", () => {
+		const detector = new StreamDegenerationDetector()
+		const degenerateChunk = "paddingTopTopTopTopTopTopTopTopTop"
+		let detected = false
+		for (let i = 0; i < degenerateChunk.length; i += 3) {
+			if (detector.check(degenerateChunk.slice(i, i + 3))) {
+				detected = true
+				break
+			}
+		}
+		expect(detected).toBe(true)
+	})
+
+	it("should detect repeating identical non-structural lines", () => {
+		const detector = new StreamDegenerationDetector()
+		detector.check("function LineChart() {}\n")
+		detector.check("function LineChart() {}\n")
+		detector.check("function LineChart() {}\n")
+		const detected = detector.check("function LineChart() {}\n")
+		expect(detected).toBe(true)
+	})
+
+	it("should detect alternating two-line cyclic degeneration loops", () => {
+		const detector = new StreamDegenerationDetector()
+		detector.check("=======\n")
+		detector.check("function LineChart() {}\n")
+		detector.check("=======\n")
+		detector.check("function LineChart() {}\n")
+		detector.check("=======\n")
+		const detected = detector.check("function LineChart() {}\n")
+		expect(detected).toBe(true)
+	})
 })
