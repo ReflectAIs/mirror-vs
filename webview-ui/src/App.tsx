@@ -51,7 +51,7 @@ const tabsByMessageAction: Partial<Record<NonNullable<ExtensionMessage["action"]
 const App = () => {
 	const { didHydrateState, showWelcome, shouldShowAnnouncement, renderContext, activeTabId } = useExtensionState()
 
-	// Webview-level keyboard shortcuts (Cmd/Ctrl+N, Cmd/Ctrl+Shift+N, Cmd/Ctrl+W)
+	// Webview-level keyboard shortcuts (Cmd/Ctrl+N, Cmd/Ctrl+W)
 	useShortcutKeys(activeTabId ?? "")
 
 	const [showAnnouncement, setShowAnnouncement] = useState(false)

@@ -8,6 +8,7 @@ import {
 	openRouterDefaultModelInfo,
 	OPENROUTER_DEFAULT_PROVIDER_NAME,
 	OPEN_ROUTER_PROMPT_CACHING_MODELS,
+	isOpenRouterPromptCachingModel,
 	DEEP_SEEK_DEFAULT_TEMPERATURE,
 } from "@mirror-vs/types"
 
@@ -45,6 +46,8 @@ type OpenRouterChatCompletionParams = OpenAI.Chat.ChatCompletionCreateParams & {
 	include_reasoning?: boolean
 	// https://openrouter.ai/docs/use-cases/reasoning-tokens
 	reasoning?: OpenRouterReasoningParams
+	// https://openrouter.ai/docs/features/prompt-caching (Session stickiness for provider routing)
+	session_id?: string
 }
 
 // Zod schema for OpenRouter error response structure (for caught exceptions)
@@ -291,11 +294,10 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 		}
 
 		// https://openrouter.ai/docs/features/prompt-caching
-		// TODO: Add a `promptCacheStratey` field to `ModelInfo`.
-		if (OPEN_ROUTER_PROMPT_CACHING_MODELS.has(modelId)) {
-			if (modelId.startsWith("google")) {
+		if (isOpenRouterPromptCachingModel(modelId)) {
+			if (modelId.startsWith("google") || modelId.includes("gemini")) {
 				addGeminiCacheBreakpoints(systemPrompt, openAiMessages)
-			} else {
+			} else if (modelId.startsWith("anthropic") || modelId.includes("claude")) {
 				addAnthropicCacheBreakpoints(systemPrompt, openAiMessages)
 			}
 		}
@@ -336,6 +338,7 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 			...(reasoning && { reasoning }),
 			tools: this.convertToolsForOpenAI(metadata?.tools),
 			tool_choice: metadata?.tool_choice,
+			...(metadata?.taskId && { session_id: metadata.taskId }),
 		}
 
 		// Add Anthropic beta header for fine-grained tool streaming when using Anthropic models

@@ -334,6 +334,97 @@ export const rateLimiterMiddleware: TestScenario = {
 }
 
 // ────────────────────────────────────────────────────────────
+//  SOTA Frontier & Stress Test Scenarios (Antigravity / Claude Code / Cursor Tier)
+// ────────────────────────────────────────────────────────────
+
+// 1. Long Log Diagnostics (1,000+ line compilation log inspection)
+const buildLogChunks: string[] = []
+for (let i = 1; i <= 350; i++) {
+	buildLogChunks.push(
+		`[info] [tsc:worker-${(i % 4) + 1}] Compiled module src/generated/schema_${i}.ts in ${12 + (i % 7)}ms`,
+	)
+}
+buildLogChunks.push(
+	`src/models/user.ts:18:7 - error TS2339: Property 'stripeCustomerId' does not exist on type 'UserPayload'.`,
+)
+buildLogChunks.push(`18   user.stripeCustomerId = payload.stripeCustomerId;`)
+buildLogChunks.push(`          ~~~~~~~~~~~~~~~~`)
+for (let i = 351; i <= 700; i++) {
+	buildLogChunks.push(`[info] [webpack:asset] Emitted asset static/chunks/vendor.${i}.js (14.2 KiB)`)
+}
+buildLogChunks.push(`src/services/billing.ts:42:10 - error TS2322: Type 'string' is not assignable to type 'number'.`)
+buildLogChunks.push(`42   invoice.accountId = String(user.id);`)
+buildLogChunks.push(`             ~~~~~~~~~`)
+for (let i = 701; i <= 1000; i++) {
+	buildLogChunks.push(`[info] [optimize] Tree-shaking pass ${i - 700} complete across 42 modules`)
+}
+buildLogChunks.push(`Found 2 errors in 2 files. Exited with status 1.`)
+
+export const longLogDiagnostics: TestScenario = {
+	name: "long_log_diagnostics",
+	description: "Diagnose buried compiler errors in a 1,000+ line CI build log without token-wasting dump",
+	expectedMaxTurns: 5,
+	tags: ["perf", "bugfix", "advanced", "stress"],
+	files: {
+		"build.log": buildLogChunks.join("\n"),
+		"src/models/user.ts": `export interface UserPayload {\n  id: number\n  name: string\n  email: string\n}\n\nexport interface UserRecord extends UserPayload {\n  stripeCustomerId?: string\n  createdAt: Date\n}\n\nexport function createUser(payload: UserPayload): UserRecord {\n  const user: UserRecord = {\n    ...payload,\n    createdAt: new Date(),\n  }\n  user.stripeCustomerId = payload.stripeCustomerId\n  return user\n}\n`,
+		"src/services/billing.ts": `export interface Invoice {\n  id: string\n  accountId: number\n  amount: number\n}\n\nexport function generateInvoice(user: { id: number }, amount: number): Invoice {\n  const invoice: Invoice = {\n    id: \`inv-\${Date.now()}\`,\n    accountId: 0,\n    amount,\n  }\n  invoice.accountId = String(user.id)\n  return invoice\n}\n`,
+		"package.json": `{\n  "name": "billing-app",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"The CI pipeline failed during build. Inspect the 1,000+ line log in `build.log` to identify the two TypeScript errors, find their exact root causes in the source code, and fix them in `src/models/user.ts` and `src/services/billing.ts` so the types match.",
+}
+
+// 2. Massive Multi-Module Migration (8-file architecture refactor)
+export const massiveMultiModuleMigration: TestScenario = {
+	name: "massive_multi_module_migration",
+	description: "System-wide EntityId migration from number to string UUID across 8 interdependent modules",
+	expectedMaxTurns: 8,
+	tags: ["refactor", "typescript", "advanced", "stress"],
+	files: {
+		"src/types/id.ts": `export type EntityId = number\n`,
+		"src/models/account.ts": `import { EntityId } from "../types/id"\n\nexport interface Account {\n  id: EntityId\n  ownerName: string\n  balance: number\n}\n`,
+		"src/models/transaction.ts": `import { EntityId } from "../types/id"\n\nexport interface Transaction {\n  id: EntityId\n  accountId: EntityId\n  amount: number\n  timestamp: number\n}\n`,
+		"src/repositories/accountRepo.ts": `import { EntityId } from "../types/id"\nimport { Account } from "../models/account"\n\nexport class AccountRepository {\n  private accounts = new Map<EntityId, Account>()\n  async findById(id: EntityId): Promise<Account | null> {\n    return this.accounts.get(id) || null\n  }\n  async save(account: Account): Promise<void> {\n    this.accounts.set(account.id, account)\n  }\n}\n`,
+		"src/services/paymentService.ts": `import { EntityId } from "../types/id"\nimport { AccountRepository } from "../repositories/accountRepo"\n\nexport class PaymentService {\n  constructor(private repo: AccountRepository) {}\n  async processTransfer(fromId: EntityId, toId: EntityId, amount: number): Promise<boolean> {\n    const from = await this.repo.findById(fromId)\n    const to = await this.repo.findById(toId)\n    if (!from || !to || from.balance < amount) return false\n    from.balance -= amount\n    to.balance += amount\n    await this.repo.save(from)\n    await this.repo.save(to)\n    return true\n  }\n}\n`,
+		"src/controllers/paymentController.ts": `import { PaymentService } from "../services/paymentService"\n\nexport class PaymentController {\n  constructor(private paymentService: PaymentService) {}\n  async handleTransfer(req: any, res: any) {\n    const fromId = parseInt(req.body.fromId, 10)\n    const toId = parseInt(req.body.toId, 10)\n    const amount = Number(req.body.amount)\n    const success = await this.paymentService.processTransfer(fromId, toId, amount)\n    res.status(success ? 200 : 400).json({ success })\n  }\n}\n`,
+		"src/middleware/authValidator.ts": `import { EntityId } from "../types/id"\n\nexport function validateAccountId(id: any): id is EntityId {\n  return typeof id === "number" && !isNaN(id)\n}\n`,
+		"src/tests/payment.test.ts": `import { AccountRepository } from "../repositories/accountRepo"\nimport { PaymentService } from "../services/paymentService"\nimport { validateAccountId } from "../middleware/authValidator"\n\ndescribe("Payment System", () => {\n  it("validates IDs", () => {\n    expect(validateAccountId(123)).toBe(true)\n  })\n  it("processes transfers", async () => {\n    const repo = new AccountRepository()\n    repo.save({ id: 1, ownerName: "Alice", balance: 500 })\n    repo.save({ id: 2, ownerName: "Bob", balance: 100 })\n    const service = new PaymentService(repo)\n    const result = await service.processTransfer(1, 2, 200)\n    expect(result).toBe(true)\n  })\n})\n`,
+		"package.json": `{\n  "name": "enterprise-payments",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"Perform a system-wide migration to change `EntityId` from `number` to a UUID `string` across all 8 files:\n1. Update `src/types/id.ts` to `export type EntityId = string`\n2. In `src/controllers/paymentController.ts`, remove `parseInt` and assign string IDs directly.\n3. In `src/middleware/authValidator.ts`, validate that the ID is a string with length >= 4.\n4. In `src/tests/payment.test.ts`, update tests to use string UUIDs like 'acc-uuid-1' and 'acc-uuid-2'.",
+}
+
+// 3. Complex State Machine & Concurrency Audit
+export const complexStateMachineAudit: TestScenario = {
+	name: "complex_state_machine_audit",
+	description: "Fix race conditions, lease renewal timeouts, and timer leaks in a distributed worker queue",
+	expectedMaxTurns: 6,
+	tags: ["bugfix", "concurrency", "advanced", "stress"],
+	files: {
+		"src/workerQueue.ts": `export type JobStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT"\n\nexport interface Job<T> {\n  id: string\n  data: T\n  status: JobStatus\n  leaseExpiresAt: number\n}\n\nexport class DistributedWorkerQueue<T> {\n  private jobs = new Map<string, Job<T>>()\n  private timers = new Map<string, NodeJS.Timeout>()\n  private leaseDurationMs: number\n\n  constructor(leaseDurationMs = 5000) {\n    this.leaseDurationMs = leaseDurationMs\n  }\n\n  submitJob(id: string, data: T): Job<T> {\n    const job: Job<T> = {\n      id,\n      data,\n      status: "PENDING",\n      leaseExpiresAt: 0,\n    }\n    this.jobs.set(id, job)\n    return job\n  }\n\n  startJob(id: string): Job<T> | null {\n    const job = this.jobs.get(id)\n    if (!job || job.status !== "PENDING") return null\n    job.status = "RUNNING"\n    job.leaseExpiresAt = Date.now() + this.leaseDurationMs\n\n    // Start heartbeat lease renewal\n    const timer = setInterval(() => {\n      this.renewLease(id)\n    }, Math.floor(this.leaseDurationMs / 2))\n    this.timers.set(id, timer)\n    return job\n  }\n\n  // BUG 1: Race condition — does not check if job was cancelled or already timed out\n  renewLease(id: string): boolean {\n    const job = this.jobs.get(id)\n    if (!job) return false\n    job.leaseExpiresAt = Date.now() + this.leaseDurationMs\n    return true\n  }\n\n  // BUG 2: Memory leak — does not clear interval timer on completion or cancellation\n  completeJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) job.status = "COMPLETED"\n  }\n\n  cancelJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) job.status = "CANCELLED"\n  }\n\n  isLeaseValid(id: string): boolean {\n    const job = this.jobs.get(id)\n    if (!job || job.status !== "RUNNING") return false\n    return Date.now() < job.leaseExpiresAt\n  }\n}\n`,
+		"package.json": `{\n  "name": "distributed-queue",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"In `src/workerQueue.ts`, audit and fix two critical concurrency defects:\n1. Concurrency Race in `renewLease`: Only renew if `job.status === 'RUNNING'` and `Date.now() < job.leaseExpiresAt`. If expired or in any other state, abort renewal, set status to 'TIMED_OUT' if not already cancelled/completed, clear the timer, and return false.\n2. Timer Leak in `completeJob` and `cancelJob`: Always clear the interval timer stored in `this.timers` and delete the key to prevent memory leaks.\n3. Add a helper `clearJobTimer(id: string): void`.",
+}
+
+// 4. Long Output Generator (Stress-testing token throughput and output consistency)
+export const longOutputGenerator: TestScenario = {
+	name: "long_output_generator",
+	description: "Generate a full-coverage 15+ unit test suite for a protocol parser without truncation",
+	expectedMaxTurns: 5,
+	tags: ["testing", "feature", "advanced", "stress"],
+	files: {
+		"src/protocol.ts": `export enum MessageOpcode {\n  CONNECT = 0x01,\n  DISCONNECT = 0x02,\n  PING = 0x03,\n  PONG = 0x04,\n  DATA = 0x05,\n  ACK = 0x06,\n  NACK = 0x07,\n  ERROR = 0xff,\n}\n\nexport interface ProtocolMessage {\n  version: number\n  opcode: MessageOpcode\n  sequenceId: number\n  payload: Buffer\n}\n\nexport class ProtocolCodec {\n  public static readonly MAGIC_BYTE = 0xaa\n  public static readonly HEADER_SIZE = 8\n\n  public static encode(msg: ProtocolMessage): Buffer {\n    const payloadLen = msg.payload.length\n    const buf = Buffer.alloc(ProtocolCodec.HEADER_SIZE + payloadLen)\n    buf.writeUInt8(ProtocolCodec.MAGIC_BYTE, 0)\n    buf.writeUInt8(msg.version, 1)\n    buf.writeUInt8(msg.opcode, 2)\n    buf.writeUInt8(0, 3) // Reserved\n    buf.writeUInt32BE(msg.sequenceId, 4)\n    msg.payload.copy(buf, ProtocolCodec.HEADER_SIZE)\n    return buf\n  }\n\n  public static decode(buf: Buffer): ProtocolMessage {\n    if (buf.length < ProtocolCodec.HEADER_SIZE) {\n      throw new Error("Buffer too short for protocol header")\n    }\n    const magic = buf.readUInt8(0)\n    if (magic !== ProtocolCodec.MAGIC_BYTE) {\n      throw new Error(\`Invalid magic byte: \${magic.toString(16)}\`)\n    }\n    const version = buf.readUInt8(1)\n    const opcode = buf.readUInt8(2) as MessageOpcode\n    const sequenceId = buf.readUInt32BE(4)\n    const payload = buf.subarray(ProtocolCodec.HEADER_SIZE)\n    return { version, opcode, sequenceId, payload }\n  }\n}\n`,
+		"package.json": `{\n  "name": "protocol-parser",\n  "version": "1.0.0",\n  "devDependencies": { "vitest": "^1.0.0" }\n}\n`,
+	},
+	userPrompt:
+		"In `src/protocol.spec.ts`, write a comprehensive, exhaustive test suite using vitest covering:\n- All opcodes (CONNECT, DISCONNECT, PING, PONG, DATA, ACK, NACK, ERROR)\n- Encoding and decoding round-trips with empty, small, and 4KB binary payloads\n- Validation of Magic Byte and throwing on invalid magic byte\n- Buffer underflow checks (buffer length < 8)\n- SequenceId preservation across full 32-bit unsigned integer range (0 to 4294967295)\nInclude at least 10 discrete test cases with detailed assertions.",
+}
+
+// ────────────────────────────────────────────────────────────
 //  All Scenarios (basic → advanced)
 // ────────────────────────────────────────────────────────────
 
@@ -364,4 +455,9 @@ export const ALL_SCENARIOS: TestScenario[] = [
 	circuitBreakerImplementation,
 	lruCacheImplementation,
 	rateLimiterMiddleware,
+	// Frontier & Stress Tests (Antigravity / Claude Code / Codex / Cursor SOTA Tier)
+	longLogDiagnostics,
+	massiveMultiModuleMigration,
+	complexStateMachineAudit,
+	longOutputGenerator,
 ]

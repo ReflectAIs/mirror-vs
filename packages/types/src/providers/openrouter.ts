@@ -64,6 +64,30 @@ export const OPEN_ROUTER_PROMPT_CACHING_MODELS = new Set([
 	"openai/gpt-5.4-mini",
 ])
 
+/**
+ * Detects whether an OpenRouter model ID supports prompt caching.
+ * Matches explicit known models as well as family patterns (Anthropic Claude, Google Gemini,
+ * DeepSeek V3/R1/V4, and modern OpenAI models) including date-versioned suffixes and tags.
+ */
+export function isOpenRouterPromptCachingModel(modelId: string): boolean {
+	if (OPEN_ROUTER_PROMPT_CACHING_MODELS.has(modelId)) {
+		return true
+	}
+	const lower = modelId.toLowerCase()
+	return (
+		lower.startsWith("anthropic/") ||
+		lower.includes("claude-") ||
+		lower.startsWith("google/") ||
+		lower.includes("gemini-") ||
+		lower.includes("deepseek") ||
+		lower.startsWith("openai/gpt-4") ||
+		lower.startsWith("openai/gpt-5") ||
+		lower.startsWith("openai/o1") ||
+		lower.startsWith("openai/o3") ||
+		lower.startsWith("openai/o4")
+	)
+}
+
 // When we first launched these models we didn't have support for
 // enabling/disabling the reasoning budget for hybrid models. Now that we
 // do support this we should give users the option to enable/disable it

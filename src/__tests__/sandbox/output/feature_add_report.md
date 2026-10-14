@@ -7,20 +7,20 @@
 
 | Metric              | Value |
 | ------------------- | ----- |
-| Total Turns         | 3     |
+| Total Turns         | 2     |
 | Wasted Turns        | 0     |
-| Turns to Completion | 3     |
+| Turns to Completion | 2     |
 
 ## Token Usage
 
 | Metric                    | Value    |
 | ------------------------- | -------- |
-| Total Input Tokens        | 6,102    |
-| Total Output Tokens       | 711      |
-| Avg Input/Turn            | 2,034    |
-| Avg Output/Turn           | 237      |
-| Token Efficiency (out/in) | 0.117    |
-| Estimated Cost            | $0.00082 |
+| Total Input Tokens        | 3,814    |
+| Total Output Tokens       | 517      |
+| Avg Input/Turn            | 1,907    |
+| Avg Output/Turn           | 259      |
+| Token Efficiency (out/in) | 0.136    |
+| Estimated Cost            | $0.00054 |
 
 ## Tool Usage
 
@@ -42,19 +42,19 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 6.3s  |
-| Avg per Turn  | 2.1s  |
-| Fastest Turn  | 1.5s  |
-| Slowest Turn  | 3.0s  |
+| Total Latency | 6.6s  |
+| Avg per Turn  | 3.3s  |
+| Fastest Turn  | 2.3s  |
+| Slowest Turn  | 4.2s  |
 
 ## Reasoning
 
 | Metric                   | Value |
 | ------------------------ | ----- |
-| Turns with Reasoning     | 0 / 3 |
+| Turns with Reasoning     | 0 / 2 |
 | Avg Reasoning Chars/Turn | 0     |
 
 ## Behavioral Signals
 
-- ✅ Excellent turn efficiency — completed in 3 turn(s)
+- ✅ Excellent turn efficiency — completed in 2 turn(s)
 - 🧠 No reasoning detected — model may not be using thinking mode

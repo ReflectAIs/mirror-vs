@@ -30,6 +30,9 @@ export interface TurnTrace {
 	inputTokens: number
 	outputTokens: number
 	totalTokens: number
+	cachedTokens: number
+	cacheWriteTokens: number
+	upstreamCost?: number
 	assistantText: string
 	reasoningText: string
 	toolCalls: ToolInvocation[]
@@ -45,6 +48,10 @@ export interface ConversationTrace {
 	totalInputTokens: number
 	totalOutputTokens: number
 	totalToolCalls: number
+	totalCachedTokens: number
+	totalCacheWriteTokens: number
+	overallCacheHitRate: number
+	totalCost: number
 	completed: boolean
 	error?: string
 }
@@ -268,6 +275,10 @@ export class SandboxHarness {
 			totalInputTokens: 0,
 			totalOutputTokens: 0,
 			totalToolCalls: 0,
+			totalCachedTokens: 0,
+			totalCacheWriteTokens: 0,
+			overallCacheHitRate: 0,
+			totalCost: 0,
 			completed: false,
 		}
 
@@ -276,15 +287,19 @@ export class SandboxHarness {
 			{ role: "user", content: userPrompt },
 		]
 
+		const sessionId = `sandbox-${scenarioName}-${Date.now()}`
 		const scenarioStart = performance.now()
 
 		try {
 			for (let turn = 0; turn < this.config.maxTurns; turn++) {
-				const turnResult = await this.executeTurn(turn, messages, project)
+				const turnResult = await this.executeTurn(turn, messages, project, sessionId)
 				trace.turns.push(turnResult)
 				trace.totalInputTokens += turnResult.inputTokens
 				trace.totalOutputTokens += turnResult.outputTokens
 				trace.totalToolCalls += turnResult.toolCalls.length
+				trace.totalCachedTokens += turnResult.cachedTokens
+				trace.totalCacheWriteTokens += turnResult.cacheWriteTokens
+				trace.totalCost += turnResult.upstreamCost ?? 0
 
 				if (turnResult.isCompletion) {
 					trace.completed = true
@@ -302,6 +317,10 @@ export class SandboxHarness {
 				}
 			}
 
+			if (trace.totalInputTokens > 0) {
+				trace.overallCacheHitRate = Math.round((trace.totalCachedTokens / trace.totalInputTokens) * 1000) / 10
+			}
+
 			if (!trace.completed && trace.turns.length >= this.config.maxTurns) {
 				trace.error = `Hit max turns limit (${this.config.maxTurns})`
 			}
@@ -317,6 +336,7 @@ export class SandboxHarness {
 		turnIndex: number,
 		messages: OpenAI.Chat.ChatCompletionMessageParam[],
 		project: SandboxProject,
+		sessionId?: string,
 	): Promise<TurnTrace> {
 		const requestTimestamp = Date.now()
 		const requestStart = performance.now()
@@ -327,7 +347,8 @@ export class SandboxHarness {
 			tools: SANDBOX_TOOLS,
 			temperature: this.config.temperature ?? 0,
 			max_tokens: 8192,
-		})
+			...(sessionId && { session_id: sessionId }),
+		} as any)
 
 		const responseTimestamp = Date.now()
 		const latencyMs = performance.now() - requestStart
@@ -403,6 +424,11 @@ export class SandboxHarness {
 			// Model finished without tool calls — might be done or stuck
 		}
 
+		const u = usage as any
+		const cachedTokens = u?.prompt_tokens_details?.cached_tokens ?? 0
+		const cacheWriteTokens = u?.prompt_tokens_details?.cache_write_tokens ?? 0
+		const upstreamCost = u?.cost ?? u?.cost_details?.upstream_inference_cost
+
 		return {
 			turnIndex,
 			requestTimestamp,
@@ -412,6 +438,9 @@ export class SandboxHarness {
 			inputTokens: usage?.prompt_tokens ?? 0,
 			outputTokens: usage?.completion_tokens ?? 0,
 			totalTokens: usage?.total_tokens ?? 0,
+			cachedTokens,
+			cacheWriteTokens,
+			upstreamCost,
 			assistantText,
 			reasoningText,
 			toolCalls,

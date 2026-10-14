@@ -15,37 +15,37 @@
 
 | Metric                    | Value    |
 | ------------------------- | -------- |
-| Total Input Tokens        | 3,910    |
-| Total Output Tokens       | 308      |
-| Avg Input/Turn            | 1,955    |
-| Avg Output/Turn           | 154      |
-| Token Efficiency (out/in) | 0.079    |
-| Estimated Cost            | $0.00048 |
+| Total Input Tokens        | 4,114    |
+| Total Output Tokens       | 320      |
+| Avg Input/Turn            | 2,057    |
+| Avg Output/Turn           | 160      |
+| Token Efficiency (out/in) | 0.078    |
+| Estimated Cost            | $0.00051 |
 
 ## Tool Usage
 
-| Metric            | Value                         |
-| ----------------- | ----------------------------- |
-| Total Tool Calls  | 2                             |
-| Unique Tools Used | edit_file, attempt_completion |
-| Redundant Reads   | 0                             |
-| Failed Tool Calls | 0                             |
+| Metric            | Value                          |
+| ----------------- | ------------------------------ |
+| Total Tool Calls  | 2                              |
+| Unique Tools Used | apply_diff, attempt_completion |
+| Redundant Reads   | 0                              |
+| Failed Tool Calls | 0                              |
 
 ### Tool Call Breakdown
 
 | Tool               | Count |
 | ------------------ | ----- |
-| edit_file          | 1     |
+| apply_diff         | 1     |
 | attempt_completion | 1     |
 
 ## Latency
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 3.1s  |
-| Avg per Turn  | 1.6s  |
-| Fastest Turn  | 1.3s  |
-| Slowest Turn  | 1.8s  |
+| Total Latency | 9.3s  |
+| Avg per Turn  | 4.7s  |
+| Fastest Turn  | 4.0s  |
+| Slowest Turn  | 5.3s  |
 
 ## Reasoning
 

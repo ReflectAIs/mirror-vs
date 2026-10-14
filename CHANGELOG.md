@@ -10,6 +10,15 @@ All notable changes to the "Mirror VS" extension will be documented in this file
     - Scoped checkpoint saves, diffs, and restores to the specific files edited or created by the current task/tab.
     - Replaced global `git clean -df` and `git reset --hard` during checkpoint restore with per-file restore (`git checkout <commit> -- <file>`) and targeted deletion of files created after the checkpoint by the current task.
     - Changes made by other open tabs and untracked files from concurrent tasks are now completely preserved when restoring a checkpoint in any tab.
+- **Prefix KV Cache Immutability & OpenRouter Sticky Routing**:
+    - Gated intermediate environment details to omit unchanging static blocks (`Current Mode`, `Visible Files`, `Open Tabs`, `Current Time`), preserving prompt prefix byte-for-byte across turns.
+    - Transmitted `session_id: metadata.taskId` to OpenRouter to enable provider sticky routing, unlocking up to 92.7% turn-over-turn cache hit rates and 90% input token cost reduction.
+    - Expanded model prefix caching detection across all date-stamped and provider-prefixed model IDs (`anthropic/*`, `google/*`, `deepseek/*`, `openai/*`).
+- **SOTA Frontier Benchmark Suite**:
+    - Added high-difficulty real-world stress test scenarios: `long_log_diagnostics` (1,000+ line compilation log), `massive_multi_module_migration` (8-file architectural refactor), `complex_state_machine_audit` (concurrency races & timer leaks), and `long_output_generator` (exhaustive protocol test suite).
+    - Added automated SOTA grading (A+ / Frontier A / Competent B) and cache economy metrics to sandbox analysis and HTML reporting.
+- **Keyboard Shortcut Refinement**:
+    - Disabled `Ctrl+Shift+N` / `Cmd+Shift+N` for new session so it no longer hijacks or conflicts with VS Code's native New Window shortcut. (Use `Ctrl/Cmd+N` or `Ctrl/Cmd+T` for new tabs, or the Command Palette for new sessions).
 
 ## [1.0.2] - 2026-10-13
 

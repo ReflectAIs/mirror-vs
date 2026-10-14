@@ -1,68 +1,81 @@
-# 📋 Sandbox Test Summary
+# 📋 Sandbox Test Summary & SOTA Benchmark
 
-| Scenario                       | Turns | Tools | Redundant Reads | Errors | Input Tokens | Output Tokens | Cost     | Status |
-| ------------------------------ | ----- | ----- | --------------- | ------ | ------------ | ------------- | -------- | ------ |
-| mirror_fix_repetition_detector | 2     | 2     | 0               | 0      | 6,963        | 1,888         | $0.00126 | ✅     |
+| Scenario              | Grade            | Score | Cache Hit % | Cost Savings | Turns | Tools | Redundant Reads | Errors | Tokens (In/Out) | Cost     | Status |
+| --------------------- | ---------------- | ----- | ----------- | ------------ | ----- | ----- | --------------- | ------ | --------------- | -------- | ------ |
+| long_output_generator | **Frontier (A)** | 82    | 43.5%       | 39.2%        | 5     | 5     | 0               | 0      | 24,112 / 4,768  | $0.00330 | ✅     |
 
 ---
 
-# 📊 Sandbox Test Report: mirror_fix_repetition_detector
+# 📊 Sandbox Test Report: long_output_generator
 
 **Model**: deepseek/deepseek-v4-flash-0731
+**Benchmark Grade**: **Frontier (A)** (Score: 82/100)
 **Status**: ✅ Completed
+
+## 🏆 Competitive SOTA Benchmark
+
+| Metric             | Value            | Target (SOTA) |
+| ------------------ | ---------------- | ------------- |
+| Benchmark Grade    | **Frontier (A)** | SOTA (A+)     |
+| Efficiency Score   | 82 / 100         | > 85          |
+| Cache Hit Rate     | 43.5%            | > 80%         |
+| Cache Cost Savings | 39.2%            | > 60%         |
+| Redundant Reads    | 0                | 0             |
 
 ## Turn Efficiency
 
 | Metric              | Value |
 | ------------------- | ----- |
-| Total Turns         | 2     |
+| Total Turns         | 5     |
 | Wasted Turns        | 0     |
-| Turns to Completion | 2     |
+| Turns to Completion | 5     |
 
-## Token Usage
+## Token & Cache Economics
 
-| Metric                    | Value    |
-| ------------------------- | -------- |
-| Total Input Tokens        | 6,963    |
-| Total Output Tokens       | 1,888    |
-| Avg Input/Turn            | 3,482    |
-| Avg Output/Turn           | 944      |
-| Token Efficiency (out/in) | 0.271    |
-| Estimated Cost            | $0.00126 |
+| Metric                         | Value                  |
+| ------------------------------ | ---------------------- |
+| Total Input Tokens             | 24,112                 |
+| Cached Input Tokens            | 10,496 (43.5%)         |
+| Total Output Tokens            | 4,768                  |
+| Avg Input/Turn                 | 4,822                  |
+| Avg Output/Turn                | 954                    |
+| Token Efficiency (out/in)      | 0.198                  |
+| Net Cost (with Cache Discount) | $0.00330 (39.2% saved) |
 
 ## Tool Usage
 
-| Metric            | Value                          |
-| ----------------- | ------------------------------ |
-| Total Tool Calls  | 2                              |
-| Unique Tools Used | apply_diff, attempt_completion |
-| Redundant Reads   | 0                              |
-| Failed Tool Calls | 0                              |
+| Metric            | Value                                              |
+| ----------------- | -------------------------------------------------- |
+| Total Tool Calls  | 5                                                  |
+| Unique Tools Used | write_to_file, execute_command, attempt_completion |
+| Redundant Reads   | 0                                                  |
+| Failed Tool Calls | 0                                                  |
 
 ### Tool Call Breakdown
 
 | Tool               | Count |
 | ------------------ | ----- |
-| apply_diff         | 1     |
+| execute_command    | 3     |
+| write_to_file      | 1     |
 | attempt_completion | 1     |
 
 ## Latency
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 9.9s  |
-| Avg per Turn  | 4.9s  |
-| Fastest Turn  | 2.3s  |
-| Slowest Turn  | 7.6s  |
+| Total Latency | 93.8s |
+| Avg per Turn  | 18.8s |
+| Fastest Turn  | 2.7s  |
+| Slowest Turn  | 54.8s |
 
 ## Reasoning
 
 | Metric                   | Value |
 | ------------------------ | ----- |
-| Turns with Reasoning     | 0 / 2 |
+| Turns with Reasoning     | 0 / 5 |
 | Avg Reasoning Chars/Turn | 0     |
 
 ## Behavioral Signals
 
-- ✅ Excellent turn efficiency — completed in 2 turn(s)
+- 🏆 SOTA Benchmark Grade: Frontier (A) (82/100)
 - 🧠 No reasoning detected — model may not be using thinking mode

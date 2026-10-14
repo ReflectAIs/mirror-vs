@@ -304,14 +304,6 @@
 				"when": "activeWebviewPanelId == 'mirror-vs.TabPanelProvider' || focusedView == 'mirror-vs.SidebarProvider'"
 			},
 			{
-				"command": "mirror-vs.newSession",
-				"key": "ctrl+shift+n",
-				"mac": "cmd+shift+n",
-				"win": "ctrl+shift+n",
-				"linux": "ctrl+shift+n",
-				"when": "activeWebviewPanelId == 'mirror-vs.TabPanelProvider' || focusedView == 'mirror-vs.SidebarProvider'"
-			},
-			{
 				"command": "mirror-vs.closeTab",
 				"key": "ctrl+w",
 				"mac": "cmd+w",

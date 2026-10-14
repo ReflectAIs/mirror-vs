@@ -13,7 +13,6 @@ import { vscode } from "../utils/vscode"
  *
  * Shortcuts:
  *   - Cmd/Ctrl+N or Cmd/Ctrl+T → new tab  (newTask with empty text)
- *   - Cmd/Ctrl+Shift+N    → new session (clearTask)
  *   - Cmd/Ctrl+W          → close active tab (closeTaskTab)
  *
  * @param activeTabId - The currently active task's id, used to close a tab.
@@ -30,18 +29,10 @@ export function useShortcutKeys(activeTabId: string) {
 
 			const key = event.key.toLowerCase()
 
-			// Cmd/Ctrl+Shift+N — new session
-			if (event.shiftKey && key === "n") {
-				event.preventDefault()
-				event.stopPropagation()
-				vscode.postMessage({ type: "clearTask" })
-				return
-			}
-
 			// Cmd/Ctrl+N or Cmd/Ctrl+T — new tab
 			// (T mirrors the browser-style "new tab" shortcut; without this,
 			// Cmd+T falls through to VS Code's native "Go to Symbol in Workspace")
-			if (key === "n" || key === "t") {
+			if (!event.shiftKey && (key === "n" || key === "t")) {
 				event.preventDefault()
 				event.stopPropagation()
 				vscode.postMessage({ type: "newTask", text: "", images: [] })

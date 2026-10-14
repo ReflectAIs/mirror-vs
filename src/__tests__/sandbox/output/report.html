@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mirror VS — Sandbox Test Report</title>
+<title>Mirror VS — SOTA Benchmark & Sandbox Test Report</title>
 <style>
-:root{--bg:#0f0f13;--surface:#1a1a24;--surface2:#22222e;--border:#2a2a3a;--text:#e2e2f0;--muted:#888899;--accent:#7c6ff7;--pass:#10b981;--fail:#ef4444}
+:root{--bg:#0f0f13;--surface:#1a1a24;--surface2:#22222e;--border:#2a2a3a;--text:#e2e2f0;--muted:#888899;--accent:#7c6ff7;--pass:#10b981;--fail:#ef4444;--sota:#10b981}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh}
 .header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);padding:40px 32px;border-bottom:1px solid var(--border)}
-.header h1{font-size:28px;font-weight:700;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header h1{font-size:28px;font-weight:700;background:linear-gradient(90deg,#a78bfa,#60a5fa,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .header .subtitle{color:var(--muted);margin-top:6px;font-size:14px}
 .header .model-chip{display:inline-block;background:#7c6ff720;border:1px solid #7c6ff740;color:#a78bfa;padding:4px 12px;border-radius:20px;font-size:12px;margin-top:12px}
 .summary-bar{display:flex;gap:20px;padding:20px 32px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -45,18 +45,19 @@ tr:hover td{background:var(--surface2)}
 </head>
 <body>
 <div class="header">
-  <h1>🔬 Mirror VS Sandbox Test Report</h1>
-  <div class="subtitle">AI model performance across coding tasks — basic to advanced</div>
+  <h1>🏆 Mirror VS — SOTA Competitive Benchmark</h1>
+  <div class="subtitle">Benchmarked against Gemini Antigravity, Claude Code, Cursor, and Cline standards</div>
   <div class="model-chip">🤖 deepseek-v4-flash-0731</div>
 </div>
 <div class="summary-bar">
   <div class="summary-stat"><div class="val">1</div><div class="lbl">Total Scenarios</div></div>
   <div class="summary-stat"><div class="val pass-val">1</div><div class="lbl">Passed ✅</div></div>
   <div class="summary-stat"><div class="val fail-val">0</div><div class="lbl">Failed ❌</div></div>
-  <div class="summary-stat"><div class="val">100%</div><div class="lbl">Pass Rate</div></div>
-  <div class="summary-stat"><div class="val">9.9s</div><div class="lbl">Total Time</div></div>
-  <div class="summary-stat"><div class="val">9k</div><div class="lbl">Total Tokens</div></div>
-  <div class="summary-stat"><div class="val">$0.0013</div><div class="lbl">Est. Cost</div></div>
+  <div class="summary-stat"><div class="val" style="color:#a78bfa">82/100</div><div class="lbl">Avg Score</div></div>
+  <div class="summary-stat"><div class="val" style="color:#34d399">43.5%</div><div class="lbl">Global Cache Hit %</div></div>
+  <div class="summary-stat"><div class="val">93.8s</div><div class="lbl">Total Latency</div></div>
+  <div class="summary-stat"><div class="val">29k</div><div class="lbl">Total Tokens</div></div>
+  <div class="summary-stat"><div class="val" style="color:#10b981">$0.0033</div><div class="lbl">Net Cost (Discounted)</div></div>
 </div>
 <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
 <div class="section-title">Scenario Results</div>
@@ -64,26 +65,29 @@ tr:hover td{background:var(--surface2)}
 <div class="card card-pass">
   <div class="card-header">
     <div>
-      <div class="card-title">mirror_fix_repetition_detector</div>
+      <div class="card-title">long_output_generator</div>
       <div class="card-model">deepseek-v4-flash-0731</div>
     </div>
-    <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#38bdf820;color:#38bdf8;border:1px solid #38bdf840">Frontier (A) (82)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
   </div>
   
   <div class="stats-grid">
-    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
-    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">43.5%</div><div class="stat-label">Cache Hit Rate</div></div>
     <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
-    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Errors</div></div>
-    <div class="stat"><div class="stat-value">9.9s</div><div class="stat-label">Time</div></div>
-    <div class="stat"><div class="stat-value">$0.00126</div><div class="stat-label">Cost</div></div>
+    <div class="stat"><div class="stat-value">93.8s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00330</div><div class="stat-label">Cost (-39%)</div></div>
   </div>
   <div class="tokens-row">
-    <span>🔢 6,963 in / 1,888 out</span>
-    <span>Efficiency: 0.271</span>
+    <span>🔢 24,112 in (10,496 cached) / 4,768 out</span>
+    <span>Efficiency: 0.198</span>
   </div>
-  <div class="tools-row"><span class="tool-badge">apply_diff: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
-  <div class="signals"><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+  <div class="tools-row"><span class="tool-badge">execute_command: 3</span><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: Frontier (A) (82/100)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
 </div></div>
 <div class="section-title">Summary Table</div>
 <table>
@@ -92,17 +96,20 @@ tr:hover td{background:var(--surface2)}
   </thead>
   <tbody>
 <tr>
-  <td style="font-family:monospace;color:#c4b5fd">mirror_fix_repetition_detector</td>
+  <td style="font-family:monospace;color:#c4b5fd">long_output_generator</td>
+  <td><b>Frontier (A)</b></td>
+  <td>82</td>
   <td><span style="color:#10b981">✅</span></td>
-  <td>2</td>
-  <td>2</td>
+  <td>43.5%</td>
+  <td>5</td>
+  <td>5</td>
   <td>0</td>
-  <td>6,963</td>
-  <td>1,888</td>
-  <td>9.9s</td>
-  <td>$0.00126</td>
+  <td>24,112</td>
+  <td>4,768</td>
+  <td>93.8s</td>
+  <td>$0.00330</td>
 </tr></tbody>
 </table>
-<div class="ts">Generated 2026-10-13T02:52:17.644Z · Mirror VS Sandbox</div>
+<div class="ts">Generated 2026-10-14T15:02:04.707Z · Mirror VS Sandbox</div>
 </body>
 </html>

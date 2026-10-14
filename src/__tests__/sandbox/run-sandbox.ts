@@ -61,8 +61,10 @@ async function runSingleScenario(
 
 		// Print live summary
 		console.log(
-			`  ✓ Turns: ${report.totalTurns} | Tools: ${report.totalToolCalls} | ` +
-				`Tokens: ${report.totalInputTokens}in/${report.totalOutputTokens}out | ` +
+			`  ✓ [${report.grade}] Score: ${report.score}/100 | ` +
+				`Cache Hit: ${report.cacheHitRate.toFixed(1)}% (-${report.cacheSavingsPercent.toFixed(0)}% cost) | ` +
+				`Turns: ${report.totalTurns} | Tools: ${report.totalToolCalls} | ` +
+				`Tokens: ${report.totalInputTokens}in (${report.totalCachedTokens} cached)/${report.totalOutputTokens}out | ` +
 				`Time: ${(report.totalLatencyMs / 1000).toFixed(1)}s | ` +
 				`${report.completed ? "✅ Complete" : "❌ Incomplete"}`,
 		)
@@ -162,6 +164,11 @@ async function main() {
 				totalReasoningChars: 0,
 				turnsWithReasoning: 0,
 				avgReasoningCharsPerTurn: 0,
+				grade: "Failed (F)",
+				score: 0,
+				totalCachedTokens: 0,
+				cacheHitRate: 0,
+				cacheSavingsPercent: 0,
 				signals: [`❌ Scenario crashed: ${e.message}`],
 			})
 		}

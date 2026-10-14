@@ -1,0 +1,77 @@
+{
+	"scenarioName": "complex_state_machine_audit",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.\n- NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.\n- IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-4tJQI5\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/workerQueue.ts\n```\nexport type JobStatus = \"PENDING\" | \"RUNNING\" | \"COMPLETED\" | \"FAILED\" | \"CANCELLED\" | \"TIMED_OUT\"\n\nexport interface Job<T> {\n  id: string\n  data: T\n  status: JobStatus\n  leaseExpiresAt: number\n}\n\nexport class DistributedWorkerQueue<T> {\n  private jobs = new Map<string, Job<T>>()\n  private timers = new Map<string, NodeJS.Timeout>()\n  private leaseDurationMs: number\n\n  constructor(leaseDurationMs = 5000) {\n    this.leaseDurationMs = leaseDurationMs\n  }\n\n  submitJob(id: string, data: T): Job<T> {\n    const job: Job<T> = {\n      id,\n      data,\n      status: \"PENDING\",\n      leaseExpiresAt: 0,\n    }\n    this.jobs.set(id, job)\n    return job\n  }\n\n  startJob(id: string): Job<T> | null {\n    const job = this.jobs.get(id)\n    if (!job || job.status !== \"PENDING\") return null\n    job.status = \"RUNNING\"\n    job.leaseExpiresAt = Date.now() + this.leaseDurationMs\n\n    // Start heartbeat lease renewal\n    const timer = setInterval(() => {\n      this.renewLease(id)\n    }, Math.floor(this.leaseDurationMs / 2))\n    this.timers.set(id, timer)\n    return job\n  }\n\n  // BUG 1: Race condition — does not check if job was cancelled or already timed out\n  renewLease(id: string): boolean {\n    const job = this.jobs.get(id)\n    if (!job) return false\n    job.leaseExpiresAt = Date.now() + this.leaseDurationMs\n    return true\n  }\n\n  // BUG 2: Memory leak — does not clear interval timer on completion or cancellation\n  completeJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) job.status = \"COMPLETED\"\n  }\n\n  cancelJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) job.status = \"CANCELLED\"\n  }\n\n  isLeaseValid(id: string): boolean {\n    const job = this.jobs.get(id)\n    if (!job || job.status !== \"RUNNING\") return false\n    return Date.now() < job.leaseExpiresAt\n  }\n}\n\n```\n\n### package.json\n```\n{\n  \"name\": \"distributed-queue\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1791989987355,
+			"responseTimestamp": 1791989994724,
+			"latencyMs": 7369.117749999999,
+			"timeToFirstTokenMs": 7369.117749999999,
+			"inputTokens": 2220,
+			"outputTokens": 1183,
+			"totalTokens": 3403,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00064204,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "src/workerQueue.ts",
+						"diff": "<<<<<<< SEARCH\n  // BUG 1: Race condition — does not check if job was cancelled or already timed out\n  renewLease(id: string): boolean {\n    const job = this.jobs.get(id)\n    if (!job) return false\n    job.leaseExpiresAt = Date.now() + this.leaseDurationMs\n    return true\n  }\n\n  // BUG 2: Memory leak — does not clear interval timer on completion or cancellation\n  completeJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) job.status = \"COMPLETED\"\n  }\n\n  cancelJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) job.status = \"CANCELLED\"\n  }\n=======\n  // BUG 1 FIXED: Only renew if the job is RUNNING and its lease has not expired.\n  // If the lease expired or the job is in any other state, abort renewal, mark\n  // the job TIMED_OUT (unless already CANCELLED/COMPLETED), clear the timer, and return false.\n  renewLease(id: string): boolean {\n    const job = this.jobs.get(id)\n    if (!job) return false\n    if (job.status !== \"RUNNING\" || Date.now() >= job.leaseExpiresAt) {\n      if (job.status !== \"CANCELLED\" && job.status !== \"COMPLETED\") {\n        job.status = \"TIMED_OUT\"\n      }\n      this.clearJobTimer(id)\n      return false\n    }\n    job.leaseExpiresAt = Date.now() + this.leaseDurationMs\n    return true\n  }\n\n  // BUG 2 FIXED: Always clear the interval timer on completion to prevent memory leaks.\n  completeJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) {\n      job.status = \"COMPLETED\"\n      this.clearJobTimer(id)\n    }\n  }\n\n  // BUG 2 FIXED: Always clear the interval timer on cancellation to prevent memory leaks.\n  cancelJob(id: string): void {\n    const job = this.jobs.get(id)\n    if (job) {\n      job.status = \"CANCELLED\"\n      this.clearJobTimer(id)\n    }\n  }\n\n  // Helper: clears and removes the heartbeat interval timer for a job, if any.\n  clearJobTimer(id: string): void {\n    const timer = this.timers.get(id)\n    if (timer) {\n      clearInterval(timer)\n      this.timers.delete(id)\n    }\n  }\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to src/workerQueue.ts.",
+					"durationMs": 0.6068749999994907,
+					"timestamp": 1791989994725
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1791989994725,
+			"responseTimestamp": 1791989997551,
+			"latencyMs": 2826.065375,
+			"timeToFirstTokenMs": 2826.065375,
+			"inputTokens": 3428,
+			"outputTokens": 392,
+			"totalTokens": 3820,
+			"cachedTokens": 256,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00057176,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Fixed both concurrency defects in `src/workerQueue.ts`:\n\n1. **`renewLease` race condition** — Now only renews the lease when `job.status === \"RUNNING\"` AND `Date.now() < job.leaseExpiresAt`. If the lease has expired or the job is in any other state, it aborts renewal, sets the status to `\"TIMED_OUT\"` (unless already `CANCELLED`/`COMPLETED`), clears the timer, and returns `false`.\n\n2. **Timer leak in `completeJob`/`cancelJob`** — Both methods now call the new `clearJobTimer(id)` helper to clear the interval timer and delete its key from `this.timers`, preventing memory leaks.\n\n3. **Added `clearJobTimer(id: string): void`** — Helper that clears the stored interval timer (if present) and removes the key from the `timers` map."
+					},
+					"result": "[TASK_COMPLETED] Fixed both concurrency defects in `src/workerQueue.ts`:\n\n1. **`renewLease` race condition** — Now only renews the lease when `job.status === \"RUNNING\"` AND `Date.now() < job.leaseExpiresAt`. If the lease has expired or the job is in any other state, it aborts renewal, sets the status to `\"TIMED_OUT\"` (unless already `CANCELLED`/`COMPLETED`), clears the timer, and returns `false`.\n\n2. **Timer leak in `completeJob`/`cancelJob`** — Both methods now call the new `clearJobTimer(id)` helper to clear the interval timer and delete its key from `this.timers`, preventing memory leaks.\n\n3. **Added `clearJobTimer(id: string): void`** — Helper that clears the stored interval timer (if present) and removes the key from the `timers` map.",
+					"durationMs": 0.0522080000009737,
+					"timestamp": 1791989997552
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 10196.546250000001,
+	"totalInputTokens": 5648,
+	"totalOutputTokens": 1575,
+	"totalToolCalls": 2,
+	"totalCachedTokens": 256,
+	"totalCacheWriteTokens": 0,
+	"overallCacheHitRate": 4.5,
+	"totalCost": 0.0012138000000000001,
+	"completed": true
+}

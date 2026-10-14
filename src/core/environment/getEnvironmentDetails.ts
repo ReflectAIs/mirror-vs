@@ -19,7 +19,16 @@ import { Task } from "../task/Task"
 import { formatReminderSection } from "./reminder"
 import { buildWorkspacePulse } from "./workspacePulse"
 
-export async function getEnvironmentDetails(mirror: Task, includeFileDetails: boolean = false, modeSlug?: string) {
+export interface EnvironmentDetailsOptions {
+	isIntermediateTurn?: boolean
+}
+
+export async function getEnvironmentDetails(
+	mirror: Task,
+	includeFileDetails: boolean = false,
+	modeSlug?: string,
+	options?: EnvironmentDetailsOptions,
+) {
 	let details = ""
 	let volatileDetails = ""
 
@@ -31,19 +40,27 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 	const { id: modelId } = mirror.api.getModel()
 	const effectiveMode = modeSlug ?? mode ?? defaultModeSlug
 
+	// On intermediate turns, the model already has the static environment details
+	// (mode, file tree, open tabs, visible files, time) in its prefix cache.
+	// Skipping redundant re-generation saves 500-1,200 tokens per turn and prevents
+	// cache-busting timestamp/tab shifts.
+	const isIntermediate = options?.isIntermediateTurn === true
+
 	// ── SEMI-STATIC BLOCK (cacheable — changes infrequently) ──────────────
 
-	// 1. Current Mode (changes only on mode switch)
-	const modeDetails = await getFullModeDetails(effectiveMode, customModes, customModePrompts, {
-		cwd: mirror.cwd,
-		globalCustomInstructions,
-		language: language ?? formatLanguage(vscode.env.language),
-	})
+	if (!isIntermediate) {
+		// 1. Current Mode (changes only on mode switch)
+		const modeDetails = await getFullModeDetails(effectiveMode, customModes, customModePrompts, {
+			cwd: mirror.cwd,
+			globalCustomInstructions,
+			language: language ?? formatLanguage(vscode.env.language),
+		})
 
-	details += `# Current Mode\n`
-	details += `<slug>${effectiveMode}</slug>\n`
-	details += `<name>${modeDetails.name}</name>\n`
-	details += `<model>${modelId}</model>\n`
+		details += `# Current Mode\n`
+		details += `<slug>${effectiveMode}</slug>\n`
+		details += `<name>${modeDetails.name}</name>\n`
+		details += `<model>${modelId}</model>\n`
+	}
 
 	// 2. Workspace File Tree (semi-static — changes on file create/delete)
 	if (includeFileDetails) {
@@ -74,39 +91,41 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 	}
 
 	// 3. VSCode Visible Files (semi-static)
-	const visibleFilePaths = vscode.window.visibleTextEditors
-		?.map((editor) => editor.document?.uri?.fsPath)
-		.filter(Boolean)
-		.map((absolutePath) => path.relative(mirror.cwd, absolutePath))
-		.slice(0, maxWorkspaceFiles)
+	if (!isIntermediate) {
+		const visibleFilePaths = vscode.window.visibleTextEditors
+			?.map((editor) => editor.document?.uri?.fsPath)
+			.filter(Boolean)
+			.map((absolutePath) => path.relative(mirror.cwd, absolutePath))
+			.slice(0, maxWorkspaceFiles)
 
-	const allowedVisibleFiles = mirror.mirrorIgnoreController
-		? mirror.mirrorIgnoreController.filterPaths(visibleFilePaths)
-		: visibleFilePaths.map((p) => p.toPosix()).join("\n")
+		const allowedVisibleFiles = mirror.mirrorIgnoreController
+			? mirror.mirrorIgnoreController.filterPaths(visibleFilePaths)
+			: visibleFilePaths.map((p) => p.toPosix()).join("\n")
 
-	if (allowedVisibleFiles) {
-		details += "\n\n# VSCode Visible Files"
-		details += `\n${allowedVisibleFiles}`
-	}
+		if (allowedVisibleFiles) {
+			details += "\n\n# VSCode Visible Files"
+			details += `\n${allowedVisibleFiles}`
+		}
 
-	// 4. VSCode Open Tabs (semi-static)
-	const { maxOpenTabsContext } = state ?? {}
-	const maxTabs = maxOpenTabsContext ?? 20
-	const openTabPaths = vscode.window.tabGroups.all
-		.flatMap((group) => group.tabs)
-		.filter((tab) => tab.input instanceof vscode.TabInputText)
-		.map((tab) => (tab.input as vscode.TabInputText).uri.fsPath)
-		.filter(Boolean)
-		.map((absolutePath) => path.relative(mirror.cwd, absolutePath).toPosix())
-		.slice(0, maxTabs)
+		// 4. VSCode Open Tabs (semi-static)
+		const { maxOpenTabsContext } = state ?? {}
+		const maxTabs = maxOpenTabsContext ?? 20
+		const openTabPaths = vscode.window.tabGroups.all
+			.flatMap((group) => group.tabs)
+			.filter((tab) => tab.input instanceof vscode.TabInputText)
+			.map((tab) => (tab.input as vscode.TabInputText).uri.fsPath)
+			.filter(Boolean)
+			.map((absolutePath) => path.relative(mirror.cwd, absolutePath).toPosix())
+			.slice(0, maxTabs)
 
-	const allowedOpenTabs = mirror.mirrorIgnoreController
-		? mirror.mirrorIgnoreController.filterPaths(openTabPaths)
-		: openTabPaths.map((p) => p.toPosix()).join("\n")
+		const allowedOpenTabs = mirror.mirrorIgnoreController
+			? mirror.mirrorIgnoreController.filterPaths(openTabPaths)
+			: openTabPaths.map((p) => p.toPosix()).join("\n")
 
-	if (allowedOpenTabs) {
-		details += "\n\n# VSCode Open Tabs"
-		details += `\n${allowedOpenTabs}`
+		if (allowedOpenTabs) {
+			details += "\n\n# VSCode Open Tabs"
+			details += `\n${allowedOpenTabs}`
+		}
 	}
 
 	// 5. Recently Modified Files (semi-static — changes on edit)
@@ -137,7 +156,7 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 			gitStatus: sharedGitStatus,
 		})
 		details += pulse
-	} else {
+	} else if (!isIntermediate) {
 		details += `\n\n# Workspace Pulse\n(Use \`get_workspace_pulse\` for live project health data — diagnostics, git branch, terminals, recent changes.)`
 	}
 
@@ -245,7 +264,7 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 	// 10. Current Time (Date & Timezone - stabilized across turns for prompt caching)
 	const { includeCurrentTime = true } = state ?? {}
 
-	if (includeCurrentTime) {
+	if (!isIntermediate && includeCurrentTime) {
 		const now = new Date()
 		const dateStr = now.toISOString().split("T")[0] // YYYY-MM-DD
 		const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -274,6 +293,14 @@ export async function getEnvironmentDetails(mirror: Task, includeFileDetails: bo
 			? state.apiConfiguration.todoListEnabled
 			: true
 	const reminderSection = todoListEnabled ? formatReminderSection(mirror.todoList) : ""
+
+	if (isIntermediate) {
+		const combined = `${volatileDetails.trim()}\n${reminderSection}`.trim()
+		if (!combined) {
+			return ""
+		}
+		return `<environment_details>\n${combined}\n</environment_details>`
+	}
 
 	return `<environment_details>\n${details.trim()}\n${reminderSection}\n</environment_details>`
 }

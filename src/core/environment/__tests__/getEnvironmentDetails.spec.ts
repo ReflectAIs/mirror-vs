@@ -493,4 +493,43 @@ describe("getEnvironmentDetails", () => {
 		expect(getGitStatus).toHaveBeenCalledTimes(1)
 		expect(getGitStatus).toHaveBeenCalledWith(mockCwd, 10)
 	})
+
+	it("should return empty string on intermediate turns when there are no volatile updates or reminders", async () => {
+		mockProvider.getState.mockResolvedValue({
+			...mockState,
+			apiConfiguration: { todoListEnabled: false },
+		})
+
+		const result = await getEnvironmentDetails(mockMirror as Task, false, undefined, { isIntermediateTurn: true })
+		expect(result).toBe("")
+	})
+
+	it("should return only volatile details on intermediate turns when terminals have active or completed output", async () => {
+		mockProvider.getState.mockResolvedValue({
+			...mockState,
+			apiConfiguration: { todoListEnabled: false },
+		})
+		;(TerminalRegistry.getTerminals as Mock).mockImplementation((active: boolean) => {
+			if (!active) {
+				return [
+					{
+						id: 1,
+						getCurrentWorkingDirectory: () => "/test/path",
+						getProcessesWithOutput: () => [
+							{ command: "npm test", getUnretrievedOutput: () => "PASS src/index.test.ts" },
+						],
+						cleanCompletedProcessQueue: vi.fn(),
+					},
+				]
+			}
+			return []
+		})
+
+		const result = await getEnvironmentDetails(mockMirror as Task, false, undefined, { isIntermediateTurn: true })
+		expect(result).toContain("<environment_details>")
+		expect(result).toContain("PASS src/index.test.ts")
+		expect(result).not.toContain("# Current Mode")
+		expect(result).not.toContain("# Current Time")
+		expect(result).not.toContain("# Workspace Pulse")
+	})
 })

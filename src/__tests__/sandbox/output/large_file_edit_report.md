@@ -15,12 +15,12 @@
 
 | Metric                    | Value    |
 | ------------------------- | -------- |
-| Total Input Tokens        | 3,689    |
-| Total Output Tokens       | 209      |
-| Avg Input/Turn            | 1,845    |
-| Avg Output/Turn           | 105      |
-| Token Efficiency (out/in) | 0.057    |
-| Estimated Cost            | $0.00043 |
+| Total Input Tokens        | 3,918    |
+| Total Output Tokens       | 198      |
+| Avg Input/Turn            | 1,959    |
+| Avg Output/Turn           | 99       |
+| Token Efficiency (out/in) | 0.051    |
+| Estimated Cost            | $0.00045 |
 
 ## Tool Usage
 
@@ -42,10 +42,10 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 1.8s  |
-| Avg per Turn  | 0.9s  |
-| Fastest Turn  | 0.8s  |
-| Slowest Turn  | 0.9s  |
+| Total Latency | 15.6s |
+| Avg per Turn  | 7.8s  |
+| Fastest Turn  | 4.8s  |
+| Slowest Turn  | 10.8s |
 
 ## Reasoning
 

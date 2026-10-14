@@ -511,7 +511,10 @@ export class TaskMainLoop {
 				}
 			}
 
-			const environmentDetails = await getEnvironmentDetails(this.task, currentIncludeFileDetails, currentMode)
+			const isIntermediateTurn = !currentIncludeFileDetails && this.task.apiConversationHistory.length > 0
+			const environmentDetails = await getEnvironmentDetails(this.task, currentIncludeFileDetails, currentMode, {
+				isIntermediateTurn,
+			})
 
 			// Remove any existing environment_details blocks before adding fresh ones.
 			// This prevents duplicate environment details when resuming tasks,
@@ -530,9 +533,12 @@ export class TaskMainLoop {
 				return true
 			})
 
-			// Add environment details as its own text block, separate from tool
+			// Add environment details as its own text block (only if non-empty), separate from tool
 			// results.
-			let finalUserContent = [...contentWithoutEnvDetails, { type: "text" as const, text: environmentDetails }]
+			let finalUserContent = [
+				...contentWithoutEnvDetails,
+				...(environmentDetails ? [{ type: "text" as const, text: environmentDetails }] : []),
+			]
 			// Only add user message to conversation history if:
 			// 1. This is the first attempt (retryAttempt === 0), AND
 			// 2. The original userContent was not empty (empty signals delegation resume where
