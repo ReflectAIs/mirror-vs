@@ -17,6 +17,12 @@ All notable changes to the "Mirror VS" extension will be documented in this file
 - **SOTA Frontier Benchmark Suite**:
     - Added high-difficulty real-world stress test scenarios: `long_log_diagnostics` (1,000+ line compilation log), `massive_multi_module_migration` (8-file architectural refactor), `complex_state_machine_audit` (concurrency races & timer leaks), and `long_output_generator` (exhaustive protocol test suite).
     - Added automated SOTA grading (A+ / Frontier A / Competent B) and cache economy metrics to sandbox analysis and HTML reporting.
+- **Anti-Looping Engine & Active Memory Retention**:
+    - Expanded active turn retention in `pruneHistoricalToolResults` from 3 to 12 turns, preventing premature file folding during multi-file exploration.
+    - Removed loop-inducing prompts (`"Call tool again"`) from historical folded outputs.
+    - Upgraded `ToolRepetitionDetector` to track cyclic loops across periods 2 through 8 (catching 5-step alternating cycles on turn 2 of the repeat) with an expanded 64-call buffer.
+    - Neutralized false failure flags in `SwitchModeTool` when switching to the already active mode, preventing model regression into re-reading.
+    - Added explicit anti-re-reading and loop prevention rules to the system prompt.
 - **Keyboard Shortcut Refinement**:
     - Disabled `Ctrl+Shift+N` / `Cmd+Shift+N` for new session so it no longer hijacks or conflicts with VS Code's native New Window shortcut. (Use `Ctrl/Cmd+N` or `Ctrl/Cmd+T` for new tabs, or the Command Palette for new sessions).
 

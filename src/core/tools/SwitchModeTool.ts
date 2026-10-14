@@ -42,9 +42,10 @@ export class SwitchModeTool extends BaseTool<"switch_mode"> {
 			const currentMode = (await task.providerRef.deref()?.getState())?.mode ?? defaultModeSlug
 
 			if (currentMode === mode_slug) {
-				task.recordToolError("switch_mode")
-				task.didToolFailInCurrentTurn = true
-				pushToolResult(`Already in ${targetMode.name} mode.`)
+				task.consecutiveMistakeCount = 0
+				pushToolResult(
+					`Already in ${targetMode.name} mode. You are ready to proceed with editing and executing tools directly.`,
+				)
 				return
 			}
 

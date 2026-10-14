@@ -633,5 +633,45 @@ describe("ToolRepetitionDetector", () => {
 			expect(result.askUser).toBeDefined()
 			expect(result.askUser?.messageDetail).toContain("Cyclic tool repetition loop detected across 4 tools")
 		})
+
+		it("should detect 5-step cyclic tool loops (A -> B -> C -> D -> E -> A -> B -> C -> D -> E)", () => {
+			const detector = new ToolRepetitionDetector(3)
+			const toolA = createToolUse("read_file", "read_file", { path: "src/App.tsx" })
+			const toolB = createToolUse("read_file", "read_file", { path: "src/Sidebar.tsx" })
+			const toolC = createToolUse("read_file", "read_file", { path: "src/Dashboard.tsx" })
+			const toolD = createToolUse("search_files", "search_files", { path: "src/api" })
+			const toolE = createToolUse("read_file", "read_file", { path: "src/types.ts" })
+
+			// 1st cycle (5 calls)
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+			expect(detector.check(toolC).allowExecution).toBe(true)
+			expect(detector.check(toolD).allowExecution).toBe(true)
+			expect(detector.check(toolE).allowExecution).toBe(true)
+
+			// 2nd cycle: A, B, C, D allowed
+			expect(detector.check(toolA).allowExecution).toBe(true)
+			expect(detector.check(toolB).allowExecution).toBe(true)
+			expect(detector.check(toolC).allowExecution).toBe(true)
+			expect(detector.check(toolD).allowExecution).toBe(true)
+
+			// 10th call completes the 2nd A-B-C-D-E cycle and must be blocked
+			const result = detector.check(toolE)
+			expect(result.allowExecution).toBe(false)
+			expect(result.askUser).toBeDefined()
+			expect(result.askUser?.messageDetail).toContain("Cyclic tool repetition loop detected across 5 tools")
+		})
+
+		it("should allow genuine exploration across many different files without blocking", () => {
+			const detector = new ToolRepetitionDetector(3)
+
+			// Reading 15 different files across a project must be completely allowed
+			for (let i = 1; i <= 15; i++) {
+				const tool = createToolUse("read_file", "read_file", { path: `src/module_${i}.ts` })
+				const res = detector.check(tool)
+				expect(res.allowExecution).toBe(true)
+				expect(res.askUser).toBeUndefined()
+			}
+		})
 	})
 })

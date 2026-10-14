@@ -71,10 +71,9 @@ export class ToolRepetitionDetector {
 			this.previousToolCallJson = currentToolCallJson
 		}
 
-		// Track recent tool calls for cycle detection (e.g. A -> B -> A -> B -> A -> B)
-		// Track recent tool calls for cycle detection (e.g. A -> B -> A -> B or A -> B -> C -> A -> B -> C)
+		// Track recent tool calls for cycle detection (e.g. A -> B -> A -> B or A -> B -> C -> D -> E -> A -> B -> C -> D -> E)
 		this.recentToolCalls.push(currentToolCallJson)
-		if (this.recentToolCalls.length > 16) {
+		if (this.recentToolCalls.length > 64) {
 			this.recentToolCalls.shift()
 		}
 
@@ -118,13 +117,17 @@ export class ToolRepetitionDetector {
 			this.consecutiveIdenticalToolCallLimit > 0 &&
 			this.consecutiveBaseCommandCount >= Math.max(this.consecutiveIdenticalToolCallLimit + 2, 5)
 
-		// Check for repeating cyclic tool loops (periods of 2, 3, or 4 steps)
+		// Check for repeating cyclic tool loops across periods of 2 to 8 steps
+		// (e.g. 5-step cycle: A -> B -> C -> D -> E -> A -> B -> C -> D -> E)
 		let reachedCycle = false
 		let detectedCycleLength = 0
 		if (this.consecutiveIdenticalToolCallLimit > 0) {
 			const n = this.recentToolCalls.length
-			for (const cycleLen of [2, 3, 4]) {
-				const requiredRepeats = cycleLen === 4 ? 2 : 3
+			for (const cycleLen of [2, 3, 4, 5, 6, 7, 8]) {
+				// For longer cycles (>= 4), 2 full identical repeating periods is sufficient to flag a loop
+				// (e.g. 5 tools called identically twice in a row = 10 calls in exact same order).
+				// For short cycles (2 or 3), require 3 periods to prevent premature false positives.
+				const requiredRepeats = cycleLen >= 4 ? 2 : 3
 				const neededCalls = cycleLen * requiredRepeats
 				if (n >= neededCalls) {
 					// Verify that not all elements in the period are identical (handled separately by reachedIdenticalLimit)

@@ -4,18 +4,18 @@ import { ApiMessage } from "../task-persistence/apiMessages"
 export interface PruneHistoricalToolResultsOptions {
 	/**
 	 * Number of recent turns (user/assistant pairs) to keep 100% unpruned in active working memory.
-	 * Default: 3 turns (the last 3 user/assistant exchanges).
+	 * Default: 12 turns (preserves full working context during multi-file exploration and edits).
 	 */
 	keepRecentTurns?: number
 	/**
 	 * Maximum character length for a historical tool result before it is folded.
-	 * Default: 1200 characters (~300 tokens).
+	 * Default: 4000 characters (~1000 tokens).
 	 */
 	maxToolResultChars?: number
 }
 
-const DEFAULT_KEEP_RECENT_TURNS = 3
-const DEFAULT_MAX_TOOL_RESULT_CHARS = 1200
+const DEFAULT_KEEP_RECENT_TURNS = 12
+const DEFAULT_MAX_TOOL_RESULT_CHARS = 4000
 
 /**
  * Prunes large, superseded historical tool results from older conversation turns.
@@ -131,7 +131,7 @@ export function pruneHistoricalToolResults(
 
 			// Keep first 3 lines (e.g. file header or command snippet)
 			const snippetHeader = lines.slice(0, 3).join("\n")
-			const foldedContent = `${snippetHeader}\n\n[... Output folded (${originalLineCount} lines, ${originalCharCount} characters) to conserve context. Call the tool again if full contents are needed ...]`
+			const foldedContent = `${snippetHeader}\n\n[... Historical Output folded (${originalLineCount} lines, ${originalCharCount} characters) to conserve context. Use the information already gathered in previous turns ...]`
 
 			return {
 				...toolResult,
