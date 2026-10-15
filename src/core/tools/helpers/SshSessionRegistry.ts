@@ -1,4 +1,8 @@
 import { ChildProcess, spawn } from "child_process"
+import * as crypto from "crypto"
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
 
 /**
  * Strips ANSI escape sequences from a string.
@@ -9,8 +13,8 @@ function stripAnsi(str: string): string {
 }
 
 /**
- * Common SSH authentication failure patterns detected in output.
- * Used to fail-fast on connection attempts rather than waiting for timeout.
+ * Common SSH authentication/connection failure patterns detected in stderr.
+ * Used to fail-fast on connection attempts.
  */
 const AUTH_FAILURE_PATTERNS = [
 	"permission denied",
@@ -21,194 +25,387 @@ const AUTH_FAILURE_PATTERNS = [
 	"connection refused",
 	"connection closed",
 	"connection reset",
+	"operation timed out",
+	"network is unreachable",
+	"no route to host",
 ]
 
+/**
+ * Resolves the path to the `sshpass` binary, searching standard install locations
+ * (e.g. Homebrew on macOS, Linux paths) if not directly found in PATH.
+ */
+function resolveSshpassBinary(): string {
+	const candidates = ["sshpass", "/opt/homebrew/bin/sshpass", "/usr/local/bin/sshpass", "/usr/bin/sshpass"]
+	for (const candidate of candidates) {
+		if (candidate === "sshpass") {
+			// Will be checked via PATH
+			continue
+		}
+		try {
+			if (fs.existsSync(candidate)) {
+				return candidate
+			}
+		} catch {}
+	}
+	return "sshpass"
+}
+
+/**
+ * Provides an augmented PATH environment including standard Homebrew and local bin paths
+ * so subprocesses can reliably discover binaries like sshpass in macOS GUI/VS Code environments.
+ */
+function getExtendedEnv(extraEnv?: Record<string, string | undefined>): NodeJS.ProcessEnv {
+	const extraPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+	const currentPath = process.env.PATH || ""
+	const pathList = currentPath.split(path.delimiter)
+	for (const p of extraPaths) {
+		if (!pathList.includes(p)) {
+			pathList.unshift(p)
+		}
+	}
+	return {
+		...process.env,
+		PATH: pathList.join(path.delimiter),
+		...extraEnv,
+	}
+}
+
 export class SshSession {
-	private child: ChildProcess
-	private outputBuffer: string = ""
-	private commandPromise: { resolve: (out: string) => void; reject: (err: Error) => void } | null = null
-	private onConnectCallback: { resolve: () => void; reject: (err: Error) => void } | null = null
-	private onOutputCallback: ((chunk: string) => void) | null = null
+	private socketPath: string
+	private currentExecChild: ChildProcess | null = null
 	public isDead = false
 
 	constructor(
 		private host: string,
 		private port: number,
-		password?: string,
+		private password?: string,
 	) {
-		const args = password
-			? ["-p", password, "ssh", "-tt", "-o", "StrictHostKeyChecking=no", host, "-p", String(port)]
-			: ["-tt", "-o", "StrictHostKeyChecking=no", host, "-p", String(port)]
-
-		this.child = spawn(password ? "sshpass" : "ssh", args)
-
-		this.child.stdout?.on("data", (data) => {
-			const str = stripAnsi(data.toString())
-			this.outputBuffer += str
-
-			this.checkAuthFailure()
-
-			// Check for initial connection prompt stabilization if resolving connection
-			if (
-				this.onConnectCallback &&
-				(this.outputBuffer.includes("$") || this.outputBuffer.includes("#") || this.outputBuffer.includes(">"))
-			) {
-				const cb = this.onConnectCallback
-				this.onConnectCallback = null
-				cb.resolve()
+		// Use a secure socket directory with 0700 permissions in os.tmpdir()
+		const socketDir = path.join(os.tmpdir(), "mirror-ssh")
+		try {
+			if (!fs.existsSync(socketDir)) {
+				fs.mkdirSync(socketDir, { recursive: true, mode: 0o700 })
 			}
+		} catch {}
 
-			if (this.commandPromise) {
-				const sentinelIndex = this.outputBuffer.indexOf("__SSH_COMMAND_FINISHED__")
-				if (sentinelIndex !== -1) {
-					const output = this.outputBuffer.slice(0, sentinelIndex)
-					const remainder = this.outputBuffer.slice(sentinelIndex)
+		// Hash host:port for a short, collision-free socket name compliant with macOS 104-byte sun_path limit
+		const hash = crypto.createHash("sha256").update(`${host}:${port}`).digest("hex").slice(0, 16)
+		this.socketPath = path.join(socketDir, `${hash}.sock`)
+	}
 
-					const lines = remainder.split("\n")
-					const exitCodeLine = lines.find((l) => l.includes("__SSH_COMMAND_FINISHED__"))
-					const exitCodeMatch = exitCodeLine?.match(/__SSH_COMMAND_FINISHED__\s+(\d+)/)
-					const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : 0
+	public getSocketPath(): string {
+		return this.socketPath
+	}
 
-					const resolve = this.commandPromise.resolve
-					this.commandPromise = null
-					this.onOutputCallback = null
-					this.outputBuffer = ""
+	/**
+	 * Checks if the OpenSSH master connection is currently running and healthy.
+	 */
+	public async checkAlive(): Promise<boolean> {
+		if (this.isDead || !fs.existsSync(this.socketPath)) {
+			return false
+		}
+		return new Promise<boolean>((resolve) => {
+			const check = spawn(
+				"ssh",
+				[
+					"-O",
+					"check",
+					"-o",
+					`ControlPath=${this.socketPath}`,
+					"-o",
+					"LogLevel=ERROR",
+					"-p",
+					String(this.port),
+					this.host,
+				],
+				{ env: getExtendedEnv() },
+			)
 
-					if (exitCode !== 0) {
-						resolve(output.trim() + `\n[Command exited with code ${exitCode}]`)
-					} else {
-						resolve(output.trim())
-					}
-				} else {
-					if (this.onOutputCallback) {
-						this.onOutputCallback(str)
-					}
+			check.on("close", (code) => {
+				const alive = code === 0
+				if (!alive) {
+					this.isDead = true
 				}
-			}
-		})
-
-		this.child.stderr?.on("data", (data) => {
-			const str = stripAnsi(data.toString())
-			this.outputBuffer += str
-			this.checkAuthFailure()
-			if (this.commandPromise && this.onOutputCallback) {
-				this.onOutputCallback(str)
-			}
-		})
-
-		this.child.on("close", (code, signal) => {
-			this.isDead = true
-			if (this.commandPromise) {
-				const resolve = this.commandPromise.resolve
-				this.commandPromise = null
-				this.onOutputCallback = null
-				resolve(this.outputBuffer.trim() + `\n[SSH Connection Closed unexpectedly with code ${code}]`)
-			}
-			// Reject connection if still pending
-			if (this.onConnectCallback) {
-				const cb = this.onConnectCallback
-				this.onConnectCallback = null
-				cb.reject(new Error(`SSH connection closed unexpectedly (code: ${code})`))
-			}
-		})
-
-		this.child.on("error", (err) => {
-			this.isDead = true
-			if (this.commandPromise) {
-				const resolve = this.commandPromise.resolve
-				this.commandPromise = null
-				this.onOutputCallback = null
-				resolve(this.outputBuffer.trim() + `\n[SSH Process Error: ${err.message}]`)
-			}
-			// Reject connection if still pending
-			if (this.onConnectCallback) {
-				const cb = this.onConnectCallback
-				this.onConnectCallback = null
-				cb.reject(new Error(`SSH process error: ${err.message}`))
-			}
+				resolve(alive)
+			})
+			check.on("error", () => {
+				this.isDead = true
+				resolve(false)
+			})
 		})
 	}
 
 	/**
-	 * Detects authentication/connection failures in the output buffer
-	 * and rejects the connection promise early to avoid hanging.
+	 * Establishes the persistent OpenSSH master multiplexer connection with keepalives.
+	 * If already connected and alive, this is a no-op.
 	 */
-	private checkAuthFailure(): void {
-		if (!this.onConnectCallback) return
-		const lower = this.outputBuffer.toLowerCase()
-		for (const pattern of AUTH_FAILURE_PATTERNS) {
-			if (lower.includes(pattern)) {
-				const cb = this.onConnectCallback
-				this.onConnectCallback = null
-				cb.reject(
-					new Error(
-						`SSH authentication/connection failed: detected "${pattern}" in server response.\n` +
-							`Output: ${this.outputBuffer.slice(0, 500).trim()}`,
-					),
-				)
-				return
-			}
+	public async connect(timeoutMs: number = 15000): Promise<void> {
+		if (await this.checkAlive()) {
+			this.isDead = false
+			return
 		}
-	}
 
-	public waitForConnection(timeoutMs: number = 10000): Promise<void> {
-		return new Promise((resolve, reject) => {
-			this.onConnectCallback = { resolve, reject }
-			setTimeout(() => {
-				if (this.onConnectCallback) {
-					this.onConnectCallback = null
-					resolve() // Fallback to resolve anyway so agent can try running commands
+		// Clean up any stale or orphaned socket file before establishing a new master
+		try {
+			if (fs.existsSync(this.socketPath)) {
+				fs.unlinkSync(this.socketPath)
+			}
+		} catch {}
+
+		return new Promise<void>((resolve, reject) => {
+			let settled = false
+			const timer = setTimeout(() => {
+				if (!settled) {
+					settled = true
+					this.isDead = true
+					reject(
+						new Error(`SSH connection attempt to ${this.host}:${this.port} timed out after ${timeoutMs}ms`),
+					)
 				}
 			}, timeoutMs)
+
+			// Master connection arguments:
+			// -N: do not execute remote command
+			// -f: fork to background once authenticated and master socket established
+			// ControlPersist=1h: keep master tunnel alive in background across idle gaps
+			// ServerAliveInterval=15 & ServerAliveCountMax=3: send keepalive pings every 15s to keep tunnel open
+			const masterArgs = [
+				"-N",
+				"-f",
+				"-o",
+				"ControlMaster=auto",
+				"-o",
+				`ControlPath=${this.socketPath}`,
+				"-o",
+				"ControlPersist=1h",
+				"-o",
+				"ServerAliveInterval=15",
+				"-o",
+				"ServerAliveCountMax=3",
+				"-o",
+				"TCPKeepAlive=yes",
+				"-o",
+				"StrictHostKeyChecking=no",
+				"-o",
+				"UserKnownHostsFile=/dev/null",
+				"-o",
+				"ConnectTimeout=15",
+				"-o",
+				"LogLevel=ERROR",
+				"-p",
+				String(this.port),
+				this.host,
+			]
+
+			let child: ChildProcess
+			let stderrOutput = ""
+
+			if (this.password) {
+				const sshpass = resolveSshpassBinary()
+				child = spawn(sshpass, ["-e", "ssh", ...masterArgs], {
+					env: getExtendedEnv({ SSHPASS: this.password }),
+				})
+			} else {
+				child = spawn("ssh", masterArgs, {
+					env: getExtendedEnv(),
+				})
+			}
+
+			child.stderr?.on("data", (data) => {
+				stderrOutput += stripAnsi(data.toString())
+			})
+
+			child.on("error", (err) => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+				this.isDead = true
+				reject(new Error(`Failed to start SSH process: ${err.message}`))
+			})
+
+			child.on("close", (code) => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+
+				if (code === 0) {
+					this.isDead = false
+					resolve()
+				} else {
+					this.isDead = true
+					const lower = stderrOutput.toLowerCase()
+					for (const pattern of AUTH_FAILURE_PATTERNS) {
+						if (lower.includes(pattern)) {
+							reject(
+								new Error(
+									`SSH authentication/connection failed: detected "${pattern}" in server response.\n` +
+										`Output: ${stderrOutput.trim()}`,
+								),
+							)
+							return
+						}
+					}
+					reject(new Error(`SSH connection failed (code ${code}): ${stderrOutput.trim() || "Unknown error"}`))
+				}
+			})
 		})
 	}
 
-	public executeCommand(
+	/**
+	 * Backwards-compatibility alias for connect.
+	 */
+	public async waitForConnection(timeoutMs: number = 15000): Promise<void> {
+		return this.connect(timeoutMs)
+	}
+
+	/**
+	 * Executes a remote command over the existing OpenSSH multiplexed master connection.
+	 * Runs cleanly without pseudo-terminal echo or sentinel hacks, streaming stdout/stderr
+	 * and capturing the real remote process exit code.
+	 */
+	public async executeCommand(
 		command: string,
-		timeoutMs: number = 60000,
+		timeoutMs: number = 180000,
 		onOutput?: (chunk: string) => void,
 	): Promise<string> {
-		if (this.isDead) {
-			return Promise.resolve("[SSH Session is disconnected]")
+		// Ensure master connection is healthy before executing
+		const isAlive = await this.checkAlive()
+		if (!isAlive) {
+			try {
+				await this.connect()
+			} catch (err: any) {
+				this.isDead = true
+				return `[SSH Session is disconnected: ${err.message}]`
+			}
 		}
-		if (this.commandPromise) {
+
+		if (this.currentExecChild) {
 			return Promise.reject(new Error("Another command is currently running in this SSH session."))
 		}
 
-		return new Promise((resolve, reject) => {
-			this.outputBuffer = ""
-			this.onOutputCallback = onOutput || null
-			this.commandPromise = { resolve, reject }
+		return new Promise((resolve) => {
+			let outputBuffer = ""
+			let settled = false
 
-			// Using a structured execution format that exports non-interactive environment variables and redirects stdin to /dev/null to prevent hanging on TTY progress spinners or interactive prompts
-			const formattedCommand = `(export CI=true TERM=dumb DOCKER_CLI_HINTS=false DEBIAN_FRONTEND=noninteractive; ${command}) </dev/null\necho "__SSH_COMMAND_FINISHED__" $?\n`
-			this.child.stdin?.write(formattedCommand)
+			// Command executes in non-interactive environment with stdin redirected to /dev/null
+			const remoteFormattedCommand = `(export CI=true TERM=dumb DOCKER_CLI_HINTS=false DEBIAN_FRONTEND=noninteractive; ${command}) </dev/null`
 
-			setTimeout(() => {
-				if (this.commandPromise) {
-					const partialOutput = this.outputBuffer
-					this.commandPromise = null
-					this.onOutputCallback = null
-					resolve(partialOutput.trim() + "\n[Command execution timed out after " + timeoutMs + "ms]")
+			const execArgs = [
+				"-o",
+				`ControlPath=${this.socketPath}`,
+				"-o",
+				"LogLevel=ERROR",
+				"-o",
+				"StrictHostKeyChecking=no",
+				"-o",
+				"UserKnownHostsFile=/dev/null",
+				"-p",
+				String(this.port),
+				this.host,
+				remoteFormattedCommand,
+			]
+
+			const child = spawn("ssh", execArgs, {
+				env: getExtendedEnv(),
+				stdio: ["ignore", "pipe", "pipe"],
+			})
+
+			this.currentExecChild = child
+
+			child.stdout?.on("data", (data) => {
+				const str = stripAnsi(data.toString())
+				outputBuffer += str
+				if (onOutput) {
+					onOutput(str)
+				}
+			})
+
+			child.stderr?.on("data", (data) => {
+				const str = stripAnsi(data.toString())
+				outputBuffer += str
+				if (onOutput) {
+					onOutput(str)
+				}
+			})
+
+			const timer = setTimeout(() => {
+				if (!settled) {
+					settled = true
+					this.currentExecChild = null
+					try {
+						child.kill("SIGTERM")
+					} catch {}
+					resolve(outputBuffer.trim() + `\n[Command execution timed out after ${timeoutMs}ms]`)
 				}
 			}, timeoutMs)
+
+			child.on("close", (code) => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+				this.currentExecChild = null
+
+				const trimmed = outputBuffer.trim()
+				if (code !== 0 && code !== null) {
+					resolve(trimmed + `\n[Command exited with code ${code}]`)
+				} else {
+					resolve(trimmed)
+				}
+			})
+
+			child.on("error", (err) => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+				this.currentExecChild = null
+				resolve(outputBuffer.trim() + `\n[SSH Process Error: ${err.message}]`)
+			})
 		})
 	}
 
-	public close() {
-		try {
-			this.child.stdin?.write("exit\n")
-		} catch {}
-		this.child.kill()
+	/**
+	 * Aborts the currently executing remote command without killing the master SSH tunnel.
+	 */
+	public abort(): void {
+		if (this.currentExecChild) {
+			try {
+				this.currentExecChild.kill("SIGINT")
+			} catch {}
+			this.currentExecChild = null
+		}
 	}
 
-	public abort() {
-		if (this.commandPromise) {
-			this.commandPromise = null
-			this.onOutputCallback = null
+	/**
+	 * Closes the SSH session and requests the OpenSSH master daemon to exit cleanly.
+	 */
+	public close(): void {
+		this.isDead = true
+		this.abort()
+
+		if (fs.existsSync(this.socketPath)) {
+			try {
+				spawn(
+					"ssh",
+					[
+						"-O",
+						"exit",
+						"-o",
+						`ControlPath=${this.socketPath}`,
+						"-o",
+						"LogLevel=ERROR",
+						"-p",
+						String(this.port),
+						this.host,
+					],
+					{ env: getExtendedEnv() },
+				)
+			} catch {}
 		}
+
 		try {
-			this.child.stdin?.write("\x03")
+			if (fs.existsSync(this.socketPath)) {
+				fs.unlinkSync(this.socketPath)
+			}
 		} catch {}
 	}
 }
@@ -220,14 +417,14 @@ export class SshSessionRegistry {
 	 * never contain pipes, making parsing unambiguous.
 	 */
 	private static sessions = new Map<string, SshSession>()
+
 	/**
 	 * Caches passwords per host:port so that reconnection after a session
 	 * drops does not require the LLM to re-send the password parameter.
-	 * NOTE: Passwords are NOT isolated per taskId — they are shared across
-	 * tasks connecting to the same host:port so the LLM doesn't need to
-	 * re-authenticate when switching tabs.
+	 * Passwords are shared across tasks connecting to the same host:port.
 	 */
 	private static passwordCache = new Map<string, string>()
+
 	private static makeKey(taskId: string, host: string, port: number): string {
 		return `${taskId}|${host}|${port}`
 	}
@@ -240,27 +437,36 @@ export class SshSessionRegistry {
 	): Promise<SshSession> {
 		const key = this.makeKey(taskId, host, port)
 		const hostPortKey = `${host}:${port}`
-		// Cache the password if provided (LLM may not send it on subsequent calls)
+
+		// Cache password if provided
 		if (password) {
 			this.passwordCache.set(hostPortKey, password)
 		}
 		const resolvedPassword = password || this.passwordCache.get(hostPortKey)
 
 		let session = this.sessions.get(key)
-		if (!session || session.isDead) {
-			// Clean up dead session entry
-			if (session) {
-				this.sessions.delete(key)
+		if (session && !session.isDead) {
+			const alive = await session.checkAlive()
+			if (alive) {
+				return session
 			}
-			session = new SshSession(host, port, resolvedPassword)
-			try {
-				await session.waitForConnection()
-			} catch (err) {
-				this.sessions.delete(key)
-				throw err
-			}
-			this.sessions.set(key, session)
 		}
+
+		// Clean up dead session if present
+		if (session) {
+			session.close()
+			this.sessions.delete(key)
+		}
+
+		session = new SshSession(host, port, resolvedPassword)
+		try {
+			await session.connect()
+		} catch (err) {
+			this.sessions.delete(key)
+			throw err
+		}
+
+		this.sessions.set(key, session)
 		return session
 	}
 
@@ -278,7 +484,6 @@ export class SshSessionRegistry {
 		for (const [key, session] of this.sessions.entries()) {
 			if (!session.isDead) {
 				const parts = key.split("|")
-				// key format: taskId|host|port
 				result.push({ taskId: parts[0], host: parts[1], port: parseInt(parts[2], 10), session })
 			}
 		}
@@ -286,8 +491,7 @@ export class SshSessionRegistry {
 	}
 
 	/**
-	 * Removes all sessions for a given task. Called when a task is closed to
-	 * ensure SSH sessions don't leak across task boundaries.
+	 * Removes all sessions for a given task. Called when a task is closed.
 	 */
 	public static removeSessionsForTask(taskId: string) {
 		for (const [key, session] of this.sessions.entries()) {
