@@ -163,9 +163,10 @@ export class SessionContextManager {
 			lines.push("| Status | Title | Summary |")
 			lines.push("|--------|-------|---------|")
 			for (const sib of siblings) {
-				lines.push(
-					`| ${sib.status} | ${sib.title.replace(/\|/g, "\\|")} | ${(sib.oneLiner ?? "").replace(/\|/g, "\\|")} |`,
-				)
+				const summaryWithId = sib.oneLiner
+					? `${sib.oneLiner.replace(/\|/g, "\\|")} (id: \`${sib.taskId}\`)`
+					: `(id: \`${sib.taskId}\`)`
+				lines.push(`| ${sib.status} | ${sib.title.replace(/\|/g, "\\|")} | ${summaryWithId} |`)
 			}
 		} else {
 			lines.push("")
@@ -177,7 +178,7 @@ export class SessionContextManager {
 		const notesPresent = ctx?.notes?.trim() ? true : false
 		lines.push("")
 		lines.push(
-			`> Shared knowledge notes: ${knowledgeCount}${notesPresent ? " · User notes: present" : ""}. Use the \`read_session_context\` tool to pull full details, knowledge, or notes on demand.`,
+			`> Shared knowledge notes: ${knowledgeCount}${notesPresent ? " · User notes: present" : ""}. Use the \`read_session_context\` tool to inspect any sibling tab's work (via target_task_id), read full knowledge, or broadcast notes to siblings (via share_note).`,
 		)
 
 		return lines.join("\n")
@@ -186,12 +187,108 @@ export class SessionContextManager {
 	// ── Full context (read_session_context tool) ───────────────────────────
 
 	/**
-	 * Returns the full shared context for a session, optionally filtered by scope.
+	 * Explicitly posts a shared knowledge note to the session.
+	 * Immediately available to all sibling tabs via read_session_context.
+	 */
+	public async addKnowledgeNote(
+		sessionId: string,
+		text: string,
+		sourceTaskId?: string,
+	): Promise<SessionKnowledgeNote> {
+		const ctx = await this.getOrCreateContext(sessionId)
+		const note: SessionKnowledgeNote = {
+			id: crypto.randomUUID(),
+			sourceTaskId: sourceTaskId ?? "manual",
+			createdAt: Date.now(),
+			text: text.trim().slice(0, MAX_NOTE_TEXT_LENGTH),
+		}
+
+		ctx.knowledge.unshift(note)
+		if (ctx.knowledge.length > MAX_KNOWLEDGE_NOTES) {
+			ctx.knowledge = ctx.knowledge.slice(0, MAX_KNOWLEDGE_NOTES)
+		}
+		ctx.updatedAt = Date.now()
+		await this.persistAll(await this.getAllContexts())
+		return note
+	}
+
+	/**
+	 * Returns detailed information about a specific sibling tab in the session:
+	 * its prompt/goal, status, todo list, files modified, and latest findings/conclusions.
+	 */
+	public async getSiblingTabDetail(sessionId: string, targetTaskId: string): Promise<string> {
+		const tasks = this.provider.getAllTasksSorted()
+		const task = tasks.find((t) => t.taskId === targetTaskId || t.taskId.startsWith(targetTaskId))
+		if (!task) {
+			return `Sibling tab with ID "${targetTaskId}" not found in current session.`
+		}
+		if (task.sessionId !== sessionId) {
+			return `Task "${targetTaskId}" belongs to a different session.`
+		}
+
+		const taskNames: Record<string, string> = (await this.provider.getValue("taskNames")) || {}
+		const title = taskNames[task.taskId] || task.name || task.metadata.task || `Task #${task.taskNumber}`
+
+		const sections: string[] = []
+		sections.push(`## Sibling Tab Details: ${title} (\`${task.taskId}\`)`)
+		sections.push(`**Status:** ${this.deriveStatus(task)}`)
+
+		// Goal
+		const originalGoal =
+			task.metadata?.task ||
+			task.mirrorMessages?.find((m) => m.type === "say" && (m.say === "user_feedback" || m.say === "text"))?.text
+		if (originalGoal) {
+			sections.push(`### Goal\n${originalGoal.slice(0, 500)}`)
+		}
+
+		// Todo list
+		if (task.todoList && task.todoList.length > 0) {
+			const todos = task.todoList.map((item) => `- [${item.status}] ${item.content}`).join("\n")
+			sections.push(`### Plan & Tasks\n${todos}`)
+		}
+
+		// Modified files
+		if (task.fileEdits && task.fileEdits.length > 0) {
+			const files = Array.from(new Set(task.fileEdits.map((f) => f.path))).slice(0, 15)
+			sections.push(`### Modified Files\n${files.map((f) => `- ${f}`).join("\n")}`)
+		}
+
+		// Latest completion summary or last assistant response
+		const completion = task.mirrorMessages
+			?.filter((m) => m.say === "completion_result" && m.text)
+			.slice(-1)[0]?.text
+		if (completion) {
+			sections.push(`### Findings & Completion Summary\n${completion.slice(0, 1000)}`)
+		} else {
+			const lastAssistantMsg = task.mirrorMessages
+				?.filter((m) => m.type === "say" && m.say === "text" && m.text)
+				.slice(-1)[0]?.text
+			if (lastAssistantMsg) {
+				sections.push(`### Latest Progress / Findings\n${lastAssistantMsg.slice(0, 800)}`)
+			}
+		}
+
+		return sections.join("\n\n")
+	}
+
+	/**
+	 * Returns the full shared context for a session, optionally filtered by scope or target tab.
 	 * Used by the `read_session_context` tool.
 	 */
-	public async getFullContext(sessionId: string, scope: SessionContextScope = "all"): Promise<string> {
+	public async getFullContext(
+		sessionId: string,
+		scope: SessionContextScope = "all",
+		targetTaskId?: string,
+	): Promise<string> {
 		if (!sessionId) {
 			return "No active session — this task is not associated with a session."
+		}
+
+		if (targetTaskId || scope === "tab_detail") {
+			if (targetTaskId) {
+				return this.getSiblingTabDetail(sessionId, targetTaskId)
+			}
+			return "Please provide a target_task_id to inspect a specific sibling tab."
 		}
 
 		const [siblings, ctx] = await Promise.all([
@@ -212,7 +309,7 @@ export class SessionContextManager {
 						siblings
 							.map(
 								(sib) =>
-									`- [${sib.status}] ${sib.title}${sib.isCurrent ? " (current)" : ""}` +
+									`- [${sib.status}] ${sib.title} (ID: \`${sib.taskId}\`)${sib.isCurrent ? " (current)" : ""}` +
 									(sib.oneLiner ? ` — ${sib.oneLiner}` : ""),
 							)
 							.join("\n"),

@@ -77,4 +77,31 @@ describe("readSessionContextTool", () => {
 
 		expect(mockGetFullContext).toHaveBeenCalledWith("", "all")
 	})
+
+	it("passes target_task_id through to getFullContext for deep tab inspection", async () => {
+		const task = makeTask()
+		await readSessionContextTool.execute({ target_task_id: "target-123" }, task as any, callbacks)
+
+		expect(mockGetFullContext).toHaveBeenCalledWith("session-1", "all", "target-123")
+	})
+
+	it("broadcasts shared notes via share_note parameter", async () => {
+		const mockAddKnowledgeNote = vi.fn().mockResolvedValue({ text: "DB is running on port 5433" })
+		const task = {
+			taskId: "source-task-1",
+			sessionId: "session-1",
+			providerRef: {
+				deref: () => ({
+					getSessionContextManager: () => ({
+						addKnowledgeNote: mockAddKnowledgeNote,
+					}),
+				}),
+			},
+		}
+
+		await readSessionContextTool.execute({ share_note: "DB is running on port 5433" }, task as any, callbacks)
+
+		expect(mockAddKnowledgeNote).toHaveBeenCalledWith("session-1", "DB is running on port 5433", "source-task-1")
+		expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("DB is running on port 5433"))
+	})
 })

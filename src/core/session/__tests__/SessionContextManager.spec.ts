@@ -21,6 +21,7 @@ interface MockTask {
 	isStreaming?: boolean
 	isWaitingForFirstChunk?: boolean
 	taskAsk?: { isAnswered?: boolean }
+	fileEdits?: { path: string }[]
 }
 
 /**
@@ -438,6 +439,54 @@ describe("SessionContextManager", () => {
 			const ctx = (await manager.getContext("session-1"))!
 			const goal = ctx.knowledge.find((n) => n.text.startsWith("🎯 Goal:"))!
 			expect(goal.text.length).toBeLessThanOrEqual(1024)
+		})
+	})
+
+	describe("Active Sibling Tab Sharing & Deep Inspection", () => {
+		it("allows explicitly broadcasting a knowledge note via addKnowledgeNote", async () => {
+			const note = await manager.addKnowledgeNote("session-1", "Auth service is on port 4000", "t-1")
+			expect(note.text).toBe("Auth service is on port 4000")
+			expect(note.sourceTaskId).toBe("t-1")
+
+			const fullContext = await manager.getFullContext("session-1", "knowledge")
+			expect(fullContext).toContain("Auth service is on port 4000")
+		})
+
+		it("returns rich details for a sibling tab via getSiblingTabDetail", async () => {
+			const task1 = makeTask({
+				taskId: "t-sibling-1",
+				sessionId: "session-1",
+				metadata: { task: "Migrate user database schema" },
+				todoList: [
+					{ id: "1", content: "Add tenantId column", status: "completed" },
+					{ id: "2", content: "Backfill existing users", status: "in_progress" },
+				],
+				fileEdits: [{ path: "src/db/schema.ts" }],
+				mirrorMessages: [{ say: "completion_result", text: "Successfully migrated schema to version 2" }],
+			})
+			mock.setTasks([task1])
+
+			const detail = await manager.getSiblingTabDetail("session-1", "t-sibling-1")
+			expect(detail).toContain("Sibling Tab Details")
+			expect(detail).toContain("Migrate user database schema")
+			expect(detail).toContain("Add tenantId column")
+			expect(detail).toContain("src/db/schema.ts")
+			expect(detail).toContain("Successfully migrated schema to version 2")
+		})
+
+		it("supports inspecting specific sibling tab via getFullContext with targetTaskId", async () => {
+			const task1 = makeTask({
+				taskId: "t-sibling-2",
+				sessionId: "session-1",
+				metadata: { task: "Implement payment webhook" },
+				todoList: [{ id: "1", content: "Verify HMAC signature", status: "completed" }],
+			})
+			mock.setTasks([task1])
+
+			const result = await manager.getFullContext("session-1", "all", "t-sibling-2")
+			expect(result).toContain("Sibling Tab Details")
+			expect(result).toContain("Implement payment webhook")
+			expect(result).toContain("Verify HMAC signature")
 		})
 	})
 })
