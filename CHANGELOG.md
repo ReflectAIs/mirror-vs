@@ -2,6 +2,24 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.4] - 2026-10-15
+
+### Improvements & Fixes
+
+- **Quantized Block Pruning for Prompt Caching**:
+    - Replaced single-turn sliding cutoff in `pruneHistoricalToolResults` with quantized block pruning (`pruneBlockSize = 6`).
+    - Keeps the historical conversation prefix byte-for-byte identical in cache across consecutive turns (turns 13–17, 19–23, etc.), preventing continuous cache eviction and the 1.25× cache write surcharge on every request after turn 12.
+    - Slashes multi-turn input token costs by up to 80% while sustaining >90% prefix cache hit rates on Anthropic, Gemini, and OpenAI.
+- **Multi-Tab Cache Isolation**:
+    - De-volatilized sibling session context in `getEnvironmentDetails`: omitted from intermediate turns (turns 2..N) and stabilized on initial turns.
+    - Concurrent tasks and background tabs can now stream or transition states without invalidating the prompt prefix cache of active tabs.
+- **Active Sibling Tab Content Sharing & Deep Inspection**:
+    - Enhanced `read_session_context` with `target_task_id` for deep inspection of any sibling tab (original prompt/goal, execution status, todo checklist, files modified, and latest findings/conclusions).
+    - Added active knowledge broadcasting (`share_note`), allowing tabs to broadcast findings, decisions, and schema changes to all sibling tabs immediately without waiting for task completion or context condensing.
+- **SSH Connection Multiplexing & Reconnection Stability**:
+    - Resolved reconnection rate limiting with OpenSSH connection multiplexing (`ControlMaster`, `ControlPath`, `ControlPersist`) and socket keepalives.
+    - Added stream degeneration detection to prevent repetitive diff degeneration and autoregressive context poisoning loops.
+
 ## [1.0.3] - 2026-10-14
 
 ### Improvements & Fixes

@@ -24,14 +24,11 @@ AGENTS.local.md
 
 # Test environment
 .test_env
-.vscode-test/
 
 # Docs
 docs/_site/
 
 # Dotenv
-.env
-.env.*
 !.env.*.sample
 
 # Logging
@@ -62,3 +59,5 @@ temp/
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
+.gitignore
+config.bat
