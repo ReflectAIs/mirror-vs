@@ -173,8 +173,12 @@ export type NativeToolArgs = {
 	get_git_status: { maxFiles?: number }
 	search_mcp_tools: { query?: string }
 	activate_mcp_tool: { server_name: string; tool_name: string }
-	// Session shared context (intersession context sharing)
-	read_session_context: { scope?: "siblings" | "knowledge" | "notes" | "all" }
+	// Session shared context (intersession context sharing & collaboration)
+	read_session_context: {
+		scope?: "siblings" | "knowledge" | "notes" | "all" | "tab_detail"
+		target_task_id?: string
+		share_note?: string
+	}
 	// LSP Code Graph navigation
 	code_graph: {
 		action: "workspace_symbols" | "find_definitions" | "find_references"

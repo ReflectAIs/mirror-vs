@@ -60,6 +60,6 @@ export type SharedSessionContext = z.infer<typeof sharedSessionContextSchema>
 /**
  * Scope filter for the read_session_context tool.
  */
-export const sessionContextScopeSchema = z.enum(["siblings", "knowledge", "notes", "all"]).default("all")
+export const sessionContextScopeSchema = z.enum(["siblings", "knowledge", "notes", "all", "tab_detail"]).default("all")
 
 export type SessionContextScope = z.infer<typeof sessionContextScopeSchema>

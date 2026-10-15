@@ -178,4 +178,65 @@ describe("pruneHistoricalToolResults", () => {
 		expect(toolUseBlock.input.diff).toContain("sanitized to prevent context poisoning")
 		expect(toolUseBlock.input.diff).not.toContain("=======\n=======")
 	})
+
+	it("preserves exact prefix stability across turns using quantized block pruning", () => {
+		const largeContent = "data\n" + "x\n".repeat(100)
+		// Helper to create N turns
+		const createTurns = (n: number): ApiMessage[] => {
+			const msgs: ApiMessage[] = []
+			for (let i = 1; i <= n; i++) {
+				msgs.push({
+					role: "user",
+					content: [{ type: "tool_result", tool_use_id: `t${i}`, content: largeContent }],
+				})
+				msgs.push({
+					role: "assistant",
+					content: `assistant turn ${i}`,
+				})
+			}
+			return msgs
+		}
+
+		// Keep 4 turns, block size 4
+		// Turns 1..4: unpruned
+		const msgs4 = createTurns(4)
+		const res4 = pruneHistoricalToolResults(msgs4, {
+			keepRecentTurns: 4,
+			pruneBlockSize: 4,
+			maxToolResultChars: 50,
+		})
+		expect((res4[0].content as any[])[0].content).toBe(largeContent)
+
+		// Turn 5: excess turns = 1. Math.floor(1/4)*4 = 0 -> still unpruned! Prefix is identical to turn 4!
+		const msgs5 = createTurns(5)
+		const res5 = pruneHistoricalToolResults(msgs5, {
+			keepRecentTurns: 4,
+			pruneBlockSize: 4,
+			maxToolResultChars: 50,
+		})
+		expect((res5[0].content as any[])[0].content).toBe(largeContent)
+
+		// Turn 8: excess turns = 4. Math.floor(4/4)*4 = 4 -> first 4 turns are folded!
+		const msgs8 = createTurns(8)
+		const res8 = pruneHistoricalToolResults(msgs8, {
+			keepRecentTurns: 4,
+			pruneBlockSize: 4,
+			maxToolResultChars: 50,
+		})
+		expect((res8[0].content as any[])[0].content).toContain("Output folded")
+		// Turn 5 (index 8) is NOT folded
+		expect((res8[8].content as any[])[0].content).toBe(largeContent)
+
+		// Turn 9: excess turns = 5. Math.floor(5/4)*4 = 4 -> first 4 turns are STILL folded, turns 5..8 untouched!
+		const msgs9 = createTurns(9)
+		const res9 = pruneHistoricalToolResults(msgs9, {
+			keepRecentTurns: 4,
+			pruneBlockSize: 4,
+			maxToolResultChars: 50,
+		})
+		// Turn 1 is folded identically to turn 8
+		expect((res9[0].content as any[])[0].content).toBe((res8[0].content as any[])[0].content)
+		// Turn 5 is still untouched! Prefix between turn 8 and turn 9 matches!
+		expect((res9[8].content as any[])[0].content).toBe(largeContent)
+	})
 })
