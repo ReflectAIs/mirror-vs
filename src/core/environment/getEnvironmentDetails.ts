@@ -275,11 +275,12 @@ export async function getEnvironmentDetails(
 		volatileDetails += `\n\n# Current Time\nCurrent date: ${dateStr}\nUser time zone: ${timeZone}, UTC${timeZoneOffsetStr}`
 	}
 
-	// 11. Sibling Tabs in Session (volatile — live tab status updates)
-	if (mirror.sessionId && mirrorProvider) {
+	// 11. Sibling Tabs in Session (semi-static overview — deep inspection via read_session_context)
+	// Only injected on initial/non-intermediate turns to prevent cross-tab cache invalidation during multi-tab workflows.
+	if (!isIntermediate && mirror.sessionId && mirrorProvider) {
 		const sessionContext = await mirrorProvider.buildSessionSharedContext(mirror.taskId)
 		if (sessionContext) {
-			volatileDetails += `\n\n${sessionContext}`
+			details += `\n\n${sessionContext}`
 		}
 	}
 
