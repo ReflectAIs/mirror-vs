@@ -12,10 +12,13 @@ export type SerializedCustomToolParameters = z.core.JSONSchema.JSONSchema
 
 /**
  * Context provided to tool execute functions.
+ * Flexible to support custom domain contexts (Figma API, DB connections, HTTP requests, etc.)
+ * as well as VS Code task environments.
  */
 export interface CustomToolContext {
-	mode: string
-	task: TaskLike
+	mode?: string
+	task?: TaskLike
+	[key: string]: unknown
 }
 
 /**
@@ -23,9 +26,9 @@ export interface CustomToolContext {
  *
  * Note: This interface uses simple types to avoid TypeScript performance issues
  * with Zod's complex type inference. For type-safe parameter inference, use
- * the `defineCustomTool` helper function instead of annotating with this interface.
+ * the `defineCustomTool` or `defineTool` helper function instead of annotating with this interface.
  */
-export interface CustomToolDefinition {
+export interface CustomToolDefinition<TArgs = unknown, TContext = unknown> {
 	/**
 	 * The name of the tool.
 	 * This is used to identify the tool in the prompt and in the tool registry.
@@ -48,11 +51,10 @@ export interface CustomToolDefinition {
 	 * The function that executes the tool.
 	 *
 	 * @param args - The validated arguments
-	 * @param context - Execution context with session and message info
-	 * @returns A string result to return to the AI
+	 * @param context - Execution context with session, domain, or message info
+	 * @returns A string result (or Promise of string) to return to the AI
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	execute: (args: any, context: CustomToolContext) => Promise<string>
+	execute: (args: TArgs, context: TContext) => Promise<string> | string
 }
 
 export interface SerializedCustomToolDefinition {
@@ -64,14 +66,17 @@ export interface SerializedCustomToolDefinition {
 
 /**
  * Type-safe definition structure for a custom tool with inferred parameter types.
- * Use this with `defineCustomTool` for full type inference.
+ * Use this with `defineCustomTool` / `defineTool` for full type inference.
  *
  * @template T - The Zod schema type for parameters
+ * @template TContext - Context passed to the execute function
  */
-export interface TypedCustomToolDefinition<T extends CustomToolParametersSchema>
-	extends Omit<CustomToolDefinition, "execute" | "parameters"> {
+export interface TypedCustomToolDefinition<
+	T extends CustomToolParametersSchema = CustomToolParametersSchema,
+	TContext = unknown,
+> extends Omit<CustomToolDefinition<z.infer<T>, TContext>, "execute" | "parameters"> {
 	parameters?: T
-	execute: (args: z.infer<T>, context: CustomToolContext) => Promise<string>
+	execute: (args: z.infer<T>, context: TContext) => Promise<string> | string
 }
 
 /**
@@ -82,9 +87,9 @@ export interface TypedCustomToolDefinition<T extends CustomToolParametersSchema>
  *
  * @example
  * ```ts
- * import { parametersSchema as z, defineCustomTool } from "@mirror-vs/types"
+ * import { parametersSchema as z, defineTool } from "@mirror-vs/types"
  *
- * export default defineCustomTool({
+ * export default defineTool({
  *   name: "add_numbers",
  *   description: "Add two numbers",
  *   parameters: z.object({
@@ -97,8 +102,13 @@ export interface TypedCustomToolDefinition<T extends CustomToolParametersSchema>
  * })
  * ```
  */
-export function defineCustomTool<T extends CustomToolParametersSchema>(
-	definition: TypedCustomToolDefinition<T>,
-): TypedCustomToolDefinition<T> {
+export function defineCustomTool<T extends CustomToolParametersSchema, TContext = unknown>(
+	definition: TypedCustomToolDefinition<T, TContext>,
+): TypedCustomToolDefinition<T, TContext> {
 	return definition
 }
+
+/**
+ * Shorthand alias for `defineCustomTool`.
+ */
+export const defineTool = defineCustomTool

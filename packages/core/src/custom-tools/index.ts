@@ -1,3 +1,5 @@
+export * from "./tool-registry.js"
 export * from "./custom-tool-registry.js"
 export * from "./serialize.js"
 export * from "./format-native.js"
+export { defineTool, defineCustomTool } from "@mirror-vs/types"
