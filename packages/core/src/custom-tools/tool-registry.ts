@@ -124,7 +124,7 @@ export class ToolRegistry {
 			}
 		}
 
-		const result = await tool.execute(parsedArgs, context as never)
+		const result = await tool.execute(parsedArgs, (context ?? {}) as never)
 		return typeof result === "string" ? result : JSON.stringify(result)
 	}
 

@@ -62,12 +62,13 @@ describe("ToolRegistry (Universal / In-Memory)", () => {
 			},
 		}
 
-		const figmaTool = defineTool<{ type: "RECTANGLE" }, FigmaContext>({
+		const schema = z.object({
+			type: z.literal("RECTANGLE"),
+		})
+		const figmaTool = defineTool<typeof schema, FigmaContext>({
 			name: "create_node",
 			description: "Create a node in Figma",
-			parameters: z.object({
-				type: z.literal("RECTANGLE"),
-			}),
+			parameters: schema,
 			async execute({ type }, ctx) {
 				const node = ctx.figma.createRectangle()
 				return `Created ${type} with id ${node.id}`

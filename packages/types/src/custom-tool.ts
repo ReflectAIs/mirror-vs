@@ -28,7 +28,8 @@ export interface CustomToolContext {
  * with Zod's complex type inference. For type-safe parameter inference, use
  * the `defineCustomTool` or `defineTool` helper function instead of annotating with this interface.
  */
-export interface CustomToolDefinition<TArgs = unknown, TContext = unknown> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface CustomToolDefinition<TArgs = any, TContext = any> {
 	/**
 	 * The name of the tool.
 	 * This is used to identify the tool in the prompt and in the tool registry.
@@ -73,7 +74,8 @@ export interface SerializedCustomToolDefinition {
  */
 export interface TypedCustomToolDefinition<
 	T extends CustomToolParametersSchema = CustomToolParametersSchema,
-	TContext = unknown,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	TContext = any,
 > extends Omit<CustomToolDefinition<z.infer<T>, TContext>, "execute" | "parameters"> {
 	parameters?: T
 	execute: (args: z.infer<T>, context: TContext) => Promise<string> | string
@@ -102,7 +104,8 @@ export interface TypedCustomToolDefinition<
  * })
  * ```
  */
-export function defineCustomTool<T extends CustomToolParametersSchema, TContext = unknown>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function defineCustomTool<T extends CustomToolParametersSchema, TContext = any>(
 	definition: TypedCustomToolDefinition<T, TContext>,
 ): TypedCustomToolDefinition<T, TContext> {
 	return definition

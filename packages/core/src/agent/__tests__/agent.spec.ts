@@ -129,9 +129,11 @@ describe("MirrorAgent (Pluggable Domain Agent)", () => {
 
 		const figmaContext: FigmaPluginContext = { figmaNodeCount: 42 }
 
-		const countTool = defineTool<Record<string, unknown>, FigmaPluginContext>({
+		const schema = z.object({})
+		const countTool = defineTool<typeof schema, FigmaPluginContext>({
 			name: "get_node_count",
 			description: "Get current Figma nodes count",
+			parameters: schema,
 			async execute(_args, ctx) {
 				return `Current nodes: ${ctx.figmaNodeCount}`
 			},
