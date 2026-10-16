@@ -6,16 +6,18 @@
 
 ## Why `@mirror-vs/core`?
 
-Traditional AI agent libraries bundle dozens of hardcoded coding tools (`execute_command`, `read_file`, `write_to_file`, `git`, etc.) and system prompts designed exclusively for software engineering.
+Traditional AI agent libraries bundle dozens of hardcoded coding tools (`execute_command`, `read_file`, `write_to_file`, `git`, `apply_diff`, etc.) and multi-thousand-token system prompts designed exclusively for software engineering.
 
-When building an AI assistant for a **Figma Plugin**, a **BI / Data Analytics dashboard**, or an **in-browser Web App**, you don't want terminal commands or file edits. You need:
+When building an AI assistant for a **Figma Plugin**, a **BI / Data Analytics dashboard**, or an **in-browser Web App**, you don't want terminal commands, file edits, or prompt bloat. You need:
 
-1. **100% Pluggable Toolsets**: Only the tools _you_ define exist. Zero unwanted developer tools.
-2. **Zero Native/VS Code Dependencies**: Runs anywhere TypeScript runs — Node.js, Next.js, Vite, Cloudflare Workers, Electron, or Figma's iframe sandbox.
-3. **Dual Runtime Support**:
+1. **Zero Hardcoded Tools & Zero Token Bloat**: Absolutely **no default or pre-bundled tools**. The agent starts with a 100% clean slate. The LLM only receives schemas for tools you explicitly pass in `tools: [...]`. If you pass 2 tools, exactly 2 tool schemas are sent. If you pass 0 tools, zero tool tokens are consumed.
+2. **100% Pluggable Toolsets**: Only the tools _you_ define exist. No developer tools, terminal runners, or filesystem utilities are injected.
+3. **Lean System Prompts**: No 500-line developer instructions or environment dumps. The model only receives the concise `systemPrompt` you provide.
+4. **Zero Native/VS Code Dependencies**: Runs anywhere TypeScript runs — Node.js, Next.js, Vite, Cloudflare Workers, Electron, or Figma's iframe sandbox.
+5. **Dual Runtime Support**:
     - `@mirror-vs/core`: Full Node.js runtime with TypeScript dynamic tool loader & compiler.
     - `@mirror-vs/core/browser`: Ultra-lightweight, 100% in-memory browser-safe build (no `fs`, `path`, `os`, or `child_process`).
-4. **Universal LLM Compatibility**: Works seamlessly with OpenAI (`gpt-4o`, `gpt-4o-mini`), Claude (via OpenRouter or LiteLLM), DeepSeek, Groq, and local models (Ollama, vLLM).
+6. **Universal LLM Compatibility**: Works seamlessly with OpenAI (`gpt-4o`, `gpt-4o-mini`), Claude (via OpenRouter or LiteLLM), DeepSeek, Groq, and local models (Ollama, vLLM).
 
 ---
 
@@ -65,6 +67,32 @@ const agent = createMirrorAgent({
 // 3. Run autonomously
 const response = await agent.run("What's the weather in Tokyo?")
 console.log(response.text)
+```
+
+---
+
+## 🪙 Zero Hardcoded Tools & Token Efficiency
+
+Token consumption directly impacts your latency and API costs. When running agents in production, tool definitions eat up your model's context window.
+
+| Dimension                   | Legacy Coding Agent Frameworks                                                                           | `@mirror-vs/core`                           |
+| :-------------------------- | :------------------------------------------------------------------------------------------------------- | :------------------------------------------ |
+| **Bundled Tools**           | 15 – 30 pre-installed tools (`execute_command`, `read_file`, `write_to_file`, `apply_diff`, `git`, etc.) | **0 hardcoded tools**                       |
+| **Default Token Overhead**  | **1,500 – 3,500 input tokens wasted** on every single request                                            | **0 tokens** (starts empty)                 |
+| **System Prompt Bloat**     | 400+ lines of developer rules & filesystem instructions                                                  | **Only what you pass** in `systemPrompt`    |
+| **Tool Transmitted to LLM** | Everything bundled in the SDK                                                                            | **Strictly tools passed in `tools: [...]`** |
+
+```typescript
+// 1. Pass 0 tools -> LLM receives NO tool schemas (0 token tool tax)
+const conversationalAgent = createMirrorAgent({
+	systemPrompt: "You are a customer support triage bot.",
+})
+
+// 2. Pass 1 domain tool -> LLM receives ONLY that 1 tool schema
+const sqlAgent = createMirrorAgent({
+	systemPrompt: "You are a data assistant.",
+	tools: [querySqlTool], // only query_sql schema is sent!
+})
 ```
 
 ---
@@ -351,16 +379,16 @@ const myTool = defineTool<TArgs, TContext>({
 
 ### `createMirrorAgent(options)` / `new MirrorAgent(options)`
 
-| Option         | Type                                     | Description                                                                                           |
-| -------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `tools`        | `CustomToolDefinition[] \| ToolRegistry` | Array of domain tools or tool registry instance. Defaults to empty (no coding tools).                 |
-| `systemPrompt` | `string`                                 | Base instructions for the agent's persona, domain, and behavior.                                      |
-| `context`      | `TContext`                               | Default contextual object passed to tool handlers (e.g. database handle, API client, Figma instance). |
-| `llm`          | `AgentLlmConfig`                         | LLM configuration (`apiKey`, `model`, `baseURL`, `fetch`, `client`).                                  |
-| `maxSteps`     | `number`                                 | Maximum autonomous tool execution loops (default: `10`).                                              |
-| `onToolCall`   | `(name, args) => void`                   | Lifecycle hook triggered when a tool execution starts.                                                |
-| `onToolResult` | `(name, result) => void`                 | Lifecycle hook triggered when a tool execution finishes.                                              |
-| `onStep`       | `(step) => void`                         | Lifecycle hook triggered after each assistant turn.                                                   |
+| Option         | Type                                     | Description                                                                                                                                                                     |
+| -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools`        | `CustomToolDefinition[] \| ToolRegistry` | Array of domain tools or tool registry instance. Defaults to empty: **zero hardcoded tools**, **zero token overhead**. Only the tools you pass here are transmitted to the LLM. |
+| `systemPrompt` | `string`                                 | Base instructions for the agent's persona, domain, and behavior.                                                                                                                |
+| `context`      | `TContext`                               | Default contextual object passed to tool handlers (e.g. database handle, API client, Figma instance).                                                                           |
+| `llm`          | `AgentLlmConfig`                         | LLM configuration (`apiKey`, `model`, `baseURL`, `fetch`, `client`).                                                                                                            |
+| `maxSteps`     | `number`                                 | Maximum autonomous tool execution loops (default: `10`).                                                                                                                        |
+| `onToolCall`   | `(name, args) => void`                   | Lifecycle hook triggered when a tool execution starts.                                                                                                                          |
+| `onToolResult` | `(name, result) => void`                 | Lifecycle hook triggered when a tool execution finishes.                                                                                                                        |
+| `onStep`       | `(step) => void`                         | Lifecycle hook triggered after each assistant turn.                                                                                                                             |
 
 ### Agent Methods
 
