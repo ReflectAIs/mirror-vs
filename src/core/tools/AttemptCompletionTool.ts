@@ -76,6 +76,27 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 				return
 			}
 
+			// If there are pending in-between messages (e.g. force-sent queued messages) or queued messages,
+			// do NOT complete the task. Drain the message immediately and return it as user feedback so the model processes it.
+			const pendingInBetween = task.inBetweenMessages?.find((m) => m.sayType === "user_feedback" || !m.sayType)
+			if (pendingInBetween) {
+				const idx = task.inBetweenMessages.indexOf(pendingInBetween)
+				task.inBetweenMessages.splice(idx, 1)
+				const feedbackText = `<user_message>\n${pendingInBetween.text}\n</user_message>`
+				pushToolResult(formatResponse.toolResult(feedbackText, pendingInBetween.images))
+				return
+			}
+
+			if (task.messageQueueService && !task.messageQueueService.isEmpty()) {
+				const queued = task.messageQueueService.dequeueMessage()
+				if (queued) {
+					await task.say("user_feedback", queued.text, queued.images)
+					const feedbackText = `<user_message>\n${queued.text}\n</user_message>`
+					pushToolResult(formatResponse.toolResult(feedbackText, queued.images))
+					return
+				}
+			}
+
 			task.consecutiveMistakeCount = 0
 
 			const finalResult = result
@@ -134,6 +155,28 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 			const { response, text, images } = await task.ask("completion_result", "", false)
 
 			if (response === "yesButtonClicked") {
+				// Safety check: if an in-between or queued message arrived while waiting on ask, do NOT complete!
+				const pendingInBetweenAfterAsk = task.inBetweenMessages?.find(
+					(m) => m.sayType === "user_feedback" || !m.sayType,
+				)
+				if (pendingInBetweenAfterAsk) {
+					const idx = task.inBetweenMessages.indexOf(pendingInBetweenAfterAsk)
+					task.inBetweenMessages.splice(idx, 1)
+					const feedbackText = `<user_message>\n${pendingInBetweenAfterAsk.text}\n</user_message>`
+					pushToolResult(formatResponse.toolResult(feedbackText, pendingInBetweenAfterAsk.images))
+					return
+				}
+
+				if (task.messageQueueService && !task.messageQueueService.isEmpty()) {
+					const queued = task.messageQueueService.dequeueMessage()
+					if (queued) {
+						await task.say("user_feedback", queued.text, queued.images)
+						const feedbackText = `<user_message>\n${queued.text}\n</user_message>`
+						pushToolResult(formatResponse.toolResult(feedbackText, queued.images))
+						return
+					}
+				}
+
 				if (task.sandboxPath && task.workspacePath) {
 					const mergeRes = await WorktreeSandboxManager.applySandboxToWorkspace(
 						task.workspacePath,
@@ -161,7 +204,11 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 			}
 
 			// User provided feedback - push tool result to continue the conversation
-			await task.say("user_feedback", text ?? "", images)
+			const lastMsg = task.mirrorMessages?.at(-1)
+			const alreadySaid = lastMsg?.say === "user_feedback" && lastMsg?.text === text
+			if (!alreadySaid) {
+				await task.say("user_feedback", text ?? "", images)
+			}
 
 			const feedbackText = `<user_message>\n${text}\n</user_message>`
 			pushToolResult(formatResponse.toolResult(feedbackText, images))

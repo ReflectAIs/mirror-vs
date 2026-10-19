@@ -338,7 +338,7 @@ export interface FileEditRecord {
  * - `completed`: Task has completed successfully
  * - `error`: Task encountered an error
  */
-export type TabStatus = "streaming" | "interactive" | "idle" | "completed" | "error"
+export type TabStatus = "streaming" | "interactive" | "idle" | "completed" | "error" | "waiting_for_callback"
 
 /**
  * Represents one tab in the multi-tab interface.
@@ -529,6 +529,8 @@ export type ExtensionState = Pick<
 	sessionNotes?: string
 	activeTerminalCount: number
 	activeTerminals: TerminalInfo[]
+	isWaitingForCallback?: boolean
+	waitingForCallbackCommand?: string
 	imageAutoSetupRunning?: boolean
 	imageAutoSetupStatus?: { step: string; message?: string; progress?: number } | null
 }

@@ -14,7 +14,7 @@ interface TerminalStatusBadgeProps {
 export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ className }) => {
 	const [open, setOpen] = React.useState(false)
 	const portalContainer = useMirrorPortal("mirror-portal")
-	const { activeTerminalCount, activeTerminals = [] } = useExtensionState()
+	const { activeTerminalCount, activeTerminals = [], isWaitingForCallback } = useExtensionState()
 
 	const count = activeTerminalCount ?? 0
 
@@ -22,13 +22,18 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 		<Popover open={open} onOpenChange={setOpen} data-testid="terminal-status-root">
 			<StandardTooltip
 				content={
-					count > 0 ? `${count} active terminal${count !== 1 ? "s" : ""} running` : "No active terminals"
+					isWaitingForCallback
+						? `Waiting for terminal callback (${count} active terminal${count !== 1 ? "s" : ""})`
+						: count > 0
+							? `${count} active terminal${count !== 1 ? "s" : ""} running`
+							: "No active terminals"
 				}>
 				<PopoverTrigger
 					data-testid="terminal-status-trigger"
 					className={cn(
 						"inline-flex items-center gap-1 relative whitespace-nowrap px-1.5 py-1 text-xs",
-						"bg-transparent border border-[rgba(255,255,255,0.08)] rounded-md text-vscode-foreground",
+						"bg-transparent border border-[rgba(255,255,255,0.08)] text-vscode-foreground",
+						"rounded-md",
 						"transition-all duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder focus-visible:ring-inset",
 						"opacity-90 hover:opacity-100 hover:bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.15)] cursor-pointer",
 						className,
@@ -36,10 +41,16 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 					<Terminal
 						className={cn(
 							"size-3 flex-shrink-0",
-							count > 0 ? "text-green-500" : "text-vscode-descriptionForeground",
+							isWaitingForCallback
+								? "text-vscode-focusBorder animate-pulse"
+								: count > 0
+									? "text-green-500"
+									: "text-vscode-descriptionForeground",
 						)}
 					/>
-					<span className="hidden min-[450px]:inline truncate min-w-0">{count > 0 ? count : "—"}</span>
+					<span className="hidden min-[450px]:inline truncate min-w-0">
+						{isWaitingForCallback ? "Waiting..." : count > 0 ? count : "—"}
+					</span>
 				</PopoverTrigger>
 			</StandardTooltip>
 			<PopoverContent
@@ -51,13 +62,20 @@ export const TerminalStatusBadge: React.FC<TerminalStatusBadgeProps> = ({ classN
 				<div className="flex flex-col w-full max-h-[70vh]">
 					{/* Header */}
 					<div className="p-3 border-b border-vscode-dropdown-border shrink-0">
-						<h4 className="m-0 font-bold text-base text-vscode-foreground">
-							{count > 0 ? "Active Terminals" : "Terminals"}
+						<h4 className="m-0 font-bold text-base text-vscode-foreground flex items-center justify-between">
+							<span>{count > 0 ? "Active Terminals" : "Terminals"}</span>
+							{isWaitingForCallback && (
+								<span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-vscode-badge-background text-vscode-badge-foreground">
+									Waiting
+								</span>
+							)}
 						</h4>
 						<p className="m-0 mt-0.5 text-xs text-vscode-descriptionForeground">
-							{count > 0
-								? `${count} terminal${count !== 1 ? "s" : ""} currently running`
-								: "No terminals are currently running"}
+							{isWaitingForCallback
+								? "Extension is waiting for background terminal callback..."
+								: count > 0
+									? `${count} terminal${count !== 1 ? "s" : ""} currently running`
+									: "No terminals are currently running"}
 						</p>
 					</div>
 

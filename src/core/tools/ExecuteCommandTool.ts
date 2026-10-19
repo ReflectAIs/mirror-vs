@@ -544,6 +544,9 @@ export async function executeCommandInTerminal(
 		}
 
 		hasEmittedBackgroundCompletion = true
+		task.isWaitingForCallback = false
+		task.waitingForCallbackCommand = undefined
+		provider?.postStateToWebviewWithoutTaskHistory?.()
 		const currentWorkingDir = terminal.getCurrentWorkingDirectory().toPosix()
 		const exitStatus = exitDetails !== undefined ? formatExitStatus(exitDetails) : "Command finished"
 		const rawOutput = result || latestCompressedOutput || accumulatedOutput || ""
@@ -612,6 +615,8 @@ export async function executeCommandInTerminal(
 
 			try {
 				runInBackground = true
+				task.isWaitingForCallback = true
+				task.waitingForCallbackCommand = command
 				startBackgroundNoticeTimer()
 				provider?.postStateToWebviewWithoutTaskHistory?.()
 				const { response, text, images } = await task.ask("command_output", "")
@@ -747,6 +752,8 @@ export async function executeCommandInTerminal(
 			new Promise<void>((resolve) => {
 				agentTimeoutId = setTimeout(() => {
 					runInBackground = true
+					task.isWaitingForCallback = true
+					task.waitingForCallbackCommand = command
 					startBackgroundNoticeTimer()
 					process.continue()
 					task.supersedePendingAsk()

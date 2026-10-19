@@ -2,6 +2,30 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.5] - 2026-10-16
+
+### Improvements & Fixes
+
+- **Chat Window Terminal Full Command Expansion**:
+    - Clicking on terminal commands in the chat window expands them from a 1-liner (`truncate`) to the full multi-line wrapped command (`whitespace-pre-wrap break-all`).
+    - Added an interactive shell header with prompt `~ $`, selectable text, and a 1-click copy button.
+    - Updated `BatchCommandExecution` and `TerminalCallbackNudge` with matching full command view on click.
+- **Terminal "Waiting for Callback" Indicators in Chat**:
+    - When an execution moves to the background or the agent waits for a command callback, the chat window terminal displays an active `Waiting for callback...` state with pulsing amber indicators and an inline abort button instead of falsely showing `Ran`.
+    - Integrated `WaitingForCallbackBanner` in the chat window above the prompt area with command display, 1-click full command expansion, and abort capability.
+- **Background Editing Focus Isolation**:
+    - Suppressed automatic diff review (`vscode.diff`) and notification popups during background edits (`PREVENT_FOCUS_DISRUPTION`), ensuring uninterrupted workflow without unexpected editor tabs opening.
+- **Pluggable Core Agent Infrastructure**:
+    - Enhanced `@mirror-vs/core` standalone packaging, exports, and module resolution for non-VSCode environments.
+- **Protected Paths & Configuration Unblocking**:
+    - Removed `.vscode/**` from `PROTECTED_PATTERNS` so developer configurations like `.vscode/settings.json`, `.vscode/launch.json`, and `.vscode/tasks.json` can be managed and edited without being blocked.
+- **Terminal Callback Nudge & Parsing Robustness**:
+    - Resolved duplicate command rendering in `TerminalCallbackNudge` by strictly enforcing single-line truncation in headers and scrollable expanded previews.
+    - Upgraded parsing delimiters to support arbitrary quotes, subcommands, and pipes, and stripped internal system prompt instructions from user UI.
+- **Queued Message Draining & Task Completion Safety**:
+    - Resolved race condition where force-sent queued messages were ignored upon task completion; `AttemptCompletionTool` now drains in-between and queued messages before completing so all user instructions are executed.
+    - Synchronized queue state with webview immediately upon force-sending.
+
 ## [1.0.4] - 2026-10-15
 
 ### Improvements & Fixes

@@ -381,7 +381,7 @@ export class TaskUserInteraction {
 		}
 		this.task._draining = true
 		try {
-			if (this.task.askResponse === undefined && !this.task.messageQueueService.isEmpty()) {
+			if (this.task.askResponse === undefined) {
 				const lastMessage = this.mirrorMessages.at(-1)
 				if (lastMessage?.type === "ask" && lastMessage.ts === this.task.lastMessageTs) {
 					// Only auto-drain for terminal/completion asks where the model is
@@ -392,16 +392,23 @@ export class TaskUserInteraction {
 						return false
 					}
 
-					// For completion_result / resume_completed_task:
-					// Dequeue one message at a time as messageResponse (user feedback).
-					// This lets the model see it, process it, and call attempt_completion
-					// again. Each subsequent completion_result drains the next queued
-					// message until the queue is empty. Only then does yesButtonClicked
-					// fire, letting the task truly complete.
-					const queued = this.task.messageQueueService.dequeueMessage()
-					if (queued) {
-						this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
+					// 1. Drain pending in-between messages (e.g. force-sent steering messages)
+					const inBetweenIdx = this.task.inBetweenMessages?.findIndex(
+						(m) => m.sayType === "user_feedback" || !m.sayType,
+					)
+					if (inBetweenIdx !== undefined && inBetweenIdx !== -1) {
+						const [inBetween] = this.task.inBetweenMessages.splice(inBetweenIdx, 1)
+						this.handleWebviewAskResponse("messageResponse", inBetween.text, inBetween.images)
 						return true
+					}
+
+					// 2. Drain queued message from queue service
+					if (!this.task.messageQueueService.isEmpty()) {
+						const queued = this.task.messageQueueService.dequeueMessage()
+						if (queued) {
+							this.handleWebviewAskResponse("messageResponse", queued.text, queued.images)
+							return true
+						}
 					}
 				}
 			}

@@ -204,13 +204,7 @@ export class ApplyDiffTool extends BaseTool<"apply_diff"> {
 					writeDelayMs,
 				)
 
-				// Show green/red review decorations for the saved changes
-				try {
-					ReviewManager.getInstance().showReviewDecorations(absolutePath, originalContent, diffResult.content)
-				} catch (e) {
-					// Non-blocking — decorations are visual polish
-					console.warn("[ApplyDiffTool] Failed to show review decorations:", e)
-				}
+				// When background editing is enabled (preventFocusDisruption), do not open review or diff views
 			} else {
 				// Original behavior with diff view
 				// Show diff view before asking for approval

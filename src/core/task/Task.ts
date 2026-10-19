@@ -450,6 +450,43 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	/** Whether the task is currently blocked waiting for an ask() response. */
 	public isWaitingOnAsk: boolean = false
 
+	/** Whether this task is currently waiting for a background callback (e.g. terminal process completion). */
+	public _isWaitingForCallback: boolean = false
+	public _waitingForCallbackCommand?: string
+
+	public get isWaitingForCallback(): boolean {
+		if (this._isWaitingForCallback) return true
+		if (
+			this.isLoopActive ||
+			this.isStreaming ||
+			this.isWaitingOnAsk ||
+			this.state === TaskState.Completed ||
+			this.state === TaskState.Error ||
+			this.state === TaskState.Aborted
+		) {
+			return false
+		}
+		return Boolean(
+			this.terminalProcess !== undefined || TerminalRegistry.getTerminals(true, this.taskId).length > 0,
+		)
+	}
+
+	public set isWaitingForCallback(val: boolean) {
+		this._isWaitingForCallback = val
+	}
+
+	public get waitingForCallbackCommand(): string | undefined {
+		if (this._waitingForCallbackCommand) {
+			return this._waitingForCallbackCommand
+		}
+		const busyTerminal = TerminalRegistry.getTerminals(true, this.taskId)[0]
+		return busyTerminal?.getLastCommand()
+	}
+
+	public set waitingForCallbackCommand(cmd: string | undefined) {
+		this._waitingForCallbackCommand = cmd
+	}
+
 	// Tool Use
 	consecutiveMistakeCount: number = 0
 	consecutiveMistakeLimit: number

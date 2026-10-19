@@ -78,6 +78,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		sessionNames,
 		sessionNotes,
 		disableTabBar,
+		isWaitingForCallback,
+		waitingForCallbackCommand,
+		activeTerminals = [],
 	} = useExtensionState()
 
 	const scrollLifecycleRef = useRef<ReturnType<typeof useScrollLifecycle> | null>(null)
@@ -461,6 +464,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 						<FloatingChatHud
 							show={showScrollToBottom2}
 							isStreaming={isStreaming}
+							isWaitingForCallback={isWaitingForCallback}
 							lastMessage={displayedMessages[displayedMessages.length - 1]}
 							hasLatestCheckpoint={hasLatestCheckpoint}
 							onScrollToBottom={handleScrollToBottomAndResetCheckpointCursor}

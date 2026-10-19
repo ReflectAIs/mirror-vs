@@ -72,19 +72,24 @@ export async function handleForceSendQueuedMessage(provider: MirrorProvider, mes
 		currentTask.messageQueueService.removeMessage(idToRemove)
 	}
 
+	// Always sync updated queue state to webview immediately
+	await provider.postStateToWebviewWithoutMirrorMessages()
+
 	const text = payload?.text ?? message.text ?? ""
 	const images = payload?.images ?? message.images
 
 	const resolved = await resolveIncomingImages(provider, { text, images })
 
-	// If the task is currently waiting on an ask (e.g. question/approval), answer the ask with this message
+	// If the task is currently waiting on an ask (e.g. question/approval/completion_result), answer the ask with this message
 	if (currentTask.isWaitingOnAsk || (currentTask.taskAsk && !currentTask.taskAsk.isAnswered)) {
 		currentTask.handleWebviewAskResponse("messageResponse", resolved.text, resolved.images)
+		await provider.postStateToWebviewWithoutMirrorMessages()
 		return
 	}
 
 	if (currentTask.isLoopActive) {
 		await currentTask.injectInBetweenMessage(resolved.text, resolved.images)
+		await provider.postStateToWebviewWithoutMirrorMessages()
 	} else if ((currentTask as any)._started) {
 		await currentTask.say("user_feedback", resolved.text, resolved.images)
 		const { formatResponse } = await import("../../prompts/responses")
@@ -94,5 +99,6 @@ export async function handleForceSendQueuedMessage(provider: MirrorProvider, mes
 			...imageBlocks,
 		]
 		void currentTask.initiateTaskLoop(userContent)
+		await provider.postStateToWebviewWithoutMirrorMessages()
 	}
 }

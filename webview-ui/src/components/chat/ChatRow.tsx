@@ -232,8 +232,15 @@ export const ChatRowContent = ({
 }: ChatRowContentProps) => {
 	const { t, i18n } = useTranslation()
 
-	const { mcpServers, alwaysAllowMcp, currentCheckpoint, mode, apiConfiguration, currentTaskItem } =
-		useExtensionState()
+	const {
+		mcpServers,
+		alwaysAllowMcp,
+		currentCheckpoint,
+		mode,
+		apiConfiguration,
+		currentTaskItem,
+		isWaitingForCallback,
+	} = useExtensionState()
 	const { info: model } = useSelectedModel(apiConfiguration)
 	const [isEditing, setIsEditing] = useState(false)
 	const [editedContent, setEditedContent] = useState("")
@@ -346,14 +353,15 @@ export const ChatRowContent = ({
 			case "mistake_limit_reached":
 				return [null, null] // These will be handled by ErrorRow component
 			case "command":
+				const isWaiting = isLast && isWaitingForCallback
 				return [
-					isCommandExecuting ? (
+					isWaiting || isCommandExecuting ? (
 						<ProgressIndicator />
 					) : (
 						<TerminalSquare className="size-4" aria-label="Terminal icon" />
 					),
 					<span style={{ color: normalColor, fontWeight: "bold" }}>
-						{t("chat:commandExecution.running")}
+						{isWaiting ? "Waiting..." : t("chat:commandExecution.running")}
 					</span>,
 				]
 			case "use_mcp_server":
@@ -450,6 +458,7 @@ export const ChatRowContent = ({
 		apiRequestFailedMessage,
 		t,
 		isLast,
+		isWaitingForCallback,
 	])
 
 	const headerStyle: React.CSSProperties = {

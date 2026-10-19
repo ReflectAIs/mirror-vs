@@ -250,7 +250,9 @@ const FileChangesPanel = memo(({ mirrorMessages, fileEdits, className }: FileCha
 							type="button"
 							className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 bg-transparent border-none py-1 px-0.5 cursor-pointer text-xs select-none transition-colors">
 							<FileDiff className="size-3.5 opacity-80 text-mirror-brand-via shrink-0" />
-							<span className="font-medium">Review files ({fileCount})</span>
+							<span className="font-medium">
+								{hasActiveReviews ? `Review files (${fileCount})` : `Changed files (${fileCount})`}
+							</span>
 							{totalStats.added > 0 || totalStats.removed > 0 ? (
 								<div className="flex items-center gap-1 ml-0.5 shrink-0 font-mono text-[10px]">
 									<span className="text-[#4ade80]" data-testid="total-added">

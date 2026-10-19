@@ -32,16 +32,10 @@ describe("MirrorProtectedController", () => {
 			expect(controller.isWriteProtected(".mirrorrules")).toBe(true)
 			expect(controller.isWriteProtected(".mirrorrules.md")).toBe(true)
 		})
-
-		it("should protect .mirrorrules* files", () => {
-			expect(controller.isWriteProtected(".mirrorrules")).toBe(true)
-			expect(controller.isWriteProtected(".mirrorrules.md")).toBe(true)
-		})
-
-		it("should protect files in .vscode directory", () => {
-			expect(controller.isWriteProtected(".vscode/settings.json")).toBe(true)
-			expect(controller.isWriteProtected(".vscode/launch.json")).toBe(true)
-			expect(controller.isWriteProtected(".vscode/tasks.json")).toBe(true)
+		it("should not protect files in .vscode directory", () => {
+			expect(controller.isWriteProtected(".vscode/settings.json")).toBe(false)
+			expect(controller.isWriteProtected(".vscode/launch.json")).toBe(false)
+			expect(controller.isWriteProtected(".vscode/tasks.json")).toBe(false)
 		})
 
 		it("should protect .code-workspace files", () => {
@@ -158,9 +152,7 @@ describe("MirrorProtectedController", () => {
 				".mirrorignore",
 				".mirrormodes",
 				".mirrorrules*",
-				".mirrorrules*",
 				".mirror/**",
-				".vscode/**",
 				"*.code-workspace",
 				".mirrorprotected",
 				"AGENTS.md",

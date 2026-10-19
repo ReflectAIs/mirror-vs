@@ -604,5 +604,65 @@ Output:
 			expect(terminalOutput).toBeInTheDocument()
 			expect(terminalOutput).toHaveTextContent("0 total")
 		})
+
+		it("should show full terminal command in expanded terminal view when clicked and truncate in header", async () => {
+			const longCommand =
+				"pnpm --filter @mirror-vs/vscode-webview run build:types --mode production && echo 'done'"
+			const textWithOutput = `${longCommand}\nOutput:\nBuild complete`
+
+			render(
+				<ExtensionStateWrapper>
+					<CommandExecution executionId="test-click-expand" text={textWithOutput} />
+				</ExtensionStateWrapper>,
+			)
+
+			// Header row code block stays neat and truncated
+			const codeBlock = screen.getAllByTestId("code-block")[0]
+			expect(codeBlock).toHaveClass("truncate")
+
+			// Click on the command row to expand
+			const clickRow = codeBlock.closest(".cursor-pointer")
+			expect(clickRow).not.toBeNull()
+			fireEvent.click(clickRow!)
+
+			// Header code block remains clean with truncate
+			expect(codeBlock).toHaveClass("truncate")
+
+			// Expanded terminal prompt renders the full command
+			expect(screen.getByText(longCommand, { selector: ".whitespace-pre-wrap" })).toBeInTheDocument()
+
+			// Click again to collapse
+			fireEvent.click(clickRow!)
+			expect(codeBlock).toHaveClass("truncate")
+		})
+
+		it("should show 'Waiting...' when isWaitingForCallback is true", () => {
+			const customState = {
+				...mockExtensionState,
+				isWaitingForCallback: true,
+				waitingForCallbackCommand: "npm run watch",
+			}
+
+			render(
+				<ExtensionStateContext.Provider value={customState as any}>
+					<CommandExecution executionId="test-wait-1" text="npm run watch" />
+				</ExtensionStateContext.Provider>,
+			)
+
+			expect(screen.getByText(/Waiting/i)).toBeInTheDocument()
+		})
+
+		it("should show 'Waiting...' when output indicates background execution", () => {
+			const textWithBgOutput =
+				"cargo watch -x run\nOutput:\nCommand is running in background in terminal from '/app'."
+
+			render(
+				<ExtensionStateWrapper>
+					<CommandExecution executionId="test-wait-2" text={textWithBgOutput} />
+				</ExtensionStateWrapper>,
+			)
+
+			expect(screen.getByText(/Waiting/i)).toBeInTheDocument()
+		})
 	})
 })

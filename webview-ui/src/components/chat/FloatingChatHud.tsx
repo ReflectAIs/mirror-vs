@@ -6,6 +6,7 @@ import type { MirrorMessage } from "@mirror-vs/types"
 interface FloatingChatHudProps {
 	show: boolean
 	isStreaming?: boolean
+	isWaitingForCallback?: boolean
 	lastMessage?: MirrorMessage
 	hasLatestCheckpoint?: boolean
 	onScrollToBottom: () => void
@@ -16,6 +17,7 @@ export const FloatingChatHud = memo(
 	({
 		show,
 		isStreaming = false,
+		isWaitingForCallback = false,
 		lastMessage,
 		hasLatestCheckpoint = false,
 		onScrollToBottom,
@@ -62,6 +64,11 @@ export const FloatingChatHud = memo(
 							<>
 								<span className="size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0" />
 								<span className="text-vscode-foreground font-medium">Working...</span>
+							</>
+						) : isWaitingForCallback ? (
+							<>
+								<span className="size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0" />
+								<span className="text-vscode-foreground font-medium">Waiting...</span>
 							</>
 						) : (
 							<span className="text-vscode-descriptionForeground hover:text-vscode-foreground">

@@ -551,6 +551,7 @@ export class ReviewManager
 		originalContent: string,
 		proposedContent: string,
 		checkpointId?: string,
+		options?: { autoOpenDiff?: boolean; showNotification?: boolean },
 	): void {
 		const normPath = this.normalizePath(filePath)
 		let original = originalContent
@@ -611,14 +612,18 @@ export class ReviewManager
 			}
 		}
 
-		// Automatically open the visual side-by-side/inline diff editor (vscode.diff)
-		vscode.commands.executeCommand("mirror-vs.diffReview", filePath).then(
-			() => {},
-			(err) => console.warn("Failed to automatically open visual diff in showReviewDecorations:", err),
-		)
+		// Automatically open the visual side-by-side/inline diff editor (vscode.diff) if allowed
+		if (options?.autoOpenDiff !== false) {
+			vscode.commands.executeCommand("mirror-vs.diffReview", filePath).then(
+				() => {},
+				(err) => console.warn("Failed to automatically open visual diff in showReviewDecorations:", err),
+			)
+		}
 
-		// Show non-blocking notification toast
-		this.showReviewNotification(filePath)
+		// Show non-blocking notification toast if allowed
+		if (options?.showNotification !== false) {
+			this.showReviewNotification(filePath)
+		}
 	}
 
 	private updateStatusBar() {

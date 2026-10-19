@@ -310,6 +310,8 @@ export class StateManager {
 				status = "interactive"
 			} else if (task.state === TaskState.Error || task.state === TaskState.Aborted) {
 				status = "error"
+			} else if (task.isWaitingForCallback) {
+				status = "waiting_for_callback"
 			} else if (task.isLoopActive && !isCompletionAsk) {
 				status = "streaming"
 			} else if (task.state === TaskState.Streaming) {
@@ -491,6 +493,8 @@ export class StateManager {
 					type: "ssh" as const,
 				})),
 			],
+			isWaitingForCallback: currentTask?.isWaitingForCallback ?? false,
+			waitingForCallbackCommand: currentTask?.waitingForCallbackCommand,
 			currentSessionId: activeSessionId || currentSessionId,
 			sessionNames: sessionNames ?? {},
 			taskNames: taskNames ?? {},

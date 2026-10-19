@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { cn } from "@src/lib/utils"
 
-export type MascotStatus = "idle" | "streaming" | "interactive" | "completed" | "error"
+export type MascotStatus = "idle" | "streaming" | "interactive" | "completed" | "error" | "waiting_for_callback"
 
 interface MascotBadgeProps {
 	status?: MascotStatus
@@ -79,6 +79,19 @@ const MASCOT_EXPRESSIONS: Record<MascotStatus, MascotExpression> = {
 		label: "Waiting",
 		dotClass: "bg-amber-400/90 shadow-[0_0_6px_rgba(250,204,21,0.4)]",
 		badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-200 shadow-amber-900/10",
+	},
+	waiting_for_callback: {
+		expressions: ["(⏳_⏳)", "(⏱️‿⏱️)", "(🍵‿🍵)", "(˘▾˘~)", "( ˘▽˘)っ♨", "(•_•)☕"],
+		funnyQuotes: [
+			"Waiting for terminal callback... ⏳",
+			"Background process running... ⚙️",
+			"Grabbing tea while terminal works 🍵",
+			"Waiting for background task... 📡",
+			"Terminal process in progress... 💻",
+		],
+		label: "Waiting for callback",
+		dotClass: "bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]",
+		badgeClass: "border-cyan-500/30 bg-cyan-500/10 text-cyan-200 shadow-cyan-900/10",
 	},
 	completed: {
 		expressions: [

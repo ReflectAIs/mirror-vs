@@ -22,49 +22,109 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 		if (!text) return { command: "", cwd: "", exitStatus: "", output: "", isNotice: false }
 
 		const isNotice = text.includes("[Terminal Notice:")
+		const noticePrefix = "[Terminal Notice: Background process for '"
+		const callbackPrefix = "[Terminal Callback: Background process for '"
 
-		// Matches "[Terminal Callback: Background process for '<command>' finished in '<cwd>'. <exitStatus>]\nOutput:\n<output>"
-		const callbackMatch = text.match(
-			/\[Terminal Callback: Background process for '([^']+)' finished in '([^']*)'\.\s*([^\]]+)\](?:\s*Output:\s*([\s\S]*))?/,
-		)
+		if (isNotice && text.includes(noticePrefix)) {
+			let command = ""
+			let cwd = ""
+			let output = ""
 
-		if (callbackMatch) {
+			const runningMarker = "' is still running"
+			const runningIdx = text.indexOf(runningMarker)
+			if (runningIdx !== -1) {
+				const beforeRunning = text.slice(noticePrefix.length, runningIdx)
+				const inIdx = beforeRunning.lastIndexOf("' in '")
+				if (inIdx !== -1) {
+					command = beforeRunning.slice(0, inIdx)
+					cwd = beforeRunning.slice(inIdx + "' in '".length)
+				} else {
+					command = beforeRunning
+				}
+			}
+
+			// Clean output: strip out system "Instructions for Model:" and logs metadata
+			let cleanText = text.replace(/Instructions for Model:[\s\S]*$/, "").trim()
+			cleanText = cleanText.replace(/\]$/, "").trim()
+
+			const recentIdx = cleanText.indexOf("Recent output:\n")
+			if (recentIdx !== -1) {
+				const afterRecent = cleanText.slice(recentIdx + "Recent output:\n".length)
+				const logsIdx = afterRecent.indexOf("\nLogs:")
+				output = (logsIdx !== -1 ? afterRecent.slice(0, logsIdx) : afterRecent).trim()
+			} else {
+				// If no recent output snippet, grab progress lines if available
+				const progressMatch = cleanText.match(/Progress: [^\n]+/)
+				if (progressMatch) {
+					output = progressMatch[0]
+				}
+			}
+
 			return {
-				command: callbackMatch[1] || "",
-				cwd: callbackMatch[2] || "",
-				exitStatus: callbackMatch[3] || "",
-				output: (callbackMatch[4] || "").trim(),
-				isNotice: false,
+				command: command || "Background command",
+				cwd,
+				exitStatus: "Running",
+				output,
+				isNotice: true,
 			}
 		}
 
-		// Matches "[Terminal Notice: Background process for '<command>' in '<cwd>' ...]"
-		const noticeMatch = text.match(
-			/\[Terminal Notice: Background process for '([^']+)' in '([^']*)'\s*([\s\S]*?)\](?:\s*([\s\S]*))?/,
-		)
+		if (text.includes(callbackPrefix)) {
+			let command = ""
+			let cwd = ""
+			let exitStatus = "Completed"
+			let output = ""
 
-		if (noticeMatch) {
-			const noticeDetails = (noticeMatch[3] || "").trim()
-			const extra = (noticeMatch[4] || "").trim()
-			const fullOutput = [noticeDetails, extra].filter(Boolean).join("\n")
+			const headerEnd = text.indexOf("]")
+			const header = headerEnd !== -1 ? text.slice(0, headerEnd) : text
+			const afterPrefix = header.slice(callbackPrefix.length)
+			const finIdx = afterPrefix.lastIndexOf("' finished in '")
+			if (finIdx !== -1) {
+				command = afterPrefix.slice(0, finIdx)
+				const afterFin = afterPrefix.slice(finIdx + "' finished in '".length)
+				const dotIdx = afterFin.indexOf("'. ")
+				if (dotIdx !== -1) {
+					cwd = afterFin.slice(0, dotIdx)
+					exitStatus = afterFin.slice(dotIdx + "'. ".length).trim()
+				} else {
+					cwd = afterFin
+				}
+			}
+
+			const outputIdx = text.indexOf("Output:\n")
+			if (outputIdx !== -1) {
+				let out = text.slice(outputIdx + "Output:\n".length)
+				const logsIdx = out.indexOf("\nLogs:")
+				if (logsIdx !== -1) out = out.slice(0, logsIdx)
+				const instrIdx = out.indexOf("Instructions for Model:")
+				if (instrIdx !== -1) out = out.slice(0, instrIdx)
+				output = out.replace(/\]$/, "").trim()
+			}
+
 			return {
-				command: noticeMatch[1] || "",
-				cwd: noticeMatch[2] || "",
-				exitStatus: "Running",
-				output: fullOutput,
-				isNotice: true,
+				command: command || "Background command",
+				cwd,
+				exitStatus: exitStatus || "Completed",
+				output,
+				isNotice: false,
 			}
 		}
 
 		// Fallback parse if format differs
 		const outputIndex = text.indexOf("Output:\n")
 		const header = outputIndex !== -1 ? text.slice(0, outputIndex) : text
-		const output = outputIndex !== -1 ? text.slice(outputIndex + "Output:\n".length).trim() : ""
+		let output = outputIndex !== -1 ? text.slice(outputIndex + "Output:\n".length).trim() : ""
+		output = output.replace(/Instructions for Model:[\s\S]*$/, "").trim()
+
+		let fallbackCommand = header.replace(/^\[Terminal (?:Callback|Notice):\s*/, "").replace(/\]$/, "")
+		if (fallbackCommand.includes("\n")) {
+			fallbackCommand = fallbackCommand.split("\n")[0]
+		}
 
 		return {
-			command: header.replace(/^\[Terminal (?:Callback|Notice):\s*/, "").replace(/\]$/, ""),
+			command: fallbackCommand,
 			cwd: "",
-			exitStatus: "Completed",
+			exitStatus: isNotice ? "Running" : "Completed",
 			output,
 			isNotice,
 		}
@@ -124,13 +184,8 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 	return (
 		<div className="my-1 select-none text-xs">
 			<div
-				onClick={() => {
-					if (parsed.output) setIsExpanded(!isExpanded)
-				}}
-				className={cn(
-					"flex items-center justify-between gap-2 py-1 px-1.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground select-none group transition-colors",
-					parsed.output ? "cursor-pointer hover:bg-vscode-list-hoverBackground/30" : "",
-				)}>
+				onClick={() => setIsExpanded(!isExpanded)}
+				className="flex items-center justify-between gap-2 py-1 px-1.5 rounded text-vscode-descriptionForeground hover:text-vscode-foreground select-none group transition-colors cursor-pointer hover:bg-vscode-list-hoverBackground/30">
 				<div className="flex items-center gap-2 min-w-0 flex-1">
 					<Terminal className="size-3.5 text-vscode-descriptionForeground shrink-0" />
 					<span className="text-vscode-descriptionForeground/70 text-[11px] shrink-0 font-normal">
@@ -138,7 +193,7 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 					</span>
 					{parsed.command && (
 						<code
-							className="font-mono text-[11.5px] text-vscode-foreground font-medium truncate no-code-bg bg-transparent px-0 py-0"
+							className="font-mono text-[11.5px] text-vscode-foreground font-medium no-code-bg bg-transparent px-0 py-0 truncate"
 							title={parsed.command}>
 							{parsed.command}
 						</code>
@@ -176,20 +231,38 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 				</div>
 			</div>
 
-			{isExpanded && parsed.output && (
+			{isExpanded && (
 				<div className="ml-3 pl-2.5 border-l border-vscode-panel-border/20 flex flex-col gap-1 my-1">
-					<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono">
-						<span className="truncate mr-2">{parsed.cwd ? `cwd: ${parsed.cwd}` : "Output"}</span>
-						<button
-							onClick={handleCopy}
-							className="flex items-center gap-1 hover:text-vscode-foreground cursor-pointer transition-colors shrink-0">
-							{copied ? <Check className="size-2.5 text-emerald-400" /> : <Copy className="size-2.5" />}
-							<span>{copied ? "Copied" : "Copy"}</span>
-						</button>
-					</div>
-					<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full box-border">
-						{parsed.output}
-					</pre>
+					{parsed.command && (
+						<div className="flex items-start justify-between gap-1 text-[10.5px] font-mono text-vscode-foreground bg-vscode-terminal-background p-1.5 rounded border border-vscode-panel-border/30 max-h-[140px] overflow-y-auto">
+							<div className="flex items-start gap-1 min-w-0 flex-1">
+								<span className="text-vscode-descriptionForeground/40 shrink-0 select-none">~ $</span>
+								<span className="text-vscode-foreground/90 font-medium whitespace-pre-wrap break-all select-text font-mono">
+									{parsed.command}
+								</span>
+							</div>
+						</div>
+					)}
+					{parsed.output ? (
+						<>
+							<div className="flex items-center justify-between text-[10px] text-vscode-descriptionForeground font-mono">
+								<span className="truncate mr-2">{parsed.cwd ? `cwd: ${parsed.cwd}` : "Output"}</span>
+								<button
+									onClick={handleCopy}
+									className="flex items-center gap-1 hover:text-vscode-foreground cursor-pointer transition-colors shrink-0">
+									{copied ? (
+										<Check className="size-2.5 text-emerald-400" />
+									) : (
+										<Copy className="size-2.5" />
+									)}
+									<span>{copied ? "Copied" : "Copy"}</span>
+								</button>
+							</div>
+							<pre className="text-[10.5px] font-mono bg-vscode-terminal-background p-2 rounded border border-vscode-panel-border/30 overflow-x-auto max-h-[180px] overflow-y-auto whitespace-pre-wrap break-all sm:break-words text-vscode-editor-foreground w-full box-border">
+								{parsed.output}
+							</pre>
+						</>
+					) : null}
 				</div>
 			)}
 

@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { formatLargeNumber } from "@src/utils/format"
 import { ContextWindowProgress } from "./ContextWindowProgress"
 import { TodoListDisplay } from "./TodoListDisplay"
+import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { MascotBadge, type MascotStatus } from "./MascotBadge"
 
 // ---------------------------------------------------------------------------
@@ -111,12 +112,15 @@ const ChatToolbar = ({
 		}
 	}, [editingSessionName, currentSessionId, activeSessionName])
 
+	const { isWaitingForCallback } = useExtensionState()
+
 	// Determine mascot status from task state
 	const mascotStatus: MascotStatus = (() => {
 		if (!task) return "idle"
 		if (task.isStreaming || task.isWaitingForFirstChunk) return "streaming"
 		if (task.taskAsk && !task.taskAsk.isAnswered) return "interactive"
 		if (task.state === "error" || task.state === "aborted") return "error"
+		if (isWaitingForCallback) return "waiting_for_callback"
 		if (task.state === "completed") return "completed"
 		return "idle"
 	})()

@@ -39,6 +39,12 @@ function getMascotForTab(status: TabStatus, hasPendingApproval?: boolean) {
 				ringClass: "w-2 h-2 rounded-full bg-purple-500/20 shrink-0",
 				title: "Thinking & Generating...",
 			}
+		case "waiting_for_callback":
+			return {
+				dotClass: "w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0",
+				ringClass: "w-2 h-2 rounded-full bg-cyan-400/20 shrink-0",
+				title: "Waiting for terminal callback...",
+			}
 		case "completed":
 			return {
 				dotClass: "w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0",

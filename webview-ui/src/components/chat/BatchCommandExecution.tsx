@@ -1,11 +1,12 @@
 import React, { memo, useCallback, useMemo, useState } from "react"
-import { ChevronDown, OctagonX, Terminal as TerminalIcon } from "lucide-react"
+import { ChevronDown, OctagonX, Check, Copy, Loader2, Terminal as TerminalIcon } from "lucide-react"
 import { useEvent } from "react-use"
 
 import { type ExtensionMessage, type CommandExecutionStatus, commandExecutionStatusSchema } from "@mirror-vs/types"
 import { safeJsonParse } from "@shared/core"
 import { cn } from "@src/lib/utils"
 import { vscode } from "@src/utils/vscode"
+import { ExtensionStateContext } from "@src/context/ExtensionStateContext"
 
 import { ToolDisclosure } from "./ToolDisclosure"
 import { TerminalOutput } from "./TerminalOutput"
@@ -39,12 +40,14 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 	const [streamingOutput, setStreamingOutput] = useState("")
 	const [status, setStatus] = useState<CommandExecutionStatus | null>(null)
 	const [interactiveInput, setInteractiveInput] = useState("")
+	const [copiedCommand, setCopiedCommand] = useState(false)
 
 	const output = streamingOutput || initialOutput || item.output || ""
 
 	const handleSendInput = useCallback(
 		(customVal?: string) => {
 			const textToSend = customVal !== undefined ? customVal : interactiveInput
+			if (!textToSend && customVal === undefined) return
 			vscode.postMessage({
 				type: "sendTerminalInput",
 				terminalInput: textToSend,
@@ -88,10 +91,45 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 
 	useEvent("message", onMessage)
 
+	const extensionState = React.useContext(ExtensionStateContext)
+	const isWaitingForCallback = extensionState?.isWaitingForCallback ?? false
+	const waitingForCallbackCommand = extensionState?.waitingForCallbackCommand
+	const activeTerminals = extensionState?.activeTerminals ?? []
+
 	const isRunning = status?.status === "started"
 	const isSuccess = (status?.status === "exited" && status.exitCode === 0) || (!status && item.isAnswered)
 	const isFailed = status?.status === "exited" && status.exitCode !== 0
 	const hasInteractivePrompt = isRunning && detectInteractivePrompt(output)
+
+	const isWaiting = useMemo(() => {
+		if (status?.status === "exited") return false
+		const hasBackgroundText =
+			output.includes("Command is running in background") ||
+			output.includes("waiting for callback") ||
+			output.includes("has moved to the background")
+
+		if (isWaitingForCallback) {
+			if (!waitingForCallbackCommand) return true
+			const waitCmd = waitingForCallbackCommand.trim()
+			const currentCmd = command.trim()
+			if (waitCmd === currentCmd || currentCmd.includes(waitCmd) || waitCmd.includes(currentCmd)) {
+				return true
+			}
+		}
+
+		if (hasBackgroundText) return true
+
+		if (
+			activeTerminals.some((t) => {
+				const termCmd = t.command?.trim()
+				return termCmd && (termCmd === command.trim() || command.trim().includes(termCmd))
+			})
+		) {
+			return true
+		}
+
+		return false
+	}, [status?.status, output, isWaitingForCallback, waitingForCallbackCommand, command, activeTerminals])
 
 	const hasOutput = output.trim().length > 0
 
@@ -99,22 +137,24 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 		<div className="flex flex-col min-w-0 max-w-full">
 			<div
 				onClick={() => setIsExpanded(!isExpanded)}
-				className="flex items-center justify-between gap-2 py-0.5 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 select-none group transition-colors text-xs min-w-0 max-w-full cursor-pointer">
+				className="flex items-center justify-between gap-2 py-1 px-1.5 rounded hover:bg-vscode-list-hoverBackground/30 select-none group transition-colors text-xs min-w-0 max-w-full cursor-pointer">
 				<div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
 					<TerminalIcon className="size-3.5 text-vscode-descriptionForeground shrink-0" />
 					<code
-						className="font-mono text-[11.5px] text-vscode-foreground font-medium truncate no-code-bg bg-transparent px-0 py-0 flex-1 min-w-0"
+						className="font-mono text-[11.5px] text-vscode-foreground font-medium no-code-bg bg-transparent px-0 py-0 flex-1 min-w-0 truncate"
 						title={command}>
 						{command}
 					</code>
 				</div>
 				<div className="flex items-center gap-1.5 shrink-0">
-					{isRunning && <span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />}
+					{(isRunning || isWaiting) && (
+						<span className="size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0" />
+					)}
 					{isSuccess && <span className="text-emerald-400 text-[10px] font-medium shrink-0">✓</span>}
 					{isFailed && (
 						<span className="text-red-400 text-[10px] font-medium shrink-0">✗ ({status?.exitCode})</span>
 					)}
-					{isRunning && (
+					{(isRunning || isWaiting) && (
 						<button
 							type="button"
 							onClick={(e) => {
@@ -137,27 +177,55 @@ const BatchCommandItemRow = memo(({ item, isLast }: BatchCommandItemRowProps) =>
 
 			{isExpanded && (
 				<div className="ml-5 my-1 pl-2 border-l border-vscode-panel-border/30 min-w-0 max-w-full">
-					<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[200px] overflow-auto min-w-0 max-w-full">
-						{hasOutput ? (
-							<TerminalOutput content={output} />
-						) : (
-							<div className="text-vscode-descriptionForeground italic">
-								{isRunning
-									? "Running command..."
-									: isSuccess
-										? "Command completed with no output (exit code 0)"
-										: isFailed
-											? `Command exited with code ${status?.exitCode}`
-											: "(No output produced)"}
+					<div className="rounded bg-vscode-terminal-background border border-vscode-panel-border/30 p-2 font-mono text-[11px] max-h-[220px] overflow-auto min-w-0 max-w-full">
+						<div className="text-[10px] text-vscode-descriptionForeground/60 pb-1 mb-1 border-b border-white/5 font-mono flex items-start justify-between gap-1 select-none">
+							<div className="flex items-start gap-1 min-w-0 flex-1 max-h-[56px] overflow-y-auto pr-1">
+								<span className="text-vscode-descriptionForeground/40 shrink-0 select-none">~ $</span>
+								<span className="text-vscode-foreground/90 font-medium whitespace-pre-wrap break-all select-text font-mono leading-relaxed text-[10.5px]">
+									{command}
+								</span>
 							</div>
-						)}
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation()
+									navigator.clipboard.writeText(command)
+									setCopiedCommand(true)
+									setTimeout(() => setCopiedCommand(false), 2000)
+								}}
+								className="text-vscode-descriptionForeground/60 hover:text-vscode-foreground p-0.5 rounded hover:bg-white/10 shrink-0 transition-colors cursor-pointer"
+								title="Copy command">
+								{copiedCommand ? (
+									<Check className="size-2.5 text-emerald-400" />
+								) : (
+									<Copy className="size-2.5" />
+								)}
+							</button>
+						</div>
+						<div className="max-h-[160px] overflow-y-auto">
+							{hasOutput ? (
+								<TerminalOutput content={output} />
+							) : (
+								<div className="text-vscode-descriptionForeground italic text-[11px] py-0.5">
+									{isWaiting
+										? "Executing in background..."
+										: isRunning
+											? "Running command..."
+											: isSuccess
+												? "Command completed with no output (exit code 0)"
+												: isFailed
+													? `Command exited with code ${status?.exitCode}`
+													: "(No output produced)"}
+								</div>
+							)}
+						</div>
 					</div>
 				</div>
 			)}
 
 			{hasInteractivePrompt && (
 				<div className="ml-5 my-1 pl-2 border-l border-vscode-panel-border/30 flex items-center gap-1.5 min-w-0">
-					<span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+					<span className="size-1.5 rounded-full bg-vscode-focusBorder animate-pulse shrink-0" />
 					<button
 						type="button"
 						onClick={() => handleSendInput("y")}

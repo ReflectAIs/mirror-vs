@@ -276,6 +276,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		sessionSharedContexts: {},
 		activeTerminalCount: 0,
 		activeTerminals: [],
+		isWaitingForCallback: false,
+		waitingForCallbackCommand: undefined,
 	})
 
 	const [didHydrateState, setDidHydrateState] = useState(false)

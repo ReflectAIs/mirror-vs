@@ -16,9 +16,7 @@ export class MirrorProtectedController {
 		".mirrorignore",
 		".mirrormodes",
 		".mirrorrules*",
-		".mirrorrules*",
 		".mirror/**",
-		".vscode/**",
 		"*.code-workspace",
 		".mirrorprotected", // For future use
 		"AGENTS.md",
