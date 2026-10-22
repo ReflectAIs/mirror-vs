@@ -281,7 +281,15 @@ export const ModelPicker = ({
 	return (
 		<>
 			<div>
-				<label className="block font-medium mb-1">{label ?? t("settings:modelPicker.label")}</label>
+				<div className="flex items-center justify-between mb-1">
+					<label className="block font-medium">{label ?? t("settings:modelPicker.label")}</label>
+					{models && Object.keys(models).length > 0 && (
+						<span className="text-[10px] text-vscode-descriptionForeground font-mono">
+							{Object.keys(models).length} models available
+						</span>
+					)}
+				</div>
+
 				<Popover open={open} onOpenChange={onOpenChange}>
 					<PopoverTrigger asChild>
 						<Button
@@ -323,17 +331,53 @@ export const ModelPicker = ({
 									)}
 								</CommandEmpty>
 								<CommandGroup>
-									{modelIds.map((model) => (
-										<CommandItem
-											key={model}
-											value={model}
-											onSelect={() => onSelect(model)}
-											data-testid={`model-option-${model}`}>
-											<span className="truncate" title={model}>
-												{model}
-											</span>
-										</CommandItem>
-									))}
+									{modelIds.map((model) => {
+										const isReasoning =
+											model.toLowerCase().includes("r1") ||
+											model.toLowerCase().includes("o3") ||
+											model.toLowerCase().includes("reason")
+										const isFast =
+											model.toLowerCase().includes("turbo") ||
+											model.toLowerCase().includes("flash") ||
+											model.toLowerCase().includes("haiku") ||
+											model.toLowerCase().includes("instant")
+										const isCoding =
+											model.toLowerCase().includes("coder") ||
+											model.toLowerCase().includes("apply")
+										const isSelected = selectedModelId === model
+										return (
+											<CommandItem
+												key={model}
+												value={model}
+												onSelect={() => onSelect(model)}
+												data-testid={`model-option-${model}`}
+												className="flex items-center justify-between py-1.5">
+												<div className="flex items-center gap-2 truncate">
+													<span className="truncate font-medium" title={model}>
+														{model}
+													</span>
+													{isReasoning && (
+														<span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-semibold shrink-0">
+															Reasoning
+														</span>
+													)}
+													{isCoding && (
+														<span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold shrink-0">
+															Code
+														</span>
+													)}
+													{isFast && (
+														<span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold shrink-0">
+															Fast
+														</span>
+													)}
+												</div>
+												{isSelected && (
+													<Check className="w-3.5 h-3.5 text-mirror-brand-via shrink-0 ml-2" />
+												)}
+											</CommandItem>
+										)
+									})}
 								</CommandGroup>
 							</CommandList>
 							{searchValue && !modelIds.includes(searchValue) && (

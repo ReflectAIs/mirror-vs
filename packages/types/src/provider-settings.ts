@@ -25,6 +25,17 @@ import {
 	nvidiaModels,
 	groqModels,
 	cerebrasModels,
+	relaceModels,
+	togetherModels,
+	hyperbolicModels,
+	perplexityModels,
+	cohereModels,
+	novitaModels,
+	siliconFlowModels,
+	nebiusModels,
+	scalewayModels,
+	yiModels,
+	upstageModels,
 } from "./providers/index.js"
 
 /**
@@ -136,6 +147,17 @@ export const providerNames = [
 	"nvidia",
 	"groq",
 	"cerebras",
+	"relace",
+	"together",
+	"hyperbolic",
+	"perplexity",
+	"cohere",
+	"novita",
+	"siliconflow",
+	"nebius",
+	"scaleway",
+	"yi",
+	"upstage",
 ] as const
 
 export const providerNamesSchema = z.enum(providerNames)
@@ -427,6 +449,51 @@ const cerebrasSchema = apiModelIdProviderModelSchema.extend({
 	cerebrasApiKey: z.string().optional(),
 })
 
+const relaceSchema = apiModelIdProviderModelSchema.extend({
+	relaceApiKey: z.string().optional(),
+	relaceBaseUrl: z.string().optional(),
+})
+
+const togetherSchema = apiModelIdProviderModelSchema.extend({
+	togetherApiKey: z.string().optional(),
+})
+
+const hyperbolicSchema = apiModelIdProviderModelSchema.extend({
+	hyperbolicApiKey: z.string().optional(),
+})
+
+const perplexitySchema = apiModelIdProviderModelSchema.extend({
+	perplexityApiKey: z.string().optional(),
+})
+
+const cohereSchema = apiModelIdProviderModelSchema.extend({
+	cohereApiKey: z.string().optional(),
+})
+
+const novitaSchema = apiModelIdProviderModelSchema.extend({
+	novitaApiKey: z.string().optional(),
+})
+
+const siliconFlowSchema = apiModelIdProviderModelSchema.extend({
+	siliconFlowApiKey: z.string().optional(),
+})
+
+const nebiusSchema = apiModelIdProviderModelSchema.extend({
+	nebiusApiKey: z.string().optional(),
+})
+
+const scalewaySchema = apiModelIdProviderModelSchema.extend({
+	scalewayApiKey: z.string().optional(),
+})
+
+const yiSchema = apiModelIdProviderModelSchema.extend({
+	yiApiKey: z.string().optional(),
+})
+
+const upstageSchema = apiModelIdProviderModelSchema.extend({
+	upstageApiKey: z.string().optional(),
+})
+
 const defaultSchema = z.object({
 	apiProvider: z.undefined(),
 })
@@ -466,6 +533,17 @@ export const providerSettingsSchemaDiscriminated = z.discriminatedUnion("apiProv
 	nvidiaSchema.merge(z.object({ apiProvider: z.literal("nvidia") })),
 	groqSchema.merge(z.object({ apiProvider: z.literal("groq") })),
 	cerebrasSchema.merge(z.object({ apiProvider: z.literal("cerebras") })),
+	relaceSchema.merge(z.object({ apiProvider: z.literal("relace") })),
+	togetherSchema.merge(z.object({ apiProvider: z.literal("together") })),
+	hyperbolicSchema.merge(z.object({ apiProvider: z.literal("hyperbolic") })),
+	perplexitySchema.merge(z.object({ apiProvider: z.literal("perplexity") })),
+	cohereSchema.merge(z.object({ apiProvider: z.literal("cohere") })),
+	novitaSchema.merge(z.object({ apiProvider: z.literal("novita") })),
+	siliconFlowSchema.merge(z.object({ apiProvider: z.literal("siliconflow") })),
+	nebiusSchema.merge(z.object({ apiProvider: z.literal("nebius") })),
+	scalewaySchema.merge(z.object({ apiProvider: z.literal("scaleway") })),
+	yiSchema.merge(z.object({ apiProvider: z.literal("yi") })),
+	upstageSchema.merge(z.object({ apiProvider: z.literal("upstage") })),
 	defaultSchema,
 ])
 
@@ -505,6 +583,17 @@ export const providerSettingsSchema = z.object({
 	...nvidiaSchema.shape,
 	...groqSchema.shape,
 	...cerebrasSchema.shape,
+	...relaceSchema.shape,
+	...togetherSchema.shape,
+	...hyperbolicSchema.shape,
+	...perplexitySchema.shape,
+	...cohereSchema.shape,
+	...novitaSchema.shape,
+	...siliconFlowSchema.shape,
+	...nebiusSchema.shape,
+	...scalewaySchema.shape,
+	...yiSchema.shape,
+	...upstageSchema.shape,
 	...codebaseIndexProviderSchema.shape,
 })
 
@@ -585,6 +674,17 @@ export const modelIdKeysByProvider: Record<TypicalProvider, ModelIdKey> = {
 	nvidia: "apiModelId",
 	groq: "apiModelId",
 	cerebras: "apiModelId",
+	relace: "apiModelId",
+	together: "apiModelId",
+	hyperbolic: "apiModelId",
+	perplexity: "apiModelId",
+	cohere: "apiModelId",
+	novita: "apiModelId",
+	siliconflow: "apiModelId",
+	nebius: "apiModelId",
+	scaleway: "apiModelId",
+	yi: "apiModelId",
+	upstage: "apiModelId",
 }
 
 /**
@@ -726,6 +826,61 @@ export const MODELS_BY_PROVIDER: Record<
 		id: "cerebras",
 		label: "Cerebras",
 		models: Object.keys(cerebrasModels),
+	},
+	relace: {
+		id: "relace",
+		label: "Relace",
+		models: Object.keys(relaceModels),
+	},
+	together: {
+		id: "together",
+		label: "Together AI",
+		models: Object.keys(togetherModels),
+	},
+	hyperbolic: {
+		id: "hyperbolic",
+		label: "Hyperbolic",
+		models: Object.keys(hyperbolicModels),
+	},
+	perplexity: {
+		id: "perplexity",
+		label: "Perplexity",
+		models: Object.keys(perplexityModels),
+	},
+	cohere: {
+		id: "cohere",
+		label: "Cohere",
+		models: Object.keys(cohereModels),
+	},
+	novita: {
+		id: "novita",
+		label: "Novita AI",
+		models: Object.keys(novitaModels),
+	},
+	siliconflow: {
+		id: "siliconflow",
+		label: "SiliconFlow",
+		models: Object.keys(siliconFlowModels),
+	},
+	nebius: {
+		id: "nebius",
+		label: "Nebius AI Studio",
+		models: Object.keys(nebiusModels),
+	},
+	scaleway: {
+		id: "scaleway",
+		label: "Scaleway",
+		models: Object.keys(scalewayModels),
+	},
+	yi: {
+		id: "yi",
+		label: "01.AI (Yi)",
+		models: Object.keys(yiModels),
+	},
+	upstage: {
+		id: "upstage",
+		label: "Upstage Solar",
+		models: Object.keys(upstageModels),
 	},
 }
 

@@ -602,4 +602,22 @@ describe("SettingsView - Unsaved Changes Detection", () => {
 		// No dialog should appear
 		expect(screen.queryByText("settings:unsavedChangesDialog.title")).not.toBeInTheDocument()
 	})
+
+	it("should not enable save button when switching to Advanced tab", async () => {
+		const onDone = vi.fn()
+
+		render(
+			<QueryClientProvider client={queryClient}>
+				<SettingsView onDone={onDone} />
+			</QueryClientProvider>,
+		)
+
+		// Click Advanced button in header mode toggle
+		const advancedButton = screen.getByRole("button", { name: /Advanced/i })
+		fireEvent.click(advancedButton)
+
+		// Save button should remain disabled
+		const saveButton = screen.getByTestId("save-button") as HTMLButtonElement
+		expect(saveButton.disabled).toBe(true)
+	})
 })

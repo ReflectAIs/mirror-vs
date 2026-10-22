@@ -21,6 +21,17 @@ import {
 	nvidiaDefaultModelId,
 	groqDefaultModelId,
 	cerebrasDefaultModelId,
+	relaceDefaultModelId,
+	togetherDefaultModelId,
+	hyperbolicDefaultModelId,
+	perplexityDefaultModelId,
+	cohereDefaultModelId,
+	novitaDefaultModelId,
+	siliconFlowDefaultModelId,
+	nebiusDefaultModelId,
+	scalewayDefaultModelId,
+	yiDefaultModelId,
+	upstageDefaultModelId,
 } from "@mirror-vs/types"
 
 import { MODELS_BY_PROVIDER } from "../constants"
@@ -50,6 +61,17 @@ export const PROVIDER_SERVICE_CONFIG: Partial<Record<ProviderName, ProviderServi
 	nvidia: { serviceName: "NVIDIA NIM", serviceUrl: "https://build.nvidia.com" },
 	groq: { serviceName: "Groq", serviceUrl: "https://console.groq.com" },
 	cerebras: { serviceName: "Cerebras", serviceUrl: "https://cloud.cerebras.ai" },
+	relace: { serviceName: "Relace", serviceUrl: "https://relace.ai" },
+	together: { serviceName: "Together AI", serviceUrl: "https://together.ai" },
+	hyperbolic: { serviceName: "Hyperbolic", serviceUrl: "https://hyperbolic.xyz" },
+	perplexity: { serviceName: "Perplexity", serviceUrl: "https://perplexity.ai" },
+	cohere: { serviceName: "Cohere", serviceUrl: "https://cohere.com" },
+	novita: { serviceName: "Novita AI", serviceUrl: "https://novita.ai" },
+	siliconflow: { serviceName: "SiliconFlow", serviceUrl: "https://siliconflow.cn" },
+	nebius: { serviceName: "Nebius AI Studio", serviceUrl: "https://nebius.com" },
+	scaleway: { serviceName: "Scaleway", serviceUrl: "https://scaleway.com" },
+	yi: { serviceName: "01.AI (Yi)", serviceUrl: "https://01.ai" },
+	upstage: { serviceName: "Upstage Solar", serviceUrl: "https://upstage.ai" },
 	ollama: { serviceName: "Ollama", serviceUrl: "https://ollama.ai" },
 	lmstudio: { serviceName: "LM Studio", serviceUrl: "https://lmstudio.ai/docs" },
 	"vscode-lm": {
@@ -79,6 +101,17 @@ export const PROVIDER_DEFAULT_MODEL_IDS: Partial<Record<ProviderName, string>> =
 	nvidia: nvidiaDefaultModelId,
 	groq: groqDefaultModelId,
 	cerebras: cerebrasDefaultModelId,
+	relace: relaceDefaultModelId,
+	together: togetherDefaultModelId,
+	hyperbolic: hyperbolicDefaultModelId,
+	perplexity: perplexityDefaultModelId,
+	cohere: cohereDefaultModelId,
+	novita: novitaDefaultModelId,
+	siliconflow: siliconFlowDefaultModelId,
+	nebius: nebiusDefaultModelId,
+	scaleway: scalewayDefaultModelId,
+	yi: yiDefaultModelId,
+	upstage: upstageDefaultModelId,
 }
 
 export const getProviderServiceConfig = (provider: ProviderName): ProviderServiceConfig => {

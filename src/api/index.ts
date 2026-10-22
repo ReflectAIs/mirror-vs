@@ -39,6 +39,17 @@ import {
 	NvidiaHandler,
 	GroqHandler,
 	CerebrasHandler,
+	RelaceHandler,
+	TogetherHandler,
+	HyperbolicHandler,
+	PerplexityHandler,
+	CohereHandler,
+	NovitaHandler,
+	SiliconFlowHandler,
+	NebiusHandler,
+	ScalewayHandler,
+	YiHandler,
+	UpstageHandler,
 } from "./providers"
 import { NativeOllamaHandler } from "./providers/native-ollama"
 
@@ -196,6 +207,28 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 				return new GroqHandler(options)
 			case "cerebras":
 				return new CerebrasHandler(options)
+			case "relace":
+				return new RelaceHandler(options)
+			case "together":
+				return new TogetherHandler(options)
+			case "hyperbolic":
+				return new HyperbolicHandler(options)
+			case "perplexity":
+				return new PerplexityHandler(options)
+			case "cohere":
+				return new CohereHandler(options)
+			case "novita":
+				return new NovitaHandler(options)
+			case "siliconflow":
+				return new SiliconFlowHandler(options)
+			case "nebius":
+				return new NebiusHandler(options)
+			case "scaleway":
+				return new ScalewayHandler(options)
+			case "yi":
+				return new YiHandler(options)
+			case "upstage":
+				return new UpstageHandler(options)
 			default:
 				return new AnthropicHandler(options)
 		}

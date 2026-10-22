@@ -40,6 +40,17 @@ import {
 	nvidiaModels,
 	groqModels,
 	cerebrasModels,
+	relaceModels,
+	togetherModels,
+	hyperbolicModels,
+	perplexityModels,
+	cohereModels,
+	novitaModels,
+	siliconFlowModels,
+	nebiusModels,
+	scalewayModels,
+	yiModels,
+	upstageModels,
 } from "@mirror-vs/types"
 
 import { useRouterModels } from "./useRouterModels"
@@ -373,6 +384,61 @@ function getSelectedModel({
 		case "cerebras": {
 			const id = apiConfiguration.apiModelId ?? defaultModelId
 			const info = cerebrasModels[id as keyof typeof cerebrasModels]
+			return { id, info }
+		}
+		case "relace": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = relaceModels[id as keyof typeof relaceModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "together": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = togetherModels[id as keyof typeof togetherModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "hyperbolic": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = hyperbolicModels[id as keyof typeof hyperbolicModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "perplexity": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = perplexityModels[id as keyof typeof perplexityModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "cohere": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = cohereModels[id as keyof typeof cohereModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "novita": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = novitaModels[id as keyof typeof novitaModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "siliconflow": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = siliconFlowModels[id as keyof typeof siliconFlowModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "nebius": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = nebiusModels[id as keyof typeof nebiusModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "scaleway": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = scalewayModels[id as keyof typeof scalewayModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "yi": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = yiModels[id as keyof typeof yiModels] ?? openAiModelInfoSaneDefaults
+			return { id, info }
+		}
+		case "upstage": {
+			const id = apiConfiguration.apiModelId ?? defaultModelId
+			const info = upstageModels[id as keyof typeof upstageModels] ?? openAiModelInfoSaneDefaults
 			return { id, info }
 		}
 		// case "anthropic":

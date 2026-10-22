@@ -22,6 +22,16 @@ import {
 	nvidiaModels,
 	groqModels,
 	cerebrasModels,
+	relaceModels,
+	hyperbolicModels,
+	perplexityModels,
+	cohereModels,
+	novitaModels,
+	siliconFlowModels,
+	nebiusModels,
+	scalewayModels,
+	yiModels,
+	upstageModels,
 } from "@mirror-vs/types"
 
 export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, ModelInfo>>> = {
@@ -46,6 +56,16 @@ export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, Mod
 	nvidia: nvidiaModels,
 	groq: groqModels,
 	cerebras: cerebrasModels,
+	relace: relaceModels,
+	hyperbolic: hyperbolicModels,
+	perplexity: perplexityModels,
+	cohere: cohereModels,
+	novita: novitaModels,
+	siliconflow: siliconFlowModels,
+	nebius: nebiusModels,
+	scaleway: scalewayModels,
+	yi: yiModels,
+	upstage: upstageModels,
 }
 
 export const PROVIDERS = [
@@ -81,4 +101,15 @@ export const PROVIDERS = [
 	{ value: "nvidia", label: "NVIDIA", proxy: false },
 	{ value: "groq", label: "Groq", proxy: false },
 	{ value: "cerebras", label: "Cerebras", proxy: false },
+	{ value: "relace", label: "Relace", proxy: false },
+	{ value: "together", label: "Together AI", proxy: false },
+	{ value: "hyperbolic", label: "Hyperbolic", proxy: false },
+	{ value: "perplexity", label: "Perplexity", proxy: false },
+	{ value: "cohere", label: "Cohere", proxy: false },
+	{ value: "novita", label: "Novita AI", proxy: false },
+	{ value: "siliconflow", label: "SiliconFlow", proxy: false },
+	{ value: "nebius", label: "Nebius AI Studio", proxy: false },
+	{ value: "scaleway", label: "Scaleway", proxy: false },
+	{ value: "yi", label: "01.AI (Yi)", proxy: false },
+	{ value: "upstage", label: "Upstage Solar", proxy: false },
 ].sort((a, b) => a.label.localeCompare(b.label))

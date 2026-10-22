@@ -572,7 +572,7 @@ describe("ApiOptions", () => {
 	it("renders retired provider message and hides provider-specific forms", () => {
 		renderApiOptions({
 			apiConfiguration: {
-				apiProvider: "groq",
+				apiProvider: "chutes" as any,
 			},
 		})
 
@@ -597,7 +597,7 @@ describe("ApiOptions", () => {
 	it("does not reintroduce retired providers into active provider options", () => {
 		renderApiOptions({
 			apiConfiguration: {
-				apiProvider: "groq",
+				apiProvider: "chutes" as any,
 			},
 		})
 
@@ -605,6 +605,6 @@ describe("ApiOptions", () => {
 		const providerSelect = providerSelectContainer.querySelector("select") as HTMLSelectElement
 		const providerOptions = Array.from(providerSelect.querySelectorAll("option")).map((option) => option.value)
 
-		expect(providerOptions).not.toContain("groq")
+		expect(providerOptions).not.toContain("chutes")
 	})
 })

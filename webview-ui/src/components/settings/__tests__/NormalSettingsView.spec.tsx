@@ -2,6 +2,41 @@ import { render, screen, fireEvent } from "@/utils/test-utils"
 import { NormalSettingsView } from "../NormalSettingsView"
 import { ExtensionStateContextType } from "@src/context/ExtensionStateContext"
 
+vi.mock("@src/components/ui", async () => {
+	const actual = await vi.importActual<any>("@src/components/ui")
+	return {
+		...actual,
+		SearchableSelect: ({ value, onValueChange, options, placeholder, "data-testid": dataTestId }: any) => (
+			<select
+				value={value}
+				onChange={(e) => {
+					if (onValueChange) onValueChange(e.target.value)
+				}}
+				data-testid={dataTestId || "normal-provider-select"}>
+				<option value="">{placeholder || "Select a provider"}</option>
+				{options?.map((option: any) => (
+					<option key={option.value} value={option.value}>
+						{option.label}
+					</option>
+				))}
+			</select>
+		),
+		Select: ({ children, value, onValueChange }: any) => (
+			<div data-testid="select" data-value={value}>
+				{children}
+			</div>
+		),
+		SelectTrigger: ({ children }: any) => <div>{children}</div>,
+		SelectValue: ({ children, placeholder }: any) => <div>{children || placeholder}</div>,
+		SelectContent: ({ children }: any) => <div>{children}</div>,
+		SelectItem: ({ children, value }: any) => (
+			<div data-testid={`select-item-${value}`} data-value={value}>
+				{children}
+			</div>
+		),
+	}
+})
+
 describe("NormalSettingsView", () => {
 	const mockSetCachedStateField = vi.fn()
 	const mockSetApiConfigurationField = vi.fn()
@@ -43,22 +78,19 @@ describe("NormalSettingsView", () => {
 		vi.clearAllMocks()
 	})
 
-	it("renders curated provider options and header badge", () => {
+	it("renders provider select dropdown with options", () => {
 		renderNormalSettings()
 
-		expect(screen.getByText("Normal Setup Mode")).toBeInTheDocument()
-		expect(screen.getByText("OpenRouter")).toBeInTheDocument()
-		expect(screen.getByText("Anthropic Claude")).toBeInTheDocument()
-		expect(screen.getByText("OpenAI")).toBeInTheDocument()
-		expect(screen.getByText("Google Gemini")).toBeInTheDocument()
-		expect(screen.getByText("DeepSeek")).toBeInTheDocument()
-		expect(screen.getByText("Ollama (Local AI)")).toBeInTheDocument()
+		const select = screen.getByTestId("normal-provider-select") as HTMLSelectElement
+		expect(select).toBeInTheDocument()
+		expect(select.value).toBe("openrouter")
 	})
 
-	it("switches provider when clicking a provider card", () => {
+	it("switches provider when selecting from dropdown", () => {
 		renderNormalSettings()
 
-		fireEvent.click(screen.getByText("Anthropic Claude"))
+		const select = screen.getByTestId("normal-provider-select")
+		fireEvent.change(select, { target: { value: "anthropic" } })
 
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("apiProvider", "anthropic")
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("apiModelId", "claude-3-7-sonnet-20250219")
@@ -67,7 +99,8 @@ describe("NormalSettingsView", () => {
 	it("switches to Ollama and assigns default model and base URL", () => {
 		renderNormalSettings()
 
-		fireEvent.click(screen.getByText("Ollama (Local AI)"))
+		const select = screen.getByTestId("normal-provider-select")
+		fireEvent.change(select, { target: { value: "ollama" } })
 
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("apiProvider", "ollama")
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("ollamaModelId", "qwen2.5-coder:latest")
@@ -139,9 +172,8 @@ describe("NormalSettingsView", () => {
 	it("renders Custom API option and switches to it correctly", () => {
 		renderNormalSettings()
 
-		expect(screen.getByText("Custom API")).toBeInTheDocument()
-
-		fireEvent.click(screen.getByText("Custom API"))
+		const select = screen.getByTestId("normal-provider-select")
+		fireEvent.change(select, { target: { value: "custom" } })
 
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("apiProvider", "custom")
 		expect(mockSetApiConfigurationField).toHaveBeenCalledWith("customModelId", "gpt-4o")
@@ -158,5 +190,29 @@ describe("NormalSettingsView", () => {
 		})
 
 		expect(screen.getByText("Custom API Base URL")).toBeInTheDocument()
+	})
+
+	it("renders custom added model in the model selector without being blank", () => {
+		renderNormalSettings({
+			...defaultCachedState,
+			apiConfiguration: {
+				apiProvider: "relace",
+				apiModelId: "custom-unlisted-relace-model",
+			},
+		})
+
+		expect(screen.getByText("custom-unlisted-relace-model")).toBeInTheDocument()
+	})
+
+	it("renders curated model with its label when selected", () => {
+		renderNormalSettings({
+			...defaultCachedState,
+			apiConfiguration: {
+				apiProvider: "relace",
+				apiModelId: "deepseek-ai/DeepSeek-V4-Flash-0731",
+			},
+		})
+
+		expect(screen.getByText("DeepSeek V4 Flash 0731")).toBeInTheDocument()
 	})
 })

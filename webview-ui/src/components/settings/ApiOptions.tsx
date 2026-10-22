@@ -34,6 +34,21 @@ import {
 	minimaxDefaultModelId,
 	unboundDefaultModelId,
 	isFreeProvider,
+	freeRouterDefaultModelId,
+	nvidiaDefaultModelId,
+	groqDefaultModelId,
+	cerebrasDefaultModelId,
+	relaceDefaultModelId,
+	togetherDefaultModelId,
+	hyperbolicDefaultModelId,
+	perplexityDefaultModelId,
+	cohereDefaultModelId,
+	novitaDefaultModelId,
+	siliconFlowDefaultModelId,
+	nebiusDefaultModelId,
+	scalewayDefaultModelId,
+	yiDefaultModelId,
+	upstageDefaultModelId,
 } from "@mirror-vs/types"
 
 import {
@@ -100,6 +115,17 @@ import {
 	Nvidia,
 	Groq,
 	Cerebras,
+	Relace,
+	Together,
+	Hyperbolic,
+	Perplexity,
+	Cohere,
+	Novita,
+	SiliconFlow,
+	Nebius,
+	Scaleway,
+	Yi,
+	Upstage,
 } from "./providers"
 
 import { MODELS_BY_PROVIDER, PROVIDERS } from "./constants"
@@ -368,6 +394,21 @@ const ApiOptions = ({
 				fireworks: { field: "apiModelId", default: fireworksDefaultModelId },
 				poe: { field: "apiModelId", default: poeDefaultModelId },
 				"vercel-ai-gateway": { field: "vercelAiGatewayModelId", default: vercelAiGatewayDefaultModelId },
+				"free-router": { field: "apiModelId", default: freeRouterDefaultModelId },
+				nvidia: { field: "apiModelId", default: nvidiaDefaultModelId },
+				groq: { field: "apiModelId", default: groqDefaultModelId },
+				cerebras: { field: "apiModelId", default: cerebrasDefaultModelId },
+				relace: { field: "apiModelId", default: relaceDefaultModelId },
+				together: { field: "apiModelId", default: togetherDefaultModelId },
+				hyperbolic: { field: "apiModelId", default: hyperbolicDefaultModelId },
+				perplexity: { field: "apiModelId", default: perplexityDefaultModelId },
+				cohere: { field: "apiModelId", default: cohereDefaultModelId },
+				novita: { field: "apiModelId", default: novitaDefaultModelId },
+				siliconflow: { field: "apiModelId", default: siliconFlowDefaultModelId },
+				nebius: { field: "apiModelId", default: nebiusDefaultModelId },
+				scaleway: { field: "apiModelId", default: scalewayDefaultModelId },
+				yi: { field: "apiModelId", default: yiDefaultModelId },
+				upstage: { field: "apiModelId", default: upstageDefaultModelId },
 				openai: { field: "openAiModelId" },
 				ollama: { field: "ollamaModelId" },
 				lmstudio: { field: "lmStudioModelId" },
@@ -475,13 +516,15 @@ const ApiOptions = ({
 					<span>Only 100% free-tier providers and models with automatic routing & failover are shown.</span>
 				</div>
 			)}
-			<div className="flex flex-col gap-1 relative">
+			<div className="flex flex-col gap-1.5 relative">
 				<div className="flex justify-between items-center">
-					<label className="block font-medium">{t("settings:providers.apiProvider")}</label>
+					<label className="block text-xs font-semibold uppercase tracking-wider text-vscode-foreground/90">
+						{t("settings:providers.apiProvider")}
+					</label>
 					{docs && (
-						<VSCodeLink href={docs.url} target="_blank" className="flex gap-2">
-							{t("settings:providers.apiProviderDocs")}
-							<BookOpenText className="size-4 inline ml-2" />
+						<VSCodeLink href={docs.url} target="_blank" className="flex items-center gap-1 text-[11px]">
+							{docs.name} Docs
+							<BookOpenText className="size-3.5 inline ml-1" />
 						</VSCodeLink>
 					)}
 				</div>
@@ -490,7 +533,7 @@ const ApiOptions = ({
 					onValueChange={(value) => onProviderChange(value as ProviderName)}
 					options={providerOptions}
 					placeholder={t("settings:common.select")}
-					searchPlaceholder={t("settings:providers.searchProviderPlaceholder")}
+					searchPlaceholder="Search 40+ AI providers (Relace, Together, Anthropic, DeepSeek, OpenAI...)"
 					emptyMessage={t("settings:providers.noProviderMatchFound")}
 					className="w-full"
 					data-testid="provider-select"
@@ -771,6 +814,80 @@ const ApiOptions = ({
 
 					{selectedProvider === "cerebras" && (
 						<Cerebras
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "relace" && (
+						<Relace
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "together" && (
+						<Together
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "hyperbolic" && (
+						<Hyperbolic
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "perplexity" && (
+						<Perplexity
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "cohere" && (
+						<Cohere
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "novita" && (
+						<Novita
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "siliconflow" && (
+						<SiliconFlow
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "nebius" && (
+						<Nebius
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "scaleway" && (
+						<Scaleway
+							apiConfiguration={apiConfiguration}
+							setApiConfigurationField={setApiConfigurationField}
+						/>
+					)}
+
+					{selectedProvider === "yi" && (
+						<Yi apiConfiguration={apiConfiguration} setApiConfigurationField={setApiConfigurationField} />
+					)}
+
+					{selectedProvider === "upstage" && (
+						<Upstage
 							apiConfiguration={apiConfiguration}
 							setApiConfigurationField={setApiConfigurationField}
 						/>

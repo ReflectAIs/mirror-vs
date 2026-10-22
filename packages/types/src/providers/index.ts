@@ -30,6 +30,17 @@ export * from "./free-router.js"
 export * from "./nvidia.js"
 export * from "./groq.js"
 export * from "./cerebras.js"
+export * from "./relace.js"
+export * from "./together.js"
+export * from "./hyperbolic.js"
+export * from "./perplexity.js"
+export * from "./cohere.js"
+export * from "./novita.js"
+export * from "./siliconflow.js"
+export * from "./nebius.js"
+export * from "./scaleway.js"
+export * from "./yi.js"
+export * from "./upstage.js"
 
 import { anthropicDefaultModelId } from "./anthropic.js"
 import { basetenDefaultModelId } from "./baseten.js"
@@ -60,6 +71,17 @@ import { freeRouterDefaultModelId } from "./free-router.js"
 import { nvidiaDefaultModelId } from "./nvidia.js"
 import { groqDefaultModelId } from "./groq.js"
 import { cerebrasDefaultModelId } from "./cerebras.js"
+import { relaceDefaultModelId } from "./relace.js"
+import { togetherDefaultModelId } from "./together.js"
+import { hyperbolicDefaultModelId } from "./hyperbolic.js"
+import { perplexityDefaultModelId } from "./perplexity.js"
+import { cohereDefaultModelId } from "./cohere.js"
+import { novitaDefaultModelId } from "./novita.js"
+import { siliconFlowDefaultModelId } from "./siliconflow.js"
+import { nebiusDefaultModelId } from "./nebius.js"
+import { scalewayDefaultModelId } from "./scaleway.js"
+import { yiDefaultModelId } from "./yi.js"
+import { upstageDefaultModelId } from "./upstage.js"
 
 // Import the ProviderName type from provider-settings to avoid duplication
 import type { ProviderName } from "../provider-settings.js"
@@ -136,6 +158,28 @@ export function getProviderDefaultModelId(
 			return groqDefaultModelId
 		case "cerebras":
 			return cerebrasDefaultModelId
+		case "relace":
+			return relaceDefaultModelId
+		case "together":
+			return togetherDefaultModelId
+		case "hyperbolic":
+			return hyperbolicDefaultModelId
+		case "perplexity":
+			return perplexityDefaultModelId
+		case "cohere":
+			return cohereDefaultModelId
+		case "novita":
+			return novitaDefaultModelId
+		case "siliconflow":
+			return siliconFlowDefaultModelId
+		case "nebius":
+			return nebiusDefaultModelId
+		case "scaleway":
+			return scalewayDefaultModelId
+		case "yi":
+			return yiDefaultModelId
+		case "upstage":
+			return upstageDefaultModelId
 		case "anthropic":
 		case "gemini-cli":
 		case "fake-ai":

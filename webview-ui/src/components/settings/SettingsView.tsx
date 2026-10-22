@@ -247,16 +247,21 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		}
 	}, [settingsImportedAt, extensionState])
 
-	const setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType> = useCallback((field, value) => {
-		setCachedState((prevState) => {
-			if (prevState[field] === value) {
-				return prevState
-			}
+	const setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType> = useCallback(
+		(field, value, isUserAction: boolean = true) => {
+			setCachedState((prevState) => {
+				if (prevState[field] === value) {
+					return prevState
+				}
 
-			setChangeDetected(true)
-			return { ...prevState, [field]: value }
-		})
-	}, [])
+				if (isUserAction && field !== "settingsMode") {
+					setChangeDetected(true)
+				}
+				return { ...prevState, [field]: value }
+			})
+		},
+		[],
+	)
 
 	const setApiConfigurationField = useCallback(
 		<K extends keyof ProviderSettings>(field: K, value: ProviderSettings[K], isUserAction: boolean = true) => {
@@ -690,7 +695,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 
 	const handleSwitchMode = useCallback(
 		(mode: "free" | "normal" | "advanced") => {
-			setCachedStateField("settingsMode", mode)
+			setCachedStateField("settingsMode", mode, false)
 			vscode.postMessage({
 				type: "updateSettings",
 				updatedSettings: {
@@ -712,8 +717,11 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 							variant="ghost"
 							size="sm"
 							className="px-1 h-7 shrink-0"
+							data-testid="done-button"
+							aria-label={t("settings:common.done")}
 							onClick={() => checkUnsaveChanges(onDone)}>
 							<ArrowLeft className="w-4 h-4" />
+							<span className="sr-only">{t("settings:common.done")}</span>
 						</Button>
 					</StandardTooltip>
 					<span className="text-[13px] font-semibold text-vscode-foreground whitespace-nowrap">
@@ -721,50 +729,60 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					</span>
 				</div>
 
-				{/* Centre: 3-way mode toggle */}
-				<div className="flex items-center gap-0.5 px-0.5 py-0.5 rounded-lg bg-vscode-input-background border border-vscode-editorGroup-border/60 shrink-0">
+				{/* Centre: Enhanced 3-way mode toggle */}
+				<div className="flex items-center gap-1 p-0.5 rounded-lg bg-vscode-input-background/80 border border-vscode-editorGroup-border/70 shadow-sm shrink-0">
 					{/* Free */}
 					<button
 						type="button"
 						onClick={() => handleSwitchMode("free")}
-						title="Free AI Mode — use the extension for free with rate-limited providers"
+						title="Free AI Mode — Use free models and auto-routed zero-cost tiers"
 						className={cn(
-							"h-6 px-2.5 text-[11px] font-medium rounded-md transition-all duration-150 cursor-pointer flex items-center gap-1 border-none leading-none whitespace-nowrap",
+							"h-7 px-3 text-[11px] font-medium rounded-md transition-all duration-200 cursor-pointer flex items-center gap-1.5 border leading-none whitespace-nowrap",
 							isFreeMode
-								? "bg-emerald-500/25 text-emerald-300 font-semibold"
-								: "text-vscode-foreground/45 hover:text-vscode-foreground/70 bg-transparent",
+								? "bg-emerald-500/20 text-emerald-300 font-semibold border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.25)]"
+								: "text-vscode-foreground/60 hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground/40 border-transparent",
 						)}>
-						<Zap className="w-3 h-3" />
-						Free
+						<Zap
+							className={cn("w-3.5 h-3.5", isFreeMode ? "text-emerald-400" : "text-vscode-foreground/60")}
+						/>
+						<span>Free AI</span>
 					</button>
-					<div className="w-px h-4 bg-vscode-editorGroup-border/40" />
+
 					{/* Simple */}
 					<button
 						type="button"
 						onClick={() => handleSwitchMode("normal")}
-						title="Simple Settings — essential settings without the clutter"
+						title="Simple Settings — Clean essentials, curated models, zero clutter"
 						className={cn(
-							"h-6 px-2.5 text-[11px] font-medium rounded-md transition-all duration-150 cursor-pointer flex items-center gap-1 border-none leading-none whitespace-nowrap",
+							"h-7 px-3 text-[11px] font-medium rounded-md transition-all duration-200 cursor-pointer flex items-center gap-1.5 border leading-none whitespace-nowrap",
 							isSimpleMode
-								? "bg-blue-500/20 text-blue-300 font-semibold"
-								: "text-vscode-foreground/45 hover:text-vscode-foreground/70 bg-transparent",
+								? "bg-blue-500/20 text-blue-300 font-semibold border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.25)]"
+								: "text-vscode-foreground/60 hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground/40 border-transparent",
 						)}>
-						Simple
+						<Sparkles
+							className={cn("w-3.5 h-3.5", isSimpleMode ? "text-blue-400" : "text-vscode-foreground/60")}
+						/>
+						<span>Simple</span>
 					</button>
-					<div className="w-px h-4 bg-vscode-editorGroup-border/40" />
+
 					{/* Advanced */}
 					<button
 						type="button"
 						onClick={() => handleSwitchMode("advanced")}
-						title="Advanced Settings — full control over all extension settings"
+						title="Advanced Settings — Full granular control over all 35+ providers, MCP, and tools"
 						className={cn(
-							"h-6 px-2.5 text-[11px] font-medium rounded-md transition-all duration-150 cursor-pointer flex items-center gap-1 border-none leading-none whitespace-nowrap",
+							"h-7 px-3 text-[11px] font-medium rounded-md transition-all duration-200 cursor-pointer flex items-center gap-1.5 border leading-none whitespace-nowrap",
 							!isSimpleMode && !isFreeMode
-								? "bg-purple-500/20 text-purple-300 font-semibold"
-								: "text-vscode-foreground/45 hover:text-vscode-foreground/70 bg-transparent",
+								? "bg-purple-500/20 text-purple-300 font-semibold border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]"
+								: "text-vscode-foreground/60 hover:text-vscode-foreground hover:bg-vscode-list-hoverBackground/40 border-transparent",
 						)}>
-						<SlidersHorizontal className="w-3 h-3" />
-						Advanced
+						<SlidersHorizontal
+							className={cn(
+								"w-3.5 h-3.5",
+								!isSimpleMode && !isFreeMode ? "text-purple-400" : "text-vscode-foreground/60",
+							)}
+						/>
+						<span>Advanced</span>
 					</button>
 				</div>
 

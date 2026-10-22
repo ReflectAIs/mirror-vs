@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react"
+import React, { useState, useMemo, useCallback, useEffect } from "react"
 import {
 	Shield,
 	ShieldCheck,
@@ -34,9 +34,18 @@ import { LANGUAGES } from "@shared/language"
 
 import { ExtensionStateContextType } from "@src/context/ExtensionStateContext"
 import { cn } from "@src/lib/utils"
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@src/components/ui"
+import {
+	Button,
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+	SearchableSelect,
+} from "@src/components/ui"
 import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption, VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
 import { SetCachedStateField, SetExperimentEnabled } from "./types"
+import { PROVIDERS, MODELS_BY_PROVIDER } from "./constants"
 
 interface NormalSettingsViewProps {
 	cachedState: ExtensionStateContextType
@@ -127,6 +136,184 @@ const CURATED_PROVIDERS: CuratedProvider[] = [
 		],
 	},
 	{
+		id: "relace",
+		name: "Relace",
+		badge: "DeepSeek & Apply",
+		description: "High-throughput DeepSeek V4 inference and specialized code apply engine.",
+		keyUrl: "https://app.relace.ai",
+		keyLabel: "Get Relace Key",
+		defaultModel: "deepseek-ai/DeepSeek-V4.1-Flash",
+		models: [
+			{ id: "deepseek-ai/DeepSeek-V4.1-Flash", label: "DeepSeek V4.1 Flash (1M Context)", tag: "Recommended" },
+			{ id: "deepseek-ai/DeepSeek-V4.1-Flash-1017", label: "DeepSeek V4.1 Flash 1017", tag: "Oct '26" },
+			{ id: "deepseek-ai/DeepSeek-V4-Flash-0731", label: "DeepSeek V4 Flash 0731", tag: "High Speed" },
+			{ id: "deepseek-ai/DeepSeek-V4-Pro", label: "DeepSeek V4 Pro (Flagship)", tag: "Pro" },
+			{ id: "relace-apply-3", label: "Relace Apply 3 (Diff & Merge)", tag: "Fast Apply" },
+			{ id: "relace-search", label: "Relace Agentic Search", tag: "Search" },
+			{ id: "z-ai/glm-5.3", label: "Z.ai GLM 5.3" },
+			{ id: "moonshotai/kimi-k3", label: "Moonshot Kimi K3" },
+			{ id: "xiaomi/mimo-v2.6-flash", label: "Xiaomi MiMo-V2.6 Flash" },
+		],
+	},
+	{
+		id: "together",
+		name: "Together AI",
+		badge: "High-Speed Cloud",
+		description: "High-performance inference for DeepSeek R1, DeepSeek V3, and Llama 3.3.",
+		keyUrl: "https://api.together.xyz/",
+		keyLabel: "Get Together Key",
+		defaultModel: "deepseek-ai/DeepSeek-R1",
+		models: [
+			{ id: "deepseek-ai/DeepSeek-R1", label: "DeepSeek R1 (Reasoning)", tag: "Recommended" },
+			{ id: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3 671B", tag: "Fast" },
+			{ id: "meta-llama/Llama-3.3-70B-Instruct-Turbo", label: "Llama 3.3 70B Turbo" },
+		],
+	},
+	{
+		id: "hyperbolic",
+		name: "Hyperbolic",
+		badge: "Decentralized GPU",
+		description: "Decentralized compute cloud for DeepSeek R1 and V3 at lowest costs.",
+		keyUrl: "https://app.hyperbolic.xyz/",
+		keyLabel: "Get Hyperbolic Key",
+		defaultModel: "deepseek-ai/DeepSeek-R1",
+		models: [
+			{ id: "deepseek-ai/DeepSeek-R1", label: "DeepSeek R1 (Reasoning)", tag: "Recommended" },
+			{ id: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3 (MoE)", tag: "Fast" },
+		],
+	},
+	{
+		id: "cerebras",
+		name: "Cerebras",
+		badge: "Wafer-Scale 2000+ tps",
+		description: "CS-3 Wafer-Scale Engine providing instant speed with free tier.",
+		keyUrl: "https://cloud.cerebras.ai",
+		keyLabel: "Get Cerebras Key",
+		defaultModel: "llama-3.3-70b",
+		models: [
+			{ id: "llama-3.3-70b", label: "Llama 3.3 70B", tag: "Recommended" },
+			{ id: "llama3.1-8b", label: "Llama 3.1 8B (Fast)" },
+		],
+	},
+	{
+		id: "groq",
+		name: "Groq",
+		badge: "Sub-Second LPU",
+		description: "Ultra-fast inference on LPUs with free tier access.",
+		keyUrl: "https://console.groq.com",
+		keyLabel: "Get Groq Key",
+		defaultModel: "llama-3.3-70b-versatile",
+		models: [
+			{ id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile", tag: "Recommended" },
+			{ id: "llama-3.1-8b-instant", label: "Llama 3.1 8B Instant (Ultra-Fast)" },
+		],
+	},
+	{
+		id: "perplexity",
+		name: "Perplexity",
+		badge: "Web Grounded",
+		description: "Online web search reasoning and fact-grounded models.",
+		keyUrl: "https://www.perplexity.ai/settings/api",
+		keyLabel: "Get Perplexity Key",
+		defaultModel: "sonar-pro",
+		models: [
+			{ id: "sonar-pro", label: "Sonar Pro (Search & Reasoning)", tag: "Recommended" },
+			{ id: "sonar", label: "Sonar (Fast Search)" },
+			{ id: "sonar-reasoning-pro", label: "Sonar Reasoning Pro" },
+		],
+	},
+	{
+		id: "cohere",
+		name: "Cohere",
+		badge: "Enterprise RAG",
+		description: "Cohere Command R+ enterprise reasoning models.",
+		keyUrl: "https://dashboard.cohere.com/api-keys",
+		keyLabel: "Get Cohere Key",
+		defaultModel: "command-r-plus-08-2024",
+		models: [
+			{ id: "command-r-plus-08-2024", label: "Command R+ (Flagship)", tag: "Recommended" },
+			{ id: "command-r-08-2024", label: "Command R (Cost-Effective)" },
+		],
+	},
+	{
+		id: "novita",
+		name: "Novita AI",
+		badge: "Low Cost Cloud",
+		description: "High-speed DeepSeek R1 and V3 on Novita GPU cloud.",
+		keyUrl: "https://novita.ai/settings/key-management",
+		keyLabel: "Get Novita Key",
+		defaultModel: "deepseek/deepseek-r1",
+		models: [
+			{ id: "deepseek/deepseek-r1", label: "DeepSeek R1 (Reasoning)", tag: "Recommended" },
+			{ id: "deepseek/deepseek-v3", label: "DeepSeek V3" },
+		],
+	},
+	{
+		id: "siliconflow",
+		name: "SiliconFlow",
+		badge: "High Throughput",
+		description: "High-throughput cloud inference for DeepSeek R1 and Qwen 2.5.",
+		keyUrl: "https://cloud.siliconflow.cn/account/ak",
+		keyLabel: "Get SiliconFlow Key",
+		defaultModel: "deepseek-ai/DeepSeek-R1",
+		models: [
+			{ id: "deepseek-ai/DeepSeek-R1", label: "DeepSeek R1", tag: "Recommended" },
+			{ id: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3" },
+		],
+	},
+	{
+		id: "nebius",
+		name: "Nebius AI Studio",
+		badge: "Bare-Metal GPU",
+		description: "European bare-metal GPU clusters for ultra-low latency.",
+		keyUrl: "https://studio.nebius.ai/",
+		keyLabel: "Get Nebius Key",
+		defaultModel: "deepseek-ai/DeepSeek-R1",
+		models: [
+			{ id: "deepseek-ai/DeepSeek-R1", label: "DeepSeek R1", tag: "Recommended" },
+			{ id: "deepseek-ai/DeepSeek-V3", label: "DeepSeek V3" },
+		],
+	},
+	{
+		id: "scaleway",
+		name: "Scaleway",
+		badge: "EU Sovereign",
+		description: "Sovereign European cloud AI inference infrastructure.",
+		keyUrl: "https://console.scaleway.com/",
+		keyLabel: "Get Scaleway Key",
+		defaultModel: "deepseek-r1",
+		models: [
+			{ id: "deepseek-r1", label: "DeepSeek R1", tag: "Recommended" },
+			{ id: "deepseek-v3", label: "DeepSeek V3" },
+		],
+	},
+	{
+		id: "yi",
+		name: "01.AI (Yi)",
+		badge: "Bilingual Intelligence",
+		description: "01.AI Yi-Lightning and Yi-Large high-intelligence models.",
+		keyUrl: "https://platform.01.ai/",
+		keyLabel: "Get 01.AI Key",
+		defaultModel: "yi-lightning",
+		models: [
+			{ id: "yi-lightning", label: "Yi-Lightning", tag: "Recommended" },
+			{ id: "yi-large", label: "Yi-Large" },
+		],
+	},
+	{
+		id: "upstage",
+		name: "Upstage Solar",
+		badge: "Agentic Reasoning",
+		description: "Solar Pro frontier model specialized for coding and tools.",
+		keyUrl: "https://console.upstage.ai/",
+		keyLabel: "Get Upstage Key",
+		defaultModel: "solar-pro",
+		models: [
+			{ id: "solar-pro", label: "Solar Pro", tag: "Recommended" },
+			{ id: "solar-mini", label: "Solar Mini" },
+		],
+	},
+	{
 		id: "ollama",
 		name: "Ollama (Local AI)",
 		badge: "Free & Offline",
@@ -161,17 +348,27 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 	const currentProvider = (apiConfig.apiProvider || "openrouter") as ProviderName
 
 	// Match active provider against curated list, or provide fallback
-	const activeProviderConfig = useMemo(() => {
+	const activeProviderConfig: CuratedProvider = useMemo(() => {
 		const found = CURATED_PROVIDERS.find((p) => p.id === currentProvider)
 		if (found) return found
 
-		// If user configured a provider not in the top 6 (e.g. bedrock, mistral), preserve it nicely
+		const providerMeta = PROVIDERS.find((p) => p.value === currentProvider)
+		const staticModels = MODELS_BY_PROVIDER[currentProvider]
+		const modelList: Array<{ id: string; label: string; tag?: string }> = staticModels
+			? Object.keys(staticModels).map((id) => ({
+					id,
+					label: id,
+				}))
+			: []
+
 		return {
 			id: currentProvider,
-			name: String(currentProvider).toUpperCase(),
+			name: providerMeta?.label || String(currentProvider).toUpperCase(),
 			description: "Configured provider",
-			defaultModel: "",
-			models: [],
+			defaultModel: modelList[0]?.id || "",
+			models: modelList,
+			keyUrl: undefined,
+			keyLabel: undefined,
 		}
 	}, [currentProvider])
 
@@ -187,8 +384,32 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 				return apiConfig.geminiApiKey || ""
 			case "deepseek":
 				return apiConfig.deepSeekApiKey || ""
-			case "custom":
-				return apiConfig.customApiKey || ""
+			case "relace":
+				return apiConfig.relaceApiKey || ""
+			case "together":
+				return apiConfig.togetherApiKey || ""
+			case "hyperbolic":
+				return apiConfig.hyperbolicApiKey || ""
+			case "cerebras":
+				return apiConfig.cerebrasApiKey || ""
+			case "groq":
+				return apiConfig.groqApiKey || ""
+			case "perplexity":
+				return apiConfig.perplexityApiKey || ""
+			case "cohere":
+				return apiConfig.cohereApiKey || ""
+			case "novita":
+				return apiConfig.novitaApiKey || ""
+			case "siliconflow":
+				return apiConfig.siliconFlowApiKey || ""
+			case "nebius":
+				return apiConfig.nebiusApiKey || ""
+			case "scaleway":
+				return apiConfig.scalewayApiKey || ""
+			case "yi":
+				return apiConfig.yiApiKey || ""
+			case "upstage":
+				return apiConfig.upstageApiKey || ""
 			default:
 				return apiConfig.apiKey || (apiConfig as any)[`${currentProvider}ApiKey`] || ""
 		}
@@ -213,6 +434,45 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 				case "custom":
 					setApiConfigurationField("customApiKey", newKey)
 					break
+				case "relace":
+					setApiConfigurationField("relaceApiKey", newKey)
+					break
+				case "together":
+					setApiConfigurationField("togetherApiKey", newKey)
+					break
+				case "hyperbolic":
+					setApiConfigurationField("hyperbolicApiKey", newKey)
+					break
+				case "cerebras":
+					setApiConfigurationField("cerebrasApiKey", newKey)
+					break
+				case "groq":
+					setApiConfigurationField("groqApiKey", newKey)
+					break
+				case "perplexity":
+					setApiConfigurationField("perplexityApiKey", newKey)
+					break
+				case "cohere":
+					setApiConfigurationField("cohereApiKey", newKey)
+					break
+				case "novita":
+					setApiConfigurationField("novitaApiKey", newKey)
+					break
+				case "siliconflow":
+					setApiConfigurationField("siliconFlowApiKey", newKey)
+					break
+				case "nebius":
+					setApiConfigurationField("nebiusApiKey", newKey)
+					break
+				case "scaleway":
+					setApiConfigurationField("scalewayApiKey", newKey)
+					break
+				case "yi":
+					setApiConfigurationField("yiApiKey", newKey)
+					break
+				case "upstage":
+					setApiConfigurationField("upstageApiKey", newKey)
+					break
 				default:
 					setApiConfigurationField("apiKey", newKey)
 					break
@@ -220,6 +480,41 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 		},
 		[currentProvider, setApiConfigurationField],
 	)
+
+	// Model ID key based on provider
+	const modelIdKey = useMemo(() => {
+		switch (currentProvider) {
+			case "openrouter":
+				return "openRouterModelId"
+			case "ollama":
+				return "ollamaModelId"
+			case "custom":
+				return "customModelId"
+			default:
+				return "apiModelId"
+		}
+	}, [currentProvider])
+
+	const [isCustomMode, setIsCustomMode] = useState(false)
+	const [customInputText, setCustomInputText] = useState("")
+
+	const [savedCustomModels, setSavedCustomModels] = useState<string[]>(() => {
+		try {
+			const saved = localStorage.getItem(`custom_models_${currentProvider}_${modelIdKey}`)
+			return saved ? JSON.parse(saved) : []
+		} catch {
+			return []
+		}
+	})
+
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem(`custom_models_${currentProvider}_${modelIdKey}`)
+			setSavedCustomModels(saved ? JSON.parse(saved) : [])
+		} catch {
+			setSavedCustomModels([])
+		}
+	}, [currentProvider, modelIdKey])
 
 	// Current Model ID resolution
 	const currentModelId = useMemo(() => {
@@ -254,6 +549,48 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 		},
 		[currentProvider, setApiConfigurationField],
 	)
+
+	// Combine curated models with custom saved models and currentModelId so it never displays blank!
+	const selectableModels = useMemo(() => {
+		const list: Array<{ id: string; label: string; tag?: string }> = [...activeProviderConfig.models]
+
+		// Add custom models from localStorage
+		for (const customId of savedCustomModels) {
+			if (customId && customId.trim() && !list.some((m) => m.id === customId)) {
+				list.push({
+					id: customId,
+					label: customId,
+					tag: "Custom",
+				})
+			}
+		}
+
+		// CRITICAL FIX: If currentModelId is set and NOT in the list, ALWAYS include it so it displays properly (never blank!)
+		if (currentModelId && currentModelId.trim() && !list.some((m) => m.id === currentModelId)) {
+			list.push({
+				id: currentModelId,
+				label: currentModelId,
+				tag: "Custom",
+			})
+		}
+
+		return list
+	}, [activeProviderConfig.models, savedCustomModels, currentModelId])
+
+	const handleSaveCustomModel = useCallback(() => {
+		const trimmed = customInputText.trim()
+		if (!trimmed) return
+		handleModelSelect(trimmed)
+		try {
+			const next = Array.from(new Set([...savedCustomModels, trimmed]))
+			localStorage.setItem(`custom_models_${currentProvider}_${modelIdKey}`, JSON.stringify(next))
+			setSavedCustomModels(next)
+		} catch {
+			// ignore
+		}
+		setIsCustomMode(false)
+		setCustomInputText("")
+	}, [customInputText, handleModelSelect, savedCustomModels, currentProvider, modelIdKey])
 
 	const handleProviderChange = useCallback(
 		(newProvider: ProviderName) => {
@@ -363,35 +700,18 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 					)}
 				</div>
 
-				{/* Curated Provider Selector */}
-				<div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-					{CURATED_PROVIDERS.map((provider) => {
-						const isSelected = currentProvider === provider.id
-						return (
-							<button
-								key={provider.id}
-								type="button"
-								onClick={() => handleProviderChange(provider.id)}
-								className={cn(
-									"flex flex-col items-start p-2.5 rounded-md border text-left transition-all cursor-pointer relative",
-									isSelected
-										? "border-mirror-brand-via bg-mirror-brand-via/10 shadow-[0_0_0_1px_rgba(var(--mirror-brand-via-rgb),0.3)]"
-										: "border-vscode-editorGroup-border/40 bg-vscode-input-background/40 hover:bg-vscode-list-hoverBackground/60 opacity-80 hover:opacity-100",
-								)}>
-								<div className="flex items-center justify-between w-full">
-									<span className="text-xs font-semibold text-vscode-foreground">
-										{provider.name}
-									</span>
-									{isSelected && <Check className="w-3.5 h-3.5 text-mirror-brand-via" />}
-								</div>
-								{provider.badge && (
-									<span className="text-[9px] mt-1 px-1 rounded bg-mirror-brand-via/20 text-mirror-brand-via">
-										{provider.badge}
-									</span>
-								)}
-							</button>
-						)
-					})}
+				{/* Provider Dropdown (Single unified dropdown, no top picks cards) */}
+				<div className="pt-1">
+					<SearchableSelect
+						value={currentProvider}
+						onValueChange={(val) => handleProviderChange(val as ProviderName)}
+						options={PROVIDERS.map((p) => ({ value: p.value, label: p.label }))}
+						placeholder="Select an AI provider..."
+						searchPlaceholder="Search 40+ providers (Relace, Together, Anthropic, DeepSeek, OpenAI...)"
+						emptyMessage="No matching provider found"
+						className="w-full"
+						data-testid="normal-provider-select"
+					/>
 				</div>
 
 				{/* Provider Specific Input (API Key or Local URL) */}
@@ -479,15 +799,64 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 
 				{/* Model Selector */}
 				<div className="space-y-1.5 pt-2">
-					<label className="block text-xs font-medium text-vscode-foreground">Selected Model</label>
-					{activeProviderConfig.models.length > 0 ? (
+					<div className="flex items-center justify-between">
+						<label className="block text-xs font-medium text-vscode-foreground">Selected Model</label>
+						{activeProviderConfig.models.length > 0 && (
+							<button
+								type="button"
+								onClick={() => {
+									setCustomInputText(currentModelId || "")
+									setIsCustomMode((prev) => !prev)
+								}}
+								className="text-[11px] text-mirror-brand-via hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0">
+								{isCustomMode ? "Pick from list" : "+ Custom Model"}
+							</button>
+						)}
+					</div>
+
+					{isCustomMode || activeProviderConfig.models.length === 0 ? (
+						<div className="flex gap-2">
+							<VSCodeTextField
+								value={isCustomMode ? customInputText : currentModelId}
+								onInput={(e: any) => {
+									if (isCustomMode) {
+										setCustomInputText(e.target.value)
+									} else {
+										handleModelSelect(e.target.value)
+									}
+								}}
+								onKeyDown={(e: any) => {
+									if (isCustomMode && e.key === "Enter") {
+										e.preventDefault()
+										handleSaveCustomModel()
+									}
+								}}
+								placeholder="e.g. deepseek-ai/DeepSeek-V4-Flash-0731"
+								className="flex-1"
+							/>
+							{isCustomMode && (
+								<Button size="sm" onClick={handleSaveCustomModel} className="h-[28px] px-3">
+									Save
+								</Button>
+							)}
+						</div>
+					) : (
 						<div className="space-y-1.5">
-							<Select value={currentModelId} onValueChange={handleModelSelect}>
+							<Select
+								value={currentModelId}
+								onValueChange={(val) => {
+									if (val === "__enter_custom__") {
+										setCustomInputText("")
+										setIsCustomMode(true)
+									} else {
+										handleModelSelect(val)
+									}
+								}}>
 								<SelectTrigger className="w-full">
 									<SelectValue placeholder="Select a model" />
 								</SelectTrigger>
 								<SelectContent>
-									{activeProviderConfig.models.map((m) => (
+									{selectableModels.map((m) => (
 										<SelectItem key={m.id} value={m.id}>
 											<div className="flex items-center justify-between w-full gap-2">
 												<span>{m.label}</span>
@@ -499,16 +868,14 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 											</div>
 										</SelectItem>
 									))}
+									<SelectItem value="__enter_custom__">
+										<div className="flex items-center gap-1 text-mirror-brand-via font-medium">
+											+ Enter custom model ID...
+										</div>
+									</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
-					) : (
-						<VSCodeTextField
-							value={currentModelId}
-							onInput={(e: any) => handleModelSelect(e.target.value)}
-							placeholder="Enter model ID..."
-							className="w-full"
-						/>
 					)}
 				</div>
 			</div>
