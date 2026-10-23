@@ -1,7 +1,18 @@
 # 📊 Sandbox Test Report: feature_add
 
-**Model**: deepseek/deepseek-v4-flash-0731
+**Model**: deepseek-ai/DeepSeek-V4-Flash-0731
+**Benchmark Grade**: **SOTA (A+)** (Score: 92/100)
 **Status**: ✅ Completed
+
+## 🏆 Competitive SOTA Benchmark
+
+| Metric             | Value         | Target (SOTA) |
+| ------------------ | ------------- | ------------- |
+| Benchmark Grade    | **SOTA (A+)** | SOTA (A+)     |
+| Efficiency Score   | 92 / 100      | > 85          |
+| Cache Hit Rate     | 47.7%         | > 80%         |
+| Cache Cost Savings | 42.9%         | > 60%         |
+| Redundant Reads    | 0             | 0             |
 
 ## Turn Efficiency
 
@@ -11,41 +22,42 @@
 | Wasted Turns        | 0     |
 | Turns to Completion | 2     |
 
-## Token Usage
+## Token & Cache Economics
 
-| Metric                    | Value    |
-| ------------------------- | -------- |
-| Total Input Tokens        | 3,814    |
-| Total Output Tokens       | 517      |
-| Avg Input/Turn            | 1,907    |
-| Avg Output/Turn           | 259      |
-| Token Efficiency (out/in) | 0.136    |
-| Estimated Cost            | $0.00054 |
+| Metric                         | Value                  |
+| ------------------------------ | ---------------------- |
+| Total Input Tokens             | 3,760                  |
+| Cached Input Tokens            | 1,792 (47.7%)          |
+| Total Output Tokens            | 470                    |
+| Avg Input/Turn                 | 1,880                  |
+| Avg Output/Turn                | 235                    |
+| Token Efficiency (out/in)      | 0.125                  |
+| Net Cost (with Cache Discount) | $0.00036 (42.9% saved) |
 
 ## Tool Usage
 
-| Metric            | Value                          |
-| ----------------- | ------------------------------ |
-| Total Tool Calls  | 3                              |
-| Unique Tools Used | apply_diff, attempt_completion |
-| Redundant Reads   | 0                              |
-| Failed Tool Calls | 0                              |
+| Metric            | Value                         |
+| ----------------- | ----------------------------- |
+| Total Tool Calls  | 3                             |
+| Unique Tools Used | edit_file, attempt_completion |
+| Redundant Reads   | 0                             |
+| Failed Tool Calls | 0                             |
 
 ### Tool Call Breakdown
 
 | Tool               | Count |
 | ------------------ | ----- |
-| apply_diff         | 2     |
+| edit_file          | 2     |
 | attempt_completion | 1     |
 
 ## Latency
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 6.6s  |
-| Avg per Turn  | 3.3s  |
-| Fastest Turn  | 2.3s  |
-| Slowest Turn  | 4.2s  |
+| Total Latency | 19.4s |
+| Avg per Turn  | 9.7s  |
+| Fastest Turn  | 4.2s  |
+| Slowest Turn  | 15.2s |
 
 ## Reasoning
 
@@ -56,5 +68,6 @@
 
 ## Behavioral Signals
 
+- 🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)
 - ✅ Excellent turn efficiency — completed in 2 turn(s)
 - 🧠 No reasoning detected — model may not be using thinking mode

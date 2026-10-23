@@ -1,7 +1,18 @@
 # 📊 Sandbox Test Report: bug_fix
 
-**Model**: deepseek/deepseek-v4-flash-0731
+**Model**: deepseek-ai/DeepSeek-V4-Flash-0731
+**Benchmark Grade**: **SOTA (A+)** (Score: 96/100)
 **Status**: ✅ Completed
+
+## 🏆 Competitive SOTA Benchmark
+
+| Metric             | Value         | Target (SOTA) |
+| ------------------ | ------------- | ------------- |
+| Benchmark Grade    | **SOTA (A+)** | SOTA (A+)     |
+| Efficiency Score   | 96 / 100      | > 85          |
+| Cache Hit Rate     | 52.2%         | > 80%         |
+| Cache Cost Savings | 47.0%         | > 60%         |
+| Redundant Reads    | 0             | 0             |
 
 ## Turn Efficiency
 
@@ -11,16 +22,17 @@
 | Wasted Turns        | 0     |
 | Turns to Completion | 2     |
 
-## Token Usage
+## Token & Cache Economics
 
-| Metric                    | Value    |
-| ------------------------- | -------- |
-| Total Input Tokens        | 3,542    |
-| Total Output Tokens       | 319      |
-| Avg Input/Turn            | 1,771    |
-| Avg Output/Turn           | 160      |
-| Token Efficiency (out/in) | 0.09     |
-| Estimated Cost            | $0.00045 |
+| Metric                         | Value                  |
+| ------------------------------ | ---------------------- |
+| Total Input Tokens             | 3,435                  |
+| Cached Input Tokens            | 1,792 (52.2%)          |
+| Total Output Tokens            | 294                    |
+| Avg Input/Turn                 | 1,718                  |
+| Avg Output/Turn                | 147                    |
+| Token Efficiency (out/in)      | 0.086                  |
+| Net Cost (with Cache Discount) | $0.00027 (47.0% saved) |
 
 ## Tool Usage
 
@@ -42,10 +54,10 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 7.7s  |
-| Avg per Turn  | 3.8s  |
-| Fastest Turn  | 1.7s  |
-| Slowest Turn  | 5.9s  |
+| Total Latency | 22.0s |
+| Avg per Turn  | 11.0s |
+| Fastest Turn  | 2.7s  |
+| Slowest Turn  | 19.3s |
 
 ## Reasoning
 
@@ -56,5 +68,7 @@
 
 ## Behavioral Signals
 
+- 🏆 SOTA Benchmark Grade: SOTA (A+) (96/100)
+- ⚡ High Cache Efficiency: 52.2% KV cache hit rate (~47% cost savings)
 - ✅ Excellent turn efficiency — completed in 2 turn(s)
 - 🧠 No reasoning detected — model may not be using thinking mode

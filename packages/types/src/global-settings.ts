@@ -124,6 +124,8 @@ export const globalSettingsSchema = z.object({
 	allowedMaxCost: z.number().nullish(),
 	autoCondenseContext: z.boolean().optional(),
 	autoCondenseContextPercent: z.number().optional(),
+	condenseProvider: z.string().optional(),
+	condenseModelId: z.string().optional(),
 
 	/**
 	 * Whether to include current time in the environment details

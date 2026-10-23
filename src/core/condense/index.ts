@@ -11,6 +11,7 @@ import { MirrorIgnoreController } from "../ignore/MirrorIgnoreController"
 import { generateFoldedFileContext } from "./foldedFileContext"
 
 export type { FoldedFileContextResult, FoldedFileContextOptions } from "./foldedFileContext"
+export { getCondenseApiHandler } from "./getCondenseApiHandler"
 
 /**
  * Converts a tool_use block to a text representation.

@@ -122,6 +122,10 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setAutoCondenseContext: (value: boolean) => void
 	autoCondenseContextPercent: number
 	setAutoCondenseContextPercent: (value: number) => void
+	condenseProvider?: string
+	setCondenseProvider: (value?: string) => void
+	condenseModelId?: string
+	setCondenseModelId: (value?: string) => void
 	routerModels?: RouterModels
 	includeDiagnosticMessages?: boolean
 	setIncludeDiagnosticMessages: (value: boolean) => void
@@ -253,6 +257,8 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		organizationAllowList: ORGANIZATION_ALLOW_ALL,
 		autoCondenseContext: true,
 		autoCondenseContextPercent: 75,
+		condenseProvider: undefined,
+		condenseModelId: undefined,
 		profileThresholds: {},
 		codebaseIndexConfig: {
 			codebaseIndexEnabled: true,
@@ -593,6 +599,10 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 		setAutoCondenseContext: (value) => setState((prevState) => ({ ...prevState, autoCondenseContext: value })),
 		setAutoCondenseContextPercent: (value) =>
 			setState((prevState) => ({ ...prevState, autoCondenseContextPercent: value })),
+		condenseProvider: state.condenseProvider,
+		setCondenseProvider: (value) => setState((prevState) => ({ ...prevState, condenseProvider: value })),
+		condenseModelId: state.condenseModelId,
+		setCondenseModelId: (value) => setState((prevState) => ({ ...prevState, condenseModelId: value })),
 		setProfileThresholds: (value) => setState((prevState) => ({ ...prevState, profileThresholds: value })),
 		includeDiagnosticMessages: state.includeDiagnosticMessages,
 		setIncludeDiagnosticMessages: (value) => {

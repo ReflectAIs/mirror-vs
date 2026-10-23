@@ -47,17 +47,17 @@ tr:hover td{background:var(--surface2)}
 <div class="header">
   <h1>🏆 Mirror VS — SOTA Competitive Benchmark</h1>
   <div class="subtitle">Benchmarked against Gemini Antigravity, Claude Code, Cursor, and Cline standards</div>
-  <div class="model-chip">🤖 deepseek-v4-flash-0731</div>
+  <div class="model-chip">🤖 DeepSeek-V4-Flash-0731</div>
 </div>
 <div class="summary-bar">
-  <div class="summary-stat"><div class="val">1</div><div class="lbl">Total Scenarios</div></div>
-  <div class="summary-stat"><div class="val pass-val">1</div><div class="lbl">Passed ✅</div></div>
+  <div class="summary-stat"><div class="val">8</div><div class="lbl">Total Scenarios</div></div>
+  <div class="summary-stat"><div class="val pass-val">8</div><div class="lbl">Passed ✅</div></div>
   <div class="summary-stat"><div class="val fail-val">0</div><div class="lbl">Failed ❌</div></div>
-  <div class="summary-stat"><div class="val" style="color:#a78bfa">82/100</div><div class="lbl">Avg Score</div></div>
-  <div class="summary-stat"><div class="val" style="color:#34d399">43.5%</div><div class="lbl">Global Cache Hit %</div></div>
-  <div class="summary-stat"><div class="val">93.8s</div><div class="lbl">Total Latency</div></div>
+  <div class="summary-stat"><div class="val" style="color:#a78bfa">92/100</div><div class="lbl">Avg Score</div></div>
+  <div class="summary-stat"><div class="val" style="color:#34d399">43.8%</div><div class="lbl">Global Cache Hit %</div></div>
+  <div class="summary-stat"><div class="val">79.6s</div><div class="lbl">Total Latency</div></div>
   <div class="summary-stat"><div class="val">29k</div><div class="lbl">Total Tokens</div></div>
-  <div class="summary-stat"><div class="val" style="color:#10b981">$0.0033</div><div class="lbl">Net Cost (Discounted)</div></div>
+  <div class="summary-stat"><div class="val" style="color:#10b981">$0.0023</div><div class="lbl">Net Cost (Discounted)</div></div>
 </div>
 <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
 <div class="section-title">Scenario Results</div>
@@ -65,29 +65,225 @@ tr:hover td{background:var(--surface2)}
 <div class="card card-pass">
   <div class="card-header">
     <div>
-      <div class="card-title">long_output_generator</div>
-      <div class="card-model">deepseek-v4-flash-0731</div>
+      <div class="card-title">simple_edit</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <div class="status-badge" style="background:#38bdf820;color:#38bdf8;border:1px solid #38bdf840">Frontier (A) (82)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (92)</div>
       <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
     </div>
   </div>
   
   <div class="stats-grid">
-    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Turns</div></div>
-    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Tool Calls</div></div>
-    <div class="stat"><div class="stat-value">43.5%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">46.3%</div><div class="stat-label">Cache Hit Rate</div></div>
     <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
-    <div class="stat"><div class="stat-value">93.8s</div><div class="stat-label">Time</div></div>
-    <div class="stat"><div class="stat-value">$0.00330</div><div class="stat-label">Cost (-39%)</div></div>
+    <div class="stat"><div class="stat-value">7.2s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00025</div><div class="stat-label">Cost (-42%)</div></div>
   </div>
   <div class="tokens-row">
-    <span>🔢 24,112 in (10,496 cached) / 4,768 out</span>
-    <span>Efficiency: 0.198</span>
+    <span>🔢 3,314 in (1,536 cached) / 175 out</span>
+    <span>Efficiency: 0.053</span>
   </div>
-  <div class="tools-row"><span class="tool-badge">execute_command: 3</span><span class="tool-badge">write_to_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
-  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: Frontier (A) (82/100)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">bug_fix</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (96)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">52.2%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">22.0s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00027</div><div class="stat-label">Cost (-47%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,435 in (1,792 cached) / 294 out</span>
+    <span>Efficiency: 0.086</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (96/100)</div><div class="signal">⚡ High Cache Efficiency: 52.2% KV cache hit rate (~47% cost savings)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">feature_add</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (92)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">47.7%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">19.4s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00036</div><div class="stat-label">Cost (-43%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,760 in (1,792 cached) / 470 out</span>
+    <span>Efficiency: 0.125</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 2</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">duplicate_code_blocks</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (92)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">44.9%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">3.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00027</div><div class="stat-label">Cost (-40%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,422 in (1,536 cached) / 209 out</span>
+    <span>Efficiency: 0.061</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">whitespace_indent</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (92)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">42.7%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">5.9s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00030</div><div class="stat-label">Cost (-38%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,598 in (1,536 cached) / 246 out</span>
+    <span>Efficiency: 0.068</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">exploration</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (90)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">1</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">1</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">0.0%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">7.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00028</div><div class="stat-label">Cost (-0%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 1,752 in (0 cached) / 350 out</span>
+    <span>Efficiency: 0.2</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (90/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 1 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">large_file_edit</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (92)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">48.1%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">7.1s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00026</div><div class="stat-label">Cost (-43%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,726 in (1,792 cached) / 163 out</span>
+    <span>Efficiency: 0.044</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
+</div>
+
+<div class="card card-pass">
+  <div class="card-header">
+    <div>
+      <div class="card-title">mirror_add_param_validation</div>
+      <div class="card-model">DeepSeek-V4-Flash-0731</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">SOTA (A+) (92)</div>
+      <div class="status-badge" style="background:#10b98120;color:#10b981;border:1px solid #10b98140">✅ Passed</div>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Turns</div></div>
+    <div class="stat"><div class="stat-value">2</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat"><div class="stat-value">46.0%</div><div class="stat-label">Cache Hit Rate</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Redundant Reads</div></div>
+    <div class="stat"><div class="stat-value">7.5s</div><div class="stat-label">Time</div></div>
+    <div class="stat"><div class="stat-value">$0.00031</div><div class="stat-label">Cost (-41%)</div></div>
+  </div>
+  <div class="tokens-row">
+    <span>🔢 3,896 in (1,792 cached) / 256 out</span>
+    <span>Efficiency: 0.066</span>
+  </div>
+  <div class="tools-row"><span class="tool-badge">edit_file: 1</span><span class="tool-badge">attempt_completion: 1</span></div>
+  <div class="signals"><div class="signal">🏆 SOTA Benchmark Grade: SOTA (A+) (92/100)</div><div class="signal">✅ Excellent turn efficiency — completed in 2 turn(s)</div><div class="signal">🧠 No reasoning detected — model may not be using thinking mode</div></div>
 </div></div>
 <div class="section-title">Summary Table</div>
 <table>
@@ -96,20 +292,118 @@ tr:hover td{background:var(--surface2)}
   </thead>
   <tbody>
 <tr>
-  <td style="font-family:monospace;color:#c4b5fd">long_output_generator</td>
-  <td><b>Frontier (A)</b></td>
-  <td>82</td>
+  <td style="font-family:monospace;color:#c4b5fd">simple_edit</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>92</td>
   <td><span style="color:#10b981">✅</span></td>
-  <td>43.5%</td>
-  <td>5</td>
-  <td>5</td>
+  <td>46.3%</td>
+  <td>2</td>
+  <td>2</td>
   <td>0</td>
-  <td>24,112</td>
-  <td>4,768</td>
-  <td>93.8s</td>
-  <td>$0.00330</td>
+  <td>3,314</td>
+  <td>175</td>
+  <td>7.2s</td>
+  <td>$0.00025</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">bug_fix</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>96</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>52.2%</td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,435</td>
+  <td>294</td>
+  <td>22.0s</td>
+  <td>$0.00027</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">feature_add</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>92</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>47.7%</td>
+  <td>2</td>
+  <td>3</td>
+  <td>0</td>
+  <td>3,760</td>
+  <td>470</td>
+  <td>19.4s</td>
+  <td>$0.00036</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">duplicate_code_blocks</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>92</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>44.9%</td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,422</td>
+  <td>209</td>
+  <td>3.5s</td>
+  <td>$0.00027</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">whitespace_indent</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>92</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>42.7%</td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,598</td>
+  <td>246</td>
+  <td>5.9s</td>
+  <td>$0.00030</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">exploration</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>90</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>0.0%</td>
+  <td>1</td>
+  <td>1</td>
+  <td>0</td>
+  <td>1,752</td>
+  <td>350</td>
+  <td>7.1s</td>
+  <td>$0.00028</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">large_file_edit</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>92</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>48.1%</td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,726</td>
+  <td>163</td>
+  <td>7.1s</td>
+  <td>$0.00026</td>
+</tr>
+<tr>
+  <td style="font-family:monospace;color:#c4b5fd">mirror_add_param_validation</td>
+  <td><b>SOTA (A+)</b></td>
+  <td>92</td>
+  <td><span style="color:#10b981">✅</span></td>
+  <td>46.0%</td>
+  <td>2</td>
+  <td>2</td>
+  <td>0</td>
+  <td>3,896</td>
+  <td>256</td>
+  <td>7.5s</td>
+  <td>$0.00031</td>
 </tr></tbody>
 </table>
-<div class="ts">Generated 2026-10-14T15:02:04.707Z · Mirror VS Sandbox</div>
+<div class="ts">Generated 2026-10-23T02:50:35.331Z · Mirror VS Sandbox</div>
 </body>
 </html>

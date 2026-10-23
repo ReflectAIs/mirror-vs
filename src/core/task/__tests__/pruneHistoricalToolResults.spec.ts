@@ -239,4 +239,55 @@ describe("pruneHistoricalToolResults", () => {
 		// Turn 5 is still untouched! Prefix between turn 8 and turn 9 matches!
 		expect((res9[8].content as any[])[0].content).toBe(largeContent)
 	})
+
+	it("folds superseded read_file results in pruned turns even if under maxToolResultChars", () => {
+		const smallContent = "const x = 1\nconst y = 2\n"
+		const messages: ApiMessage[] = [
+			// Turn 1: user prompt
+			{ role: "user", content: "read the file" },
+			// Assistant calls read_file
+			{
+				role: "assistant",
+				content: [
+					{ type: "tool_use", id: "t_read_1", name: "read_file", input: { path: "src/calc.ts" } } as any,
+				],
+			},
+			// Turn 2: tool result for read_file
+			{
+				role: "user",
+				content: [{ type: "tool_result", tool_use_id: "t_read_1", content: smallContent }],
+			},
+			// Assistant edits the file
+			{
+				role: "assistant",
+				content: [
+					{
+						type: "tool_use",
+						id: "t_edit_1",
+						name: "apply_diff",
+						input: { path: "src/calc.ts", diff: "some diff" },
+					} as any,
+				],
+			},
+			// Turn 3: tool result for edit
+			{
+				role: "user",
+				content: [{ type: "tool_result", tool_use_id: "t_edit_1", content: "Successfully applied diff" }],
+			},
+			{ role: "assistant", content: "done edit" },
+			// Turn 4
+			{ role: "user", content: "now check again" },
+			{ role: "assistant", content: "done" },
+		]
+
+		const result = pruneHistoricalToolResults(messages, {
+			keepRecentTurns: 2,
+			pruneBlockSize: 2,
+			maxToolResultChars: 1000,
+		})
+
+		const turn2ToolResult = (result[2].content as any[])[0]
+		expect(turn2ToolResult.content).toContain("superseded by subsequent edit or re-read")
+		expect(turn2ToolResult.content).toContain("src/calc.ts")
+	})
 })

@@ -168,6 +168,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		autonomousMode,
 		autoCondenseContext,
 		autoCondenseContextPercent,
+		condenseProvider,
+		condenseModelId,
 		enableCheckpoints,
 		checkpointTimeout,
 		experiments,
@@ -1056,6 +1058,9 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 									maxGitStatusFiles={maxGitStatusFiles}
 									customSupportPrompts={customSupportPrompts || {}}
 									setCustomSupportPrompts={setCustomSupportPromptsField}
+									condenseProvider={condenseProvider}
+									condenseModelId={condenseModelId}
+									apiConfiguration={cachedState.apiConfiguration}
 									setCachedStateField={setCachedStateField}
 								/>
 							)}

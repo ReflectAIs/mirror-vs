@@ -129,6 +129,52 @@ export function pruneHistoricalToolResults(
 		return sanitizedMessages
 	}
 
+	// Map tool_use_id to tool name and input path to detect superseded reads
+	const toolUseMap = new Map<string, { name: string; path?: string }>()
+	const readCalls: Array<{ id: string; path: string; msgIndex: number }> = []
+	const editedPaths = new Set<string>()
+
+	for (let i = 0; i < sanitizedMessages.length; i++) {
+		const msg = sanitizedMessages[i]
+		if (msg.role === "assistant" && Array.isArray(msg.content)) {
+			for (const block of msg.content) {
+				if (block.type === "tool_use") {
+					const toolUse = block as Anthropic.Messages.ToolUseBlockParam
+					const input = (toolUse.input as any) || {}
+					const rawPath = typeof input.path === "string" ? input.path.trim() : undefined
+					toolUseMap.set(toolUse.id, { name: toolUse.name, path: rawPath })
+
+					if (rawPath) {
+						if (toolUse.name === "read_file") {
+							readCalls.push({ id: toolUse.id, path: rawPath, msgIndex: i })
+						} else if (
+							toolUse.name === "apply_diff" ||
+							toolUse.name === "write_to_file" ||
+							toolUse.name === "search_and_replace" ||
+							toolUse.name === "edit_file" ||
+							toolUse.name === "insert_content"
+						) {
+							editedPaths.add(rawPath)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	const supersededToolUseIds = new Set<string>()
+	const latestReadByPath = new Map<string, string>()
+
+	for (let i = readCalls.length - 1; i >= 0; i--) {
+		const call = readCalls[i]
+		if (editedPaths.has(call.path) || latestReadByPath.has(call.path)) {
+			supersededToolUseIds.add(call.id)
+		}
+		if (!latestReadByPath.has(call.path)) {
+			latestReadByPath.set(call.path, call.id)
+		}
+	}
+
 	return sanitizedMessages.map((msg, index) => {
 		// Only prune messages that precede the active working memory window
 		if (index >= cutoffIndex || msg.role !== "user" || !Array.isArray(msg.content)) {
@@ -186,12 +232,30 @@ export function pruneHistoricalToolResults(
 				}
 			}
 
-			// Never prune results containing images or small text
-			if (hasImages || textContent.length <= maxToolResultChars) {
+			// Never prune results containing images
+			if (hasImages) {
+				return block
+			}
+
+			const isSuperseded = supersededToolUseIds.has(toolResult.tool_use_id)
+
+			// If not superseded, leave small results untouched
+			if (!isSuperseded && textContent.length <= maxToolResultChars) {
 				return block
 			}
 
 			didModify = true
+
+			if (isSuperseded) {
+				const toolMeta = toolUseMap.get(toolResult.tool_use_id)
+				const pathDisplay = toolMeta?.path ? ` for '${toolMeta.path}'` : ""
+				const foldedContent = `[File content${pathDisplay} read previously; superseded by subsequent edit or re-read in conversation]`
+				return {
+					...toolResult,
+					content: foldedContent,
+				}
+			}
+
 			const originalCharCount = textContent.length
 			const lines = textContent.split("\n")
 			const originalLineCount = lines.length

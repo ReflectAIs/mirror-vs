@@ -30,7 +30,7 @@ import { buildNativeToolsArrayWithRestrictions } from "./build-tools"
 import { manageContext, willManageContext } from "../context-management"
 import { checkContextWindowExceededError } from "../context/context-management/context-error-handling"
 import { getEnvironmentDetails } from "../environment/getEnvironmentDetails"
-import { getMessagesSinceLastSummary, getEffectiveApiHistory } from "../condense"
+import { getMessagesSinceLastSummary, getEffectiveApiHistory, getCondenseApiHandler } from "../condense"
 import { mergeConsecutiveApiMessages } from "./mergeConsecutiveApiMessages"
 import { pruneHistoricalToolResults } from "./pruneHistoricalToolResults"
 import { defaultModeSlug } from "../../shared/modes"
@@ -571,12 +571,13 @@ export class TaskApiRequest {
 							: undefined
 
 					try {
+						const condenseApiHandler = await getCondenseApiHandler(this.task, state)
 						const truncateResult = await manageContext({
 							messages: this.task.apiConversationHistory,
 							totalTokens: contextTokens,
 							maxTokens,
 							contextWindow,
-							apiHandler: this.task.api,
+							apiHandler: condenseApiHandler,
 							autoCondenseContext,
 							autoCondenseContextPercent,
 							systemPrompt,

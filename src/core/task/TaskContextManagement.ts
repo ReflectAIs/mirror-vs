@@ -6,7 +6,7 @@ import { ApiHandler, ApiHandlerCreateMessageMetadata } from "../../api"
 import { getModelMaxOutputTokens } from "../../shared/api"
 import { buildNativeToolsArrayWithRestrictions } from "./build-tools"
 import { getEnvironmentDetails } from "../environment/getEnvironmentDetails"
-import { summarizeConversation } from "../condense"
+import { summarizeConversation, getCondenseApiHandler } from "../condense"
 import { willManageContext } from "../context-management"
 import { Task } from "./Task"
 
@@ -109,6 +109,8 @@ export class TaskContextManagement {
 
 			const filesReadByMirror = await this.task.getFilesReadByMirrorSafely("condenseContext")
 
+			const condenseApiHandler = await getCondenseApiHandler(this.task, state)
+
 			const {
 				messages,
 				summary,
@@ -119,7 +121,7 @@ export class TaskContextManagement {
 				condenseId,
 			} = await summarizeConversation({
 				messages: this.task.apiConversationHistory,
-				apiHandler: this.task.api,
+				apiHandler: condenseApiHandler,
 				systemPrompt,
 				taskId: this.task.taskId,
 				isAutomaticTrigger: false,

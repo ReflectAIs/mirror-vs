@@ -449,6 +449,8 @@ export type ExtensionState = Pick<
 	| "comfyCloudApiToken"
 	| "atlasCloudApiToken"
 	| "settingsMode"
+	| "condenseProvider"
+	| "condenseModelId"
 > & {
 	lockApiConfigAcrossModes?: boolean
 	version: string

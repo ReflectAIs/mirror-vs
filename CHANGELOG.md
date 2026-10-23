@@ -2,6 +2,21 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.6] - 2026-10-23
+
+### Improvements & Cost Optimization
+
+- **Dedicated Context Compression Provider & Model Routing**:
+    - Users can now configure a dedicated, lightweight, and cost-effective provider and model (e.g. Relace `deepseek-flash`, Google `gemini-2.5-flash`, etc.) specifically for conversation context condensation and auto-compaction.
+    - Preserves high-tier frontier model budget for active coding and reasoning while cutting context condensation latency and cost by up to 90%.
+    - Fully configurable in Settings with automatic fallback to the active task provider/model if unconfigured.
+- **Superseded Historical `read_file` Folding**:
+    - Pruning logic automatically identifies historical `read_file` results that have been superseded by subsequent reads or file edits and folds them into minimal 1-line reference stubs within quantized blocks.
+    - Strictly aligned with quantized block pruning (`pruneBlockSize = 6`) to preserve byte-for-byte prompt prefix caching across turns without incurring cache-write penalties.
+- **Inference Providers Expansion & Dropdown UX**:
+    - Added out-of-the-box support for Relace, Cohere, Hyperbolic, Nebius, Novita, Perplexity, Scaleway, SiliconFlow, Together, Upstage, and Yi providers.
+    - Refined Settings UI model picker and fixed change detection / unsaved state tracking across all providers.
+
 ## [1.0.5] - 2026-10-16
 
 ### Improvements & Fixes

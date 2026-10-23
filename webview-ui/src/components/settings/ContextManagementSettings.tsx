@@ -2,7 +2,9 @@ import { HTMLAttributes } from "react"
 import React from "react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { VSCodeCheckbox, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react"
-import { FoldVertical } from "lucide-react"
+import { FoldVertical, Sparkles } from "lucide-react"
+import { PROVIDERS, MODELS_BY_PROVIDER } from "./constants"
+import type { ProviderSettings } from "@mirror-vs/types"
 
 import { supportPrompt } from "@shared/support-prompt"
 
@@ -45,9 +47,14 @@ type ContextManagementSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	mcpToolsThreshold?: number
 	customSupportPrompts: Record<string, string | undefined>
 	setCustomSupportPrompts: (prompts: Record<string, string | undefined>) => void
+	condenseProvider?: string
+	condenseModelId?: string
+	apiConfiguration?: ProviderSettings
 	setCachedStateField: SetCachedStateField<
 		| "autoCondenseContext"
 		| "autoCondenseContextPercent"
+		| "condenseProvider"
+		| "condenseModelId"
 		| "maxOpenTabsContext"
 		| "maxWorkspaceFiles"
 		| "showMirrorIgnoredFiles"
@@ -68,6 +75,9 @@ type ContextManagementSettingsProps = HTMLAttributes<HTMLDivElement> & {
 export const ContextManagementSettings = ({
 	autoCondenseContext,
 	autoCondenseContextPercent,
+	condenseProvider,
+	condenseModelId,
+	apiConfiguration,
 	mcpToolsThreshold,
 	listApiConfigMeta,
 	maxOpenTabsContext,
@@ -558,6 +568,124 @@ export const ContextManagementSettings = ({
 									: t("settings:contextManagement.condensingThreshold.profileDescription")}
 							</div>
 						</div>
+
+						{/* Compression & Summarization Model Selection */}
+						{(() => {
+							const effectiveActiveProvider = apiConfiguration?.apiProvider || "anthropic"
+							const activeProviderObj = PROVIDERS.find((p) => p.value === effectiveActiveProvider)
+							const effectiveActiveProviderLabel = activeProviderObj?.label || effectiveActiveProvider
+
+							const effectiveCondenseProvider =
+								condenseProvider && condenseProvider !== "same"
+									? condenseProvider
+									: effectiveActiveProvider
+
+							const modelsRecord =
+								MODELS_BY_PROVIDER[effectiveCondenseProvider as keyof typeof MODELS_BY_PROVIDER] || {}
+							const availableCondenseModels = Object.keys(modelsRecord)
+
+							return (
+								<div className="pt-3 border-t border-vscode-editorWidget-border/40 flex flex-col gap-3">
+									<div className="flex items-center gap-2">
+										<Sparkles size={16} className="text-vscode-charts-yellow" />
+										<span className="font-bold text-sm">
+											Compression Provider & Model (Optional)
+										</span>
+									</div>
+									<div className="text-vscode-descriptionForeground text-xs leading-relaxed">
+										Select a specialized or lower-cost model/provider for context condensation and
+										conversation summarization. Your primary coding agent stays on your main model,
+										while compression runs on this lightweight model to drastically save tokens and
+										cost (up to 95%).
+									</div>
+
+									{/* Provider Selection */}
+									<div className="flex flex-col gap-1.5">
+										<label className="text-xs font-medium text-vscode-foreground">
+											Compression Provider
+										</label>
+										<Select
+											value={condenseProvider || "same"}
+											onValueChange={(val) => {
+												setCachedStateField(
+													"condenseProvider",
+													val === "same" ? undefined : val,
+												)
+												setCachedStateField("condenseModelId", undefined)
+											}}
+											data-testid="condense-provider-select">
+											<SelectTrigger className="w-full">
+												<SelectValue placeholder="Same as active provider (Default)" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="same">
+													Same as active provider ({effectiveActiveProviderLabel})
+												</SelectItem>
+												{PROVIDERS.map((p) => (
+													<SelectItem key={p.value} value={p.value}>
+														{p.label}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+
+									{/* Model Selection */}
+									<div className="flex flex-col gap-1.5">
+										<label className="text-xs font-medium text-vscode-foreground">
+											Compression Model
+										</label>
+										<Select
+											value={condenseModelId || "default"}
+											onValueChange={(val) => {
+												if (val === "default") {
+													setCachedStateField("condenseModelId", undefined)
+												} else {
+													setCachedStateField("condenseModelId", val)
+												}
+											}}
+											data-testid="condense-model-select">
+											<SelectTrigger className="w-full">
+												<SelectValue placeholder="Default (same as active model)" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="default">
+													Default (
+													{effectiveCondenseProvider === effectiveActiveProvider
+														? "Same as active model"
+														: "Provider default model"}
+													)
+												</SelectItem>
+												{availableCondenseModels.map((modelId) => (
+													<SelectItem key={modelId} value={modelId}>
+														{modelId}
+													</SelectItem>
+												))}
+												<SelectItem value="custom">+ Custom model ID...</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+
+									{/* Custom Model Input if custom or entered */}
+									{(condenseModelId === "custom" ||
+										(condenseModelId && !availableCondenseModels.includes(condenseModelId))) && (
+										<div className="flex flex-col gap-1">
+											<label className="text-xs text-vscode-descriptionForeground">
+												Custom Model ID
+											</label>
+											<Input
+												type="text"
+												value={condenseModelId === "custom" ? "" : condenseModelId}
+												placeholder="e.g. deepseek-ai/DeepSeek-V4.1-Flash, gpt-4o-mini, claude-3-5-haiku"
+												onChange={(e) => setCachedStateField("condenseModelId", e.target.value)}
+												className="w-full text-xs font-mono"
+												data-testid="condense-custom-model-input"
+											/>
+										</div>
+									)}
+								</div>
+							)
+						})()}
 					</div>
 				)}
 
