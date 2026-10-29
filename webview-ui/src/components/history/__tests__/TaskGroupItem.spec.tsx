@@ -411,6 +411,27 @@ describe("SessionGroupItem", () => {
 			expect(onToggleExpand).not.toHaveBeenCalled()
 		})
 
+		it("stops propagation on mouseDown to avoid header expansion", () => {
+			const onToggleExpand = vi.fn()
+			const session = createMockSession({ sessionId: "session-mousedown-tab" })
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={onToggleExpand}
+					onRenameSession={vi.fn()}
+					onNewTab={vi.fn()}
+				/>,
+			)
+
+			const btn = screen.getByTestId("new-tab-session-session-mousedown-tab")
+			fireEvent.mouseDown(btn)
+
+			expect(onToggleExpand).not.toHaveBeenCalled()
+		})
+
 		it("hides new tab button when in selection mode", () => {
 			const session = createMockSession({ sessionId: "session-selection-mode" })
 			render(
@@ -441,6 +462,60 @@ describe("SessionGroupItem", () => {
 			)
 
 			expect(screen.queryByTestId("new-tab-session-session-no-callback")).not.toBeInTheDocument()
+		})
+	})
+
+	describe("delete session button", () => {
+		it("calls onDeleteSession without triggering onToggleExpand", () => {
+			const onDeleteSession = vi.fn()
+			const onToggleExpand = vi.fn()
+			const session = createMockSession({
+				sessionId: "session-del",
+				tabs: [createMockDisplayItem({ id: "t1" })],
+				taskCount: 1,
+			})
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={onToggleExpand}
+					onRenameSession={vi.fn()}
+					onDeleteSession={onDeleteSession}
+				/>,
+			)
+
+			const btn = screen.getByRole("button", { name: "Delete session" })
+			fireEvent.click(btn)
+
+			expect(onDeleteSession).toHaveBeenCalledTimes(1)
+			expect(onToggleExpand).not.toHaveBeenCalled()
+		})
+
+		it("stops propagation on mouseDown for delete session button without triggering onToggleExpand", () => {
+			const onToggleExpand = vi.fn()
+			const session = createMockSession({
+				sessionId: "session-del-md",
+				tabs: [createMockDisplayItem({ id: "t1" })],
+				taskCount: 1,
+			})
+
+			render(
+				<SessionGroupItem
+					session={session}
+					variant="full"
+					selectedTaskIds={new Set()}
+					onToggleExpand={onToggleExpand}
+					onRenameSession={vi.fn()}
+					onDeleteSession={vi.fn()}
+				/>,
+			)
+
+			const btn = screen.getByRole("button", { name: "Delete session" })
+			fireEvent.mouseDown(btn)
+
+			expect(onToggleExpand).not.toHaveBeenCalled()
 		})
 	})
 })

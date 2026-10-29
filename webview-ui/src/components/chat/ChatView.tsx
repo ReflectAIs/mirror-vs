@@ -24,6 +24,16 @@ import ChatActionBar from "./ChatActionBar"
 import ChatWelcomeContent from "./ChatWelcomeContent"
 import FloatingChatHud from "./FloatingChatHud"
 import { StickyUserMessageHud } from "./StickyUserMessageHud"
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -379,6 +389,40 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	// ── Select images handler ──
 	const selectImages = useCallback(() => vscode.postMessage({ type: "selectImages" }), [])
 
+	const [showImageNotSupportedDialog, setShowImageNotSupportedDialog] = useState(false)
+	const [pendingSendAction, setPendingSendAction] = useState<"send" | "enqueue" | null>(null)
+
+	const modelSupportsImages = model?.supportsImages ?? true
+
+	const handleRequestSend = useCallback(() => {
+		if (selectedImages.length > 0 && !modelSupportsImages) {
+			setPendingSendAction("send")
+			setShowImageNotSupportedDialog(true)
+			return
+		}
+		handleSendMessage(inputValue, selectedImages)
+	}, [selectedImages, modelSupportsImages, handleSendMessage, inputValue])
+
+	const handleRequestEnqueue = useCallback(() => {
+		if (selectedImages.length > 0 && !modelSupportsImages) {
+			setPendingSendAction("enqueue")
+			setShowImageNotSupportedDialog(true)
+			return
+		}
+		handleEnqueueCurrentMessage()
+	}, [selectedImages, modelSupportsImages, handleEnqueueCurrentMessage])
+
+	const handleContinueWithoutImages = useCallback(() => {
+		setShowImageNotSupportedDialog(false)
+		setSelectedImages([])
+		if (pendingSendAction === "enqueue") {
+			handleEnqueueCurrentMessage([])
+		} else {
+			handleSendMessage(inputValue, [])
+		}
+		setPendingSendAction(null)
+	}, [pendingSendAction, setSelectedImages, handleEnqueueCurrentMessage, handleSendMessage, inputValue])
+
 	// ── Render ──
 	return (
 		<div
@@ -561,9 +605,10 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				placeholderText={placeholderText}
 				selectedImages={selectedImages}
 				setSelectedImages={setSelectedImages}
-				onSend={() => handleSendMessage(inputValue, selectedImages)}
+				onSend={handleRequestSend}
 				onSelectImages={selectImages}
 				shouldDisableImages={shouldDisableImages}
+				supportsImages={modelSupportsImages}
 				onHeightChange={() => {
 					if (isAtBottomRef2.current && scrollPhaseRef2.current !== "USER_BROWSING_HISTORY") {
 						scrollToBottomAuto2()
@@ -575,7 +620,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				isStreaming={isStreaming}
 				messageWillQueue={messageWillQueue}
 				onStop={handleStopTask}
-				onEnqueueMessage={handleEnqueueCurrentMessage}
+				onEnqueueMessage={handleRequestEnqueue}
 				modelId={
 					apiConfiguration?.apiProvider === "free-router"
 						? apiConfiguration?.apiModelId || ""
@@ -592,6 +637,33 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 					<ProfileViolationWarning />
 				</div>
 			)}
+
+			<AlertDialog open={showImageNotSupportedDialog} onOpenChange={setShowImageNotSupportedDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>{t("chat:imageNotSupported.title")}</AlertDialogTitle>
+						<AlertDialogDescription>
+							{inputValue.trim()
+								? t("chat:imageNotSupported.description", {
+										model: modelId || t("chat:imageNotSupported.defaultModel"),
+									})
+								: t("chat:imageNotSupported.descriptionNoText", {
+										model: modelId || t("chat:imageNotSupported.defaultModel"),
+									})}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel onClick={() => setShowImageNotSupportedDialog(false)}>
+							{t("chat:cancel.title")}
+						</AlertDialogCancel>
+						{inputValue.trim().length > 0 && (
+							<AlertDialogAction onClick={handleContinueWithoutImages}>
+								{t("chat:imageNotSupported.continueWithoutImages")}
+							</AlertDialogAction>
+						)}
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<div id="mirror-portal" />
 		</div>

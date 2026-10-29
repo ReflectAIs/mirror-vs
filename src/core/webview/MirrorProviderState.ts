@@ -373,7 +373,11 @@ export class StateManager {
 			fileEdits: currentTask?.fileEdits || [],
 			currentTaskTodos: currentTask?.todoList || [],
 			messageQueue: currentTask?.messageQueueService?.messages,
-			taskHistory: this.provider.taskHistoryStore.getAll().filter((item: HistoryItem) => item.ts && item.task),
+			taskHistory: this.provider.taskHistoryStore
+				.getAll()
+				.filter(
+					(item: HistoryItem) => item.ts && item.task && !item.task.toLowerCase().includes("(no messages)"),
+				),
 			soundEnabled: soundEnabled ?? false,
 			ttsEnabled: ttsEnabled ?? false,
 			ttsSpeed: ttsSpeed ?? 1.0,

@@ -30,6 +30,14 @@ type HistoryViewProps = {
 
 type SortOption = "newest" | "oldest" | "mostExpensive" | "mostTokens" | "mostRelevant"
 
+const VirtuosoList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => (
+	<div {...props} ref={ref} data-testid="virtuoso-item-list" />
+))
+
+const virtuosoComponents = {
+	List: VirtuosoList,
+}
+
 const HistoryView = ({ onDone }: HistoryViewProps) => {
 	const {
 		tasks,
@@ -313,25 +321,22 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 						data={flatTasks}
 						data-testid="virtuoso-container"
 						initialTopMostItemIndex={0}
-						components={{
-							List: React.forwardRef((props, ref) => (
-								<div {...props} ref={ref} data-testid="virtuoso-item-list" />
-							)),
-						}}
+						components={virtuosoComponents}
 						itemContent={(_index, item) => (
-							<TaskItem
-								key={item.id}
-								item={item}
-								variant="full"
-								showWorkspace={showAllWorkspaces}
-								isSelectionMode={isSelectionMode}
-								isSelected={selectedTaskIds.has(item.id)}
-								onToggleSelection={toggleTaskSelection}
-								onDelete={handleDelete}
-								displayName={taskNames?.[item.id]}
-								onRenameTab={handleRenameTab}
-								className="m-2"
-							/>
+							<div className="px-2 py-0.5">
+								<TaskItem
+									key={item.id}
+									item={item}
+									variant="full"
+									showWorkspace={showAllWorkspaces}
+									isSelectionMode={isSelectionMode}
+									isSelected={selectedTaskIds.has(item.id)}
+									onToggleSelection={toggleTaskSelection}
+									onDelete={handleDelete}
+									displayName={taskNames?.[item.id]}
+									onRenameTab={handleRenameTab}
+								/>
+							</div>
 						)}
 					/>
 				) : (
@@ -341,32 +346,29 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 						data={sessionGroups}
 						data-testid="virtuoso-container"
 						initialTopMostItemIndex={0}
-						components={{
-							List: React.forwardRef((props, ref) => (
-								<div {...props} ref={ref} data-testid="virtuoso-item-list" />
-							)),
-						}}
+						components={virtuosoComponents}
 						itemContent={(_index, session) => (
-							<SessionGroupItem
-								key={session.sessionId}
-								session={session}
-								variant="full"
-								showWorkspace={showAllWorkspaces}
-								isSelectionMode={isSelectionMode}
-								selectedTaskIds={selectedTaskIds}
-								onToggleSelection={toggleTaskSelection}
-								onDelete={handleDelete}
-								onDeleteSession={() => {
-									const ids = session.tabs.map((t) => t.id)
-									setDeleteSessionTaskIds(ids)
-								}}
-								onNewTab={() => handleNewTabInSession(session.sessionId)}
-								onToggleExpand={() => toggleSessionExpand(session.sessionId)}
-								onRenameSession={(name) => setSessionName(session.sessionId, name)}
-								taskNames={taskNames}
-								onRenameTab={handleRenameTab}
-								className="m-2"
-							/>
+							<div className="px-2 py-1">
+								<SessionGroupItem
+									key={session.sessionId}
+									session={session}
+									variant="full"
+									showWorkspace={showAllWorkspaces}
+									isSelectionMode={isSelectionMode}
+									selectedTaskIds={selectedTaskIds}
+									onToggleSelection={toggleTaskSelection}
+									onDelete={handleDelete}
+									onDeleteSession={() => {
+										const ids = session.tabs.map((t) => t.id)
+										setDeleteSessionTaskIds(ids)
+									}}
+									onNewTab={() => handleNewTabInSession(session.sessionId)}
+									onToggleExpand={() => toggleSessionExpand(session.sessionId)}
+									onRenameSession={(name) => setSessionName(session.sessionId, name)}
+									taskNames={taskNames}
+									onRenameTab={handleRenameTab}
+								/>
+							</div>
 						)}
 					/>
 				)}

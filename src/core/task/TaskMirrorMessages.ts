@@ -203,7 +203,16 @@ export class TaskMirrorMessages {
 			// - Final state is emitted when updates stop (trailing: true)
 			this.task.debouncedEmitTokenUsage(tokenUsage, this.task.toolUsage)
 
-			await this.task.providerRef.deref()?.updateTaskHistory(historyItem)
+			// Only persist to taskHistory if the task has actual content/messages or is a resumed history item.
+			// Blank/idle draft tasks (e.g. from clicking "+" or "New Session") must NOT pollute history.
+			const hasContent =
+				this.mirrorMessages.length > 0 ||
+				Boolean(this.task.metadata?.task && this.task.metadata.task.trim().length > 0) ||
+				Boolean(this.task.historyItem)
+
+			if (hasContent) {
+				await this.task.providerRef.deref()?.updateTaskHistory(historyItem)
+			}
 			return true
 		} catch (error) {
 			console.error("Failed to save Mirror VS messages:", error)

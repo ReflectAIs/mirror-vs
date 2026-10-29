@@ -2,6 +2,19 @@
 
 All notable changes to the "Mirror VS" extension will be documented in this file.
 
+## [1.0.7] - 2026-10-29
+
+### Fixes & Enhancements
+
+- **Model Vision Support Validation & Safe Fallback**:
+    - Fixed provider metadata for DeepSeek-V4/V4.1, GLM, and MiMo models on Relace (`supportsImages: false`), preventing HTTP 400 Bad Request rejections during task execution and conversation condensing.
+    - Added defense-in-depth sanitization in `BaseOpenAiCompatibleProvider` to convert any accidental image payloads to text placeholders for non-vision endpoints.
+    - Added an inline warning badge in the chat input area when images are attached to a model that does not support images.
+    - Added an interactive confirmation modal on send/enqueue: prompts the user if they wish to proceed without images or cancel to switch to a vision model, preserving input text and attachments on cancel.
+- **Session History Single-Click & Ghost Session Deletion Fixes**:
+    - Fixed double-click requirement and glitching on action buttons (New Tab, Delete Session, Delete Tab): completely decoupled the session expand/collapse trigger from the action button container and eliminated focus-cancelling `preventDefault` handlers and Virtuoso ResizeObserver hitbox desync.
+    - Fixed empty "Session 1" resurrecting after deletion: blank/draft tasks with 0 user messages are no longer persisted to `taskHistoryStore`, and deleting all tasks in an active session cleans up `sessionNames` and resets chat state without creating ghost history entries.
+
 ## [1.0.6] - 2026-10-23
 
 ### Improvements & Cost Optimization

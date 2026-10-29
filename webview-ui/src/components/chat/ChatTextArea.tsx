@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useEvent } from "react-use"
 import DynamicTextArea from "react-textarea-autosize"
-import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square, Zap } from "lucide-react"
+import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square, Zap, AlertTriangle } from "lucide-react"
 
 import {
 	getFreeRouterActiveModelId,
@@ -54,6 +54,7 @@ interface ChatTextAreaProps {
 	onSend: () => void
 	onSelectImages: () => void
 	shouldDisableImages: boolean
+	supportsImages?: boolean
 	onHeightChange?: (height: number) => void
 	mode: Mode
 	setMode: (value: Mode) => void
@@ -86,6 +87,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			onSend,
 			onSelectImages,
 			shouldDisableImages,
+			supportsImages,
 			onHeightChange,
 			mode,
 			setMode,
@@ -1327,6 +1329,15 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						</div>
 					</div>
 				</div>
+
+				{selectedImages.length > 0 && supportsImages === false && (
+					<div
+						data-testid="image-not-supported-warning"
+						className="flex items-center gap-1.5 px-2.5 py-1 mb-1 text-xs rounded-md bg-vscode-inputValidation-warningBackground text-vscode-inputValidation-warningForeground border border-vscode-inputValidation-warningBorder/60">
+						<AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+						<span>{t("chat:imageNotSupported.warning")}</span>
+					</div>
+				)}
 
 				{selectedImages.length > 0 && (
 					<Thumbnails

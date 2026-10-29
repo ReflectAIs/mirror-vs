@@ -158,7 +158,7 @@ export interface UseChatMessagesReturn {
 	handleSendMessage: (text: string, images: string[], forceSend?: boolean) => void
 	handleSetChatBoxMessage: (text: string, images: string[]) => void
 	handleStopTask: () => void
-	handleEnqueueCurrentMessage: () => void
+	handleEnqueueCurrentMessage: (imagesOverride?: string[]) => void
 	handlePrimaryButtonClick: (text?: string, images?: string[]) => void
 	handleSecondaryButtonClick: (text?: string, images?: string[]) => void
 	handleSetExpandedRow: (ts: number, expand?: boolean) => void
@@ -1044,30 +1044,34 @@ export function useChatMessages(options: UseChatMessagesOptions): UseChatMessage
 		setDidClickCancel(true)
 	}, [setDidClickCancel, currentTabId])
 
-	const handleEnqueueCurrentMessage = useCallback(() => {
-		const text = inputValue.trim()
-		if (text || selectedImages.length > 0) {
-			vscode.postMessage({
-				type: "queueMessage",
-				text,
-				images: selectedImages,
-				...(currentTabId ? { taskId: currentTabId } : {}),
-			})
-
-			setOptimisticQueue((prev) => [
-				...prev,
-				{
-					timestamp: Date.now(),
-					id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+	const handleEnqueueCurrentMessage = useCallback(
+		(imagesOverride?: string[]) => {
+			const text = inputValue.trim()
+			const imagesToSend = imagesOverride !== undefined ? imagesOverride : selectedImages
+			if (text || imagesToSend.length > 0) {
+				vscode.postMessage({
+					type: "queueMessage",
 					text,
-					images: selectedImages.length > 0 ? selectedImages : undefined,
-				},
-			])
+					images: imagesToSend,
+					...(currentTabId ? { taskId: currentTabId } : {}),
+				})
 
-			setInputValue("")
-			setSelectedImages([])
-		}
-	}, [inputValue, selectedImages, currentTabId])
+				setOptimisticQueue((prev) => [
+					...prev,
+					{
+						timestamp: Date.now(),
+						id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+						text,
+						images: imagesToSend.length > 0 ? imagesToSend : undefined,
+					},
+				])
+
+				setInputValue("")
+				setSelectedImages([])
+			}
+		},
+		[inputValue, selectedImages, currentTabId],
+	)
 
 	const handlePrimaryButtonClick = useCallback(
 		(text?: string, images?: string[]) => {

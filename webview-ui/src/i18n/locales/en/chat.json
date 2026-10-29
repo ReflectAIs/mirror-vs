@@ -150,6 +150,14 @@
 	},
 	"enhancePromptDescription": "The 'Enhance Prompt' button helps improve your prompt by providing additional context, clarification, or rephrasing. Try typing a prompt in here and clicking the button again to see how it works.",
 	"addImages": "Add images to message",
+	"imageNotSupported": {
+		"title": "Model Does Not Support Images",
+		"description": "The selected model ({{model}}) does not support image inputs. Would you like to proceed without the attached images, or cancel to switch models?",
+		"descriptionNoText": "The selected model ({{model}}) does not support image inputs. Please enter a text prompt or switch to a model that supports images.",
+		"continueWithoutImages": "Continue Without Images",
+		"warning": "This model does not support images",
+		"defaultModel": "This model"
+	},
 	"sendMessage": "Send message",
 	"pressToSend": "Press {{keyCombination}} to send",
 	"stopTts": "Stop text-to-speech",

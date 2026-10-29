@@ -31,7 +31,9 @@ export const useTaskSearch = () => {
 	}
 
 	const presentableTasks = useMemo(() => {
-		let tasks = taskHistory.filter((item) => item.ts && item.task)
+		let tasks = taskHistory.filter(
+			(item) => item.ts && item.task && !item.task.toLowerCase().includes("(no messages)"),
+		)
 		if (!showAllWorkspaces) {
 			const activeCwd = normalizeWorkspace(cwd)
 			tasks = tasks.filter((item) => {

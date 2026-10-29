@@ -30,9 +30,12 @@ export const DeleteButton = ({ itemId, onDelete }: DeleteButtonProps) => {
 				variant="ghost"
 				size="icon"
 				data-testid="delete-task-button"
+				onMouseDown={(e) => {
+					e.stopPropagation()
+				}}
 				onClick={handleDeleteClick}
 				className="group-hover:opacity-100 opacity-50 transition-opacity">
-				<span className="codicon codicon-trash scale-80" />
+				<span className="codicon codicon-trash scale-80 pointer-events-none" />
 			</Button>
 		</StandardTooltip>
 	)

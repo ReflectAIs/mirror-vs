@@ -115,113 +115,127 @@ const SessionGroupItem = ({
 				"bg-vscode-editor-background rounded-xl border border-vscode-panel-border/20 overflow-hidden",
 				className,
 			)}>
-			{/* Collapsible session header */}
+			{/* Session header row */}
 			<div
 				className={cn(
-					"group flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none",
+					"group flex items-center justify-between gap-2 px-3 py-2 select-none",
 					"bg-vscode-sideBar-background/20 border-b border-vscode-panel-border/10",
 					"hover:bg-vscode-sideBar-background/40 transition-colors",
-				)}
-				onClick={onToggleExpand}
-				role="button"
-				aria-expanded={isExpanded}
-				aria-label={`${sessionName} — ${taskCount} tab${taskCount !== 1 ? "s" : ""}`}
-				tabIndex={0}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault()
-						onToggleExpand()
-					}
-				}}>
-				{/* Chevron */}
-				<ChevronRight
-					className={cn(
-						"size-4 shrink-0 text-vscode-descriptionForeground transition-transform duration-200",
-						isExpanded && "rotate-90",
-					)}
-				/>
-
-				{/* Session name — inline editable */}
-				{isRenaming ? (
-					<input
-						ref={inputRef}
+				)}>
+				{/* Collapsible session expand/collapse target */}
+				<div
+					className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer py-0.5"
+					onClick={onToggleExpand}
+					role="button"
+					aria-expanded={isExpanded}
+					aria-label={`${sessionName} — ${taskCount} tab${taskCount !== 1 ? "s" : ""}`}
+					tabIndex={0}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" || e.key === " ") {
+							e.preventDefault()
+							onToggleExpand()
+						}
+					}}>
+					{/* Chevron */}
+					<ChevronRight
 						className={cn(
-							"flex-1 min-w-0 bg-vscode-input-background text-vscode-input-foreground",
-							"border border-vscode-input-border rounded px-1.5 py-0.5 text-xs font-medium",
-							"outline-none focus:border-mirror-brand-via/60",
+							"size-4 shrink-0 text-vscode-descriptionForeground transition-transform duration-200",
+							isExpanded && "rotate-90",
 						)}
-						value={renameValue}
-						onChange={(e) => setRenameValue(e.target.value)}
-						onBlur={commitRename}
-						onKeyDown={handleKeyDown}
-						onClick={(e) => e.stopPropagation()}
 					/>
-				) : (
-					<span
-						className="flex-1 min-w-0 text-xs font-semibold text-vscode-foreground truncate"
-						onDoubleClick={handleDoubleClick}
-						title={`${tabs.length > 0 ? timeLabel : ""}`}>
-						{sessionName}
+
+					{/* Session name — inline editable */}
+					{isRenaming ? (
+						<input
+							ref={inputRef}
+							className={cn(
+								"flex-1 min-w-0 bg-vscode-input-background text-vscode-input-foreground",
+								"border border-vscode-input-border rounded px-1.5 py-0.5 text-xs font-medium",
+								"outline-none focus:border-mirror-brand-via/60",
+							)}
+							value={renameValue}
+							onChange={(e) => setRenameValue(e.target.value)}
+							onBlur={commitRename}
+							onKeyDown={handleKeyDown}
+							onClick={(e) => e.stopPropagation()}
+						/>
+					) : (
+						<span
+							className="flex-1 min-w-0 text-xs font-semibold text-vscode-foreground truncate"
+							onDoubleClick={handleDoubleClick}
+							title={`${tabs.length > 0 ? timeLabel : ""}`}>
+							{sessionName}
+						</span>
+					)}
+
+					{/* Workspace badge in 'All' mode */}
+					{showWorkspace && sessionWorkspace && (
+						<span
+							className="shrink-0 text-[10px] font-mono text-vscode-descriptionForeground/75 bg-vscode-sideBar-background/60 border border-vscode-panel-border/30 rounded px-1.5 py-0.5 flex items-center gap-1 max-w-[130px] truncate"
+							title={sessionWorkspace}>
+							<Folder className="size-2.5 shrink-0" />
+							<span className="truncate">{sessionWorkspace.split("/").pop() || sessionWorkspace}</span>
+						</span>
+					)}
+
+					{/* Task count badge */}
+					<span className="shrink-0 text-[10px] text-vscode-descriptionForeground/60 bg-vscode-sideBar-background/40 rounded-full px-2 py-0.5">
+						{taskCount} tab{taskCount !== 1 ? "s" : ""}
 					</span>
-				)}
 
-				{/* Workspace badge in 'All' mode */}
-				{showWorkspace && sessionWorkspace && (
-					<span
-						className="shrink-0 text-[10px] font-mono text-vscode-descriptionForeground/75 bg-vscode-sideBar-background/60 border border-vscode-panel-border/30 rounded px-1.5 py-0.5 flex items-center gap-1 max-w-[130px] truncate"
-						title={sessionWorkspace}>
-						<Folder className="size-2.5 shrink-0" />
-						<span className="truncate">{sessionWorkspace.split("/").pop() || sessionWorkspace}</span>
+					{/* Timestamp */}
+					<span className="shrink-0 text-[10px] text-vscode-descriptionForeground/40 whitespace-nowrap">
+						{timeLabel}
 					</span>
-				)}
+				</div>
 
-				{/* Task count badge */}
-				<span className="shrink-0 text-[10px] text-vscode-descriptionForeground/60 bg-vscode-sideBar-background/40 rounded-full px-2 py-0.5">
-					{taskCount} tab{taskCount !== 1 ? "s" : ""}
-				</span>
-
-				{/* Timestamp */}
-				<span className="shrink-0 text-[10px] text-vscode-descriptionForeground/40 whitespace-nowrap">
-					{timeLabel}
-				</span>
-
-				{/* New tab in session button */}
-				{!isSelectionMode && onNewTab && (
-					<button
-						onClick={(e) => {
-							e.stopPropagation()
-							onNewTab()
-						}}
-						className={cn(
-							"shrink-0 p-1 rounded-md border border-transparent",
-							"text-vscode-descriptionForeground/40 hover:text-vscode-foreground",
-							"hover:bg-vscode-input-background/50 hover:border-vscode-panel-border/30",
-							"opacity-0 group-hover:opacity-100 transition-all duration-150",
+				{/* Action buttons — completely decoupled from onToggleExpand target */}
+				{!isSelectionMode && (onNewTab || (taskCount > 0 && onDeleteSession)) && (
+					<div
+						className="flex items-center gap-1 shrink-0"
+						onClick={(e) => e.stopPropagation()}
+						onMouseDown={(e) => e.stopPropagation()}>
+						{/* New tab in session button */}
+						{onNewTab && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation()
+									onNewTab()
+								}}
+								className={cn(
+									"shrink-0 p-1 rounded-md border border-transparent [&_svg]:pointer-events-none cursor-pointer",
+									"text-vscode-descriptionForeground/60 hover:text-vscode-foreground",
+									"hover:bg-vscode-input-background/60 hover:border-vscode-panel-border/40",
+									"opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+								)}
+								aria-label={t("history:newTabInSession")}
+								title={t("history:newTabInSession")}
+								data-testid={`new-tab-session-${sessionId}`}>
+								<Plus className="size-3.5" />
+							</button>
 						)}
-						aria-label={t("history:newTabInSession")}
-						title={t("history:newTabInSession")}
-						data-testid={`new-tab-session-${sessionId}`}>
-						<Plus className="size-3.5" />
-					</button>
-				)}
 
-				{/* Delete session button — only shown when there are tabs */}
-				{taskCount > 0 && !isSelectionMode && onDeleteSession && (
-					<button
-						onClick={(e) => {
-							e.stopPropagation()
-							onDeleteSession()
-						}}
-						className={cn(
-							"shrink-0 p-1 rounded-md border border-transparent",
-							"text-vscode-descriptionForeground/40 hover:text-vscode-errorForeground",
-							"hover:bg-vscode-input-background/50 hover:border-vscode-panel-border/30",
-							"opacity-0 group-hover:opacity-100 transition-all duration-150",
+						{/* Delete session button — only shown when there are tabs */}
+						{taskCount > 0 && onDeleteSession && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation()
+									onDeleteSession()
+								}}
+								className={cn(
+									"shrink-0 p-1 rounded-md border border-transparent [&_svg]:pointer-events-none cursor-pointer",
+									"text-vscode-descriptionForeground/60 hover:text-vscode-errorForeground",
+									"hover:bg-vscode-input-background/60 hover:border-vscode-panel-border/40",
+									"opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+								)}
+								aria-label="Delete session"
+								title="Delete session">
+								<Trash2 className="size-3.5" />
+							</button>
 						)}
-						aria-label="Delete session"
-						title="Delete session">
-						<Trash2 className="size-3.5" />
-					</button>
+					</div>
 				)}
 			</div>
 

@@ -91,7 +91,10 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 			model,
 			max_tokens,
 			temperature,
-			messages: [{ role: "system", content: systemPrompt }, ...convertToOpenAiMessages(messages)],
+			messages: [
+				{ role: "system", content: systemPrompt },
+				...convertToOpenAiMessages(messages, { supportsImages: info.supportsImages }),
+			],
 			stream: true,
 			stream_options: { include_usage: true },
 			tools: this.convertToolsForOpenAI(metadata?.tools),

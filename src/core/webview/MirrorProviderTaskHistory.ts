@@ -60,6 +60,22 @@ export class TaskHistoryManager {
 				this.provider.log("[initializeTaskHistoryStore] Migration complete")
 			}
 
+			// Clean up any stale/ghost empty tasks from taskHistoryStore
+			const emptyTaskIds = this.provider.taskHistoryStore
+				.getAll()
+				.filter(
+					(item) =>
+						(!item.task || item.task.toLowerCase().includes("(no messages)")) &&
+						(item.tokensIn || 0) === 0 &&
+						(item.tokensOut || 0) === 0,
+				)
+				.map((item) => item.id)
+
+			if (emptyTaskIds.length > 0) {
+				await this.provider.taskHistoryStore.deleteMany(emptyTaskIds)
+				this.provider.log(`[initializeTaskHistoryStore] Purged ${emptyTaskIds.length} empty ghost tasks`)
+			}
+
 			this.provider.taskHistoryStoreInitialized = true
 		} catch (error) {
 			this.provider.log(
@@ -222,7 +238,7 @@ export class TaskHistoryManager {
 
 		// Sort and filter the history the same way as getStateToPostToWebview
 		const sortedHistory = taskHistory
-			.filter((item: HistoryItem) => item.ts && item.task)
+			.filter((item: HistoryItem) => item.ts && item.task && !item.task.toLowerCase().includes("(no messages)"))
 			.sort((a: HistoryItem, b: HistoryItem) => b.ts - a.ts)
 
 		await this.provider.postMessageToWebview({
@@ -305,13 +321,31 @@ export class TaskHistoryManager {
 				}
 			}
 
-			// Check if all tasks in the active session were deleted — if so, reset to a New Session
+			// Check if all tasks in the session were deleted — clean up sessionNames map
+			const sessionToCheck = historyItem?.sessionId || this.provider.getCurrentSessionId()
+			if (sessionToCheck) {
+				const remainingForSession = this.provider.taskHistoryStore
+					.getAll()
+					.filter((item) => item.sessionId === sessionToCheck && !allIdsToDelete.includes(item.id))
+				if (remainingForSession.length === 0) {
+					try {
+						const sessionNames: Record<string, string> =
+							(await this.provider.contextProxy.getValue("sessionNames")) || {}
+						if (sessionNames[sessionToCheck]) {
+							delete sessionNames[sessionToCheck]
+							await this.provider.contextProxy.setValue("sessionNames", sessionNames)
+						}
+					} catch {}
+				}
+			}
+
+			// If the active session's tasks were all deleted, reset chat to a fresh session
 			const currentSessionId = this.provider.getCurrentSessionId()
 			if (currentSessionId) {
-				const remainingSessionTasks = this.provider.taskHistoryStore
+				const remainingActiveTasks = this.provider.taskHistoryStore
 					.getAll()
 					.filter((item) => item.sessionId === currentSessionId && !allIdsToDelete.includes(item.id))
-				if (remainingSessionTasks.length === 0) {
+				if (remainingActiveTasks.length === 0) {
 					await this.provider.createSession()
 					while (this.provider.mirrorStack.length > 0) {
 						await this.provider.removeMirrorFromStack()
