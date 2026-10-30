@@ -46,8 +46,7 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 	// Pattern match for rm or rmdir
 	const hasDangerousRm = /\b(rm|rmdir)\b/.test(lower)
 	if (hasDangerousRm) {
-		const isRecursive =
-			/\s-(r|R|f|rf|fr|rf\w*|f\w*r)\b/.test(lower) || lower.includes("--recursive") || lower.includes("-f")
+		const isRecursive = /\s-(r|R|rf|fr|rf\w*|f\w*r)\b/.test(lower) || lower.includes("--recursive")
 
 		// Split command to analyze parts / arguments
 		const parts = command.split(/\s+/)
@@ -70,7 +69,7 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 				return "Destructive command blocked: Deleting the user home directory '~' is prohibited."
 			}
 
-			// Block system paths
+			// Block core system OS directories
 			const systemPaths = [
 				"/system",
 				"/library",
@@ -79,11 +78,10 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 				"/sbin",
 				"/etc",
 				"/var",
-				"/private",
-				"/users",
+				"/private/var",
+				"/private/etc",
 				"c:\\windows",
 				"c:\\program files",
-				"c:\\users",
 			]
 			if (systemPaths.some((p) => cleanPart.toLowerCase().startsWith(p))) {
 				return `Destructive command blocked: Modifying or deleting system directory '${cleanPart}' is prohibited.`
@@ -91,11 +89,19 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 
 			// Block wildcards/current dir deletions at workspace root if recursive
 			if (isRecursive) {
-				if (cleanPart === "*" || cleanPart === "." || cleanPart === "./" || cleanPart === "./*") {
-					return "Destructive command blocked: Recursive deletion of the entire current directory or wildcard '*' is prohibited for safety."
+				if (
+					cleanPart === "*" ||
+					cleanPart === "." ||
+					cleanPart === "./" ||
+					cleanPart === "./*" ||
+					cleanPart === ".." ||
+					cleanPart === "../" ||
+					cleanPart === "../*"
+				) {
+					return "Destructive command blocked: Recursive deletion of current or parent directory or wildcard '*' is prohibited for safety."
 				}
 
-				// Check if the resolved path goes outside the workspace or is the workspace root
+				// Check if the resolved path equals workspace root
 				try {
 					const resolvedPath = path.resolve(workspacePath, cleanPart)
 					const relative = path.relative(workspacePath, resolvedPath)
@@ -104,27 +110,8 @@ function validateCommandSafety(command: string, workspacePath: string): string |
 					if (resolvedPath === path.resolve(workspacePath) || relative === "") {
 						return "Destructive command blocked: Deleting the workspace root directory recursively is prohibited."
 					}
-
-					// Allow temporary directory and scratch folder deletions
-					const isTempPath =
-						resolvedPath.startsWith(os.tmpdir()) ||
-						resolvedPath.startsWith("/tmp") ||
-						resolvedPath.startsWith("/private/tmp") ||
-						resolvedPath.startsWith("/var/tmp") ||
-						cleanPart.startsWith("/tmp") ||
-						cleanPart.startsWith("/private/tmp") ||
-						cleanPart.includes("scratch") ||
-						cleanPart.includes(".cache") ||
-						cleanPart.includes(".tmp")
-
-					// If resolvedPath goes outside the workspace (starts with '..')
-					if (relative.startsWith("..") && !isTempPath) {
-						return `Destructive command blocked: Deleting non-temporary directories outside the workspace ('${cleanPart}') is prohibited.`
-					}
-				} catch (e) {
-					if ((cleanPart.startsWith("..") || cleanPart.startsWith("/")) && !cleanPart.startsWith("/tmp")) {
-						return "Destructive command blocked: Path resolves outside the workspace."
-					}
+				} catch {
+					// Non-catastrophic paths will proceed to user approval (askApproval)
 				}
 			}
 		}
