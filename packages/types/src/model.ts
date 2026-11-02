@@ -151,3 +151,66 @@ export type ModelInfo = z.infer<typeof modelInfoSchema>
 export type ModelRecord = Record<string, ModelInfo>
 
 export type RouterModels = Record<DynamicProvider | LocalProvider, ModelRecord>
+
+/**
+ * Infers whether a model supports image inputs based on explicit configuration or model ID naming heuristics.
+ * If explicit configuration is provided, it takes precedence.
+ * Otherwise, inspects common vision tags (e.g. -vl, vision, omni, 4o, pixtral, etc.)
+ * and known text-only model architectures. Defaults to true for unknown custom models
+ * to prevent false-negative warnings.
+ */
+export function inferModelSupportsImages(modelId?: string, explicitSupportsImages?: boolean): boolean {
+	if (typeof explicitSupportsImages === "boolean") {
+		return explicitSupportsImages
+	}
+	if (!modelId) {
+		return true
+	}
+	const lower = modelId.toLowerCase()
+
+	// Explicit vision indicators in model name
+	const isExplicitVision =
+		lower.includes("vision") ||
+		lower.includes("-vl") ||
+		lower.includes("_vl") ||
+		lower.includes("/vl") ||
+		lower.includes("vl-") ||
+		lower.includes("multimodal") ||
+		lower.includes("omni") ||
+		lower.includes("gpt-4") ||
+		lower.includes("gpt-5") ||
+		lower.includes("claude") ||
+		lower.includes("gemini") ||
+		lower.includes("pixtral") ||
+		lower.includes("minicpm") ||
+		lower.includes("internvl") ||
+		lower.includes("cogvlm") ||
+		lower.includes("llava") ||
+		lower.includes("glm-4v") ||
+		lower.includes("kimi-k3") ||
+		lower.includes("kimi-k2.5") ||
+		lower.includes("paligemma") ||
+		lower.includes("aria") ||
+		lower.includes("molmo")
+
+	if (isExplicitVision) {
+		return true
+	}
+
+	// Known text-only architectures (must not match if explicit vision tag was present)
+	const isKnownNonVision =
+		(lower.includes("deepseek") && !lower.includes("vl")) ||
+		lower.includes("codestral") ||
+		(lower.includes("qwen") && !lower.includes("vl")) ||
+		lower.includes("llama-3.1") ||
+		lower.includes("llama-3.3") ||
+		lower.includes("mistral-nemo") ||
+		lower.includes("command-r") ||
+		lower.includes("gemma-2")
+
+	if (isKnownNonVision) {
+		return false
+	}
+
+	return true
+}

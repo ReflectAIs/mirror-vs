@@ -29,6 +29,7 @@ import {
 	lMStudioDefaultModelInfo,
 	customDefaultModelId,
 	customDefaultModelInfo,
+	inferModelSupportsImages,
 	BEDROCK_1M_CONTEXT_MODEL_IDS,
 	VERTEX_1M_CONTEXT_MODEL_IDS,
 	isDynamicProvider,
@@ -363,8 +364,9 @@ function getSelectedModel({
 		}
 		case "custom": {
 			const id = apiConfiguration.customModelId ?? customDefaultModelId
-			const info = apiConfiguration.customModelInfo ?? customDefaultModelInfo
-			return { id, info }
+			const baseInfo = apiConfiguration.customModelInfo ?? customDefaultModelInfo
+			const supportsImages = inferModelSupportsImages(id, apiConfiguration.customModelInfo?.supportsImages)
+			return { id, info: { ...baseInfo, supportsImages } }
 		}
 		case "free-router": {
 			const id = getFreeRouterActiveModelId(apiConfiguration)

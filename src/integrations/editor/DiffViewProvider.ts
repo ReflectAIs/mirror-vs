@@ -12,6 +12,7 @@ import { arePathsEqual, getReadablePath } from "../../utils/path"
 import { formatResponse } from "../../core/prompts/responses"
 import { diagnosticsToProblemsString, getNewDiagnostics } from "../diagnostics"
 import { Task } from "../../core/task/Task"
+import { MirrorProvider } from "../../core/webview/MirrorProvider"
 
 import { DecorationController } from "./DecorationController"
 
@@ -114,6 +115,7 @@ export class DiffViewProvider {
 		this.fadedOverlayController.addLines(0, this.activeDiffEditor.document.lineCount)
 		this.scrollEditorToLine(0) // Will this crash for new files?
 		this.streamedLines = []
+		await this.restoreWebviewFocus()
 	}
 
 	async update(accumulatedContent: string, isFinal: boolean) {
@@ -134,11 +136,6 @@ export class DiffViewProvider {
 		if (!diffEditor || !document) {
 			throw new Error("User closed text editor, unable to edit file...")
 		}
-
-		// Place cursor at the beginning of the diff editor to keep it out of
-		// the way of the stream animation, but do this without stealing focus
-		const beginningOfDocument = new vscode.Position(0, 0)
-		diffEditor.selection = new vscode.Selection(beginningOfDocument, beginningOfDocument)
 
 		const endLine = accumulatedLines.length
 		// Replace all content up to the current line with accumulated lines.
@@ -190,6 +187,7 @@ export class DiffViewProvider {
 			// Clear all decorations at the end (after applying final edit).
 			this.fadedOverlayController.clear()
 			this.activeLineController.clear()
+			await this.restoreWebviewFocus()
 		}
 	}
 
@@ -215,6 +213,7 @@ export class DiffViewProvider {
 
 		await vscode.window.showTextDocument(vscode.Uri.file(absolutePath), { preview: false, preserveFocus: true })
 		await this.closeAllDiffViews()
+		await this.restoreWebviewFocus()
 
 		// Getting diagnostics before and after the file edit is a better approach than
 		// automatically tracking problems in real-time. This method ensures we only
@@ -408,10 +407,26 @@ export class DiffViewProvider {
 			}
 
 			await this.closeAllDiffViews()
+			await this.restoreWebviewFocus()
 		}
 
 		// Edit is done.
 		await this.reset()
+	}
+
+	private async restoreWebviewFocus(): Promise<void> {
+		try {
+			const task = this.taskRef.deref()
+			const provider = task?.providerRef?.deref()
+			if (!provider) {
+				return
+			}
+
+			await provider.focus()
+			await provider.postMessageToWebview({ type: "action", action: "focusInput" })
+		} catch (error) {
+			console.error("Failed to restore webview focus:", error)
+		}
 	}
 
 	private async closeAllDiffViews(): Promise<void> {
@@ -540,8 +555,14 @@ export class DiffViewProvider {
 
 			// Pre-open the file as a text document to ensure it doesn't open in preview mode
 			// This fixes issues with files that have custom editor associations (like markdown preview)
+			const provider = this.taskRef.deref()?.providerRef?.deref()
+			let targetColumn = vscode.ViewColumn.Active
+			if (provider?.viewColumn) {
+				targetColumn = vscode.ViewColumn.Beside
+			}
+
 			vscode.window
-				.showTextDocument(uri, { preview: false, viewColumn: vscode.ViewColumn.Active, preserveFocus: true })
+				.showTextDocument(uri, { preview: false, viewColumn: targetColumn, preserveFocus: true })
 				.then(() => {
 					// Execute the diff command after ensuring the file is open as text
 					return vscode.commands.executeCommand(
@@ -595,6 +616,7 @@ export class DiffViewProvider {
 					vscode.TextEditorRevealType.InCenter,
 				)
 
+				this.restoreWebviewFocus()
 				return
 			}
 

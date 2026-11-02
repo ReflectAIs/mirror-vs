@@ -106,7 +106,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"moonshotai/kimi-k3": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.4,
 		outputPrice: 4.0,

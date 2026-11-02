@@ -272,6 +272,18 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					if (message.requestId === searchRequestId) {
 						setFileSearchResults(message.results || [])
 					}
+				} else if (message.type === "action" && message.action === "focusInput") {
+					if (textAreaRef.current) {
+						textAreaRef.current.focus()
+						if (lastSelectionRef.current) {
+							try {
+								textAreaRef.current.setSelectionRange(
+									lastSelectionRef.current.start,
+									lastSelectionRef.current.end,
+								)
+							} catch {}
+						}
+					}
 				}
 			}
 
@@ -285,6 +297,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const [cursorPosition, setCursorPosition] = useState(0)
 		const [searchQuery, setSearchQuery] = useState("")
 		const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
+		const lastSelectionRef = useRef<{ start: number; end: number } | null>(null)
 		const [isMouseDownOnMenu, setIsMouseDownOnMenu] = useState(false)
 		const highlightLayerRef = useRef<HTMLDivElement>(null)
 		const [selectedMenuIndex, setSelectedMenuIndex] = useState(-1)
@@ -681,6 +694,10 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 				const newCursorPosition = e.target.selectionStart
 				setCursorPosition(newCursorPosition)
+				lastSelectionRef.current = {
+					start: newCursorPosition,
+					end: e.target.selectionEnd,
+				}
 
 				const showMenu = shouldShowContextMenu(newValue, newCursorPosition)
 				setShowContextMenu(showMenu)
@@ -746,6 +763,13 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		}, [showContextMenu])
 
 		const handleBlur = useCallback(() => {
+			if (textAreaRef.current) {
+				lastSelectionRef.current = {
+					start: textAreaRef.current.selectionStart,
+					end: textAreaRef.current.selectionEnd,
+				}
+			}
+
 			// Only hide the context menu if the user didn't click on it.
 			if (!isMouseDownOnMenu) {
 				setShowContextMenu(false)
@@ -883,7 +907,12 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 		const updateCursorPosition = useCallback(() => {
 			if (textAreaRef.current) {
-				setCursorPosition(textAreaRef.current.selectionStart)
+				const pos = textAreaRef.current.selectionStart
+				setCursorPosition(pos)
+				lastSelectionRef.current = {
+					start: pos,
+					end: textAreaRef.current.selectionEnd,
+				}
 			}
 		}, [])
 

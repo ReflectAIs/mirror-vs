@@ -2,7 +2,7 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
 
 import type { ModelInfo } from "@mirror-vs/types"
-import { customDefaultModelId, customDefaultModelInfo } from "@mirror-vs/types"
+import { customDefaultModelId, customDefaultModelInfo, inferModelSupportsImages } from "@mirror-vs/types"
 
 import { type ApiHandlerOptions, getModelMaxOutputTokens } from "../../shared/api"
 import { TagMatcher } from "../../utils/tag-matcher"
@@ -199,36 +199,7 @@ export class CustomHandler extends BaseProvider implements SingleCompletionHandl
 	override getModel() {
 		const modelId = this.options.customModelId || customDefaultModelId
 		const baseModelInfo = this.options.customModelInfo || customDefaultModelInfo
-
-		let supportsImages = baseModelInfo.supportsImages ?? true
-		if (this.options.customModelId && this.options.customModelInfo?.supportsImages === undefined) {
-			const lower = this.options.customModelId.toLowerCase()
-			const isKnownNonVision =
-				lower.includes("deepseek") ||
-				lower.includes("codestral") ||
-				lower.includes("qwen2.5-coder") ||
-				lower.includes("llama-3.1") ||
-				lower.includes("mistral-nemo") ||
-				lower.includes("command-r") ||
-				lower.includes("gemma-2")
-			const isExplicitVision =
-				lower.includes("vision") ||
-				lower.includes("vl") ||
-				lower.includes("multimodal") ||
-				lower.includes("gpt-4") ||
-				lower.includes("gpt-5") ||
-				lower.includes("claude") ||
-				lower.includes("gemini") ||
-				lower.includes("pixtral") ||
-				lower.includes("omni") ||
-				lower.includes("llama4") ||
-				lower.includes("minicpm-v") ||
-				lower.includes("internvl")
-
-			if (isKnownNonVision && !isExplicitVision) {
-				supportsImages = false
-			}
-		}
+		const supportsImages = inferModelSupportsImages(modelId, this.options.customModelInfo?.supportsImages)
 
 		return { id: modelId, info: { ...baseModelInfo, supportsImages } }
 	}

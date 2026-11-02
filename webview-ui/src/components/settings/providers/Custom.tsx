@@ -1,9 +1,16 @@
 import { useCallback } from "react"
 import { VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
 
-import { type ProviderSettings, customDefaultModelId } from "@mirror-vs/types"
+import {
+	type ProviderSettings,
+	customDefaultModelId,
+	customDefaultModelInfo,
+	inferModelSupportsImages,
+} from "@mirror-vs/types"
 
 import { useAppTranslation } from "@src/i18n/TranslationContext"
+import { Checkbox } from "vscrui"
+import { StandardTooltip } from "@src/components/ui"
 
 import { inputEventTransform } from "../transforms"
 import { ModelPicker } from "../ModelPicker"
@@ -73,6 +80,33 @@ export const Custom = ({
 				errorMessage={modelValidationError}
 				simplifySettings={simplifySettings}
 			/>
+
+			<div className="pt-2">
+				<div className="flex items-center gap-1">
+					<Checkbox
+						checked={
+							apiConfiguration?.customModelInfo?.supportsImages ??
+							inferModelSupportsImages(apiConfiguration?.customModelId)
+						}
+						onChange={(checked: boolean) => {
+							setApiConfigurationField("customModelInfo", {
+								...(apiConfiguration?.customModelInfo || customDefaultModelInfo),
+								supportsImages: checked,
+							})
+						}}>
+						<span className="font-medium">{t("settings:providers.customModel.imageSupport.label")}</span>
+					</Checkbox>
+					<StandardTooltip content={t("settings:providers.customModel.imageSupport.description")}>
+						<i
+							className="codicon codicon-info text-vscode-descriptionForeground"
+							style={{ fontSize: "12px" }}
+						/>
+					</StandardTooltip>
+				</div>
+				<div className="text-sm text-vscode-descriptionForeground pt-1">
+					{t("settings:providers.customModel.imageSupport.description")}
+				</div>
+			</div>
 		</>
 	)
 }

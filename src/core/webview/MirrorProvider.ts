@@ -112,6 +112,32 @@ export class MirrorProvider
 	private disposables: vscode.Disposable[] = []
 	private webviewDisposables: vscode.Disposable[] = []
 	private view?: vscode.WebviewView | vscode.WebviewPanel
+
+	public get currentView(): vscode.WebviewView | vscode.WebviewPanel | undefined {
+		return this.view
+	}
+
+	public get viewColumn(): vscode.ViewColumn | undefined {
+		if (this.view && "viewColumn" in this.view) {
+			return this.view.viewColumn
+		}
+		return undefined
+	}
+
+	/**
+	 * Focus the provider's panel/view (sidebar or tab) without losing webview state.
+	 */
+	public async focus(): Promise<void> {
+		if (this.view) {
+			if ("onDidChangeVisibility" in this.view && this.view.visible) {
+				await vscode.commands.executeCommand(`${MirrorProvider.sideBarId}.focus`)
+			} else if ("onDidChangeViewState" in this.view && (this.view as vscode.WebviewPanel).visible) {
+				const panel = this.view as vscode.WebviewPanel
+				panel.reveal(panel.viewColumn, false)
+			}
+		}
+	}
+
 	/** @internal Extracted classes (TaskLifecycleManager, etc.) read this directly. */
 	public mirrorStack: Task[] = []
 
