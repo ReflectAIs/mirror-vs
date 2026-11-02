@@ -227,6 +227,7 @@ function buildSystemPrompt(projectRoot: string, fileList: string[], fileContents
 - Only call read_file for files NOT listed below, or files you created/modified mid-task.
 - ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.
 - NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.
+- RECOVERY AFTER VERIFICATION FAILURE: If attempt_completion returns [VERIFICATION_FAILED], your previous changes ARE already saved on disk. DO NOT call read_file or list_files to inspect the filesystem. Read the failure feedback, immediately apply the requested fix using edit_file or write_to_file, and re-call attempt_completion.
 - IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.
 - If a tool fails twice with the same approach, change strategy immediately.
 - Be concise. Do not engage in conversation. Never start with "Great", "Sure", "Okay", "Certainly".
@@ -248,6 +249,11 @@ ${fileSection}`
 //  Harness
 // ────────────────────────────────────────────────────────────
 
+export interface ScenarioHooks {
+	enableThinking?: boolean
+	selfCorrectionNudge?: (files: Record<string, string>, attemptCount: number) => string | null
+}
+
 export class SandboxHarness {
 	private client: OpenAI
 	private config: HarnessConfig
@@ -261,7 +267,12 @@ export class SandboxHarness {
 		})
 	}
 
-	async runScenario(scenarioName: string, userPrompt: string, project: SandboxProject): Promise<ConversationTrace> {
+	async runScenario(
+		scenarioName: string,
+		userPrompt: string,
+		project: SandboxProject,
+		hooks?: ScenarioHooks,
+	): Promise<ConversationTrace> {
 		this.repetitionDetector = new ToolRepetitionDetector(3)
 		const fileList = Object.keys(project.files)
 		const systemPrompt = buildSystemPrompt(project.rootDir, fileList, project.files)
@@ -289,10 +300,11 @@ export class SandboxHarness {
 
 		const sessionId = `sandbox-${scenarioName}-${Date.now()}`
 		const scenarioStart = performance.now()
+		const completionTracker = { attempts: 0 }
 
 		try {
 			for (let turn = 0; turn < this.config.maxTurns; turn++) {
-				const turnResult = await this.executeTurn(turn, messages, project, sessionId)
+				const turnResult = await this.executeTurn(turn, messages, project, sessionId, hooks, completionTracker)
 				trace.turns.push(turnResult)
 				trace.totalInputTokens += turnResult.inputTokens
 				trace.totalOutputTokens += turnResult.outputTokens
@@ -337,18 +349,30 @@ export class SandboxHarness {
 		messages: OpenAI.Chat.ChatCompletionMessageParam[],
 		project: SandboxProject,
 		sessionId?: string,
+		hooks?: ScenarioHooks,
+		completionTracker: { attempts: number } = { attempts: 0 },
 	): Promise<TurnTrace> {
 		const requestTimestamp = Date.now()
 		const requestStart = performance.now()
 
-		const response = await this.client.chat.completions.create({
+		const requestParams: any = {
 			model: this.config.model,
 			messages,
 			tools: SANDBOX_TOOLS,
 			temperature: this.config.temperature ?? 0,
 			max_tokens: 8192,
 			...(sessionId && { session_id: sessionId }),
-		} as any)
+		}
+
+		if (hooks?.enableThinking) {
+			requestParams.extra_body = {
+				reasoning: {
+					effort: "high",
+				},
+			}
+		}
+
+		const response = await this.client.chat.completions.create(requestParams)
 
 		const responseTimestamp = Date.now()
 		const latencyMs = performance.now() - requestStart
@@ -358,7 +382,8 @@ export class SandboxHarness {
 		const usage = response.usage
 
 		const assistantText = message.content || ""
-		const reasoningText = (message as any).reasoning_content || ""
+		const reasoningText =
+			(message as any).reasoning || (message as any).reasoning_content || (message as any).thought || ""
 
 		// Add assistant message to conversation
 		messages.push(message as any)
@@ -404,6 +429,22 @@ export class SandboxHarness {
 					invocation = toolExec.invocation
 				}
 
+				if (toolName === "attempt_completion") {
+					if (hooks?.selfCorrectionNudge) {
+						completionTracker.attempts++
+						const nudge = hooks.selfCorrectionNudge(project.files, completionTracker.attempts)
+						if (nudge) {
+							result = `[VERIFICATION_FAILED] ${nudge}`
+							invocation.result = result
+							isCompletion = false
+						} else {
+							isCompletion = true
+						}
+					} else {
+						isCompletion = true
+					}
+				}
+
 				toolCalls.push(invocation)
 
 				// Add tool result to messages
@@ -412,10 +453,6 @@ export class SandboxHarness {
 					tool_call_id: tc.id,
 					content: result,
 				})
-
-				if (toolName === "attempt_completion") {
-					isCompletion = true
-				}
 			}
 		}
 

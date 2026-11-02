@@ -1,7 +1,7 @@
 # 📊 Sandbox Test Report: bug_fix
 
-**Model**: deepseek-ai/DeepSeek-V4-Flash-0731
-**Benchmark Grade**: **SOTA (A+)** (Score: 96/100)
+**Model**: deepseek/deepseek-v4-flash-0731
+**Benchmark Grade**: **SOTA (A+)** (Score: 90/100)
 **Status**: ✅ Completed
 
 ## 🏆 Competitive SOTA Benchmark
@@ -9,9 +9,9 @@
 | Metric             | Value         | Target (SOTA) |
 | ------------------ | ------------- | ------------- |
 | Benchmark Grade    | **SOTA (A+)** | SOTA (A+)     |
-| Efficiency Score   | 96 / 100      | > 85          |
-| Cache Hit Rate     | 52.2%         | > 80%         |
-| Cache Cost Savings | 47.0%         | > 60%         |
+| Efficiency Score   | 90 / 100      | > 85          |
+| Cache Hit Rate     | 0.0%          | > 80%         |
+| Cache Cost Savings | 0.0%          | > 60%         |
 | Redundant Reads    | 0             | 0             |
 
 ## Turn Efficiency
@@ -24,15 +24,15 @@
 
 ## Token & Cache Economics
 
-| Metric                         | Value                  |
-| ------------------------------ | ---------------------- |
-| Total Input Tokens             | 3,435                  |
-| Cached Input Tokens            | 1,792 (52.2%)          |
-| Total Output Tokens            | 294                    |
-| Avg Input/Turn                 | 1,718                  |
-| Avg Output/Turn                | 147                    |
-| Token Efficiency (out/in)      | 0.086                  |
-| Net Cost (with Cache Discount) | $0.00027 (47.0% saved) |
+| Metric                         | Value                 |
+| ------------------------------ | --------------------- |
+| Total Input Tokens             | 3,685                 |
+| Cached Input Tokens            | 0 (0.0%)              |
+| Total Output Tokens            | 468                   |
+| Avg Input/Turn                 | 1,843                 |
+| Avg Output/Turn                | 234                   |
+| Token Efficiency (out/in)      | 0.127                 |
+| Net Cost (with Cache Discount) | $0.00060 (0.0% saved) |
 
 ## Tool Usage
 
@@ -54,10 +54,10 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 22.0s |
-| Avg per Turn  | 11.0s |
-| Fastest Turn  | 2.7s  |
-| Slowest Turn  | 19.3s |
+| Total Latency | 5.5s  |
+| Avg per Turn  | 2.8s  |
+| Fastest Turn  | 2.2s  |
+| Slowest Turn  | 3.4s  |
 
 ## Reasoning
 
@@ -68,7 +68,6 @@
 
 ## Behavioral Signals
 
-- 🏆 SOTA Benchmark Grade: SOTA (A+) (96/100)
-- ⚡ High Cache Efficiency: 52.2% KV cache hit rate (~47% cost savings)
+- 🏆 SOTA Benchmark Grade: SOTA (A+) (90/100)
 - ✅ Excellent turn efficiency — completed in 2 turn(s)
 - 🧠 No reasoning detected — model may not be using thinking mode

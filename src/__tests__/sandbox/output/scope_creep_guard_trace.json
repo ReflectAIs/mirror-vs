@@ -1,0 +1,78 @@
+{
+	"scenarioName": "scope_creep_guard",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.\n- NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.\n- IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-mcmqSd\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/constants.ts\n```\nexport const MAX_RETRIES = 3\nexport const TIMEOUT_MS = 5000\nexport const BASE_URL = \"https://api.example.com\"\n\n```\n\n### src/config.ts\n```\nimport { MAX_RETRIES, TIMEOUT_MS } from \"./constants\"\nexport const config = { retries: MAX_RETRIES, timeout: TIMEOUT_MS }\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1793617478632,
+			"responseTimestamp": 1793617479993,
+			"latencyMs": 1361.1000829999975,
+			"timeToFirstTokenMs": 1361.1000829999975,
+			"inputTokens": 1634,
+			"outputTokens": 135,
+			"totalTokens": 1769,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00024752,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "edit_file",
+					"args": {
+						"path": "src/constants.ts",
+						"search": "export const TIMEOUT_MS = 5000",
+						"replace": "export const TIMEOUT_MS = 10000"
+					},
+					"result": "Applied 1 search/replace operation(s) to src/constants.ts.",
+					"durationMs": 0.9005420000030426,
+					"timestamp": 1793617479994
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1793617479994,
+			"responseTimestamp": 1793617480960,
+			"latencyMs": 966.0868329999939,
+			"timeToFirstTokenMs": 966.0868329999939,
+			"inputTokens": 1794,
+			"outputTokens": 71,
+			"totalTokens": 1865,
+			"cachedTokens": 1536,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.000095008,
+			"assistantText": "\n\n",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Changed TIMEOUT_MS from 5000 to 10000 in src/constants.ts only. No other files were modified."
+					},
+					"result": "[TASK_COMPLETED] Changed TIMEOUT_MS from 5000 to 10000 in src/constants.ts only. No other files were modified.",
+					"durationMs": 0.020666999997047242,
+					"timestamp": 1793617480960
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 2328.281624999996,
+	"totalInputTokens": 3428,
+	"totalOutputTokens": 206,
+	"totalToolCalls": 2,
+	"totalCachedTokens": 1536,
+	"totalCacheWriteTokens": 0,
+	"overallCacheHitRate": 44.8,
+	"totalCost": 0.000342528,
+	"completed": true
+}

@@ -1,0 +1,77 @@
+{
+	"scenarioName": "single_target_in_repeat",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.\n- NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.\n- IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-lVGAEu\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/routes.ts\n```\nexport const routes = [\n  { path: \"/home\", component: \"Home\", auth: false },\n  { path: \"/dashboard\", component: \"Dashboard\", auth: false },\n  { path: \"/settings\", component: \"Settings\", auth: false },\n  { path: \"/profile\", component: \"Profile\", auth: false },\n  { path: \"/admin\", component: \"Admin\", auth: false },\n]\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1793617484850,
+			"responseTimestamp": 1793617487118,
+			"latencyMs": 2268.3534999999974,
+			"timeToFirstTokenMs": 2268.3534999999974,
+			"inputTokens": 1673,
+			"outputTokens": 161,
+			"totalTokens": 1834,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00021238,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "apply_diff",
+					"args": {
+						"path": "src/routes.ts",
+						"diff": "<<<<<<< SEARCH\n  { path: \"/admin\", component: \"Admin\", auth: false },\n=======\n  { path: \"/admin\", component: \"Admin\", auth: true },\n>>>>>>> REPLACE"
+					},
+					"result": "Applied 1 diff hunk(s) to src/routes.ts.",
+					"durationMs": 0.7674579999948037,
+					"timestamp": 1793617487119
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1793617487119,
+			"responseTimestamp": 1793617489563,
+			"latencyMs": 2443.6519999999946,
+			"timeToFirstTokenMs": 2443.6519999999946,
+			"inputTokens": 1858,
+			"outputTokens": 75,
+			"totalTokens": 1933,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.0002068,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Updated src/routes.ts so the \"/admin\" route now has `auth: true`, while all other routes remain unchanged with `auth: false`."
+					},
+					"result": "[TASK_COMPLETED] Updated src/routes.ts so the \"/admin\" route now has `auth: true`, while all other routes remain unchanged with `auth: false`.",
+					"durationMs": 0.022499999991850927,
+					"timestamp": 1793617489563
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 4712.947832999998,
+	"totalInputTokens": 3531,
+	"totalOutputTokens": 236,
+	"totalToolCalls": 2,
+	"totalCachedTokens": 0,
+	"totalCacheWriteTokens": 0,
+	"overallCacheHitRate": 0,
+	"totalCost": 0.00041918,
+	"completed": true
+}

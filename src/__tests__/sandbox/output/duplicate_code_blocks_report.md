@@ -1,6 +1,6 @@
 # 📊 Sandbox Test Report: duplicate_code_blocks
 
-**Model**: deepseek-ai/DeepSeek-V4-Flash-0731
+**Model**: deepseek/deepseek-v4-flash-0731
 **Benchmark Grade**: **SOTA (A+)** (Score: 92/100)
 **Status**: ✅ Completed
 
@@ -10,8 +10,8 @@
 | ------------------ | ------------- | ------------- |
 | Benchmark Grade    | **SOTA (A+)** | SOTA (A+)     |
 | Efficiency Score   | 92 / 100      | > 85          |
-| Cache Hit Rate     | 44.9%         | > 80%         |
-| Cache Cost Savings | 40.4%         | > 60%         |
+| Cache Hit Rate     | 42.4%         | > 80%         |
+| Cache Cost Savings | 38.2%         | > 60%         |
 | Redundant Reads    | 0             | 0             |
 
 ## Turn Efficiency
@@ -26,13 +26,13 @@
 
 | Metric                         | Value                  |
 | ------------------------------ | ---------------------- |
-| Total Input Tokens             | 3,422                  |
-| Cached Input Tokens            | 1,536 (44.9%)          |
-| Total Output Tokens            | 209                    |
-| Avg Input/Turn                 | 1,711                  |
-| Avg Output/Turn                | 105                    |
-| Token Efficiency (out/in)      | 0.061                  |
-| Net Cost (with Cache Discount) | $0.00027 (40.4% saved) |
+| Total Input Tokens             | 3,621                  |
+| Cached Input Tokens            | 1,536 (42.4%)          |
+| Total Output Tokens            | 253                    |
+| Avg Input/Turn                 | 1,811                  |
+| Avg Output/Turn                | 127                    |
+| Token Efficiency (out/in)      | 0.07                   |
+| Net Cost (with Cache Discount) | $0.00020 (38.2% saved) |
 
 ## Tool Usage
 
@@ -54,10 +54,10 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 3.5s  |
-| Avg per Turn  | 1.7s  |
-| Fastest Turn  | 1.6s  |
-| Slowest Turn  | 1.9s  |
+| Total Latency | 9.1s  |
+| Avg per Turn  | 4.5s  |
+| Fastest Turn  | 0.6s  |
+| Slowest Turn  | 8.4s  |
 
 ## Reasoning
 

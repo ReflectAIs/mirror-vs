@@ -1,0 +1,78 @@
+{
+	"scenarioName": "no_over_deletion",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.\n- NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.\n- IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-Q8nxXJ\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/stack.ts\n```\nexport class Stack<T> {\n  private items: T[] = []\n\n  push(item: T): void {\n    this.items.push(item)\n  }\n\n  pop(): T | undefined {\n    return this.items.pop()\n  }\n\n  peek(): T | undefined {\n    return this.items[this.items.length - 1]\n  }\n\n  size(): number {\n    return this.items.length\n  }\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1793617489568,
+			"responseTimestamp": 1793617490880,
+			"latencyMs": 1312.7202499999985,
+			"timeToFirstTokenMs": 1312.7202499999985,
+			"inputTokens": 1632,
+			"outputTokens": 120,
+			"totalTokens": 1752,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00024336,
+			"assistantText": "\n\n",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "edit_file",
+					"args": {
+						"path": "src/stack.ts",
+						"search": "  size(): number {\n    return this.items.length\n  }\n}",
+						"replace": "  size(): number {\n    return this.items.length\n  }\n\n  isEmpty(): boolean {\n    return this.items.length === 0\n  }\n}"
+					},
+					"result": "Applied 1 search/replace operation(s) to src/stack.ts.",
+					"durationMs": 1.0884169999917503,
+					"timestamp": 1793617490881
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1793617490882,
+			"responseTimestamp": 1793617492229,
+			"latencyMs": 1347.7270829999907,
+			"timeToFirstTokenMs": 1347.7270829999907,
+			"inputTokens": 1777,
+			"outputTokens": 86,
+			"totalTokens": 1863,
+			"cachedTokens": 1536,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.000096698,
+			"assistantText": "\n\n",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Added an `isEmpty(): boolean` method to the Stack class in src/stack.ts that returns true when the stack has no items. All existing methods (push, pop, peek, size) remain intact."
+					},
+					"result": "[TASK_COMPLETED] Added an `isEmpty(): boolean` method to the Stack class in src/stack.ts that returns true when the stack has no items. All existing methods (push, pop, peek, size) remain intact.",
+					"durationMs": 0.024917000002460554,
+					"timestamp": 1793617492229
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 2661.9425419999898,
+	"totalInputTokens": 3409,
+	"totalOutputTokens": 206,
+	"totalToolCalls": 2,
+	"totalCachedTokens": 1536,
+	"totalCacheWriteTokens": 0,
+	"overallCacheHitRate": 45.1,
+	"totalCost": 0.000340058,
+	"completed": true
+}

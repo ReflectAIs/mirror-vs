@@ -1,6 +1,6 @@
 # 📊 Sandbox Test Report: exploration
 
-**Model**: deepseek-ai/DeepSeek-V4-Flash-0731
+**Model**: deepseek/deepseek-v4-flash-0731
 **Benchmark Grade**: **SOTA (A+)** (Score: 90/100)
 **Status**: ✅ Completed
 
@@ -26,13 +26,13 @@
 
 | Metric                         | Value                 |
 | ------------------------------ | --------------------- |
-| Total Input Tokens             | 1,752                 |
+| Total Input Tokens             | 1,830                 |
 | Cached Input Tokens            | 0 (0.0%)              |
-| Total Output Tokens            | 350                   |
-| Avg Input/Turn                 | 1,752                 |
-| Avg Output/Turn                | 350                   |
-| Token Efficiency (out/in)      | 0.2                   |
-| Net Cost (with Cache Discount) | $0.00028 (0.0% saved) |
+| Total Output Tokens            | 656                   |
+| Avg Input/Turn                 | 1,830                 |
+| Avg Output/Turn                | 656                   |
+| Token Efficiency (out/in)      | 0.358                 |
+| Net Cost (with Cache Discount) | $0.00044 (0.0% saved) |
 
 ## Tool Usage
 
@@ -53,10 +53,10 @@
 
 | Metric        | Value |
 | ------------- | ----- |
-| Total Latency | 7.1s  |
-| Avg per Turn  | 7.1s  |
-| Fastest Turn  | 7.1s  |
-| Slowest Turn  | 7.1s  |
+| Total Latency | 6.5s  |
+| Avg per Turn  | 6.5s  |
+| Fastest Turn  | 6.5s  |
+| Slowest Turn  | 6.5s  |
 
 ## Reasoning
 

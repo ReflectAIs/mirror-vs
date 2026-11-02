@@ -199,6 +199,23 @@ export function analyzeTrace(trace: ConversationTrace): PerformanceReport {
 	}
 	if (turnsWithReasoning === 0 && turns.length > 0) {
 		signals.push(`🧠 No reasoning detected — model may not be using thinking mode`)
+	} else if (turnsWithReasoning > 0) {
+		const avgChars = turns.length > 0 ? Math.round(totalReasoningChars / turns.length) : 0
+		signals.push(`🧠 Thinking mode active — ${turnsWithReasoning} turn(s) with reasoning (${avgChars} avg chars)`)
+	}
+
+	const verificationNudges = turns.filter((t) =>
+		t.toolCalls.some((tc) => tc.result.includes("[VERIFICATION_FAILED]")),
+	).length
+	if (verificationNudges > 0 && trace.completed) {
+		signals.push(`🔄 Self-correction verified — model recovered after ${verificationNudges} verification nudge(s)`)
+	}
+	if (
+		trace.completed &&
+		(trace.scenarioName === "apply_diff_fallback" || trace.scenarioName.includes("recovery")) &&
+		wrongToolAttempts > 0
+	) {
+		signals.push(`🩹 Error recovery verified — recovered and completed successfully`)
 	}
 
 	// Check for unnecessary reads before edits

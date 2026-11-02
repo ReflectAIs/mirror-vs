@@ -1,0 +1,78 @@
+{
+	"scenarioName": "ambiguous_filename",
+	"config": {
+		"apiKey": "***",
+		"baseUrl": "https://openrouter.ai/api/v1",
+		"model": "deepseek/deepseek-v4-flash-0731",
+		"maxTurns": 15,
+		"temperature": 0
+	},
+	"systemPrompt": "You are Mirror, an expert software engineer assistant operating in an agentic coding loop.\n\n## Tool Selection\n- Read unknown/new files: `read_file` | Search: `search_files` | List dir: `list_files`\n- Edit existing file: `apply_diff` or `edit_file` | Create new file: `write_to_file` | Shell: `execute_command`\n- Done: `attempt_completion`\n\n## Batching\n- Batch multiple read_file/search_files calls in ONE turn when you need several files simultaneously.\n- Write tools must be sequential (one per turn).\n- attempt_completion must never be batched.\n\n## Efficiency Rules — CRITICAL\n- ALL workspace file contents are provided in the \"Workspace Files\" section below. DO NOT call read_file on any file already listed there — the content shown is authoritative and current.\n- Only call read_file for files NOT listed below, or files you created/modified mid-task.\n- ACTION-FIRST: You MUST invoke a tool on EVERY turn. Never output introductory chat, explanations, or plans without a tool call.\n- NO VERIFICATION READS: After a successful write_to_file, apply_diff, or edit_file — do NOT re-read the file to verify. Trust the tool success response and immediately proceed.\n- RECOVERY AFTER VERIFICATION FAILURE: If attempt_completion returns [VERIFICATION_FAILED], your previous changes ARE already saved on disk. DO NOT call read_file or list_files to inspect the filesystem. Read the failure feedback, immediately apply the requested fix using edit_file or write_to_file, and re-call attempt_completion.\n- IMMEDIATE COMPLETION: Once changes are applied, immediately call attempt_completion. Put your summary in the 'result' parameter — do not output standalone text.\n- If a tool fails twice with the same approach, change strategy immediately.\n- Be concise. Do not engage in conversation. Never start with \"Great\", \"Sure\", \"Okay\", \"Certainly\".\n\n## Objective\n1. Read the task requirements carefully.\n2. Make all required changes using tools.\n3. Call attempt_completion when FULLY done.\n\n## Project Root\n/var/folders/5w/wb398h_j76gd08pjms23n_d00000gn/T/mirror-sandbox-gLw4fg\n(All file paths are relative to the project root.)\n\n## Workspace Files\n### src/auth/utils.ts\n```\nimport crypto from \"crypto\"\n\nexport function hashToken(token: string): string {\n  // Insecure MD5 - needs upgrade\n  return crypto.createHash(\"md5\").update(token).digest(\"hex\")\n}\n\n```\n\n### src/formatters/utils.ts\n```\nexport function formatDate(date: Date): string {\n  return date.toISOString().split(\"T\")[0]\n}\n\nexport function formatCurrency(cents: number): string {\n  return `$${(cents / 100).toFixed(2)}`\n}\n\n```\n\n### package.json\n```\n{\n  \"name\": \"multi-utils\",\n  \"version\": \"1.0.0\"\n}\n\n```",
+	"turns": [
+		{
+			"turnIndex": 0,
+			"requestTimestamp": 1793618364954,
+			"responseTimestamp": 1793618366732,
+			"latencyMs": 1777.5487910000002,
+			"timeToFirstTokenMs": 1777.5487910000002,
+			"inputTokens": 1841,
+			"outputTokens": 158,
+			"totalTokens": 1999,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00022834,
+			"assistantText": "",
+			"reasoningText": "The task is clear: update `src/auth/utils.ts` to use \"sha256\" instead of \"md5\". Do not modify other files. Let me apply the edit.",
+			"toolCalls": [
+				{
+					"name": "edit_file",
+					"args": {
+						"path": "src/auth/utils.ts",
+						"search": "// Insecure MD5 - needs upgrade\n  return crypto.createHash(\"md5\").update(token).digest(\"hex\")",
+						"replace": "return crypto.createHash(\"sha256\").update(token).digest(\"hex\")"
+					},
+					"result": "Applied 1 search/replace operation(s) to src/auth/utils.ts.",
+					"durationMs": 0.7245000000002619,
+					"timestamp": 1793618366732
+				}
+			],
+			"isCompletion": false
+		},
+		{
+			"turnIndex": 1,
+			"requestTimestamp": 1793618366732,
+			"responseTimestamp": 1793618367751,
+			"latencyMs": 1018.3848330000001,
+			"timeToFirstTokenMs": 1018.3848330000001,
+			"inputTokens": 2022,
+			"outputTokens": 73,
+			"totalTokens": 2095,
+			"cachedTokens": 0,
+			"cacheWriteTokens": 0,
+			"upstreamCost": 0.00022264,
+			"assistantText": "",
+			"reasoningText": "",
+			"toolCalls": [
+				{
+					"name": "attempt_completion",
+					"args": {
+						"result": "Updated `src/auth/utils.ts` so `hashToken` uses \"sha256\" instead of \"md5\". No other files were modified."
+					},
+					"result": "[TASK_COMPLETED] Updated `src/auth/utils.ts` so `hashToken` uses \"sha256\" instead of \"md5\". No other files were modified.",
+					"durationMs": 0.02866600000015751,
+					"timestamp": 1793618367751
+				}
+			],
+			"isCompletion": true
+		}
+	],
+	"totalLatencyMs": 2796.888667,
+	"totalInputTokens": 3863,
+	"totalOutputTokens": 231,
+	"totalToolCalls": 2,
+	"totalCachedTokens": 0,
+	"totalCacheWriteTokens": 0,
+	"overallCacheHitRate": 0,
+	"totalCost": 0.00045098,
+	"completed": true
+}

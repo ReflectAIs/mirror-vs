@@ -56,7 +56,7 @@ async function runSingleScenario(
 	console.log(`  Sandbox: ${project.rootDir}`)
 
 	try {
-		const trace = await harness.runScenario(scenario.name, scenario.userPrompt, project)
+		const trace = await harness.runScenario(scenario.name, scenario.userPrompt, project, scenario)
 		const report = analyzeTrace(trace)
 
 		// Run optional post-scenario verifier

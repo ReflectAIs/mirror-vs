@@ -13,6 +13,8 @@ export interface TestScenario {
 	tags: string[]
 	files: Record<string, string>
 	userPrompt: string
+	enableThinking?: boolean
+	selfCorrectionNudge?: (files: Record<string, string>, attemptCount: number) => string | null
 	/** Optional post-run verifier: receives final file contents and returns null on pass or an error string on fail */
 	verifyFn?: (files: Record<string, string>) => string | null
 }
@@ -646,6 +648,228 @@ export const jsonFileEdit: TestScenario = {
 }
 
 // ────────────────────────────────────────────────────────────
+//  Recommended Next Scenarios (🔴 High, 🟡 Med, 🟢 Low)
+// ────────────────────────────────────────────────────────────
+
+/** R1: apply_diff_fallback — Diff SEARCH block is slightly wrong, model must recover */
+export const applyDiffFallback: TestScenario = {
+	name: "apply_diff_fallback",
+	description: "Recover gracefully when an apply_diff SEARCH block has minor mismatches",
+	expectedMaxTurns: 4,
+	tags: ["recommended", "bugfix", "error-recovery"],
+	files: {
+		"src/logger.ts": `export class Logger {\n  private prefix: string\n\n  constructor(prefix: string) {\n    this.prefix = prefix\n  }\n\n  // Standard log output format (v2)\n  log(message: string): void {\n    console.log(\`[\${this.prefix}] \${message}\`)\n  }\n}\n`,
+	},
+	userPrompt:
+		"In `src/logger.ts`, update `log(message: string)` so it prefixes logs with an ISO timestamp like `[${new Date().toISOString()}] [${this.prefix}] ${message}`.\n\nTry applying this diff hunk if possible:\n<<<<<<< SEARCH\n  // Standard log output format\n  log(message: string): void {\n    console.log(`[${this.prefix}] ${message}`)\n  }\n=======\n  // Standard log output format (v2)\n  log(message: string): void {\n    console.log(`[${new Date().toISOString()}] [${this.prefix}] ${message}`)\n  }\n>>>>>>> REPLACE\n\nNote: The SEARCH block above has `// Standard log output format` but the file actually contains `// Standard log output format (v2)`. If apply_diff fails, inspect the error and recover by fixing the SEARCH block or using edit_file/write_to_file to apply the change.",
+	verifyFn: (files) => {
+		const content = files["src/logger.ts"] || ""
+		if (!content.includes("toISOString()")) {
+			return "FAIL: ISO timestamp was not added to logger.ts"
+		}
+		if (!content.includes("[${this.prefix}]")) {
+			return "FAIL: Prefix formatting was lost or broken"
+		}
+		return null
+	},
+}
+
+/** R2: ambiguous_filename — Two files named utils.ts in different dirs */
+export const ambiguousFilename: TestScenario = {
+	name: "ambiguous_filename",
+	description: "Modify the correct utils.ts when multiple identically-named files exist across directories",
+	expectedMaxTurns: 3,
+	tags: ["recommended", "basic", "file-precision"],
+	files: {
+		"src/auth/utils.ts": `import crypto from "crypto"\n\nexport function hashToken(token: string): string {\n  // Insecure MD5 - needs upgrade\n  return crypto.createHash("md5").update(token).digest("hex")\n}\n`,
+		"src/formatters/utils.ts": `export function formatDate(date: Date): string {\n  return date.toISOString().split("T")[0]\n}\n\nexport function formatCurrency(cents: number): string {\n  return \`$\${(cents / 100).toFixed(2)}\`\n}\n`,
+		"package.json": `{\n  "name": "multi-utils",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		'There are two files named `utils.ts` in different directories (`src/auth/utils.ts` and `src/formatters/utils.ts`).\nIn `src/auth/utils.ts`, update `hashToken` to use "sha256" instead of "md5".\nDO NOT modify `src/formatters/utils.ts` or any other file. Be exact with your file paths.',
+	verifyFn: (files) => {
+		const auth = files["src/auth/utils.ts"] || ""
+		const formatters = files["src/formatters/utils.ts"] || ""
+
+		if (!auth.includes("sha256")) return "FAIL: src/auth/utils.ts was not updated to sha256"
+		if (auth.includes("md5")) return "FAIL: src/auth/utils.ts still contains md5"
+		if (!formatters.includes("formatDate") || !formatters.includes("formatCurrency")) {
+			return "FAIL: src/formatters/utils.ts was modified or deleted"
+		}
+		if (files["utils.ts"] || files["src/utils.ts"]) {
+			return "FAIL: Created/edited wrong utils.ts location"
+		}
+		return null
+	},
+}
+
+/** R3: thinking_mode_algorithm — Implement Dijkstra with thinking enabled */
+export const thinkingModeAlgorithm: TestScenario = {
+	name: "thinking_mode_algorithm",
+	description: "Implement Dijkstra's shortest path algorithm with thinking mode enabled",
+	expectedMaxTurns: 4,
+	tags: ["recommended", "algorithms", "advanced", "thinking"],
+	enableThinking: true,
+	files: {
+		"src/dijkstra.ts": `export interface Graph {\n  [node: string]: { [neighbor: string]: number }\n}\n\nexport interface DijkstraResult {\n  distances: Record<string, number>\n  previous: Record<string, string | null>\n  path: (target: string) => string[]\n}\n\n/**\n * Finds shortest paths from startNode to all other reachable nodes using Dijkstra's algorithm.\n * - Throw Error if any edge weight is negative.\n * - Handle disconnected nodes (distance = Infinity).\n * - Return path function: returns [] if unreachable, [startNode] if startNode === target.\n */\nexport function dijkstra(graph: Graph, startNode: string): DijkstraResult {\n  // TODO: implement Dijkstra algorithm\n  throw new Error("Not implemented")\n}\n`,
+	},
+	userPrompt:
+		"Implement Dijkstra's shortest path algorithm in `src/dijkstra.ts`.\nRequirements:\n1. Throw an Error if any edge weight in the graph is negative.\n2. Initialize unvisited nodes with distance Infinity.\n3. Keep track of previous nodes to reconstruct paths.\n4. Implement `path(target: string)` returning:\n   - `[startNode]` if target === startNode\n   - `[]` if target is unreachable (distance Infinity or not in graph)\n   - The sequence of nodes from startNode to target along the shortest path\n5. Handle cycles and nodes with no outgoing edges cleanly.",
+	verifyFn: (files) => {
+		const code = files["src/dijkstra.ts"] || ""
+		if (code.includes('throw new Error("Not implemented")')) {
+			return "FAIL: dijkstra function still throws 'Not implemented'"
+		}
+		if (!code.includes("Infinity")) {
+			return "FAIL: does not handle Infinity for unvisited/unreachable nodes"
+		}
+		if (!code.includes("negative") && !code.includes("< 0") && !code.includes("Error")) {
+			return "FAIL: missing negative weight validation"
+		}
+		try {
+			const jsCode = code
+				.replace(/export\s+interface\s+[\s\S]*?}\n/g, "")
+				.replace(/export\s+/g, "")
+				.replace(/:\s*Graph\b/g, "")
+				.replace(/:\s*string\b/g, "")
+				.replace(/:\s*DijkstraResult\b/g, "")
+				.replace(/:\s*number\b/g, "")
+				.replace(/:\s*Record<[^>]+>/g, "")
+				.replace(/:\s*boolean\b/g, "")
+				.replace(/:\s*string\[\]\b/g, "")
+			const fn = new Function(`${jsCode}; return dijkstra;`)()
+
+			let threwOnNegative = false
+			try {
+				fn({ A: { B: -1 } }, "A")
+			} catch {
+				threwOnNegative = true
+			}
+			if (!threwOnNegative) return "FAIL: did not throw on negative edge weight"
+
+			const graph = {
+				A: { B: 4, C: 2 },
+				B: { D: 3 },
+				C: { B: 1, D: 5 },
+				D: {},
+			}
+			const result = fn(graph, "A")
+			if (result.distances["D"] !== 5) {
+				return `FAIL: distance to D should be 5 (A->C->B->D), got ${result.distances["D"]}`
+			}
+			const p = result.path("D")
+			if (p.join("->") !== "A->C->B->D") {
+				return `FAIL: path to D should be A->C->B->D, got ${p.join("->")}`
+			}
+			if (result.path("A").join("") !== "A") {
+				return `FAIL: path to startNode should be ['A'], got ${JSON.stringify(result.path("A"))}`
+			}
+		} catch (e: any) {
+			if (!code.includes("distances") || !code.includes("previous")) {
+				return `FAIL: missing distances or previous mapping: ${e.message}`
+			}
+		}
+		return null
+	},
+}
+
+/** R4: concurrent_edit_safety — Two requested edits that touch the same line */
+export const concurrentEditSafety: TestScenario = {
+	name: "concurrent_edit_safety",
+	description: "Safely merge two requirements that touch the same function signature and return statement",
+	expectedMaxTurns: 3,
+	tags: ["recommended", "basic", "refactor"],
+	files: {
+		"src/pricing.ts": `export interface LineItem {\n  name: string\n  price: number\n  quantity: number\n}\n\n// Compute cart total\nexport function computeTotal(items: LineItem[]): number {\n  const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0)\n  return subtotal\n}\n`,
+	},
+	userPrompt:
+		"In `src/pricing.ts`, update `computeTotal` to simultaneously apply two new calculations:\n1. Accept an optional `discountMultiplier: number = 1.0` (e.g. 0.9 for 10% off).\n2. Accept an optional `taxRate: number = 0.0` (e.g. 0.08 for 8% tax applied to discounted subtotal).\nUpdate the signature to:\n`export function computeTotal(items: LineItem[], discountMultiplier: number = 1.0, taxRate: number = 0.0): number`\nReturn the final calculated amount: `subtotal * discountMultiplier * (1 + taxRate)`.\nEnsure the existing `items.reduce` subtotal calculation is preserved.",
+	verifyFn: (files) => {
+		const code = files["src/pricing.ts"] || ""
+		if (!code.includes("discountMultiplier") || !code.includes("taxRate")) {
+			return "FAIL: Missing discountMultiplier or taxRate parameters"
+		}
+		if (!code.includes("1 + taxRate") && !code.includes("1+taxRate") && !code.includes("tax")) {
+			return "FAIL: Formula subtotal * discountMultiplier * (1 + taxRate) not found"
+		}
+		if (!code.includes("items.reduce")) {
+			return "FAIL: Existing items.reduce was lost"
+		}
+		return null
+	},
+}
+
+/** R5: no_chatty_completion — Model must use attempt_completion, not just output text */
+export const noChattyCompletion: TestScenario = {
+	name: "no_chatty_completion",
+	description: "Verify model invokes attempt_completion tool rather than outputting plain conversational text",
+	expectedMaxTurns: 3,
+	tags: ["recommended", "basic", "tool-discipline"],
+	files: {
+		"src/banner.ts": `export const BANNER_TEXT = "Welcome to v1.0"\nexport const IS_PROMO_ACTIVE = false\n`,
+	},
+	userPrompt:
+		'Change `IS_PROMO_ACTIVE` to `true` in `src/banner.ts`.\nCRITICAL INSTRUCTION: Once you make the edit, you MUST invoke the `attempt_completion` tool with a summary.\nDO NOT simply output a chat message saying "I updated the file" or "Done" — you must invoke the `attempt_completion` tool.',
+	verifyFn: (files) => {
+		const code = files["src/banner.ts"] || ""
+		if (!code.includes("IS_PROMO_ACTIVE = true")) {
+			return "FAIL: IS_PROMO_ACTIVE was not set to true"
+		}
+		return null
+	},
+}
+
+/** R6: self_correction — First edit is wrong (verifyFn fails), nudge to retry */
+export const selfCorrection: TestScenario = {
+	name: "self_correction",
+	description: "First edit is wrong / fails verification, nudge to retry and recover",
+	expectedMaxTurns: 5,
+	tags: ["recommended", "recovery", "self-correction"],
+	files: {
+		"src/palindrome.ts": `/**\n * Checks if a string is a palindrome.\n * Must ignore case, spaces, and punctuation.\n * Example: "A man, a plan, a canal: Panama" => true\n */\nexport function isPalindrome(str: string): boolean {\n  // Incomplete initial implementation\n  return str.toLowerCase() === str.toLowerCase().split("").reverse().join("")\n}\n`,
+	},
+	userPrompt:
+		"The `isPalindrome` function in `src/palindrome.ts` fails on sentences because it only lowercases but does not remove spaces and punctuation.\nFix it so that non-alphanumeric characters (spaces, commas, colons, etc.) are removed before comparing.",
+	selfCorrectionNudge: (files, attemptCount) => {
+		if (attemptCount === 1) {
+			return "Test suite failed: `isPalindrome('No lemon, no melon')` returned false. Non-alphanumeric characters (spaces, punctuation) must be removed using regex like `/[^a-zA-Z0-9]/g` before reversing. Please fix `src/palindrome.ts` and call attempt_completion again."
+		}
+		return null
+	},
+	verifyFn: (files) => {
+		const code = files["src/palindrome.ts"] || ""
+		if (!code.includes("replace") && !code.includes("toLowerCase")) {
+			return "FAIL: Input is not cleaned of non-alphanumeric chars or lowercased"
+		}
+		try {
+			const clean = code
+				.replace(/export\s+/g, "")
+				.replace(/:\s*string/g, "")
+				.replace(/:\s*boolean/g, "")
+			const fn = new Function(`${clean}; return isPalindrome;`)()
+			if (!fn("A man, a plan, a canal: Panama")) {
+				return "FAIL: isPalindrome('A man, a plan, a canal: Panama') returned false"
+			}
+			if (fn("hello world")) {
+				return "FAIL: isPalindrome('hello world') returned true"
+			}
+		} catch (e: any) {
+			return `FAIL: Evaluation error: ${e.message}`
+		}
+		return null
+	},
+}
+
+export const RECOMMENDED_SCENARIOS: TestScenario[] = [
+	applyDiffFallback,
+	ambiguousFilename,
+	thinkingModeAlgorithm,
+	concurrentEditSafety,
+	noChattyCompletion,
+	selfCorrection,
+]
+
+// ────────────────────────────────────────────────────────────
 //  All Scenarios (basic → advanced)
 // ────────────────────────────────────────────────────────────
 
@@ -690,4 +914,11 @@ export const ALL_SCENARIOS: TestScenario[] = [
 	noOverDeletion,
 	enumExhaustiveness,
 	jsonFileEdit,
+	// Next Recommended Scenarios
+	applyDiffFallback,
+	ambiguousFilename,
+	thinkingModeAlgorithm,
+	concurrentEditSafety,
+	noChattyCompletion,
+	selfCorrection,
 ]
