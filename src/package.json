@@ -475,7 +475,9 @@
 		"sandbox:advanced": "SANDBOX_TAG=advanced npx tsx __tests__/sandbox/run-sandbox.ts",
 		"sandbox:mirror": "SANDBOX_TAG=mirror-vs npx tsx __tests__/sandbox/run-sandbox.ts",
 		"sandbox:bugfix": "SANDBOX_TAG=bugfix npx tsx __tests__/sandbox/run-sandbox.ts",
-		"sandbox:security": "SANDBOX_TAG=security npx tsx __tests__/sandbox/run-sandbox.ts"
+		"sandbox:security": "SANDBOX_TAG=security npx tsx __tests__/sandbox/run-sandbox.ts",
+		"sandbox:weakness": "SANDBOX_TAG=instruction-following npx tsx __tests__/sandbox/run-sandbox.ts",
+		"sandbox:all": "npx tsx __tests__/sandbox/run-sandbox.ts"
 	},
 	"dependencies": {
 		"@ai-sdk/amazon-bedrock": "^4.0.51",

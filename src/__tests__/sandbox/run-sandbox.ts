@@ -32,7 +32,7 @@ const EXTENDED_SCENARIOS: TestScenario[] = [...ALL_SCENARIOS, ...MIRROR_VS_SCENA
 //  Configuration
 // ────────────────────────────────────────────────────────────
 
-const API_KEY = process.env.API_KEY || ""
+const API_KEY = process.env.API_KEY || process.env.OPENROUTER_API_KEY || ""
 const BASE_URL = process.env.BASE_URL || "https://openrouter.ai/api/v1"
 const MODEL = process.env.MODEL || "deepseek/deepseek-v4-flash-0731"
 const MAX_TURNS = parseInt(process.env.MAX_TURNS || "15", 10)
@@ -58,6 +58,21 @@ async function runSingleScenario(
 	try {
 		const trace = await harness.runScenario(scenario.name, scenario.userPrompt, project)
 		const report = analyzeTrace(trace)
+
+		// Run optional post-scenario verifier
+		if (scenario.verifyFn && trace.completed) {
+			try {
+				const verifyResult = scenario.verifyFn(project.files)
+				if (verifyResult) {
+					report.signals.push(`🔴 Outcome Verification FAILED: ${verifyResult}`)
+					report.score = Math.max(0, report.score - 20)
+				} else {
+					report.signals.push(`✅ Outcome Verification PASSED`)
+				}
+			} catch (e: any) {
+				report.signals.push(`⚠️ Verifier threw: ${e.message}`)
+			}
+		}
 
 		// Print live summary
 		console.log(

@@ -13,6 +13,8 @@ export interface TestScenario {
 	tags: string[]
 	files: Record<string, string>
 	userPrompt: string
+	/** Optional post-run verifier: receives final file contents and returns null on pass or an error string on fail */
+	verifyFn?: (files: Record<string, string>) => string | null
 }
 
 export const simpleEdit: TestScenario = {
@@ -425,6 +427,225 @@ export const longOutputGenerator: TestScenario = {
 }
 
 // ────────────────────────────────────────────────────────────
+//  NEW: Targeted Weakness Scenarios
+// ────────────────────────────────────────────────────────────
+
+/** W1: Scope creep — model must NOT touch file B even though it's related */
+export const scopeCreepGuard: TestScenario = {
+	name: "scope_creep_guard",
+	description: "Model must edit only one specific file, not touch related files",
+	expectedMaxTurns: 3,
+	tags: ["basic", "instruction-following"],
+	files: {
+		"src/constants.ts": `export const MAX_RETRIES = 3\nexport const TIMEOUT_MS = 5000\nexport const BASE_URL = "https://api.example.com"\n`,
+		"src/config.ts": `import { MAX_RETRIES, TIMEOUT_MS } from "./constants"\nexport const config = { retries: MAX_RETRIES, timeout: TIMEOUT_MS }\n`,
+	},
+	userPrompt:
+		"In src/constants.ts ONLY, change TIMEOUT_MS from 5000 to 10000. Do NOT modify src/config.ts or any other file.",
+	verifyFn: (files) => {
+		const constants = files["src/constants.ts"] || ""
+		const config = files["src/config.ts"] || ""
+		if (!constants.includes("10000")) return "FAIL: TIMEOUT_MS not updated in src/constants.ts"
+		if (
+			config !==
+			`import { MAX_RETRIES, TIMEOUT_MS } from "./constants"\nexport const config = { retries: MAX_RETRIES, timeout: TIMEOUT_MS }\n`
+		) {
+			return "FAIL: src/config.ts was incorrectly modified (scope creep)"
+		}
+		return null
+	},
+}
+
+/** W2: Distraction resistance — long irrelevant file content, find and edit a small target */
+export const distractionResistance: TestScenario = {
+	name: "distraction_resistance",
+	description: "Make a precise edit buried deep in a large file full of distracting constants",
+	expectedMaxTurns: 3,
+	tags: ["basic", "instruction-following"],
+	files: {
+		"src/settings.ts":
+			[
+				`export const SETTING_ALPHA = "alpha"`,
+				`export const SETTING_BETA = "beta"`,
+				`export const SETTING_GAMMA = "gamma"`,
+				`export const SETTING_DELTA = "delta"`,
+				`export const SETTING_EPSILON = "epsilon"`,
+				`export const SETTING_ZETA = "zeta"`,
+				`export const SETTING_ETA = "eta"`,
+				`export const SETTING_THETA = "theta"`,
+				`export const SETTING_IOTA = "iota"`,
+				`export const SETTING_KAPPA = "kappa"`,
+				`// TARGET BELOW — do not modify anything else`,
+				`export const MAX_CONTEXT_WINDOW = 128_000`,
+				`// END TARGET`,
+				`export const SETTING_LAMBDA = "lambda"`,
+				`export const SETTING_MU = "mu"`,
+				`export const SETTING_NU = "nu"`,
+				`export const SETTING_XI = "xi"`,
+				`export const SETTING_OMICRON = "omicron"`,
+				`export const SETTING_PI = "pi"`,
+				`export const SETTING_RHO = "rho"`,
+			].join("\n") + "\n",
+	},
+	userPrompt:
+		"In src/settings.ts, change ONLY the value of MAX_CONTEXT_WINDOW from 128_000 to 200_000. Do not change anything else.",
+	verifyFn: (files) => {
+		const s = files["src/settings.ts"] || ""
+		if (!s.includes("MAX_CONTEXT_WINDOW") || (!s.includes("200_000") && !s.includes("200000")))
+			return "FAIL: MAX_CONTEXT_WINDOW not updated to 200000/200_000"
+		if (s.includes("128_000") || s.includes("128000")) return "FAIL: Old value 128_000 still present"
+		if (!s.includes('SETTING_ALPHA = "alpha"')) return "FAIL: Other settings were incorrectly modified"
+		return null
+	},
+}
+
+/** W3: No hallucinated imports — add a new function using ONLY built-in stdlib */
+export const noHallucinatedImports: TestScenario = {
+	name: "no_hallucinated_imports",
+	description: "Add a utility function using only built-in Node.js crypto — no npm imports",
+	expectedMaxTurns: 3,
+	tags: ["feature", "instruction-following"],
+	files: {
+		"src/crypto-utils.ts": `// Utility functions using Node.js built-ins only\nimport { createHash } from "crypto"\n\nexport function sha256(input: string): string {\n  return createHash("sha256").update(input).digest("hex")\n}\n`,
+		"package.json": `{\n  "name": "crypto-utils",\n  "version": "1.0.0"\n}\n`,
+	},
+	userPrompt:
+		"Add an exported function `md5(input: string): string` to src/crypto-utils.ts that returns the MD5 hex digest using Node.js built-in `crypto` module only. Do NOT install or import any npm packages.",
+	verifyFn: (files) => {
+		const src = files["src/crypto-utils.ts"] || ""
+		if (!src.includes("md5")) return "FAIL: md5 function not added"
+		if (!src.includes("createHash") || !src.includes("md5")) return "FAIL: not using createHash for md5"
+		if (src.match(/import.*from ["'][^"']*(?:md5|hash\.js|spark-md5)/))
+			return "FAIL: hallucinated npm import for md5"
+		return null
+	},
+}
+
+/** W4: Ordered multi-step — steps must be done in exact sequence to succeed */
+export const orderedMultiStep: TestScenario = {
+	name: "ordered_multi_step",
+	description: "Multiple dependent edits that must be done in correct sequence",
+	expectedMaxTurns: 5,
+	tags: ["feature", "advanced"],
+	files: {
+		"src/pipeline.ts": `export type Stage = "fetch" | "parse" | "transform"\n\nconst STAGE_ORDER: Stage[] = ["fetch", "parse", "transform"]\n\nexport function runPipeline(stages: Stage[]): string[] {\n  return stages.map(s => \`Running: \${s}\`)\n}\n`,
+	},
+	userPrompt: `In src/pipeline.ts, make these changes in order:
+1. Add "validate" as a new Stage type (between "transform" and the end of the union).
+2. Add "validate" to STAGE_ORDER array after "transform".
+3. Add a new exported function \`validateStages(stages: Stage[]): boolean\` that returns true if every element of stages is in STAGE_ORDER.`,
+	verifyFn: (files) => {
+		const src = files["src/pipeline.ts"] || ""
+		if (!src.includes('"validate"') && !src.includes("'validate'")) return "FAIL: 'validate' Stage type not added"
+		if (!src.includes("validateStages")) return "FAIL: validateStages function not added"
+		if (!src.match(/STAGE_ORDER.*validate|validate.*STAGE_ORDER/s))
+			return "FAIL: 'validate' not added to STAGE_ORDER"
+		return null
+	},
+}
+
+/** W5: Correct single-target edit in repeated structure */
+export const singleTargetInRepeat: TestScenario = {
+	name: "single_target_in_repeat",
+	description: "Edit exactly one field of one specific object in an array of identical-looking objects",
+	expectedMaxTurns: 3,
+	tags: ["basic", "bugfix", "instruction-following"],
+	files: {
+		"src/routes.ts": `export const routes = [\n  { path: "/home", component: "Home", auth: false },\n  { path: "/dashboard", component: "Dashboard", auth: false },\n  { path: "/settings", component: "Settings", auth: false },\n  { path: "/profile", component: "Profile", auth: false },\n  { path: "/admin", component: "Admin", auth: false },\n]\n`,
+	},
+	userPrompt:
+		'In src/routes.ts, set auth to true for ONLY the "/admin" route. All other routes must remain unchanged.',
+	verifyFn: (files) => {
+		const src = files["src/routes.ts"] || ""
+		// admin should have auth: true
+		if (!src.match(/\/admin.*auth:\s*true|auth:\s*true.*\/admin/))
+			return "FAIL: /admin route does not have auth: true"
+		// others should remain false
+		const otherRoutes = ["/home", "/dashboard", "/settings", "/profile"]
+		for (const r of otherRoutes) {
+			// Check that the route entry still has auth: false
+			const routeBlock = src.match(new RegExp(`\\{[^}]*"${r}"[^}]*\\}`))
+			if (!routeBlock) return `FAIL: ${r} route is missing`
+			if (!routeBlock[0].includes("false")) return `FAIL: ${r} route has wrong auth value`
+		}
+		return null
+	},
+}
+
+/** W6: No over-deletion — add a method without removing existing ones */
+export const noOverDeletion: TestScenario = {
+	name: "no_over_deletion",
+	description: "Add a new method to a class without deleting existing methods",
+	expectedMaxTurns: 3,
+	tags: ["feature", "basic"],
+	files: {
+		"src/stack.ts": `export class Stack<T> {\n  private items: T[] = []\n\n  push(item: T): void {\n    this.items.push(item)\n  }\n\n  pop(): T | undefined {\n    return this.items.pop()\n  }\n\n  peek(): T | undefined {\n    return this.items[this.items.length - 1]\n  }\n\n  size(): number {\n    return this.items.length\n  }\n}\n`,
+	},
+	userPrompt:
+		"Add an `isEmpty(): boolean` method to the Stack class in src/stack.ts that returns true if the stack has no items. Keep all existing methods intact.",
+	verifyFn: (files) => {
+		const src = files["src/stack.ts"] || ""
+		if (!src.includes("isEmpty")) return "FAIL: isEmpty method not added"
+		if (!src.includes("push")) return "FAIL: push method was deleted (over-deletion)"
+		if (!src.includes("pop")) return "FAIL: pop method was deleted (over-deletion)"
+		if (!src.includes("peek")) return "FAIL: peek method was deleted (over-deletion)"
+		if (!src.includes("size")) return "FAIL: size method was deleted (over-deletion)"
+		return null
+	},
+}
+
+/** W7: Enum exhaustiveness — update switch to handle all new enum values */
+export const enumExhaustiveness: TestScenario = {
+	name: "enum_exhaustiveness",
+	description: "Extend an enum and make all switch statements exhaustive",
+	expectedMaxTurns: 4,
+	tags: ["typescript", "bugfix", "advanced"],
+	files: {
+		"src/status.ts": `export enum TaskStatus {\n  Pending = "pending",\n  Running = "running",\n  Done = "done",\n}\n\nexport function getStatusColor(status: TaskStatus): string {\n  switch (status) {\n    case TaskStatus.Pending: return "yellow"\n    case TaskStatus.Running: return "blue"\n    case TaskStatus.Done: return "green"\n  }\n}\n\nexport function getStatusLabel(status: TaskStatus): string {\n  switch (status) {\n    case TaskStatus.Pending: return "Pending"\n    case TaskStatus.Running: return "In Progress"\n    case TaskStatus.Done: return "Done"\n  }\n}\n`,
+	},
+	userPrompt: `In src/status.ts:
+1. Add two new enum values: \`Failed = "failed"\` and \`Cancelled = "cancelled"\` to TaskStatus.
+2. Update getStatusColor: Failed → "red", Cancelled → "gray".
+3. Update getStatusLabel: Failed → "Failed", Cancelled → "Cancelled".
+4. Add a default case to both switches that throws an Error("Unhandled status").`,
+	verifyFn: (files) => {
+		const src = files["src/status.ts"] || ""
+		if (!src.includes("Failed")) return "FAIL: Failed enum value not added"
+		if (!src.includes("Cancelled")) return "FAIL: Cancelled enum value not added"
+		if (!src.includes('"red"') && !src.includes("'red'")) return "FAIL: red color for Failed not added"
+		if (!src.includes('"gray"') && !src.includes("'gray'")) return "FAIL: gray color for Cancelled not added"
+		if (!src.includes("Unhandled status")) return "FAIL: default throw for unhandled status not added"
+		return null
+	},
+}
+
+/** W8: JSON file edit — don't break JSON syntax */
+export const jsonFileEdit: TestScenario = {
+	name: "json_file_edit",
+	description: "Add entries to a JSON file without breaking its syntax",
+	expectedMaxTurns: 3,
+	tags: ["basic", "feature"],
+	files: {
+		"tsconfig.json": `{\n  "compilerOptions": {\n    "target": "ES2020",\n    "module": "commonjs",\n    "strict": true,\n    "outDir": "./dist"\n  },\n  "include": ["src/**/*"],\n  "exclude": ["node_modules"]\n}\n`,
+	},
+	userPrompt:
+		'In tsconfig.json, add `"sourceMap": true` and `"declaration": true` to compilerOptions. Keep all existing entries.',
+	verifyFn: (files) => {
+		const src = files["tsconfig.json"] || ""
+		try {
+			const parsed = JSON.parse(src)
+			if (!parsed.compilerOptions?.sourceMap) return "FAIL: sourceMap not added"
+			if (!parsed.compilerOptions?.declaration) return "FAIL: declaration not added"
+			if (parsed.compilerOptions?.target !== "ES2020") return "FAIL: existing target was changed"
+			if (!parsed.compilerOptions?.strict) return "FAIL: existing strict was removed"
+		} catch (e: any) {
+			return `FAIL: JSON syntax broken — ${e.message}`
+		}
+		return null
+	},
+}
+
+// ────────────────────────────────────────────────────────────
 //  All Scenarios (basic → advanced)
 // ────────────────────────────────────────────────────────────
 
@@ -460,4 +681,13 @@ export const ALL_SCENARIOS: TestScenario[] = [
 	massiveMultiModuleMigration,
 	complexStateMachineAudit,
 	longOutputGenerator,
+	// Targeted Weakness Probes
+	scopeCreepGuard,
+	distractionResistance,
+	noHallucinatedImports,
+	orderedMultiStep,
+	singleTargetInRepeat,
+	noOverDeletion,
+	enumExhaustiveness,
+	jsonFileEdit,
 ]
