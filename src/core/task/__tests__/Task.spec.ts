@@ -196,6 +196,45 @@ describe("injectInBetweenMessage with terminal_callback", () => {
 		])
 	})
 
+	it("supersedes command_output ask even when trailing command_output say messages exist", async () => {
+		const provider = createProvider()
+		const task = new Task({
+			provider,
+			apiConfiguration: apiConfig,
+			task: "initial task",
+			startTask: false,
+		})
+
+		const initiateTaskLoopSpy = vi.spyOn(task, "initiateTaskLoop").mockResolvedValue(undefined)
+		const supersedePendingAskSpy = vi.spyOn(task, "supersedePendingAsk")
+
+		// Simulate task started, loop idle, but waiting on command_output ask with subsequent say messages
+		task._started = true
+		task.isLoopActive = false
+		task.isWaitingOnAsk = true
+		;(task as any).mirrorMessages = [
+			{ ts: 12345, type: "ask", ask: "command_output" },
+			{ ts: 12346, type: "say", say: "command_output", text: "streaming chunk 1" },
+			{ ts: 12347, type: "say", say: "command_output", text: "streaming chunk 2" },
+		]
+
+		await task.injectInBetweenMessage(
+			"[Terminal Callback: Background process for 'python validate_correctness.py' finished. Exit code: 0]",
+			undefined,
+			"terminal_callback",
+		)
+
+		expect(supersedePendingAskSpy).toHaveBeenCalled()
+		expect(initiateTaskLoopSpy).toHaveBeenCalledWith([])
+		expect(task.inBetweenMessages).toEqual([
+			{
+				text: "[Terminal Callback: Background process for 'python validate_correctness.py' finished. Exit code: 0]",
+				images: undefined,
+				sayType: "terminal_callback",
+			},
+		])
+	})
+
 	it("does not answer interactive asks with terminal_callback", async () => {
 		const provider = createProvider()
 		const task = new Task({

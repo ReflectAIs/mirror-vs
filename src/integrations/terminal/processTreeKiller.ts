@@ -8,6 +8,21 @@ export interface KillProcessTreeOptions {
 }
 
 /**
+ * Checks if a PID is currently running in the operating system.
+ */
+export function isPidAlive(pid: number | undefined): boolean {
+	if (!pid || typeof pid !== "number" || pid <= 0) {
+		return false
+	}
+	try {
+		process.kill(pid, 0)
+		return true
+	} catch (err: any) {
+		return err?.code === "EPERM"
+	}
+}
+
+/**
  * Safely force-kills a process and all of its spawned child processes (process tree).
  *
  * Includes safety guards to NEVER kill PID 0, PID 1, or the host extension process itself.
