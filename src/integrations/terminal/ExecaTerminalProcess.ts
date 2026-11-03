@@ -5,6 +5,7 @@ import process from "process"
 import type { MirrorTerminal } from "./types"
 import { BaseTerminal } from "./BaseTerminal"
 import { BaseTerminalProcess } from "./BaseTerminalProcess"
+import { isPidAlive } from "./processTreeKiller"
 
 export class ExecaTerminalProcess extends BaseTerminalProcess {
 	private terminalRef: WeakRef<MirrorTerminal>
@@ -37,6 +38,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 	public override async run(command: string) {
 		this.command = command
 		let exitDetails: { exitCode: number; signalName?: string } = { exitCode: 0 }
+		let livenessTimer: NodeJS.Timeout | undefined
 
 		try {
 			this.isHot = true
@@ -54,6 +56,8 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 					LC_ALL: "en_US.UTF-8",
 					TERM: "dumb",
 					DOCKER_CLI_HINTS: "false",
+					// Ensure Python flushes stdout immediately so terminal streams are not delayed
+					PYTHONUNBUFFERED: "1",
 				},
 			})`${command}`
 
@@ -96,7 +100,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 							} catch {}
 						}
 						stopStreamReading?.()
-					}, 400)
+					}, 300)
 				}
 			}
 
@@ -108,10 +112,23 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 					exitCode: code ?? (signal ? 1 : 0),
 					signalName: signal ? String(signal) : undefined,
 				}
+				if (livenessTimer) {
+					clearInterval(livenessTimer)
+					livenessTimer = undefined
+				}
 				scheduleExitDrain()
 			}
 
+			// Listen to both exit and close events
 			this.subprocess?.once?.("exit", onProcessExit)
+			this.subprocess?.once?.("close", onProcessExit)
+			this.subprocess?.once?.("error", () => onProcessExit(1, null))
+
+			// Check if process already exited synchronously or before listeners attached
+			const initialSubprocess = this.subprocess as any
+			if (initialSubprocess?.exitCode !== null && initialSubprocess?.exitCode !== undefined) {
+				onProcessExit(initialSubprocess.exitCode, null)
+			}
 
 			this.subprocess
 				?.then?.((res: any) => {
@@ -131,6 +148,28 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 					}
 					scheduleExitDrain()
 				})
+
+			// Fast heartbeat liveness monitor (every 400ms): actively catches process exit, signal death,
+			// or OS PID termination even if stdio stream is kept open by child processes.
+			livenessTimer = setInterval(() => {
+				if (subprocessExited || this.aborted || this.isCompleted) {
+					if (livenessTimer) {
+						clearInterval(livenessTimer)
+						livenessTimer = undefined
+					}
+					return
+				}
+				const sub = this.subprocess as any
+				if (sub) {
+					if (sub.exitCode !== null && sub.exitCode !== undefined) {
+						onProcessExit(sub.exitCode, null)
+					} else if (sub.signalCode) {
+						onProcessExit(null, sub.signalCode)
+					} else if (this.pid && !isPidAlive(this.pid)) {
+						onProcessExit(0, null)
+					}
+				}
+			}, 400)
 
 			// Stream from unbuffered subprocess.all to ensure interactive prompts without trailing
 			// newlines (e.g. read -p "Name: ", [y/n]?) are yielded immediately rather than line-buffered.
@@ -192,6 +231,11 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 			if (drainTimeoutId) {
 				clearTimeout(drainTimeoutId)
 				drainTimeoutId = undefined
+			}
+
+			if (livenessTimer) {
+				clearInterval(livenessTimer)
+				livenessTimer = undefined
 			}
 
 			if (this.subprocess?.stdin && !this.subprocess.stdin.destroyed) {

@@ -1160,9 +1160,14 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 		// Terminal callbacks must never answer interactive asks as user messages,
 		// but should supersede any non-interactive command_output ask.
+		// Find the most recent ask message to accurately identify the pending ask,
+		// because intermediate say() messages (e.g. streaming command_output) may have been appended
+		// after the ask() was initiated.
+		const lastAskMessage = [...this.mirrorMessages].reverse().find((m) => m.type === "ask")
 		const isCommandOutputAsk =
 			this.taskAsk?.ask === "command_output" ||
-			(this.isWaitingOnAsk && this.mirrorMessages.at(-1)?.ask === "command_output")
+			(this.isWaitingOnAsk &&
+				(lastAskMessage?.ask === "command_output" || this.mirrorMessages.at(-1)?.ask === "command_output"))
 
 		if (isCommandOutputAsk && sayType === "terminal_callback") {
 			this.supersedePendingAsk()
@@ -1178,6 +1183,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		if (isInteractiveAskWaiting && sayType === "user_feedback") {
 			this.userInteractionManager.handleWebviewAskResponse("messageResponse", text, images)
 		}
+
+		// If the user sends a steering message or a terminal callback completes, allow the loop to start/continue.
+		this.abort = false
 
 		await this.say(sayType as any, text, images)
 

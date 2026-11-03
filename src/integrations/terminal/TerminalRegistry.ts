@@ -59,12 +59,25 @@ export class TerminalRegistry {
 		// should probably live elsewhere.
 
 		// Register handler for terminal close events to clean up temporary
-		// directories.
+		// directories and signal completion if closed while actively running a command.
 		const closeDisposable = vscode.window.onDidCloseTerminal((vsceTerminal) => {
 			const terminal = this.getTerminalByVSCETerminal(vsceTerminal)
 
 			if (terminal) {
 				ShellIntegrationManager.zshCleanupTmpDir(terminal.id)
+
+				if (terminal.busy || terminal.running) {
+					terminal.busy = false
+					terminal.running = false
+					const exitDetails = vsceTerminal.exitStatus
+						? TerminalProcess.interpretExitCode(vsceTerminal.exitStatus.code)
+						: { exitCode: 0 }
+					terminal.shellExecutionComplete(exitDetails)
+					if (terminal.process) {
+						;(terminal.process as any).isCompleted = true
+						terminal.process.emit("completed", terminal.getUnretrievedOutput())
+					}
+				}
 			}
 		})
 

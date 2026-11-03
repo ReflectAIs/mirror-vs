@@ -16,6 +16,7 @@ import { ExitCodeDetails, MirrorTerminalCallbacks, MirrorTerminalProcess } from 
 import { TerminalRegistry } from "../../integrations/terminal/TerminalRegistry"
 import { Terminal } from "../../integrations/terminal/Terminal"
 import { OutputInterceptor } from "../../integrations/terminal/OutputInterceptor"
+import { isPidAlive } from "../../integrations/terminal/processTreeKiller"
 import { Package } from "../../shared/package"
 import { t } from "../../i18n"
 import { getTaskDirectoryPath } from "../../utils/storage"
@@ -457,10 +458,74 @@ export async function executeCommandInTerminal(
 
 	let hasEmittedBackgroundCompletion = false
 	// Fallback interval: 90 seconds (1.5 minutes) to notify and wake model if terminal has not returned callback
+	// Fallback interval: 90 seconds (1.5 minutes) to notify and wake model if terminal has not returned callback
 	const BACKGROUND_NOTICE_INTERVAL_MS = 90 * 1000
+	const BACKGROUND_LIVENESS_INTERVAL_MS = 1000 // Fast 1-second heartbeat to detect process exit/completion immediately
 	let backgroundNoticeTimer: NodeJS.Timeout | undefined
+	let backgroundLivenessTimer: NodeJS.Timeout | undefined
+
+	const clearAllBackgroundTimers = () => {
+		if (backgroundNoticeTimer) {
+			clearInterval(backgroundNoticeTimer)
+			backgroundNoticeTimer = undefined
+		}
+		if (backgroundLivenessTimer) {
+			clearInterval(backgroundLivenessTimer)
+			backgroundLivenessTimer = undefined
+		}
+	}
+
+	const startBackgroundLivenessTimer = () => {
+		if (backgroundLivenessTimer || completed || hasEmittedBackgroundCompletion) return
+		backgroundLivenessTimer = setInterval(() => {
+			if (completed || hasEmittedBackgroundCompletion || task.abandoned || !runInBackground) {
+				if (backgroundLivenessTimer) {
+					clearInterval(backgroundLivenessTimer)
+					backgroundLivenessTimer = undefined
+				}
+				return
+			}
+
+			// Active liveness check for background terminal process
+			const proc = terminal?.process as any
+			const underlyingSubprocess = proc?.subprocess
+			const isProcessDead =
+				proc?.isCompleted ||
+				terminal?.process === undefined ||
+				!terminal?.running ||
+				(underlyingSubprocess &&
+					((underlyingSubprocess.exitCode !== null && underlyingSubprocess.exitCode !== undefined) ||
+						(underlyingSubprocess.signalCode !== null && underlyingSubprocess.signalCode !== undefined) ||
+						underlyingSubprocess.killed)) ||
+				(proc?.pid && !isPidAlive(proc.pid)) ||
+				(terminal instanceof Terminal &&
+					(terminal.isClosed() || (terminal.terminal as any)?.exitStatus !== undefined))
+
+			if (isProcessDead) {
+				clearAllBackgroundTimers()
+				completed = true
+				if (terminal) {
+					terminal.busy = false
+					terminal.running = false
+				}
+				task.terminalProcess = undefined
+				exitDetails = exitDetails ??
+					proc?.exitDetails ?? {
+						exitCode: underlyingSubprocess?.exitCode ?? (terminal as any)?.terminal?.exitStatus?.code ?? 0,
+						signalName: underlyingSubprocess?.signalCode
+							? String(underlyingSubprocess.signalCode)
+							: undefined,
+					}
+				provider?.postStateToWebviewWithoutTaskHistory?.()
+				task.supersedePendingAsk?.()
+				resolveOnCompleted?.()
+				emitBackgroundNotification()
+			}
+		}, BACKGROUND_LIVENESS_INTERVAL_MS)
+	}
 
 	const startBackgroundNoticeTimer = () => {
+		startBackgroundLivenessTimer()
 		if (backgroundNoticeTimer || completed || hasEmittedBackgroundCompletion) return
 		backgroundNoticeTimer = setInterval(() => {
 			if (!completed && !hasEmittedBackgroundCompletion && !task.abandoned && runInBackground) {
@@ -489,8 +554,10 @@ export async function executeCommandInTerminal(
 					terminal.process === undefined ||
 					(underlyingSubprocess &&
 						underlyingSubprocess.exitCode !== null &&
-						underlyingSubprocess.exitCode !== undefined)
+						underlyingSubprocess.exitCode !== undefined) ||
+					(proc?.pid && !isPidAlive(proc.pid))
 				if (isExited) {
+					clearAllBackgroundTimers()
 					completed = true
 					if (terminal) {
 						terminal.busy = false
@@ -517,15 +584,13 @@ export async function executeCommandInTerminal(
 				const notice = noticeLines.filter(Boolean).join("\n")
 				void task.injectInBetweenMessage(notice, undefined, "terminal_callback")
 			} else if (completed || hasEmittedBackgroundCompletion || task.abandoned) {
-				if (backgroundNoticeTimer) {
-					clearInterval(backgroundNoticeTimer)
-					backgroundNoticeTimer = undefined
-				}
+				clearAllBackgroundTimers()
 			}
 		}, BACKGROUND_NOTICE_INTERVAL_MS)
 	}
 
 	const emitBackgroundNotification = () => {
+		clearAllBackgroundTimers()
 		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
 			return
 		}
@@ -560,10 +625,7 @@ export async function executeCommandInTerminal(
 	}
 
 	const checkAndNotifyBackgroundCompletion = () => {
-		if (backgroundNoticeTimer) {
-			clearInterval(backgroundNoticeTimer)
-			backgroundNoticeTimer = undefined
-		}
+		clearAllBackgroundTimers()
 		if (!runInBackground || hasEmittedBackgroundCompletion || isUserTimedOut || task.abandoned) {
 			return
 		}
