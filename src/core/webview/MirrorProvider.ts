@@ -2,6 +2,7 @@ import os from "os"
 import * as path from "path"
 import EventEmitter from "events"
 import pWaitFor from "p-wait-for"
+import { readQueuedMessages } from "../task-persistence/queuedMessages"
 
 import { Anthropic } from "@anthropic-ai/sdk"
 import * as vscode from "vscode"
@@ -557,6 +558,8 @@ export class MirrorProvider
 		if (!state || typeof state.mode !== "string") {
 			throw new Error(t("common:errors.retrieve_current_mode"))
 		}
+
+		void this.persistOpenTabsState()
 	}
 
 	/**
@@ -708,6 +711,7 @@ export class MirrorProvider
 		// Case 1: Target is in background (parked mid-streaming)
 		if (this.backgroundTasks.has(taskId)) {
 			await this.focusBackgroundTask(taskId)
+			void this.persistOpenTabsState()
 			return
 		}
 
@@ -734,6 +738,7 @@ export class MirrorProvider
 		// Push target to the top of the stack (now it's the "current" task)
 		this.mirrorStack.push(target)
 		target.emit(MirrorVSEventName.TaskFocused)
+		void this.persistOpenTabsState()
 
 		// Start/resume the newly focused task if it has not been started yet
 		target.startRestoredTask().catch((error) => {
@@ -958,6 +963,7 @@ export class MirrorProvider
 		}
 
 		// Post updated state (browser-like 0-tab support in current session)
+		void this.persistOpenTabsState()
 		await this.postStateToWebview()
 	}
 
@@ -1261,6 +1267,10 @@ export class MirrorProvider
 			}
 		}
 		return undefined
+	}
+
+	public static async broadcastStateToAllInstances(): Promise<void> {
+		await Promise.all(Array.from(this.activeInstances).map((instance) => instance.postStateToWebview()))
 	}
 
 	public static async getInstance(): Promise<MirrorProvider | undefined> {
@@ -1618,11 +1628,21 @@ export class MirrorProvider
 
 		const { apiConfiguration, enableCheckpoints, checkpointTimeout, experiments } = await this.getState()
 
-		// Preserve queued messages from the existing task instance if rehydrating
+		// Preserve queued messages from the existing task instance or disk if rehydrating/restarting
 		const existingTask = options?.queuedMessages ? undefined : this.getLiveTask(historyItem.id)
+		const persistedQueuedMessages =
+			!options?.queuedMessages && !existingTask
+				? await readQueuedMessages({
+						taskId: historyItem.id,
+						globalStoragePath: this.context.globalStoragePath,
+					})
+				: undefined
 		const preservedQueuedMessages =
 			options?.queuedMessages ??
-			(existingTask?.messageQueueService?.messages ? [...existingTask.messageQueueService.messages] : undefined)
+			(existingTask?.messageQueueService?.messages
+				? [...existingTask.messageQueueService.messages]
+				: undefined) ??
+			(persistedQueuedMessages && persistedQueuedMessages.length > 0 ? persistedQueuedMessages : undefined)
 
 		const task = new Task({
 			provider: this,
@@ -2044,10 +2064,73 @@ export class MirrorProvider
 	 * Safe to call even if the session has no tasks or no session ID is set
 	 * (both are no-ops).
 	 */
+	private isRestoringTabs = false
+
+	private async persistOpenTabsState(): Promise<void> {
+		if (this.isRestoringTabs) return
+		const sessionId = this.getCurrentSessionId()
+		if (!sessionId) return
+
+		const openIds = this.getAllTasksSorted()
+			.filter((t) => !t.sessionId || t.sessionId === sessionId)
+			.map((t) => t.taskId)
+		const activeId = this.getCurrentTask()?.taskId ?? ""
+
+		const openTabsMap: Record<string, string[]> = (await this.contextProxy.getValue("sessionOpenTabs")) || {}
+		openTabsMap[sessionId] = openIds
+		await this.contextProxy.setValue("sessionOpenTabs", openTabsMap)
+
+		const activeTabMap: Record<string, string> = (await this.contextProxy.getValue("sessionActiveTabId")) || {}
+		if (activeId) {
+			activeTabMap[sessionId] = activeId
+		} else {
+			delete activeTabMap[sessionId]
+		}
+		await this.contextProxy.setValue("sessionActiveTabId", activeTabMap)
+	}
+
 	async restoreSessionTabs(): Promise<void> {
-		// Ensure the task history store's in-memory cache is loaded before reading.
 		await this.taskHistoryStore.initialized
-		this.log("[restoreSessionTabs] Skipping automatic tab restoration on startup — user will open tabs manually")
+		const sessionId = this.getCurrentSessionId()
+		if (!sessionId) return
+
+		const openTabsMap: Record<string, string[]> = (await this.contextProxy.getValue("sessionOpenTabs")) || {}
+		const closedTabsMap: Record<string, string[]> = (await this.contextProxy.getValue("sessionClosedTabs")) || {}
+		const activeTabMap: Record<string, string> = (await this.contextProxy.getValue("sessionActiveTabId")) || {}
+
+		const closedSet = new Set(closedTabsMap[sessionId] || [])
+		const savedOpenIds = (openTabsMap[sessionId] || []).filter((id) => !closedSet.has(id))
+		if (savedOpenIds.length === 0) {
+			return
+		}
+
+		this.isRestoringTabs = true
+		try {
+			const restoredIds: string[] = []
+			for (const taskId of savedOpenIds) {
+				if (this.getLiveTask(taskId)) {
+					restoredIds.push(taskId)
+					continue
+				}
+				const historyItem = this.taskHistoryStore.get(taskId)
+				if (historyItem) {
+					await this.createTaskWithHistoryItem(historyItem, { startTask: false })
+					restoredIds.push(taskId)
+				}
+			}
+
+			const savedActiveId = activeTabMap[sessionId]
+			const targetActiveId =
+				savedActiveId && restoredIds.includes(savedActiveId)
+					? savedActiveId
+					: restoredIds[restoredIds.length - 1]
+			if (targetActiveId) {
+				await this.switchToTask(targetActiveId)
+			}
+			this.log(`[restoreSessionTabs] Restored ${restoredIds.length} tabs; active=${targetActiveId ?? "none"}`)
+		} finally {
+			this.isRestoringTabs = false
+		}
 	}
 
 	async exportTaskWithId(id: string) {

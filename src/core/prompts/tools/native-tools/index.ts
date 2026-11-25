@@ -11,6 +11,7 @@ import browserScreenshot from "./browser_screenshot"
 import browserScroll from "./browser_scroll"
 import browserSelect from "./browser_select"
 import browserType from "./browser_type"
+import deviceAction from "./device_action"
 import codebaseSearch from "./codebase_search"
 import docsSearch from "./docs_search"
 import editTool from "./edit"
@@ -83,6 +84,7 @@ export function getNativeTools(options: NativeToolsOptions = {}): OpenAI.Chat.Ch
 		browserScroll,
 		browserSelect,
 		browserType,
+		deviceAction,
 		codebaseSearch,
 		docsSearch,
 		executeCommand,

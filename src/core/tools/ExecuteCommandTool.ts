@@ -138,10 +138,14 @@ function validateCommandAgainstProtectedFiles(
 ): string | null {
 	if (!protectedController) return null
 
-	// Only scan commands that could destructively modify files
-	const lower = command.toLowerCase().trim()
+	// Only scan commands that could destructively modify files (ignore benign /dev/null redirects)
+	const sanitized = command
+		.toLowerCase()
+		.trim()
+		.replace(/\d*>\s*\/dev\/null\b/g, "")
 	const isDestructive =
-		/\b(rm|rmdir|git\s+clean|find\b.*-delete|truncate|shred|mv\b|cp\b|chmod|chown|echo\b.*>)/.test(lower)
+		/\b(rm|rmdir|git\s+clean|find\b.*-delete|truncate|shred|mv\b|cp\b|chmod|chown)\b/.test(sanitized) ||
+		/(?:^|[;&|]\s*)(?:echo|printf|cat)\b.*>/.test(sanitized)
 
 	if (!isDestructive) return null
 

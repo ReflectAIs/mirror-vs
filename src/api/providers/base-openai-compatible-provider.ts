@@ -22,6 +22,7 @@ type BaseOpenAiCompatibleProviderOptions<ModelName extends string> = ApiHandlerO
 	defaultProviderModelId: ModelName
 	providerModels: Record<ModelName, ModelInfo>
 	defaultTemperature?: number
+	maxRetries?: number
 }
 
 export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
@@ -44,6 +45,7 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 		defaultProviderModelId,
 		providerModels,
 		defaultTemperature,
+		maxRetries,
 		...options
 	}: BaseOpenAiCompatibleProviderOptions<ModelName>) {
 		super()
@@ -65,6 +67,7 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 			apiKey: this.options.apiKey,
 			defaultHeaders: DEFAULT_HEADERS,
 			timeout: getApiRequestTimeout(),
+			...(maxRetries !== undefined ? { maxRetries } : {}),
 		})
 	}
 

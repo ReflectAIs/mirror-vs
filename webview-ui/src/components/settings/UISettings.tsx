@@ -12,7 +12,7 @@ interface UISettingsProps extends HTMLAttributes<HTMLDivElement> {
 	reasoningBlockCollapsed: boolean
 	enterBehavior: "send" | "newline"
 	disableTabBar: boolean
-	mascotTheme?: "cyberpunk" | "retro" | "synthwave" | "solar"
+	mascotTheme?: "cyberpunk" | "retro" | "synthwave" | "solar" | "catbot"
 	setCachedStateField: SetCachedStateField<keyof ExtensionStateContextType>
 }
 
@@ -123,6 +123,7 @@ export const UISettings = ({
 								<VSCodeOption value="retro">{t("settings:ui.mascotTheme.retro")}</VSCodeOption>
 								<VSCodeOption value="synthwave">{t("settings:ui.mascotTheme.synthwave")}</VSCodeOption>
 								<VSCodeOption value="solar">{t("settings:ui.mascotTheme.solar")}</VSCodeOption>
+								<VSCodeOption value="catbot">{t("settings:ui.mascotTheme.catbot")}</VSCodeOption>
 							</VSCodeDropdown>
 							<div className="text-vscode-descriptionForeground text-sm mt-1">
 								{t("settings:ui.mascotTheme.description")}

@@ -206,7 +206,7 @@ export class EditFileTool extends BaseTool<"edit_file"> {
 							return `replacing: "${preview}"`
 						})()
 
-			const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+			const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 
 			if (!accessAllowed) {
 				// Finalize the partial tool preview before emitting any say() messages.

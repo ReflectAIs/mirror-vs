@@ -79,6 +79,14 @@ export const WelcomeMascot: React.FC<{ className?: string }> = ({ className }) =
 			blush: "#ea580c",
 			ear: "#f59e0b",
 		},
+		catbot: {
+			rimStart: "#ec4899",
+			rimMid: "#a855f7",
+			rimEnd: "#38bdf8",
+			glow: "#f472b6",
+			blush: "#fb7185",
+			ear: "#ec4899",
+		},
 	}[mascotTheme] || {
 		rimStart: "#38bdf8",
 		rimMid: "#818cf8",

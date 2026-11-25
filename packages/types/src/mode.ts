@@ -251,4 +251,36 @@ export const DEFAULT_MODES: readonly ModeConfig[] = [
 		customInstructions:
 			"You are operating in Free Mode using zero-cost models. Focus on clear, high-quality implementations and concise explanations while maximizing token efficiency. Always check the Workspace Pulse for diagnostics and state before executing tools.",
 	},
+	{
+		slug: "device",
+		name: "🖥️ Control Device (Live)",
+		roleDefinition:
+			"You are Mirror VS in Control Device (Live) Mode, an autonomous computer-use agent capable of observing the user's entire screen and controlling the mouse, keyboard, and applications visibly like a human operator across macOS, Windows, and Linux.",
+		whenToUse:
+			"Use this mode when you need live, visible GUI interaction with desktop applications, clicking buttons, typing, and navigating UIs on screen.",
+		description: "Live OS control (visible mouse, keyboard, screen)",
+		groups: ["device", "read", "command"],
+		customInstructions:
+			'You are operating in Control Device (Live) Mode with OS-level GUI control (`device_action` with `mode: "live"`).\n\n' +
+			'1. **Always observe first:** Start by calling `device_action` with `action: "screenshot"` to see the current screen state.\n' +
+			"2. **Exact coordinates:** Use the pixel coordinates from the latest screenshot. Never guess coordinates blindly.\n" +
+			"3. **Verify every step:** After clicking, typing, or pressing hotkeys, take a follow-up `screenshot` (or `wait` then `screenshot`) to confirm the UI responded as expected.\n" +
+			"4. **Prefer keyboard shortcuts** when faster and more reliable than clicking small targets.\n" +
+			"5. **Safety:** Never attempt to bypass OS security prompts, enter unknown credentials, or execute destructive system hotkeys. Moving cursor to (0,0) triggers an immediate emergency stop.",
+	},
+	{
+		slug: "device-background",
+		name: "🕵️ Control Device (Background)",
+		roleDefinition:
+			"You are Mirror VS in Control Device (Background) Mode, an autonomous device automation agent that executes desktop workflows, app automation, and document creation silently in the background without stealing the user's mouse cursor or keyboard focus.",
+		whenToUse:
+			"Use this mode when you want Mirror VS to automate desktop apps, generate presentations/documents, or run OS workflows in the background while you keep using your computer undisturbed.",
+		description: "Background OS automation without stealing mouse/focus",
+		groups: ["device", "read", "command"],
+		customInstructions:
+			'You are operating in Control Device (Background) Mode (`device_action` with `mode: "background"`).\n\n' +
+			'1. **Non-intrusive:** Do NOT hijack the user\'s physical mouse or keyboard focus. Use `action: "run_script"` (AppleScript/PowerShell/Python/Bash) or `action: "launch_app"` (which launches in background) to automate desktop apps silently.\n' +
+			'2. **Verify visually if needed:** You may call `action: "screenshot"` to inspect screen state without moving the cursor.\n' +
+			"3. **Safety:** Never bypass OS security prompts or execute destructive system commands.",
+	},
 ] as const

@@ -108,7 +108,7 @@ export class ApplyPatchTool extends BaseTool<"apply_patch"> {
 				const absolutePath = path.resolve(task.cwd, relPath)
 
 				// Check access permissions
-				const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+				const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 				if (!accessAllowed) {
 					await task.say("mirrorignore_error", relPath)
 					pushToolResult(formatResponse.mirrorIgnoreError(relPath))
@@ -373,7 +373,7 @@ export class ApplyPatchTool extends BaseTool<"apply_patch"> {
 			const moveAbsolutePath = path.resolve(task.cwd, change.movePath)
 
 			// Validate destination path access permissions
-			const moveAccessAllowed = task.mirrorIgnoreController?.validateAccess(change.movePath)
+			const moveAccessAllowed = task.mirrorIgnoreController?.validateAccess(change.movePath) ?? true
 			if (!moveAccessAllowed) {
 				await task.say("mirrorignore_error", change.movePath)
 				pushToolResult(formatResponse.mirrorIgnoreError(change.movePath))

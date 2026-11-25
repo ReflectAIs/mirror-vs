@@ -167,7 +167,7 @@ export const globalSettingsSchema = z.object({
 	ttsSpeed: z.number().optional(),
 	soundEnabled: z.boolean().optional(),
 	soundVolume: z.number().optional(),
-	mascotTheme: z.enum(["cyberpunk", "retro", "synthwave", "solar"]).optional(),
+	mascotTheme: z.enum(["cyberpunk", "retro", "synthwave", "solar", "catbot"]).optional(),
 	soundTheme: z.enum(["classic", "scifi"]).optional(),
 
 	maxOpenTabsContext: z.number().optional(),
@@ -273,6 +273,16 @@ export const globalSettingsSchema = z.object({
 	 * Closed tabs are excluded from session tab restoration on next startup.
 	 */
 	sessionClosedTabs: z.record(z.string(), z.array(z.string())).optional(),
+
+	/**
+	 * Tracks open tab task IDs per session so they can be auto-loaded on startup.
+	 */
+	sessionOpenTabs: z.record(z.string(), z.array(z.string())).optional(),
+
+	/**
+	 * Tracks the last active tab task ID per session so it can be re-activated on startup.
+	 */
+	sessionActiveTabId: z.record(z.string(), z.string()).optional(),
 
 	/**
 	 * Maps taskId to its selected git worktree path.

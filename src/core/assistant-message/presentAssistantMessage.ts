@@ -56,6 +56,7 @@ import {
 	browserSnapshotTool,
 	browserActionsTool,
 } from "../tools/BrowserTools"
+import { deviceActionTool } from "../tools/DeviceActionTool"
 import { webSearchTool } from "../tools/WebSearchTool"
 import { gitHubSearchTool } from "../tools/GitHubSearchTool"
 import { docsSearchTool } from "../tools/DocsSearchTool"
@@ -1221,6 +1222,13 @@ export async function presentAssistantMessage(mirror: Task) {
 					break
 				case "browser_actions":
 					await browserActionsTool.handle(mirror, block as ToolUse<"browser_actions">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "device_action":
+					await deviceActionTool.handle(mirror, block as any, {
 						askApproval,
 						handleError,
 						pushToolResult,

@@ -47,7 +47,7 @@ export class WriteToFileTool extends BaseTool<"write_to_file"> {
 			return
 		}
 
-		const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+		const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 
 		if (!accessAllowed) {
 			await task.say("mirrorignore_error", relPath)

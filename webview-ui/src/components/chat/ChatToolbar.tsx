@@ -137,9 +137,6 @@ const ChatToolbar = ({
 						<MirrorHero activity={activity as any} size="small" />
 					</div>
 					<div className="flex flex-col min-w-0 overflow-hidden">
-						<span className="font-semibold text-xs sm:text-sm tracking-tight text-vscode-foreground shrink-0">
-							Mirror VS
-						</span>
 						{isEditingSession ? (
 							<input
 								type="text"
@@ -151,7 +148,7 @@ const ChatToolbar = ({
 								}}
 								onBlur={handleSaveSessionName}
 								autoFocus
-								className="text-[11px] px-1.5 py-0.5 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none max-w-[150px]"
+								className="text-xs px-1.5 py-0.5 rounded bg-vscode-input-background text-vscode-input-foreground border border-vscode-focusBorder outline-none max-w-[170px]"
 							/>
 						) : (
 							<div
@@ -159,9 +156,20 @@ const ChatToolbar = ({
 									setEditingSessionName(activeSessionName)
 									setIsEditingSession(true)
 								}}
-								className="group flex items-center gap-1 cursor-pointer min-w-0"
+								className="group flex items-center gap-1.5 cursor-pointer min-w-0"
 								title="Click to rename session">
-								<span className="text-[11px] font-medium text-vscode-descriptionForeground group-hover:text-vscode-foreground truncate transition-colors">
+								<span
+									className={cn(
+										"w-1.5 h-1.5 rounded-full shrink-0",
+										mascotStatus === "streaming" && "bg-emerald-400 animate-pulse",
+										mascotStatus === "interactive" && "bg-amber-400 animate-pulse",
+										mascotStatus === "waiting_for_callback" && "bg-sky-400 animate-pulse",
+										mascotStatus === "error" && "bg-rose-400",
+										mascotStatus === "completed" && "bg-emerald-400",
+										mascotStatus === "idle" && "bg-vscode-descriptionForeground/50",
+									)}
+								/>
+								<span className="text-xs font-medium text-vscode-foreground/90 group-hover:text-vscode-foreground truncate transition-colors">
 									{activeSessionName}
 								</span>
 								<Pencil className="w-2.5 h-2.5 text-vscode-descriptionForeground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />

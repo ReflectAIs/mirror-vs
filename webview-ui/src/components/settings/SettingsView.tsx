@@ -898,60 +898,63 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 									: "w-[156px] min-w-[156px]",
 						)}
 						data-testid="settings-tab-list">
-						{SETTINGS_CATEGORIES.map((category, catIndex) => (
-							<div key={category.name} className="flex flex-col gap-0.5 w-full">
-								{!isNarrow ? (
-									<div
+						{SETTINGS_CATEGORIES.flatMap((category, catIndex) => {
+							const header = !isNarrow ? (
+								<div
+									key={`cat-${category.name}`}
+									className={cn(
+										"px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-vscode-descriptionForeground/60 select-none",
+										catIndex > 0 ? "pt-2.5" : "pt-1",
+									)}>
+									{category.name}
+								</div>
+							) : catIndex > 0 ? (
+								<div
+									key={`cat-sep-${category.name}`}
+									className="h-[1px] bg-vscode-editorGroup-border/30 my-1 mx-1"
+								/>
+							) : null
+
+							const items = category.sections.map(({ id, icon: Icon }) => {
+								const isSelected = id === activeTab
+								const label = t(`settings:sections.${id}`)
+
+								const trigger = (
+									<TabTrigger
+										key={id}
+										ref={(element) => (tabRefs.current[id] = element)}
+										value={id}
+										isSelected={isSelected}
 										className={cn(
-											"px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-vscode-descriptionForeground/60 select-none",
-											catIndex > 0 ? "pt-2.5" : "pt-1",
-										)}>
-										{category.name}
-									</div>
-								) : (
-									catIndex > 0 && (
-										<div className="h-[1px] bg-vscode-editorGroup-border/30 my-1 mx-1" />
-									)
-								)}
-								{category.sections.map(({ id, icon: Icon }) => {
-									const isSelected = id === activeTab
-									const label = t(`settings:sections.${id}`)
+											isSelected
+												? `${settingsTabTrigger} ${settingsTabTriggerActive}`
+												: settingsTabTrigger,
+											"cursor-pointer focus:ring-0",
+											isNarrow && "justify-center px-0",
+										)}
+										data-testid={`tab-${id}`}>
+										<Icon className="w-3.5 h-3.5 shrink-0" />
+										{!isNarrow && <span className="truncate">{label}</span>}
+									</TabTrigger>
+								)
 
-									const trigger = (
-										<TabTrigger
-											key={id}
-											ref={(element) => (tabRefs.current[id] = element)}
-											value={id}
-											isSelected={isSelected}
-											className={cn(
-												isSelected
-													? `${settingsTabTrigger} ${settingsTabTriggerActive}`
-													: settingsTabTrigger,
-												"cursor-pointer focus:ring-0",
-												isNarrow && "justify-center px-0",
-											)}
-											data-testid={`tab-${id}`}>
-											<Icon className="w-3.5 h-3.5 shrink-0" />
-											{!isNarrow && <span className="truncate">{label}</span>}
-										</TabTrigger>
+								if (isNarrow) {
+									return (
+										<TooltipProvider key={id} delayDuration={400}>
+											<Tooltip>
+												<TooltipTrigger asChild>{trigger}</TooltipTrigger>
+												<TooltipContent side="right" className="text-xs">
+													{label}
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
 									)
+								}
+								return trigger
+							})
 
-									if (isNarrow) {
-										return (
-											<TooltipProvider key={id} delayDuration={400}>
-												<Tooltip>
-													<TooltipTrigger asChild>{trigger}</TooltipTrigger>
-													<TooltipContent side="right" className="text-xs">
-														{label}
-													</TooltipContent>
-												</Tooltip>
-											</TooltipProvider>
-										)
-									}
-									return trigger
-								})}
-							</div>
-						))}
+							return header ? [header, ...items] : items
+						})}
 					</TabList>
 
 					{/* Content area - renders only the active tab */}

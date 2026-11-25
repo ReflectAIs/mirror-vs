@@ -345,19 +345,16 @@ export const openMirrorSettingsInTab = async ({
 	const contextProxy = await ContextProxy.getInstance(context)
 	settingsProvider = new MirrorProvider(context, outputChannel, "settings", contextProxy)
 
-	const hasVisibleEditors = vscode.window.visibleTextEditors.length > 0
-	if (!hasVisibleEditors) {
-		await vscode.commands.executeCommand("workbench.action.newGroupRight")
-	}
-
-	const lastCol = Math.max(...vscode.window.visibleTextEditors.map((editor) => editor.viewColumn || 0))
-	const targetCol = hasVisibleEditors ? Math.max(lastCol + 1, 1) : vscode.ViewColumn.Two
-
-	settingsPanel = vscode.window.createWebviewPanel("mirror-vs.settings", "Mirror VS Settings", targetCol, {
-		enableScripts: true,
-		retainContextWhenHidden: true,
-		localResourceRoots: [context.extensionUri],
-	})
+	settingsPanel = vscode.window.createWebviewPanel(
+		"mirror-vs.settings",
+		"Mirror VS Settings",
+		vscode.ViewColumn.Active,
+		{
+			enableScripts: true,
+			retainContextWhenHidden: true,
+			localResourceRoots: [context.extensionUri],
+		},
+	)
 
 	settingsPanel.iconPath = {
 		light: vscode.Uri.joinPath(context.extensionUri, "assets", "icons", "panel_light.png"),

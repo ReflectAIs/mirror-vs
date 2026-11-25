@@ -148,7 +148,7 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 				const relPath = fileResult.path
 
 				// MirrorIgnore validation
-				const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+				const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 				if (!accessAllowed) {
 					await task.say("mirrorignore_error", relPath)
 					const errorMsg = formatResponse.mirrorIgnoreError(relPath)
@@ -722,7 +722,7 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			const fullPath = path.resolve(task.cwd, relPath)
 
 			// MirrorIgnore validation
-			const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+			const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 			if (!accessAllowed) {
 				await task.say("mirrorignore_error", relPath)
 				const errorMsg = formatResponse.mirrorIgnoreError(relPath)

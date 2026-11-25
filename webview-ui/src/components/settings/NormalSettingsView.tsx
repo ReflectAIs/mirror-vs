@@ -1073,6 +1073,8 @@ export const NormalSettingsView: React.FC<NormalSettingsViewProps> = ({
 							<VSCodeOption value="retro">Retro Monochrome</VSCodeOption>
 							<VSCodeOption value="synthwave">Synthwave Sunset</VSCodeOption>
 							<VSCodeOption value="solar">Solar Flare</VSCodeOption>
+							<VSCodeOption value="catbot">Cat-bot (Neon Pink)</VSCodeOption>
+							<VSCodeOption value="catbot">Cat-bot (Neon Pink)</VSCodeOption>
 						</VSCodeDropdown>
 					</div>
 				</div>
