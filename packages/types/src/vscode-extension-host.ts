@@ -387,6 +387,8 @@ export type ExtensionState = Pick<
 	| "alwaysAllowFollowupQuestions"
 	| "alwaysAllowExecute"
 	| "alwaysAllowGitCommit"
+	| "allowGitNoVerify"
+	| "allowGitForcePush"
 	| "alwaysAllowBrowser"
 	| "followupAutoApproveTimeoutMs"
 	| "allowedCommands"

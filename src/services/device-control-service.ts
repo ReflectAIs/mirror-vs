@@ -47,6 +47,8 @@ export interface ScreenCaptureResult {
 	mimeType: "image/jpeg" | "image/png"
 	width: number
 	height: number
+	actualWidth?: number
+	actualHeight?: number
 }
 
 export type MouseButton = "left" | "right" | "middle"
@@ -75,12 +77,15 @@ export interface DeviceSafetyConfig {
 	maxActionsPerSession: number
 	/** Normalized hotkey combos that are blocked for safety. */
 	blockedHotkeys: string[]
+	/** Maximum screenshot width in pixels for token optimization (0 to disable). */
+	maxScreenshotWidth: number
 }
 
 export const DEFAULT_SAFETY_CONFIG: DeviceSafetyConfig = {
 	failSafeCornerPx: 5,
 	minActionIntervalMs: 80,
 	maxActionsPerSession: 200,
+	maxScreenshotWidth: 1280,
 	blockedHotkeys: [
 		"cmd+q",
 		"command+q",
@@ -271,13 +276,35 @@ export class MacDeviceDriver implements DeviceDriver {
 		return { x: x ?? 100, y: y ?? 100 }
 	}
 
-	async captureScreen(): Promise<ScreenCaptureResult> {
+	async captureScreen(maxWidth = 1280): Promise<ScreenCaptureResult> {
 		const tmpFile = path.join(os.tmpdir(), `mirror-screen-${Date.now()}.jpg`)
 		try {
 			await execFileAsync("screencapture", ["-x", "-t", "jpg", tmpFile], { timeout: 10000 })
+			const actual = await this.getScreenSize()
+			let width = actual.width
+			let height = actual.height
+			if (maxWidth > 0 && actual.width > maxWidth) {
+				try {
+					await execFileAsync(
+						"sips",
+						["--resampleWidth", String(maxWidth), "-s", "formatOptions", "75", tmpFile],
+						{ timeout: 10000 },
+					)
+					width = maxWidth
+					height = Math.max(1, Math.round(actual.height * (maxWidth / actual.width)))
+				} catch {
+					// Keep full-res capture if sips fails
+				}
+			}
 			const buffer = await fs.readFile(tmpFile)
-			const size = await this.getScreenSize()
-			return { buffer, mimeType: "image/jpeg", width: size.width, height: size.height }
+			return {
+				buffer,
+				mimeType: "image/jpeg",
+				width,
+				height,
+				actualWidth: actual.width,
+				actualHeight: actual.height,
+			}
 		} finally {
 			await fs.unlink(tmpFile).catch(() => {})
 		}
@@ -541,6 +568,8 @@ export class DeviceControlService {
 	private config: DeviceSafetyConfig
 	private actionCount = 0
 	private lastActionAt = 0
+	private lastScaleX = 1
+	private lastScaleY = 1
 
 	constructor(driver?: DeviceDriver, config: Partial<DeviceSafetyConfig> = {}) {
 		this.driver = driver ?? DeviceControlService.createPlatformDriver()
@@ -601,9 +630,21 @@ export class DeviceControlService {
 		this.lastActionAt = Date.now()
 	}
 
+	private toActualCoordinates(x: number, y: number, screen: ScreenSize): CursorPosition {
+		return clampCoordinates(x * this.lastScaleX, y * this.lastScaleY, screen)
+	}
+
 	public async screenshot(signal?: AbortSignal): Promise<ScreenCaptureResult> {
 		if (signal?.aborted) throw new DeviceFailSafeError("Screenshot aborted by user.")
-		return this.driver.captureScreen()
+		const result =
+			this.driver instanceof MacDeviceDriver
+				? await this.driver.captureScreen(this.config.maxScreenshotWidth)
+				: await this.driver.captureScreen()
+		const actualW = result.actualWidth ?? result.width
+		const actualH = result.actualHeight ?? result.height
+		this.lastScaleX = result.width > 0 ? actualW / result.width : 1
+		this.lastScaleY = result.height > 0 ? actualH / result.height : 1
+		return result
 	}
 
 	public async click(
@@ -615,7 +656,7 @@ export class DeviceControlService {
 	): Promise<CursorPosition> {
 		await this.enforceGuardrails(signal)
 		const screen = await this.driver.getScreenSize()
-		const clamped = clampCoordinates(x, y, screen)
+		const clamped = this.toActualCoordinates(x, y, screen)
 		await this.driver.click(clamped.x, clamped.y, button, clicks)
 		return clamped
 	}
@@ -623,7 +664,7 @@ export class DeviceControlService {
 	public async move(x: number, y: number, signal?: AbortSignal): Promise<CursorPosition> {
 		await this.enforceGuardrails(signal)
 		const screen = await this.driver.getScreenSize()
-		const clamped = clampCoordinates(x, y, screen)
+		const clamped = this.toActualCoordinates(x, y, screen)
 		await this.driver.moveMouse(clamped.x, clamped.y)
 		return clamped
 	}
@@ -637,8 +678,8 @@ export class DeviceControlService {
 	): Promise<{ from: CursorPosition; to: CursorPosition }> {
 		await this.enforceGuardrails(signal)
 		const screen = await this.driver.getScreenSize()
-		const from = clampCoordinates(x1, y1, screen)
-		const to = clampCoordinates(x2, y2, screen)
+		const from = this.toActualCoordinates(x1, y1, screen)
+		const to = this.toActualCoordinates(x2, y2, screen)
 		await this.driver.drag(from.x, from.y, to.x, to.y)
 		return { from, to }
 	}
@@ -664,7 +705,7 @@ export class DeviceControlService {
 		await this.enforceGuardrails(signal)
 		if (x !== undefined && y !== undefined) {
 			const screen = await this.driver.getScreenSize()
-			const clamped = clampCoordinates(x, y, screen)
+			const clamped = this.toActualCoordinates(x, y, screen)
 			await this.driver.scroll(dx, dy, clamped.x, clamped.y)
 		} else {
 			await this.driver.scroll(dx, dy)

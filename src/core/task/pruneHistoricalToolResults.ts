@@ -28,6 +28,13 @@ export interface PruneHistoricalToolResultsOptions {
 	 * Default: true.
 	 */
 	pruneHistoricalScreenshots?: boolean
+	/**
+	 * Maximum number of most recent screenshot tool results to keep in full image fidelity
+	 * across the entire conversation (including active turns). Older screenshots are folded
+	 * to text placeholders to prevent vision token bloat during GUI/device loops.
+	 * Default: 2.
+	 */
+	maxRecentScreenshots?: number
 }
 
 const DEFAULT_KEEP_RECENT_TURNS = 12
@@ -50,6 +57,52 @@ const DEFAULT_PRUNE_HISTORICAL_SCREENSHOTS = true
  * 5. Large tool results are folded to preserve the initial snippet/header while dropping the bulk body.
  * 6. Pruning cutoff advances in quantized blocks (`pruneBlockSize`) to preserve prefix prompt caching.
  */
+function capRecentScreenshots(
+	messages: ApiMessage[],
+	pruneHistoricalScreenshots: boolean,
+	maxRecentScreenshots: number,
+): ApiMessage[] {
+	if (!pruneHistoricalScreenshots || maxRecentScreenshots < 0) {
+		return messages
+	}
+
+	let keptScreenshots = 0
+	const result = [...messages]
+	for (let i = result.length - 1; i >= 0; i--) {
+		const msg = result[i]
+		if (msg.role !== "user" || !Array.isArray(msg.content)) continue
+
+		let modifiedMsg = false
+		const updatedContent = [...msg.content]
+		for (let j = updatedContent.length - 1; j >= 0; j--) {
+			const block = updatedContent[j]
+			if (block.type !== "tool_result") continue
+			const tr = block as Anthropic.Messages.ToolResultBlockParam
+			if (!Array.isArray(tr.content) || !tr.content.some((p) => p.type === "image")) continue
+
+			if (keptScreenshots < maxRecentScreenshots) {
+				keptScreenshots++
+			} else {
+				modifiedMsg = true
+				const textParts = tr.content.filter((p) => p.type === "text") as Anthropic.Messages.TextBlockParam[]
+				updatedContent[j] = {
+					...tr,
+					content: [
+						...textParts,
+						{ type: "text", text: "[... Earlier screenshot folded to conserve vision tokens ...]" },
+					],
+				}
+			}
+		}
+
+		if (modifiedMsg) {
+			result[i] = { ...msg, content: updatedContent }
+		}
+	}
+
+	return result
+}
+
 export function pruneHistoricalToolResults(
 	messages: ApiMessage[],
 	options: PruneHistoricalToolResultsOptions = {},
@@ -100,6 +153,8 @@ export function pruneHistoricalToolResults(
 		return didModifyAssistant ? { ...msg, content: newContent } : msg
 	})
 
+	const maxRecentScreenshots = options.maxRecentScreenshots ?? 2
+
 	// Count total user messages (turns)
 	let totalUserTurns = 0
 	for (const msg of sanitizedMessages) {
@@ -110,13 +165,13 @@ export function pruneHistoricalToolResults(
 
 	const excessTurns = totalUserTurns - keepRecentTurns
 	if (excessTurns <= 0) {
-		return sanitizedMessages
+		return capRecentScreenshots(sanitizedMessages, pruneHistoricalScreenshots, maxRecentScreenshots)
 	}
 
 	// Quantize into stable blocks so historical messages stay byte-for-byte identical in prompt cache
 	const prunedTurnCount = Math.floor(excessTurns / pruneBlockSize) * pruneBlockSize
 	if (prunedTurnCount === 0) {
-		return sanitizedMessages
+		return capRecentScreenshots(sanitizedMessages, pruneHistoricalScreenshots, maxRecentScreenshots)
 	}
 
 	// Find the cutoff index for prunedTurnCount starting from the beginning of the conversation.
@@ -135,7 +190,7 @@ export function pruneHistoricalToolResults(
 	}
 
 	if (cutoffIndex === 0) {
-		return sanitizedMessages
+		return capRecentScreenshots(sanitizedMessages, pruneHistoricalScreenshots, maxRecentScreenshots)
 	}
 
 	// Map tool_use_id to tool name and input path to detect superseded reads
@@ -184,7 +239,7 @@ export function pruneHistoricalToolResults(
 		}
 	}
 
-	return sanitizedMessages.map((msg, index) => {
+	const prunedMessages = sanitizedMessages.map((msg, index) => {
 		// Only prune messages that precede the active working memory window
 		if (index >= cutoffIndex || msg.role !== "user" || !Array.isArray(msg.content)) {
 			return msg
@@ -317,4 +372,6 @@ export function pruneHistoricalToolResults(
 			content: newContent,
 		}
 	})
+
+	return capRecentScreenshots(prunedMessages, pruneHistoricalScreenshots, maxRecentScreenshots)
 }

@@ -58,6 +58,8 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setAlwaysAllowWriteOutsideWorkspace: (value: boolean) => void
 	setAlwaysAllowExecute: (value: boolean) => void
 	setAlwaysAllowGitCommit: (value: boolean) => void
+	allowGitNoVerify?: boolean
+	allowGitForcePush?: boolean
 	setAlwaysAllowMcp: (value: boolean) => void
 	setAlwaysAllowModeSwitch: (value: boolean) => void
 	setAlwaysAllowSubtasks: (value: boolean) => void

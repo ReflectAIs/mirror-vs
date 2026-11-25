@@ -29,6 +29,8 @@ type AutoApproveSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	alwaysAllowSubtasks?: boolean
 	alwaysAllowExecute?: boolean
 	alwaysAllowGitCommit?: boolean
+	allowGitNoVerify?: boolean
+	allowGitForcePush?: boolean
 	alwaysAllowFollowupQuestions?: boolean
 	alwaysAllowBrowser?: boolean
 	autonomousMode?: boolean
@@ -48,6 +50,8 @@ type AutoApproveSettingsProps = HTMLAttributes<HTMLDivElement> & {
 		| "alwaysAllowSubtasks"
 		| "alwaysAllowExecute"
 		| "alwaysAllowGitCommit"
+		| "allowGitNoVerify"
+		| "allowGitForcePush"
 		| "alwaysAllowFollowupQuestions"
 		| "alwaysAllowBrowser"
 		| "autonomousMode"
@@ -70,6 +74,8 @@ export const AutoApproveSettings = ({
 	alwaysAllowSubtasks,
 	alwaysAllowExecute,
 	alwaysAllowGitCommit,
+	allowGitNoVerify = false,
+	allowGitForcePush = false,
 	alwaysAllowFollowupQuestions,
 	alwaysAllowBrowser,
 	autonomousMode,
@@ -418,6 +424,42 @@ export const AutoApproveSettings = ({
 						</div>
 					</div>
 				)}
+
+				{/* GIT SAFETY GUARDRAILS */}
+				<div className="flex flex-col gap-3 pl-3 border-l-2 border-vscode-button-background mt-2">
+					<div className="flex items-center gap-2 font-bold">
+						<span className="codicon codicon-shield" />
+						<div>Git Safety Guardrails</div>
+					</div>
+					<SearchableSetting
+						settingId="auto-approve-git-no-verify"
+						section="autoApprove"
+						label="Allow git --no-verify">
+						<VSCodeCheckbox
+							checked={allowGitNoVerify}
+							onChange={(e: any) => setCachedStateField("allowGitNoVerify", e.target.checked)}
+							data-testid="allow-git-no-verify-checkbox">
+							<span className="font-medium">Allow git --no-verify (bypass hooks)</span>
+						</VSCodeCheckbox>
+						<div className="text-vscode-descriptionForeground text-sm mt-1">
+							Disabled by default so the agent cannot bypass pre-commit or pre-push hooks automatically.
+						</div>
+					</SearchableSetting>
+					<SearchableSetting
+						settingId="auto-approve-git-force-push"
+						section="autoApprove"
+						label="Allow git force-push to main/master">
+						<VSCodeCheckbox
+							checked={allowGitForcePush}
+							onChange={(e: any) => setCachedStateField("allowGitForcePush", e.target.checked)}
+							data-testid="allow-git-force-push-checkbox">
+							<span className="font-medium">Allow git force-push to protected branches</span>
+						</VSCodeCheckbox>
+						<div className="text-vscode-descriptionForeground text-sm mt-1">
+							Disabled by default to prevent overwriting history on main, master, or prod branches.
+						</div>
+					</SearchableSetting>
+				</div>
 			</Section>
 		</div>
 	)

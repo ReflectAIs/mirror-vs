@@ -112,7 +112,7 @@ const ChatToolbar = ({
 		}
 	}, [editingSessionName, currentSessionId, activeSessionName])
 
-	const { isWaitingForCallback } = useExtensionState()
+	const { isWaitingForCallback, mode } = useExtensionState()
 
 	// Determine mascot status from task state
 	const mascotStatus: MascotStatus = (() => {
@@ -173,6 +173,13 @@ const ChatToolbar = ({
 									{activeSessionName}
 								</span>
 								<Pencil className="w-2.5 h-2.5 text-vscode-descriptionForeground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+								{(mode === "device" || mode === "device-background") && (
+									<span
+										title="Move cursor to top-left corner (0,0) for emergency stop"
+										className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+										{mode === "device" ? "Live Device" : "Bg Device"}
+									</span>
+								)}
 							</div>
 						)}
 					</div>

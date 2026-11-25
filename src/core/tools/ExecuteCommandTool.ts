@@ -131,6 +131,50 @@ function validateCommandSafety(command: string, workspacePath: string): string |
  * This is a HARD BLOCK — protected config files cannot be deleted/modified
  * via shell commands regardless of auto-approval settings.
  */
+export function validateGitNoVerify(command: string): string | null {
+	const subCommands = command.split(/&&|\|\||;|\|/)
+	for (const sub of subCommands) {
+		const trimmed = sub.trim()
+		if (!/\bgit\b/i.test(trimmed)) continue
+
+		// Block explicit --no-verify on any git subcommand (commit, push, merge, etc.)
+		if (/(?:^|\s)--no-verify(?:\s|$|=)/i.test(trimmed)) {
+			return `Command blocked: "--no-verify" bypasses git hooks and is blocked by Mirror VS. Run this command manually in your terminal if needed, or enable "allowGitNoVerify" in Settings.`
+		}
+
+		// Block -n (shorthand for --no-verify) on commit / merge / cherry-pick / am
+		// (Note: on git push / git log, -n means --dry-run / max-count, so do NOT block there)
+		if (
+			/\bgit\s+(?:commit|merge|cherry-pick|am)\b/i.test(trimmed) &&
+			/(?:^|\s)-[a-zA-Z]*n[a-zA-Z]*(?:\s|$)/.test(trimmed)
+		) {
+			return `Command blocked: "-n" (--no-verify) bypasses git hooks and is blocked by Mirror VS. Run this command manually in your terminal if needed, or enable "allowGitNoVerify" in Settings.`
+		}
+	}
+	return null
+}
+
+export function validateGitForcePush(command: string): string | null {
+	const subCommands = command.split(/&&|\|\||;|\|/)
+	for (const sub of subCommands) {
+		const trimmed = sub.trim()
+		if (!/\bgit\s+push\b/i.test(trimmed)) continue
+
+		const hasForce =
+			/(?:^|\s)--force(?:-with-lease)?(?:\s|$|=)/i.test(trimmed) ||
+			/(?:^|\s)-[a-zA-Z]*f[a-zA-Z]*(?:\s|$)/.test(trimmed) ||
+			/\+\S+:(?:main|master|prod|production)\b/i.test(trimmed)
+		if (!hasForce) continue
+
+		const targetsProtectedBranch =
+			/\b(?:main|master|prod|production)\b/i.test(trimmed) || !/\s[a-zA-Z0-9._/-]+\s/.test(trimmed)
+		if (targetsProtectedBranch) {
+			return `Command blocked: force-pushing to protected branch (main/master/prod) is disabled by default. Run this command manually in your terminal if needed, or enable "Allow git force-push" in Settings.`
+		}
+	}
+	return null
+}
+
 function validateCommandAgainstProtectedFiles(
 	command: string,
 	workspacePath: string,
@@ -217,6 +261,30 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 				await task.say("error", protectedViolation)
 				pushToolResult(formatResponse.toolError(protectedViolation))
 				return
+			}
+
+			// Block git --no-verify unless the user explicitly opted in via allowGitNoVerify
+			const noVerifyViolation = validateGitNoVerify(canonicalCommand)
+			if (noVerifyViolation) {
+				const providerForSettings = await task.providerRef.deref()
+				const allowGitNoVerify = providerForSettings?.contextProxy?.getValue("allowGitNoVerify")
+				if (!allowGitNoVerify) {
+					await task.say("error", noVerifyViolation)
+					pushToolResult(formatResponse.toolError(noVerifyViolation))
+					return
+				}
+			}
+
+			// Block git force-push to protected branches unless explicitly opted in via allowGitForcePush
+			const forcePushViolation = validateGitForcePush(canonicalCommand)
+			if (forcePushViolation) {
+				const providerForSettings = await task.providerRef.deref()
+				const allowGitForcePush = providerForSettings?.contextProxy?.getValue("allowGitForcePush")
+				if (!allowGitForcePush) {
+					await task.say("error", forcePushViolation)
+					pushToolResult(formatResponse.toolError(forcePushViolation))
+					return
+				}
 			}
 
 			task.consecutiveMistakeCount = 0

@@ -244,6 +244,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		customSupportPrompts,
 		profileThresholds,
 		alwaysAllowGitCommit,
+		allowGitNoVerify,
+		allowGitForcePush,
 		alwaysAllowFollowupQuestions,
 		followupAutoApproveTimeoutMs,
 		includeDiagnosticMessages,
@@ -524,6 +526,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					maxDiagnosticMessages: maxDiagnosticMessages ?? 50,
 					alwaysAllowSubtasks,
 					alwaysAllowGitCommit: alwaysAllowGitCommit ?? false,
+					allowGitNoVerify: allowGitNoVerify ?? false,
+					allowGitForcePush: allowGitForcePush ?? false,
 					alwaysAllowFollowupQuestions: alwaysAllowFollowupQuestions ?? false,
 					followupAutoApproveTimeoutMs,
 					includeTaskHistoryInEnhance: includeTaskHistoryInEnhance ?? true,
@@ -1080,6 +1084,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 										alwaysAllowSubtasks={alwaysAllowSubtasks}
 										alwaysAllowExecute={alwaysAllowExecute}
 										alwaysAllowGitCommit={alwaysAllowGitCommit}
+										allowGitNoVerify={allowGitNoVerify}
+										allowGitForcePush={allowGitForcePush}
 										alwaysAllowFollowupQuestions={alwaysAllowFollowupQuestions}
 										autonomousMode={autonomousMode}
 										followupAutoApproveTimeoutMs={followupAutoApproveTimeoutMs}

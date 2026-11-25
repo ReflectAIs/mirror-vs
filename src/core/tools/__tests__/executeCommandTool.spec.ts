@@ -327,4 +327,17 @@ describe("executeCommandTool", () => {
 			expect(executeCommandModule.resolveAgentTimeoutMs(30)).toBe(30_000)
 		})
 	})
+
+	describe("validateGitNoVerify", () => {
+		it("blocks --no-verify on git push and git commit, and -n on git commit", () => {
+			expect(executeCommandModule.validateGitNoVerify("git push --force --no-verify origin main")).toContain(
+				"--no-verify",
+			)
+			expect(executeCommandModule.validateGitNoVerify("git commit -m 'msg' --no-verify")).toContain("--no-verify")
+			expect(executeCommandModule.validateGitNoVerify("git commit -nm 'msg'")).toContain("-n")
+			expect(executeCommandModule.validateGitNoVerify("git log -n 5")).toBeNull()
+			expect(executeCommandModule.validateGitNoVerify("git push -n origin main")).toBeNull()
+			expect(executeCommandModule.validateGitNoVerify("git commit -m 'msg'")).toBeNull()
+		})
+	})
 })
