@@ -169,6 +169,22 @@ describe("ImageProgressRow", () => {
 		expect(screen.queryByText(/~.*s/)).not.toBeInTheDocument()
 	})
 
+	it("should render live preview image inside Gemini placeholder when previewDataUrl is provided", () => {
+		const data = {
+			stage: "Sampling",
+			progress: 50,
+			state: "running",
+			previewDataUrl: "data:image/jpeg;base64,/9j/4AAQ",
+		}
+
+		render(<ImageProgressRow text={JSON.stringify(data)} />)
+
+		const img = screen.getByAltText("Live image preview") as HTMLImageElement
+		expect(img).toBeInTheDocument()
+		expect(img.src).toBe("data:image/jpeg;base64,/9j/4AAQ")
+		expect(screen.getByText("Refining image...")).toBeInTheDocument()
+	})
+
 	it("should clamp progress over 100 to 100", () => {
 		const data = {
 			stage: "over",

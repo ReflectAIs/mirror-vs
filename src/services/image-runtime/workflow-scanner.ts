@@ -246,11 +246,14 @@ export class WorkflowScanner {
 				const srcPath = path.join(workflowsSrcDir, file)
 				const userDestPath = path.join(userWorkflowsDir, file)
 
-				// Copy only to ComfyUI's user default workflows directory so ComfyUI sees them.
+				// Copy only missing workflows to ComfyUI's user default workflows directory
+				// so ComfyUI sees them without overwriting user customizations.
 				// Do NOT automatically seed into mirror pipelines directory — pipelines should
 				// only appear when explicitly imported by the user from workflow scanning or import.
 				try {
-					await fsp.copyFile(srcPath, userDestPath)
+					if (!fs.existsSync(userDestPath)) {
+						await fsp.copyFile(srcPath, userDestPath)
+					}
 				} catch (err) {
 					logger.warn(`[WorkflowScanner] Failed to copy workflow to user workflows: ${err}`)
 				}

@@ -31,6 +31,7 @@ import {
 	LucideIcon,
 	Zap,
 	SlidersHorizontal,
+	Image as ImageIcon,
 } from "lucide-react"
 
 import {
@@ -72,6 +73,7 @@ import { NotificationSettings } from "./NotificationSettings"
 import { ContextManagementSettings } from "./ContextManagementSettings"
 import { TerminalSettings } from "./TerminalSettings"
 import { ExperimentalSettings } from "./ExperimentalSettings"
+import { ImageGenerationSettings } from "./ImageGenerationSettings"
 import { LanguageSettings } from "./LanguageSettings"
 import { About } from "./About"
 import { Section } from "./Section"
@@ -105,6 +107,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
 		name: "Core & Models",
 		sections: [
 			{ id: "providers", icon: Cpu },
+			{ id: "imageGeneration", icon: ImageIcon },
 			{ id: "ui", icon: Palette },
 			{ id: "language", icon: Languages },
 		],
@@ -145,6 +148,7 @@ export interface SettingsViewRef {
 
 export const sectionNames = [
 	"providers",
+	"imageGeneration",
 	"autoApprove",
 	"slashCommands",
 	"skills",
@@ -1199,6 +1203,33 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 										mascotTheme={mascotTheme}
 										setCachedStateField={setCachedStateField}
 									/>
+								)}
+
+								{/* Image Generation / ComfyUI Section */}
+								{renderTab === "imageGeneration" && (
+									<div className="flex flex-col gap-2">
+										<SectionHeader>{t("settings:sections.imageGeneration")}</SectionHeader>
+										<Section>
+											<ImageGenerationSettings
+												experiments={experiments}
+												setExperimentEnabled={setExperimentEnabled}
+												imageGenerationProvider={imageGenerationProvider}
+												setImageGenerationProvider={setImageGenerationProvider}
+												openRouterImageApiKey={openRouterImageApiKey}
+												setOpenRouterImageApiKey={setOpenRouterImageApiKey}
+												generationProviders={generationProviders}
+												updateGenerationProvider={updateGenerationProvider}
+												openRouterModels={openRouterModels}
+												updateOpenRouterModel={updateOpenRouterModel}
+												comfyuiDefaultPipelines={comfyuiDefaultPipelines}
+												setComfyuiDefaultPipeline={setComfyuiDefaultPipeline}
+												comfyuiHardwareProfile={comfyuiHardwareProfile}
+												atlasCloudModels={atlasCloudModels}
+												updateAtlasCloudModel={updateAtlasCloudModel}
+												comfyuiAutoSetup={comfyuiAutoSetup}
+											/>
+										</Section>
+									</div>
 								)}
 
 								{/* Experimental Section */}

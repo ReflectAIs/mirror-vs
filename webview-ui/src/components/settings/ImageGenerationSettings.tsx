@@ -28,6 +28,7 @@ import {
 	Play,
 	ExternalLink,
 	Copy,
+	Star,
 	Check,
 } from "lucide-react"
 import { useAppTranslation } from "@/i18n/TranslationContext"
@@ -170,6 +171,7 @@ interface ImageGenerationSettingsProps {
 	updateAtlasCloudModel?: (type: string, model: string) => void
 
 	// Auto-setup
+	comfyuiAutoSetup?: boolean
 	onAutoSetup?: (provider: "comfyui") => void
 	autoSetupRunning?: boolean
 	autoSetupStatus?: string
@@ -199,15 +201,77 @@ export const ImageGenerationSettings = ({
 	comfyuiHardwareProfile,
 	atlasCloudModels,
 	updateAtlasCloudModel,
-	onAutoSetup,
-	autoSetupRunning,
-	autoSetupStatus,
-	autoSetupProgress,
-	configuredProviders,
+	comfyuiAutoSetup,
+	onAutoSetup: onAutoSetupProp,
+	autoSetupRunning: autoSetupRunningProp,
+	autoSetupStatus: autoSetupStatusProp,
+	autoSetupProgress: autoSetupProgressProp,
+	configuredProviders: configuredProvidersProp,
 	onScanComfyuiWorkflows,
 	onImportComfyuiWorkflows,
 }: ImageGenerationSettingsProps) => {
 	const { t } = useAppTranslation()
+
+	// Internal auto-setup fallback state (used when rendered standalone in SettingsView)
+	const [internalAutoSetupRunning, setInternalAutoSetupRunning] = useState(false)
+	const [internalAutoSetupStatus, setInternalAutoSetupStatus] = useState<string | undefined>(undefined)
+	const [internalAutoSetupProgress, setInternalAutoSetupProgress] = useState<number>(0)
+	const [internalConfiguredProviders, setInternalConfiguredProviders] = useState<Set<"comfyui">>(() => {
+		const initial = new Set<"comfyui">()
+		if (comfyuiAutoSetup) initial.add("comfyui")
+		return initial
+	})
+
+	useEffect(() => {
+		if (comfyuiAutoSetup) {
+			setInternalConfiguredProviders((prev) => (prev.has("comfyui") ? prev : new Set(prev).add("comfyui")))
+		}
+	}, [comfyuiAutoSetup])
+
+	useEffect(() => {
+		if (onAutoSetupProp) return
+		const handler = (event: MessageEvent) => {
+			const message = event.data
+			if (message?.type !== "imageAutoSetupResult") return
+			if (message.progress !== undefined) setInternalAutoSetupProgress(message.progress)
+			if (message.step === "complete" || message.step === "error") {
+				setInternalAutoSetupRunning(false)
+				setInternalAutoSetupStatus(
+					message.step === "complete" ? "Setup complete" : message.text || "Setup failed",
+				)
+			} else {
+				setInternalAutoSetupRunning(true)
+				setInternalAutoSetupStatus(message.text || message.step || "Working...")
+			}
+			if (
+				message.step === "complete" &&
+				(message.text === "ComfyUI is ready" || message.text === "ComfyUI is already running")
+			) {
+				setInternalConfiguredProviders((prev) => new Set(prev).add("comfyui"))
+			}
+		}
+		window.addEventListener("message", handler)
+		return () => window.removeEventListener("message", handler)
+	}, [onAutoSetupProp])
+
+	const autoSetupRunning = autoSetupRunningProp ?? internalAutoSetupRunning
+	const autoSetupStatus = autoSetupStatusProp ?? internalAutoSetupStatus
+	const autoSetupProgress = autoSetupProgressProp ?? internalAutoSetupProgress
+	const configuredProviders = configuredProvidersProp ?? internalConfiguredProviders
+	const onAutoSetup = useCallback(
+		(provider: "comfyui") => {
+			if (onAutoSetupProp) {
+				onAutoSetupProp(provider)
+				return
+			}
+			if (internalAutoSetupRunning) return
+			setInternalAutoSetupRunning(true)
+			setInternalAutoSetupStatus("Starting...")
+			setInternalAutoSetupProgress(0)
+			vscode.postMessage({ type: "imageAutoSetup", text: provider })
+		},
+		[onAutoSetupProp, internalAutoSetupRunning],
+	)
 
 	// Dynamic models fetched from running local provider (ComfyUI)
 	const [dynamicModels, setDynamicModels] = useState<Record<string, ImageProviderModelInfo[]>>({})
@@ -504,6 +568,28 @@ export const ImageGenerationSettings = ({
 												<span className="text-[10px] text-vscode-descriptionForeground shrink-0 mr-1">
 													{p.slug}
 												</span>
+												<VSCodeButton
+													appearance="icon"
+													disabled={p.isDefault}
+													onClick={() => {
+														setComfyuiDefaultPipeline?.(channel.pipelineType, p.slug)
+														vscode.postMessage({
+															type: "setComfyuiDefaultPipeline",
+															values: {
+																pipelineType: channel.pipelineType,
+																slug: p.slug,
+															},
+														} as any)
+													}}
+													title={
+														p.isDefault
+															? "Active default workflow"
+															: "Set as active default workflow"
+													}>
+													<Star
+														className={`w-3.5 h-3.5 ${p.isDefault ? "text-vscode-charts-yellow fill-current" : ""}`}
+													/>
+												</VSCodeButton>
 												<VSCodeButton
 													appearance="icon"
 													onClick={() => handleDeletePipeline(p.slug)}

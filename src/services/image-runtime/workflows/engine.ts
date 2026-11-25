@@ -675,6 +675,33 @@ export class WorkflowEngine {
 		}
 	}
 
+	/**
+	 * Set denoise strength (0.0 - 1.0) on KSampler or SDTurboScheduler.
+	 */
+	static injectDenoise(workflow: any, denoise: number): void {
+		const clamped = Math.max(0, Math.min(1, denoise))
+		const ksampler = WorkflowEngine.findNode(workflow, "KSampler", "KSampler")
+		if (ksampler?.inputs) {
+			ksampler.inputs.denoise = clamped
+			return
+		}
+		const turbo = WorkflowEngine.findNodeByClassType(workflow, "SDTurboScheduler")
+		if (turbo?.inputs) {
+			turbo.inputs.denoise = clamped
+		}
+	}
+
+	/**
+	 * Set batch_size (1 - 4) on EmptyLatentImage.
+	 */
+	static injectBatchSize(workflow: any, batchSize: number): void {
+		const clamped = Math.max(1, Math.min(4, Math.round(batchSize)))
+		const latent = WorkflowEngine.findNode(workflow, "Empty Latent Image", "EmptyLatentImage")
+		if (latent?.inputs) {
+			latent.inputs.batch_size = clamped
+		}
+	}
+
 	// --------------------------------------------------------------------------
 	// Injectors — img2img / inpaint / upscale (title-based with class_type fallback)
 	// --------------------------------------------------------------------------

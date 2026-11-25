@@ -39,7 +39,7 @@
 		"slashCommands": "Slash Commands",
 		"prompts": "Prompts",
 		"ui": "UI",
-		"imageGeneration": "Image Generation",
+		"imageGeneration": "ComfyUI Generation",
 		"experimental": "Experimental",
 		"language": "Language",
 		"pipelines": "Pipelines",

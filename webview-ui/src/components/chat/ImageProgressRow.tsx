@@ -11,6 +11,7 @@ interface ImageProgressData {
 	state?: string
 	eta?: number
 	currentNode?: string
+	previewDataUrl?: string
 }
 
 interface ImageProgressRowProps {
@@ -39,7 +40,7 @@ export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partia
 		return null
 	}
 
-	const { progress, stage, value, max, state, eta, currentNode } = data
+	const { progress, stage, value, max, state, eta, currentNode, previewDataUrl } = data
 	const clampedProgress = Math.max(0, Math.min(100, progress ?? 0))
 	const isRunning = partial || state === "running" || state === "preparing"
 	const isComplete = state === "completed"
@@ -112,6 +113,53 @@ export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partia
 					</div>
 				</div>
 			</div>
+
+			{/* Gemini-style animated generation canvas / live latent preview while running */}
+			{isRunning && !isFailed && (
+				<div
+					data-testid="gemini-image-placeholder"
+					className="relative mt-2.5 w-64 sm:w-72 aspect-square rounded-xl overflow-hidden border border-vscode-editorGroup-border/60 bg-vscode-editor-background/60 shadow-md">
+					{/* Live latent preview from ComfyUI WebSocket, progressively sharpening */}
+					{previewDataUrl && (
+						<img
+							src={previewDataUrl}
+							alt="Live image preview"
+							className="absolute inset-0 w-full h-full object-cover transition-all duration-500"
+							style={{
+								filter: `blur(${Math.max(0, Math.round((1 - clampedProgress / 100) * 12))}px)`,
+								transform: "scale(1.03)",
+							}}
+						/>
+					)}
+
+					{/* Animated Gemini-style iridescent aurora mesh */}
+					<div
+						className={cn(
+							"absolute inset-0 gemini-aurora-bg backdrop-blur-xl transition-opacity duration-500",
+							previewDataUrl ? "opacity-30 backdrop-blur-[2px]" : "opacity-100",
+						)}
+					/>
+
+					{/* Sweeping diagonal light shimmer */}
+					<div className="pointer-events-none absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent gemini-shimmer-sweep" />
+
+					{/* Center frosted sparkle pill */}
+					<div className="relative z-10 h-full w-full flex flex-col items-center justify-center p-4 text-center">
+						<div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/35 backdrop-blur-md border border-white/15 text-white text-xs font-medium shadow-sm">
+							<Sparkles className="size-3.5 text-amber-300 animate-pulse" />
+							<span>{previewDataUrl ? "Refining image..." : "Creating image..."}</span>
+						</div>
+					</div>
+
+					{/* Bottom smooth progress bar */}
+					<div className="absolute inset-x-0 bottom-0 h-1 bg-black/25">
+						<div
+							className="h-full bg-gradient-to-r from-blue-400 via-purple-400 to-amber-300 transition-all duration-300"
+							style={{ width: `${Math.max(4, clampedProgress)}%` }}
+						/>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }

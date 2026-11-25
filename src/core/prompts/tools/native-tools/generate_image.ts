@@ -13,7 +13,7 @@ Parameters:
 - prompt: (required) The text prompt describing what to generate or how to edit the image / audio
 - path: (required) The file path where the generated/edited image or audio should be saved (relative to the current workspace directory). The tool will automatically add the appropriate file extension if not provided.
 - image: (optional, but REQUIRED for edits) The file path to an existing image to edit or transform (relative to the current workspace directory). Pass the path of a previously-generated image here to modify it. Supported formats: PNG, JPG, JPEG, GIF, WEBP.
-- pipeline: (required) Pipeline slug to select a specific workflow variant. You must always specify the best pipeline for the task.`
+- pipeline: (optional) Pipeline slug to select a specific workflow variant (e.g. "txt2img-portrait", "txt2img-ui-banner", "upscale"). Omit this to use the user's configured default pipeline.`
 
 const EXAMPLES_SECTION = `
 Examples:
@@ -68,7 +68,7 @@ export function createGenerateImageTool(options: GenerateImageToolOptions = {}):
 		function: {
 			name: "generate_image",
 			description,
-			strict: true,
+			strict: false,
 			parameters: {
 				type: "object",
 				properties: {
@@ -88,8 +88,47 @@ export function createGenerateImageTool(options: GenerateImageToolOptions = {}):
 						type: "string",
 						description: pipelineParamDesc,
 					},
+					aspect_ratio: {
+						type: "string",
+						enum: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"],
+						description:
+							"Optional aspect ratio preset (e.g. '16:9' for banners, '1:1' for icons, '9:16' for mobile).",
+					},
+					width: {
+						type: "number",
+						description: "Optional explicit image width in pixels (e.g. 1024, 1344).",
+					},
+					height: {
+						type: "number",
+						description: "Optional explicit image height in pixels (e.g. 1024, 768).",
+					},
+					negative_prompt: {
+						type: "string",
+						description:
+							"Optional negative prompt describing what to avoid (e.g. 'blurry, watermark, low quality').",
+					},
+					steps: {
+						type: "number",
+						description: "Optional sampling steps (e.g. 4 for Turbo/Lightning, 20 for standard).",
+					},
+					cfg: {
+						type: "number",
+						description: "Optional CFG guidance scale (e.g. 1.0-2.0 for Turbo, 5.0-7.5 for standard).",
+					},
+					seed: {
+						type: "number",
+						description: "Optional deterministic seed for reproducible generations.",
+					},
+					denoise: {
+						type: "number",
+						description: "Optional denoise strength (0.0-1.0) for img2img/inpaint edits.",
+					},
+					batch_size: {
+						type: "number",
+						description: "Optional number of image variations to generate (1-4).",
+					},
 				},
-				required: ["prompt", "path", "image", "pipeline"],
+				required: ["prompt", "path", "pipeline"],
 				additionalProperties: false,
 			},
 		},

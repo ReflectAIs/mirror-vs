@@ -13,6 +13,34 @@
 		"tags": ["fast", "logo", "icon", "quick", "draft", "turbo"],
 		"isDefault": false
 	},
+	"txt2img-flux-schnell": {
+		"name": "FLUX.1 Schnell (FP8)",
+		"description": "Ungated FP8 FLUX.1 Schnell 4-step generation. Best for crisp typography, product shots, and photorealism.",
+		"type": "generate",
+		"tags": ["flux", "schnell", "fp8", "text", "photorealistic"],
+		"isDefault": false
+	},
+	"txt2img-hires": {
+		"name": "High-Res 2-Pass (1.5x)",
+		"description": "Two-pass latent upscale workflow (1024px -> 1536px refine) for extra-crisp textures and detail.",
+		"type": "generate",
+		"tags": ["hires", "detailed", "2k", "sharp"],
+		"isDefault": false
+	},
+	"txt2img-portrait": {
+		"name": "Portrait & Character (3:4)",
+		"description": "896x1152 portrait-ratio workflow tuned for characters, avatars, and studio portraits.",
+		"type": "generate",
+		"tags": ["portrait", "character", "avatar", "3:4"],
+		"isDefault": false
+	},
+	"txt2img-ui-banner": {
+		"name": "Widescreen Hero Banner (16:9)",
+		"description": "1344x768 widescreen workflow tuned for website hero banners, slides, and thumbnails.",
+		"type": "generate",
+		"tags": ["banner", "widescreen", "hero", "16:9", "ui"],
+		"isDefault": false
+	},
 	"img2img": {
 		"name": "Image-to-Image",
 		"description": "Edit an existing image guided by a text prompt.",

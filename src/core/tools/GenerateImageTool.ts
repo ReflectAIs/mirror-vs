@@ -198,8 +198,16 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 
 		// Resolve the actual pipeline early so the human-readable name can be shown
 		// in the frontend message alongside the generic type.
+		const internalType = inputImageData ? "edit" : "generate"
+		const userDefaultPipeline =
+			activeProvider.name === "comfyui"
+				? (state?.comfyuiDefaultPipelines?.[internalType] ?? state?.comfyuiDefaultPipelines?.[pipelineType])
+				: undefined
+		const GENERIC_TXT2IMG_PIPELINES = new Set(["auto", "txt2img", "text-to-img-turbo", "txt2img-flash"])
 		const effectivePipeline =
-			pipeline || (activeProvider.name === "comfyui" ? state?.comfyuiDefaultPipelines?.[pipelineType] : undefined)
+			!inputImageData && userDefaultPipeline && (!pipeline || GENERIC_TXT2IMG_PIPELINES.has(pipeline))
+				? userDefaultPipeline
+				: pipeline || userDefaultPipeline
 
 		let resolvedPipelineName: string | undefined
 		try {
@@ -207,7 +215,10 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 				const cwd = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath
 				await PipelineRegistry.initialize(cwd)
 			}
-			const internalType = inputImageData ? "edit" : "generate"
+			PipelineRegistry.restorePersistedDefaults(
+				state?.comfyuiDefaultPipelines ?? {},
+				(state as any)?.hiddenPipelines ?? [],
+			)
 			console.log(`[GenerateImageTool] Resolving pipeline slug="${effectivePipeline}" type="${internalType}"`)
 			if (effectivePipeline) {
 				const def = PipelineRegistry.resolve(effectivePipeline, internalType as any)
@@ -272,6 +283,7 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 					state: p.state,
 					eta: p.eta,
 					currentNode: p.currentNode,
+					...(p.previewDataUrl && { previewDataUrl: p.previewDataUrl }),
 				})
 				if (payload !== lastProgressJson) {
 					lastProgressJson = payload
@@ -290,15 +302,30 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 						}
 					: undefined
 
-			const baseOptions: {
-				model: string
-				onProgress: typeof onProgress
-				pipeline?: string
-				allowlists?: import("../../shared/allowlists").PipelineAllowlists
-			} = {
+			const ASPECT_RATIO_PRESETS: Record<string, { width: number; height: number }> = {
+				"1:1": { width: 1024, height: 1024 },
+				"16:9": { width: 1344, height: 768 },
+				"9:16": { width: 768, height: 1344 },
+				"4:3": { width: 1152, height: 896 },
+				"3:4": { width: 896, height: 1152 },
+				"3:2": { width: 1216, height: 832 },
+				"2:3": { width: 832, height: 1216 },
+			}
+			const presetDims = params.aspect_ratio ? ASPECT_RATIO_PRESETS[params.aspect_ratio] : undefined
+			const resolvedWidth = params.width ?? presetDims?.width
+			const resolvedHeight = params.height ?? presetDims?.height
+
+			const baseOptions: import("../../api/image/types").GenOptions = {
 				model: selectedModel,
 				onProgress,
 				...(allowlists && { allowlists }),
+				...(resolvedWidth && resolvedHeight && { width: resolvedWidth, height: resolvedHeight }),
+				...(params.negative_prompt && { negativePrompt: params.negative_prompt }),
+				...(params.steps !== undefined && { steps: params.steps }),
+				...(params.cfg !== undefined && { cfgScale: params.cfg }),
+				...(params.seed !== undefined && { seed: params.seed }),
+				...(params.denoise !== undefined && { denoise: params.denoise }),
+				...(params.batch_size !== undefined && { batchSize: params.batch_size }),
 			}
 			baseOptions.pipeline = effectivePipeline
 

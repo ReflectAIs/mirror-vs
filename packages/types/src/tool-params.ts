@@ -109,4 +109,13 @@ export interface GenerateImageParams {
 	/** Pipeline slug to select a specific workflow variant (e.g. "txt2img-flash" for fast generation).
 	 *  The LLM must always specify the best pipeline for the task. */
 	pipeline: string
+	width?: number
+	height?: number
+	aspect_ratio?: string
+	negative_prompt?: string
+	steps?: number
+	cfg?: number
+	seed?: number
+	denoise?: number
+	batch_size?: number
 }

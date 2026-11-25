@@ -37,8 +37,12 @@ import type {
 import { parseComfyUIError, ComfyUIError } from "./comfyui-errors"
 import { WorkflowEngine } from "../../../services/image-runtime/workflows/engine"
 import { ComfyUIManager } from "../../../services/image-runtime/comfyui-manager"
+import { modelRegistry } from "../../../services/image-runtime/model-registry"
+import { downloadManager } from "../../../services/image-runtime/download-manager"
 import { PipelineRegistry } from "../pipeline-registry"
 import type { PipelineType } from "../pipeline"
+import * as fs from "fs/promises"
+import * as path from "path"
 import * as vscode from "vscode"
 
 interface ComfyPromptResponse {
@@ -76,6 +80,8 @@ export class ComfyUIProvider implements ImageProvider {
 	private wsURL: string
 	private manager: ComfyUIManager | null
 	private currentPromptId: string | null = null
+	private clientId: string =
+		typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `mirror-${Date.now()}`
 	private progress: ProgressInfo = { state: "idle", progress: 0 }
 
 	// Keep-alive: delayed shutdown timer.  After each operation, ComfyUI stays
@@ -339,6 +345,8 @@ export class ComfyUIProvider implements ImageProvider {
 			if (options.scheduler) WorkflowEngine.injectScheduler(workflow, options.scheduler)
 			if (options.cfgScale !== undefined) WorkflowEngine.injectCFG(workflow, options.cfgScale)
 			if (options.steps !== undefined) WorkflowEngine.injectSteps(workflow, options.steps)
+			if (options.denoise !== undefined) WorkflowEngine.injectDenoise(workflow, options.denoise)
+			if (options.batchSize !== undefined) WorkflowEngine.injectBatchSize(workflow, options.batchSize)
 
 			return this.executeWorkflow(workflow, options.onProgress)
 		})
@@ -453,13 +461,72 @@ export class ComfyUIProvider implements ImageProvider {
 
 	// ------------------------------------------------------------------ Private
 
+	private async ensureWorkflowModelsDownloaded(workflow: any, onProgress?: (p: ProgressInfo) => void): Promise<void> {
+		if (!this.manager) return
+		const comfyRoot = this.manager.comfyUISrcPath
+		if (!comfyRoot) return
+
+		const checkpointsDir = path.join(comfyRoot, "models", "checkpoints")
+		for (const node of Object.values(workflow ?? {}) as any[]) {
+			if (node?.class_type !== "CheckpointLoaderSimple" || !node?.inputs?.ckpt_name) continue
+			const ckptName = String(node.inputs.ckpt_name)
+			const destPath = path.join(checkpointsDir, ckptName)
+			try {
+				await fs.access(destPath)
+				continue // Already present on disk
+			} catch {
+				// Not present — check catalog for auto-download
+			}
+
+			const catalog = modelRegistry.getCatalog()
+			const match = catalog.find(
+				(m) => m.downloadable && m.downloadUrl && (m.downloadUrl.endsWith(`/${ckptName}`) || m.id === ckptName),
+			)
+			if (!match?.downloadUrl) continue
+
+			onProgress?.({ state: "preparing", progress: 5, stage: `Downloading ${match.displayName}...` })
+			await fs.mkdir(checkpointsDir, { recursive: true })
+			await new Promise<void>((resolve, reject) => {
+				const jobId = downloadManager.enqueue(match.downloadUrl!, destPath, match.checksum, match.size)
+				const cleanup = () => {
+					downloadManager.off("progress", onDlProgress)
+					downloadManager.off("complete", onDlComplete)
+					downloadManager.off("error", onDlError)
+				}
+				const onDlProgress = (dp: { id: string; progress: number }) => {
+					if (dp.id !== jobId) return
+					onProgress?.({
+						state: "preparing",
+						progress: Math.min(9, Math.max(5, Math.round((dp.progress / 100) * 9))),
+						stage: `Downloading ${match.displayName} (${dp.progress}%)...`,
+					})
+				}
+				const onDlComplete = (ev: { id: string }) => {
+					if (ev.id !== jobId) return
+					cleanup()
+					resolve()
+				}
+				const onDlError = (ev: { id: string; error?: string }) => {
+					if (ev.id !== jobId) return
+					cleanup()
+					reject(new Error(ev.error || `Failed to download ${match.displayName}`))
+				}
+				downloadManager.on("progress", onDlProgress)
+				downloadManager.on("complete", onDlComplete)
+				downloadManager.on("error", onDlError)
+			})
+		}
+	}
+
 	private async executeWorkflow(workflow: any, onProgress?: (p: ProgressInfo) => void): Promise<ImageResult> {
 		const startTime = Date.now()
 		this.progress = { state: "preparing", progress: 0 }
 		onProgress?.(this.progress)
 
+		await this.ensureWorkflowModelsDownloaded(workflow, onProgress).catch(() => {})
+
 		// Debug: log the full workflow JSON so the user can inspect what's being sent
-		const bodyStr = JSON.stringify({ prompt: workflow })
+		const bodyStr = JSON.stringify({ prompt: workflow, client_id: this.clientId })
 		console.log(`[ComfyUIProvider] executeWorkflow — POST /prompt body (${bodyStr.length} chars)`)
 		console.log(`[ComfyUIProvider] WORKFLOW JSON:\n${JSON.stringify(workflow, null, 2)}`)
 
@@ -568,20 +635,54 @@ export class ComfyUIProvider implements ImageProvider {
 	 * to avoid the race condition where WS error/close triggers result-fetching
 	 * before ComfyUI has finished saving the output.
 	 */
-	private async pollForResult(promptId: string, onProgress?: (p: ProgressInfo) => void): Promise<string | null> {
-		// Open WebSocket for progress (non-blocking — errors/closes are ignored)
+	public async freeMemory(unloadModels = true): Promise<void> {
 		try {
-			const ws = new WebSocket(`${this.wsURL}/ws`)
+			await fetch(`${this.baseURL}/free`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ unload_models: unloadModels, free_memory: true }),
+			})
+		} catch {
+			// Best-effort VRAM cleanup
+		}
+	}
+
+	private async pollForResult(promptId: string, onProgress?: (p: ProgressInfo) => void): Promise<string | null> {
+		// Open WebSocket with matching clientId so ComfyUI routes real-time step progress events to us
+		let ws: WebSocket | null = null
+		try {
+			ws = new WebSocket(`${this.wsURL}/ws?clientId=${encodeURIComponent(this.clientId)}`)
+			ws.binaryType = "arraybuffer"
 			ws.onmessage = (event: MessageEvent) => {
+				// ComfyUI sends binary frames for live latent preview images:
+				// [0..3] uint32BE eventType (1 = PREVIEW_IMAGE), [4..7] uint32BE format (1 = JPEG, 2 = PNG), [8..] bytes
+				if (event.data instanceof ArrayBuffer && event.data.byteLength > 8) {
+					const view = new DataView(event.data)
+					const eventType = view.getUint32(0, false)
+					const imageFormat = view.getUint32(4, false)
+					if (eventType === 1) {
+						const mime = imageFormat === 2 ? "image/png" : "image/jpeg"
+						const base64 = Buffer.from(event.data, 8).toString("base64")
+						this.progress = {
+							...this.progress,
+							state: "running",
+							previewDataUrl: `data:${mime};base64,${base64}`,
+						}
+						onProgress?.(this.progress)
+					}
+					return
+				}
+
 				try {
 					const msg: ComfyProgressMessage = JSON.parse(event.data as string)
 					if (msg.type === "progress") {
 						const { value, max } = msg.data
 						const pct = Math.min(90, Math.round((value / max) * 90))
 						this.progress = {
+							...this.progress,
 							state: "running",
 							progress: pct,
-							stage: msg.data.stage,
+							stage: msg.data.stage || "Sampling",
 							value,
 							max,
 						}
@@ -613,11 +714,10 @@ export class ComfyUIProvider implements ImageProvider {
 			if (attempt % 5 === 0 && attempt > 0) {
 				const pct = Math.min(85, 10 + Math.round((attempt / MAX_ATTEMPTS) * 75))
 				this.progress = {
+					...this.progress,
 					state: "running",
-					progress: pct,
-					stage: `waiting (attempt ${attempt}/${MAX_ATTEMPTS})`,
-					value: attempt,
-					max: MAX_ATTEMPTS,
+					progress: Math.max(this.progress.progress ?? 0, pct),
+					stage: this.progress.stage || "Generating image...",
 				}
 				onProgress?.(this.progress)
 			}

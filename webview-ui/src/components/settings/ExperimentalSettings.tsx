@@ -173,47 +173,7 @@ export const ExperimentalSettings = ({
 
 	return (
 		<div className={cn("flex flex-col gap-2", className)} {...props}>
-			{/* ─── Image Generation / ComfyUI section ─── */}
-			<SectionHeader>{t("settings:sections.imageGeneration")}</SectionHeader>
-			<Section>
-				{pipelineEntry &&
-					(() => {
-						const [experimentKey] = pipelineEntry
-						const label = t(`settings:experimental.${experimentKey}.name`)
-						return (
-							<SearchableSetting
-								key={experimentKey}
-								settingId={`experimental-${experimentKey.toLowerCase()}`}
-								section="experimental"
-								label={label}>
-								<ImageGenerationSettings
-									experiments={experiments}
-									setExperimentEnabled={setExperimentEnabled}
-									imageGenerationProvider={imageGenerationProvider}
-									setImageGenerationProvider={setImageGenerationProvider}
-									openRouterImageApiKey={openRouterImageApiKey}
-									setOpenRouterImageApiKey={setOpenRouterImageApiKey}
-									generationProviders={generationProviders}
-									updateGenerationProvider={updateGenerationProvider}
-									openRouterModels={openRouterModels}
-									updateOpenRouterModel={updateOpenRouterModel}
-									comfyuiDefaultPipelines={comfyuiDefaultPipelines}
-									setComfyuiDefaultPipeline={setComfyuiDefaultPipeline}
-									comfyuiHardwareProfile={comfyuiHardwareProfile}
-									atlasCloudModels={atlasCloudModels}
-									updateAtlasCloudModel={updateAtlasCloudModel}
-									onAutoSetup={handleAutoSetup}
-									autoSetupRunning={autoSetupRunning}
-									autoSetupStatus={autoSetupStatus}
-									autoSetupProgress={autoSetupProgress}
-									configuredProviders={configuredProviders}
-								/>
-							</SearchableSetting>
-						)
-					})()}
-			</Section>
-
-			{/* ─── Other experimental features section ─── */}
+			{/* ─── Experimental features section ─── */}
 			<SectionHeader>{t("settings:sections.experimental")}</SectionHeader>
 			<Section>
 				{nonPipelineEntries.map((config) => {

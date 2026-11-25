@@ -34,6 +34,8 @@ export interface GenOptions {
 	seed?: number
 	steps?: number
 	cfgScale?: number
+	denoise?: number
+	batchSize?: number
 	negativePrompt?: string
 	/** Sampler name (e.g. "euler", "euler_ancestral", "dpmpp_2m") */
 	samplerName?: string
@@ -108,6 +110,8 @@ export interface ProgressInfo {
 	value?: number
 	/** Raw progress maximum from the provider (e.g. ComfyUI WS max) */
 	max?: number
+	/** Optional live preview image data URL emitted during generation (e.g. ComfyUI latent preview) */
+	previewDataUrl?: string
 }
 
 /** Flags describing what a provider supports */

@@ -580,6 +580,16 @@ export class NativeToolCallParser {
 						prompt: partialArgs.prompt,
 						path: partialArgs.path,
 						image: partialArgs.image,
+						pipeline: partialArgs.pipeline,
+						width: partialArgs.width,
+						height: partialArgs.height,
+						aspect_ratio: partialArgs.aspect_ratio,
+						negative_prompt: partialArgs.negative_prompt,
+						steps: partialArgs.steps,
+						cfg: partialArgs.cfg,
+						seed: partialArgs.seed,
+						denoise: partialArgs.denoise,
+						batch_size: partialArgs.batch_size,
 					}
 				}
 				break
@@ -1103,6 +1113,15 @@ export class NativeToolCallParser {
 							path: args.path,
 							image: args.image,
 							pipeline: args.pipeline,
+							width: args.width,
+							height: args.height,
+							aspect_ratio: args.aspect_ratio,
+							negative_prompt: args.negative_prompt,
+							steps: args.steps,
+							cfg: args.cfg,
+							seed: args.seed,
+							denoise: args.denoise,
+							batch_size: args.batch_size,
 						} as NativeArgsFor<TName>
 					}
 					break

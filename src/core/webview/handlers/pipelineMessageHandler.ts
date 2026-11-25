@@ -645,6 +645,7 @@ export async function handleScanComfyuiWorkflows(provider: MirrorProvider): Prom
 	try {
 		const comfyUIPath = getDefaultComfyUIPath()
 		const comfyUISrcPath = WorkflowScanner.getComfyUISrcPath(comfyUIPath)
+		await WorkflowScanner.seedDefaultWorkflows(comfyUISrcPath)
 		const discovered = await WorkflowScanner.scan(comfyUISrcPath)
 
 		// Return workflows as top-level properties so the webview can read them directly
