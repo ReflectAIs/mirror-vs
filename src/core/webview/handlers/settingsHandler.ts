@@ -2,7 +2,7 @@ import * as vscode from "vscode"
 
 import { type Language, MirrorVSSettings, ExperimentId } from "@mirror-vs/types"
 
-import type { MirrorProvider } from "../MirrorProvider"
+import { MirrorProvider } from "../MirrorProvider"
 import { getGlobalState, updateGlobalState, getCurrentCwd } from "./_helpers"
 import { changeLanguage, t } from "../../../i18n"
 import { Package } from "../../../shared/package"
@@ -144,7 +144,7 @@ export async function handleUpdateSettings(
 		await handleRequestPipelines(provider)
 	}
 
-	await provider.postStateToWebview()
+	await MirrorProvider.broadcastStateToAllInstances()
 }
 
 /**
@@ -154,7 +154,7 @@ export async function handleTtsEnabled(provider: MirrorProvider, bool?: boolean)
 	const ttsEnabled = bool ?? true
 	await updateGlobalState(provider, "ttsEnabled", ttsEnabled)
 	setTtsEnabled(ttsEnabled)
-	await provider.postStateToWebview()
+	await MirrorProvider.broadcastStateToAllInstances()
 }
 
 /**
@@ -164,7 +164,7 @@ export async function handleTtsSpeed(provider: MirrorProvider, value?: number): 
 	const ttsSpeed = value ?? 1.0
 	await updateGlobalState(provider, "ttsSpeed", ttsSpeed)
 	setTtsSpeed(ttsSpeed)
-	await provider.postStateToWebview()
+	await MirrorProvider.broadcastStateToAllInstances()
 }
 
 /**
@@ -260,5 +260,5 @@ export async function handleDebugSetting(provider: MirrorProvider, bool?: boolea
 	await vscode.workspace
 		.getConfiguration(Package.name)
 		.update("debug", bool ?? false, vscode.ConfigurationTarget.Global)
-	await provider.postStateToWebview()
+	await MirrorProvider.broadcastStateToAllInstances()
 }

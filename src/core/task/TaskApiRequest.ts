@@ -779,7 +779,9 @@ export class TaskApiRequest {
 		// After the first chunk, the gate is released and streaming continues
 		// fully in parallel (Anthropic permits concurrent active streams; it
 		// only rejects the simultaneous start burst).
-		const rateLimitSeconds = this.task.apiConfiguration?.rateLimitSeconds ?? 0
+		const configuredRateLimit = this.task.apiConfiguration?.rateLimitSeconds ?? 0
+		const rateLimitSeconds =
+			this.task.apiConfiguration?.apiProvider === "relace" && configuredRateLimit <= 0 ? 2 : configuredRateLimit
 		let didShowGateWait = false
 		const releaseGlobalGate = await Task.acquireGlobalRequestGate(rateLimitSeconds, async (secondsRemaining) => {
 			didShowGateWait = true
@@ -953,7 +955,7 @@ export class TaskApiRequest {
 				rateLimitDelay = Math.ceil(Math.min(rateLimit, Math.max(0, rateLimit * 1000 - elapsed) / 1000))
 			}
 
-			// Prefer RetryInfo on 429 if present
+			// Prefer RetryInfo or standard Retry-After header on 429
 			if (error?.status === 429) {
 				const retryInfo = error?.errorDetails?.find(
 					(d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
@@ -961,6 +963,16 @@ export class TaskApiRequest {
 				const match = retryInfo?.retryDelay?.match?.(/^(\d+)s$/)
 				if (match) {
 					exponentialDelay = Number(match[1]) + 1
+				} else {
+					const retryAfterHeader =
+						error?.headers?.get?.("retry-after") ??
+						error?.headers?.["retry-after"] ??
+						error?.response?.headers?.["retry-after"]
+					const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : NaN
+					exponentialDelay = Math.max(
+						exponentialDelay,
+						Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? Math.ceil(retryAfterSec) + 1 : 5,
+					)
 				}
 			}
 

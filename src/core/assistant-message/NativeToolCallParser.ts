@@ -776,6 +776,12 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "device_action":
+				if (partialArgs.action !== undefined) {
+					nativeArgs = partialArgs as any
+				}
+				break
+
 			case "browser_type":
 				if (partialArgs.selector !== undefined) {
 					nativeArgs = {
@@ -1303,6 +1309,12 @@ export class NativeToolCallParser {
 						nativeArgs = {
 							selector: args.selector,
 						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "device_action":
+					if (args.action !== undefined) {
+						nativeArgs = args as NativeArgsFor<TName>
 					}
 					break
 

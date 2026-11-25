@@ -99,14 +99,36 @@ const THEME_COLORS: Record<string, MascotThemeColors> = {
 		gradientTo: "#facc15", // yellow
 		glowColor: "#f97316",
 	},
+	catbot: {
+		eyes: "#f472b6", // neon pink
+		blush: "#fb7185", // rose blush
+		visorFill: "#170b1c", // deep plum
+		gradientFrom: "#ec4899", // pink
+		gradientVia: "#a855f7", // purple
+		gradientTo: "#38bdf8", // sky
+		glowColor: "#f472b6",
+	},
 }
 
 /**
  * An animated robotic screen mascot with glowing neon facial expressions that react to model activity states.
  */
 const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => {
-	const { mascotTheme = "cyberpunk" } = useExtensionState()
+	const { mascotTheme = "cyberpunk", mode } = useExtensionState()
 	const colors = THEME_COLORS[mascotTheme] || THEME_COLORS.cyberpunk
+	const isNightOwl = (() => {
+		const h = new Date().getHours()
+		return h >= 22 || h < 5
+	})()
+	const [showConfetti, setShowConfetti] = useState(false)
+
+	useEffect(() => {
+		if (activity === "completed") {
+			setShowConfetti(true)
+			const t = setTimeout(() => setShowConfetti(false), 3000)
+			return () => clearTimeout(t)
+		}
+	}, [activity])
 
 	const [isHovered, setIsHovered] = useState(false)
 	const [isClicked, setIsClicked] = useState(false)
@@ -187,8 +209,8 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 			const dyRaw = e.clientY - centerY
 			const distance = Math.sqrt(dxRaw * dxRaw + dyRaw * dyRaw)
 
-			const maxOffset = size === "small" ? 1.5 : 3.0
-			const scale = Math.min(maxOffset, distance / 40)
+			const maxOffset = size === "small" ? 4.5 : 7.5
+			const scale = Math.min(maxOffset, distance / 18)
 
 			const dx = distance > 0 ? (dxRaw / distance) * scale : 0
 			const dy = distance > 0 ? (dyRaw / distance) * scale : 0
@@ -816,6 +838,64 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 						</filter>
 					</defs>
 
+					{/* Catbot / Cat expression ears, nose & whiskers */}
+					{(String(mascotTheme) === "catbot" || activeClickExpression === "cat") && (
+						<g>
+							<g stroke="url(#mirror-gradient)" strokeWidth="2.5" fill={colors.visorFill}>
+								<polygon points="15,28 8,2 34,15" strokeLinejoin="round" />
+								<polygon points="81,28 88,2 62,15" strokeLinejoin="round" />
+								<polygon points="18,22 14,9 29,16" fill={colors.blush} stroke="none" opacity="0.65" />
+								<polygon points="78,22 82,9 67,16" fill={colors.blush} stroke="none" opacity="0.65" />
+							</g>
+							<polygon points="45,51 51,51 48,55" fill={colors.blush} />
+							<g stroke={colors.eyes} strokeWidth="1.4" opacity="0.65" strokeLinecap="round">
+								<line x1="16" y1="48" x2="27" y2="50" />
+								<line x1="15" y1="54" x2="27" y2="54" />
+								<line x1="80" y1="48" x2="69" y2="50" />
+								<line x1="81" y1="54" x2="69" y2="54" />
+							</g>
+						</g>
+					)}
+
+					{/* Control Device mode radar ring */}
+					{mode === "device" && (
+						<circle
+							cx="48"
+							cy="48"
+							r="43"
+							fill="none"
+							stroke={colors.glowColor}
+							strokeWidth="1.5"
+							strokeDasharray="6 4"
+							opacity={0.75}>
+							<animateTransform
+								attributeName="transform"
+								type="rotate"
+								from="0 48 48"
+								to="360 48 48"
+								dur="4s"
+								repeatCount="indefinite"
+							/>
+						</circle>
+					)}
+
+					{/* Night-owl crescent moon badge */}
+					{isNightOwl && activeState === "idle" && (
+						<text x="74" y="20" fontSize="14" className="select-none">
+							🌙
+						</text>
+					)}
+
+					{/* Completion milestone confetti */}
+					{showConfetti && (
+						<g className="pointer-events-none">
+							<circle cx="14" cy="18" r="2.5" fill="#facc15" />
+							<circle cx="82" cy="16" r="2.5" fill="#22d3ee" />
+							<circle cx="18" cy="78" r="2" fill="#f472b6" />
+							<circle cx="80" cy="76" r="2.5" fill="#34d399" />
+						</g>
+					)}
+
 					{/* Visor head */}
 					<circle
 						cx="48"
@@ -1004,6 +1084,64 @@ const MirrorHero = ({ activity = "idle", size = "normal" }: MirrorHeroProps) => 
 							</feMerge>
 						</filter>
 					</defs>
+
+					{/* Catbot / Cat expression ears, nose & whiskers */}
+					{(String(mascotTheme) === "catbot" || activeClickExpression === "cat") && (
+						<g>
+							<g stroke="url(#mirror-gradient)" strokeWidth="2.5" fill={colors.visorFill}>
+								<polygon points="15,28 8,2 34,15" strokeLinejoin="round" />
+								<polygon points="81,28 88,2 62,15" strokeLinejoin="round" />
+								<polygon points="18,22 14,9 29,16" fill={colors.blush} stroke="none" opacity="0.65" />
+								<polygon points="78,22 82,9 67,16" fill={colors.blush} stroke="none" opacity="0.65" />
+							</g>
+							<polygon points="45,51 51,51 48,55" fill={colors.blush} />
+							<g stroke={colors.eyes} strokeWidth="1.4" opacity="0.65" strokeLinecap="round">
+								<line x1="16" y1="48" x2="27" y2="50" />
+								<line x1="15" y1="54" x2="27" y2="54" />
+								<line x1="80" y1="48" x2="69" y2="50" />
+								<line x1="81" y1="54" x2="69" y2="54" />
+							</g>
+						</g>
+					)}
+
+					{/* Control Device mode radar ring */}
+					{mode === "device" && (
+						<circle
+							cx="48"
+							cy="48"
+							r="43"
+							fill="none"
+							stroke={colors.glowColor}
+							strokeWidth="1.5"
+							strokeDasharray="6 4"
+							opacity={0.75}>
+							<animateTransform
+								attributeName="transform"
+								type="rotate"
+								from="0 48 48"
+								to="360 48 48"
+								dur="4s"
+								repeatCount="indefinite"
+							/>
+						</circle>
+					)}
+
+					{/* Night-owl crescent moon badge */}
+					{isNightOwl && activeState === "idle" && (
+						<text x="74" y="20" fontSize="14" className="select-none">
+							🌙
+						</text>
+					)}
+
+					{/* Completion milestone confetti */}
+					{showConfetti && (
+						<g className="pointer-events-none">
+							<circle cx="14" cy="18" r="2.5" fill="#facc15" />
+							<circle cx="82" cy="16" r="2.5" fill="#22d3ee" />
+							<circle cx="18" cy="78" r="2" fill="#f472b6" />
+							<circle cx="80" cy="76" r="2.5" fill="#34d399" />
+						</g>
+					)}
 
 					{/* Visor head */}
 					<circle

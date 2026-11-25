@@ -68,7 +68,7 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 			return
 		}
 
-		const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+		const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 		if (!accessAllowed) {
 			await task.say("mirrorignore_error", relPath)
 			pushToolResult(formatResponse.mirrorIgnoreError(relPath))
@@ -101,7 +101,8 @@ export class GenerateImageTool extends BaseTool<"generate_image"> {
 				return
 			}
 
-			const inputImageAccessAllowed = task.mirrorIgnoreController?.validateAccess(normalizedInputImagePath)
+			const inputImageAccessAllowed =
+				task.mirrorIgnoreController?.validateAccess(normalizedInputImagePath) ?? true
 			if (!inputImageAccessAllowed) {
 				await task.say("mirrorignore_error", normalizedInputImagePath)
 				pushToolResult(formatResponse.mirrorIgnoreError(normalizedInputImagePath))

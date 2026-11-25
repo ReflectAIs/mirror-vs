@@ -396,6 +396,7 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	browser_evaluate_script: "execute browser script",
 	browser_snapshot: "inspect semantic page structure",
 	browser_actions: "execute batch browser actions",
+	device_action: "control device screen, mouse, and keyboard",
 	web_search: "search the web",
 	render_preview: "render web preview",
 	github_search: "search GitHub",
@@ -461,6 +462,9 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 			"browser_snapshot",
 			"browser_actions",
 		],
+	},
+	device: {
+		tools: ["device_action"],
 	},
 }
 

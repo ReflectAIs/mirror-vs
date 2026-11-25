@@ -4,7 +4,7 @@ import { z } from "zod"
  * ToolGroup
  */
 
-export const toolGroups = ["read", "edit", "command", "mcp", "modes", "browser"] as const
+export const toolGroups = ["read", "edit", "command", "mcp", "modes", "browser", "device"] as const
 
 export const toolGroupsSchema = z.enum(toolGroups)
 
@@ -57,6 +57,8 @@ export const toolNames = [
 	"render_preview",
 	"browser_snapshot",
 	"browser_actions",
+	"device_action",
+	"device_action",
 	// Research / specialized search tools
 	"github_search",
 	"docs_search",

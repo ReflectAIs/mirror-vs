@@ -69,7 +69,7 @@ export class SearchReplaceTool extends BaseTool<"search_replace"> {
 				relPath = file_path
 			}
 
-			const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath)
+			const accessAllowed = task.mirrorIgnoreController?.validateAccess(relPath) ?? true
 
 			if (!accessAllowed) {
 				await task.say("mirrorignore_error", relPath)

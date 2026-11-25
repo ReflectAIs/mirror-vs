@@ -112,6 +112,7 @@ import {
 import { processUserContentMentions } from "../mentions/processUserContentMentions"
 import { getMessagesSinceLastSummary, summarizeConversation, getEffectiveApiHistory } from "../condense"
 import { MessageQueueService } from "../message-queue/MessageQueueService"
+import { saveQueuedMessages } from "../task-persistence/queuedMessages"
 import { AutoApprovalHandler } from "../auto-approval"
 import { MessageManager } from "../message-manager"
 import { mergeConsecutiveApiMessages } from "./mergeConsecutiveApiMessages"
@@ -699,6 +700,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.messageQueueStateChangedHandler = () => {
 			this.emit(MirrorVSEventName.TaskUserMessage, this.taskId)
 			this.emit(MirrorVSEventName.QueuedMessagesUpdated, this.taskId, this.messageQueueService.messages)
+			saveQueuedMessages({
+				messages: this.messageQueueService.messages,
+				taskId: this.taskId,
+				globalStoragePath: this.globalStoragePath,
+			}).catch(() => {})
 			this.providerRef.deref()?.postStateToWebviewWithoutTaskHistory()
 
 			// Auto-drain: if a queued message arrives while the task is

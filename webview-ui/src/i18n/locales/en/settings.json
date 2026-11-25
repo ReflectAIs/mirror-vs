@@ -167,7 +167,10 @@
 			"cyberpunk": "Cyberpunk Neon",
 			"retro": "Retro Monochrome",
 			"synthwave": "Synthwave Sunset",
-			"solar": "Solar Flare"
+			"solar": "Solar Flare",
+			"catbot": "Cat-bot (Neon Pink)",
+			"catbot": "Cat-bot (Neon Pink)",
+			"catbot": "Cat-bot (Neon Pink)"
 		}
 	},
 	"prompts": {
