@@ -53,6 +53,8 @@ import {
 	browserSelectTool,
 	browserEvaluateScriptTool,
 	renderPreviewTool,
+	browserSnapshotTool,
+	browserActionsTool,
 } from "../tools/BrowserTools"
 import { webSearchTool } from "../tools/WebSearchTool"
 import { gitHubSearchTool } from "../tools/GitHubSearchTool"
@@ -62,6 +64,7 @@ import { readUrlTool } from "../tools/ReadUrlTool"
 import { sleepTool } from "../tools/SleepTool"
 import { codeGraphTool } from "../tools/CodeGraphTool"
 import { checkpointSave } from "../checkpoints"
+import { invalidateListFilesCache } from "../../services/glob/list-files"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
@@ -128,6 +131,21 @@ const READ_TOOL_MAP: Record<string, { handle: (task: Task, block: any, callbacks
 	get_git_status: getGitStatusTool,
 	read_session_context: readSessionContextTool,
 	read_command_output: readCommandOutputTool,
+}
+
+/**
+ * Set of write/edit tool names that can be safely executed in parallel
+ * WHEN their target file paths are disjoint.
+ */
+const WRITE_TOOLS = new Set(["write_to_file", "apply_diff", "edit", "search_and_replace", "edit_file", "apply_patch"])
+
+const WRITE_TOOL_MAP: Record<string, { handle: (task: Task, block: any, callbacks: any) => Promise<void> }> = {
+	write_to_file: writeToFileTool,
+	apply_diff: applyDiffToolClass,
+	edit: editTool,
+	search_and_replace: editTool,
+	edit_file: editFileTool,
+	apply_patch: applyPatchTool,
 }
 
 /**
@@ -882,6 +900,17 @@ export async function presentAssistantMessage(mirror: Task) {
 				break
 			}
 
+			if (!block.partial && WRITE_TOOLS.has(block.name)) {
+				const handled = await executeConcurrentWriteBatch(mirror, block, toolCallId, {
+					pushToolResult,
+					handleError,
+					askApproval,
+				})
+				if (handled) {
+					break
+				}
+			}
+
 			switch (block.name) {
 				case "write_to_file":
 					mirror.pendingEditFilePath = (block.params as any)?.path ?? (block.params as any)?.file_path
@@ -1183,6 +1212,20 @@ export async function presentAssistantMessage(mirror: Task) {
 						pushToolResult,
 					})
 					break
+				case "browser_snapshot":
+					await browserSnapshotTool.handle(mirror, block as ToolUse<"browser_snapshot">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "browser_actions":
+					await browserActionsTool.handle(mirror, block as ToolUse<"browser_actions">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
 				case "web_search":
 					await webSearchTool.handle(mirror, block as ToolUse<"web_search">, {
 						askApproval,
@@ -1412,6 +1455,10 @@ function recordFileEdit(mirror: Task, block: any) {
 		toolName,
 		checkpointId,
 	})
+
+	if (toolName === "write_to_file") {
+		invalidateListFilesCache(mirror.cwd)
+	}
 }
 
 /**
@@ -1611,4 +1658,130 @@ async function executeReadBatch(
 	for (const { block } of readBlocks) {
 		mirror.recordToolUsage(block.name as ToolName)
 	}
+}
+
+/**
+ * Batch-execute consecutive write/edit tool blocks in parallel when targeting disjoint files.
+ */
+async function executeConcurrentWriteBatch(
+	mirror: Task,
+	_firstBlock: any,
+	_firstToolCallId: string,
+	callbacks: {
+		pushToolResult: (content: ToolResponse) => void
+		handleError: (action: string, error: Error) => Promise<void>
+		askApproval: (
+			type: MirrorAsk,
+			partialMessage?: string,
+			progressStatus?: ToolProgressStatus,
+			isProtected?: boolean,
+		) => Promise<boolean>
+	},
+): Promise<boolean> {
+	const startIndex = mirror.currentStreamingContentIndex
+	const content = mirror.assistantMessageContent
+
+	// Collect consecutive non-partial write blocks with disjoint file paths
+	const writeBlocks: Array<{ block: any; toolCallId: string; filePath: string }> = []
+	const seenPaths = new Set<string>()
+
+	for (let i = startIndex; i < content.length; i++) {
+		const b = content[i]
+		if (b.type !== "tool_use" || b.partial) break
+		if (!WRITE_TOOLS.has(b.name as string)) break
+
+		const rawPath = (b.params as any)?.path ?? (b.params as any)?.file_path
+		if (!rawPath || typeof rawPath !== "string") break
+
+		const normPath = rawPath.trim()
+		if (seenPaths.has(normPath)) {
+			// Duplicate path detected: break batch so conflicting edits on the same file run sequentially
+			break
+		}
+
+		if (i > startIndex) {
+			const repetitionCheck = mirror.toolRepetitionDetector.check(b)
+			if (!repetitionCheck.allowExecution) {
+				break
+			}
+		}
+
+		seenPaths.add(normPath)
+		writeBlocks.push({ block: b, toolCallId: (b as any).id as string, filePath: normPath })
+	}
+
+	// If only 1 block, let normal sequential switch/case handle it
+	if (writeBlocks.length <= 1) {
+		return false
+	}
+
+	// Single checkpoint before starting concurrent writes
+	await checkpointSaveAndMark(mirror)
+
+	const makePushToolResult = (toolCallId: string) => {
+		let hasResult = false
+		return (res: ToolResponse) => {
+			if (hasResult) return
+			hasResult = true
+			let resultContent: string
+			let imageBlocks: Anthropic.ImageBlockParam[] = []
+
+			if (typeof res === "string") {
+				resultContent = res || "(tool did not return anything)"
+			} else {
+				const textBlocks = res.filter((item) => item.type === "text")
+				imageBlocks = res.filter((item) => item.type === "image") as Anthropic.ImageBlockParam[]
+				resultContent =
+					textBlocks.map((item) => (item as Anthropic.TextBlockParam).text).join("\n") ||
+					"(tool did not return anything)"
+			}
+
+			mirror.pushToolResultToUserContent({
+				type: "tool_result",
+				tool_use_id: sanitizeToolUseId(toolCallId),
+				content: resultContent,
+			})
+
+			if (imageBlocks.length > 0) {
+				mirror.userMessageContent.push(...imageBlocks)
+			}
+		}
+	}
+
+	let askLock: Promise<any> = Promise.resolve()
+	const serializedAskApproval = (
+		type: MirrorAsk,
+		partialMessage?: string,
+		progressStatus?: ToolProgressStatus,
+		isProtected?: boolean,
+	): Promise<boolean> => {
+		const next = askLock.then(() => callbacks.askApproval(type, partialMessage, progressStatus, isProtected))
+		askLock = next.catch(() => {})
+		return next
+	}
+
+	await Promise.all(
+		writeBlocks.map(async ({ block, toolCallId }) => {
+			const tool = WRITE_TOOL_MAP[block.name as string]
+			if (!tool) {
+				throw new Error(`Unknown write tool: ${block.name}`)
+			}
+			await tool.handle(mirror, block, {
+				askApproval: serializedAskApproval,
+				handleError: callbacks.handleError,
+				pushToolResult: makePushToolResult(toolCallId),
+			})
+			recordFileEdit(mirror, block)
+		}),
+	)
+
+	// Advance streaming index past all concurrently processed blocks
+	const blocksProcessed = writeBlocks.length
+	mirror.currentStreamingContentIndex = startIndex + blocksProcessed - 1
+
+	for (const { block } of writeBlocks) {
+		mirror.recordToolUsage(block.name as ToolName)
+	}
+
+	return true
 }

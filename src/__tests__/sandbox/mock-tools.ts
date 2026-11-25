@@ -7,6 +7,7 @@
 import fs from "fs"
 import path from "path"
 import os from "os"
+import { generateFileSkeleton } from "../../integrations/misc/ast-skeleton"
 
 export interface ToolInvocation {
 	name: string
@@ -145,6 +146,11 @@ function handleReadFile(args: Record<string, unknown>, project: SandboxProject):
 	}
 
 	const content = fs.readFileSync(fullPath, "utf-8")
+
+	if (args.mode === "skeleton") {
+		return generateFileSkeleton(content, filePath).skeleton
+	}
+
 	const lines = content.split("\n")
 	const startLine = Number(args.start_line) || 1
 	const endLine = Number(args.end_line) || lines.length

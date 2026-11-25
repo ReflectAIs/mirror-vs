@@ -22,6 +22,7 @@ import { isPathOutsideWorkspace } from "../../utils/pathUtils"
 import { getReadablePath } from "../../utils/path"
 import { extractTextFromFile, addLineNumbers, getSupportedBinaryFormats } from "../../integrations/misc/extract-text"
 import { readWithIndentation, readWithSlice } from "../../integrations/misc/indentation-reader"
+import { generateFileSkeleton } from "../../integrations/misc/ast-skeleton"
 import { DEFAULT_LINE_LIMIT } from "../prompts/tools/native-tools/read_file"
 import type { ToolUse, PushToolResult } from "../../shared/tools"
 
@@ -268,6 +269,11 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 	 */
 	private processTextFile(content: string, entry: InternalFileEntry): string {
 		const mode = entry.mode || "slice"
+
+		if (mode === "skeleton") {
+			const skeletonResult = generateFileSkeleton(content, entry.path)
+			return skeletonResult.skeleton
+		}
 
 		if (mode === "indentation") {
 			// Indentation mode: semantic block extraction

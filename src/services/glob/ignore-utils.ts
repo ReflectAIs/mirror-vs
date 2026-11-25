@@ -1,4 +1,4 @@
-import { DIRS_TO_IGNORE } from "./constants"
+import { DIRS_TO_IGNORE, ALLOWED_DOT_DIRECTORIES } from "./constants"
 
 /**
  * Checks if a file path should be ignored based on the DIRS_TO_IGNORE patterns.
@@ -17,9 +17,11 @@ export function isPathInIgnoredDirectory(filePath: string): boolean {
 		// Skip empty parts (from leading or trailing slashes)
 		if (!part) continue
 
-		// Handle the ".*" pattern for hidden directories
+		// Handle the ".*" pattern for hidden directories (excluding allowed config directories)
 		if (DIRS_TO_IGNORE.includes(".*") && part.startsWith(".") && part !== ".") {
-			return true
+			if (!ALLOWED_DOT_DIRECTORIES.includes(part)) {
+				return true
+			}
 		}
 
 		// Check for exact matches

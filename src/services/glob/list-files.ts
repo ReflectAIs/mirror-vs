@@ -6,7 +6,7 @@ import * as vscode from "vscode"
 import ignore from "ignore"
 import { arePathsEqual } from "../../utils/path"
 import { getBinPath } from "../../services/ripgrep"
-import { DIRS_TO_IGNORE } from "./constants"
+import { DIRS_TO_IGNORE, ALLOWED_DOT_DIRECTORIES } from "./constants"
 
 /**
  * Context object for directory scanning operations
@@ -24,10 +24,11 @@ interface ScanContext {
 
 interface ListFilesCacheEntry {
 	timestamp: number
+	limit: number
 	result: [string[], boolean]
 }
 const listFilesCache = new Map<string, ListFilesCacheEntry>()
-const LIST_FILES_CACHE_TTL_MS = 10_000
+const LIST_FILES_CACHE_TTL_MS = 60_000
 
 export function invalidateListFilesCache(dirPath?: string): void {
 	if (dirPath) {
@@ -56,11 +57,24 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 	}
 
 	const isTestEnv = process.env.NODE_ENV === "test" || process.env.VITEST === "true"
-	const cacheKey = `${dirPath}:${recursive}:${limit}`
+	const cachePrefix = `${dirPath}:${recursive}`
+	const cacheKey = `${cachePrefix}:${limit}`
 	if (!isTestEnv) {
 		const cached = listFilesCache.get(cacheKey)
 		if (cached && Date.now() - cached.timestamp < LIST_FILES_CACHE_TTL_MS) {
 			return cached.result
+		}
+		// Superset cache hit: If we previously scanned this exact directory with a larger or equal limit
+		// and didn't hit the limit (or the cached result has at least `limit` files), slice from memory
+		for (const [key, entry] of listFilesCache.entries()) {
+			if (key.startsWith(cachePrefix) && Date.now() - entry.timestamp < LIST_FILES_CACHE_TTL_MS) {
+				const [cachedFiles, didHitLimit] = entry.result
+				if (cachedFiles.length >= limit) {
+					return [cachedFiles.slice(0, limit), true]
+				} else if (!didHitLimit) {
+					return [cachedFiles, false]
+				}
+			}
 		}
 	}
 
@@ -68,7 +82,7 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 	const specialResult = await handleSpecialDirectories(dirPath)
 
 	if (specialResult) {
-		listFilesCache.set(cacheKey, { timestamp: Date.now(), result: specialResult })
+		listFilesCache.set(cacheKey, { timestamp: Date.now(), limit, result: specialResult })
 		return specialResult
 	}
 
@@ -83,7 +97,7 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 		const remainingLimit = Math.max(0, limit - files.length)
 		const directories = await listFilteredDirectories(dirPath, false, ignoreInstance, remainingLimit)
 		const finalResult = formatAndCombineResults(files, directories, limit)
-		listFilesCache.set(cacheKey, { timestamp: Date.now(), result: finalResult })
+		listFilesCache.set(cacheKey, { timestamp: Date.now(), limit, result: finalResult })
 		return finalResult
 	}
 
@@ -101,12 +115,12 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 	if (limitReached) {
 		const firstLevelDirs = await getFirstLevelDirectories(dirPath, ignoreInstance)
 		const finalResult = ensureFirstLevelDirectoriesIncluded(results, firstLevelDirs, limit)
-		listFilesCache.set(cacheKey, { timestamp: Date.now(), result: finalResult })
+		listFilesCache.set(cacheKey, { timestamp: Date.now(), limit, result: finalResult })
 		return finalResult
 	}
 
 	const finalResult: [string[], boolean] = [results, limitReached]
-	listFilesCache.set(cacheKey, { timestamp: Date.now(), result: finalResult })
+	listFilesCache.set(cacheKey, { timestamp: Date.now(), limit, result: finalResult })
 	return finalResult
 }
 
@@ -302,8 +316,11 @@ function buildRecursiveArgs(dirPath: string): string[] {
 			// If we're explicitly targeting a hidden directory, don't exclude hidden files/dirs
 			// This allows the target hidden directory and all its contents to be listed
 			if (!isTargetingHiddenDir) {
-				// Not targeting hidden dir: exclude all hidden directories
+				// Not targeting hidden dir: exclude all hidden directories except allowed config directories
 				args.push("-g", `!**/.*/**`)
+				for (const allowed of ALLOWED_DOT_DIRECTORIES) {
+					args.push("-g", `**/${allowed}/**`)
+				}
 			}
 			// If targeting hidden dir: don't add any exclusion for hidden directories
 			continue
@@ -500,11 +517,13 @@ async function listFilteredDirectories(
 						shouldRecurseIntoDir = !isDirectoryExplicitlyIgnored(dirName)
 					}
 
+					const isAllowedDotDir = ALLOWED_DOT_DIRECTORIES.includes(dirName)
 					const shouldRecurse =
 						recursive &&
 						shouldRecurseIntoDir &&
 						!(
 							isHiddenDir &&
+							!isAllowedDotDir &&
 							DIRS_TO_IGNORE.includes(".*") &&
 							!context.isTargetDir &&
 							!context.insideExplicitHiddenTarget

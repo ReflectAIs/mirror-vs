@@ -65,7 +65,7 @@ describe("pruneHistoricalToolResults", () => {
 		expect(turn1Content[0].content).toBe(largeError)
 	})
 
-	it("never folds tool results containing images", () => {
+	it("never folds tool results containing images when pruneHistoricalScreenshots is false", () => {
 		const messages: ApiMessage[] = [
 			{
 				role: "user",
@@ -84,8 +84,41 @@ describe("pruneHistoricalToolResults", () => {
 			{ role: "user", content: "step 2" },
 		]
 
-		const result = pruneHistoricalToolResults(messages, { keepRecentTurns: 1, maxToolResultChars: 100 })
+		const result = pruneHistoricalToolResults(messages, {
+			keepRecentTurns: 1,
+			maxToolResultChars: 100,
+			pruneHistoricalScreenshots: false,
+		})
 		expect(result).toEqual(messages)
+	})
+
+	it("folds heavy historical screenshots when older than keepRecentTurns by default", () => {
+		const messages: ApiMessage[] = [
+			{
+				role: "user",
+				content: [
+					{
+						type: "tool_result",
+						tool_use_id: "t1",
+						content: [
+							{ type: "text", text: "Preview rendered successfully" },
+							{
+								type: "image",
+								source: { type: "base64", media_type: "image/webp", data: "VERY_LARGE_BASE64_DATA" },
+							},
+						],
+					},
+				],
+			},
+			{ role: "assistant", content: "ok" },
+			{ role: "user", content: "step 2" },
+		]
+
+		const result = pruneHistoricalToolResults(messages, { keepRecentTurns: 1 })
+		const turn1 = result[0].content as any[]
+		expect(turn1[0].content[1].type).toBe("text")
+		expect(turn1[0].content[1].text).toContain("Historical")
+		expect(turn1[0].content[1].text).toContain("screenshot")
 	})
 
 	it("folds historical environment_details in older turns while preserving turn 0 and recent turns", () => {

@@ -65,9 +65,10 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		"Read a file and return its contents with line numbers for diffing or discussion. IMPORTANT: This tool reads exactly one file per call. If you need multiple files, issue multiple parallel read_file calls."
 
 	const modeDescription =
-		` Supports two modes: 'slice' (default) reads lines sequentially with offset/limit; 'indentation' extracts complete semantic code blocks around an anchor line based on indentation hierarchy.` +
+		` Supports three modes: 'slice' (default) reads lines sequentially with offset/limit; 'indentation' extracts complete semantic code blocks around an anchor line based on indentation hierarchy; 'skeleton' extracts an outline of classes, functions, types, and methods with exact line ranges at 90% fewer tokens.` +
 		` Slice mode is ideal for initial file exploration, understanding overall structure, reading configuration/data files, or when you need a specific line range. Use it when you don't have a target line number.` +
 		` PREFER indentation mode when you have a specific line number from search results, error messages, or definition lookups - it guarantees complete, syntactically valid code blocks without mid-function truncation.` +
+		` PREFER skeleton mode for large source files (> 500 lines) to quickly inspect file architecture before deciding which sections to read with offset/limit.` +
 		` IMPORTANT: Indentation mode requires anchor_line to be useful. Without it, only header content (imports) is returned.`
 
 	const limitNote = ` By default, returns up to ${DEFAULT_LINE_LIMIT} lines per file. Lines longer than ${MAX_LINE_LENGTH} characters are truncated. If a file is truncated, call read_file with offset set to the next line number to read subsequent parts.`
@@ -116,7 +117,7 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		},
 		mode: {
 			type: "string",
-			enum: ["slice", "indentation"],
+			enum: ["slice", "indentation", "skeleton"],
 			description:
 				"Reading mode. 'slice' (default): read lines sequentially with offset/limit - use for general file exploration or when you don't have a target line number (may truncate code mid-function). 'indentation': extract complete semantic code blocks containing anchor_line - PREFERRED when you have a line number because it guarantees complete, valid code blocks. WARNING: Do not use indentation mode without specifying indentation.anchor_line, or you will only get header content.",
 		},

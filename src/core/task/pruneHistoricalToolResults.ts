@@ -21,11 +21,19 @@ export interface PruneHistoricalToolResultsOptions {
 	 * Default: 6 turns (or keepRecentTurns if smaller).
 	 */
 	pruneBlockSize?: number
+	/**
+	 * Whether to prune heavy base64 historical screenshots from older turns.
+	 * When true, image blocks in historical turns older than keepRecentTurns are replaced with a lightweight
+	 * text summary, conserving thousands of vision tokens while preserving active turns in full fidelity.
+	 * Default: true.
+	 */
+	pruneHistoricalScreenshots?: boolean
 }
 
 const DEFAULT_KEEP_RECENT_TURNS = 12
 const DEFAULT_MAX_TOOL_RESULT_CHARS = 4000
 const DEFAULT_PRUNE_BLOCK_SIZE = 6
+const DEFAULT_PRUNE_HISTORICAL_SCREENSHOTS = true
 
 /**
  * Prunes large, superseded historical tool results from older conversation turns.
@@ -37,7 +45,7 @@ const DEFAULT_PRUNE_BLOCK_SIZE = 6
  * Rules:
  * 1. The last `keepRecentTurns` turns are preserved in full fidelity.
  * 2. Error tool results (`is_error: true`) are NEVER pruned (the model must remember what failed).
- * 3. Results containing images are NEVER pruned.
+ * 3. Results containing images in historical turns have base64 image data folded to preserve context (unless pruneHistoricalScreenshots is false).
  * 4. Small tool results under `maxToolResultChars` are left completely untouched.
  * 5. Large tool results are folded to preserve the initial snippet/header while dropping the bulk body.
  * 6. Pruning cutoff advances in quantized blocks (`pruneBlockSize`) to preserve prefix prompt caching.
@@ -56,6 +64,7 @@ export function pruneHistoricalToolResults(
 		1,
 		options.pruneBlockSize ?? Math.min(DEFAULT_PRUNE_BLOCK_SIZE, Math.max(1, keepRecentTurns)),
 	)
+	const pruneHistoricalScreenshots = options.pruneHistoricalScreenshots ?? DEFAULT_PRUNE_HISTORICAL_SCREENSHOTS
 
 	// 0. Always sanitize degenerated assistant tool_use diffs across messages to prevent autoregressive priming loops
 	const sanitizedMessages = messages.map((msg) => {
@@ -232,9 +241,38 @@ export function pruneHistoricalToolResults(
 				}
 			}
 
-			// Never prune results containing images
-			if (hasImages) {
+			// If historical screenshot pruning is disabled, never prune results containing images
+			if (hasImages && !pruneHistoricalScreenshots) {
 				return block
+			}
+
+			// If historical screenshot pruning is enabled, fold heavy base64 image blocks in older turns
+			if (hasImages && pruneHistoricalScreenshots) {
+				didModify = true
+				const toolMeta = toolUseMap.get(toolResult.tool_use_id)
+				const toolName = toolMeta?.name || "browser"
+				const placeholder = `[Historical ${toolName} screenshot from earlier turn folded to conserve context. Latest screenshot available in recent turns.]`
+
+				if (Array.isArray(toolResult.content)) {
+					const folded = toolResult.content.map((part) => {
+						if (part.type === "image") {
+							return {
+								type: "text" as const,
+								text: placeholder,
+							}
+						}
+						return part
+					})
+					return {
+						...toolResult,
+						content: folded,
+					}
+				}
+
+				return {
+					...toolResult,
+					content: placeholder,
+				}
 			}
 
 			const isSuperseded = supersededToolUseIds.has(toolResult.tool_use_id)

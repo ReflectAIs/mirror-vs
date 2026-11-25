@@ -270,6 +270,23 @@ export class TerminalProcess extends BaseTerminalProcess {
 			// Emit any remaining output before completing
 			this.emitRemainingBufferIfListening()
 		} else {
+			// If preOutput captured actual command text despite missing start sequence (]633;C),
+			// recover the clean output gracefully rather than aborting with an error.
+			const cleanPre = this.stripCursorSequences(this.removeVSCodeShellIntegration(preOutput)).trim()
+			if (cleanPre.length > 0) {
+				console.warn(
+					"[Terminal Process] Shell start markers missing but preOutput was captured, recovering output",
+				)
+				this.fullOutput = cleanPre
+				this.stopHotTimer()
+				this.isCompleted = true
+				this.terminal.busy = false
+				this.terminal.running = false
+				this.emit("completed", this.fullOutput)
+				this.emit("continue")
+				return
+			}
+
 			const errorMsg =
 				"VSCE output start escape sequence (]633;C or ]133;C) not received, but the stream has started. Upstream VSCE Bug?"
 

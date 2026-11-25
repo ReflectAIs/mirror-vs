@@ -200,4 +200,113 @@ describe("BrowserService", () => {
 			expect(path).toBe("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe")
 		})
 	})
+
+	describe("tab close detection and notifications", () => {
+		it("detects when a tab is closed, updates state, and triggers onTabClose listeners", async () => {
+			const { BrowserService } = await getBrowserService()
+			const instance = BrowserService.getInstance()
+
+			let closeListener: (() => void) | undefined
+			const mockPage = {
+				on: vi.fn((event: string, cb: () => void) => {
+					if (event === "close") closeListener = cb
+				}),
+				isClosed: vi.fn(() => false),
+				url: vi.fn(() => "http://localhost:5173/documents/123"),
+			}
+
+			const mockBrowser = {
+				on: vi.fn(),
+				pages: vi.fn(async () => [mockPage]),
+				newPage: vi.fn(async () => mockPage),
+			}
+
+			;(instance as any).browser = mockBrowser
+			;(instance as any).page = mockPage
+			;(instance as any).closedByUser = false
+			;(instance as any).lastUrl = "http://localhost:5173/documents/123"
+			;(instance as any).attachPageListeners(mockPage)
+
+			expect(instance.isTabOpen()).toBe(true)
+			expect(instance.wasClosedByUser()).toBe(false)
+
+			let notifiedUrl = ""
+			const unsubscribe = instance.onTabClose((info) => {
+				notifiedUrl = info.lastUrl
+			})
+
+			// Simulate user closing the tab in Chrome
+			expect(closeListener).toBeDefined()
+			mockPage.isClosed.mockReturnValue(true)
+			await closeListener!()
+
+			expect(instance.isTabOpen()).toBe(false)
+			expect(instance.wasClosedByUser()).toBe(true)
+			expect(notifiedUrl).toBe("http://localhost:5173/documents/123")
+			expect(instance.getLastUrl()).toBe("http://localhost:5173/documents/123")
+
+			unsubscribe()
+		})
+
+		it("notifies active task via injectInBetweenMessage when user closes tab", async () => {
+			const { BrowserService } = await getBrowserService()
+			const instance = BrowserService.getInstance()
+
+			let closeListener: (() => void) | undefined
+			const mockPage = {
+				on: vi.fn((event: string, cb: () => void) => {
+					if (event === "close") closeListener = cb
+				}),
+				isClosed: vi.fn(() => false),
+				url: vi.fn(() => "http://localhost:5173/login"),
+			}
+
+			const mockBrowser = {
+				on: vi.fn(),
+				pages: vi.fn(async () => [mockPage]),
+				newPage: vi.fn(async () => mockPage),
+			}
+
+			const mockTask = {
+				abort: false,
+				injectInBetweenMessage: vi.fn(async () => {}),
+			}
+
+			;(instance as any).browser = mockBrowser
+			;(instance as any).page = mockPage
+			;(instance as any).closedByUser = false
+			;(instance as any).lastUrl = "http://localhost:5173/login"
+			instance.setActiveTask(mockTask)
+			;(instance as any).attachPageListeners(mockPage)
+
+			// Simulate user closing tab
+			mockPage.isClosed.mockReturnValue(true)
+			await closeListener!()
+
+			expect(mockTask.injectInBetweenMessage).toHaveBeenCalledTimes(1)
+			const calls = mockTask.injectInBetweenMessage.mock.calls as any[][]
+			const injectedText = calls[0][0]
+			expect(injectedText).toContain("[Browser Notification]")
+			expect(injectedText).toContain("Chrome browser tab was closed by the user")
+			expect(injectedText).toContain("http://localhost:5173/login")
+		})
+
+		it("throws an informative error if click/type is attempted on a closed tab instead of hanging or opening about:blank", async () => {
+			const { BrowserService } = await getBrowserService()
+			const instance = BrowserService.getInstance()
+
+			;(instance as any).browser = { pages: vi.fn() }
+			;(instance as any).page = null
+			;(instance as any).closedByUser = true
+			;(instance as any).lastUrl = "http://localhost:5173/documents/123"
+
+			await expect(instance.click("#submit-btn")).rejects.toThrow(
+				/The browser tab was closed by the user.*last URL: http:\/\/localhost:5173\/documents\/123.*Please use browser_navigate/,
+			)
+
+			await expect(instance.type("#input-email", "test@example.com")).rejects.toThrow(
+				/The browser tab was closed by the user.*last URL: http:\/\/localhost:5173\/documents\/123.*Please use browser_navigate/,
+			)
+		})
+	})
 })

@@ -23,3 +23,20 @@ export const DIRS_TO_IGNORE = [
 	".git",
 	".*",
 ]
+
+/**
+ * Common project/configuration dot-directories that should NOT be blindly ignored
+ * by codebase indexing, file watchers, or file listings even though they start with a dot.
+ */
+export const ALLOWED_DOT_DIRECTORIES = [
+	".github",
+	".vscode",
+	".husky",
+	".changeset",
+	".storybook",
+	".devcontainer",
+	".gitlab",
+	".circleci",
+	".cargo",
+	".config",
+]

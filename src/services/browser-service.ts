@@ -6,10 +6,21 @@ import { execSync } from "child_process"
 type PuppeteerBrowser = any
 type PuppeteerPage = any
 
+export interface BrowserTabCloseEvent {
+	lastUrl: string
+	remainingPages: number
+	browserDisconnected?: boolean
+}
+
 export class BrowserService {
 	private static instance: BrowserService
 	private browser: PuppeteerBrowser | null = null
 	private page: PuppeteerPage | null = null
+	private lastUrl: string = ""
+	private closedByUser: boolean = false
+	private isProgrammaticClose: boolean = false
+	private activeTask: WeakRef<any> | null = null
+	private tabCloseListeners: Array<(info: BrowserTabCloseEvent) => void> = []
 
 	private constructor() {}
 
@@ -18,6 +29,35 @@ export class BrowserService {
 			BrowserService.instance = new BrowserService()
 		}
 		return BrowserService.instance
+	}
+
+	public setActiveTask(task: any): void {
+		this.activeTask = task ? new WeakRef(task) : null
+	}
+
+	public clearActiveTask(task?: any): void {
+		if (!task || this.activeTask?.deref() === task) {
+			this.activeTask = null
+		}
+	}
+
+	public onTabClose(listener: (info: BrowserTabCloseEvent) => void): () => void {
+		this.tabCloseListeners.push(listener)
+		return () => {
+			this.tabCloseListeners = this.tabCloseListeners.filter((l) => l !== listener)
+		}
+	}
+
+	public isTabOpen(): boolean {
+		return Boolean(this.browser && this.page && !this.page.isClosed())
+	}
+
+	public getLastUrl(): string {
+		return this.lastUrl
+	}
+
+	public wasClosedByUser(): boolean {
+		return this.closedByUser
 	}
 
 	private logError(operation: string, error: any) {
@@ -154,9 +194,16 @@ export class BrowserService {
 		try {
 			// @ts-ignore — playwright is an optional fallback dependency
 			const { chromium } = await import("playwright")
+			const isHeadless = process.env.BROWSER_HEADLESS !== "false"
 			const browser = await chromium.launch({
-				headless: false,
-				args: ["--no-first-run", "--no-default-browser-check"],
+				headless: isHeadless,
+				args: [
+					"--no-first-run",
+					"--no-default-browser-check",
+					"--disable-extensions",
+					"--disable-gpu",
+					"--disable-dev-shm-usage",
+				],
 			})
 			const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
 			const page = await context.newPage()
@@ -191,19 +238,129 @@ export class BrowserService {
 		)
 	}
 
-	public async getPage(): Promise<PuppeteerPage> {
+	private attachPageListeners(page: PuppeteerPage): void {
+		if (!page || (page as any).__mirror_listeners_attached) {
+			return
+		}
+		;(page as any).__mirror_listeners_attached = true
+
+		if (typeof page.on === "function") {
+			page.on("close", async () => {
+				if (this.isProgrammaticClose) {
+					return
+				}
+
+				const closedUrl = this.lastUrl || "about:blank"
+				this.page = null
+				this.closedByUser = true
+
+				let remainingPages = 0
+				if (this.browser) {
+					try {
+						const pages = await this.browser.pages()
+						remainingPages = pages.length
+					} catch {
+						remainingPages = 0
+					}
+				}
+
+				try {
+					vscode.window.setStatusBarMessage(`$(browser) Chrome tab closed (${closedUrl})`, 5000)
+				} catch {}
+
+				const task = this.activeTask?.deref()
+				if (task && !task.abort && typeof task.injectInBetweenMessage === "function") {
+					const notice = `[Browser Notification] The Chrome browser tab was closed by the user (last URL: ${closedUrl}). The webpage is no longer open. If you need to interact with the browser again, use browser_navigate to reopen it.`
+					task.injectInBetweenMessage(notice, undefined, "user_feedback").catch((e: any) => {
+						console.error("[BrowserService] Failed to inject browser tab close notification:", e)
+					})
+				}
+
+				for (const listener of this.tabCloseListeners) {
+					try {
+						listener({ lastUrl: closedUrl, remainingPages })
+					} catch (err) {
+						console.error("[BrowserService] tabCloseListener error:", err)
+					}
+				}
+			})
+		}
+	}
+
+	private attachBrowserListeners(browser: PuppeteerBrowser): void {
+		if (!browser || (browser as any).__mirror_listeners_attached) {
+			return
+		}
+		;(browser as any).__mirror_listeners_attached = true
+
+		if (typeof browser.on === "function") {
+			browser.on("disconnected", () => {
+				if (this.isProgrammaticClose) {
+					return
+				}
+
+				const closedUrl = this.lastUrl || "about:blank"
+				this.browser = null
+				this.page = null
+				this.closedByUser = true
+
+				try {
+					vscode.window.setStatusBarMessage("$(browser) Chrome window closed by user", 5000)
+				} catch {}
+
+				const task = this.activeTask?.deref()
+				if (task && !task.abort && typeof task.injectInBetweenMessage === "function") {
+					const notice = `[Browser Notification] The Chrome browser window was closed by the user (last URL: ${closedUrl}). The browser session has ended. Use browser_navigate if you need to open a URL again.`
+					task.injectInBetweenMessage(notice, undefined, "user_feedback").catch((e: any) => {
+						console.error("[BrowserService] Failed to inject browser close notification:", e)
+					})
+				}
+
+				for (const listener of this.tabCloseListeners) {
+					try {
+						listener({ lastUrl: closedUrl, remainingPages: 0, browserDisconnected: true })
+					} catch (err) {
+						console.error("[BrowserService] tabCloseListener error:", err)
+					}
+				}
+			})
+		}
+	}
+
+	public async getPage(options: { forNavigation?: boolean } = {}): Promise<PuppeteerPage> {
 		try {
+			// If not navigating and the tab or browser was closed by user or not open:
+			if (!options.forNavigation) {
+				if (this.closedByUser || !this.browser || !this.page || this.page.isClosed()) {
+					const urlInfo = this.lastUrl ? ` (last URL: ${this.lastUrl})` : ""
+					throw new Error(
+						`The browser tab was closed by the user${urlInfo}. No active webpage is loaded. Please use browser_navigate with a URL to reopen the browser before attempting actions.`,
+					)
+				}
+				return this.page
+			}
+
+			// If navigating: reset closedByUser flag
+			this.closedByUser = false
+
 			if (!this.browser) {
 				// Try finding a system browser first
 				try {
 					const executablePath = await this.getChromePath()
 					// Use dynamic import for ESM-only puppeteer-core
 					const puppeteer = await import("puppeteer-core")
+					const isHeadless = process.env.BROWSER_HEADLESS !== "false"
 					this.browser = await puppeteer.launch({
 						executablePath,
-						headless: false,
+						headless: (isHeadless ? "new" : false) as any,
 						defaultViewport: { width: 1280, height: 800 },
-						args: ["--no-first-run", "--no-default-browser-check", "--disable-extensions"],
+						args: [
+							"--no-first-run",
+							"--no-default-browser-check",
+							"--disable-extensions",
+							"--disable-gpu",
+							"--disable-dev-shm-usage",
+						],
 					})
 				} catch (browserError) {
 					// Fallback: try Playwright if system browser not found
@@ -217,10 +374,7 @@ export class BrowserService {
 				}
 
 				if (this.browser) {
-					this.browser.on("disconnected", () => {
-						this.browser = null
-						this.page = null
-					})
+					this.attachBrowserListeners(this.browser)
 				}
 			}
 
@@ -229,6 +383,7 @@ export class BrowserService {
 				this.page = pages.length > 0 ? pages[0] : await this.browser.newPage()
 			}
 
+			this.attachPageListeners(this.page)
 			return this.page
 		} catch (error) {
 			this.logError("getPage/launch", error)
@@ -236,19 +391,53 @@ export class BrowserService {
 		}
 	}
 
+	/**
+	 * Smart page stabilization that waits for document completion and network quiescence
+	 * with a responsive ceiling instead of an arbitrary long sleep.
+	 */
+	public async waitForPageStabilization(page: PuppeteerPage, maxWaitMs = 1200, minWaitMs = 250): Promise<void> {
+		const start = Date.now()
+		// Minimum wait so hydration / mounting starts
+		await new Promise((r) => setTimeout(r, minWaitMs))
+
+		try {
+			// Check document readyState
+			const isComplete = await page.evaluate(() => document.readyState === "complete").catch(() => true)
+			if (isComplete && Date.now() - start >= minWaitMs) {
+				// Wait for network idle or micro-quiescence up to remaining maxWaitMs
+				const remainingMs = Math.max(100, maxWaitMs - (Date.now() - start))
+				if (typeof page.waitForNetworkIdle === "function") {
+					await page.waitForNetworkIdle({ idleTime: 150, timeout: remainingMs }).catch(() => {})
+				} else {
+					await new Promise((r) => setTimeout(r, Math.min(remainingMs, 200)))
+				}
+			}
+		} catch {
+			// Fallback: small graceful delay
+			await new Promise((r) => setTimeout(r, 150))
+		}
+	}
+
 	public async navigate(url: string): Promise<{ title: string; textContent: string }> {
 		try {
-			const page = await this.getPage()
+			this.lastUrl = url
+			const page = await this.getPage({ forNavigation: true })
 			// Use 'domcontentloaded' — 'networkidle2' hangs indefinitely on dev servers
 			// that maintain persistent connections (e.g. python http.server, vite HMR).
 			// Use a shorter timeout (10s) so connection errors like ERR_CONNECTION_REFUSED
 			// surface quickly without the model hanging for 30+ seconds.
 			await page.goto(url, { waitUntil: "domcontentloaded", timeout: 10000 })
-			// Wait 3 seconds for JS-heavy pages, SPAs, and dev servers to finish rendering.
-			// Reduced from 10s to minimize idle blocking while still allowing SPA rendering.
-			await new Promise((r) => setTimeout(r, 3000))
+			// Smart stabilization instead of a rigid 3000ms delay:
+			// Resolves as soon as the page is stable, saving 2-2.5 seconds per navigation.
+			await this.waitForPageStabilization(page)
 			const title: string = await page.title()
 			const textContent: string = await page.evaluate(() => (document.body?.innerText || "").trim())
+			try {
+				const currentUrl = page.url()
+				if (currentUrl && currentUrl !== "about:blank") {
+					this.lastUrl = currentUrl
+				}
+			} catch {}
 			return { title, textContent }
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
@@ -268,7 +457,49 @@ export class BrowserService {
 	public async click(selector: string): Promise<string> {
 		try {
 			const page = await this.getPage()
-			await page.click(selector)
+			// Auto-wait for element to be visible before clicking
+			try {
+				if (typeof page.waitForSelector === "function") {
+					await page.waitForSelector(selector, { visible: true, timeout: 2500 })
+				}
+				await page.click(selector)
+			} catch (err: any) {
+				// Resilient text-based fallback: if selector didn't match, attempt finding by visible text or aria-label
+				const clickedByText = await page
+					.evaluate((target: string) => {
+						const cleanTarget = target.startsWith("text=") ? target.slice(5).trim() : target.trim()
+						const clickable = Array.from(
+							document.querySelectorAll(
+								'button, a, input[type="submit"], input[type="button"], [role="button"], span, div',
+							),
+						)
+						const match = clickable.find((el) => {
+							const text = (el.textContent || "").trim()
+							const aria = el.getAttribute("aria-label") || ""
+							return (
+								text === cleanTarget ||
+								aria === cleanTarget ||
+								text.toLowerCase() === cleanTarget.toLowerCase()
+							)
+						})
+						if (match && typeof (match as any).click === "function") {
+							;(match as any).click()
+							return true
+						}
+						return false
+					}, selector)
+					.catch(() => false)
+
+				if (!clickedByText) {
+					throw err
+				}
+			}
+			try {
+				const currentUrl = page.url()
+				if (currentUrl && currentUrl !== "about:blank") {
+					this.lastUrl = currentUrl
+				}
+			} catch {}
 			return `Clicked on ${selector}`
 		} catch (error) {
 			this.logError(`click(${selector})`, error)
@@ -279,7 +510,53 @@ export class BrowserService {
 	public async type(selector: string, text: string): Promise<string> {
 		try {
 			const page = await this.getPage()
-			await page.type(selector, text)
+			// Auto-wait for input/textarea to be available
+			try {
+				if (typeof page.waitForSelector === "function") {
+					await page.waitForSelector(selector, { visible: true, timeout: 2500 })
+				}
+				await page.type(selector, text)
+			} catch (err: any) {
+				// Fallback: match input by placeholder or name or aria-label
+				const typedByAttr = await page
+					.evaluate(
+						(target: string, value: string) => {
+							const cleanTarget = target.startsWith("placeholder=")
+								? target.slice(12).trim()
+								: target.trim()
+							const inputs = Array.from(document.querySelectorAll("input, textarea")) as Array<
+								HTMLInputElement | HTMLTextAreaElement
+							>
+							const match = inputs.find(
+								(el) =>
+									el.placeholder === cleanTarget ||
+									el.name === cleanTarget ||
+									el.getAttribute("aria-label") === cleanTarget,
+							)
+							if (match) {
+								match.focus()
+								match.value = value
+								match.dispatchEvent(new Event("input", { bubbles: true }))
+								match.dispatchEvent(new Event("change", { bubbles: true }))
+								return true
+							}
+							return false
+						},
+						selector,
+						text,
+					)
+					.catch(() => false)
+
+				if (!typedByAttr) {
+					throw err
+				}
+			}
+			try {
+				const currentUrl = page.url()
+				if (currentUrl && currentUrl !== "about:blank") {
+					this.lastUrl = currentUrl
+				}
+			} catch {}
 			return `Typed "${text}" into ${selector}`
 		} catch (error) {
 			this.logError(`type(${selector})`, error)
@@ -433,7 +710,7 @@ export class BrowserService {
 
 	public async setViewport(width: number, height: number): Promise<void> {
 		try {
-			const page = await this.getPage()
+			const page = await this.getPage({ forNavigation: true })
 			await page.setViewport({ width, height })
 		} catch (error) {
 			this.logError("setViewport", error)
@@ -441,11 +718,35 @@ export class BrowserService {
 		}
 	}
 
-	public async screenshot(): Promise<{ base64: string; textContent: string }> {
+	public async screenshot(options?: {
+		format?: "webp" | "jpeg" | "png"
+		quality?: number
+	}): Promise<{ base64: string; mediaType: string; textContent: string }> {
 		try {
 			const page = await this.getPage()
-			// Return base64 encoded image
-			const buffer = await page.screenshot({ type: "png", encoding: "base64" })
+			const format = options?.format ?? "webp"
+			const quality = options?.quality ?? 75
+
+			let buffer: string | Buffer
+			let mediaType = "image/webp"
+
+			try {
+				if (format === "webp") {
+					buffer = await page.screenshot({ type: "webp", quality, encoding: "base64" })
+					mediaType = "image/webp"
+				} else if (format === "jpeg") {
+					buffer = await page.screenshot({ type: "jpeg", quality, encoding: "base64" })
+					mediaType = "image/jpeg"
+				} else {
+					buffer = await page.screenshot({ type: "png", encoding: "base64" })
+					mediaType = "image/png"
+				}
+			} catch {
+				// Fallback to PNG if webp/jpeg options are rejected by older chromium/browser wrapper
+				buffer = await page.screenshot({ type: "png", encoding: "base64" })
+				mediaType = "image/png"
+			}
+
 			let textContent = ""
 			try {
 				textContent = await page.evaluate(() => (document.body?.innerText || "").trim())
@@ -454,6 +755,7 @@ export class BrowserService {
 			}
 			return {
 				base64: buffer as string,
+				mediaType,
 				textContent,
 			}
 		} catch (error) {
@@ -462,11 +764,157 @@ export class BrowserService {
 		}
 	}
 
+	/**
+	 * Extracts a compact, token-efficient semantic accessibility snapshot of visible interactive elements.
+	 * Typically consumes only ~100-250 tokens (vs 2,000+ tokens for full screenshots).
+	 */
+	public async getAccessibilitySnapshot(): Promise<{
+		title: string
+		url: string
+		snapshot: string
+		elementCount: number
+	}> {
+		try {
+			const page = await this.getPage()
+			const title = await page.title()
+			const url = page.url()
+
+			const elements = await page.evaluate(() => {
+				const interactive = Array.from(
+					document.querySelectorAll(
+						'a, button, input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="tab"], h1, h2, h3',
+					),
+				)
+				return interactive
+					.map((el, idx) => {
+						const rect = el.getBoundingClientRect()
+						if (rect.width === 0 || rect.height === 0) return null
+
+						const tag = el.tagName.toLowerCase()
+						let label = ""
+						let role = el.getAttribute("role") || tag
+
+						if (el instanceof HTMLInputElement) {
+							role = `input[${el.type || "text"}]`
+							label = el.placeholder || el.name || el.value || el.getAttribute("aria-label") || ""
+						} else if (el instanceof HTMLSelectElement) {
+							role = "select"
+							label = el.name || el.getAttribute("aria-label") || ""
+						} else if (el instanceof HTMLTextAreaElement) {
+							role = "textarea"
+							label = el.placeholder || el.name || ""
+						} else {
+							label = (el.textContent || "").trim().slice(0, 40)
+						}
+
+						const aria = el.getAttribute("aria-label")
+						if (aria && aria !== label) {
+							label = `${label} (aria: "${aria}")`
+						}
+
+						let selector = tag
+						if (el.id) selector = `#${el.id}`
+						else if (el.className && typeof el.className === "string") {
+							const cls = el.className.trim().split(/\s+/)[0]
+							if (cls) selector = `.${cls}`
+						}
+
+						return `[#${idx + 1}] <${role}> "${label}" -> selector: ${selector}`
+					})
+					.filter(Boolean)
+					.slice(0, 40)
+			})
+
+			const formatted = [
+				`Page: "${title}" (${url})`,
+				`Visible Interactive Elements (${elements.length}):`,
+				...elements.map((e: any) => `  ${e}`),
+			].join("\n")
+
+			return {
+				title,
+				url,
+				snapshot: formatted,
+				elementCount: elements.length,
+			}
+		} catch (error: any) {
+			this.logError("getAccessibilitySnapshot", error)
+			return {
+				title: "Error",
+				url: "",
+				snapshot: `Failed to extract accessibility snapshot: ${error.message}`,
+				elementCount: 0,
+			}
+		}
+	}
+
+	/**
+	 * Executes a sequence of browser actions in a single turn.
+	 */
+	public async executeBatchActions(
+		actions: Array<{
+			action: "click" | "type" | "select" | "scroll" | "navigate"
+			selector?: string
+			text?: string
+			value?: string
+			direction?: string
+			amount?: number
+			url?: string
+		}>,
+	): Promise<string[]> {
+		const results: string[] = []
+		for (let i = 0; i < actions.length; i++) {
+			const item = actions[i]
+			try {
+				switch (item.action) {
+					case "navigate":
+						if (item.url) {
+							const nav = await this.navigate(item.url)
+							results.push(`Action ${i + 1} (navigate): Navigated to ${item.url} (${nav.title})`)
+						}
+						break
+					case "click":
+						if (item.selector) {
+							const res = await this.click(item.selector)
+							results.push(`Action ${i + 1} (click): ${res}`)
+						}
+						break
+					case "type":
+						if (item.selector) {
+							const res = await this.type(item.selector, item.text || "")
+							results.push(`Action ${i + 1} (type): ${res}`)
+						}
+						break
+					case "select":
+						if (item.selector && item.value) {
+							const res = await this.selectOption(item.selector, item.value)
+							results.push(`Action ${i + 1} (select): ${res}`)
+						}
+						break
+					case "scroll":
+						const res = await this.scroll(item.direction || "down", item.amount ?? 300)
+						results.push(`Action ${i + 1} (scroll): ${res}`)
+						break
+					default:
+						results.push(`Action ${i + 1}: Unknown action "${(item as any).action}"`)
+				}
+			} catch (err: any) {
+				results.push(`Action ${i + 1} (${item.action}) failed: ${err.message}`)
+				break // Stop batch on failure
+			}
+		}
+		return results
+	}
+
 	public async close(): Promise<string> {
 		if (this.browser) {
-			await this.browser.close()
+			this.isProgrammaticClose = true
+			try {
+				await this.browser.close()
+			} catch {}
 			this.browser = null
 			this.page = null
+			this.isProgrammaticClose = false
 		}
 		return "Browser closed."
 	}

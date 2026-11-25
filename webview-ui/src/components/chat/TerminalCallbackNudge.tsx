@@ -98,6 +98,8 @@ export const TerminalCallbackNudge = memo(({ text, onNavigateToMessage, messageT
 				if (logsIdx !== -1) out = out.slice(0, logsIdx)
 				const instrIdx = out.indexOf("Instructions for Model:")
 				if (instrIdx !== -1) out = out.slice(0, instrIdx)
+				const sysInstrIdx = out.indexOf("[System Instructions:")
+				if (sysInstrIdx !== -1) out = out.slice(0, sysInstrIdx)
 				output = out.replace(/\]$/, "").trim()
 			}
 

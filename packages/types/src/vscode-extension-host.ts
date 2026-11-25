@@ -489,7 +489,7 @@ export type ExtensionState = Pick<
 	toolRequirements?: Record<string, boolean> // Map of tool names to their requirements (e.g. {"apply_diff": true})
 
 	cwd?: string // Current working directory
-	renderContext: "sidebar" | "editor"
+	renderContext: "sidebar" | "editor" | "settings"
 	settingsImportedAt?: number
 	historyPreviewCollapsed?: boolean
 
@@ -671,6 +671,9 @@ export interface WebviewMessage {
 		| "focusPanelRequest"
 		| "openExternal"
 		| "switchTab"
+		| "openSettingsInTab"
+		| "openHistoryInSidebar"
+		| "closePanel"
 		// Multi-tab messages
 		| "switchTaskTab" // Switch to a specific task's tab
 		| "closeTaskTab" // Close a task tab (frontend has already confirmed)
@@ -781,6 +784,7 @@ export interface WebviewMessage {
 	taskId?: string
 	editedMessageContent?: string
 	tab?: "settings" | "history" | "mcp" | "modes" | "chat" | "brain" | "analytics"
+	targetSection?: string
 	disabled?: boolean
 	context?: string
 	dataUri?: string

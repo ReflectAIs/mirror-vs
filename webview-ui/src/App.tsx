@@ -55,7 +55,13 @@ const App = () => {
 	useShortcutKeys(activeTabId ?? "")
 
 	const [showAnnouncement, setShowAnnouncement] = useState(false)
-	const [tab, setTab] = useState<Tab>("chat")
+	const [tab, setTab] = useState<Tab>(renderContext === "settings" ? "settings" : "chat")
+
+	useEffect(() => {
+		if (renderContext === "settings") {
+			setTab("settings")
+		}
+	}, [renderContext])
 
 	const [deleteMessageDialogState, setDeleteMessageDialogState] = useState<DeleteMessageDialogState>({
 		isOpen: false,
@@ -84,7 +90,13 @@ const App = () => {
 		}
 	}, [])
 
-	const handleDoneToChat = useCallback(() => switchTab("chat"), [switchTab])
+	const handleDoneToChat = useCallback(() => {
+		if (renderContext === "settings") {
+			vscode.postMessage({ type: "closePanel" })
+		} else {
+			switchTab("chat")
+		}
+	}, [renderContext, switchTab])
 
 	const [currentSection, setCurrentSection] = useState<string | undefined>(undefined)
 
@@ -218,6 +230,11 @@ const App = () => {
 				)}
 			</div>
 		)
+	}
+
+	// In dedicated settings window mode, render only the settings page
+	if (renderContext === "settings") {
+		return <SettingsView ref={settingsRef} onDone={handleDoneToChat} targetSection={currentSection} />
 	}
 
 	// Do not conditionally load ChatView, it's expensive and there's state we

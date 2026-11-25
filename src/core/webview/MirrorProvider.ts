@@ -252,8 +252,8 @@ export class MirrorProvider
 
 	constructor(
 		readonly context: vscode.ExtensionContext,
-		private readonly outputChannel: vscode.OutputChannel,
-		private readonly renderContext: "sidebar" | "editor" = "sidebar",
+		public readonly outputChannel: vscode.OutputChannel,
+		public readonly renderContext: "sidebar" | "editor" | "settings" = "sidebar",
 		public readonly contextProxy: ContextProxy,
 	) {
 		super()
@@ -1236,6 +1236,33 @@ export class MirrorProvider
 		return Helpers.getVisibleInstance(this.activeInstances)
 	}
 
+	public static getSidebarInstance(): MirrorProvider | undefined {
+		for (const instance of this.activeInstances) {
+			if (instance.renderContext === "sidebar") {
+				return instance
+			}
+		}
+		return undefined
+	}
+
+	public static getEditorInstance(): MirrorProvider | undefined {
+		for (const instance of this.activeInstances) {
+			if (instance.renderContext === "editor") {
+				return instance
+			}
+		}
+		return undefined
+	}
+
+	public static getSettingsInstance(): MirrorProvider | undefined {
+		for (const instance of this.activeInstances) {
+			if (instance.renderContext === "settings") {
+				return instance
+			}
+		}
+		return undefined
+	}
+
 	public static async getInstance(): Promise<MirrorProvider | undefined> {
 		return Helpers.getInstance(this.activeInstances, MirrorProvider)
 	}
@@ -2203,7 +2230,7 @@ export class MirrorProvider
 	/**
 	 * Exposes the render context for StateManager (extracted class).
 	 */
-	public getRenderContext(): "sidebar" | "editor" {
+	public getRenderContext(): "sidebar" | "editor" | "settings" {
 		return this.renderContext
 	}
 

@@ -1271,9 +1271,26 @@ export class TaskMainLoop {
 				// Check if we have any content to process (text or tool uses)
 				const hasTextContent = assistantMessage.length > 0
 
-				const hasToolUses = this.task.assistantMessageContent.some(
+				let hasToolUses = this.task.assistantMessageContent.some(
 					(block) => block.type === "tool_use" || block.type === "mcp_tool_use",
 				)
+
+				// Auto-recovery: If the model emitted text with no native tool calls, attempt
+				// to extract tool calls embedded in the assistant text (JSON, XML tags, or function syntax).
+				if (!hasToolUses && hasTextContent) {
+					const recovery = NativeToolCallParser.recoverToolCallsFromText(assistantMessage)
+					if (recovery.toolCalls.length > 0) {
+						console.log(
+							`[Task#${this.task.taskId}] Recovered ${recovery.toolCalls.length} tool call(s) from assistant text`,
+						)
+						for (const recoveredTool of recovery.toolCalls) {
+							this.task.assistantMessageContent.push(recoveredTool)
+						}
+						hasToolUses = true
+						this.task.userMessageContentReady = false
+						presentAssistantMessage(this.task)
+					}
+				}
 
 				if (hasTextContent || hasToolUses) {
 					// Reset counter when we get a successful response with content

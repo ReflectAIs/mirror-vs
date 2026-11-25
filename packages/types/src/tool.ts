@@ -55,6 +55,8 @@ export const toolNames = [
 	"browser_select",
 	"browser_evaluate_script",
 	"render_preview",
+	"browser_snapshot",
+	"browser_actions",
 	// Research / specialized search tools
 	"github_search",
 	"docs_search",

@@ -93,25 +93,15 @@ const getCommandsMap = ({ context, outputChannel, provider }: RegisterCommandOpt
 		return openMirrorInNewTab({ context, outputChannel })
 	},
 	openInNewTab: () => openMirrorInNewTab({ context, outputChannel }),
-	settingsButtonClicked: () => {
-		const visibleProvider = getVisibleProviderOrLog(outputChannel)
-
-		if (!visibleProvider) {
-			return
-		}
-
-		visibleProvider.postMessageToWebview({ type: "action", action: "settingsButtonClicked" })
-		// Also explicitly post the visibility message to trigger scroll reliably
-		visibleProvider.postMessageToWebview({ type: "action", action: "didBecomeVisible" })
+	settingsButtonClicked: async () => {
+		await openMirrorSettingsInTab({ context, outputChannel })
 	},
-	historyButtonClicked: () => {
-		const visibleProvider = getVisibleProviderOrLog(outputChannel)
-
-		if (!visibleProvider) {
-			return
+	historyButtonClicked: async () => {
+		await vscode.commands.executeCommand(`${MirrorProvider.sideBarId}.focus`)
+		const sidebarProvider = MirrorProvider.getSidebarInstance() || getVisibleProviderOrLog(outputChannel)
+		if (sidebarProvider) {
+			await sidebarProvider.postMessageToWebview({ type: "action", action: "historyButtonClicked" })
 		}
-
-		visibleProvider.postMessageToWebview({ type: "action", action: "historyButtonClicked" })
 	},
 	newTask: handleNewTask,
 	// New tab: mirrors the "+" button in TabBar which sends an empty newTask
@@ -323,4 +313,87 @@ export const openMirrorInNewTab = async ({
 	await vscode.commands.executeCommand("workbench.action.lockEditorGroup")
 
 	return tabProvider
+}
+
+let settingsPanel: vscode.WebviewPanel | undefined = undefined
+let settingsProvider: MirrorProvider | undefined = undefined
+
+export const openMirrorSettingsInTab = async ({
+	context,
+	outputChannel,
+	targetSection,
+}: {
+	context: vscode.ExtensionContext
+	outputChannel: vscode.OutputChannel
+	targetSection?: string
+}) => {
+	// If settings panel is already open, reveal it
+	if (settingsPanel && settingsProvider) {
+		settingsPanel.reveal(settingsPanel.viewColumn, false)
+		if (targetSection) {
+			await settingsProvider.postMessageToWebview({
+				type: "action",
+				action: "switchTab",
+				tab: "settings",
+				values: { section: targetSection },
+			})
+		}
+		await settingsProvider.postMessageToWebview({ type: "action", action: "didBecomeVisible" })
+		return settingsProvider
+	}
+
+	const contextProxy = await ContextProxy.getInstance(context)
+	settingsProvider = new MirrorProvider(context, outputChannel, "settings", contextProxy)
+
+	const hasVisibleEditors = vscode.window.visibleTextEditors.length > 0
+	if (!hasVisibleEditors) {
+		await vscode.commands.executeCommand("workbench.action.newGroupRight")
+	}
+
+	const lastCol = Math.max(...vscode.window.visibleTextEditors.map((editor) => editor.viewColumn || 0))
+	const targetCol = hasVisibleEditors ? Math.max(lastCol + 1, 1) : vscode.ViewColumn.Two
+
+	settingsPanel = vscode.window.createWebviewPanel("mirror-vs.settings", "Mirror VS Settings", targetCol, {
+		enableScripts: true,
+		retainContextWhenHidden: true,
+		localResourceRoots: [context.extensionUri],
+	})
+
+	settingsPanel.iconPath = {
+		light: vscode.Uri.joinPath(context.extensionUri, "assets", "icons", "panel_light.png"),
+		dark: vscode.Uri.joinPath(context.extensionUri, "assets", "icons", "panel_dark.png"),
+	}
+
+	await settingsProvider.resolveWebviewView(settingsPanel)
+
+	settingsPanel.onDidChangeViewState(
+		(e) => {
+			if (e.webviewPanel.visible) {
+				settingsProvider?.postMessageToWebview({ type: "action", action: "didBecomeVisible" })
+			}
+		},
+		null,
+		context.subscriptions,
+	)
+
+	settingsPanel.onDidDispose(
+		() => {
+			settingsPanel = undefined
+			settingsProvider = undefined
+		},
+		null,
+		context.subscriptions,
+	)
+
+	if (targetSection) {
+		await delay(100)
+		await settingsProvider.postMessageToWebview({
+			type: "action",
+			action: "switchTab",
+			tab: "settings",
+			values: { section: targetSection },
+		})
+	}
+
+	return settingsProvider
 }

@@ -1476,4 +1476,186 @@ export class NativeToolCallParser {
 			return null
 		}
 	}
+
+	/**
+	 * Recovers tool calls from plain text when a model outputs tool calls in text
+	 * (e.g. JSON markdown blocks, XML-style tags, or function syntax) instead of using native function calling.
+	 * Also detects mentioned tool names when no complete parameters were provided.
+	 */
+	public static recoverToolCallsFromText(text: string): {
+		toolCalls: Array<ToolUse | McpToolUse>
+		mentionedTools: ToolName[]
+	} {
+		const toolCalls: Array<ToolUse | McpToolUse> = []
+		const mentionedTools: ToolName[] = []
+		if (!text || typeof text !== "string") {
+			return { toolCalls, mentionedTools }
+		}
+
+		const validToolSet = new Set<string>(toolNames as readonly string[])
+		const toolAliasMap: Record<string, ToolName> = {
+			search_replace: "search_and_replace",
+			edit_file: "edit",
+		}
+
+		// 1. Check for JSON markdown code blocks or balanced JSON objects:
+		// Extract all code blocks first
+		const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g
+		let match: RegExpExecArray | null
+		const jsonCandidates: string[] = []
+
+		while ((match = codeBlockRegex.exec(text)) !== null) {
+			const candidate = match[1].trim()
+			if (candidate.startsWith("{") && candidate.endsWith("}")) {
+				jsonCandidates.push(candidate)
+			}
+		}
+
+		// Also scan for balanced JSON object containing "name" if not found in code blocks
+		if (jsonCandidates.length === 0) {
+			let braceDepth = 0
+			let startIndex = -1
+			for (let i = 0; i < text.length; i++) {
+				if (text[i] === "{") {
+					if (braceDepth === 0) {
+						startIndex = i
+					}
+					braceDepth++
+				} else if (text[i] === "}") {
+					braceDepth--
+					if (braceDepth === 0 && startIndex !== -1) {
+						const candidate = text.slice(startIndex, i + 1).trim()
+						if (candidate.includes('"name"') || candidate.includes("'name'")) {
+							jsonCandidates.push(candidate)
+						}
+						startIndex = -1
+					}
+				}
+			}
+		}
+
+		for (const candidate of jsonCandidates) {
+			try {
+				const parsed = JSON.parse(candidate)
+				const rawName = parsed.name
+				const mappedName: ToolName | undefined = validToolSet.has(rawName)
+					? (rawName as ToolName)
+					: toolAliasMap[rawName]
+
+				if (mappedName) {
+					const args = parsed.arguments || parsed.parameters || parsed.input || parsed.params || {}
+					const id = `recovered_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+					const toolUse = this.parseToolCall({
+						id,
+						name: mappedName,
+						arguments: typeof args === "string" ? args : JSON.stringify(args),
+					})
+					if (toolUse) {
+						toolUse.id = id
+						toolCalls.push(toolUse)
+					}
+				}
+			} catch {
+				// Not valid JSON, continue
+			}
+		}
+
+		// 2. Check for XML tags: <tool_name>...</tool_name> or <tool_call><name>...</name><arguments>...</arguments></tool_call>
+		if (toolCalls.length === 0) {
+			// Check <tool_call> format first
+			const toolCallTagRegex =
+				/<tool_call>[\s\S]*?<name>\s*([a-zA-Z0-9_-]+)\s*<\/name>[\s\S]*?<arguments>\s*([\s\S]*?)\s*<\/arguments>[\s\S]*?<\/tool_call>/g
+			while ((match = toolCallTagRegex.exec(text)) !== null) {
+				const rawName = match[1].trim()
+				const rawArgs = match[2].trim()
+				const mappedName: ToolName | undefined = validToolSet.has(rawName)
+					? (rawName as ToolName)
+					: toolAliasMap[rawName]
+				if (mappedName) {
+					const id = `recovered_xml_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+					const toolUse = this.parseToolCall({
+						id,
+						name: mappedName,
+						arguments: rawArgs,
+					})
+					if (toolUse) {
+						toolUse.id = id
+						toolCalls.push(toolUse)
+					}
+				}
+			}
+
+			// Check direct <tool_name> ... </tool_name> tags
+			for (const tool of toolNames) {
+				const directTagRegex = new RegExp(`<${tool}>([\\s\\S]*?)<\\/${tool}>`, "g")
+				while ((match = directTagRegex.exec(text)) !== null) {
+					const inner = match[1].trim()
+					const params: Record<string, string> = {}
+					const childTagRegex = /<([a-zA-Z0-9_-]+)>([\s\S]*?)<\/\1>/g
+					let childMatch: RegExpExecArray | null
+					while ((childMatch = childTagRegex.exec(inner)) !== null) {
+						params[childMatch[1]] = childMatch[2].trim()
+					}
+					const id = `recovered_tag_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+					const toolUse = this.parseToolCall({
+						id,
+						name: tool,
+						arguments: JSON.stringify(params),
+					})
+					if (toolUse) {
+						toolUse.id = id
+						toolCalls.push(toolUse)
+					}
+				}
+			}
+		}
+
+		// 3. Check for Python/function-call syntax: tool_name(param1="val", param2="val")
+		if (toolCalls.length === 0) {
+			for (const tool of toolNames) {
+				const funcRegex = new RegExp(`(?:^|\\s|\`)${tool}\\s*\\(([^)]*)\\)`, "g")
+				while ((match = funcRegex.exec(text)) !== null) {
+					const argsStr = match[1].trim()
+					const params: Record<string, unknown> = {}
+					if (argsStr.startsWith("{") && argsStr.endsWith("}")) {
+						try {
+							Object.assign(params, JSON.parse(argsStr))
+						} catch {}
+					} else {
+						const kvRegex = /([a-zA-Z0-9_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,\s)]+))/g
+						let kvMatch: RegExpExecArray | null
+						while ((kvMatch = kvRegex.exec(argsStr)) !== null) {
+							const key = kvMatch[1]
+							const val = kvMatch[2] ?? kvMatch[3] ?? kvMatch[4]
+							params[key] = val
+						}
+					}
+					if (Object.keys(params).length > 0) {
+						const id = `recovered_fn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+						const toolUse = this.parseToolCall({
+							id,
+							name: tool,
+							arguments: JSON.stringify(params),
+						})
+						if (toolUse) {
+							toolUse.id = id
+							toolCalls.push(toolUse)
+						}
+					}
+				}
+			}
+		}
+
+		// 4. If no executable tool calls found, scan for tool names mentioned in text
+		if (toolCalls.length === 0) {
+			for (const tool of toolNames) {
+				const mentionRegex = new RegExp(`(?:^|\\s|\`)${tool}(?:$|\\s|\`|\\()`)
+				if (mentionRegex.test(text)) {
+					mentionedTools.push(tool)
+				}
+			}
+		}
+
+		return { toolCalls, mentionedTools }
+	}
 }

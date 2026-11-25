@@ -188,6 +188,10 @@ export class TerminalRegistry {
 						terminal.busy = false
 						if (process) {
 							terminal.shellExecutionComplete(exitDetails)
+							if (!(process as any).isCompleted) {
+								;(process as any).isCompleted = true
+								process.emit("completed", terminal.getUnretrievedOutput())
+							}
 						}
 						return
 					}

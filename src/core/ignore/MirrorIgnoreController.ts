@@ -59,7 +59,7 @@ export class MirrorIgnoreController {
 	}
 
 	/**
-	 * Load custom patterns from .mirrorignore if it exists
+	 * Load custom patterns from .mirrorignore (or .rooignore fallback) if it exists
 	 */
 	private async loadMirrorIgnore(): Promise<void> {
 		try {
@@ -116,7 +116,9 @@ export class MirrorIgnoreController {
 	}
 
 	/**
-	 * Check if a terminal command should be allowed to execute based on file access patterns
+	 * Check if a terminal command should be allowed to execute based on file access patterns.
+	 * Accurately parses options and distinguishes non-file parameters (patterns, scripts, line counts)
+	 * so legitimate queries and searches are not falsely blocked.
 	 * @param command - Terminal command to validate
 	 * @returns path of file that is being accessed if it is being accessed, undefined if command is allowed
 	 */
@@ -126,12 +128,11 @@ export class MirrorIgnoreController {
 			return undefined
 		}
 
-		// Split command into parts and get the base command
-		const parts = command.trim().split(/\s+/)
-		const baseCommand = parts[0].toLowerCase()
+		// Support piped or chained shell commands (;, &&, ||, |)
+		const subCommands = command.split(/&&|\|\||;|\|/)
 
 		// Commands that read file contents
-		const fileReadingCommands = [
+		const fileReadingCommands = new Set([
 			// Unix commands
 			"cat",
 			"less",
@@ -139,6 +140,8 @@ export class MirrorIgnoreController {
 			"head",
 			"tail",
 			"grep",
+			"egrep",
+			"fgrep",
 			"awk",
 			"sed",
 			// PowerShell commands and aliases
@@ -147,23 +150,96 @@ export class MirrorIgnoreController {
 			"type",
 			"select-string",
 			"sls",
-		]
+		])
 
-		if (fileReadingCommands.includes(baseCommand)) {
-			// Check each argument that could be a file path
+		for (const subCmd of subCommands) {
+			const parts = subCmd.trim().split(/\s+/).filter(Boolean)
+			if (parts.length === 0) continue
+
+			const baseCommand = parts[0].toLowerCase()
+			if (!fileReadingCommands.has(baseCommand)) {
+				continue
+			}
+
+			// Identify if the command requires skipping a non-file parameter (pattern or script)
+			const isPatternCommand = ["grep", "egrep", "fgrep", "select-string", "sls"].includes(baseCommand)
+			const isScriptCommand = ["sed", "awk"].includes(baseCommand)
+
+			// Determine if -e or -f was passed, which explicitly supplies the pattern/script
+			let hasExplicitPatternFlag = false
+			let skipNextOptionValue = false
+			let skippedFirstPositional = false
+
+			// Options that take an argument value that is NOT a file path
+			const isHeadOrTail = baseCommand === "head" || baseCommand === "tail"
+			const headTailOptionsWithValue = new Set(["-n", "-c", "--lines", "--bytes"])
+			const grepOptionsWithValue = new Set(["-m", "-A", "-B", "-C", "--max-count", "--context"])
+
 			for (let i = 1; i < parts.length; i++) {
-				const arg = parts[i]
-				// Skip command flags/options (both Unix and PowerShell style)
-				if (arg.startsWith("-") || arg.startsWith("/")) {
+				const rawArg = parts[i]
+				const cleanArg = rawArg.replace(/^['"]|['"]$/g, "")
+
+				if (skipNextOptionValue) {
+					skipNextOptionValue = false
 					continue
 				}
-				// Ignore PowerShell parameter names
-				if (arg.includes(":")) {
+
+				// Skip flags/options (both Unix and PowerShell style)
+				if (rawArg.startsWith("-") || rawArg.startsWith("/")) {
+					const lowerArg = rawArg.toLowerCase()
+					if (rawArg === "-e" || rawArg === "-f" || lowerArg === "-pattern") {
+						hasExplicitPatternFlag = true
+						skipNextOptionValue = true
+						continue
+					}
+					if (lowerArg === "-path") {
+						hasExplicitPatternFlag = true // Path is explicitly flagged, so positional argument isn't pattern
+						continue
+					}
+					// If the flag expects a separate value, mark to skip the next token
+					if (isHeadOrTail && headTailOptionsWithValue.has(rawArg)) {
+						skipNextOptionValue = true
+					} else if (isPatternCommand && grepOptionsWithValue.has(rawArg)) {
+						skipNextOptionValue = true
+					}
 					continue
 				}
-				// Validate file access
-				if (!this.validateAccess(arg)) {
-					return arg
+
+				// Ignore PowerShell parameter names (e.g. -Path:...)
+				if (rawArg.includes(":")) {
+					continue
+				}
+
+				// Skip the first non-option argument for grep/sed/awk if it's the pattern or script
+				if ((isPatternCommand && !hasExplicitPatternFlag) || isScriptCommand) {
+					if (!skippedFirstPositional) {
+						skippedFirstPositional = true
+						continue
+					}
+				}
+
+				// Skip numeric values (e.g. arguments to head/tail)
+				if (/^\+?\d+$/.test(cleanArg)) {
+					continue
+				}
+
+				// Only test cleanArg if it corresponds to an existing file/directory or looks like a file path
+				const absolutePath = path.resolve(this.cwd, cleanArg)
+				let fileExists = false
+				try {
+					fileExists = fsSync.existsSync(absolutePath)
+				} catch {}
+
+				// Check access if file exists on disk, or if it explicitly looks like a path (contains slashes or relative prefixes or has file extension)
+				const looksLikePath =
+					cleanArg.includes("/") ||
+					cleanArg.includes("\\") ||
+					cleanArg.startsWith(".") ||
+					cleanArg.includes(".")
+				if (fileExists || looksLikePath) {
+					if (!this.validateAccess(cleanArg)) {
+						return cleanArg
+					}
 				}
 			}
 		}

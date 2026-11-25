@@ -7,7 +7,7 @@
  * - "slice": Simple offset/limit reading (default)
  * - "indentation": Semantic block extraction based on code structure
  */
-export type ReadFileMode = "slice" | "indentation"
+export type ReadFileMode = "slice" | "indentation" | "skeleton"
 
 /**
  * Indentation-mode configuration for the read_file tool.

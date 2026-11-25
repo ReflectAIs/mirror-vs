@@ -165,6 +165,18 @@ export type NativeToolArgs = {
 	browser_screenshot: Record<string, never>
 	browser_evaluate_script: { script: string }
 	render_preview: { url: string; width?: number; height?: number }
+	browser_snapshot: Record<string, never>
+	browser_actions: {
+		actions: Array<{
+			action: "click" | "type" | "select" | "scroll" | "navigate"
+			selector?: string
+			text?: string
+			value?: string
+			direction?: string
+			amount?: number
+			url?: string
+		}>
+	}
 	browser_scroll: { direction: string; amount?: number }
 	browser_select: { selector: string; value: string }
 	// On-demand context retrieval tools (cost optimization)
@@ -382,6 +394,8 @@ export const TOOL_DISPLAY_NAMES: Record<ToolName, string> = {
 	browser_scroll: "scroll web page",
 	browser_select: "select dropdown option",
 	browser_evaluate_script: "execute browser script",
+	browser_snapshot: "inspect semantic page structure",
+	browser_actions: "execute batch browser actions",
 	web_search: "search the web",
 	render_preview: "render web preview",
 	github_search: "search GitHub",
@@ -444,6 +458,8 @@ export const TOOL_GROUPS: Record<ToolGroup, ToolGroupConfig> = {
 			"browser_select",
 			"browser_evaluate_script",
 			"render_preview",
+			"browser_snapshot",
+			"browser_actions",
 		],
 	},
 }

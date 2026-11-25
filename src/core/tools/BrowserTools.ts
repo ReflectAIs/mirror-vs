@@ -129,10 +129,13 @@ export class BrowserNavigateTool extends BaseTool<"browser_navigate"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const { title, textContent } = await browser.navigate(url)
-			pushToolResult(
-				`Navigated to ${url}\nPage title: ${title}\nText content (first 5000 chars):\n${textContent.substring(0, 5000)}`,
-			)
+			const snippet =
+				textContent.length > 1500
+					? `${textContent.substring(0, 1500)}\n\n[... Remaining page text truncated to save tokens. Use browser_snapshot or browser_evaluate_script to inspect specific sections ...]`
+					: textContent
+			pushToolResult(`Navigated to ${url}\nPage title: ${title}\nText content:\n${snippet}`)
 		} catch (error) {
 			await handleError("navigating browser", error)
 		}
@@ -161,6 +164,7 @@ export class BrowserClickTool extends BaseTool<"browser_click"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const result = await browser.click(selector)
 			pushToolResult(result)
 		} catch (error) {
@@ -199,6 +203,7 @@ export class BrowserTypeTool extends BaseTool<"browser_type"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const result = await browser.type(selector, typeText)
 			pushToolResult(result)
 		} catch (error) {
@@ -224,6 +229,7 @@ export class BrowserScreenshotTool extends BaseTool<"browser_screenshot"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const screenshot = await browser.screenshot()
 			if (!screenshot) {
 				pushToolResult("Screenshot failed: no page loaded. Use browser_navigate first.")
@@ -237,13 +243,17 @@ export class BrowserScreenshotTool extends BaseTool<"browser_screenshot"> {
 			const savedMsg = savedPath ? `\nScreenshot saved to: ${savedPath}` : ""
 
 			const pageText = screenshot.textContent?.trim()
-				? `\n\n--- Page Text Content ---\n${screenshot.textContent}`
+				? `\n\n--- Page Text Snippet ---\n${screenshot.textContent.slice(0, 400)}${screenshot.textContent.length > 400 ? "..." : ""}`
 				: ""
 			pushToolResult([
 				{ type: "text", text: `Browser screenshot taken.${savedMsg}${pageText}` },
 				{
 					type: "image",
-					source: { type: "base64", media_type: "image/png", data: screenshot.base64 },
+					source: {
+						type: "base64",
+						media_type: (screenshot as any).mediaType || "image/webp",
+						data: screenshot.base64,
+					},
 				},
 			])
 		} catch (error) {
@@ -275,6 +285,7 @@ export class BrowserScrollTool extends BaseTool<"browser_scroll"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const result = await browser.scroll(direction, amount ?? 300)
 			pushToolResult(result)
 		} catch (error) {
@@ -313,6 +324,7 @@ export class BrowserSelectTool extends BaseTool<"browser_select"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const result = await browser.selectOption(selector, value)
 			pushToolResult(result)
 		} catch (error) {
@@ -346,6 +358,7 @@ export class BrowserEvaluateScriptTool extends BaseTool<"browser_evaluate_script
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 			const result = await browser.evaluate(script)
 			pushToolResult(result)
 		} catch (error) {
@@ -380,6 +393,7 @@ export class RenderPreviewTool extends BaseTool<"render_preview"> {
 			if (!didApprove) return
 
 			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
 
 			// Capture layout snapshot before navigation (if a page is already loaded)
 			const layoutBefore = await captureLayoutSnapshot(browser)
@@ -410,7 +424,7 @@ export class RenderPreviewTool extends BaseTool<"render_preview"> {
 					: ""
 
 			const pageText = screenshot.textContent?.trim()
-				? `\n\n--- Page Text Content ---\n${screenshot.textContent}`
+				? `\n\n--- Page Text Snippet ---\n${screenshot.textContent.slice(0, 400)}${screenshot.textContent.length > 400 ? "..." : ""}`
 				: ""
 
 			pushToolResult([
@@ -420,7 +434,11 @@ export class RenderPreviewTool extends BaseTool<"render_preview"> {
 				},
 				{
 					type: "image",
-					source: { type: "base64", media_type: "image/png", data: screenshot.base64 },
+					source: {
+						type: "base64",
+						media_type: (screenshot as any).mediaType || "image/webp",
+						data: screenshot.base64,
+					},
 				},
 			])
 		} catch (error) {
@@ -434,6 +452,78 @@ export class RenderPreviewTool extends BaseTool<"render_preview"> {
 	}
 }
 
+export class BrowserSnapshotTool extends BaseTool<"browser_snapshot"> {
+	readonly name = "browser_snapshot" as const
+
+	async execute(_params: Record<string, never>, task: Task, callbacks: ToolCallbacks): Promise<void> {
+		const { askApproval, handleError, pushToolResult } = callbacks
+
+		try {
+			const didApprove = await askApproval("tool", JSON.stringify({ tool: "browserSnapshot" }))
+			if (!didApprove) return
+
+			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
+			const snapshot = await browser.getAccessibilitySnapshot()
+			pushToolResult(snapshot.snapshot)
+		} catch (error) {
+			await handleError("capturing browser accessibility snapshot", error)
+		}
+	}
+
+	override async handlePartial(task: Task, _block: ToolUse<"browser_snapshot">): Promise<void> {
+		await task.ask("tool", JSON.stringify({ tool: "browserSnapshot" })).catch(() => {})
+	}
+}
+
+export class BrowserActionsTool extends BaseTool<"browser_actions"> {
+	readonly name = "browser_actions" as const
+
+	async execute(
+		params: {
+			actions: Array<{
+				action: "click" | "type" | "select" | "scroll" | "navigate"
+				selector?: string
+				text?: string
+				value?: string
+				direction?: string
+				amount?: number
+				url?: string
+			}>
+		},
+		task: Task,
+		callbacks: ToolCallbacks,
+	): Promise<void> {
+		const { actions } = params
+		const { askApproval, handleError, pushToolResult } = callbacks
+
+		try {
+			if (!actions || !Array.isArray(actions) || actions.length === 0) {
+				pushToolResult("Missing required parameter: actions array")
+				return
+			}
+
+			const didApprove = await askApproval(
+				"tool",
+				JSON.stringify({ tool: "browserActions", count: actions.length }),
+			)
+			if (!didApprove) return
+
+			const browser = BrowserService.getInstance()
+			browser.setActiveTask(task)
+			const results = await browser.executeBatchActions(actions)
+			pushToolResult(`Batch browser actions executed (${results.length}):\n${results.join("\n")}`)
+		} catch (error) {
+			await handleError("executing batch browser actions", error)
+		}
+	}
+
+	override async handlePartial(task: Task, block: ToolUse<"browser_actions">): Promise<void> {
+		const count = (block.params as any)?.actions?.length || 0
+		await task.ask("tool", JSON.stringify({ tool: "browserActions", count }), block.partial).catch(() => {})
+	}
+}
+
 export const browserNavigateTool = new BrowserNavigateTool()
 export const browserClickTool = new BrowserClickTool()
 export const browserTypeTool = new BrowserTypeTool()
@@ -442,3 +532,5 @@ export const browserScrollTool = new BrowserScrollTool()
 export const browserSelectTool = new BrowserSelectTool()
 export const browserEvaluateScriptTool = new BrowserEvaluateScriptTool()
 export const renderPreviewTool = new RenderPreviewTool()
+export const browserSnapshotTool = new BrowserSnapshotTool()
+export const browserActionsTool = new BrowserActionsTool()

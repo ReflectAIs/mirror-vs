@@ -568,6 +568,17 @@ export class TaskLifecycle {
 			console.error("Error removing event listeners:", error)
 		}
 
+		// Clear active task reference in BrowserService
+		try {
+			import("../../services/browser-service")
+				.then(({ BrowserService }) => {
+					BrowserService.getInstance().clearActiveTask(this.task)
+				})
+				.catch(() => {})
+		} catch (error) {
+			console.error("Error clearing BrowserService active task:", error)
+		}
+
 		// Abort and release any terminals associated with this task.
 		try {
 			TerminalRegistry.abortTerminalsForTask(this.task.taskId)

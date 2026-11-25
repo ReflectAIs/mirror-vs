@@ -1067,7 +1067,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					"flex flex-col gap-1.5 outline-none box-border",
 					isEditMode
 						? "p-2 w-full bg-editor-background"
-						: "relative px-2.5 pt-2 pb-1.5 mb-1.5 w-[calc(100%-20px)] ml-auto mr-auto rounded-lg border border-vscode-input-border/50 bg-vscode-input-background transition-shadow duration-200 focus-within:shadow-[0_0_0_1px_var(--vscode-focusBorder)] focus-within:border-transparent",
+						: "relative px-3 pt-2.5 pb-2 mb-2 w-[calc(100%-16px)] ml-auto mr-auto rounded-xl border border-vscode-input-border/60 bg-vscode-input-background/95 shadow-sm transition-all duration-200 focus-within:border-vscode-focusBorder focus-within:ring-1 focus-within:ring-vscode-focusBorder/25",
 				)}>
 				<div className={cn(!isEditMode && "relative")}>
 					<div
@@ -1155,7 +1155,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 										: "border border-transparent",
 									"px-1.5",
 									"py-1.5",
-									isEditMode ? "pr-16" : "pr-14",
+									isEditMode ? "pr-16" : "pr-[88px]",
 									"z-10",
 									"forced-color-adjust-none",
 								)}
@@ -1221,7 +1221,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 									"resize-none",
 									"overflow-x-hidden",
 									"overflow-y-auto",
-									isEditMode ? "pr-16" : hasInputContent ? "pr-20" : "pr-8",
+									isEditMode ? "pr-16" : "pr-[88px]",
 									"flex-none flex-grow",
 									"z-[2]",
 									"scrollbar-none",

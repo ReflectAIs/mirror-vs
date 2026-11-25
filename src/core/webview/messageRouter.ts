@@ -12,6 +12,7 @@ import * as vscode from "vscode"
 import type { WebviewMessage } from "@mirror-vs/types"
 
 import { getCommand } from "../../utils/commands"
+import { openMirrorSettingsInTab } from "../../activate/registerCommands"
 import type { MirrorProvider } from "./MirrorProvider"
 
 // ── Task handlers ──────────────────────────────────────────────
@@ -365,6 +366,25 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 			break
 		case "switchTab":
 			await handleSwitchTab(provider, message.tab, message.values)
+			break
+		case "openSettingsInTab":
+			await openMirrorSettingsInTab({
+				context: provider.context,
+				outputChannel: provider.outputChannel,
+				targetSection: message.targetSection,
+			})
+			break
+		case "openHistoryInSidebar": {
+			const { MirrorProvider: MP } = await import("./MirrorProvider")
+			await vscode.commands.executeCommand(`${MP.sideBarId}.focus`)
+			const sidebarProvider = MP.getSidebarInstance() || provider
+			await sidebarProvider.postMessageToWebview({ type: "action", action: "historyButtonClicked" })
+			break
+		}
+		case "closePanel":
+			if (provider.currentView && "dispose" in provider.currentView) {
+				;(provider.currentView as vscode.WebviewPanel).dispose()
+			}
 			break
 		case "forgetContextFile":
 			if (message.text && provider.getCurrentTask()) {

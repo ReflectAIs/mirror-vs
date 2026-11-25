@@ -267,6 +267,19 @@ describe("MirrorIgnoreController", () => {
 			// Commands accessing allowed files should return undefined
 			expect(controller.validateCommand("cat src/app.ts")).toBeUndefined()
 			expect(controller.validateCommand("less README.md")).toBeUndefined()
+
+			// Grep with a search pattern matching an ignore rule should NOT be blocked if target file is allowed
+			expect(controller.validateCommand("grep node_modules src/app.ts")).toBeUndefined()
+
+			// Chained commands should detect blocked files in subsequent commands
+			expect(controller.validateCommand("npm test && cat secrets/api-keys.json")).toBe("secrets/api-keys.json")
+			expect(controller.validateCommand("echo 'done' ; less node_modules/package.json")).toBe(
+				"node_modules/package.json",
+			)
+
+			// Sed / head / tail with options
+			expect(controller.validateCommand("head -n 20 src/app.ts")).toBeUndefined()
+			expect(controller.validateCommand("sed 's/foo/bar/g' src/app.ts")).toBeUndefined()
 		})
 
 		/**

@@ -68,6 +68,15 @@ export class Terminal extends BaseTerminal {
 		process.command = command
 		this.process = process
 
+		// Attach shell PID if available for reliable background liveness tracking
+		Promise.resolve(this.terminal?.processId)
+			.then((pid) => {
+				if (pid) {
+					;(process as any).pid = pid
+				}
+			})
+			.catch(() => {})
+
 		// Set up event handlers from callbacks before starting process.
 		// This ensures that we don't miss any events because they are
 		// configured before the process starts.

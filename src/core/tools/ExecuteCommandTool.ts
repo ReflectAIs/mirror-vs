@@ -619,6 +619,7 @@ export async function executeCommandInTerminal(
 			`[Terminal Callback: Background process for '${command}' finished in '${currentWorkingDir}'. ${exitStatus} (Duration: ${elapsedStr})]`,
 			previewSnippet ? `\nOutput:\n${previewSnippet}` : "\nOutput: <No output captured in terminal stream>",
 			`\nLogs: Full execution log saved to disk. Artifact ID: ${artifactId}. You can use read_command_output with artifact_id '${artifactId}' to view complete logs instead of rerunning.`,
+			`\n[System Instructions: The background process for this command has finished. Review the exit status and output above. If it succeeded, continue directly with the next step of your task or call attempt_completion. Do not re-run the command.]`,
 		].join("")
 
 		void task.injectInBetweenMessage(notification, undefined, "terminal_callback")
@@ -637,6 +638,11 @@ export async function executeCommandInTerminal(
 			setTimeout(() => {
 				emitBackgroundNotification()
 			}, 150)
+		} else if (!completed && exitDetails !== undefined) {
+			// If exit event arrived before onCompleted drained output, allow brief window then emit
+			setTimeout(() => {
+				emitBackgroundNotification()
+			}, 300)
 		}
 	}
 

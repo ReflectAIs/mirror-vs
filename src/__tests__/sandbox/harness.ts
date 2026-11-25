@@ -8,6 +8,9 @@
 import OpenAI from "openai"
 import { executeTool, type ToolInvocation, type SandboxProject } from "./mock-tools"
 import { ToolRepetitionDetector } from "../../core/tools/ToolRepetitionDetector"
+import { NativeToolCallParser } from "../../core/assistant-message/NativeToolCallParser"
+import { isOpenRouterPromptCachingModel } from "../../../packages/types/src/providers/openrouter"
+import { addCacheBreakpoints as addAnthropicCacheBreakpoints } from "../../api/transform/caching/anthropic"
 
 // ────────────────────────────────────────────────────────────
 //  Types
@@ -318,13 +321,17 @@ export class SandboxHarness {
 					break
 				}
 
-				// If no tool calls and text only, push a nudge
+				// If no tool calls and text only, push an intelligent nudge
 				if (turnResult.toolCalls.length === 0 && turnResult.assistantText) {
+					const mentionCheck = NativeToolCallParser.recoverToolCallsFromText(turnResult.assistantText)
+					const nudgeContent =
+						mentionCheck.mentionedTools.length > 0
+							? `You mentioned using tool(s) "${mentionCheck.mentionedTools.join(", ")}" in your message but did not invoke any tools. In this environment, you must invoke tools directly using the tool call format. Please proceed with the task using the available tools, or call attempt_completion if you're done.`
+							: "You haven't used any tools yet. Please proceed with the task using the available tools, or call attempt_completion if you're done."
 					messages.push({ role: "assistant", content: turnResult.assistantText })
 					messages.push({
 						role: "user",
-						content:
-							"You haven't used any tools yet. Please proceed with the task using the available tools, or call attempt_completion if you're done.",
+						content: nudgeContent,
 					})
 				}
 			}
@@ -355,10 +362,26 @@ export class SandboxHarness {
 		const requestTimestamp = Date.now()
 		const requestStart = performance.now()
 
+		let messagesToSend = messages
+		let toolsToSend: any[] = SANDBOX_TOOLS
+
+		const isAnthropic =
+			this.config.model.toLowerCase().includes("anthropic") || this.config.model.toLowerCase().includes("claude")
+
+		if (isAnthropic && messages.length > 0) {
+			// Clone messages for prompt cache control annotation
+			messagesToSend = messages.map((m) => ({ ...m }))
+			const sysContent = typeof messagesToSend[0].content === "string" ? messagesToSend[0].content : ""
+			addAnthropicCacheBreakpoints(sysContent, messagesToSend)
+			toolsToSend = SANDBOX_TOOLS.map((t, idx) =>
+				idx === SANDBOX_TOOLS.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t,
+			)
+		}
+
 		const requestParams: any = {
 			model: this.config.model,
-			messages,
-			tools: SANDBOX_TOOLS,
+			messages: messagesToSend,
+			tools: toolsToSend,
 			temperature: this.config.temperature ?? 0,
 			max_tokens: 8192,
 			...(sessionId && { session_id: sessionId }),
@@ -391,8 +414,25 @@ export class SandboxHarness {
 		const toolCalls: ToolInvocation[] = []
 		let isCompletion = false
 
-		if (message.tool_calls && message.tool_calls.length > 0) {
-			for (const tc of message.tool_calls as any[]) {
+		let rawToolCalls = message.tool_calls as any[] | undefined
+
+		// If model emitted text with no native tool calls, attempt recovery
+		if ((!rawToolCalls || rawToolCalls.length === 0) && assistantText) {
+			const recovery = NativeToolCallParser.recoverToolCallsFromText(assistantText)
+			if (recovery.toolCalls.length > 0) {
+				rawToolCalls = recovery.toolCalls.map((tc, idx) => ({
+					id: tc.id || `recovered_call_${Date.now()}_${idx}`,
+					type: "function",
+					function: {
+						name: tc.name,
+						arguments: JSON.stringify((tc as any).params || (tc as any).nativeArgs || {}),
+					},
+				}))
+			}
+		}
+
+		if (rawToolCalls && rawToolCalls.length > 0) {
+			for (const tc of rawToolCalls) {
 				const toolName = tc.function?.name || ""
 				let toolArgs: Record<string, unknown> = {}
 

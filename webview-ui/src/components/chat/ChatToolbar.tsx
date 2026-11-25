@@ -130,7 +130,7 @@ const ChatToolbar = ({
 	return (
 		<>
 			{/* Top Header Area */}
-			<div className="flex items-center justify-between px-3 py-2 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/50 backdrop-blur-md shrink-0 select-none overflow-visible gap-2 relative z-10">
+			<div className="flex items-center justify-between h-11 px-3 border-b border-vscode-editorGroup-border/40 bg-vscode-sideBar-background/60 backdrop-blur-md shrink-0 select-none overflow-visible gap-2 relative z-10">
 				{/* Left Brand + Title Area */}
 				<div className="flex items-center gap-2 min-w-0 flex-1 overflow-visible">
 					<div className="shrink-0 relative z-20">
@@ -196,9 +196,16 @@ const ChatToolbar = ({
 					<Button
 						variant="ghost"
 						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
-						onClick={() => vscode.postMessage({ type: "switchTab", tab: "history" })}
-						title="Task History">
+						onClick={() => vscode.postMessage({ type: "openHistoryInSidebar" })}
+						title="Task History (Sidebar)">
 						<span className="codicon codicon-history text-xs flex items-center justify-center" />
+					</Button>
+					<Button
+						variant="ghost"
+						className="p-0 flex items-center justify-center h-6 w-6 hover:bg-vscode-list-hoverBackground"
+						onClick={() => vscode.postMessage({ type: "openSettingsInTab" })}
+						title="Settings (Open in Page)">
+						<span className="codicon codicon-settings-gear text-xs flex items-center justify-center" />
 					</Button>
 
 					{/* More Actions Dropdown Menu */}
@@ -247,10 +254,10 @@ const ChatToolbar = ({
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem
-								onClick={() => vscode.postMessage({ type: "switchTab", tab: "settings" })}
+								onClick={() => vscode.postMessage({ type: "openSettingsInTab" })}
 								className="flex items-center gap-2 text-xs">
 								<span className="codicon codicon-settings-gear text-xs" />
-								<span>Settings</span>
+								<span>Settings (Open in Page)</span>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
