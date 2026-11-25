@@ -175,6 +175,13 @@ export function validateGitForcePush(command: string): string | null {
 	return null
 }
 
+export function validateSshpassUsage(command: string): string | null {
+	if (/\bsshpass\b/i.test(command)) {
+		return `Command blocked: using "sshpass" in execute_command opens repeated password-authenticated SSH connections and triggers server rate limits. Use the "ssh_session" tool (which keeps a single multiplexed OpenSSH ControlMaster connection) instead.`
+	}
+	return null
+}
+
 function validateCommandAgainstProtectedFiles(
 	command: string,
 	workspacePath: string,
@@ -285,6 +292,13 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 					pushToolResult(formatResponse.toolError(forcePushViolation))
 					return
 				}
+			}
+
+			const sshpassViolation = validateSshpassUsage(canonicalCommand)
+			if (sshpassViolation) {
+				await task.say("error", sshpassViolation)
+				pushToolResult(formatResponse.toolError(sshpassViolation))
+				return
 			}
 
 			task.consecutiveMistakeCount = 0

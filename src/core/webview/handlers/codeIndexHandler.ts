@@ -276,6 +276,11 @@ export async function handleStartIndexing(provider: MirrorProvider): Promise<voi
 		// Ensure MirrorProvider has an active status subscription
 		provider.updateCodeIndexStatusSubscription()
 
+		// Ensure manager is initialized if background startup initialization hasn't finished yet
+		if (!manager.isInitialized) {
+			await manager.initialize(provider.contextProxy)
+		}
+
 		// Start indexing
 		await manager.startIndexing()
 

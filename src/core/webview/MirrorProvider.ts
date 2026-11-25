@@ -1270,7 +1270,11 @@ export class MirrorProvider
 	}
 
 	public static async broadcastStateToAllInstances(): Promise<void> {
-		await Promise.all(Array.from(this.activeInstances).map((instance) => instance.postStateToWebview()))
+		await Promise.all(
+			Array.from(this.activeInstances)
+				.filter((instance) => !instance.isDisposed())
+				.map((instance) => instance.postStateToWebview().catch(() => {})),
+		)
 	}
 
 	public static async getInstance(): Promise<MirrorProvider | undefined> {

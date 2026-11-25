@@ -327,19 +327,28 @@ export const openMirrorSettingsInTab = async ({
 	outputChannel: vscode.OutputChannel
 	targetSection?: string
 }) => {
-	// If settings panel is already open, reveal it
-	if (settingsPanel && settingsProvider) {
-		settingsPanel.reveal(settingsPanel.viewColumn, false)
-		if (targetSection) {
-			await settingsProvider.postMessageToWebview({
-				type: "action",
-				action: "switchTab",
-				tab: "settings",
-				values: { section: targetSection },
-			})
+	// If settings panel is already open and not disposed, reveal it
+	if (settingsPanel && settingsProvider && !settingsProvider.isDisposed()) {
+		try {
+			settingsPanel.reveal(settingsPanel.viewColumn, false)
+			if (targetSection) {
+				await settingsProvider.postMessageToWebview({
+					type: "action",
+					action: "switchTab",
+					tab: "settings",
+					values: { section: targetSection },
+				})
+			}
+			await settingsProvider.postMessageToWebview({ type: "action", action: "didBecomeVisible" })
+			return settingsProvider
+		} catch {
+			// Panel was disposed by VS Code; clear stale refs and recreate below
+			settingsPanel = undefined
+			settingsProvider = undefined
 		}
-		await settingsProvider.postMessageToWebview({ type: "action", action: "didBecomeVisible" })
-		return settingsProvider
+	} else {
+		settingsPanel = undefined
+		settingsProvider = undefined
 	}
 
 	const contextProxy = await ContextProxy.getInstance(context)

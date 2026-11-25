@@ -339,5 +339,12 @@ describe("executeCommandTool", () => {
 			expect(executeCommandModule.validateGitNoVerify("git push -n origin main")).toBeNull()
 			expect(executeCommandModule.validateGitNoVerify("git commit -m 'msg'")).toBeNull()
 		})
+
+		it("blocks sshpass in execute_command to prevent SSH rate limits", () => {
+			expect(
+				executeCommandModule.validateSshpassUsage("sshpass -p 'pass' rsync -az src/ root@host:/app"),
+			).toContain("ssh_session")
+			expect(executeCommandModule.validateSshpassUsage("rsync -az src/ dest/")).toBeNull()
+		})
 	})
 })
