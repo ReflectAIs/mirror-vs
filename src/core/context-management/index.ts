@@ -18,6 +18,98 @@ import { MirrorIgnoreController } from "../ignore/MirrorIgnoreController"
  */
 
 /**
+ * Options for micro-compacting stale tool results in older conversation turns.
+ */
+export interface CompactStaleToolResultsOptions {
+	/** Number of most recent messages to keep completely untouched (default: 12) */
+	keepRecentMessages?: number
+	/** Minimum character length of a tool_result before compacting (default: 1500) */
+	minChars?: number
+}
+
+export interface CompactStaleToolResultsResult {
+	messages: ApiMessage[]
+	compactedCount: number
+	charsSaved: number
+}
+
+/**
+ * Replaces oversized `tool_result` payloads from older turns with a concise stub,
+ * preserving `tool_use_id`, errors, images, and the most recent `keepRecentMessages`.
+ */
+export function compactStaleToolResults(
+	messages: ApiMessage[],
+	options?: CompactStaleToolResultsOptions,
+): CompactStaleToolResultsResult {
+	const keepRecentMessages = options?.keepRecentMessages ?? 12
+	const minChars = options?.minChars ?? 1500
+
+	const cutoffIndex = messages.length - keepRecentMessages
+	if (cutoffIndex <= 0) {
+		return { messages, compactedCount: 0, charsSaved: 0 }
+	}
+
+	let compactedCount = 0
+	let charsSaved = 0
+
+	const nextMessages = messages.map((msg, idx) => {
+		if (idx >= cutoffIndex || !Array.isArray(msg.content)) {
+			return msg
+		}
+
+		let blockModified = false
+		const nextContent = msg.content.map((block: any) => {
+			if (block?.type !== "tool_result" || block.is_error) {
+				return block
+			}
+
+			let textLen = 0
+			let lineCount = 0
+			let hasImage = false
+
+			if (typeof block.content === "string") {
+				textLen = block.content.length
+				lineCount = block.content.split("\n").length
+			} else if (Array.isArray(block.content)) {
+				for (const sub of block.content) {
+					if (sub?.type === "image") {
+						hasImage = true
+					} else if (sub?.type === "text" && typeof sub.text === "string") {
+						textLen += sub.text.length
+						lineCount += sub.text.split("\n").length
+					}
+				}
+			}
+
+			if (hasImage || textLen < minChars) {
+				return block
+			}
+
+			const stub = `[Compacted tool result (${textLen} chars, ${lineCount} lines) — re-run tool if needed]`
+			if (textLen <= stub.length) {
+				return block
+			}
+
+			blockModified = true
+			compactedCount++
+			charsSaved += textLen - stub.length
+			return {
+				...block,
+				content: stub,
+			}
+		})
+
+		return blockModified ? { ...msg, content: nextContent } : msg
+	})
+
+	return {
+		messages: compactedCount > 0 ? nextMessages : messages,
+		compactedCount,
+		charsSaved,
+	}
+}
+
+/**
  * Default percentage of the context window to use as a buffer when deciding when to truncate.
  * Used by Context Management to determine when to trigger condensation or (fallback) sliding window truncation.
  */
@@ -307,6 +399,15 @@ export async function manageContext({
 	}
 	// If no specific threshold is found for the profile, fall back to global setting
 
+	// Micro-compact stale oversized tool results before triggering expensive condensation/truncation
+	let workingMessages = messages
+	if (prevContextTokens >= allowedTokens * 0.5 && messages.length > 12) {
+		const compacted = compactStaleToolResults(messages)
+		if (compacted.compactedCount > 0) {
+			workingMessages = compacted.messages
+		}
+	}
+
 	if (autoCondenseContext) {
 		const contextPercent = (100 * prevContextTokens) / contextWindow
 		const exceededAbsoluteThreshold =
@@ -314,7 +415,7 @@ export async function manageContext({
 		if (contextPercent >= effectiveThreshold || prevContextTokens > allowedTokens || exceededAbsoluteThreshold) {
 			// Attempt to intelligently condense the context
 			const result = await summarizeConversation({
-				messages,
+				messages: workingMessages,
 				apiHandler,
 				systemPrompt,
 				taskId,
@@ -338,7 +439,7 @@ export async function manageContext({
 
 	// Fall back to sliding window truncation if needed
 	if (prevContextTokens > allowedTokens) {
-		const truncationResult = truncateConversation(messages, 0.5, taskId)
+		const truncationResult = truncateConversation(workingMessages, 0.5, taskId)
 
 		// Calculate new context tokens after truncation by counting non-truncated messages
 		// Messages with truncationParent are hidden, so we count only those without it
@@ -374,6 +475,6 @@ export async function manageContext({
 			newContextTokensAfterTruncation,
 		}
 	}
-	// No truncation or condensation needed
-	return { messages, summary: "", cost, prevContextTokens, error, errorDetails }
+	// No truncation or condensation needed (return compacted messages if any stale tool results were trimmed)
+	return { messages: workingMessages, summary: "", cost, prevContextTokens, error, errorDetails }
 }

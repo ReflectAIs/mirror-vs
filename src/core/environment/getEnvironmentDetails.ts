@@ -23,6 +23,8 @@ export interface EnvironmentDetailsOptions {
 	isIntermediateTurn?: boolean
 }
 
+const lastGitStatusByTask = new WeakMap<Task, string>()
+
 export async function getEnvironmentDetails(
 	mirror: Task,
 	includeFileDetails: boolean = false,
@@ -249,8 +251,13 @@ export async function getEnvironmentDetails(
 
 	// 8. Git Status (volatile — changes on edit/commit)
 	// Reuse the status fetched above (shared with the architect-mode pulse).
+	// On intermediate turns, skip re-sending if identical to the previous turn's git status.
 	if (maxGitStatusFiles > 0 && sharedGitStatus) {
-		volatileDetails += `\n\n# Git Status\n${sharedGitStatus}`
+		const prevGitStatus = lastGitStatusByTask.get(mirror)
+		if (!isIntermediate || prevGitStatus !== sharedGitStatus) {
+			volatileDetails += `\n\n# Git Status\n${sharedGitStatus}`
+		}
+		lastGitStatusByTask.set(mirror, sharedGitStatus)
 	}
 
 	// 9. Current Cost (disabled by default to prevent prefix cache invalidation across turns)

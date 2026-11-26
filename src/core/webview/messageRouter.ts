@@ -935,6 +935,12 @@ export async function routeMessage(provider: MirrorProvider, message: WebviewMes
 		case "cancelTask":
 			await provider.cancelTask(message.taskId)
 			break
+		case "cancelImageGeneration": {
+			const { ImageProviderRouter } = await import("../../api/image/router")
+			const activeProvider = ImageProviderRouter.getActiveProvider("txt2img") as any
+			await activeProvider?.interrupt?.()
+			break
+		}
 		case "cancelAutoApproval":
 			provider.getCurrentTask()?.cancelAutoApprovalTimeout()
 			break

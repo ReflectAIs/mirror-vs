@@ -83,6 +83,7 @@ export class ComfyUIProvider implements ImageProvider {
 	private clientId: string =
 		typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `mirror-${Date.now()}`
 	private progress: ProgressInfo = { state: "idle", progress: 0 }
+	private activeAbortController: AbortController | null = null
 
 	// Keep-alive: delayed shutdown timer.  After each operation, ComfyUI stays
 	// alive for SHUTDOWN_DELAY_MS so the user can debug.  Repeated operations
@@ -702,116 +703,141 @@ export class ComfyUIProvider implements ImageProvider {
 			// WebSocket not available — polling still works
 		}
 
-		// Single polling loop: check /history for completion, then fetch the image
-		// Total budget: 120 attempts × 2s = 240s (4 minutes)
-		const MAX_ATTEMPTS = 120
-		for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-			await new Promise((r) => setTimeout(r, 2000))
+		const abortController = new AbortController()
+		this.activeAbortController = abortController
 
-			// Report intermediate progress from the polling loop every 5 attempts (10s),
-			// so the user sees progress advancing even when the WebSocket doesn't send events.
-			// Progress ranges from 10 → 85 (%); the final 15% is reserved for image fetch.
-			if (attempt % 5 === 0 && attempt > 0) {
-				const pct = Math.min(85, 10 + Math.round((attempt / MAX_ATTEMPTS) * 75))
-				this.progress = {
-					...this.progress,
-					state: "running",
-					progress: Math.max(this.progress.progress ?? 0, pct),
-					stage: this.progress.stage || "Generating image...",
+		try {
+			// Single polling loop: check /history for completion, then fetch the image
+			// Total budget: 120 attempts × 2s = 240s (4 minutes)
+			const MAX_ATTEMPTS = 120
+			for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+				if (abortController.signal.aborted) {
+					throw new Error("Image generation cancelled by user")
 				}
-				onProgress?.(this.progress)
+				await new Promise<void>((resolve) => {
+					const timer = setTimeout(resolve, 2000)
+					abortController.signal.addEventListener(
+						"abort",
+						() => {
+							clearTimeout(timer)
+							resolve()
+						},
+						{ once: true },
+					)
+				})
+				if (abortController.signal.aborted) {
+					throw new Error("Image generation cancelled by user")
+				}
+
+				// Report intermediate progress from the polling loop every 5 attempts (10s),
+				// so the user sees progress advancing even when the WebSocket doesn't send events.
+				// Progress ranges from 10 → 85 (%); the final 15% is reserved for image fetch.
+				if (attempt % 5 === 0 && attempt > 0) {
+					const pct = Math.min(85, 10 + Math.round((attempt / MAX_ATTEMPTS) * 75))
+					this.progress = {
+						...this.progress,
+						state: "running",
+						progress: Math.max(this.progress.progress ?? 0, pct),
+						stage: this.progress.stage || "Generating image...",
+					}
+					onProgress?.(this.progress)
+				}
+
+				try {
+					const res = await fetch(`${this.baseURL}/history/${promptId}`)
+					if (!res.ok) continue
+
+					const history: Record<string, ComfyHistoryItem> = await res.json()
+					const item = history[promptId]
+					if (!item?.status?.completed) continue
+
+					// Check for error status — ComfyUI may report errors via status_str or
+					// messages array even when completed is true.
+					if (item?.status?.status_str === "error") {
+						const errorMsg = item.status.messages?.find((m: [string, any]) => m[0] === "error")?.[1]
+						const rawError = errorMsg ? String(errorMsg) : "ComfyUI execution error"
+						// Try to extract node information from error messages
+						const nodeMatch = typeof errorMsg === "string" ? errorMsg.match(/Node\s+#?(\d+)/i) : null
+						const parsed = parseComfyUIError(rawError, undefined, {
+							nodeId: nodeMatch?.[1],
+							nodeClassType: "unknown",
+						})
+						throw new ComfyUIError({
+							...parsed,
+							message: rawError,
+						})
+					}
+					// Also check the messages array for execution errors (some ComfyUI versions
+					// report errors in messages without setting status_str)
+					const errorMessage = item?.status?.messages?.find(
+						(m: [string, any]) => m[0] === "error" || m[0] === "execution_error",
+					)
+					if (errorMessage) {
+						const rawError = String(errorMessage[1] ?? "ComfyUI execution error")
+						const parsed = parseComfyUIError(rawError)
+						throw new ComfyUIError({
+							...parsed,
+							message: rawError,
+						})
+					}
+
+					// Report that we found completion and are fetching the image
+					this.progress = { state: "running", progress: 90, stage: "fetching result" }
+					onProgress?.(this.progress)
+
+					// Find the first image or audio output
+					for (const nodeId of Object.keys(item.outputs)) {
+						const output = item.outputs[nodeId]
+
+						// Check for image outputs
+						if (output.images && output.images.length > 0) {
+							const img = output.images[0]
+							const imgRes = await fetch(
+								`${this.baseURL}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`,
+							)
+							if (imgRes.ok) {
+								const blob = await imgRes.arrayBuffer()
+								const base64 = Buffer.from(blob).toString("base64")
+
+								this.progress = { state: "running", progress: 95, stage: "decoding result" }
+								onProgress?.(this.progress)
+
+								return `data:image/${img.filename.endsWith(".png") ? "png" : "jpeg"};base64,${base64}`
+							}
+						}
+
+						// Check for audio outputs (e.g. from SaveAudio node)
+						if (output.audio && output.audio.length > 0) {
+							const aud = output.audio[0]
+							const audRes = await fetch(
+								`${this.baseURL}/view?filename=${encodeURIComponent(aud.filename)}&subfolder=${encodeURIComponent(aud.subfolder)}&type=${encodeURIComponent(aud.type)}`,
+							)
+							if (audRes.ok) {
+								const blob = await audRes.arrayBuffer()
+								const base64 = Buffer.from(blob).toString("base64")
+
+								this.progress = { state: "running", progress: 95, stage: "decoding result" }
+								onProgress?.(this.progress)
+
+								// Determine MIME type from the audio filename extension
+								const ext = aud.filename.split(".").pop()?.toLowerCase() || "wav"
+								return `data:audio/${ext};base64,${base64}`
+							}
+						}
+					}
+					// Completed but no image or audio outputs found
+					return null
+				} catch {
+					// network hiccup, retry
+					continue
+				}
 			}
-
-			try {
-				const res = await fetch(`${this.baseURL}/history/${promptId}`)
-				if (!res.ok) continue
-
-				const history: Record<string, ComfyHistoryItem> = await res.json()
-				const item = history[promptId]
-				if (!item?.status?.completed) continue
-
-				// Check for error status — ComfyUI may report errors via status_str or
-				// messages array even when completed is true.
-				if (item?.status?.status_str === "error") {
-					const errorMsg = item.status.messages?.find((m: [string, any]) => m[0] === "error")?.[1]
-					const rawError = errorMsg ? String(errorMsg) : "ComfyUI execution error"
-					// Try to extract node information from error messages
-					const nodeMatch = typeof errorMsg === "string" ? errorMsg.match(/Node\s+#?(\d+)/i) : null
-					const parsed = parseComfyUIError(rawError, undefined, {
-						nodeId: nodeMatch?.[1],
-						nodeClassType: "unknown",
-					})
-					throw new ComfyUIError({
-						...parsed,
-						message: rawError,
-					})
-				}
-				// Also check the messages array for execution errors (some ComfyUI versions
-				// report errors in messages without setting status_str)
-				const errorMessage = item?.status?.messages?.find(
-					(m: [string, any]) => m[0] === "error" || m[0] === "execution_error",
-				)
-				if (errorMessage) {
-					const rawError = String(errorMessage[1] ?? "ComfyUI execution error")
-					const parsed = parseComfyUIError(rawError)
-					throw new ComfyUIError({
-						...parsed,
-						message: rawError,
-					})
-				}
-
-				// Report that we found completion and are fetching the image
-				this.progress = { state: "running", progress: 90, stage: "fetching result" }
-				onProgress?.(this.progress)
-
-				// Find the first image or audio output
-				for (const nodeId of Object.keys(item.outputs)) {
-					const output = item.outputs[nodeId]
-
-					// Check for image outputs
-					if (output.images && output.images.length > 0) {
-						const img = output.images[0]
-						const imgRes = await fetch(
-							`${this.baseURL}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${encodeURIComponent(img.type)}`,
-						)
-						if (imgRes.ok) {
-							const blob = await imgRes.arrayBuffer()
-							const base64 = Buffer.from(blob).toString("base64")
-
-							this.progress = { state: "running", progress: 95, stage: "decoding result" }
-							onProgress?.(this.progress)
-
-							return `data:image/${img.filename.endsWith(".png") ? "png" : "jpeg"};base64,${base64}`
-						}
-					}
-
-					// Check for audio outputs (e.g. from SaveAudio node)
-					if (output.audio && output.audio.length > 0) {
-						const aud = output.audio[0]
-						const audRes = await fetch(
-							`${this.baseURL}/view?filename=${encodeURIComponent(aud.filename)}&subfolder=${encodeURIComponent(aud.subfolder)}&type=${encodeURIComponent(aud.type)}`,
-						)
-						if (audRes.ok) {
-							const blob = await audRes.arrayBuffer()
-							const base64 = Buffer.from(blob).toString("base64")
-
-							this.progress = { state: "running", progress: 95, stage: "decoding result" }
-							onProgress?.(this.progress)
-
-							// Determine MIME type from the audio filename extension
-							const ext = aud.filename.split(".").pop()?.toLowerCase() || "wav"
-							return `data:audio/${ext};base64,${base64}`
-						}
-					}
-				}
-				// Completed but no image or audio outputs found
-				return null
-			} catch {
-				// network hiccup, retry
-				continue
+			return null
+		} finally {
+			if (this.activeAbortController === abortController) {
+				this.activeAbortController = null
 			}
 		}
-		return null
 	}
 
 	private async uploadImage(dataUrl: string): Promise<string> {

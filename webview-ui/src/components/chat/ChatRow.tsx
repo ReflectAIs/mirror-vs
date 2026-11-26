@@ -2106,7 +2106,13 @@ export const ChatRowContent = ({
 					)
 				}
 				case "progress":
-					return <ImageProgressRow text={message.text} partial={message.partial} />
+					return (
+						<ImageProgressRow
+							text={message.text}
+							partial={message.partial}
+							isStreaming={isStreaming && isLast}
+						/>
+					)
 				default:
 					return (
 						<>

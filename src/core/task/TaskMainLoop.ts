@@ -727,9 +727,10 @@ export class TaskMainLoop {
 						const nextPromise = iterator.next()
 
 						// If we have an abort controller, race it with the next chunk
-						if (this.task.currentRequestAbortController) {
+						const abortController = this.task.currentRequestAbortController
+						if (abortController) {
 							const abortPromise = new Promise<never>((_, reject) => {
-								const signal = this.task.currentRequestAbortController!.signal
+								const signal = abortController.signal
 								if (signal.aborted) {
 									reject(new Error("Request cancelled by user"))
 								} else {

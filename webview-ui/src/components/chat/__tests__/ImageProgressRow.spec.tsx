@@ -8,6 +8,7 @@ vi.mock("lucide-react", () => ({
 	Sparkles: () => <svg data-testid="icon-sparkles" />,
 	ImageIcon: () => <svg data-testid="icon-image" />,
 	LoaderCircle: () => <svg data-testid="icon-loader" />,
+	Square: () => <svg data-testid="icon-square" />,
 }))
 
 // Mock CircularProgress
@@ -209,5 +210,16 @@ describe("ImageProgressRow", () => {
 		const { container } = render(<ImageProgressRow text={JSON.stringify(data)} />)
 		const progress = container.querySelector("[data-testid='circular-progress']")
 		expect(progress?.getAttribute("data-percentage")).toBe("0")
+	})
+
+	it("should mark incomplete image generation as cancelled when isStreaming is false (e.g. after reload)", () => {
+		const data = {
+			stage: "Generating image...",
+			progress: 45,
+			state: "running",
+		}
+		render(<ImageProgressRow text={JSON.stringify(data)} partial={true} isStreaming={false} />)
+		expect(screen.getByText("Image generation cancelled")).toBeInTheDocument()
+		expect(screen.queryByTestId("gemini-image-placeholder")).not.toBeInTheDocument()
 	})
 })

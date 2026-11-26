@@ -532,4 +532,29 @@ describe("getEnvironmentDetails", () => {
 		expect(result).not.toContain("# Current Time")
 		expect(result).not.toContain("# Workspace Pulse")
 	})
+
+	it("should omit unchanged # Git Status on intermediate turns and re-include it when git status changes", async () => {
+		const { getGitStatus } = await import("../../../utils/git")
+		vi.mocked(getGitStatus).mockResolvedValue(" M src/app.ts\n M src/utils.ts")
+		mockProvider.getState.mockResolvedValue({
+			...mockState,
+			maxGitStatusFiles: 20,
+			apiConfiguration: { todoListEnabled: false },
+		})
+
+		// First (initial) turn includes Git Status
+		const first = await getEnvironmentDetails(mockMirror as Task, false)
+		expect(first).toContain("# Git Status")
+		expect(first).toContain("M src/app.ts")
+
+		// Second (intermediate) turn with identical git status omits it
+		const second = await getEnvironmentDetails(mockMirror as Task, false, undefined, { isIntermediateTurn: true })
+		expect(second).not.toContain("# Git Status")
+
+		// Third (intermediate) turn after git status changes re-includes it
+		vi.mocked(getGitStatus).mockResolvedValue(" M src/app.ts\n M src/new-file.ts")
+		const third = await getEnvironmentDetails(mockMirror as Task, false, undefined, { isIntermediateTurn: true })
+		expect(third).toContain("# Git Status")
+		expect(third).toContain("M src/new-file.ts")
+	})
 })

@@ -1,7 +1,8 @@
 import React, { useMemo } from "react"
-import { Sparkles, ImageIcon, LoaderCircle } from "lucide-react"
+import { Sparkles, ImageIcon, LoaderCircle, Square } from "lucide-react"
 import { CircularProgress } from "../ui/circular-progress"
 import { cn } from "@/lib/utils"
+import { vscode } from "@/utils/vscode"
 
 interface ImageProgressData {
 	stage?: string
@@ -17,6 +18,7 @@ interface ImageProgressData {
 interface ImageProgressRowProps {
 	text?: string
 	partial?: boolean
+	isStreaming?: boolean
 }
 
 /**
@@ -26,7 +28,7 @@ interface ImageProgressRowProps {
  *
  * The `text` field is expected to contain a JSON string matching ImageProgressData.
  */
-export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partial }) => {
+export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partial, isStreaming = true }) => {
 	const data = useMemo<ImageProgressData | null>(() => {
 		if (!text) return null
 		try {
@@ -42,9 +44,10 @@ export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partia
 
 	const { progress, stage, value, max, state, eta, currentNode, previewDataUrl } = data
 	const clampedProgress = Math.max(0, Math.min(100, progress ?? 0))
-	const isRunning = partial || state === "running" || state === "preparing"
 	const isComplete = state === "completed"
 	const isFailed = state === "failed"
+	const isInterrupted = !isStreaming && !isComplete && !isFailed
+	const isRunning = !isInterrupted && (partial || state === "running" || state === "preparing")
 
 	// Determine icon and label color based on state
 	const iconColor = isFailed
@@ -55,7 +58,7 @@ export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partia
 
 	const IconComponent = isFailed ? LoaderCircle : isComplete ? Sparkles : ImageIcon
 
-	const stageLabel = stage || "generating"
+	const stageLabel = isInterrupted ? "Image generation cancelled" : stage || "generating"
 	const stepInfo = value !== undefined && max !== undefined && max > 0 ? `${value}/${max}` : null
 	const etaInfo = eta !== undefined && eta > 0 ? `${Math.round(eta)}s` : null
 
@@ -84,6 +87,16 @@ export const ImageProgressRow: React.FC<ImageProgressRowProps> = ({ text, partia
 						<span className="font-medium text-sm text-vscode-foreground truncate">{stageLabel}</span>
 						{isRunning && (
 							<LoaderCircle className="size-3 shrink-0 animate-spin text-vscode-descriptionForeground" />
+						)}
+						{isRunning && !isComplete && !isFailed && (
+							<button
+								type="button"
+								onClick={() => vscode.postMessage({ type: "cancelImageGeneration" } as any)}
+								className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-vscode-button-secondaryBackground hover:bg-vscode-button-secondaryHoverBackground text-vscode-button-secondaryForeground border border-vscode-editorGroup-border/50 cursor-pointer transition-colors"
+								title="Interrupt image generation">
+								<Square className="size-2.5 fill-current" />
+								<span>Stop</span>
+							</button>
 						)}
 					</div>
 

@@ -676,8 +676,9 @@ export class TaskApiRequest {
 		// even if Tesseract.js OCR hangs on a large user-attached image.
 		// Previously this was created 72 lines later (after tool building), meaning
 		// a hanging OCR call would prevent both the API request AND the cancel button.
-		this.task.currentRequestAbortController = new AbortController()
-		const imageCleanupAbortSignal = this.task.currentRequestAbortController.signal
+		const requestAbortController = new AbortController()
+		this.task.currentRequestAbortController = requestAbortController
+		const imageCleanupAbortSignal = requestAbortController.signal
 
 		const messagesWithoutImages = await Promise.race([
 			maybeRemoveImageBlocks(prunedForApi, this.task.api),
@@ -761,7 +762,7 @@ export class TaskApiRequest {
 				: {}),
 		}
 
-		const abortSignal = this.task.currentRequestAbortController!.signal
+		const abortSignal = (this.task.currentRequestAbortController ?? requestAbortController).signal
 		// Reset the flag after using it
 		this.task.skipPrevResponseIdOnce = false
 

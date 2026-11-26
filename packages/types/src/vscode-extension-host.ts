@@ -609,6 +609,7 @@ export interface WebviewMessage {
 		| "readFileContent"
 		| "openMention"
 		| "cancelTask"
+		| "cancelImageGeneration"
 		| "cancelAutoApproval"
 		| "updateVSCodeSetting"
 		| "getVSCodeSetting"
