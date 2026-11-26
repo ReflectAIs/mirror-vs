@@ -187,6 +187,20 @@ export function inferModelSupportsImages(modelId?: string, explicitSupportsImage
 		lower.includes("cogvlm") ||
 		lower.includes("llava") ||
 		lower.includes("glm-4v") ||
+		lower.includes("glm-4.5v") ||
+		lower.includes("glm-4.6v") ||
+		lower.includes("glm-5") ||
+		lower.includes("deepseek-v4") ||
+		lower.includes("qwen3.5") ||
+		lower.includes("qwen3.8") ||
+		lower.includes("gemma-3") ||
+		lower.includes("llama-4") ||
+		lower.includes("grok-3") ||
+		lower.includes("grok-4") ||
+		lower.includes("mistral-small-3.1") ||
+		lower.includes("mistral-medium-3") ||
+		lower.includes("o3") ||
+		lower.includes("o4") ||
 		lower.includes("kimi-k3") ||
 		lower.includes("kimi-k2.5") ||
 		lower.includes("paligemma") ||
@@ -199,7 +213,7 @@ export function inferModelSupportsImages(modelId?: string, explicitSupportsImage
 
 	// Known text-only architectures (must not match if explicit vision tag was present)
 	const isKnownNonVision =
-		(lower.includes("deepseek") && !lower.includes("vl")) ||
+		(lower.includes("deepseek") && !lower.includes("vl") && !lower.includes("v4")) ||
 		lower.includes("codestral") ||
 		(lower.includes("qwen") && !lower.includes("vl")) ||
 		lower.includes("llama-3.1") ||

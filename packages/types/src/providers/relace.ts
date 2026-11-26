@@ -21,7 +21,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"deepseek-ai/DeepSeek-V4.1-Flash": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.2,
 		outputPrice: 0.6,
@@ -32,7 +32,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"deepseek-ai/DeepSeek-V4.1-Flash-1017": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.2,
 		outputPrice: 0.6,
@@ -43,7 +43,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"deepseek-ai/DeepSeek-V4-Flash-0731": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.2,
 		outputPrice: 0.6,
@@ -54,7 +54,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"deepseek-ai/DeepSeek-V4-Flash-0423": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.2,
 		outputPrice: 0.6,
@@ -65,7 +65,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"deepseek-ai/DeepSeek-V4-Pro": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.75,
 		outputPrice: 2.4,
@@ -76,7 +76,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"deepseek-ai/DeepSeek-V4-Pro-0813": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.75,
 		outputPrice: 2.4,
@@ -116,7 +116,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"z-ai/glm-5.3": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.75,
 		outputPrice: 2.4,
@@ -126,7 +126,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"z-ai/glm-5.3-flash": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.075,
 		outputPrice: 0.5,
@@ -137,7 +137,7 @@ export const relaceModels: Record<RelaceModelId, ModelInfo> = {
 	"z-ai/glm-5.2": {
 		maxTokens: 131072,
 		contextWindow: 1048576,
-		supportsImages: false,
+		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 0.5,
 		outputPrice: 1.8,
